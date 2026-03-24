@@ -1,0 +1,385 @@
+
+-- ============================================================
+-- PHASE 3 — W1: Migrate legacy finance:read/manage → granular RBAC
+-- W3: Rateio sum validation trigger
+-- W4: Mandatory justificativa trigger
+-- ============================================================
+
+-- ─────────────────────────────────────────────────────────────
+-- W1: DROP ALL LEGACY POLICIES & RECREATE WITH GRANULAR KEYS
+-- Classification: SAFE (additive replacement, no data change)
+-- ─────────────────────────────────────────────────────────────
+
+-- ═══ fin_categorias (financeiro:cadastros) ═══
+DROP POLICY IF EXISTS tenant_read ON public.fin_categorias;
+DROP POLICY IF EXISTS tenant_insert ON public.fin_categorias;
+DROP POLICY IF EXISTS tenant_update ON public.fin_categorias;
+DROP POLICY IF EXISTS tenant_delete ON public.fin_categorias;
+
+CREATE POLICY "fin_categorias_select" ON public.fin_categorias FOR SELECT
+  USING (company_id = get_current_company_id()
+    AND has_any_permission(auth.uid(), ARRAY['financeiro:cadastros:view','system:global:manage']));
+
+CREATE POLICY "fin_categorias_insert" ON public.fin_categorias FOR INSERT
+  WITH CHECK (company_id = get_current_company_id()
+    AND has_any_permission(auth.uid(), ARRAY['financeiro:cadastros:create','financeiro:cadastros:manage','system:global:manage']));
+
+CREATE POLICY "fin_categorias_update" ON public.fin_categorias FOR UPDATE
+  USING (company_id = get_current_company_id()
+    AND has_any_permission(auth.uid(), ARRAY['financeiro:cadastros:edit','financeiro:cadastros:manage','system:global:manage']));
+
+CREATE POLICY "fin_categorias_delete" ON public.fin_categorias FOR DELETE
+  USING (company_id = get_current_company_id()
+    AND has_any_permission(auth.uid(), ARRAY['financeiro:cadastros:delete','financeiro:cadastros:manage','system:global:manage']));
+
+-- ═══ fin_centros_custo (financeiro:cadastros) ═══
+DROP POLICY IF EXISTS tenant_read ON public.fin_centros_custo;
+DROP POLICY IF EXISTS tenant_insert ON public.fin_centros_custo;
+DROP POLICY IF EXISTS tenant_update ON public.fin_centros_custo;
+DROP POLICY IF EXISTS tenant_delete ON public.fin_centros_custo;
+
+CREATE POLICY "fin_centros_custo_select" ON public.fin_centros_custo FOR SELECT
+  USING (company_id = get_current_company_id()
+    AND has_any_permission(auth.uid(), ARRAY['financeiro:cadastros:view','system:global:manage']));
+
+CREATE POLICY "fin_centros_custo_insert" ON public.fin_centros_custo FOR INSERT
+  WITH CHECK (company_id = get_current_company_id()
+    AND has_any_permission(auth.uid(), ARRAY['financeiro:cadastros:create','financeiro:cadastros:manage','system:global:manage']));
+
+CREATE POLICY "fin_centros_custo_update" ON public.fin_centros_custo FOR UPDATE
+  USING (company_id = get_current_company_id()
+    AND has_any_permission(auth.uid(), ARRAY['financeiro:cadastros:edit','financeiro:cadastros:manage','system:global:manage']));
+
+CREATE POLICY "fin_centros_custo_delete" ON public.fin_centros_custo FOR DELETE
+  USING (company_id = get_current_company_id()
+    AND has_any_permission(auth.uid(), ARRAY['financeiro:cadastros:delete','financeiro:cadastros:manage','system:global:manage']));
+
+-- ═══ fin_plano_contas (financeiro:cadastros) ═══
+DROP POLICY IF EXISTS tenant_read ON public.fin_plano_contas;
+DROP POLICY IF EXISTS tenant_insert ON public.fin_plano_contas;
+DROP POLICY IF EXISTS tenant_update ON public.fin_plano_contas;
+DROP POLICY IF EXISTS tenant_delete ON public.fin_plano_contas;
+
+CREATE POLICY "fin_plano_contas_select" ON public.fin_plano_contas FOR SELECT
+  USING (company_id = get_current_company_id()
+    AND has_any_permission(auth.uid(), ARRAY['financeiro:cadastros:view','system:global:manage']));
+
+CREATE POLICY "fin_plano_contas_insert" ON public.fin_plano_contas FOR INSERT
+  WITH CHECK (company_id = get_current_company_id()
+    AND has_any_permission(auth.uid(), ARRAY['financeiro:cadastros:create','financeiro:cadastros:manage','system:global:manage']));
+
+CREATE POLICY "fin_plano_contas_update" ON public.fin_plano_contas FOR UPDATE
+  USING (company_id = get_current_company_id()
+    AND has_any_permission(auth.uid(), ARRAY['financeiro:cadastros:edit','financeiro:cadastros:manage','system:global:manage']));
+
+CREATE POLICY "fin_plano_contas_delete" ON public.fin_plano_contas FOR DELETE
+  USING (company_id = get_current_company_id()
+    AND has_any_permission(auth.uid(), ARRAY['financeiro:cadastros:delete','financeiro:cadastros:manage','system:global:manage']));
+
+-- ═══ fin_contas (financeiro:contas) — SELECT already granular, fix mutations ═══
+DROP POLICY IF EXISTS tenant_insert ON public.fin_contas;
+DROP POLICY IF EXISTS tenant_update ON public.fin_contas;
+DROP POLICY IF EXISTS tenant_delete ON public.fin_contas;
+
+CREATE POLICY "fin_contas_insert" ON public.fin_contas FOR INSERT
+  WITH CHECK (company_id = get_current_company_id()
+    AND has_any_permission(auth.uid(), ARRAY['financeiro:contas:create','system:global:manage']));
+
+CREATE POLICY "fin_contas_update" ON public.fin_contas FOR UPDATE
+  USING (company_id = get_current_company_id()
+    AND has_any_permission(auth.uid(), ARRAY['financeiro:contas:edit','system:global:manage']));
+
+CREATE POLICY "fin_contas_delete" ON public.fin_contas FOR DELETE
+  USING (company_id = get_current_company_id()
+    AND has_any_permission(auth.uid(), ARRAY['financeiro:contas:delete','system:global:manage']));
+
+-- ═══ fin_lancamentos (financeiro:lancamentos) — SELECT already granular, fix mutations ═══
+DROP POLICY IF EXISTS tenant_insert ON public.fin_lancamentos;
+DROP POLICY IF EXISTS tenant_update ON public.fin_lancamentos;
+DROP POLICY IF EXISTS tenant_delete ON public.fin_lancamentos;
+
+CREATE POLICY "fin_lancamentos_insert" ON public.fin_lancamentos FOR INSERT
+  WITH CHECK (company_id = get_current_company_id()
+    AND has_any_permission(auth.uid(), ARRAY['financeiro:lancamentos:create','system:global:manage']));
+
+CREATE POLICY "fin_lancamentos_update" ON public.fin_lancamentos FOR UPDATE
+  USING (company_id = get_current_company_id()
+    AND has_any_permission(auth.uid(), ARRAY['financeiro:lancamentos:edit','system:global:manage']));
+
+CREATE POLICY "fin_lancamentos_delete" ON public.fin_lancamentos FOR DELETE
+  USING (company_id = get_current_company_id()
+    AND has_any_permission(auth.uid(), ARRAY['financeiro:lancamentos:delete','system:global:manage']));
+
+-- ═══ fin_contas_pagar (financeiro:pagar) — SELECT already granular, fix mutations ═══
+DROP POLICY IF EXISTS tenant_insert ON public.fin_contas_pagar;
+DROP POLICY IF EXISTS tenant_update ON public.fin_contas_pagar;
+DROP POLICY IF EXISTS tenant_delete ON public.fin_contas_pagar;
+
+CREATE POLICY "fin_contas_pagar_insert" ON public.fin_contas_pagar FOR INSERT
+  WITH CHECK (company_id = get_current_company_id()
+    AND has_any_permission(auth.uid(), ARRAY['financeiro:pagar:create','system:global:manage']));
+
+CREATE POLICY "fin_contas_pagar_update" ON public.fin_contas_pagar FOR UPDATE
+  USING (company_id = get_current_company_id()
+    AND has_any_permission(auth.uid(), ARRAY['financeiro:pagar:edit','financeiro:pagar:approve','system:global:manage']));
+
+CREATE POLICY "fin_contas_pagar_delete" ON public.fin_contas_pagar FOR DELETE
+  USING (company_id = get_current_company_id()
+    AND has_any_permission(auth.uid(), ARRAY['financeiro:pagar:delete','system:global:manage']));
+
+-- ═══ fin_contas_receber (financeiro:receber) — SELECT already granular, fix mutations ═══
+DROP POLICY IF EXISTS tenant_insert ON public.fin_contas_receber;
+DROP POLICY IF EXISTS tenant_update ON public.fin_contas_receber;
+DROP POLICY IF EXISTS tenant_delete ON public.fin_contas_receber;
+
+CREATE POLICY "fin_contas_receber_insert" ON public.fin_contas_receber FOR INSERT
+  WITH CHECK (company_id = get_current_company_id()
+    AND has_any_permission(auth.uid(), ARRAY['financeiro:receber:create','system:global:manage']));
+
+CREATE POLICY "fin_contas_receber_update" ON public.fin_contas_receber FOR UPDATE
+  USING (company_id = get_current_company_id()
+    AND has_any_permission(auth.uid(), ARRAY['financeiro:receber:edit','system:global:manage']));
+
+CREATE POLICY "fin_contas_receber_delete" ON public.fin_contas_receber FOR DELETE
+  USING (company_id = get_current_company_id()
+    AND has_any_permission(auth.uid(), ARRAY['financeiro:receber:delete','system:global:manage']));
+
+-- ═══ fin_dre_linhas (financeiro:dre) ═══
+DROP POLICY IF EXISTS tenant_read ON public.fin_dre_linhas;
+DROP POLICY IF EXISTS tenant_insert ON public.fin_dre_linhas;
+DROP POLICY IF EXISTS tenant_update ON public.fin_dre_linhas;
+DROP POLICY IF EXISTS tenant_delete ON public.fin_dre_linhas;
+
+CREATE POLICY "fin_dre_linhas_select" ON public.fin_dre_linhas FOR SELECT
+  USING (company_id = get_current_company_id()
+    AND has_any_permission(auth.uid(), ARRAY['financeiro:dre:view','system:global:manage']));
+
+CREATE POLICY "fin_dre_linhas_insert" ON public.fin_dre_linhas FOR INSERT
+  WITH CHECK (company_id = get_current_company_id()
+    AND has_any_permission(auth.uid(), ARRAY['financeiro:cadastros:create','financeiro:cadastros:manage','system:global:manage']));
+
+CREATE POLICY "fin_dre_linhas_update" ON public.fin_dre_linhas FOR UPDATE
+  USING (company_id = get_current_company_id()
+    AND has_any_permission(auth.uid(), ARRAY['financeiro:cadastros:edit','financeiro:cadastros:manage','system:global:manage']));
+
+CREATE POLICY "fin_dre_linhas_delete" ON public.fin_dre_linhas FOR DELETE
+  USING (company_id = get_current_company_id()
+    AND has_any_permission(auth.uid(), ARRAY['financeiro:cadastros:delete','financeiro:cadastros:manage','system:global:manage']));
+
+-- ═══ fin_orcamentos (financeiro:orcamento) ═══
+DROP POLICY IF EXISTS tenant_read ON public.fin_orcamentos;
+DROP POLICY IF EXISTS tenant_insert ON public.fin_orcamentos;
+DROP POLICY IF EXISTS tenant_update ON public.fin_orcamentos;
+DROP POLICY IF EXISTS tenant_delete ON public.fin_orcamentos;
+
+CREATE POLICY "fin_orcamentos_select" ON public.fin_orcamentos FOR SELECT
+  USING (company_id = get_current_company_id()
+    AND has_any_permission(auth.uid(), ARRAY['financeiro:orcamento:view','system:global:manage']));
+
+CREATE POLICY "fin_orcamentos_insert" ON public.fin_orcamentos FOR INSERT
+  WITH CHECK (company_id = get_current_company_id()
+    AND has_any_permission(auth.uid(), ARRAY['financeiro:orcamento:edit','system:global:manage']));
+
+CREATE POLICY "fin_orcamentos_update" ON public.fin_orcamentos FOR UPDATE
+  USING (company_id = get_current_company_id()
+    AND has_any_permission(auth.uid(), ARRAY['financeiro:orcamento:edit','system:global:manage']));
+
+CREATE POLICY "fin_orcamentos_delete" ON public.fin_orcamentos FOR DELETE
+  USING (company_id = get_current_company_id()
+    AND has_any_permission(auth.uid(), ARRAY['financeiro:orcamento:edit','system:global:manage']));
+
+-- ═══ fin_lancamento_rateios (financeiro:lancamentos) ═══
+DROP POLICY IF EXISTS tenant_read ON public.fin_lancamento_rateios;
+DROP POLICY IF EXISTS tenant_insert ON public.fin_lancamento_rateios;
+DROP POLICY IF EXISTS tenant_update ON public.fin_lancamento_rateios;
+DROP POLICY IF EXISTS tenant_delete ON public.fin_lancamento_rateios;
+
+CREATE POLICY "fin_lancamento_rateios_select" ON public.fin_lancamento_rateios FOR SELECT
+  USING (company_id = get_current_company_id()
+    AND has_any_permission(auth.uid(), ARRAY['financeiro:lancamentos:view','system:global:manage']));
+
+CREATE POLICY "fin_lancamento_rateios_insert" ON public.fin_lancamento_rateios FOR INSERT
+  WITH CHECK (company_id = get_current_company_id()
+    AND has_any_permission(auth.uid(), ARRAY['financeiro:lancamentos:create','financeiro:lancamentos:edit','system:global:manage']));
+
+CREATE POLICY "fin_lancamento_rateios_update" ON public.fin_lancamento_rateios FOR UPDATE
+  USING (company_id = get_current_company_id()
+    AND has_any_permission(auth.uid(), ARRAY['financeiro:lancamentos:edit','system:global:manage']));
+
+CREATE POLICY "fin_lancamento_rateios_delete" ON public.fin_lancamento_rateios FOR DELETE
+  USING (company_id = get_current_company_id()
+    AND has_any_permission(auth.uid(), ARRAY['financeiro:lancamentos:delete','system:global:manage']));
+
+-- ═══ fin_rateios (legacy table, financeiro:lancamentos) ═══
+DROP POLICY IF EXISTS tenant_read ON public.fin_rateios;
+DROP POLICY IF EXISTS tenant_insert ON public.fin_rateios;
+DROP POLICY IF EXISTS tenant_update ON public.fin_rateios;
+DROP POLICY IF EXISTS tenant_delete ON public.fin_rateios;
+
+CREATE POLICY "fin_rateios_select" ON public.fin_rateios FOR SELECT
+  USING (company_id = get_current_company_id()
+    AND has_any_permission(auth.uid(), ARRAY['financeiro:lancamentos:view','system:global:manage']));
+
+CREATE POLICY "fin_rateios_insert" ON public.fin_rateios FOR INSERT
+  WITH CHECK (company_id = get_current_company_id()
+    AND has_any_permission(auth.uid(), ARRAY['financeiro:lancamentos:create','financeiro:lancamentos:edit','system:global:manage']));
+
+CREATE POLICY "fin_rateios_update" ON public.fin_rateios FOR UPDATE
+  USING (company_id = get_current_company_id()
+    AND has_any_permission(auth.uid(), ARRAY['financeiro:lancamentos:edit','system:global:manage']));
+
+CREATE POLICY "fin_rateios_delete" ON public.fin_rateios FOR DELETE
+  USING (company_id = get_current_company_id()
+    AND has_any_permission(auth.uid(), ARRAY['financeiro:lancamentos:delete','system:global:manage']));
+
+-- ═══ fin_regras_categorizacao (financeiro:categorizacao) ═══
+DROP POLICY IF EXISTS tenant_read ON public.fin_regras_categorizacao;
+DROP POLICY IF EXISTS tenant_insert ON public.fin_regras_categorizacao;
+DROP POLICY IF EXISTS tenant_update ON public.fin_regras_categorizacao;
+DROP POLICY IF EXISTS tenant_delete ON public.fin_regras_categorizacao;
+
+CREATE POLICY "fin_regras_categorizacao_select" ON public.fin_regras_categorizacao FOR SELECT
+  USING (company_id = get_current_company_id()
+    AND has_any_permission(auth.uid(), ARRAY['financeiro:categorizacao:view','system:global:manage']));
+
+CREATE POLICY "fin_regras_categorizacao_insert" ON public.fin_regras_categorizacao FOR INSERT
+  WITH CHECK (company_id = get_current_company_id()
+    AND has_any_permission(auth.uid(), ARRAY['financeiro:categorizacao:manage','system:global:manage']));
+
+CREATE POLICY "fin_regras_categorizacao_update" ON public.fin_regras_categorizacao FOR UPDATE
+  USING (company_id = get_current_company_id()
+    AND has_any_permission(auth.uid(), ARRAY['financeiro:categorizacao:manage','system:global:manage']));
+
+CREATE POLICY "fin_regras_categorizacao_delete" ON public.fin_regras_categorizacao FOR DELETE
+  USING (company_id = get_current_company_id()
+    AND has_any_permission(auth.uid(), ARRAY['financeiro:categorizacao:manage','system:global:manage']));
+
+-- ═══ financeiro_fechamento_caixa — remove finance:read/manage from has_any_permission ═══
+DROP POLICY IF EXISTS fechamento_select ON public.financeiro_fechamento_caixa;
+DROP POLICY IF EXISTS fechamento_insert ON public.financeiro_fechamento_caixa;
+DROP POLICY IF EXISTS fechamento_update ON public.financeiro_fechamento_caixa;
+DROP POLICY IF EXISTS fechamento_delete ON public.financeiro_fechamento_caixa;
+
+CREATE POLICY "fechamento_caixa_select" ON public.financeiro_fechamento_caixa FOR SELECT
+  USING (company_id = get_current_company_id()
+    AND has_any_permission(auth.uid(), ARRAY[
+      'financeiro:fechamento:view','financeiro:lancamentos:view',
+      'cmv:categoria:view','cmv:semanal:view','system:global:manage'
+    ]));
+
+CREATE POLICY "fechamento_caixa_insert" ON public.financeiro_fechamento_caixa FOR INSERT
+  WITH CHECK (company_id = get_current_company_id()
+    AND has_any_permission(auth.uid(), ARRAY['financeiro:fechamento:create','system:global:manage']));
+
+CREATE POLICY "fechamento_caixa_update" ON public.financeiro_fechamento_caixa FOR UPDATE
+  USING (company_id = get_current_company_id()
+    AND has_any_permission(auth.uid(), ARRAY['financeiro:fechamento:edit','system:global:manage']));
+
+CREATE POLICY "fechamento_caixa_delete" ON public.financeiro_fechamento_caixa FOR DELETE
+  USING (company_id = get_current_company_id()
+    AND has_any_permission(auth.uid(), ARRAY['financeiro:fechamento:delete','system:global:manage']));
+
+
+-- ─────────────────────────────────────────────────────────────
+-- W3: Rateio sum validation trigger on fin_lancamento_rateios
+-- Classification: SAFE (new trigger, only rejects invalid data)
+-- ─────────────────────────────────────────────────────────────
+
+CREATE OR REPLACE FUNCTION public.trg_validate_rateio_sum()
+RETURNS TRIGGER LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+DECLARE
+  v_lancamento_id uuid;
+  v_lancamento_valor numeric;
+  v_soma_rateios numeric;
+BEGIN
+  -- Determine which lancamento_id to check
+  IF TG_OP = 'DELETE' THEN
+    v_lancamento_id := OLD.lancamento_id;
+  ELSE
+    v_lancamento_id := NEW.lancamento_id;
+  END IF;
+
+  -- Lock the parent lancamento row
+  SELECT ABS(valor) INTO v_lancamento_valor
+  FROM fin_lancamentos
+  WHERE id = v_lancamento_id
+  FOR UPDATE;
+
+  IF v_lancamento_valor IS NULL THEN
+    RAISE EXCEPTION 'Lançamento não encontrado: %', v_lancamento_id
+      USING ERRCODE = 'P0002';
+  END IF;
+
+  -- Sum all rateios for this lancamento (excluding current row on DELETE)
+  IF TG_OP = 'DELETE' THEN
+    SELECT COALESCE(SUM(ABS(valor)), 0) INTO v_soma_rateios
+    FROM fin_lancamento_rateios
+    WHERE lancamento_id = v_lancamento_id AND id <> OLD.id;
+  ELSE
+    SELECT COALESCE(SUM(ABS(valor)), 0) INTO v_soma_rateios
+    FROM fin_lancamento_rateios
+    WHERE lancamento_id = v_lancamento_id AND id <> COALESCE(NEW.id, '00000000-0000-0000-0000-000000000000'::uuid);
+    -- Add the new/updated row's value
+    v_soma_rateios := v_soma_rateios + ABS(NEW.valor);
+  END IF;
+
+  -- Validate with 0.01 tolerance
+  IF v_soma_rateios > v_lancamento_valor + 0.01 THEN
+    RAISE EXCEPTION 'Soma dos rateios (%) excede o valor do lançamento (%). Diferença: %',
+      v_soma_rateios, v_lancamento_valor, v_soma_rateios - v_lancamento_valor
+      USING ERRCODE = 'P0001';
+  END IF;
+
+  IF TG_OP = 'DELETE' THEN
+    RETURN OLD;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_validate_rateio_sum ON public.fin_lancamento_rateios;
+CREATE TRIGGER trg_validate_rateio_sum
+  BEFORE INSERT OR UPDATE OR DELETE ON public.fin_lancamento_rateios
+  FOR EACH ROW EXECUTE FUNCTION public.trg_validate_rateio_sum();
+
+
+-- ─────────────────────────────────────────────────────────────
+-- W4: Mandatory justificativa_edicao on critical lancamento updates
+-- Classification: SAFE (new trigger, only rejects invalid edits)
+-- ─────────────────────────────────────────────────────────────
+
+CREATE OR REPLACE FUNCTION public.trg_validate_fin_lancamento_update()
+RETURNS TRIGGER LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+BEGIN
+  -- Only enforce when status is REALIZADO
+  IF OLD.status = 'REALIZADO' THEN
+    -- Check if critical fields changed
+    IF (
+      NEW.valor IS DISTINCT FROM OLD.valor
+      OR NEW.categoria_id IS DISTINCT FROM OLD.categoria_id
+      OR NEW.conta_id IS DISTINCT FROM OLD.conta_id
+      OR NEW.data_competencia IS DISTINCT FROM OLD.data_competencia
+      OR NEW.centro_custo_id IS DISTINCT FROM OLD.centro_custo_id
+    ) THEN
+      -- Require justificativa_edicao
+      IF NEW.justificativa_edicao IS NULL OR TRIM(NEW.justificativa_edicao) = '' THEN
+        RAISE EXCEPTION 'Justificativa obrigatória ao editar lançamento realizado (campos: valor, categoria, conta, data, centro de custo)'
+          USING ERRCODE = 'P0003';
+      END IF;
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_validate_fin_lancamento_update ON public.fin_lancamentos;
+CREATE TRIGGER trg_validate_fin_lancamento_update
+  BEFORE UPDATE ON public.fin_lancamentos
+  FOR EACH ROW EXECUTE FUNCTION public.trg_validate_fin_lancamento_update();

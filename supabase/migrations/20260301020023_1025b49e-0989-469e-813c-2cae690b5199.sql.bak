@@ -1,0 +1,141 @@
+
+-- Drop functions with wrong return types then recreate
+DROP FUNCTION IF EXISTS public.create_transfer(uuid,uuid,numeric,date,text,uuid);
+DROP FUNCTION IF EXISTS public.delete_transfer(uuid);
+DROP FUNCTION IF EXISTS public.update_transfer(uuid,uuid,uuid,numeric,date,text);
+DROP FUNCTION IF EXISTS public.get_stock_summary();
+DROP FUNCTION IF EXISTS public.get_inactive_stock_items();
+
+-- create_transfer
+CREATE FUNCTION public.create_transfer(p_conta_origem uuid, p_conta_destino uuid, p_valor numeric, p_data date, p_descricao text, p_created_by uuid DEFAULT NULL)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = 'public' AS $$
+DECLARE v_id uuid; v_company uuid;
+BEGIN
+  v_company := assert_tenant();
+  IF NOT has_permission(auth.uid(), 'finance:manage') THEN RAISE EXCEPTION 'Sem permissão'; END IF;
+  IF p_valor <= 0 THEN RAISE EXCEPTION 'Valor deve ser positivo'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM fin_contas WHERE id = p_conta_origem AND company_id = v_company) THEN RAISE EXCEPTION 'Conta origem não encontrada'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM fin_contas WHERE id = p_conta_destino AND company_id = v_company) THEN RAISE EXCEPTION 'Conta destino não encontrada'; END IF;
+  INSERT INTO fin_lancamentos (tipo, valor, data_competencia, descricao, conta_id, conta_destino_id, status, created_by, company_id)
+  VALUES ('TRANSFERENCIA', p_valor, p_data, COALESCE(p_descricao,'Transferência'), p_conta_origem, p_conta_destino, 'REALIZADO', COALESCE(p_created_by, auth.uid()), v_company)
+  RETURNING id INTO v_id;
+  RETURN jsonb_build_object('id', v_id);
+END; $$;
+
+-- delete_transfer
+CREATE FUNCTION public.delete_transfer(p_lancamento_id uuid)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = 'public' AS $$
+DECLARE v_company uuid;
+BEGIN
+  v_company := assert_tenant();
+  IF NOT has_permission(auth.uid(), 'finance:manage') THEN RAISE EXCEPTION 'Sem permissão'; END IF;
+  DELETE FROM fin_lancamentos WHERE id = p_lancamento_id AND company_id = v_company AND tipo = 'TRANSFERENCIA';
+  IF NOT FOUND THEN RAISE EXCEPTION 'Transferência não encontrada'; END IF;
+  RETURN jsonb_build_object('ok', true);
+END; $$;
+
+-- update_transfer
+CREATE FUNCTION public.update_transfer(p_lancamento_id uuid, p_conta_origem uuid, p_conta_destino uuid, p_valor numeric, p_data date, p_descricao text)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = 'public' AS $$
+DECLARE v_company uuid;
+BEGIN
+  v_company := assert_tenant();
+  IF NOT has_permission(auth.uid(), 'finance:manage') THEN RAISE EXCEPTION 'Sem permissão'; END IF;
+  IF p_valor <= 0 THEN RAISE EXCEPTION 'Valor positivo'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM fin_contas WHERE id = p_conta_origem AND company_id = v_company) THEN RAISE EXCEPTION 'Conta origem inválida'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM fin_contas WHERE id = p_conta_destino AND company_id = v_company) THEN RAISE EXCEPTION 'Conta destino inválida'; END IF;
+  UPDATE fin_lancamentos SET conta_id=p_conta_origem, conta_destino_id=p_conta_destino, valor=p_valor,
+    data_competencia=p_data, descricao=COALESCE(p_descricao,'Transferência'), updated_at=now()
+  WHERE id=p_lancamento_id AND company_id=v_company AND tipo='TRANSFERENCIA';
+  IF NOT FOUND THEN RAISE EXCEPTION 'Transferência não encontrada'; END IF;
+  RETURN jsonb_build_object('ok', true);
+END; $$;
+
+-- get_stock_summary (was json, now jsonb)
+CREATE FUNCTION public.get_stock_summary()
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = 'public' AS $$
+DECLARE v_company uuid; v_result jsonb;
+BEGIN
+  v_company := assert_tenant();
+  SELECT jsonb_build_object(
+    'total_ativos', (SELECT COUNT(*) FROM produtos WHERE ativo AND company_id = v_company),
+    'valor_estoque', COALESCE((
+      SELECT SUM(sub.saldo * sub.custo) FROM (
+        SELECT p.id, COALESCE(p.preco_custo, 0) AS custo,
+          COALESCE((SELECT SUM(CASE WHEN m.tipo IN ('ENTRADA_ESTORNO','SAIDA_ESTORNO') THEN 0 WHEN m.direction='IN' THEN m.quantidade ELSE -m.quantidade END)
+            FROM movimentacoes_estoque m WHERE m.produto_id=p.id AND m.status='ATIVO' AND m.company_id=v_company), 0) AS saldo
+        FROM produtos p WHERE p.ativo AND p.company_id = v_company
+      ) sub
+    ), 0),
+    'abaixo_minimo', (
+      SELECT COUNT(*) FROM produtos p WHERE p.ativo AND p.company_id = v_company AND p.estoque_minimo > 0
+        AND COALESCE((SELECT SUM(CASE WHEN m.tipo IN ('ENTRADA_ESTORNO','SAIDA_ESTORNO') THEN 0 WHEN m.direction='IN' THEN m.quantidade ELSE -m.quantidade END)
+          FROM movimentacoes_estoque m WHERE m.produto_id=p.id AND m.status='ATIVO' AND m.company_id=v_company), 0) < p.estoque_minimo
+    )
+  ) INTO v_result;
+  RETURN v_result;
+END; $$;
+
+-- get_inactive_stock_items (was json, now jsonb)
+CREATE FUNCTION public.get_inactive_stock_items()
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = 'public' AS $$
+DECLARE v_company uuid;
+BEGIN
+  v_company := assert_tenant();
+  RETURN (
+    SELECT COALESCE(jsonb_agg(row_to_json(sub)::jsonb), '[]'::jsonb)
+    FROM (
+      SELECT p.id, p.nome_produto, p.categoria, p.unidade, MAX(m.data) AS ultima_saida
+      FROM produtos p
+      LEFT JOIN movimentacoes_estoque m ON m.produto_id = p.id AND m.status = 'ATIVO' AND m.direction = 'OUT' AND m.company_id = v_company
+      WHERE p.ativo AND p.company_id = v_company
+      GROUP BY p.id, p.nome_produto, p.categoria, p.unidade
+      HAVING MAX(m.data) IS NULL OR MAX(m.data) < (CURRENT_DATE - interval '30 days')
+      ORDER BY ultima_saida NULLS FIRST LIMIT 20
+    ) sub
+  );
+END; $$;
+
+-- get_saldo_conta
+CREATE OR REPLACE FUNCTION public.get_saldo_conta(p_conta_id uuid)
+RETURNS numeric LANGUAGE plpgsql SECURITY DEFINER SET search_path = 'public' AS $$
+DECLARE v_saldo numeric; v_company uuid;
+BEGIN
+  v_company := assert_tenant();
+  IF NOT EXISTS (SELECT 1 FROM fin_contas WHERE id = p_conta_id AND company_id = v_company) THEN RAISE EXCEPTION 'Conta não encontrada'; END IF;
+  SELECT COALESCE(saldo_inicial, 0) INTO v_saldo FROM fin_contas WHERE id = p_conta_id;
+  v_saldo := v_saldo + COALESCE((
+    SELECT SUM(CASE
+      WHEN tipo = 'TRANSFERENCIA' AND conta_id = p_conta_id THEN -valor
+      WHEN tipo = 'TRANSFERENCIA' AND conta_destino_id = p_conta_id THEN valor
+      WHEN tipo = 'RECEITA' AND conta_id = p_conta_id THEN valor
+      WHEN tipo = 'DESPESA' AND conta_id = p_conta_id THEN -valor ELSE 0 END)
+    FROM fin_lancamentos WHERE status = 'REALIZADO' AND company_id = v_company
+      AND (conta_id = p_conta_id OR conta_destino_id = p_conta_id)
+  ), 0);
+  RETURN ROUND(v_saldo, 2);
+END; $$;
+
+-- get_saldo_produto
+CREATE OR REPLACE FUNCTION public.get_saldo_produto(p_produto_id uuid)
+RETURNS numeric LANGUAGE plpgsql SECURITY DEFINER SET search_path = 'public' AS $$
+DECLARE v_saldo numeric; v_company uuid;
+BEGIN
+  v_company := assert_tenant();
+  SELECT COALESCE(SUM(CASE WHEN tipo IN ('ENTRADA_ESTORNO','SAIDA_ESTORNO') THEN 0 WHEN direction = 'IN' THEN quantidade ELSE -quantidade END), 0) INTO v_saldo
+  FROM movimentacoes_estoque WHERE produto_id = p_produto_id AND status = 'ATIVO' AND company_id = v_company;
+  RETURN ROUND(v_saldo, 4);
+END; $$;
+
+-- get_saldo_produtos (batch)
+CREATE OR REPLACE FUNCTION public.get_saldo_produtos(p_produto_ids uuid[])
+RETURNS TABLE(produto_id uuid, saldo numeric) LANGUAGE plpgsql SECURITY DEFINER SET search_path = 'public' AS $$
+DECLARE v_company uuid;
+BEGIN
+  v_company := assert_tenant();
+  RETURN QUERY
+  SELECT m.produto_id, ROUND(COALESCE(SUM(CASE WHEN m.tipo IN ('ENTRADA_ESTORNO','SAIDA_ESTORNO') THEN 0 WHEN m.direction = 'IN' THEN m.quantidade ELSE -m.quantidade END), 0), 4)
+  FROM movimentacoes_estoque m
+  WHERE m.produto_id = ANY(p_produto_ids) AND m.status = 'ATIVO' AND m.company_id = v_company
+  GROUP BY m.produto_id;
+END; $$;

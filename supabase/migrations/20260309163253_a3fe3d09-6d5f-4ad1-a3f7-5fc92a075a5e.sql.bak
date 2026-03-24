@@ -1,0 +1,277 @@
+
+-- 1. Create recalc_product_costs function
+CREATE OR REPLACE FUNCTION recalc_product_costs(p_produto_id uuid)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_last RECORD;
+  v_avg30 RECORD;
+BEGIN
+  SELECT m.custo_unitario, m.data, 
+         CASE 
+           WHEN m.reference_type = 'SALMON_ENTRY' THEN (SELECT supplier_name FROM salmon_entries WHERE id = m.reference_id::uuid AND status = 'ACTIVE' LIMIT 1)
+           WHEN m.reference_type = 'PURCHASE_ORDER_ITEM' THEN (
+             SELECT po.supplier_name FROM purchase_orders po
+             JOIN purchase_order_items poi ON poi.order_id = po.id
+             WHERE 'POI:' || poi.id::text = m.reference_id AND poi.deleted_at IS NULL
+             LIMIT 1
+           )
+           ELSE NULL
+         END as supplier_name
+  INTO v_last
+  FROM movimentacoes_estoque m
+  WHERE m.produto_id = p_produto_id
+    AND m.status = 'ATIVO'
+    AND m.cancelado_em IS NULL
+    AND m.direction = 'IN'
+    AND m.tipo = 'ENTRADA'
+    AND m.custo_unitario > 0
+  ORDER BY m.data DESC, m.created_at DESC
+  LIMIT 1;
+
+  SELECT 
+    COALESCE(AVG(m.custo_unitario), 0) as avg_cost,
+    COUNT(*) as cnt
+  INTO v_avg30
+  FROM movimentacoes_estoque m
+  WHERE m.produto_id = p_produto_id
+    AND m.status = 'ATIVO'
+    AND m.cancelado_em IS NULL
+    AND m.direction = 'IN'
+    AND m.tipo = 'ENTRADA'
+    AND m.custo_unitario > 0
+    AND m.data >= (CURRENT_DATE - interval '30 days')::date;
+
+  UPDATE produtos SET
+    last_cost_base_unit = COALESCE(v_last.custo_unitario, 0),
+    last_cost_purchase_unit = COALESCE(v_last.custo_unitario, 0),
+    last_purchase_date = CASE WHEN v_last.data IS NOT NULL THEN v_last.data::text ELSE NULL END,
+    last_supplier = v_last.supplier_name,
+    custo_ultima_compra = COALESCE(v_last.custo_unitario, 0),
+    avg30_cost_base_unit = CASE WHEN v_avg30.cnt > 0 THEN ROUND(v_avg30.avg_cost::numeric, 4) ELSE 0 END,
+    avg30_cost_purchase_unit = CASE WHEN v_avg30.cnt > 0 THEN ROUND(v_avg30.avg_cost::numeric, 4) ELSE 0 END,
+    custo_medio_30d = CASE WHEN v_avg30.cnt > 0 THEN ROUND(v_avg30.avg_cost::numeric, 4) ELSE 0 END,
+    avg30_variation_percent = CASE 
+      WHEN v_avg30.cnt > 0 AND COALESCE(v_last.custo_unitario, 0) > 0 
+      THEN ROUND(((v_avg30.avg_cost - v_last.custo_unitario) / v_last.custo_unitario * 100)::numeric, 2)
+      ELSE 0 
+    END
+  WHERE id = p_produto_id;
+END;
+$$;
+
+-- 2. Update cancel_salmon_entry_atomic 
+CREATE OR REPLACE FUNCTION cancel_salmon_entry_atomic(p_entry_id uuid, p_reason text DEFAULT '')
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_entry RECORD;
+  v_mov RECORD;
+  v_estorno_id uuid;
+  v_caller uuid;
+  v_produto_id uuid;
+BEGIN
+  v_caller := auth.uid();
+  IF v_caller IS NULL THEN RAISE EXCEPTION 'Não autenticado.'; END IF;
+  IF NOT has_permission(v_caller, 'salmon:edit') AND NOT has_permission(v_caller, 'salmon:delete') THEN
+    RAISE EXCEPTION 'Sem permissão para cancelar entrada de salmão.';
+  END IF;
+
+  SELECT * INTO v_entry FROM salmon_entries WHERE id = p_entry_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Entrada não encontrada: %', p_entry_id; END IF;
+  IF v_entry.status = 'CANCELLED' THEN RAISE EXCEPTION 'Entrada já cancelada.'; END IF;
+
+  IF EXISTS (SELECT 1 FROM salmon_manipulations WHERE entry_id = p_entry_id AND status = 'ACTIVE') THEN
+    RAISE EXCEPTION 'Existem manipulações ativas vinculadas. Cancele-as primeiro.';
+  END IF;
+
+  UPDATE salmon_entries SET status = 'CANCELLED', updated_at = now() WHERE id = p_entry_id;
+
+  SELECT * INTO v_mov FROM movimentacoes_estoque
+    WHERE reference_type = 'SALMON_ENTRY' AND reference_id = p_entry_id::text AND status = 'ATIVO'
+    FOR UPDATE;
+
+  IF v_mov.id IS NOT NULL THEN
+    v_produto_id := v_mov.produto_id;
+
+    UPDATE movimentacoes_estoque SET
+      status = 'CANCELADO', cancelado_em = now(), cancelado_por = v_caller,
+      justificativa_cancelamento = p_reason
+    WHERE id = v_mov.id;
+
+    INSERT INTO movimentacoes_estoque (
+      produto_id, data, tipo, quantidade, custo_unitario, custo_total,
+      origem, observacao, created_by, status, estorno_de_id,
+      reference_type, reference_id, internal_transfer, source_module, salmon_lot_id
+    ) VALUES (
+      v_mov.produto_id, CURRENT_DATE, 'ENTRADA_ESTORNO', v_mov.quantidade,
+      v_mov.custo_unitario, v_mov.custo_total, 'ESTORNO',
+      'Estorno — ' || p_reason, v_caller, 'ATIVO', v_mov.id,
+      'SALMON_ENTRY', v_mov.reference_id || '_ESTORNO', false, 'salmon', v_mov.salmon_lot_id
+    ) RETURNING id INTO v_estorno_id;
+
+    PERFORM recalc_product_costs(v_produto_id);
+  END IF;
+
+  PERFORM log_audit('rpc', 'salmon', 'salmon_entries', p_entry_id, 'CANCEL_ATOMIC',
+    jsonb_build_object('status_anterior', 'ACTIVE', 'gross_kg', v_entry.gross_kg),
+    jsonb_build_object('reason', p_reason, 'estorno_id', v_estorno_id));
+
+  RETURN jsonb_build_object('cancelled', true, 'entry_id', p_entry_id, 'estorno_id', v_estorno_id);
+END;
+$$;
+
+-- 3. Update storno_purchase_order_stock
+CREATE OR REPLACE FUNCTION storno_purchase_order_stock(p_order_id uuid)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_user uuid;
+  v_company uuid;
+  v_mov RECORD;
+  v_count int := 0;
+  v_affected_products uuid[] := ARRAY[]::uuid[];
+  v_pid uuid;
+BEGIN
+  v_user := auth.uid();
+  IF v_user IS NULL THEN RAISE EXCEPTION 'Não autenticado.'; END IF;
+  v_company := assert_tenant();
+  IF NOT public.has_permission(v_user, 'purchases:create') AND NOT public.has_permission(v_user, 'stock:edit') THEN
+    RAISE EXCEPTION 'Sem permissão para estornar movimentações de pedido.';
+  END IF;
+
+  PERFORM 1 FROM purchase_orders WHERE id = p_order_id AND company_id = v_company FOR UPDATE;
+
+  FOR v_mov IN
+    SELECT * FROM movimentacoes_estoque
+    WHERE company_id = v_company
+    AND (
+      (reference_type = 'PURCHASE_ORDER' AND reference_id = p_order_id::text)
+      OR
+      (reference_type = 'PURCHASE_ORDER_ITEM' AND reference_id LIKE 'POI:%' AND EXISTS (
+        SELECT 1 FROM purchase_order_items poi
+        WHERE poi.order_id = p_order_id AND poi.company_id = v_company
+          AND 'POI:' || poi.id::text = movimentacoes_estoque.reference_id
+      ))
+    )
+    AND status = 'ATIVO'
+    AND tipo NOT IN ('ENTRADA_ESTORNO', 'SAIDA_ESTORNO')
+    FOR UPDATE
+  LOOP
+    UPDATE movimentacoes_estoque
+    SET status = 'CANCELADO', cancelado_em = now(), cancelado_por = v_user,
+        justificativa_cancelamento = 'Exclusão de pedido de compra'
+    WHERE id = v_mov.id AND company_id = v_company;
+
+    INSERT INTO movimentacoes_estoque (
+      produto_id, data, tipo, quantidade, custo_unitario, custo_total,
+      origem, observacao, created_by, status, estorno_de_id,
+      reference_type, reference_id, internal_transfer, source_module, company_id
+    ) VALUES (
+      v_mov.produto_id, CURRENT_DATE, 'ENTRADA_ESTORNO', v_mov.quantidade,
+      v_mov.custo_unitario, v_mov.custo_total, 'ESTORNO',
+      'Estorno automático — Exclusão pedido compra ' || p_order_id::text,
+      v_user, 'ATIVO', v_mov.id, v_mov.reference_type,
+      v_mov.reference_id || '_ESTORNO', false, 'purchases', v_company
+    );
+
+    IF NOT v_mov.produto_id = ANY(v_affected_products) THEN
+      v_affected_products := array_append(v_affected_products, v_mov.produto_id);
+    END IF;
+    v_count := v_count + 1;
+  END LOOP;
+
+  FOREACH v_pid IN ARRAY v_affected_products LOOP
+    PERFORM recalc_product_costs(v_pid);
+  END LOOP;
+
+  PERFORM public.log_audit('rpc', 'compras', 'purchase_orders', p_order_id, 'STORNO', NULL,
+    jsonb_build_object('movimentacoes_estornadas', v_count));
+END;
+$$;
+
+-- 4. Drop and recreate cancel_salmon_manipulation_atomic
+DROP FUNCTION IF EXISTS cancel_salmon_manipulation_atomic(uuid, text);
+
+CREATE OR REPLACE FUNCTION cancel_salmon_manipulation_atomic(p_manip_id uuid, p_reason text DEFAULT 'Cancelamento de manipulação')
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_manip RECORD;
+  v_mov RECORD;
+  v_estorno_id uuid;
+  v_caller uuid;
+  v_produto_id uuid;
+BEGIN
+  v_caller := auth.uid();
+  IF v_caller IS NULL THEN RAISE EXCEPTION 'Não autenticado.'; END IF;
+  IF NOT has_permission(v_caller, 'salmon:edit') AND NOT has_permission(v_caller, 'salmon:delete') THEN
+    RAISE EXCEPTION 'Sem permissão para cancelar manipulação.';
+  END IF;
+
+  SELECT * INTO v_manip FROM salmon_manipulations WHERE id = p_manip_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Manipulação não encontrada: %', p_manip_id; END IF;
+  IF v_manip.status = 'CANCELLED' THEN RAISE EXCEPTION 'Manipulação já cancelada.'; END IF;
+
+  UPDATE salmon_manipulations SET status = 'CANCELLED', updated_at = now() WHERE id = p_manip_id;
+
+  FOR v_mov IN
+    SELECT * FROM movimentacoes_estoque
+    WHERE reference_type = 'SALMON_MANIPULATION' AND reference_id LIKE p_manip_id::text || '%' AND status = 'ATIVO'
+    FOR UPDATE
+  LOOP
+    v_produto_id := v_mov.produto_id;
+
+    UPDATE movimentacoes_estoque SET
+      status = 'CANCELADO', cancelado_em = now(), cancelado_por = v_caller,
+      justificativa_cancelamento = p_reason
+    WHERE id = v_mov.id;
+
+    INSERT INTO movimentacoes_estoque (
+      produto_id, data, tipo, quantidade, custo_unitario, custo_total,
+      origem, observacao, created_by, status, estorno_de_id,
+      reference_type, reference_id, internal_transfer, source_module, salmon_lot_id
+    ) VALUES (
+      v_mov.produto_id, CURRENT_DATE,
+      CASE WHEN v_mov.direction = 'OUT' THEN 'SAIDA_ESTORNO' ELSE 'ENTRADA_ESTORNO' END,
+      v_mov.quantidade, v_mov.custo_unitario, v_mov.custo_total, 'ESTORNO',
+      'Estorno manipulação — ' || p_reason, v_caller, 'ATIVO', v_mov.id,
+      'SALMON_MANIPULATION', v_mov.reference_id || '_ESTORNO', false, 'salmon', v_mov.salmon_lot_id
+    ) RETURNING id INTO v_estorno_id;
+
+    PERFORM recalc_product_costs(v_produto_id);
+  END LOOP;
+
+  PERFORM log_audit('rpc', 'salmon', 'salmon_manipulations', p_manip_id, 'CANCEL_ATOMIC',
+    jsonb_build_object('status_anterior', 'ACTIVE', 'clean_kg', v_manip.clean_kg, 'gross_kg', v_manip.gross_kg),
+    jsonb_build_object('reason', p_reason, 'estorno_id', v_estorno_id));
+
+  RETURN jsonb_build_object('cancelled', true, 'manipulation_id', p_manip_id, 'estorno_id', v_estorno_id);
+END;
+$$;
+
+-- 5. Fix existing stale data NOW
+DO $$
+DECLARE
+  v_prod RECORD;
+BEGIN
+  FOR v_prod IN
+    SELECT id FROM public.produtos
+    WHERE (last_cost_base_unit > 0 OR avg30_cost_base_unit > 0 OR custo_ultima_compra > 0)
+  LOOP
+    PERFORM public.recalc_product_costs(v_prod.id);
+  END LOOP;
+END;
+$$;

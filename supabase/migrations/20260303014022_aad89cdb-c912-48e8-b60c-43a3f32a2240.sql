@@ -1,0 +1,26 @@
+
+-- FORCE RLS ON for all 24 RH tables
+ALTER TABLE public.rh_audit_log FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.rh_banco_horas FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.rh_beneficios FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.rh_colaboradores FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.rh_comunicados FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.rh_custos_mensais FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.rh_disponibilidade FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.rh_documentos FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.rh_epis FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.rh_escala_slots FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.rh_escalas FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.rh_exames FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.rh_ferias_afastamentos FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.rh_ferias_saldo FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.rh_folha_pagamento FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.rh_incidentes FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.rh_ocorrencias_disciplinares FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.rh_onboarding FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.rh_ponto_ajustes FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.rh_ponto_registros FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.rh_progresso_treinamento FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.rh_tarefas FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.rh_trilhas_treinamento FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.rh_trocas_turno FORCE ROW LEVEL SECURITY;

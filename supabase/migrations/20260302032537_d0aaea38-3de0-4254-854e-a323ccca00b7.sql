@@ -1,0 +1,5 @@
+
+-- Add ESTOQUE_ATUALIZADO and RECEBIDO_CONFIRMADO to status check constraint
+ALTER TABLE solic_compra_mercado DROP CONSTRAINT solic_compra_mercado_status_check;
+ALTER TABLE solic_compra_mercado ADD CONSTRAINT solic_compra_mercado_status_check 
+  CHECK (status IN ('ENVIADA','EM_COMPRA','AGUARDANDO_APROVACAO','APROVADA','REPROVADA','PARCIAL','CONCLUIDA','CANCELADA','AGUARDANDO_RECEBIMENTO','RECEBIDO_CONFIRMADO','ESTOQUE_ATUALIZADO'));

@@ -1,0 +1,3 @@
+-- Insert test turno for QA
+-- INSERT INTO turnos (company_id, nome, hora_inicio, hora_fim, ativo)
+-- VALUES ('68fd6ab4-0088-4671-b77f-7991ac26c42a', 'QA Manhã', '06:00', '14:00', true);

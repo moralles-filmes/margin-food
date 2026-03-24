@@ -1,0 +1,369 @@
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { ShieldCheck, Search, ChevronDown, Eye, Filter, Download } from 'lucide-react';
+import { format, subDays } from 'date-fns';
+import { cn } from '@/lib/utils';
+import { CursorState } from '@/hooks/useCursorPagination';
+
+interface AuditLog {
+  id: string;
+  created_at: string;
+  actor_user_id: string | null;
+  actor_email: string | null;
+  actor_role: string | null;
+  source: string;
+  module: string;
+  entity: string;
+  entity_id: string | null;
+  action: string;
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown> | null;
+  metadata: Record<string, unknown> | null;
+  success: boolean;
+}
+
+const PAGE_SIZE = 50;
+
+const MODULES = [
+  { value: 'all', label: 'Todos' },
+  { value: 'financeiro', label: 'Financeiro' },
+  { value: 'compras', label: 'Compras' },
+  { value: 'estoque', label: 'Estoque' },
+  { value: 'inventario', label: 'Inventário' },
+  { value: 'salmon', label: 'Salmão' },
+  { value: 'rh', label: 'RH' },
+  { value: 'perf', label: 'Performance' },
+  { value: 'system', label: 'Sistema' },
+];
+
+const ACTIONS = [
+  { value: 'all', label: 'Todas' },
+  { value: 'CREATE', label: 'Criar' },
+  { value: 'UPDATE', label: 'Atualizar' },
+  { value: 'DELETE', label: 'Excluir' },
+  { value: 'PAY', label: 'Pagar' },
+  { value: 'RECEIVE', label: 'Receber' },
+  { value: 'TRANSFER_CREATE', label: 'Transferência' },
+  { value: 'TRANSFER_DELETE', label: 'Excluir Transf.' },
+  { value: 'FERIAS_APPROVE', label: 'Aprovar Férias' },
+  { value: 'MIRROR', label: 'Espelhar' },
+  { value: 'CANCEL_MIRROR', label: 'Cancelar Espelho' },
+  { value: 'STORNO', label: 'Estorno' },
+  { value: 'JOB_RUN', label: 'Job' },
+  { value: 'SLOW_QUERY', label: 'Slow Query' },
+];
+
+const ACTION_COLORS: Record<string, string> = {
+  CREATE: 'bg-emerald-500/15 text-emerald-400',
+  UPDATE: 'bg-blue-500/15 text-blue-400',
+  DELETE: 'bg-destructive/15 text-destructive',
+  PAY: 'bg-amber-500/15 text-amber-400',
+  RECEIVE: 'bg-emerald-500/15 text-emerald-400',
+  TRANSFER_CREATE: 'bg-violet-500/15 text-violet-400',
+  TRANSFER_DELETE: 'bg-destructive/15 text-destructive',
+  FERIAS_APPROVE: 'bg-emerald-500/15 text-emerald-400',
+  MIRROR: 'bg-blue-500/15 text-blue-400',
+  CANCEL_MIRROR: 'bg-amber-500/15 text-amber-400',
+  STORNO: 'bg-destructive/15 text-destructive',
+  JOB_RUN: 'bg-violet-500/15 text-violet-400',
+  SLOW_QUERY: 'bg-amber-500/15 text-amber-400',
+};
+
+export default function GlobalAuditView() {
+  const [logs, setLogs] = useState<AuditLog[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [hasMore, setHasMore] = useState(true);
+  const [profiles, setProfiles] = useState<Record<string, string>>({});
+  const cursorRef = useRef<CursorState | null>(null);
+
+  // Filters
+  const [dateFrom, setDateFrom] = useState(format(subDays(new Date(), 7), 'yyyy-MM-dd'));
+  const [dateTo, setDateTo] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [moduleFilter, setModuleFilter] = useState('all');
+  const [actionFilter, setActionFilter] = useState('all');
+  const [search, setSearch] = useState('');
+
+  // Detail modal
+  const [detail, setDetail] = useState<AuditLog | null>(null);
+
+  const buildQuery = useCallback((cursor: CursorState | null) => {
+    let query = supabase
+      .from('audit_logs')
+      .select('id, created_at, actor_user_id, actor_email, actor_role, source, module, entity, entity_id, action, before, after, metadata, success')
+      .gte('created_at', `${dateFrom}T00:00:00`)
+      .lte('created_at', `${dateTo}T23:59:59`)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .limit(PAGE_SIZE + 1);
+
+    if (moduleFilter !== 'all') query = query.eq('module', moduleFilter);
+    if (actionFilter !== 'all') query = query.eq('action', actionFilter);
+    if (search) query = query.or(`entity.ilike.%${search}%,entity_id::text.ilike.%${search}%`);
+
+    // Cursor-based: fetch records older than cursor
+    if (cursor) {
+      query = query.or(`created_at.lt.${cursor.created_at},and(created_at.eq.${cursor.created_at},id.lt.${cursor.id})`);
+    }
+
+    return query;
+  }, [dateFrom, dateTo, moduleFilter, actionFilter, search]);
+
+  const fetchLogs = useCallback(async (cursor: CursorState | null, append: boolean) => {
+    setLoading(true);
+    const { data, error } = await buildQuery(cursor);
+    if (error) { console.error(error); setLoading(false); return; }
+
+    const all = (data || []) as AuditLog[];
+    const hasNext = all.length > PAGE_SIZE;
+    const pageData = hasNext ? all.slice(0, PAGE_SIZE) : all;
+
+    setHasMore(hasNext);
+    if (pageData.length > 0) {
+      const last = pageData[pageData.length - 1];
+      cursorRef.current = { created_at: last.created_at, id: last.id };
+    }
+
+    if (append) setLogs(prev => [...prev, ...pageData]);
+    else setLogs(pageData);
+
+    // Fetch profiles for new actor_user_ids
+    const userIds = [...new Set(pageData.map(l => l.actor_user_id).filter(Boolean))] as string[];
+    const missing = userIds.filter(id => !profiles[id]);
+    if (missing.length > 0) {
+      const { data: profs } = await supabase.rpc('list_profiles_minimal', { p_search: '', p_limit: 200 });
+      if (profs) {
+        const newProfiles = { ...profiles };
+        const rows = profs as Array<{ id: string; nome?: string; email?: string }>;
+        rows.filter(p => missing.includes(p.id)).forEach(p => { newProfiles[p.id] = p.nome || p.email || ''; });
+        setProfiles(newProfiles);
+      }
+    }
+
+    setLoading(false);
+  }, [buildQuery, profiles]);
+
+  const resetAndFetch = useCallback(() => {
+    cursorRef.current = null;
+    fetchLogs(null, false);
+  }, [fetchLogs]);
+
+  useEffect(() => { resetAndFetch(); }, [dateFrom, dateTo, moduleFilter, actionFilter]);
+
+  const handleSearch = () => resetAndFetch();
+  const loadMore = () => { if (hasMore && !loading) fetchLogs(cursorRef.current, true); };
+
+  const exportCSV = () => {
+    const headers = ['Data', 'Módulo', 'Ação', 'Entidade', 'ID', 'Usuário', 'Source', 'Sucesso'];
+    const rows = logs.map(l => [
+      format(new Date(l.created_at), 'dd/MM/yyyy HH:mm:ss'),
+      l.module, l.action, l.entity, l.entity_id || '',
+      profiles[l.actor_user_id || ''] || l.actor_user_id || 'Sistema',
+      l.source, l.success ? 'Sim' : 'Não',
+    ]);
+    const csv = [headers, ...rows].map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `audit_trail_${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    a.click(); URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-display font-bold text-foreground flex items-center gap-2">
+            <ShieldCheck className="w-5 h-5 text-primary" /> Auditoria do Sistema
+          </h2>
+          <p className="text-xs text-muted-foreground">Trilha de auditoria global (cursor pagination) — {logs.length} registros</p>
+        </div>
+        <Button onClick={exportCSV} size="sm" variant="outline" className="gap-1.5 text-xs">
+          <Download className="w-3.5 h-3.5" /> CSV
+        </Button>
+      </div>
+
+      {/* Filters */}
+      <Card>
+        <CardContent className="pt-4">
+          <div className="flex items-center gap-1.5 mb-3">
+            <Filter className="w-3.5 h-3.5 text-muted-foreground" />
+            <span className="text-xs font-semibold text-foreground">Filtros</span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            <div>
+              <Label className="text-[10px] text-muted-foreground">De</Label>
+              <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="h-8 text-xs" />
+            </div>
+            <div>
+              <Label className="text-[10px] text-muted-foreground">Até</Label>
+              <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="h-8 text-xs" />
+            </div>
+            <div>
+              <Label className="text-[10px] text-muted-foreground">Módulo</Label>
+              <Select value={moduleFilter} onValueChange={setModuleFilter}>
+                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>{MODULES.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-[10px] text-muted-foreground">Ação</Label>
+              <Select value={actionFilter} onValueChange={setActionFilter}>
+                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>{ACTIONS.map(a => <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-[10px] text-muted-foreground">Busca</Label>
+              <div className="flex gap-1">
+                <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="entidade/id..." className="h-8 text-xs" onKeyDown={e => e.key === 'Enter' && handleSearch()} />
+                <Button size="icon" variant="outline" className="h-8 w-8 shrink-0" onClick={handleSearch}>
+                  <Search className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Table */}
+      <Card>
+        <CardContent className="pt-4 px-0">
+          {loading && logs.length === 0 ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : logs.length === 0 ? (
+            <div className="text-center py-12 text-sm text-muted-foreground">Nenhum registro encontrado</div>
+          ) : (
+            <>
+              <ScrollArea className="max-h-[60vh]">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-[10px] w-[130px]">Data</TableHead>
+                      <TableHead className="text-[10px]">Módulo</TableHead>
+                      <TableHead className="text-[10px]">Ação</TableHead>
+                      <TableHead className="text-[10px]">Entidade</TableHead>
+                      <TableHead className="text-[10px]">Usuário</TableHead>
+                      <TableHead className="text-[10px]">Source</TableHead>
+                      <TableHead className="text-[10px] w-10"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {logs.map(log => (
+                      <TableRow key={log.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setDetail(log)}>
+                        <TableCell className="text-[11px] text-muted-foreground font-mono">
+                          {format(new Date(log.created_at), 'dd/MM HH:mm:ss')}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-[9px] font-normal">{log.module}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <span className={cn('text-[10px] font-medium px-1.5 py-0.5 rounded', ACTION_COLORS[log.action] || 'bg-muted text-muted-foreground')}>
+                            {log.action}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-[11px]">
+                          <span className="text-foreground">{log.entity}</span>
+                          {log.entity_id && (
+                            <span className="text-muted-foreground ml-1 font-mono text-[9px]">
+                              {log.entity_id.slice(0, 8)}…
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-[11px] text-muted-foreground">
+                          {profiles[log.actor_user_id || ''] || (log.actor_user_id ? log.actor_user_id.slice(0, 8) + '…' : 'Sistema')}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary" className="text-[9px]">{log.source}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Eye className="w-3.5 h-3.5 text-muted-foreground" />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </ScrollArea>
+              {hasMore && (
+                <div className="flex justify-center pt-3 px-4">
+                  <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={loadMore} disabled={loading}>
+                    <ChevronDown className="w-3.5 h-3.5" /> Carregar mais
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Detail Modal */}
+      <Dialog open={!!detail} onOpenChange={open => !open && setDetail(null)}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-sm">
+              <ShieldCheck className="w-4 h-4 text-primary" /> Detalhes do Log
+            </DialogTitle>
+          </DialogHeader>
+          {detail && (
+            <div className="space-y-4 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <InfoRow label="Data" value={format(new Date(detail.created_at), 'dd/MM/yyyy HH:mm:ss')} />
+                <InfoRow label="Módulo" value={detail.module} />
+                <InfoRow label="Ação" value={detail.action} />
+                <InfoRow label="Entidade" value={detail.entity} />
+                <InfoRow label="ID" value={detail.entity_id || '—'} mono />
+                <InfoRow label="Usuário" value={profiles[detail.actor_user_id || ''] || detail.actor_user_id || 'Sistema'} />
+                <InfoRow label="Source" value={detail.source} />
+                <InfoRow label="Sucesso" value={detail.success ? '✅ Sim' : '❌ Não'} />
+              </div>
+
+              {detail.before && (
+                <div>
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-1">Before</p>
+                  <pre className="bg-muted rounded-lg p-3 text-[10px] font-mono overflow-x-auto max-h-40 text-foreground">
+                    {JSON.stringify(detail.before, null, 2)}
+                  </pre>
+                </div>
+              )}
+              {detail.after && (
+                <div>
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-1">After</p>
+                  <pre className="bg-muted rounded-lg p-3 text-[10px] font-mono overflow-x-auto max-h-40 text-foreground">
+                    {JSON.stringify(detail.after, null, 2)}
+                  </pre>
+                </div>
+              )}
+              {detail.metadata && (
+                <div>
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-1">Metadata</p>
+                  <pre className="bg-muted rounded-lg p-3 text-[10px] font-mono overflow-x-auto max-h-40 text-foreground">
+                    {JSON.stringify(detail.metadata, null, 2)}
+                  </pre>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function InfoRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div>
+      <p className="text-[10px] text-muted-foreground">{label}</p>
+      <p className={cn('text-foreground font-medium', mono && 'font-mono text-[10px]')}>{value}</p>
+    </div>
+  );
+}

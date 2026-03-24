@@ -1,0 +1,126 @@
+
+-- ============================================================
+-- T18: Validation triggers to block negative values on RH tables
+-- Enterprise pattern: BEFORE INSERT OR UPDATE, RAISE on invalid
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION public.validate_rh_colaboradores_numeric()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+BEGIN
+  IF NEW.salario IS NOT NULL AND NEW.salario < 0 THEN
+    RAISE EXCEPTION '400: salario não pode ser negativo (valor: %)', NEW.salario;
+  END IF;
+  IF NEW.valor_hora IS NOT NULL AND NEW.valor_hora < 0 THEN
+    RAISE EXCEPTION '400: valor_hora não pode ser negativo (valor: %)', NEW.valor_hora;
+  END IF;
+  IF NEW.carga_horaria_semanal <= 0 THEN
+    RAISE EXCEPTION '400: carga_horaria_semanal deve ser maior que zero (valor: %)', NEW.carga_horaria_semanal;
+  END IF;
+  IF NEW.adicional_noturno_percent IS NOT NULL AND NEW.adicional_noturno_percent < 0 THEN
+    RAISE EXCEPTION '400: adicional_noturno_percent não pode ser negativo (valor: %)', NEW.adicional_noturno_percent;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_validate_rh_colaboradores_numeric
+  BEFORE INSERT OR UPDATE ON public.rh_colaboradores
+  FOR EACH ROW
+  EXECUTE FUNCTION public.validate_rh_colaboradores_numeric();
+
+-- rh_beneficios
+CREATE OR REPLACE FUNCTION public.validate_rh_beneficios_numeric()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+BEGIN
+  IF NEW.valor_empresa < 0 THEN
+    RAISE EXCEPTION '400: valor_empresa não pode ser negativo (valor: %)', NEW.valor_empresa;
+  END IF;
+  IF NEW.valor_colaborador < 0 THEN
+    RAISE EXCEPTION '400: valor_colaborador não pode ser negativo (valor: %)', NEW.valor_colaborador;
+  END IF;
+  IF NEW.percentual_desconto < 0 THEN
+    RAISE EXCEPTION '400: percentual_desconto não pode ser negativo (valor: %)', NEW.percentual_desconto;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_validate_rh_beneficios_numeric
+  BEFORE INSERT OR UPDATE ON public.rh_beneficios
+  FOR EACH ROW
+  EXECUTE FUNCTION public.validate_rh_beneficios_numeric();
+
+-- rh_banco_horas
+CREATE OR REPLACE FUNCTION public.validate_rh_banco_horas_numeric()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+BEGIN
+  IF NEW.horas_trabalhadas < 0 THEN
+    RAISE EXCEPTION '400: horas_trabalhadas não pode ser negativo (valor: %)', NEW.horas_trabalhadas;
+  END IF;
+  IF NEW.horas_escaladas < 0 THEN
+    RAISE EXCEPTION '400: horas_escaladas não pode ser negativo (valor: %)', NEW.horas_escaladas;
+  END IF;
+  IF NEW.horas_extras < 0 THEN
+    RAISE EXCEPTION '400: horas_extras não pode ser negativo (valor: %)', NEW.horas_extras;
+  END IF;
+  IF NEW.atrasos_min < 0 THEN
+    RAISE EXCEPTION '400: atrasos_min não pode ser negativo (valor: %)', NEW.atrasos_min;
+  END IF;
+  IF NEW.faltas < 0 THEN
+    RAISE EXCEPTION '400: faltas não pode ser negativo (valor: %)', NEW.faltas;
+  END IF;
+  IF NEW.dias_trabalhados < 0 THEN
+    RAISE EXCEPTION '400: dias_trabalhados não pode ser negativo (valor: %)', NEW.dias_trabalhados;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_validate_rh_banco_horas_numeric
+  BEFORE INSERT OR UPDATE ON public.rh_banco_horas
+  FOR EACH ROW
+  EXECUTE FUNCTION public.validate_rh_banco_horas_numeric();
+
+-- rh_folha_pagamento
+CREATE OR REPLACE FUNCTION public.validate_rh_folha_numeric()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+BEGIN
+  IF NEW.salario_base < 0 THEN
+    RAISE EXCEPTION '400: salario_base não pode ser negativo (valor: %)', NEW.salario_base;
+  END IF;
+  IF NEW.valor_hora < 0 THEN
+    RAISE EXCEPTION '400: valor_hora não pode ser negativo (valor: %)', NEW.valor_hora;
+  END IF;
+  IF NEW.horas_normais < 0 THEN
+    RAISE EXCEPTION '400: horas_normais não pode ser negativo (valor: %)', NEW.horas_normais;
+  END IF;
+  IF NEW.horas_extras_50 < 0 THEN
+    RAISE EXCEPTION '400: horas_extras_50 não pode ser negativo (valor: %)', NEW.horas_extras_50;
+  END IF;
+  IF NEW.horas_extras_100 < 0 THEN
+    RAISE EXCEPTION '400: horas_extras_100 não pode ser negativo (valor: %)', NEW.horas_extras_100;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_validate_rh_folha_numeric
+  BEFORE INSERT OR UPDATE ON public.rh_folha_pagamento
+  FOR EACH ROW
+  EXECUTE FUNCTION public.validate_rh_folha_numeric();

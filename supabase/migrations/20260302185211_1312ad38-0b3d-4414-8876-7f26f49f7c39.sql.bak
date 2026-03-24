@@ -1,0 +1,396 @@
+
+-- ============================================================
+-- P2 FIX: planning_metas_compra — TENANT ISOLATION + AUDIT + TIMEZONE
+-- ============================================================
+
+-- 1) Add soft-delete tracking columns
+ALTER TABLE public.planning_metas_compra
+  ADD COLUMN IF NOT EXISTS deleted_at timestamptz DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS deleted_by uuid DEFAULT NULL;
+
+-- 2) Fix UNIQUE constraint: must include company_id for multi-tenant
+ALTER TABLE public.planning_metas_compra
+  DROP CONSTRAINT IF EXISTS planning_metas_compra_year_month_categoria_key;
+
+ALTER TABLE public.planning_metas_compra
+  ADD CONSTRAINT planning_metas_compra_company_year_month_cat_key
+  UNIQUE (company_id, year, month, categoria);
+
+-- 3) Drop ALL legacy RLS policies
+DROP POLICY IF EXISTS planning_select ON public.planning_metas_compra;
+DROP POLICY IF EXISTS planning_insert ON public.planning_metas_compra;
+DROP POLICY IF EXISTS planning_update ON public.planning_metas_compra;
+DROP POLICY IF EXISTS planning_delete ON public.planning_metas_compra;
+
+-- 4) Recreate RLS policies with tenant isolation + granular permissions
+CREATE POLICY "planning_select_tenant"
+  ON public.planning_metas_compra FOR SELECT
+  TO authenticated
+  USING (
+    company_id = get_current_company_id()
+    AND has_any_permission(auth.uid(), ARRAY[
+      'planning:meta-compras:view',
+      'planning:projecao:view',
+      'planning:ritmo:view',
+      'planning:pressao:view',
+      'planning:radar:view',
+      'planning:simulador:view'
+    ])
+  );
+
+CREATE POLICY "planning_insert_tenant"
+  ON public.planning_metas_compra FOR INSERT
+  TO authenticated
+  WITH CHECK (
+    company_id = get_current_company_id()
+    AND has_permission(auth.uid(), 'planning:meta-compras:edit')
+    AND created_by = auth.uid()
+  );
+
+CREATE POLICY "planning_update_tenant"
+  ON public.planning_metas_compra FOR UPDATE
+  TO authenticated
+  USING (
+    company_id = get_current_company_id()
+    AND has_permission(auth.uid(), 'planning:meta-compras:edit')
+  )
+  WITH CHECK (
+    company_id = get_current_company_id()
+    AND has_permission(auth.uid(), 'planning:meta-compras:edit')
+  );
+
+CREATE POLICY "planning_delete_tenant"
+  ON public.planning_metas_compra FOR DELETE
+  TO authenticated
+  USING (
+    company_id = get_current_company_id()
+    AND has_permission(auth.uid(), 'planning:meta-compras:edit')
+  );
+
+-- 5) Fix RPC: _planning_upsert_meta_guarded — add tenant guard + audit
+CREATE OR REPLACE FUNCTION public._planning_upsert_meta_guarded(
+  p_year integer,
+  p_month integer,
+  p_categoria text,
+  p_target_value numeric,
+  p_alerta_amarelo numeric DEFAULT 80,
+  p_alerta_vermelho numeric DEFAULT 100
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_uid uuid := auth.uid();
+  v_cid uuid;
+  v_before jsonb;
+  v_after jsonb;
+  v_result_id uuid;
+BEGIN
+  IF v_uid IS NULL THEN
+    RAISE EXCEPTION 'Não autenticado';
+  END IF;
+
+  -- Resolve tenant
+  SELECT company_id INTO v_cid FROM profiles WHERE id = v_uid;
+  IF v_cid IS NULL THEN
+    RAISE EXCEPTION 'Tenant não encontrado';
+  END IF;
+
+  IF NOT has_permission(v_uid, 'planning:meta-compras:edit') THEN
+    RAISE EXCEPTION 'Sem permissão para editar metas de compras';
+  END IF;
+
+  -- Capture before state (for audit)
+  SELECT jsonb_build_object(
+    'id', id, 'target_value', target_value,
+    'alerta_amarelo_percent', alerta_amarelo_percent,
+    'alerta_vermelho_percent', alerta_vermelho_percent,
+    'ativo', ativo
+  ) INTO v_before
+  FROM planning_metas_compra
+  WHERE company_id = v_cid AND year = p_year AND month = p_month AND categoria = p_categoria;
+
+  -- Upsert with explicit company_id
+  INSERT INTO planning_metas_compra (company_id, year, month, categoria, target_value, alerta_amarelo_percent, alerta_vermelho_percent, ativo, created_by)
+  VALUES (v_cid, p_year, p_month, p_categoria, p_target_value, p_alerta_amarelo, p_alerta_vermelho, true, v_uid)
+  ON CONFLICT (company_id, year, month, categoria) DO UPDATE SET
+    target_value = EXCLUDED.target_value,
+    alerta_amarelo_percent = EXCLUDED.alerta_amarelo_percent,
+    alerta_vermelho_percent = EXCLUDED.alerta_vermelho_percent,
+    ativo = true,
+    updated_at = now()
+  RETURNING id INTO v_result_id;
+
+  -- Capture after state
+  SELECT jsonb_build_object(
+    'id', id, 'target_value', target_value,
+    'alerta_amarelo_percent', alerta_amarelo_percent,
+    'alerta_vermelho_percent', alerta_vermelho_percent,
+    'ativo', ativo
+  ) INTO v_after
+  FROM planning_metas_compra
+  WHERE id = v_result_id;
+
+  -- Audit trail
+  PERFORM audit_log_write(
+    'planning', 
+    CASE WHEN v_before IS NULL THEN 'create_meta' ELSE 'update_meta' END,
+    'planning_metas_compra',
+    v_result_id::text,
+    v_before,
+    v_after,
+    jsonb_build_object('year', p_year, 'month', p_month, 'categoria', p_categoria)
+  );
+
+  RETURN jsonb_build_object('success', true, 'id', v_result_id);
+END;
+$function$;
+
+-- 6) Fix RPC: _planning_delete_meta_guarded — add tenant guard + audit
+CREATE OR REPLACE FUNCTION public._planning_delete_meta_guarded(p_id uuid)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_uid uuid := auth.uid();
+  v_cid uuid;
+  v_before jsonb;
+  v_found boolean;
+BEGIN
+  IF v_uid IS NULL THEN
+    RAISE EXCEPTION 'Não autenticado';
+  END IF;
+
+  -- Resolve tenant
+  SELECT company_id INTO v_cid FROM profiles WHERE id = v_uid;
+  IF v_cid IS NULL THEN
+    RAISE EXCEPTION 'Tenant não encontrado';
+  END IF;
+
+  IF NOT has_permission(v_uid, 'planning:meta-compras:edit') THEN
+    RAISE EXCEPTION 'Sem permissão para remover metas de compras';
+  END IF;
+
+  -- Capture before state and verify tenant ownership
+  SELECT jsonb_build_object(
+    'id', id, 'year', year, 'month', month, 'categoria', categoria,
+    'target_value', target_value, 'ativo', ativo
+  ), true
+  INTO v_before, v_found
+  FROM planning_metas_compra
+  WHERE id = p_id AND company_id = v_cid;
+
+  IF NOT COALESCE(v_found, false) THEN
+    RAISE EXCEPTION 'Meta não encontrada ou não pertence ao tenant';
+  END IF;
+
+  -- Soft delete with tracking
+  UPDATE planning_metas_compra
+  SET ativo = false, updated_at = now(), deleted_at = now(), deleted_by = v_uid
+  WHERE id = p_id AND company_id = v_cid;
+
+  -- Audit trail
+  PERFORM audit_log_write(
+    'planning',
+    'delete_meta',
+    'planning_metas_compra',
+    p_id::text,
+    v_before,
+    jsonb_build_object('ativo', false, 'deleted_at', now(), 'deleted_by', v_uid),
+    NULL
+  );
+
+  RETURN jsonb_build_object('success', true);
+END;
+$function$;
+
+-- 7) Fix RPC: _planning_spend_summary_guarded — add tenant resolution
+CREATE OR REPLACE FUNCTION public._planning_spend_summary_guarded(
+  p_year integer,
+  p_month integer,
+  p_source text DEFAULT NULL::text,
+  p_categoria text DEFAULT NULL::text
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_uid uuid := auth.uid();
+  v_cid uuid;
+  v_result jsonb;
+BEGIN
+  IF v_uid IS NULL THEN
+    RAISE EXCEPTION 'Não autenticado';
+  END IF;
+
+  -- Resolve tenant
+  SELECT company_id INTO v_cid FROM profiles WHERE id = v_uid;
+  IF v_cid IS NULL THEN
+    RAISE EXCEPTION 'Tenant não encontrado';
+  END IF;
+
+  IF NOT has_permission(v_uid, 'planning:meta-compras:view')
+     AND NOT has_permission(v_uid, 'planning:projecao:view')
+     AND NOT has_permission(v_uid, 'planning:ritmo:view')
+     AND NOT has_permission(v_uid, 'planning:pressao:view')
+     AND NOT has_permission(v_uid, 'planning:radar:view')
+  THEN
+    RAISE EXCEPTION 'Sem permissão para acessar resumo de planejamento';
+  END IF;
+
+  -- Pass company_id to the inner function
+  SELECT _planning_spend_summary_inner(v_cid, p_year, p_month, p_source, p_categoria) INTO v_result;
+  RETURN v_result;
+END;
+$function$;
+
+-- 8) Create new tenant-scoped inner function (replaces get_planning_spend_summary)
+CREATE OR REPLACE FUNCTION public._planning_spend_summary_inner(
+  p_company_id uuid,
+  p_year integer,
+  p_month integer,
+  p_source text DEFAULT NULL::text,
+  p_categoria text DEFAULT NULL::text
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+STABLE SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_start_date date;
+  v_end_date date;
+  v_metas jsonb;
+  v_realizado jsonb;
+  v_realizado_total numeric;
+  v_comparativo jsonb;
+  v_weekly jsonb;
+BEGIN
+  v_start_date := make_date(p_year, p_month, 1);
+  v_end_date := (date_trunc('month', v_start_date) + interval '1 month' - interval '1 day')::date;
+
+  -- Metas do mês (TENANT SCOPED)
+  SELECT COALESCE(jsonb_agg(jsonb_build_object(
+    'id', pm.id,
+    'categoria', pm.categoria,
+    'target_value', pm.target_value,
+    'alerta_amarelo_percent', pm.alerta_amarelo_percent,
+    'alerta_vermelho_percent', pm.alerta_vermelho_percent
+  )), '[]'::jsonb)
+  INTO v_metas
+  FROM planning_metas_compra pm
+  WHERE pm.company_id = p_company_id
+    AND pm.year = p_year AND pm.month = p_month AND pm.ativo = true;
+
+  -- Realizado por categoria (TENANT SCOPED via purchase_orders.company_id)
+  WITH received_items AS (
+    SELECT
+      COALESCE(prod.categoria, 'Sem Categoria') AS cat,
+      poi.qty_received * COALESCE(NULLIF(poi.purchase_unit_cost_snapshot, 0), poi.estimated_unit_value) AS item_value,
+      (poi.received_at AT TIME ZONE 'America/Sao_Paulo')::date AS received_date
+    FROM purchase_order_items poi
+    JOIN purchase_orders po ON po.id = poi.order_id
+    LEFT JOIN produtos prod ON prod.id = poi.stock_item_id
+    WHERE po.company_id = p_company_id
+      AND (poi.received_at AT TIME ZONE 'America/Sao_Paulo')::date BETWEEN v_start_date AND v_end_date
+      AND poi.qty_received > 0
+      AND poi.received_status = 'RECEIVED'
+      AND po.status NOT IN ('CANCELLED','DELETED')
+  ),
+  cat_totals AS (
+    SELECT cat, ROUND(SUM(item_value)::numeric, 2) AS spent_value
+    FROM received_items
+    GROUP BY cat
+  )
+  SELECT
+    COALESCE(jsonb_agg(jsonb_build_object('categoria', cat, 'spent_value', spent_value)), '[]'::jsonb),
+    COALESCE(SUM(spent_value), 0)
+  INTO v_realizado, v_realizado_total
+  FROM cat_totals
+  WHERE (p_categoria IS NULL OR cat = p_categoria);
+
+  -- Weekly breakdown W1-W5 (TENANT SCOPED + TZ corrected)
+  WITH received_items AS (
+    SELECT
+      COALESCE(prod.categoria, 'Sem Categoria') AS cat,
+      poi.qty_received * COALESCE(NULLIF(poi.purchase_unit_cost_snapshot, 0), poi.estimated_unit_value) AS item_value,
+      EXTRACT(DAY FROM (poi.received_at AT TIME ZONE 'America/Sao_Paulo'))::int AS day_num
+    FROM purchase_order_items poi
+    JOIN purchase_orders po ON po.id = poi.order_id
+    LEFT JOIN produtos prod ON prod.id = poi.stock_item_id
+    WHERE po.company_id = p_company_id
+      AND (poi.received_at AT TIME ZONE 'America/Sao_Paulo')::date BETWEEN v_start_date AND v_end_date
+      AND poi.qty_received > 0
+      AND poi.received_status = 'RECEIVED'
+      AND po.status NOT IN ('CANCELLED','DELETED')
+      AND (p_categoria IS NULL OR COALESCE(prod.categoria, 'Sem Categoria') = p_categoria)
+  ),
+  weekly AS (
+    SELECT
+      CASE
+        WHEN day_num <= 7 THEN 'W1'
+        WHEN day_num <= 14 THEN 'W2'
+        WHEN day_num <= 21 THEN 'W3'
+        WHEN day_num <= 28 THEN 'W4'
+        ELSE 'W5'
+      END AS week_label,
+      ROUND(SUM(item_value)::numeric, 2) AS total
+    FROM received_items
+    GROUP BY 1
+  )
+  SELECT COALESCE(jsonb_object_agg(week_label, total), '{}'::jsonb)
+  INTO v_weekly
+  FROM weekly;
+
+  -- Comparativo metas vs realizado (TENANT SCOPED)
+  WITH all_cats AS (
+    SELECT categoria AS cat, target_value, alerta_amarelo_percent, alerta_vermelho_percent
+    FROM planning_metas_compra
+    WHERE company_id = p_company_id
+      AND year = p_year AND month = p_month AND ativo = true
+  ),
+  cat_spent AS (
+    SELECT
+      COALESCE(prod.categoria, 'Sem Categoria') AS cat,
+      ROUND(SUM(poi.qty_received * COALESCE(NULLIF(poi.purchase_unit_cost_snapshot, 0), poi.estimated_unit_value))::numeric, 2) AS spent
+    FROM purchase_order_items poi
+    JOIN purchase_orders po ON po.id = poi.order_id
+    LEFT JOIN produtos prod ON prod.id = poi.stock_item_id
+    WHERE po.company_id = p_company_id
+      AND (poi.received_at AT TIME ZONE 'America/Sao_Paulo')::date BETWEEN v_start_date AND v_end_date
+      AND poi.qty_received > 0 AND poi.received_status = 'RECEIVED'
+      AND po.status NOT IN ('CANCELLED','DELETED')
+    GROUP BY 1
+  )
+  SELECT COALESCE(jsonb_agg(jsonb_build_object(
+    'categoria', COALESCE(ac.cat, cs.cat),
+    'target_value', COALESCE(ac.target_value, 0),
+    'spent_value', COALESCE(cs.spent, 0),
+    'delta_value', COALESCE(ac.target_value, 0) - COALESCE(cs.spent, 0),
+    'percent_of_target', CASE 
+      WHEN COALESCE(ac.target_value, 0) > 0 
+      THEN ROUND((COALESCE(cs.spent, 0) / ac.target_value * 100)::numeric, 2) 
+      ELSE 0 END
+  )), '[]'::jsonb)
+  INTO v_comparativo
+  FROM all_cats ac
+  FULL OUTER JOIN cat_spent cs ON ac.cat = cs.cat
+  WHERE (p_categoria IS NULL OR COALESCE(ac.cat, cs.cat) = p_categoria);
+
+  RETURN jsonb_build_object(
+    'period', jsonb_build_object('year', p_year, 'month', p_month, 'start_date', v_start_date, 'end_date', v_end_date),
+    'metas', v_metas,
+    'realizado_por_categoria', v_realizado,
+    'realizado_total', COALESCE(v_realizado_total, 0),
+    'weekly_breakdown', v_weekly,
+    'comparativo', v_comparativo,
+    'computed_at', now()
+  );
+END;
+$function$;

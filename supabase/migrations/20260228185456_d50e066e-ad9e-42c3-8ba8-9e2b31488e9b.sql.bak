@@ -1,0 +1,311 @@
+
+-- 1) Create suppliers table
+CREATE TABLE IF NOT EXISTS public.suppliers (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT UNIQUE NOT NULL,
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  contact_info JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.suppliers ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Authenticated users can read suppliers"
+  ON public.suppliers FOR SELECT TO authenticated USING (true);
+
+CREATE POLICY "Users with purchases:create can manage suppliers"
+  ON public.suppliers FOR ALL TO authenticated
+  USING (public.has_permission(auth.uid(), 'purchases:create'))
+  WITH CHECK (public.has_permission(auth.uid(), 'purchases:create'));
+
+-- 2) Backfill suppliers from existing supplier_item_prices and purchase_orders
+INSERT INTO public.suppliers (name)
+SELECT DISTINCT supplier_id FROM public.supplier_item_prices WHERE supplier_id IS NOT NULL AND supplier_id != ''
+ON CONFLICT (name) DO NOTHING;
+
+INSERT INTO public.suppliers (name)
+SELECT DISTINCT supplier_name FROM public.purchase_orders WHERE supplier_name IS NOT NULL AND supplier_name != ''
+ON CONFLICT (name) DO NOTHING;
+
+-- 3) Add supplier_uuid column to supplier_item_prices
+ALTER TABLE public.supplier_item_prices ADD COLUMN IF NOT EXISTS supplier_uuid UUID;
+
+-- 4) Backfill supplier_uuid
+UPDATE public.supplier_item_prices sip
+SET supplier_uuid = s.id
+FROM public.suppliers s
+WHERE sip.supplier_id = s.name AND sip.supplier_uuid IS NULL;
+
+-- 5) Add FK (allow NULL for now for backward compat)
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'supplier_item_prices_supplier_uuid_fkey') THEN
+    ALTER TABLE public.supplier_item_prices
+      ADD CONSTRAINT supplier_item_prices_supplier_uuid_fkey
+      FOREIGN KEY (supplier_uuid) REFERENCES public.suppliers(id);
+  END IF;
+END $$;
+
+-- 6) Index for ranking queries
+CREATE INDEX IF NOT EXISTS idx_sip_stock_item ON public.supplier_item_prices (stock_item_id, unit_cost);
+CREATE INDEX IF NOT EXISTS idx_sip_supplier_uuid ON public.supplier_item_prices (supplier_uuid);
+
+-- 7) RPC: get_supplier_ranking
+CREATE OR REPLACE FUNCTION public.get_supplier_ranking(
+  p_stock_item_id UUID DEFAULT NULL,
+  p_category TEXT DEFAULT NULL,
+  p_limit INT DEFAULT 50,
+  p_offset INT DEFAULT 0,
+  p_sort TEXT DEFAULT 'cheapest'
+)
+RETURNS TABLE(
+  supplier_id TEXT,
+  supplier_uuid UUID,
+  supplier_name TEXT,
+  avg_unit_cost NUMERIC,
+  min_unit_cost NUMERIC,
+  max_unit_cost NUMERIC,
+  last_price NUMERIC,
+  last_updated_at TIMESTAMPTZ,
+  items_count BIGINT,
+  rank_position BIGINT,
+  has_more BOOLEAN
+)
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path TO 'public'
+AS $fn$
+DECLARE
+  v_limit INT := LEAST(COALESCE(p_limit, 50), 200);
+BEGIN
+  IF NOT has_permission(auth.uid(), 'purchases:read') THEN
+    RAISE EXCEPTION 'Sem permissão (purchases:read).';
+  END IF;
+
+  RETURN QUERY
+  WITH base AS (
+    SELECT
+      sip.supplier_id AS sid,
+      sip.supplier_uuid AS suuid,
+      COALESCE(s.name, sip.supplier_id) AS sname,
+      sip.unit_cost,
+      sip.last_updated_at AS lua,
+      sip.stock_item_id
+    FROM supplier_item_prices sip
+    LEFT JOIN suppliers s ON s.id = sip.supplier_uuid
+    WHERE
+      (p_stock_item_id IS NULL OR sip.stock_item_id = p_stock_item_id)
+      AND (p_category IS NULL OR EXISTS (
+        SELECT 1 FROM produtos p WHERE p.id = sip.stock_item_id AND p.categoria = p_category
+      ))
+  ),
+  agg AS (
+    SELECT
+      b.sid,
+      b.suuid,
+      b.sname,
+      ROUND(AVG(b.unit_cost)::numeric, 4) AS avg_cost,
+      ROUND(MIN(b.unit_cost)::numeric, 4) AS min_cost,
+      ROUND(MAX(b.unit_cost)::numeric, 4) AS max_cost,
+      COUNT(DISTINCT b.stock_item_id) AS cnt,
+      MAX(b.lua) AS last_ua
+    FROM base b
+    GROUP BY b.sid, b.suuid, b.sname
+  ),
+  ranked AS (
+    SELECT
+      a.*,
+      ROW_NUMBER() OVER (
+        ORDER BY
+          CASE WHEN p_sort = 'cheapest' THEN a.avg_cost END ASC,
+          CASE WHEN p_sort = 'expensive' THEN a.avg_cost END DESC,
+          a.sname ASC
+      ) AS rn
+    FROM agg a
+  ),
+  with_last AS (
+    SELECT
+      r.*,
+      (SELECT b2.unit_cost FROM base b2 WHERE b2.sid = r.sid ORDER BY b2.lua DESC LIMIT 1) AS lp
+    FROM ranked r
+    WHERE r.rn > p_offset
+    ORDER BY r.rn
+    LIMIT v_limit + 1
+  )
+  SELECT
+    wl.sid,
+    wl.suuid,
+    wl.sname,
+    wl.avg_cost,
+    wl.min_cost,
+    wl.max_cost,
+    wl.lp,
+    wl.last_ua,
+    wl.cnt,
+    wl.rn,
+    (ROW_NUMBER() OVER () > v_limit) AS has_more
+  FROM with_last wl
+  LIMIT v_limit;
+END;
+$fn$;
+
+-- 8) Update receive_purchase_order_atomic to upsert supplier_item_prices
+CREATE OR REPLACE FUNCTION public.receive_purchase_order_atomic(p_order_id uuid, p_items jsonb, p_metadata jsonb DEFAULT '{}'::jsonb)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_order RECORD;
+  v_item jsonb;
+  v_oi RECORD;
+  v_conv numeric;
+  v_qty_base numeric;
+  v_cost_base numeric;
+  v_mov_id uuid;
+  v_items_received int := 0;
+  v_items_not_delivered int := 0;
+  v_total_confirmed numeric := 0;
+  v_new_status text;
+  v_ref_id text;
+  v_caller uuid;
+  v_supplier_uuid uuid;
+BEGIN
+  v_caller := auth.uid();
+  IF v_caller IS NULL THEN RAISE EXCEPTION 'Não autenticado.'; END IF;
+  IF NOT has_permission(v_caller, 'purchases:receiving:manage') THEN
+    RAISE EXCEPTION 'Sem permissão para receber pedidos (purchases:receiving:manage).';
+  END IF;
+
+  SELECT * INTO v_order FROM purchase_orders WHERE id = p_order_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Pedido não encontrado: %', p_order_id; END IF;
+  IF v_order.status NOT IN ('IN_RECEIVING', 'OPEN', 'SHOPPING_OK', 'PARTIAL') THEN
+    RAISE EXCEPTION 'Status inválido para recebimento: %', v_order.status;
+  END IF;
+
+  -- Resolve supplier UUID (ensure supplier exists)
+  IF v_order.supplier_name IS NOT NULL AND v_order.supplier_name != '' THEN
+    INSERT INTO suppliers (name) VALUES (v_order.supplier_name)
+    ON CONFLICT (name) DO UPDATE SET updated_at = now()
+    RETURNING id INTO v_supplier_uuid;
+  END IF;
+
+  FOR v_item IN SELECT * FROM jsonb_array_elements(p_items)
+  LOOP
+    SELECT * INTO v_oi FROM purchase_order_items
+    WHERE id = (v_item->>'order_item_id')::uuid AND order_id = p_order_id FOR UPDATE;
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'Item % não pertence ao pedido %', v_item->>'order_item_id', p_order_id;
+    END IF;
+
+    IF (v_item->>'status') = 'NOT_DELIVERED' THEN
+      UPDATE purchase_order_items SET
+        received_status = 'NOT_DELIVERED',
+        not_delivered_reason = COALESCE(v_item->>'reason', 'Não entregue'),
+        received_at = now(), received_by = v_caller, updated_at = now()
+      WHERE id = v_oi.id;
+      v_items_not_delivered := v_items_not_delivered + 1;
+    ELSE
+      IF COALESCE((v_item->>'qty_received')::numeric, 0) <= 0 THEN
+        RAISE EXCEPTION 'Quantidade deve ser > 0 para item %', v_oi.name_snapshot;
+      END IF;
+
+      UPDATE purchase_order_items SET
+        qty_received = (v_item->>'qty_received')::numeric,
+        received_status = 'RECEIVED', received_at = now(),
+        received_by = v_caller, updated_at = now()
+      WHERE id = v_oi.id;
+
+      IF v_oi.stock_item_id IS NOT NULL THEN
+        v_conv := COALESCE(v_oi.conversion_factor_snapshot, 1);
+        v_qty_base := (v_item->>'qty_received')::numeric * v_conv;
+        v_cost_base := CASE WHEN v_conv > 0
+          THEN COALESCE((v_item->>'unit_cost')::numeric, v_oi.estimated_unit_value) / v_conv
+          ELSE COALESCE((v_item->>'unit_cost')::numeric, v_oi.estimated_unit_value)
+        END;
+
+        v_ref_id := 'POI:' || v_oi.id::text;
+
+        IF NOT EXISTS (
+          SELECT 1 FROM movimentacoes_estoque
+          WHERE reference_type = 'PURCHASE_ORDER_ITEM' AND reference_id = v_ref_id AND status = 'ATIVO'
+        ) THEN
+          INSERT INTO movimentacoes_estoque (
+            produto_id, data, tipo, quantidade, custo_unitario, custo_total,
+            origem, observacao, created_by, status,
+            reference_type, reference_id, internal_transfer, source_module
+          ) VALUES (
+            v_oi.stock_item_id,
+            COALESCE((v_item->>'movement_date')::date, CURRENT_DATE),
+            'ENTRADA', v_qty_base, ROUND(v_cost_base::numeric, 4),
+            ROUND((v_qty_base * v_cost_base)::numeric, 2),
+            'Recebimento Pedido/Compra',
+            'Recebimento atômico — Pedido ' || p_order_id::text || ' Item ' || v_oi.name_snapshot,
+            v_caller, 'ATIVO', 'PURCHASE_ORDER_ITEM', v_ref_id, false, 'purchases'
+          ) RETURNING id INTO v_mov_id;
+
+          UPDATE produtos SET
+            last_cost_purchase_unit = COALESCE((v_item->>'unit_cost')::numeric, v_oi.estimated_unit_value),
+            last_cost_base_unit = ROUND(v_cost_base::numeric, 4),
+            last_purchase_date = CURRENT_DATE::text,
+            last_supplier = v_order.supplier_name
+          WHERE id = v_oi.stock_item_id;
+
+          -- Upsert supplier_item_prices for ranking
+          IF v_supplier_uuid IS NOT NULL AND v_oi.stock_item_id IS NOT NULL THEN
+            INSERT INTO supplier_item_prices (supplier_id, supplier_uuid, stock_item_id, unit_cost, purchase_unit, last_updated_at, source)
+            VALUES (
+              v_order.supplier_name,
+              v_supplier_uuid,
+              v_oi.stock_item_id,
+              COALESCE((v_item->>'unit_cost')::numeric, v_oi.estimated_unit_value),
+              COALESCE(v_oi.purchase_unit_snapshot, v_oi.unit_snapshot),
+              now(),
+              'receiving'
+            )
+            ON CONFLICT (supplier_id, stock_item_id) DO UPDATE SET
+              unit_cost = EXCLUDED.unit_cost,
+              supplier_uuid = EXCLUDED.supplier_uuid,
+              purchase_unit = EXCLUDED.purchase_unit,
+              last_updated_at = EXCLUDED.last_updated_at,
+              source = 'receiving';
+          END IF;
+        END IF;
+      END IF;
+
+      v_items_received := v_items_received + 1;
+      v_total_confirmed := v_total_confirmed + (v_item->>'qty_received')::numeric * v_oi.estimated_unit_value;
+    END IF;
+  END LOOP;
+
+  IF EXISTS (
+    SELECT 1 FROM purchase_order_items WHERE order_id = p_order_id AND received_status = 'PENDING' AND shopping_status = 'OK'
+  ) THEN
+    v_new_status := 'IN_RECEIVING';
+  ELSIF EXISTS (
+    SELECT 1 FROM purchase_order_items WHERE order_id = p_order_id
+      AND (received_status = 'NOT_DELIVERED' OR shopping_status = 'NOT_AVAILABLE')
+  ) THEN
+    v_new_status := 'PARTIAL';
+  ELSE
+    v_new_status := 'COMPLETED';
+  END IF;
+
+  UPDATE purchase_orders SET
+    status = v_new_status,
+    total_confirmed = COALESCE(total_confirmed, 0) + v_total_confirmed,
+    concluded_at = CASE WHEN v_new_status = 'COMPLETED' THEN now() ELSE concluded_at END,
+    updated_at = now()
+  WHERE id = p_order_id;
+
+  PERFORM log_audit('rpc', 'purchases', 'purchase_orders', p_order_id, 'RECEIVE_ATOMIC', NULL,
+    jsonb_build_object(
+      'items_received', v_items_received, 'items_not_delivered', v_items_not_delivered,
+      'total_confirmed', v_total_confirmed, 'new_status', v_new_status, 'metadata', p_metadata
+    ));
+
+  RETURN jsonb_build_object(
+    'status', v_new_status, 'items_received', v_items_received,
+    'items_not_delivered', v_items_not_delivered, 'total_confirmed', v_total_confirmed
+  );
+END;
+$function$;

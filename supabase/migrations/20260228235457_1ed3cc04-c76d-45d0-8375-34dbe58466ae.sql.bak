@@ -1,0 +1,319 @@
+
+-- =============================================
+-- GOVERNANCE PHASE 1.2: Add permission guards to sensitive RPCs
+-- =============================================
+
+-- 1) get_saldo_produto → stock:read
+CREATE OR REPLACE FUNCTION public.get_saldo_produto(p_produto_id uuid)
+ RETURNS numeric
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $$
+BEGIN
+  IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Not authenticated'; END IF;
+  IF NOT public.has_permission(auth.uid(), 'stock:read') THEN RAISE EXCEPTION 'Insufficient permissions'; END IF;
+
+  RETURN (
+    SELECT COALESCE(
+      SUM(
+        CASE
+          WHEN tipo IN ('ENTRADA_ESTORNO', 'SAIDA_ESTORNO') THEN 0
+          WHEN direction = 'IN' THEN quantidade
+          ELSE -quantidade
+        END
+      ), 0
+    )
+    FROM movimentacoes_estoque
+    WHERE produto_id = p_produto_id
+      AND status = 'ATIVO'
+  );
+END;
+$$;
+
+-- 2) get_saldo_produtos → stock:read
+CREATE OR REPLACE FUNCTION public.get_saldo_produtos(p_produto_ids uuid[])
+ RETURNS TABLE(produto_id uuid, saldo numeric)
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $$
+BEGIN
+  IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Not authenticated'; END IF;
+  IF NOT public.has_permission(auth.uid(), 'stock:read') THEN RAISE EXCEPTION 'Insufficient permissions'; END IF;
+
+  RETURN QUERY
+  SELECT
+    m.produto_id,
+    COALESCE(SUM(
+      CASE
+        WHEN m.tipo IN ('ENTRADA_ESTORNO', 'SAIDA_ESTORNO') THEN 0
+        WHEN m.direction = 'IN' THEN m.quantidade
+        ELSE -m.quantidade
+      END
+    ), 0) AS saldo
+  FROM movimentacoes_estoque m
+  WHERE m.produto_id = ANY(p_produto_ids)
+    AND m.status = 'ATIVO'
+  GROUP BY m.produto_id;
+END;
+$$;
+
+-- 3) get_stock_summary → stock:read
+CREATE OR REPLACE FUNCTION public.get_stock_summary()
+ RETURNS json
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $$
+DECLARE
+  result json;
+BEGIN
+  IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Not authenticated'; END IF;
+  IF NOT public.has_permission(auth.uid(), 'stock:read') THEN RAISE EXCEPTION 'Insufficient permissions'; END IF;
+
+  SELECT json_build_object(
+    'total_stock_value', COALESCE(agg.total_value, 0),
+    'items_count', COALESCE(agg.items_count, 0),
+    'missing_cost_items_count', COALESCE(agg.missing_cost, 0),
+    'updated_at', now(),
+    'breakdown_by_category', COALESCE(agg.by_category, '[]'::json)
+  ) INTO result
+  FROM (
+    SELECT
+      SUM(CASE WHEN unit_cost > 0 THEN saldo * unit_cost ELSE 0 END) AS total_value,
+      COUNT(*) AS items_count,
+      COUNT(*) FILTER (WHERE unit_cost <= 0) AS missing_cost,
+      json_agg(json_build_object(
+        'categoria', categoria,
+        'valor', CASE WHEN unit_cost > 0 THEN ROUND((saldo * unit_cost)::numeric, 2) ELSE 0 END,
+        'produto', nome_produto,
+        'saldo', saldo,
+        'custo_unitario', unit_cost
+      )) AS by_category
+    FROM (
+      SELECT
+        p.id, p.nome_produto, p.categoria,
+        COALESCE((
+          SELECT SUM(
+            CASE
+              WHEN m.tipo IN ('ENTRADA_ESTORNO', 'SAIDA_ESTORNO') THEN 0
+              WHEN m.direction = 'IN' THEN m.quantidade
+              ELSE -m.quantidade
+            END
+          )
+          FROM movimentacoes_estoque m
+          WHERE m.produto_id = p.id AND m.status = 'ATIVO'
+        ), 0) AS saldo,
+        COALESCE(
+          NULLIF(p.avg30_cost_base_unit, 0),
+          NULLIF(p.last_cost_base_unit, 0),
+          NULLIF(p.default_cost_base_unit, 0),
+          CASE WHEN COALESCE(p.fator_conversao_padrao, 1) > 0
+            THEN p.custo_padrao / COALESCE(NULLIF(p.fator_conversao_padrao, 0), 1)
+            ELSE 0
+          END
+        ) AS unit_cost
+      FROM produtos p
+      WHERE p.ativo = true
+    ) sub
+  ) agg;
+
+  RETURN result;
+END;
+$$;
+
+-- 4) list_movimentacoes_cursor → stock:movements:read
+CREATE OR REPLACE FUNCTION public.list_movimentacoes_cursor(
+  p_limit integer DEFAULT 50,
+  p_cursor_created_at timestamp with time zone DEFAULT NULL,
+  p_cursor_id uuid DEFAULT NULL,
+  p_direction text DEFAULT 'IN',
+  p_produto_id uuid DEFAULT NULL,
+  p_categoria text DEFAULT NULL,
+  p_setor text DEFAULT NULL,
+  p_date_from date DEFAULT NULL,
+  p_date_to date DEFAULT NULL,
+  p_show_cancelled boolean DEFAULT false
+)
+ RETURNS TABLE(id uuid, produto_id uuid, data date, tipo text, quantidade numeric, custo_unitario numeric, custo_total numeric, origem text, referencia_id text, observacao text, created_by text, created_at timestamp with time zone, status text, estorno_de_id uuid, justificativa_cancelamento text, justificativa_edicao text, setor text, reference_type text, reference_id text, internal_transfer boolean, source_module text, salmon_lot_id text, direction text, has_more boolean)
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $$
+DECLARE
+  v_actual_limit int := LEAST(COALESCE(p_limit, 50), 200);
+BEGIN
+  IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Not authenticated'; END IF;
+  IF NOT public.has_permission(auth.uid(), 'stock:movements:read') THEN RAISE EXCEPTION 'Insufficient permissions'; END IF;
+
+  RETURN QUERY
+  WITH filtered AS (
+    SELECT
+      m.id, m.produto_id, m.data, m.tipo, m.quantidade,
+      m.custo_unitario, m.custo_total, m.origem, m.referencia_id,
+      m.observacao, m.created_by, m.created_at, m.status,
+      m.estorno_de_id, m.justificativa_cancelamento,
+      m.justificativa_edicao, m.setor, m.reference_type,
+      m.reference_id, m.internal_transfer, m.source_module,
+      m.salmon_lot_id, m.direction
+    FROM movimentacoes_estoque m
+    WHERE
+      (p_direction IS NULL OR m.direction = p_direction)
+      AND (p_produto_id IS NULL OR m.produto_id = p_produto_id)
+      AND (p_categoria IS NULL OR EXISTS (
+        SELECT 1 FROM produtos p WHERE p.id = m.produto_id AND p.categoria = p_categoria
+      ))
+      AND (p_setor IS NULL OR m.setor = p_setor)
+      AND (p_date_from IS NULL OR m.data >= p_date_from)
+      AND (p_date_to IS NULL OR m.data <= p_date_to)
+      AND (p_show_cancelled OR m.status = 'ATIVO')
+      AND (
+        p_cursor_created_at IS NULL
+        OR (m.created_at, m.id) < (p_cursor_created_at, COALESCE(p_cursor_id, '00000000-0000-0000-0000-000000000000'::uuid))
+      )
+    ORDER BY m.created_at DESC, m.id DESC
+    LIMIT v_actual_limit + 1
+  )
+  SELECT
+    f.id, f.produto_id, f.data, f.tipo, f.quantidade,
+    f.custo_unitario, f.custo_total, f.origem, f.referencia_id,
+    f.observacao, f.created_by, f.created_at, f.status,
+    f.estorno_de_id, f.justificativa_cancelamento,
+    f.justificativa_edicao, f.setor, f.reference_type,
+    f.reference_id, f.internal_transfer, f.source_module,
+    f.salmon_lot_id, f.direction,
+    (ROW_NUMBER() OVER () > v_actual_limit) AS has_more
+  FROM filtered f
+  LIMIT v_actual_limit;
+END;
+$$;
+
+-- 5) get_inactive_stock_items → stock:read
+CREATE OR REPLACE FUNCTION public.get_inactive_stock_items()
+ RETURNS json
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $$
+BEGIN
+  IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Not authenticated'; END IF;
+  IF NOT public.has_permission(auth.uid(), 'stock:read') THEN RAISE EXCEPTION 'Insufficient permissions'; END IF;
+
+  RETURN (
+    SELECT COALESCE(json_agg(row_to_json(sub) ORDER BY sub.days_inactive DESC), '[]'::json)
+    FROM (
+      SELECT
+        p.id AS item_id,
+        p.nome_produto AS item_name,
+        p.categoria AS category,
+        p.local_estoque AS location,
+        p.unidade_medida,
+        p.inactivity_days_threshold,
+        COALESCE(p.last_movement_at, p.created_at) AS last_movement_at,
+        EXTRACT(DAY FROM now() - COALESCE(p.last_movement_at, p.created_at))::int AS days_inactive,
+        COALESCE((
+          SELECT SUM(
+            CASE
+              WHEN m.tipo IN ('ENTRADA_ESTORNO','SAIDA_ESTORNO') THEN 0
+              WHEN m.tipo LIKE 'ENTRADA%' OR m.tipo = 'AJUSTE' OR m.tipo LIKE '%DEVOLUCAO%' THEN m.quantidade
+              ELSE -m.quantidade
+            END
+          )
+          FROM movimentacoes_estoque m WHERE m.produto_id = p.id AND m.status = 'ATIVO'
+        ), 0) AS stock_qty
+      FROM produtos p
+      WHERE p.ativo = true
+        AND p.inactivity_days_threshold IS NOT NULL
+        AND EXTRACT(DAY FROM now() - COALESCE(p.last_movement_at, p.created_at)) >= p.inactivity_days_threshold
+    ) sub
+  );
+END;
+$$;
+
+-- 6) get_spend_by_sector → stock:read (used by Relatórios which already requires stock:read)
+CREATE OR REPLACE FUNCTION public.get_spend_by_sector(p_start_date date, p_end_date date, p_include_losses boolean DEFAULT true)
+ RETURNS json
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $$
+BEGIN
+  IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Not authenticated'; END IF;
+  IF NOT public.has_permission(auth.uid(), 'stock:read') THEN RAISE EXCEPTION 'Insufficient permissions'; END IF;
+
+  RETURN (
+    WITH sector_spend AS (
+      SELECT
+        COALESCE(NULLIF(m.setor, ''), 'Não informado') AS sector,
+        SUM(m.custo_total) AS total
+      FROM movimentacoes_estoque m
+      WHERE m.status = 'ATIVO'
+        AND m.tipo NOT LIKE 'ENTRADA%'
+        AND m.tipo != 'AJUSTE'
+        AND m.tipo NOT IN ('ENTRADA_ESTORNO', 'SAIDA_ESTORNO')
+        AND m.data >= p_start_date
+        AND m.data <= p_end_date
+        AND (
+          CASE WHEN p_include_losses THEN TRUE
+          ELSE m.tipo NOT IN ('BAIXA_PERDA') END
+        )
+      GROUP BY COALESCE(NULLIF(m.setor, ''), 'Não informado')
+    ),
+    grand_total AS (
+      SELECT COALESCE(SUM(total), 0) AS gt FROM sector_spend
+    )
+    SELECT json_build_object(
+      'total_spend', (SELECT gt FROM grand_total),
+      'updated_at', now(),
+      'breakdown', COALESCE(
+        (SELECT json_agg(
+          json_build_object(
+            'sector', ss.sector,
+            'value', ROUND(ss.total::numeric, 2),
+            'percent', CASE WHEN gt.gt > 0 THEN ROUND((ss.total / gt.gt * 100)::numeric, 1) ELSE 0 END
+          ) ORDER BY ss.total DESC
+        )
+        FROM sector_spend ss, grand_total gt),
+        '[]'::json
+      )
+    )
+  );
+END;
+$$;
+
+-- 7) get_saldo_conta → finance:read
+CREATE OR REPLACE FUNCTION public.get_saldo_conta(p_conta_id uuid)
+ RETURNS numeric
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $$
+BEGIN
+  IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Not authenticated'; END IF;
+  IF NOT public.has_permission(auth.uid(), 'finance:read') THEN RAISE EXCEPTION 'Insufficient permissions'; END IF;
+
+  RETURN (
+    SELECT COALESCE(c.saldo_inicial, 0) + COALESCE(
+      (SELECT SUM(
+        CASE
+          WHEN l.tipo = 'RECEITA' THEN l.valor
+          WHEN l.tipo = 'DESPESA' THEN -l.valor
+          WHEN l.tipo = 'TRANSFERENCIA' THEN
+            CASE
+              WHEN l.conta_id = p_conta_id AND l.conta_destino_id IS NOT NULL AND l.conta_destino_id != p_conta_id THEN -l.valor
+              WHEN l.conta_id = p_conta_id AND (l.conta_destino_id IS NULL OR l.conta_destino_id = p_conta_id) THEN l.valor
+              ELSE 0
+            END
+          ELSE 0
+        END
+      )
+      FROM fin_lancamentos l
+      WHERE l.conta_id = p_conta_id AND l.status = 'REALIZADO'
+      ), 0
+    )
+    FROM fin_contas c
+    WHERE c.id = p_conta_id
+  );
+END;
+$$;

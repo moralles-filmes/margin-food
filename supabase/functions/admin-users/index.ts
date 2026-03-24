@@ -1,0 +1,355 @@
+import { createClient } from "npm:@supabase/supabase-js@2";
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
+};
+
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+
+const VALID_ROLES = ['admin', 'operador'];
+
+// Permission keys for this edge function
+const PERM_USERS_VIEW = 'configuracoes:usuarios:view';
+const PERM_USERS_MANAGE = 'configuracoes:usuarios:manage';
+
+// Legacy permission aliases that also grant access
+const LEGACY_VIEW = ['users:manage', 'system:admin'];
+const LEGACY_MANAGE = ['users:manage', 'system:admin'];
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
+
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    if (!supabaseUrl || !serviceRoleKey || !anonKey) return json({ error: 'Server config error' }, 500);
+
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) return json({ error: 'Não autorizado' }, 401);
+
+    const token = authHeader.replace('Bearer ', '');
+    const authClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authHeader } } });
+
+    // JWT validation (signing-keys compatible): prefer getClaims(), fallback to getUser()
+    let callerUserId: string | null = null;
+
+    try {
+      const getClaimsFn = (authClient.auth as any).getClaims;
+      if (typeof getClaimsFn === 'function') {
+        const { data: claimsData, error: claimsError } = await getClaimsFn.call(authClient.auth, token);
+        if (!claimsError && claimsData?.claims?.sub) {
+          callerUserId = claimsData.claims.sub as string;
+        }
+      }
+    } catch {
+      // ignore and fallback below
+    }
+
+    if (!callerUserId) {
+      const { data: tokenUserData, error: tokenAuthError } = await authClient.auth.getUser(token);
+      if (!tokenAuthError && tokenUserData?.user?.id) {
+        callerUserId = tokenUserData.user.id;
+      }
+    }
+
+    if (!callerUserId) {
+      const { data: sessionUserData, error: sessionAuthError } = await authClient.auth.getUser();
+      if (!sessionAuthError && sessionUserData?.user?.id) {
+        callerUserId = sessionUserData.user.id;
+      }
+    }
+
+    if (!callerUserId) return json({ error: 'Usuário não autenticado' }, 403);
+
+    const adminClient = createClient(supabaseUrl, serviceRoleKey);
+
+    // Resolve caller tenant/company for tenant-safe writes
+    const { data: callerProfile } = await adminClient
+      .from('profiles')
+      .select('company_id')
+      .eq('id', callerUserId)
+      .single();
+
+    if (!callerProfile?.company_id) {
+      return json({ error: 'Tenant do usuário não encontrado' }, 400);
+    }
+
+    const callerCompanyId = callerProfile.company_id;
+
+    // ─── Permission check helper ───
+    const checkPermission = async (requiredPerm: string, legacyAliases: string[]): Promise<boolean> => {
+      // Check new granular permission
+      const { data: hasPerm } = await adminClient.rpc('has_permission', { _user_id: callerUserId, _permission: requiredPerm });
+      if (hasPerm === true) return true;
+
+      // Check legacy aliases
+      for (const alias of legacyAliases) {
+        const { data: hasAlias } = await adminClient.rpc('has_permission', { _user_id: callerUserId, _permission: alias });
+        if (hasAlias === true) return true;
+      }
+
+      // Check admin role (isMaster)
+      const { data: callerRoles } = await adminClient.from('user_roles').select('role').eq('user_id', callerUserId);
+      return (callerRoles || []).some((r: any) => r.role === 'admin');
+    };
+
+    let body: Record<string, any>;
+    try {
+      body = await req.json();
+    } catch {
+      return json({ error: 'Body inválido. Envie JSON com a ação.' }, 400);
+    }
+    const { action } = body;
+    if (!action || typeof action !== 'string') {
+      return json({ error: 'Ação obrigatória' }, 400);
+    }
+
+    // ─── Route permission checks ───
+    // Read-only actions need VIEW, mutating actions need MANAGE
+    const readActions = ['list'];
+    const manageActions = ['create', 'edit-user', 'update-role', 'reset-password', 'disable', 'enable', 'delete', 'create-job-role', 'toggle-job-role'];
+
+    if (readActions.includes(action)) {
+      const allowed = await checkPermission(PERM_USERS_VIEW, LEGACY_VIEW);
+      if (!allowed) return json({ error: `Sem permissão (${PERM_USERS_VIEW})` }, 403);
+    } else if (manageActions.includes(action)) {
+      const allowed = await checkPermission(PERM_USERS_MANAGE, LEGACY_MANAGE);
+      if (!allowed) return json({ error: `Sem permissão (${PERM_USERS_MANAGE})` }, 403);
+    } else {
+      return json({ error: 'Ação inválida' }, 400);
+    }
+
+    // Helper: audit log
+    const audit = async (acao: string, registro_id: string, opts: { campo?: string; valor_anterior?: string; valor_novo?: string } = {}) => {
+      await adminClient.from('audit_log').insert({
+        user_id: callerUserId, acao, tabela: 'auth.users', registro_id,
+        campo: opts.campo || null, valor_anterior: opts.valor_anterior || null, valor_novo: opts.valor_novo || null,
+      });
+    };
+
+    // Helper: save user permissions with DENY for unchecked ones
+    const saveUserPermissions = async (userId: string, selectedPermissions: string[], userRole?: string) => {
+      await adminClient.from('user_permissions').delete().eq('user_id', userId);
+
+      const { data: allPermsData } = await adminClient.from('permissions').select('key');
+      const allKeys = (allPermsData || []).map((p: any) => p.key);
+
+      const roleToUse = userRole || '';
+      const { data: rolePermsData } = await adminClient.from('role_permissions').select('permission_key').eq('role', roleToUse);
+      const roleGranted = new Set((rolePermsData || []).map((rp: any) => rp.permission_key));
+
+      const selectedSet = new Set(selectedPermissions);
+      const rows: { user_id: string; permission_key: string; effect: string; granted_by: string }[] = [];
+
+      for (const key of allKeys) {
+        if (selectedSet.has(key) && !roleGranted.has(key)) {
+          rows.push({ user_id: userId, permission_key: key, effect: 'ALLOW', granted_by: callerUserId });
+        } else if (!selectedSet.has(key) && roleGranted.has(key)) {
+          rows.push({ user_id: userId, permission_key: key, effect: 'DENY', granted_by: callerUserId });
+        }
+      }
+
+      if (rows.length > 0) {
+        await adminClient.from('user_permissions').insert(rows);
+      }
+    };
+
+    // ─── LIST ───
+    if (action === 'list') {
+      const { data: profiles } = await adminClient.from('profiles').select('id, nome, email, avatar_url, sector, job_role_id, created_at');
+      const { data: roles } = await adminClient.from('user_roles').select('user_id, role');
+      const { data: jobRoles } = await adminClient.from('job_roles').select('id, nome');
+      const { data: userPerms } = await adminClient.from('user_permissions').select('user_id, permission_key, effect');
+      const { data: authUsers } = await adminClient.auth.admin.listUsers({ perPage: 1000 });
+      const bannedMap = new Map<string, boolean>();
+      (authUsers?.users || []).forEach((u: any) => {
+        bannedMap.set(u.id, !!u.banned_until && new Date(u.banned_until) > new Date());
+      });
+      const jobRoleMap = new Map<string, string>();
+      (jobRoles || []).forEach((j: any) => jobRoleMap.set(j.id, j.nome));
+
+      const users = (profiles || [])
+        .filter((p: any) => !p.nome?.startsWith('[EXCLUÍDO]'))
+        .map((p: any) => ({
+          ...p,
+          role: roles?.find((r: any) => r.user_id === p.id)?.role || 'sem_role',
+          job_role_name: p.job_role_id ? jobRoleMap.get(p.job_role_id) || null : null,
+          disabled: bannedMap.get(p.id) || false,
+          permissions: (userPerms || []).filter((up: any) => up.user_id === p.id).map((up: any) => ({ key: up.permission_key, effect: up.effect })),
+        }));
+      return json({ users });
+    }
+
+    // ─── CREATE ───
+    if (action === 'create') {
+      const { email, password, nome, role, sector, job_role_id, permissions } = body;
+      if (!email || !password || !nome || !role) return json({ error: 'Campos obrigatórios: email, password, nome, role' }, 400);
+      if (!VALID_ROLES.includes(role)) return json({ error: 'Role inválido. Use admin ou operador.' }, 400);
+
+      const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
+        email, password, email_confirm: true, user_metadata: { nome }
+      });
+      if (createError) return json({ error: createError.message }, 400);
+
+      await adminClient.from('user_roles').insert({ user_id: newUser.user.id, role });
+
+      const profileUpdate: Record<string, any> = {};
+      if (job_role_id) profileUpdate.job_role_id = job_role_id;
+      if (Object.keys(profileUpdate).length > 0) {
+        await adminClient.from('profiles').update(profileUpdate).eq('id', newUser.user.id);
+      }
+
+      if (Array.isArray(permissions) && permissions.length > 0) {
+        await saveUserPermissions(newUser.user.id, permissions, role);
+      }
+
+      await audit('user.created', newUser.user.id, { valor_novo: JSON.stringify({ email, nome, role, sector: sector || null, job_role_id: job_role_id || null, permissions_count: permissions?.length || 0 }) });
+      return json({ success: true, user: { id: newUser.user.id, email, nome, role, sector: sector || null } });
+    }
+
+    // ─── EDIT USER ───
+    if (action === 'edit-user') {
+      const { userId, nome, email, role, sector, job_role_id, permissions } = body;
+      if (!userId) return json({ error: 'userId obrigatório' }, 400);
+
+      const { data: oldProfile } = await adminClient.from('profiles').select('nome, email, sector, job_role_id').eq('id', userId).single();
+      const { data: oldRoleRow } = await adminClient.from('user_roles').select('role').eq('user_id', userId).single();
+      const before = { nome: oldProfile?.nome, email: oldProfile?.email, role: oldRoleRow?.role, sector: oldProfile?.sector };
+
+      const profileUpdate: Record<string, any> = {};
+      if (nome !== undefined && nome !== before.nome) profileUpdate.nome = nome;
+      if (email !== undefined && email !== before.email) profileUpdate.email = email;
+
+      if (role !== undefined && role !== before.role) {
+        if (!VALID_ROLES.includes(role)) return json({ error: 'Role inválido. Use admin ou operador.' }, 400);
+        await adminClient.from('user_roles').delete().eq('user_id', userId);
+        await adminClient.from('user_roles').insert({ user_id: userId, role });
+      }
+
+      if (job_role_id !== undefined) {
+        profileUpdate.job_role_id = job_role_id || null;
+      }
+
+      if (Object.keys(profileUpdate).length > 0) {
+        await adminClient.from('profiles').update(profileUpdate).eq('id', userId);
+      }
+
+      if (email && email !== before.email) {
+        await adminClient.auth.admin.updateUserById(userId, { email });
+      }
+      if (nome && nome !== before.nome) {
+        await adminClient.auth.admin.updateUserById(userId, { user_metadata: { nome } });
+      }
+
+      if (Array.isArray(permissions)) {
+        const effectiveRole = (role !== undefined ? role : before.role) || '';
+        await saveUserPermissions(userId, permissions, effectiveRole);
+      }
+
+      const after = { nome: nome || before.nome, email: email || before.email, role: role || before.role, sector: profileUpdate.sector !== undefined ? profileUpdate.sector : before.sector };
+      await audit('user.edited', userId, { valor_anterior: JSON.stringify(before), valor_novo: JSON.stringify(after) });
+      return json({ success: true });
+    }
+
+    // ─── UPDATE ROLE (legacy) ───
+    if (action === 'update-role') {
+      const { userId, role, sector } = body;
+      if (!userId || !role) return json({ error: 'userId e role são obrigatórios' }, 400);
+      if (!VALID_ROLES.includes(role)) return json({ error: 'Role inválido. Use admin ou operador.' }, 400);
+
+      const { data: oldRole } = await adminClient.from('user_roles').select('role').eq('user_id', userId).single();
+      await adminClient.from('user_roles').delete().eq('user_id', userId);
+      await adminClient.from('user_roles').insert({ user_id: userId, role });
+      await audit('role.changed', userId, { campo: 'role', valor_anterior: oldRole?.role || '', valor_novo: JSON.stringify({ role }) });
+      return json({ success: true });
+    }
+
+    // ─── RESET PASSWORD ───
+    if (action === 'reset-password') {
+      const { userId, newPassword } = body;
+      if (!userId || !newPassword) return json({ error: 'userId e newPassword obrigatórios' }, 400);
+      if (newPassword.length < 12) return json({ error: 'Senha deve ter no mínimo 12 caracteres' }, 400);
+      const { error } = await adminClient.auth.admin.updateUserById(userId, { password: newPassword });
+      if (error) return json({ error: error.message }, 500);
+      await audit('password.reset', userId);
+      return json({ success: true });
+    }
+
+    // ─── DISABLE ───
+    if (action === 'disable') {
+      const { userId } = body;
+      if (!userId) return json({ error: 'userId obrigatório' }, 400);
+      const { error } = await adminClient.auth.admin.updateUserById(userId, { ban_duration: '876600h' });
+      if (error) return json({ error: error.message }, 500);
+      await audit('user.disabled', userId);
+      return json({ success: true });
+    }
+
+    // ─── ENABLE ───
+    if (action === 'enable') {
+      const { userId } = body;
+      if (!userId) return json({ error: 'userId obrigatório' }, 400);
+      const { error } = await adminClient.auth.admin.updateUserById(userId, { ban_duration: 'none' });
+      if (error) return json({ error: error.message }, 500);
+      await audit('user.enabled', userId);
+      return json({ success: true });
+    }
+
+    // ─── DELETE ───
+    if (action === 'delete') {
+      const { userId, motivo } = body;
+      if (!userId) return json({ error: 'userId obrigatório' }, 400);
+      if (!motivo || motivo.trim().length < 3) return json({ error: 'Motivo da exclusão é obrigatório (mín. 3 caracteres)' }, 400);
+      if (userId === callerUserId) return json({ error: 'Não é possível excluir a si mesmo' }, 400);
+
+      const { data: profile } = await adminClient.from('profiles').select('nome, email').eq('id', userId).single();
+      const { data: roleRow } = await adminClient.from('user_roles').select('role').eq('user_id', userId).single();
+
+      const { error: banError } = await adminClient.auth.admin.updateUserById(userId, { ban_duration: '876600h' });
+      if (banError) return json({ error: banError.message }, 500);
+
+      await adminClient.from('user_roles').delete().eq('user_id', userId);
+      await adminClient.from('user_permissions').delete().eq('user_id', userId);
+      await adminClient.from('profiles').update({ nome: `[EXCLUÍDO] ${profile?.nome || ''}` }).eq('id', userId);
+
+      await audit('user.deleted', userId, {
+        valor_anterior: JSON.stringify({ nome: profile?.nome, email: profile?.email, role: roleRow?.role }),
+        valor_novo: JSON.stringify({ motivo }),
+      });
+      return json({ success: true });
+    }
+
+    // ─── CREATE JOB ROLE ───
+    if (action === 'create-job-role') {
+      const { nome, descricao } = body;
+      if (!nome || !nome.trim()) return json({ error: 'Nome do cargo é obrigatório' }, 400);
+      const { error } = await adminClient.from('job_roles').insert({
+        nome: nome.trim(),
+        descricao: descricao || null,
+        created_by: callerUserId,
+        company_id: callerCompanyId,
+      });
+      if (error) return json({ error: error.message }, 400);
+      await audit('job_role.created', 'job_roles', { valor_novo: JSON.stringify({ nome }) });
+      return json({ success: true });
+    }
+
+    // ─── TOGGLE JOB ROLE ───
+    if (action === 'toggle-job-role') {
+      const { jobRoleId, is_active } = body;
+      if (!jobRoleId) return json({ error: 'jobRoleId obrigatório' }, 400);
+      const { error } = await adminClient.from('job_roles').update({ is_active }).eq('id', jobRoleId).eq('company_id', callerCompanyId);
+      if (error) return json({ error: error.message }, 500);
+      await audit('job_role.toggled', jobRoleId, { valor_novo: JSON.stringify({ is_active }) });
+      return json({ success: true });
+    }
+
+    return json({ error: 'Ação inválida' }, 400);
+  } catch (err) {
+    console.error('admin-users error:', err);
+    return json({ error: 'Erro interno' }, 500);
+  }
+});

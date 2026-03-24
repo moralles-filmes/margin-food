@@ -1,0 +1,470 @@
+
+-- Fix get_stock_top_consumed: exclude estornos from saldos and consumo CTEs,
+-- and compute category summary from full dataset (not just top N)
+CREATE OR REPLACE FUNCTION public.get_stock_top_consumed(
+    p_start_date date,
+    p_end_date date,
+    p_rank_by text DEFAULT 'quantity',
+    p_limit integer DEFAULT 20,
+    p_category text DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_company uuid;
+    v_result jsonb;
+    v_days integer;
+BEGIN
+    v_company := public.assert_tenant();
+    v_days := GREATEST((p_end_date - p_start_date + 1), 1);
+
+    WITH saldos AS (
+        SELECT
+            m.produto_id,
+            SUM(
+              CASE
+                WHEN m.tipo IN ('ENTRADA_ESTORNO', 'SAIDA_ESTORNO') THEN 0
+                WHEN m.direction = 'IN' THEN m.quantidade
+                ELSE -m.quantidade
+              END
+            ) AS saldo
+        FROM public.movimentacoes_estoque m
+        WHERE m.company_id = v_company AND m.status = 'ATIVO'
+        GROUP BY m.produto_id
+    ),
+    consumo AS (
+        SELECT
+            m.produto_id,
+            ROUND(SUM(m.quantidade)::numeric, 4) AS consumo_total,
+            ROUND(SUM(m.quantidade * m.custo_unitario)::numeric, 2) AS custo_total,
+            COUNT(*)::int AS total_saidas,
+            MAX(m.created_at) AS ultima_saida
+        FROM public.movimentacoes_estoque m
+        WHERE m.company_id = v_company
+          AND m.status = 'ATIVO'
+          AND m.direction = 'OUT'
+          AND m.tipo NOT IN ('ENTRADA_ESTORNO', 'SAIDA_ESTORNO')
+          AND m.created_at::date >= p_start_date
+          AND m.created_at::date <= p_end_date
+        GROUP BY m.produto_id
+    ),
+    -- Full dataset (no LIMIT) for category summary
+    full_ranked AS (
+        SELECT
+            p.id AS produto_id,
+            p.nome_produto,
+            p.categoria,
+            p.unidade_medida,
+            p.estoque_minimo,
+            COALESCE(s.saldo, 0) AS saldo_atual,
+            COALESCE(c.consumo_total, 0) AS consumo_total,
+            COALESCE(c.custo_total, 0) AS custo_total,
+            COALESCE(c.total_saidas, 0) AS total_saidas,
+            c.ultima_saida,
+            ROUND(COALESCE(c.consumo_total, 0) / v_days, 4) AS media_diaria,
+            CASE
+                WHEN COALESCE(c.consumo_total, 0) > 0 AND COALESCE(s.saldo, 0) > 0
+                THEN ROUND((COALESCE(s.saldo, 0) / (COALESCE(c.consumo_total, 0) / v_days))::numeric, 1)
+                ELSE NULL
+            END AS cobertura_dias,
+            CASE
+                WHEN COALESCE(s.saldo, 0) <= 0 THEN 'sem_estoque'
+                WHEN p.estoque_minimo > 0 AND COALESCE(s.saldo, 0) <= (p.estoque_minimo * 0.5) THEN 'critico'
+                WHEN p.estoque_minimo > 0 AND COALESCE(s.saldo, 0) <= p.estoque_minimo THEN 'atencao'
+                ELSE 'ok'
+            END AS status_estoque,
+            CASE
+                WHEN COALESCE(
+                    NULLIF(p.avg30_cost_base_unit, 0),
+                    NULLIF(p.last_cost_base_unit, 0),
+                    NULLIF(p.default_cost_base_unit, 0), 0
+                ) = 0 THEN true ELSE false
+            END AS sem_custo
+        FROM consumo c
+        JOIN public.produtos p ON p.id = c.produto_id AND p.company_id = v_company AND p.ativo = true
+        LEFT JOIN saldos s ON s.produto_id = p.id
+        WHERE (p_category IS NULL OR p.categoria = p_category)
+    ),
+    ranked AS (
+        SELECT *
+        FROM full_ranked
+        ORDER BY
+            CASE WHEN p_rank_by = 'cost' THEN custo_total ELSE consumo_total END DESC NULLS LAST
+        LIMIT p_limit
+    ),
+    items_json AS (
+        SELECT COALESCE(jsonb_agg(jsonb_build_object(
+            'produto_id', r.produto_id,
+            'nome_produto', r.nome_produto,
+            'categoria', r.categoria,
+            'unidade_medida', r.unidade_medida,
+            'consumo_total', r.consumo_total,
+            'custo_total', r.custo_total,
+            'media_diaria', r.media_diaria,
+            'saldo_atual', r.saldo_atual,
+            'estoque_minimo', r.estoque_minimo,
+            'cobertura_dias', r.cobertura_dias,
+            'status_estoque', r.status_estoque,
+            'sem_custo', r.sem_custo,
+            'total_saidas', r.total_saidas,
+            'ultima_saida', r.ultima_saida
+        )), '[]'::jsonb) AS data
+        FROM ranked r
+    ),
+    alertas AS (
+        SELECT COALESCE(jsonb_agg(jsonb_build_object(
+            'produto_id', r.produto_id,
+            'nome_produto', r.nome_produto,
+            'status_estoque', r.status_estoque,
+            'sem_custo', r.sem_custo,
+            'consumo_total', r.consumo_total,
+            'saldo_atual', r.saldo_atual,
+            'cobertura_dias', r.cobertura_dias,
+            'unidade_medida', r.unidade_medida
+        )), '[]'::jsonb) AS data
+        FROM ranked r
+        WHERE r.status_estoque IN ('critico', 'sem_estoque', 'atencao') OR r.sem_custo = true
+    ),
+    -- Category summary from FULL dataset (not limited)
+    cat_summary AS (
+        SELECT COALESCE(jsonb_agg(jsonb_build_object(
+            'categoria', sub.categoria,
+            'consumo_total', sub.consumo_total,
+            'custo_total', sub.custo_total,
+            'qtd_itens', sub.qtd_itens
+        ) ORDER BY sub.consumo_total DESC), '[]'::jsonb) AS data
+        FROM (
+            SELECT
+                COALESCE(NULLIF(r.categoria, ''), 'Sem Categoria') AS categoria,
+                ROUND(SUM(r.consumo_total)::numeric, 4) AS consumo_total,
+                ROUND(SUM(r.custo_total)::numeric, 2) AS custo_total,
+                COUNT(*)::int AS qtd_itens
+            FROM full_ranked r
+            GROUP BY 1
+        ) sub
+    ),
+    totals AS (
+        SELECT
+            ROUND(COALESCE(SUM(r.consumo_total), 0)::numeric, 4) AS consumo_total,
+            ROUND(COALESCE(SUM(r.custo_total), 0)::numeric, 2) AS custo_total,
+            COUNT(CASE WHEN r.status_estoque IN ('critico','sem_estoque') THEN 1 END)::int AS itens_criticos,
+            COUNT(CASE WHEN r.sem_custo THEN 1 END)::int AS itens_sem_custo
+        FROM full_ranked r
+    )
+    SELECT jsonb_build_object(
+        'items', ij.data,
+        'alertas', al.data,
+        'categorias', cs.data,
+        'consumo_total', t.consumo_total,
+        'custo_total', t.custo_total,
+        'itens_criticos', t.itens_criticos,
+        'itens_sem_custo', t.itens_sem_custo,
+        'dias_periodo', v_days
+    ) INTO v_result
+    FROM items_json ij, alertas al, cat_summary cs, totals t;
+
+    RETURN v_result;
+END;
+$$;
+
+-- Fix get_stock_dashboard: exclude estornos from saldos and ledger_value CTEs
+CREATE OR REPLACE FUNCTION public.get_stock_dashboard(
+    p_days integer DEFAULT 30
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_company uuid;
+    v_result jsonb;
+    v_cutoff timestamptz;
+BEGIN
+    v_company := public.assert_tenant();
+    v_cutoff := now() - (p_days || ' days')::interval;
+
+    WITH saldos AS (
+        SELECT
+            m.produto_id,
+            SUM(
+              CASE
+                WHEN m.tipo IN ('ENTRADA_ESTORNO', 'SAIDA_ESTORNO') THEN 0
+                WHEN m.direction = 'IN' THEN m.quantidade
+                ELSE -m.quantidade
+              END
+            ) AS saldo
+        FROM public.movimentacoes_estoque m
+        WHERE m.company_id = v_company AND m.status = 'ATIVO'
+        GROUP BY m.produto_id
+    ),
+    ledger_value AS (
+        SELECT COALESCE(ROUND(SUM(
+            CASE
+                WHEN m.tipo IN ('ENTRADA_ESTORNO', 'SAIDA_ESTORNO') THEN 0
+                WHEN m.direction = 'IN'
+                     THEN m.quantidade * m.custo_unitario
+                     ELSE -m.quantidade * m.custo_unitario
+            END
+        )::numeric, 2), 0) AS valor_total
+        FROM public.movimentacoes_estoque m
+        WHERE m.company_id = v_company AND m.status = 'ATIVO'
+    ),
+    produto_saldos AS (
+        SELECT
+            p.id,
+            p.nome_produto,
+            p.categoria,
+            p.unidade_medida,
+            p.estoque_minimo,
+            COALESCE(s.saldo, 0) AS saldo,
+            COALESCE(
+                NULLIF(p.avg30_cost_base_unit, 0),
+                NULLIF(p.last_cost_base_unit, 0),
+                NULLIF(p.default_cost_base_unit, 0),
+                0
+            ) AS custo_efetivo
+        FROM public.produtos p
+        LEFT JOIN saldos s ON s.produto_id = p.id
+        WHERE p.company_id = v_company AND p.ativo = true
+    ),
+    cat_dist AS (
+        SELECT COALESCE(jsonb_agg(jsonb_build_object(
+            'categoria', COALESCE(sub.categoria, 'Sem Categoria'),
+            'valor', sub.valor,
+            'qtd_itens', sub.qtd_itens
+        ) ORDER BY sub.valor DESC), '[]'::jsonb) AS data
+        FROM (
+            SELECT
+                COALESCE(NULLIF(ps.categoria, ''), 'Sem Categoria') AS categoria,
+                ROUND(SUM(ps.saldo * ps.custo_efetivo)::numeric, 2) AS valor,
+                COUNT(*)::int AS qtd_itens
+            FROM produto_saldos ps
+            WHERE ps.saldo > 0
+            GROUP BY 1
+        ) sub
+    ),
+    status_counts AS (
+        SELECT
+            COUNT(*)::int AS total,
+            COUNT(CASE WHEN ps.saldo > ps.estoque_minimo AND ps.estoque_minimo > 0 THEN 1
+                       WHEN ps.estoque_minimo = 0 AND ps.saldo > 0 THEN 1 END)::int AS ok,
+            COUNT(CASE WHEN ps.estoque_minimo > 0 AND ps.saldo > 0
+                       AND ps.saldo <= ps.estoque_minimo AND ps.saldo > (ps.estoque_minimo * 0.5) THEN 1 END)::int AS atencao,
+            COUNT(CASE WHEN ps.estoque_minimo > 0 AND ps.saldo > 0
+                       AND ps.saldo <= (ps.estoque_minimo * 0.5) THEN 1 END)::int AS critico,
+            COUNT(CASE WHEN ps.saldo <= 0 THEN 1 END)::int AS sem_estoque,
+            COUNT(CASE WHEN ps.custo_efetivo = 0 THEN 1 END)::int AS sem_custo
+        FROM produto_saldos ps
+    ),
+    recent_mov AS (
+        SELECT COALESCE(jsonb_agg(jsonb_build_object(
+            'id', sub.id,
+            'produto_nome', sub.nome_produto,
+            'tipo', sub.tipo,
+            'direction', sub.direction,
+            'quantidade', sub.quantidade,
+            'custo_total', sub.custo_total,
+            'created_at', sub.created_at
+        ) ORDER BY sub.created_at DESC), '[]'::jsonb) AS data
+        FROM (
+            SELECT m.id, p.nome_produto, m.tipo, m.direction, m.quantidade, m.custo_total, m.created_at
+            FROM public.movimentacoes_estoque m
+            JOIN public.produtos p ON p.id = m.produto_id
+            WHERE m.company_id = v_company AND m.status = 'ATIVO'
+              AND m.tipo NOT IN ('ENTRADA_ESTORNO', 'SAIDA_ESTORNO')
+              AND m.created_at >= v_cutoff
+            ORDER BY m.created_at DESC
+            LIMIT 10
+        ) sub
+    ),
+    entradas_periodo AS (
+        SELECT
+            COALESCE(ROUND(SUM(m.custo_total)::numeric, 2), 0) AS valor,
+            COUNT(*)::int AS qtd
+        FROM public.movimentacoes_estoque m
+        WHERE m.company_id = v_company AND m.status = 'ATIVO'
+          AND m.direction = 'IN'
+          AND m.tipo NOT IN ('ENTRADA_ESTORNO', 'SAIDA_ESTORNO')
+          AND m.created_at >= v_cutoff
+    ),
+    saidas_periodo AS (
+        SELECT
+            COALESCE(ROUND(SUM(m.custo_total)::numeric, 2), 0) AS valor,
+            COUNT(*)::int AS qtd
+        FROM public.movimentacoes_estoque m
+        WHERE m.company_id = v_company AND m.status = 'ATIVO'
+          AND m.direction = 'OUT'
+          AND m.tipo NOT IN ('ENTRADA_ESTORNO', 'SAIDA_ESTORNO')
+          AND m.created_at >= v_cutoff
+    )
+    SELECT jsonb_build_object(
+        'valor_total_estoque', lv.valor_total,
+        'categorias', cd.data,
+        'status', jsonb_build_object(
+            'total', sc.total,
+            'ok', sc.ok,
+            'atencao', sc.atencao,
+            'critico', sc.critico,
+            'sem_estoque', sc.sem_estoque,
+            'sem_custo', sc.sem_custo
+        ),
+        'movimentacoes_recentes', rm.data,
+        'entradas_periodo', jsonb_build_object('valor', ep.valor, 'qtd', ep.qtd),
+        'saidas_periodo', jsonb_build_object('valor', sp.valor, 'qtd', sp.qtd),
+        'dias_periodo', p_days
+    ) INTO v_result
+    FROM ledger_value lv, cat_dist cd, status_counts sc, recent_mov rm, entradas_periodo ep, saidas_periodo sp;
+
+    RETURN v_result;
+END;
+$$;
+
+-- Fix get_stock_consumption_history: exclude estornos from consumption data
+CREATE OR REPLACE FUNCTION public.get_stock_consumption_history(
+    p_start_date date,
+    p_end_date date,
+    p_group_by text DEFAULT 'daily',
+    p_product_id uuid DEFAULT NULL,
+    p_category text DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_company uuid;
+    v_result jsonb;
+BEGIN
+    v_company := public.assert_tenant();
+
+    WITH filtered_mov AS (
+        SELECT
+            m.produto_id,
+            p.nome_produto,
+            p.categoria,
+            p.unidade_medida,
+            m.quantidade,
+            m.custo_unitario,
+            m.created_at::date AS mov_date
+        FROM public.movimentacoes_estoque m
+        JOIN public.produtos p ON p.id = m.produto_id AND p.company_id = v_company
+        WHERE m.company_id = v_company
+          AND m.status = 'ATIVO'
+          AND m.direction = 'OUT'
+          AND m.tipo NOT IN ('ENTRADA_ESTORNO', 'SAIDA_ESTORNO')
+          AND m.created_at::date >= p_start_date
+          AND m.created_at::date <= p_end_date
+          AND (p_product_id IS NULL OR m.produto_id = p_product_id)
+          AND (p_category IS NULL OR p.categoria = p_category)
+    ),
+    timeline AS (
+        SELECT
+            CASE p_group_by
+                WHEN 'weekly' THEN date_trunc('week', fm.mov_date)::date
+                WHEN 'monthly' THEN date_trunc('month', fm.mov_date)::date
+                ELSE fm.mov_date
+            END AS period,
+            ROUND(SUM(fm.quantidade)::numeric, 4) AS total_qty,
+            ROUND(SUM(fm.quantidade * fm.custo_unitario)::numeric, 2) AS total_cost
+        FROM filtered_mov fm
+        GROUP BY 1
+        ORDER BY 1
+    ),
+    timeline_json AS (
+        SELECT COALESCE(jsonb_agg(jsonb_build_object(
+            'period', t.period,
+            'total_qty', t.total_qty,
+            'total_cost', t.total_cost
+        ) ORDER BY t.period), '[]'::jsonb) AS data
+        FROM timeline t
+    ),
+    product_summary AS (
+        SELECT
+            fm.produto_id,
+            fm.nome_produto,
+            fm.categoria,
+            fm.unidade_medida,
+            ROUND(SUM(fm.quantidade)::numeric, 4) AS consumo_total,
+            ROUND(SUM(fm.quantidade * fm.custo_unitario)::numeric, 2) AS custo_total,
+            COUNT(DISTINCT fm.mov_date) AS dias_com_consumo,
+            MIN(fm.mov_date) AS primeiro_consumo,
+            MAX(fm.mov_date) AS ultimo_consumo
+        FROM filtered_mov fm
+        GROUP BY fm.produto_id, fm.nome_produto, fm.categoria, fm.unidade_medida
+    ),
+    product_enriched AS (
+        SELECT
+            ps.*,
+            ROUND(ps.consumo_total / GREATEST((p_end_date - p_start_date + 1), 1), 4) AS media_diaria,
+            ROUND(ps.consumo_total / GREATEST(CEIL((p_end_date - p_start_date + 1)::numeric / 7), 1), 4) AS media_semanal
+        FROM product_summary ps
+    ),
+    products_json AS (
+        SELECT COALESCE(jsonb_agg(jsonb_build_object(
+            'produto_id', pe.produto_id,
+            'nome_produto', pe.nome_produto,
+            'categoria', pe.categoria,
+            'unidade_medida', pe.unidade_medida,
+            'consumo_total', pe.consumo_total,
+            'custo_total', pe.custo_total,
+            'dias_com_consumo', pe.dias_com_consumo,
+            'media_diaria', pe.media_diaria,
+            'media_semanal', pe.media_semanal,
+            'ultimo_consumo', pe.ultimo_consumo
+        ) ORDER BY pe.consumo_total DESC), '[]'::jsonb) AS data
+        FROM product_enriched pe
+    ),
+    top10_json AS (
+        SELECT COALESCE(jsonb_agg(jsonb_build_object(
+            'nome_produto', pe.nome_produto,
+            'consumo_total', pe.consumo_total,
+            'unidade_medida', pe.unidade_medida,
+            'custo_total', pe.custo_total
+        ) ORDER BY pe.consumo_total DESC), '[]'::jsonb) AS data
+        FROM (SELECT * FROM product_enriched ORDER BY consumo_total DESC LIMIT 10) pe
+    ),
+    cat_json AS (
+        SELECT COALESCE(jsonb_agg(jsonb_build_object(
+            'categoria', sub.categoria,
+            'consumo_total', sub.consumo_total,
+            'custo_total', sub.custo_total,
+            'qtd_itens', sub.qtd_itens
+        ) ORDER BY sub.consumo_total DESC), '[]'::jsonb) AS data
+        FROM (
+            SELECT
+                COALESCE(NULLIF(pe.categoria, ''), 'Sem Categoria') AS categoria,
+                ROUND(SUM(pe.consumo_total)::numeric, 4) AS consumo_total,
+                ROUND(SUM(pe.custo_total)::numeric, 2) AS custo_total,
+                COUNT(*)::int AS qtd_itens
+            FROM product_enriched pe
+            GROUP BY 1
+        ) sub
+    ),
+    totals AS (
+        SELECT
+            ROUND(COALESCE(SUM(fm.quantidade), 0)::numeric, 4) AS consumo_total,
+            ROUND(COALESCE(SUM(fm.quantidade * fm.custo_unitario), 0)::numeric, 2) AS custo_total,
+            COUNT(DISTINCT fm.produto_id)::int AS itens_distintos,
+            COUNT(DISTINCT fm.mov_date)::int AS dias_com_consumo
+        FROM filtered_mov fm
+    )
+    SELECT jsonb_build_object(
+        'consumo_total', tt.consumo_total,
+        'custo_total', tt.custo_total,
+        'itens_distintos', tt.itens_distintos,
+        'dias_com_consumo', tt.dias_com_consumo,
+        'timeline', tl.data,
+        'produtos', pj.data,
+        'top10', t10.data,
+        'categorias', cj.data
+    ) INTO v_result
+    FROM totals tt, timeline_json tl, products_json pj, top10_json t10, cat_json cj;
+
+    RETURN v_result;
+END;
+$$;

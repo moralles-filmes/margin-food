@@ -1,0 +1,50 @@
+-- Add inactivity threshold and cached last_movement_at to produtos
+ALTER TABLE public.produtos
+  ADD COLUMN IF NOT EXISTS inactivity_days_threshold integer DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS last_movement_at timestamptz DEFAULT NULL;
+
+-- Backfill last_movement_at from existing movements
+UPDATE public.produtos p
+SET last_movement_at = sub.last_at
+FROM (
+  SELECT produto_id, MAX(created_at) AS last_at
+  FROM movimentacoes_estoque
+  WHERE status = 'ATIVO'
+    AND tipo NOT IN ('ENTRADA_ESTORNO', 'SAIDA_ESTORNO')
+  GROUP BY produto_id
+) sub
+WHERE p.id = sub.produto_id;
+
+CREATE OR REPLACE FUNCTION public.get_inactive_stock_items()
+RETURNS json
+LANGUAGE sql
+STABLE SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+  SELECT COALESCE(json_agg(row_to_json(sub) ORDER BY sub.days_inactive DESC), '[]'::json)
+  FROM (
+    SELECT
+      p.id AS item_id,
+      p.nome_produto AS item_name,
+      p.categoria AS category,
+      p.local_estoque AS location,
+      p.unidade_medida,
+      p.inactivity_days_threshold,
+      COALESCE(p.last_movement_at, p.created_at) AS last_movement_at,
+      EXTRACT(DAY FROM now() - COALESCE(p.last_movement_at, p.created_at))::int AS days_inactive,
+      COALESCE((
+        SELECT SUM(
+          CASE
+            WHEN m.tipo IN ('ENTRADA_ESTORNO','SAIDA_ESTORNO') THEN 0
+            WHEN m.tipo LIKE 'ENTRADA%' OR m.tipo = 'AJUSTE' OR m.tipo LIKE '%DEVOLUCAO%' THEN m.quantidade
+            ELSE -m.quantidade
+          END
+        )
+        FROM movimentacoes_estoque m WHERE m.produto_id = p.id AND m.status = 'ATIVO'
+      ), 0) AS stock_qty
+    FROM produtos p
+    WHERE p.ativo = true
+      AND p.inactivity_days_threshold IS NOT NULL
+      AND EXTRACT(DAY FROM now() - COALESCE(p.last_movement_at, p.created_at)) >= p.inactivity_days_threshold
+  ) sub
+$function$;

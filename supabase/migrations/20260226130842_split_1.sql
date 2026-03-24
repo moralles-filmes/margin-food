@@ -1,0 +1,141 @@
+CREATE OR REPLACE FUNCTION public.has_role(_user_id UUID, _role app_role)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.user_roles WHERE user_id = _user_id AND role = _role
+  )
+$$;
+
+CREATE POLICY "Users can read own roles" ON public.user_roles FOR SELECT TO authenticated USING (auth.uid() = user_id);
+CREATE POLICY "Admins can manage roles" ON public.user_roles FOR ALL TO authenticated USING (public.has_role(auth.uid(), 'admin'));
+
+-- 3) Produtos (estoque geral migration)
+CREATE TABLE public.produtos (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  nome_produto TEXT NOT NULL,
+  sku TEXT DEFAULT '',
+  categoria TEXT NOT NULL DEFAULT 'Outros',
+  unidade_medida TEXT NOT NULL DEFAULT 'UN',
+  conversoes TEXT DEFAULT '',
+  custo_padrao DECIMAL(12,2) NOT NULL DEFAULT 0,
+  fornecedores_preferenciais TEXT[] DEFAULT '{}',
+  lead_time_dias INT NOT NULL DEFAULT 1,
+  estoque_minimo DECIMAL(12,3) NOT NULL DEFAULT 0,
+  estoque_ideal DECIMAL(12,3) NOT NULL DEFAULT 0,
+  local_estoque TEXT DEFAULT '',
+  ativo BOOLEAN NOT NULL DEFAULT true,
+  observacoes TEXT DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE public.produtos ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Authenticated can read produtos" ON public.produtos FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Admin/Compras can manage produtos" ON public.produtos FOR ALL TO authenticated USING (
+  public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'compras') OR public.has_role(auth.uid(), 'compras_assistente')
+);
+
+-- 4) Movimentacoes estoque
+CREATE TABLE public.movimentacoes_estoque (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  produto_id UUID REFERENCES public.produtos(id) ON DELETE CASCADE NOT NULL,
+  data DATE NOT NULL DEFAULT CURRENT_DATE,
+  tipo TEXT NOT NULL CHECK (tipo IN ('ENTRADA', 'SAIDA', 'AJUSTE', 'BAIXA_PERDA')),
+  quantidade DECIMAL(12,3) NOT NULL DEFAULT 0,
+  custo_unitario DECIMAL(12,2) NOT NULL DEFAULT 0,
+  custo_total DECIMAL(12,2) NOT NULL DEFAULT 0,
+  origem TEXT DEFAULT '',
+  referencia_id TEXT DEFAULT '',
+  observacao TEXT DEFAULT '',
+  created_by UUID REFERENCES auth.users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE public.movimentacoes_estoque ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Authenticated can read movimentacoes" ON public.movimentacoes_estoque FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Admin/Compras can insert movimentacoes" ON public.movimentacoes_estoque FOR INSERT TO authenticated WITH CHECK (
+  public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'compras') OR public.has_role(auth.uid(), 'compras_assistente')
+);
+
+-- 5) Solicitação Compra Mercado
+CREATE TABLE public.solic_compra_mercado (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  titulo TEXT NOT NULL,
+  tipo TEXT NOT NULL CHECK (tipo IN ('MERCADO', 'SAZONAL')),
+  solicitante_user_id UUID REFERENCES auth.users(id) NOT NULL,
+  responsavel_user_id UUID REFERENCES auth.users(id),
+  prioridade TEXT NOT NULL DEFAULT 'media' CHECK (prioridade IN ('baixa', 'media', 'alta', 'urgente')),
+  data_necessidade DATE,
+  status TEXT NOT NULL DEFAULT 'ENVIADA' CHECK (status IN ('ENVIADA', 'EM_COMPRA', 'AGUARDANDO_APROVACAO', 'APROVADA', 'REPROVADA', 'PARCIAL', 'CONCLUIDA', 'CANCELADA')),
+  observacoes TEXT DEFAULT '',
+  total_estimado DECIMAL(12,2) NOT NULL DEFAULT 0,
+  total_real DECIMAL(12,2) NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE public.solic_compra_mercado ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Authenticated can read solic_mercado" ON public.solic_compra_mercado FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Admin/Compras can insert solic_mercado" ON public.solic_compra_mercado FOR INSERT TO authenticated WITH CHECK (
+  public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'compras')
+);
+CREATE POLICY "Admin/Compras/Assistente can update solic_mercado" ON public.solic_compra_mercado FOR UPDATE TO authenticated USING (
+  public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'compras') OR public.has_role(auth.uid(), 'compras_assistente')
+);
+
+-- 6) Items da solicitação
+CREATE TABLE public.solic_compra_mercado_item (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  solicitacao_id UUID REFERENCES public.solic_compra_mercado(id) ON DELETE CASCADE NOT NULL,
+  produto_id UUID REFERENCES public.produtos(id),
+  produto_texto TEXT DEFAULT '',
+  categoria TEXT DEFAULT '',
+  quantidade_solicitada DECIMAL(12,3) NOT NULL DEFAULT 0,
+  unidade_medida TEXT NOT NULL DEFAULT 'UN',
+  detalhes TEXT DEFAULT '',
+  quantidade_comprada DECIMAL(12,3) NOT NULL DEFAULT 0,
+  preco_unitario DECIMAL(12,2),
+  comprado BOOLEAN NOT NULL DEFAULT false,
+  comprado_em TIMESTAMPTZ,
+  comprado_por UUID REFERENCES auth.users(id),
+  custo_nao_informado BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE public.solic_compra_mercado_item ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Authenticated can read solic_items" ON public.solic_compra_mercado_item FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Admin/Compras/Assistente can manage items" ON public.solic_compra_mercado_item FOR ALL TO authenticated USING (
+  public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'compras') OR public.has_role(auth.uid(), 'compras_assistente')
+);
+
+-- 7) Aprovações
+CREATE TABLE public.aprovacoes_solic_compra_mercado (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  solicitacao_id UUID REFERENCES public.solic_compra_mercado(id) ON DELETE CASCADE NOT NULL,
+  aprovado_por_user_id UUID REFERENCES auth.users(id) NOT NULL,
+  aprovado_em TIMESTAMPTZ NOT NULL DEFAULT now(),
+  decisao TEXT NOT NULL CHECK (decisao IN ('APROVADO', 'REPROVADO')),
+  comentario TEXT DEFAULT ''
+);
+ALTER TABLE public.aprovacoes_solic_compra_mercado ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Authenticated can read aprovacoes" ON public.aprovacoes_solic_compra_mercado FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Admin/Compras can approve" ON public.aprovacoes_solic_compra_mercado FOR INSERT TO authenticated WITH CHECK (
+  public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'compras')
+);
+
+-- 8) Audit log
+CREATE TABLE public.audit_log (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tabela TEXT NOT NULL,
+  registro_id UUID NOT NULL,
+  acao TEXT NOT NULL,
+  campo TEXT DEFAULT '',
+  valor_anterior TEXT DEFAULT '',
+  valor_novo TEXT DEFAULT '',
+  user_id UUID REFERENCES auth.users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE public.audit_log ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Admin can read audit" ON public.audit_log FOR SELECT TO authenticated USING (
+  public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'compras')
+);
+CREATE POLICY "System can insert audit" ON public.audit_log FOR INSERT TO authenticated WITH CHECK (true);

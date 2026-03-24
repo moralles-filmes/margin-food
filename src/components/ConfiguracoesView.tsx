@@ -1,0 +1,194 @@
+import { useState } from 'react';
+import { Settings, Users, ShieldAlert, Database, Fish, Shield, ShieldCheck, Activity } from 'lucide-react';
+import AuditView from './AuditView';
+import SecurityAuditView from './SecurityAuditView';
+import GlobalAuditView from './GlobalAuditView';
+import PerformanceMonitorView from './PerformanceMonitorView';
+import AdminUsersView from './AdminUsersView';
+import SalmonMigrationWizard from './SalmonMigrationWizard';
+import SalmonReconciliationReport from './SalmonReconciliationReport';
+import { useSalmonStore } from '@/hooks/useSalmonStore';
+import { useAuth } from '@/contexts/AuthContext';
+import { useCan, useModuleAccess } from '@/permissions';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
+
+// Map internal subtab keys to module registry keys
+const SUBTAB_MAP: Record<string, string> = {
+  'geral': 'geral',
+  'salmao': 'salmon',
+  'usuarios': 'usuarios',
+  'audit-global': 'auditoria-sistema',
+  'performance': 'performance',
+  'seguranca': 'auditoria-seguranca',
+  'auditoria': 'auditoria-compras',
+};
+
+type SubView = 'geral' | 'salmao' | 'usuarios' | 'auditoria' | 'seguranca' | 'audit-global' | 'performance';
+
+const allSubViews: { id: SubView; label: string; icon: typeof Settings; registryKey: string }[] = [
+  { id: 'geral', label: 'Geral', icon: Settings, registryKey: 'geral' },
+  { id: 'salmao', label: 'Salmão', icon: Fish, registryKey: 'salmon' },
+  { id: 'usuarios', label: 'Usuários', icon: Users, registryKey: 'usuarios' },
+  { id: 'audit-global', label: 'Auditoria Sistema', icon: ShieldCheck, registryKey: 'auditoria-sistema' },
+  { id: 'performance', label: 'Performance', icon: Activity, registryKey: 'performance' },
+  { id: 'seguranca', label: 'Auditoria Segurança', icon: Shield, registryKey: 'auditoria-seguranca' },
+  { id: 'auditoria', label: 'Auditoria Compras', icon: ShieldAlert, registryKey: 'auditoria-compras' },
+];
+
+interface Props {
+  store: ReturnType<typeof useSalmonStore>;
+}
+
+export default function ConfiguracoesView({ store }: Props) {
+  const [activeView, setActiveView] = useState<SubView>('geral');
+  const { stockConfig, setStockConfig } = store;
+  const { } = useAuth();
+  const { visibleSubtabs } = useModuleAccess('configuracoes');
+
+  // Granular permission checks for actions
+  const canManageGeral = useCan('configuracoes:geral:manage');
+  const canManageUsuarios = useCan('configuracoes:usuarios:manage');
+
+  const [perdaPercent, setPerdaPercent] = useState(String(stockConfig.perdaPercentAlerta ?? 15));
+  const [perdaValor, setPerdaValor] = useState(String(stockConfig.perdaValorAlerta ?? 500));
+  const [validadeDias, setValidadeDias] = useState(String(stockConfig.validadePadraoDias ?? 2));
+  const [alertaVencimento, setAlertaVencimento] = useState(String(stockConfig.alertaVencimentoDias ?? 1));
+
+  const handleSaveSalmaoConfig = () => {
+    setStockConfig({
+      ...stockConfig,
+      perdaPercentAlerta: parseFloat(perdaPercent) || 15,
+      perdaValorAlerta: parseFloat(perdaValor) || 500,
+      validadePadraoDias: parseInt(validadeDias) || 2,
+      alertaVencimentoDias: parseInt(alertaVencimento) || 1,
+    });
+    toast.success('Configurações de salmão atualizadas!');
+  };
+
+  // Filter subtabs by permission
+  const visibleViews = allSubViews.filter(v => visibleSubtabs.includes(v.registryKey));
+
+  // If active view is not visible, switch to first visible
+  const effectiveActive = visibleViews.some(v => v.id === activeView)
+    ? activeView
+    : (visibleViews[0]?.id || 'geral');
+
+  if (visibleViews.length === 0) {
+    return (
+      <div className="bg-card border border-border rounded-xl p-8 text-center">
+        <Shield className="w-12 h-12 mx-auto text-destructive/30 mb-3" />
+        <p className="text-sm font-medium text-foreground">Acesso Negado</p>
+        <p className="text-xs text-muted-foreground">Você não possui permissões para acessar as configurações.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-lg font-display font-bold text-foreground">Configurações</h2>
+        <p className="text-xs text-muted-foreground">Sistema, usuários, segurança e auditoria</p>
+      </div>
+
+      <div className="flex items-center gap-1 overflow-x-auto pb-1 -mx-1 px-1">
+        {visibleViews.map(view => {
+          const Icon = view.icon;
+          const active = effectiveActive === view.id;
+          return (
+            <button key={view.id} onClick={() => setActiveView(view.id)} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${active ? 'gradient-salmon text-primary-foreground shadow-md' : 'bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80'}`}>
+              <Icon className="w-3.5 h-3.5" />{view.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {effectiveActive === 'geral' && (
+        <div className="space-y-3">
+          <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+            <p className="text-sm font-semibold text-foreground flex items-center gap-2"><Database className="w-4 h-4 text-primary" /> Dados do Sistema</p>
+            <div className="grid grid-cols-2 gap-3 text-[11px]">
+              <div className="bg-secondary rounded-lg p-3"><p className="text-muted-foreground">Entradas salmão</p><p className="text-lg font-bold text-foreground">{store.entries.length}</p></div>
+              <div className="bg-secondary rounded-lg p-3"><p className="text-muted-foreground">Manipulações</p><p className="text-lg font-bold text-foreground">{store.manipulations.length}</p></div>
+              <div className="bg-secondary rounded-lg p-3"><p className="text-muted-foreground">Fornecedores</p><p className="text-lg font-bold text-foreground">{store.suppliers.length}</p></div>
+              <div className="bg-secondary rounded-lg p-3"><p className="text-muted-foreground">Auditorias</p><p className="text-lg font-bold text-foreground">{store.auditorias.length}</p></div>
+            </div>
+          </div>
+          {canManageGeral && (
+            <SalmonMigrationWizard onComplete={() => store.reloadFromDb?.()} />
+          )}
+          {canManageGeral && (
+            <SalmonReconciliationReport />
+          )}
+        </div>
+      )}
+
+      {effectiveActive === 'salmao' && (
+        <div className="space-y-3">
+          <div className="bg-card border border-border rounded-xl p-4 space-y-4">
+            <p className="text-sm font-semibold text-foreground flex items-center gap-2"><Fish className="w-4 h-4 text-primary" /> Alertas de Perda (Manipulação)</p>
+            <p className="text-[11px] text-muted-foreground">Limites para destaque visual de perda nas manipulações.</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-[11px] text-muted-foreground font-medium">Perda % máxima</label>
+                <div className="flex items-center gap-1.5">
+                  <Input type="text" inputMode="decimal" value={perdaPercent} onChange={e => setPerdaPercent(e.target.value.replace(/[^0-9.,]/g, ''))} className="bg-secondary border-border text-foreground h-8 text-sm" disabled={!canManageGeral} />
+                  <span className="text-xs text-muted-foreground">%</span>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[11px] text-muted-foreground font-medium">Perda R$ máxima</label>
+                <div className="flex items-center gap-1.5">
+                  <Input type="text" inputMode="decimal" value={perdaValor} onChange={e => setPerdaValor(e.target.value.replace(/[^0-9.,]/g, ''))} className="bg-secondary border-border text-foreground h-8 text-sm" disabled={!canManageGeral} />
+                  <span className="text-xs text-muted-foreground">R$</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-card border border-border rounded-xl p-4 space-y-4">
+            <p className="text-sm font-semibold text-foreground flex items-center gap-2"><Fish className="w-4 h-4 text-success" /> Validade do Salmão Limpo</p>
+            <p className="text-[11px] text-muted-foreground">Configure a validade padrão após manipulação e o alerta de vencimento.</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-[11px] text-muted-foreground font-medium">Validade padrão (dias)</label>
+                <div className="flex items-center gap-1.5">
+                  <Input type="number" step="1" value={validadeDias} onChange={e => setValidadeDias(e.target.value)} className="bg-secondary border-border text-foreground h-8 text-sm" disabled={!canManageGeral} />
+                  <span className="text-xs text-muted-foreground">dias</span>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[11px] text-muted-foreground font-medium">Alerta de vencimento (dias antes)</label>
+                <div className="flex items-center gap-1.5">
+                  <Input type="number" step="1" value={alertaVencimento} onChange={e => setAlertaVencimento(e.target.value)} className="bg-secondary border-border text-foreground h-8 text-sm" disabled={!canManageGeral} />
+                  <span className="text-xs text-muted-foreground">dias</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {canManageGeral && (
+            <Button size="sm" className="gradient-salmon text-primary-foreground border-0 text-xs" onClick={handleSaveSalmaoConfig}>
+              Salvar Configurações
+            </Button>
+          )}
+        </div>
+      )}
+
+      {effectiveActive === 'usuarios' && (
+        canManageUsuarios ? <AdminUsersView /> : (
+          <div className="bg-card border border-border rounded-xl p-8 text-center">
+            <Shield className="w-12 h-12 mx-auto text-destructive/30 mb-3" />
+            <p className="text-sm font-medium text-foreground">Acesso Restrito</p>
+            <p className="text-xs text-muted-foreground">Você pode visualizar esta aba, mas a gestão de usuários requer a permissão <code className="text-[10px] bg-muted px-1 rounded">configuracoes:usuarios:manage</code>.</p>
+          </div>
+        )
+      )}
+      {effectiveActive === 'audit-global' && <GlobalAuditView />}
+      {effectiveActive === 'performance' && <PerformanceMonitorView />}
+      {effectiveActive === 'seguranca' && <SecurityAuditView />}
+      {effectiveActive === 'auditoria' && <AuditView store={store} />}
+    </div>
+  );
+}

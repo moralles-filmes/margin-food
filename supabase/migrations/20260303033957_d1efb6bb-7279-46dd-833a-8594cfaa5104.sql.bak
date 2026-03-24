@@ -1,0 +1,551 @@
+
+-- =====================================================
+-- COMPRAS P2 FIX — W1 + W2 + W4 + W5
+-- =====================================================
+
+-- ─── W1: ALIGN RBAC purchases:* → compras:* ───
+-- Permission mapping:
+--   purchases:read          → compras:lista:view OR compras:pedidos:view
+--   purchases:create        → compras:pedidos:create
+--   purchases:edit          → compras:pedidos:edit
+--   purchases:delete        → compras:pedidos:delete
+--   purchases:approve       → compras:lista:approve OR compras:checklist:approve
+--   purchases:receiving:confirm → compras:recebimentos:create
+--   purchases:receiving:manage  → compras:recebimentos:edit
+
+-- Helper: has_any_compras_view checks any compras view permission
+CREATE OR REPLACE FUNCTION public.has_compras_view(p_user_id uuid)
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT has_any_permission(p_user_id, ARRAY[
+    'compras:lista:view','compras:pedidos:view','compras:checklist:view',
+    'compras:calendario:view','compras:ranking:view','compras:fornecedores:view',
+    'compras:recebimentos:view','compras:confirmacoes:view',
+    'system:global:manage'
+  ])
+$$;
+
+-- ── aprovacoes_solic_compra_mercado ──
+DROP POLICY IF EXISTS "purchases:approve aprovacoes" ON public.aprovacoes_solic_compra_mercado;
+DROP POLICY IF EXISTS "purchases:read aprovacoes" ON public.aprovacoes_solic_compra_mercado;
+
+CREATE POLICY "compras:confirmacoes:approve insert" ON public.aprovacoes_solic_compra_mercado
+  FOR INSERT TO authenticated
+  WITH CHECK (has_any_permission(auth.uid(), ARRAY['compras:lista:approve','compras:confirmacoes:approve','system:global:manage']));
+
+CREATE POLICY "compras:view aprovacoes" ON public.aprovacoes_solic_compra_mercado
+  FOR SELECT TO authenticated
+  USING (company_id = get_current_company_id() AND has_compras_view(auth.uid()));
+
+-- ── confirmacoes_recebimento ──
+DROP POLICY IF EXISTS "purchases:delete confirmacoes" ON public.confirmacoes_recebimento;
+DROP POLICY IF EXISTS "purchases:read confirmacoes" ON public.confirmacoes_recebimento;
+DROP POLICY IF EXISTS "purchases:receiving:confirm insert" ON public.confirmacoes_recebimento;
+DROP POLICY IF EXISTS "purchases:receiving:confirm update" ON public.confirmacoes_recebimento;
+
+CREATE POLICY "compras:confirmacoes:view" ON public.confirmacoes_recebimento
+  FOR SELECT TO authenticated
+  USING (company_id = get_current_company_id() AND has_compras_view(auth.uid()));
+
+CREATE POLICY "compras:confirmacoes:approve insert" ON public.confirmacoes_recebimento
+  FOR INSERT TO authenticated
+  WITH CHECK (has_any_permission(auth.uid(), ARRAY['compras:confirmacoes:approve','compras:recebimentos:create','system:global:manage']));
+
+CREATE POLICY "compras:confirmacoes:approve update" ON public.confirmacoes_recebimento
+  FOR UPDATE TO authenticated
+  USING (has_any_permission(auth.uid(), ARRAY['compras:confirmacoes:approve','system:global:manage']))
+  WITH CHECK (has_any_permission(auth.uid(), ARRAY['compras:confirmacoes:approve','system:global:manage']));
+
+CREATE POLICY "compras:pedidos:delete confirmacoes" ON public.confirmacoes_recebimento
+  FOR DELETE TO authenticated
+  USING (has_any_permission(auth.uid(), ARRAY['compras:pedidos:delete','system:global:manage']));
+
+-- ── purchase_ignored_rules ──
+DROP POLICY IF EXISTS "purchases:delete ignored_rules" ON public.purchase_ignored_rules;
+DROP POLICY IF EXISTS "purchases:edit ignored_rules insert" ON public.purchase_ignored_rules;
+DROP POLICY IF EXISTS "purchases:edit ignored_rules update" ON public.purchase_ignored_rules;
+DROP POLICY IF EXISTS "purchases:read ignored_rules" ON public.purchase_ignored_rules;
+
+CREATE POLICY "compras:view ignored_rules" ON public.purchase_ignored_rules
+  FOR SELECT TO authenticated
+  USING (company_id = get_current_company_id() AND has_compras_view(auth.uid()));
+
+CREATE POLICY "compras:pedidos:edit ignored_rules insert" ON public.purchase_ignored_rules
+  FOR INSERT TO authenticated
+  WITH CHECK (has_any_permission(auth.uid(), ARRAY['compras:pedidos:edit','system:global:manage']));
+
+CREATE POLICY "compras:pedidos:edit ignored_rules update" ON public.purchase_ignored_rules
+  FOR UPDATE TO authenticated
+  USING (has_any_permission(auth.uid(), ARRAY['compras:pedidos:edit','system:global:manage']))
+  WITH CHECK (has_any_permission(auth.uid(), ARRAY['compras:pedidos:edit','system:global:manage']));
+
+CREATE POLICY "compras:pedidos:delete ignored_rules" ON public.purchase_ignored_rules
+  FOR DELETE TO authenticated
+  USING (has_any_permission(auth.uid(), ARRAY['compras:pedidos:delete','system:global:manage']));
+
+-- ── purchase_order_items ──
+DROP POLICY IF EXISTS "poi_tenant_select" ON public.purchase_order_items;
+DROP POLICY IF EXISTS "poi_tenant_insert" ON public.purchase_order_items;
+DROP POLICY IF EXISTS "poi_tenant_update" ON public.purchase_order_items;
+DROP POLICY IF EXISTS "poi_tenant_delete" ON public.purchase_order_items;
+
+CREATE POLICY "compras:view order_items" ON public.purchase_order_items
+  FOR SELECT TO authenticated
+  USING (company_id = get_current_company_id() AND has_compras_view(auth.uid()));
+
+CREATE POLICY "compras:pedidos:create order_items" ON public.purchase_order_items
+  FOR INSERT TO authenticated
+  WITH CHECK (has_any_permission(auth.uid(), ARRAY['compras:pedidos:create','compras:lista:create','system:global:manage']));
+
+CREATE POLICY "compras:pedidos:edit order_items" ON public.purchase_order_items
+  FOR UPDATE TO authenticated
+  USING (has_any_permission(auth.uid(), ARRAY['compras:pedidos:edit','compras:checklist:edit','compras:recebimentos:edit','system:global:manage']))
+  WITH CHECK (has_any_permission(auth.uid(), ARRAY['compras:pedidos:edit','compras:checklist:edit','compras:recebimentos:edit','system:global:manage']));
+
+CREATE POLICY "compras:pedidos:delete order_items" ON public.purchase_order_items
+  FOR DELETE TO authenticated
+  USING (has_any_permission(auth.uid(), ARRAY['compras:pedidos:delete','system:global:manage']));
+
+-- ── purchase_orders ──
+DROP POLICY IF EXISTS "po_tenant_select" ON public.purchase_orders;
+DROP POLICY IF EXISTS "po_tenant_insert" ON public.purchase_orders;
+DROP POLICY IF EXISTS "po_tenant_delete" ON public.purchase_orders;
+
+CREATE POLICY "compras:view orders" ON public.purchase_orders
+  FOR SELECT TO authenticated
+  USING (company_id = get_current_company_id() AND has_compras_view(auth.uid()));
+
+CREATE POLICY "compras:pedidos:create orders" ON public.purchase_orders
+  FOR INSERT TO authenticated
+  WITH CHECK (has_any_permission(auth.uid(), ARRAY['compras:pedidos:create','compras:lista:create','system:global:manage']));
+
+CREATE POLICY "compras:pedidos:delete orders" ON public.purchase_orders
+  FOR DELETE TO authenticated
+  USING (has_any_permission(auth.uid(), ARRAY['compras:pedidos:delete','system:global:manage']));
+
+-- ── purchase_reminders ──
+DROP POLICY IF EXISTS "Purchases editors can delete reminders" ON public.purchase_reminders;
+DROP POLICY IF EXISTS "Purchases editors can update reminders" ON public.purchase_reminders;
+DROP POLICY IF EXISTS "Authenticated users can insert reminders" ON public.purchase_reminders;
+DROP POLICY IF EXISTS "purchases:read reminders" ON public.purchase_reminders;
+
+CREATE POLICY "compras:calendario:view reminders" ON public.purchase_reminders
+  FOR SELECT TO authenticated
+  USING (company_id = get_current_company_id() AND has_compras_view(auth.uid()));
+
+CREATE POLICY "compras:calendario:edit insert" ON public.purchase_reminders
+  FOR INSERT TO authenticated
+  WITH CHECK (auth.uid() = created_by AND has_any_permission(auth.uid(), ARRAY['compras:calendario:edit','system:global:manage']));
+
+CREATE POLICY "compras:calendario:edit update" ON public.purchase_reminders
+  FOR UPDATE TO authenticated
+  USING (created_by = auth.uid() AND has_any_permission(auth.uid(), ARRAY['compras:calendario:edit','system:global:manage']))
+  WITH CHECK (created_by = auth.uid() AND has_any_permission(auth.uid(), ARRAY['compras:calendario:edit','system:global:manage']));
+
+-- W4: reminders — soft delete via setting active=false; block hard DELETE
+CREATE POLICY "compras:calendario:no_hard_delete" ON public.purchase_reminders
+  FOR DELETE TO authenticated
+  USING (false); -- block all hard deletes
+
+-- ── purchase_requisition_audit ──
+DROP POLICY IF EXISTS "purchases:read req_audit" ON public.purchase_requisition_audit;
+
+CREATE POLICY "compras:view req_audit" ON public.purchase_requisition_audit
+  FOR SELECT TO authenticated
+  USING (company_id = get_current_company_id() AND has_compras_view(auth.uid()));
+
+-- ── purchase_requisition_items ──
+DROP POLICY IF EXISTS "purchases:delete req_items" ON public.purchase_requisition_items;
+DROP POLICY IF EXISTS "purchases:create req_items" ON public.purchase_requisition_items;
+DROP POLICY IF EXISTS "purchases:edit req_items" ON public.purchase_requisition_items;
+DROP POLICY IF EXISTS "purchases:read req_items" ON public.purchase_requisition_items;
+
+CREATE POLICY "compras:view req_items" ON public.purchase_requisition_items
+  FOR SELECT TO authenticated
+  USING (company_id = get_current_company_id() AND has_compras_view(auth.uid()));
+
+CREATE POLICY "compras:lista:create req_items" ON public.purchase_requisition_items
+  FOR INSERT TO authenticated
+  WITH CHECK (has_any_permission(auth.uid(), ARRAY['compras:lista:create','compras:pedidos:create','system:global:manage']));
+
+CREATE POLICY "compras:lista:edit req_items" ON public.purchase_requisition_items
+  FOR UPDATE TO authenticated
+  USING (has_any_permission(auth.uid(), ARRAY['compras:lista:edit','compras:pedidos:edit','system:global:manage']))
+  WITH CHECK (has_any_permission(auth.uid(), ARRAY['compras:lista:edit','compras:pedidos:edit','system:global:manage']));
+
+CREATE POLICY "compras:lista:delete req_items" ON public.purchase_requisition_items
+  FOR DELETE TO authenticated
+  USING (has_any_permission(auth.uid(), ARRAY['compras:lista:delete','compras:pedidos:delete','system:global:manage']));
+
+-- ── purchase_requisitions ──
+DROP POLICY IF EXISTS "purchases:delete requisitions" ON public.purchase_requisitions;
+DROP POLICY IF EXISTS "purchases:create requisitions" ON public.purchase_requisitions;
+DROP POLICY IF EXISTS "purchases:edit requisitions" ON public.purchase_requisitions;
+DROP POLICY IF EXISTS "purchases:read requisitions" ON public.purchase_requisitions;
+
+CREATE POLICY "compras:view requisitions" ON public.purchase_requisitions
+  FOR SELECT TO authenticated
+  USING (company_id = get_current_company_id() AND has_compras_view(auth.uid()));
+
+CREATE POLICY "compras:lista:create requisitions" ON public.purchase_requisitions
+  FOR INSERT TO authenticated
+  WITH CHECK (has_any_permission(auth.uid(), ARRAY['compras:lista:create','compras:pedidos:create','system:global:manage']));
+
+CREATE POLICY "compras:lista:edit requisitions" ON public.purchase_requisitions
+  FOR UPDATE TO authenticated
+  USING (has_any_permission(auth.uid(), ARRAY['compras:lista:edit','compras:pedidos:edit','system:global:manage']))
+  WITH CHECK (has_any_permission(auth.uid(), ARRAY['compras:lista:edit','compras:pedidos:edit','system:global:manage']));
+
+CREATE POLICY "compras:lista:delete requisitions" ON public.purchase_requisitions
+  FOR DELETE TO authenticated
+  USING (has_any_permission(auth.uid(), ARRAY['compras:lista:delete','compras:pedidos:delete','system:global:manage']));
+
+-- ── recebimento_itens ──
+DROP POLICY IF EXISTS "purchases:delete receb_itens" ON public.recebimento_itens;
+DROP POLICY IF EXISTS "purchases:receiving:manage receb_itens insert" ON public.recebimento_itens;
+DROP POLICY IF EXISTS "purchases:read receb_itens" ON public.recebimento_itens;
+DROP POLICY IF EXISTS "purchases:receiving:manage receb_itens update" ON public.recebimento_itens;
+
+CREATE POLICY "compras:recebimentos:view itens" ON public.recebimento_itens
+  FOR SELECT TO authenticated
+  USING (company_id = get_current_company_id() AND has_compras_view(auth.uid()));
+
+CREATE POLICY "compras:recebimentos:create itens" ON public.recebimento_itens
+  FOR INSERT TO authenticated
+  WITH CHECK (has_any_permission(auth.uid(), ARRAY['compras:recebimentos:create','compras:recebimentos:edit','system:global:manage']));
+
+CREATE POLICY "compras:recebimentos:edit itens" ON public.recebimento_itens
+  FOR UPDATE TO authenticated
+  USING (has_any_permission(auth.uid(), ARRAY['compras:recebimentos:edit','system:global:manage']))
+  WITH CHECK (has_any_permission(auth.uid(), ARRAY['compras:recebimentos:edit','system:global:manage']));
+
+CREATE POLICY "compras:recebimentos:delete itens" ON public.recebimento_itens
+  FOR DELETE TO authenticated
+  USING (has_any_permission(auth.uid(), ARRAY['compras:pedidos:delete','system:global:manage']));
+
+-- ── recebimentos ──
+DROP POLICY IF EXISTS "purchases:delete recebimentos" ON public.recebimentos;
+DROP POLICY IF EXISTS "purchases:receiving:manage receb insert" ON public.recebimentos;
+DROP POLICY IF EXISTS "purchases:read recebimentos" ON public.recebimentos;
+DROP POLICY IF EXISTS "purchases:receiving:manage receb update" ON public.recebimentos;
+
+CREATE POLICY "compras:recebimentos:view" ON public.recebimentos
+  FOR SELECT TO authenticated
+  USING (company_id = get_current_company_id() AND has_compras_view(auth.uid()));
+
+CREATE POLICY "compras:recebimentos:create" ON public.recebimentos
+  FOR INSERT TO authenticated
+  WITH CHECK (has_any_permission(auth.uid(), ARRAY['compras:recebimentos:create','system:global:manage']));
+
+CREATE POLICY "compras:recebimentos:edit" ON public.recebimentos
+  FOR UPDATE TO authenticated
+  USING (has_any_permission(auth.uid(), ARRAY['compras:recebimentos:edit','system:global:manage']))
+  WITH CHECK (has_any_permission(auth.uid(), ARRAY['compras:recebimentos:edit','system:global:manage']));
+
+CREATE POLICY "compras:recebimentos:delete" ON public.recebimentos
+  FOR DELETE TO authenticated
+  USING (has_any_permission(auth.uid(), ARRAY['compras:pedidos:delete','system:global:manage']));
+
+-- ── solic_compra_mercado ──
+DROP POLICY IF EXISTS "purchases:delete solic_mercado" ON public.solic_compra_mercado;
+DROP POLICY IF EXISTS "purchases:read solic_mercado" ON public.solic_compra_mercado;
+DROP POLICY IF EXISTS "purchases:create solic_mercado" ON public.solic_compra_mercado;
+DROP POLICY IF EXISTS "purchases:edit solic_mercado" ON public.solic_compra_mercado;
+
+CREATE POLICY "compras:view solic_mercado" ON public.solic_compra_mercado
+  FOR SELECT TO authenticated
+  USING (company_id = get_current_company_id() AND has_compras_view(auth.uid()));
+
+CREATE POLICY "compras:pedidos:create solic_mercado" ON public.solic_compra_mercado
+  FOR INSERT TO authenticated
+  WITH CHECK (has_any_permission(auth.uid(), ARRAY['compras:pedidos:create','compras:lista:create','system:global:manage']));
+
+CREATE POLICY "compras:pedidos:edit solic_mercado" ON public.solic_compra_mercado
+  FOR UPDATE TO authenticated
+  USING (has_any_permission(auth.uid(), ARRAY['compras:pedidos:edit','compras:lista:edit','system:global:manage']))
+  WITH CHECK (has_any_permission(auth.uid(), ARRAY['compras:pedidos:edit','compras:lista:edit','system:global:manage']));
+
+CREATE POLICY "compras:pedidos:delete solic_mercado" ON public.solic_compra_mercado
+  FOR DELETE TO authenticated
+  USING (has_any_permission(auth.uid(), ARRAY['compras:pedidos:delete','system:global:manage']));
+
+-- ── solic_compra_mercado_item ──
+DROP POLICY IF EXISTS "purchases:delete solic_mercado_item" ON public.solic_compra_mercado_item;
+DROP POLICY IF EXISTS "purchases:read solic_mercado_item" ON public.solic_compra_mercado_item;
+DROP POLICY IF EXISTS "purchases:create solic_mercado_item" ON public.solic_compra_mercado_item;
+DROP POLICY IF EXISTS "purchases:edit solic_mercado_item" ON public.solic_compra_mercado_item;
+
+CREATE POLICY "compras:view solic_mercado_item" ON public.solic_compra_mercado_item
+  FOR SELECT TO authenticated
+  USING (company_id = get_current_company_id() AND has_compras_view(auth.uid()));
+
+CREATE POLICY "compras:pedidos:create solic_mercado_item" ON public.solic_compra_mercado_item
+  FOR INSERT TO authenticated
+  WITH CHECK (has_any_permission(auth.uid(), ARRAY['compras:pedidos:create','compras:lista:create','system:global:manage']));
+
+CREATE POLICY "compras:pedidos:edit solic_mercado_item" ON public.solic_compra_mercado_item
+  FOR UPDATE TO authenticated
+  USING (has_any_permission(auth.uid(), ARRAY['compras:pedidos:edit','compras:lista:edit','system:global:manage']))
+  WITH CHECK (has_any_permission(auth.uid(), ARRAY['compras:pedidos:edit','compras:lista:edit','system:global:manage']));
+
+CREATE POLICY "compras:pedidos:delete solic_mercado_item" ON public.solic_compra_mercado_item
+  FOR DELETE TO authenticated
+  USING (has_any_permission(auth.uid(), ARRAY['compras:pedidos:delete','system:global:manage']));
+
+-- ── solicitacoes_compra ──
+DROP POLICY IF EXISTS "purchases:delete solicitacoes" ON public.solicitacoes_compra;
+DROP POLICY IF EXISTS "purchases:read solicitacoes" ON public.solicitacoes_compra;
+DROP POLICY IF EXISTS "purchases:create solicitacoes" ON public.solicitacoes_compra;
+DROP POLICY IF EXISTS "purchases:edit solicitacoes" ON public.solicitacoes_compra;
+
+CREATE POLICY "compras:view solicitacoes" ON public.solicitacoes_compra
+  FOR SELECT TO authenticated
+  USING (company_id = get_current_company_id() AND has_compras_view(auth.uid()));
+
+CREATE POLICY "compras:lista:create solicitacoes" ON public.solicitacoes_compra
+  FOR INSERT TO authenticated
+  WITH CHECK (has_any_permission(auth.uid(), ARRAY['compras:lista:create','system:global:manage']));
+
+CREATE POLICY "compras:lista:edit solicitacoes" ON public.solicitacoes_compra
+  FOR UPDATE TO authenticated
+  USING (has_any_permission(auth.uid(), ARRAY['compras:lista:edit','system:global:manage']))
+  WITH CHECK (has_any_permission(auth.uid(), ARRAY['compras:lista:edit','system:global:manage']));
+
+CREATE POLICY "compras:lista:delete solicitacoes" ON public.solicitacoes_compra
+  FOR DELETE TO authenticated
+  USING (has_any_permission(auth.uid(), ARRAY['compras:lista:delete','system:global:manage']));
+
+
+-- ─── W2: ATOMIC RPCs ───
+
+-- Add idempotency_key column
+ALTER TABLE public.purchase_orders ADD COLUMN IF NOT EXISTS idempotency_key uuid;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_po_company_idempotency 
+  ON public.purchase_orders (company_id, idempotency_key) WHERE idempotency_key IS NOT NULL;
+
+-- ── create_purchase_order_atomic ──
+CREATE OR REPLACE FUNCTION public.create_purchase_order_atomic(
+  p_payload jsonb,
+  p_idempotency_key uuid
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_user uuid := auth.uid();
+  v_company uuid;
+  v_order_id uuid;
+  v_title text;
+  v_type text;
+  v_status text;
+  v_total numeric := 0;
+  v_item jsonb;
+  v_is_mercado boolean;
+  v_shopping_status text;
+  v_existing_id uuid;
+BEGIN
+  IF v_user IS NULL THEN RAISE EXCEPTION 'AUTH_REQUIRED'; END IF;
+  v_company := assert_tenant();
+
+  -- Idempotency check
+  SELECT id INTO v_existing_id
+  FROM purchase_orders
+  WHERE company_id = v_company AND idempotency_key = p_idempotency_key;
+  
+  IF v_existing_id IS NOT NULL THEN
+    RETURN jsonb_build_object('status','idempotent','order_id', v_existing_id);
+  END IF;
+
+  v_title := p_payload->>'title';
+  v_type  := p_payload->>'type';
+  v_is_mercado := v_type IN ('MERCADO','SAZONAL');
+  v_status := CASE WHEN v_is_mercado THEN 'PENDING' ELSE 'OPEN' END;
+  v_shopping_status := CASE WHEN v_is_mercado THEN 'PENDING' ELSE 'OK' END;
+
+  -- Calculate total
+  FOR v_item IN SELECT * FROM jsonb_array_elements(p_payload->'items')
+  LOOP
+    v_total := v_total + (v_item->>'qty_requested')::numeric * (v_item->>'estimated_unit_value')::numeric;
+  END LOOP;
+
+  -- Insert order header
+  INSERT INTO purchase_orders (
+    title, type, priority, category, supplier_name, payment_type,
+    need_by_date, delivery_forecast_date, responsible_user_id, notes,
+    status, total_estimated, created_by, company_id, idempotency_key
+  ) VALUES (
+    v_title, v_type,
+    COALESCE(p_payload->>'priority','MEDIA'),
+    COALESCE(p_payload->>'category',''),
+    NULLIF(p_payload->>'supplier_name',''),
+    NULLIF(p_payload->>'payment_type',''),
+    NULLIF(p_payload->>'need_by_date',''),
+    NULLIF(p_payload->>'delivery_forecast_date',''),
+    NULLIF(p_payload->>'responsible_user_id','')::uuid,
+    COALESCE(p_payload->>'notes',''),
+    v_status, v_total, v_user, v_company, p_idempotency_key
+  ) RETURNING id INTO v_order_id;
+
+  -- Insert items
+  INSERT INTO purchase_order_items (
+    order_id, stock_item_id, name_snapshot, unit_snapshot,
+    estimated_unit_value, qty_requested,
+    purchase_unit_snapshot, purchase_unit_cost_snapshot, conversion_factor_snapshot,
+    shopping_status, company_id
+  )
+  SELECT
+    v_order_id,
+    NULLIF(item->>'stock_item_id','')::uuid,
+    item->>'name_snapshot',
+    item->>'unit_snapshot',
+    (item->>'estimated_unit_value')::numeric,
+    (item->>'qty_requested')::numeric,
+    COALESCE(NULLIF(item->>'purchase_unit_snapshot',''), item->>'unit_snapshot'),
+    COALESCE((item->>'purchase_unit_cost_snapshot')::numeric, (item->>'estimated_unit_value')::numeric),
+    COALESCE((item->>'conversion_factor_snapshot')::numeric, 1),
+    v_shopping_status,
+    v_company
+  FROM jsonb_array_elements(p_payload->'items') AS item;
+
+  -- Audit
+  INSERT INTO audit_log (tabela, registro_id, acao, user_id)
+  VALUES ('purchase_orders', v_order_id::text, 'CRIACAO', v_user);
+
+  RETURN jsonb_build_object('status','created','order_id', v_order_id);
+END;
+$$;
+
+-- ── edit_purchase_order_atomic ──
+CREATE OR REPLACE FUNCTION public.edit_purchase_order_atomic(
+  p_order_id uuid,
+  p_payload jsonb
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_user uuid := auth.uid();
+  v_company uuid;
+  v_order record;
+  v_is_mercado boolean;
+  v_total numeric := 0;
+  v_item jsonb;
+BEGIN
+  IF v_user IS NULL THEN RAISE EXCEPTION 'AUTH_REQUIRED'; END IF;
+  v_company := assert_tenant();
+
+  -- Lock order for update
+  SELECT * INTO v_order
+  FROM purchase_orders
+  WHERE id = p_order_id AND company_id = v_company AND deleted_at IS NULL
+  FOR UPDATE;
+
+  IF NOT FOUND THEN RAISE EXCEPTION 'ORDER_NOT_FOUND'; END IF;
+
+  v_is_mercado := v_order.type IN ('MERCADO','SAZONAL');
+
+  -- Update header fields
+  UPDATE purchase_orders SET
+    title = COALESCE(NULLIF(p_payload->>'title',''), title),
+    type = COALESCE(NULLIF(p_payload->>'type',''), type),
+    priority = COALESCE(NULLIF(p_payload->>'priority',''), priority),
+    category = COALESCE(p_payload->>'category', category),
+    supplier_name = NULLIF(p_payload->>'supplier_name',''),
+    payment_type = NULLIF(p_payload->>'payment_type',''),
+    need_by_date = NULLIF(p_payload->>'need_by_date',''),
+    delivery_forecast_date = NULLIF(p_payload->>'delivery_forecast_date',''),
+    responsible_user_id = NULLIF(p_payload->>'responsible_user_id','')::uuid,
+    notes = COALESCE(p_payload->>'notes', notes),
+    updated_at = now()
+  WHERE id = p_order_id;
+
+  -- Replace items if provided
+  IF p_payload ? 'items' AND jsonb_array_length(p_payload->'items') > 0 THEN
+    -- Soft-delete existing PENDING items
+    UPDATE purchase_order_items SET
+      deleted_at = now(), deleted_by = v_user
+    WHERE order_id = p_order_id
+      AND company_id = v_company
+      AND received_status = 'PENDING'
+      AND shopping_status = 'PENDING'
+      AND deleted_at IS NULL;
+
+    -- Re-check is_mercado from potentially updated type
+    v_is_mercado := COALESCE(NULLIF(p_payload->>'type',''), v_order.type::text) IN ('MERCADO','SAZONAL');
+
+    -- Insert new items
+    INSERT INTO purchase_order_items (
+      order_id, stock_item_id, name_snapshot, unit_snapshot,
+      estimated_unit_value, qty_requested,
+      purchase_unit_snapshot, purchase_unit_cost_snapshot, conversion_factor_snapshot,
+      shopping_status, company_id
+    )
+    SELECT
+      p_order_id,
+      NULLIF(item->>'stock_item_id','')::uuid,
+      item->>'name_snapshot',
+      item->>'unit_snapshot',
+      (item->>'estimated_unit_value')::numeric,
+      (item->>'qty_requested')::numeric,
+      COALESCE(NULLIF(item->>'purchase_unit_snapshot',''), item->>'unit_snapshot'),
+      COALESCE((item->>'purchase_unit_cost_snapshot')::numeric, (item->>'estimated_unit_value')::numeric),
+      COALESCE((item->>'conversion_factor_snapshot')::numeric, 1),
+      CASE WHEN v_is_mercado THEN 'PENDING' ELSE 'OK' END,
+      v_company
+    FROM jsonb_array_elements(p_payload->'items') AS item;
+
+    -- Recalculate total
+    SELECT COALESCE(SUM(qty_requested * estimated_unit_value), 0) INTO v_total
+    FROM purchase_order_items
+    WHERE order_id = p_order_id AND company_id = v_company AND deleted_at IS NULL;
+
+    UPDATE purchase_orders SET total_estimated = v_total WHERE id = p_order_id;
+  END IF;
+
+  -- Audit
+  INSERT INTO audit_log (tabela, registro_id, acao, user_id)
+  VALUES ('purchase_orders', p_order_id::text, 'EDICAO', v_user);
+
+  RETURN jsonb_build_object('status','updated','order_id', p_order_id);
+END;
+$$;
+
+
+-- ─── W5: Server-side updated_at trigger ───
+-- Create trigger to auto-set updated_at on purchase_orders and purchase_order_items
+CREATE OR REPLACE FUNCTION public.trg_set_updated_at()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  NEW.updated_at := now();
+  RETURN NEW;
+END;
+$$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='trg_purchase_orders_updated_at') THEN
+    CREATE TRIGGER trg_purchase_orders_updated_at
+      BEFORE UPDATE ON public.purchase_orders
+      FOR EACH ROW EXECUTE FUNCTION public.trg_set_updated_at();
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='trg_purchase_order_items_updated_at') THEN
+    CREATE TRIGGER trg_purchase_order_items_updated_at
+      BEFORE UPDATE ON public.purchase_order_items
+      FOR EACH ROW EXECUTE FUNCTION public.trg_set_updated_at();
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='trg_purchase_reminders_updated_at') THEN
+    CREATE TRIGGER trg_purchase_reminders_updated_at
+      BEFORE UPDATE ON public.purchase_reminders
+      FOR EACH ROW EXECUTE FUNCTION public.trg_set_updated_at();
+  END IF;
+END $$;

@@ -1,0 +1,222 @@
+
+-- =============================================
+-- SALMON MODULE: DB-FIRST TABLES + RLS + AUDIT
+-- =============================================
+
+-- 1) TABLES
+
+CREATE TABLE public.salmon_entries (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  entry_date date NOT NULL DEFAULT CURRENT_DATE,
+  lot text NOT NULL DEFAULT '',
+  sif text NOT NULL DEFAULT '',
+  supplier_id uuid REFERENCES public.suppliers(id) ON DELETE SET NULL,
+  supplier_name text NOT NULL DEFAULT '',
+  boxes int NOT NULL DEFAULT 0,
+  units int NOT NULL DEFAULT 0,
+  gross_kg numeric NOT NULL,
+  total_value numeric NOT NULL DEFAULT 0,
+  unit_cost numeric GENERATED ALWAYS AS (CASE WHEN gross_kg > 0 THEN ROUND(total_value / gross_kg, 4) ELSE 0 END) STORED,
+  notes text DEFAULT '',
+  status text NOT NULL DEFAULT 'ACTIVE',
+  created_by uuid NOT NULL DEFAULT auth.uid(),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE public.salmon_manipulations (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  entry_id uuid NOT NULL REFERENCES public.salmon_entries(id) ON DELETE RESTRICT,
+  manipulation_date date NOT NULL DEFAULT CURRENT_DATE,
+  lot text NOT NULL DEFAULT '',
+  sif text NOT NULL DEFAULT '',
+  supplier_name text NOT NULL DEFAULT '',
+  fish_count int NOT NULL DEFAULT 0,
+  gross_out_kg numeric NOT NULL,
+  clean_in_kg numeric NOT NULL DEFAULT 0,
+  leftover_kg numeric NOT NULL DEFAULT 0,
+  leftover_recorded boolean NOT NULL DEFAULT false,
+  waste_kg numeric GENERATED ALWAYS AS (GREATEST(gross_out_kg - clean_in_kg, 0)) STORED,
+  yield_percent numeric GENERATED ALWAYS AS (CASE WHEN gross_out_kg > 0 THEN ROUND(clean_in_kg / gross_out_kg * 100, 2) ELSE 0 END) STORED,
+  loss_percent numeric GENERATED ALWAYS AS (CASE WHEN gross_out_kg > 0 THEN ROUND((gross_out_kg - clean_in_kg) / gross_out_kg * 100, 2) ELSE 0 END) STORED,
+  cost_per_kg_gross numeric NOT NULL DEFAULT 0,
+  notes text DEFAULT '',
+  status text NOT NULL DEFAULT 'ACTIVE',
+  created_by uuid NOT NULL DEFAULT auth.uid(),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE public.salmon_daily_records (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  record_date date NOT NULL,
+  clients_count int NOT NULL DEFAULT 0,
+  revenue numeric NOT NULL DEFAULT 0,
+  notes text DEFAULT '',
+  created_by uuid NOT NULL DEFAULT auth.uid(),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (record_date)
+);
+
+CREATE TABLE public.salmon_config (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  min_gross_kg numeric NOT NULL DEFAULT 50,
+  min_clean_kg numeric NOT NULL DEFAULT 30,
+  stale_days_limit int NOT NULL DEFAULT 7,
+  loss_percent_alert numeric NOT NULL DEFAULT 15,
+  loss_value_alert numeric NOT NULL DEFAULT 500,
+  expiration_days int NOT NULL DEFAULT 2,
+  expiration_alert_days int NOT NULL DEFAULT 1,
+  target_g_per_client numeric NOT NULL DEFAULT 0,
+  fifo_enabled boolean NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE public.salmon_purchase_targets (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  year_num int NOT NULL,
+  month_num int NOT NULL,
+  category text NOT NULL DEFAULT 'salmon',
+  target_kg numeric NOT NULL DEFAULT 0,
+  target_value numeric NOT NULL DEFAULT 0,
+  alert_yellow_pct numeric NOT NULL DEFAULT 80,
+  alert_red_pct numeric NOT NULL DEFAULT 100,
+  created_by uuid NOT NULL DEFAULT auth.uid(),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (year_num, month_num, category)
+);
+
+-- 2) VALIDATION TRIGGERS (instead of CHECK constraints for flexibility)
+
+CREATE OR REPLACE FUNCTION public.validate_salmon_entry()
+  RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public'
+AS $$
+BEGIN
+  IF NEW.gross_kg <= 0 THEN RAISE EXCEPTION 'gross_kg deve ser > 0'; END IF;
+  IF NEW.total_value < 0 THEN RAISE EXCEPTION 'total_value não pode ser negativo'; END IF;
+  IF NEW.status NOT IN ('ACTIVE', 'CANCELLED') THEN RAISE EXCEPTION 'status inválido: %', NEW.status; END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_validate_salmon_entry BEFORE INSERT OR UPDATE ON public.salmon_entries
+  FOR EACH ROW EXECUTE FUNCTION public.validate_salmon_entry();
+
+CREATE OR REPLACE FUNCTION public.validate_salmon_manipulation()
+  RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public'
+AS $$
+BEGIN
+  IF NEW.gross_out_kg <= 0 THEN RAISE EXCEPTION 'gross_out_kg deve ser > 0'; END IF;
+  IF NEW.clean_in_kg < 0 THEN RAISE EXCEPTION 'clean_in_kg não pode ser negativo'; END IF;
+  IF NEW.status NOT IN ('ACTIVE', 'CANCELLED') THEN RAISE EXCEPTION 'status inválido: %', NEW.status; END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_validate_salmon_manipulation BEFORE INSERT OR UPDATE ON public.salmon_manipulations
+  FOR EACH ROW EXECUTE FUNCTION public.validate_salmon_manipulation();
+
+-- 3) INDICES
+
+CREATE INDEX idx_salmon_entries_date ON public.salmon_entries (entry_date DESC);
+CREATE INDEX idx_salmon_entries_status ON public.salmon_entries (status);
+CREATE INDEX idx_salmon_entries_supplier ON public.salmon_entries (supplier_id);
+CREATE INDEX idx_salmon_manipulations_date ON public.salmon_manipulations (manipulation_date DESC);
+CREATE INDEX idx_salmon_manipulations_status ON public.salmon_manipulations (status);
+CREATE INDEX idx_salmon_manipulations_entry ON public.salmon_manipulations (entry_id);
+CREATE INDEX idx_salmon_daily_date ON public.salmon_daily_records (record_date DESC);
+CREATE INDEX idx_salmon_targets_period ON public.salmon_purchase_targets (year_num, month_num);
+
+-- 4) updated_at triggers
+
+CREATE TRIGGER trg_salmon_entries_updated BEFORE UPDATE ON public.salmon_entries
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+CREATE TRIGGER trg_salmon_manipulations_updated BEFORE UPDATE ON public.salmon_manipulations
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+CREATE TRIGGER trg_salmon_daily_updated BEFORE UPDATE ON public.salmon_daily_records
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+CREATE TRIGGER trg_salmon_config_updated BEFORE UPDATE ON public.salmon_config
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+CREATE TRIGGER trg_salmon_targets_updated BEFORE UPDATE ON public.salmon_purchase_targets
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+-- 5) RLS
+
+ALTER TABLE public.salmon_entries ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.salmon_manipulations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.salmon_daily_records ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.salmon_config ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.salmon_purchase_targets ENABLE ROW LEVEL SECURITY;
+
+-- SELECT policies
+CREATE POLICY "salmon_entries_select" ON public.salmon_entries FOR SELECT TO authenticated
+  USING (public.has_permission(auth.uid(), 'salmon:read'));
+CREATE POLICY "salmon_manipulations_select" ON public.salmon_manipulations FOR SELECT TO authenticated
+  USING (public.has_permission(auth.uid(), 'salmon:read'));
+CREATE POLICY "salmon_daily_select" ON public.salmon_daily_records FOR SELECT TO authenticated
+  USING (public.has_permission(auth.uid(), 'salmon:read'));
+CREATE POLICY "salmon_config_select" ON public.salmon_config FOR SELECT TO authenticated
+  USING (public.has_permission(auth.uid(), 'salmon:read'));
+CREATE POLICY "salmon_targets_select" ON public.salmon_purchase_targets FOR SELECT TO authenticated
+  USING (public.has_permission(auth.uid(), 'salmon:read'));
+
+-- INSERT policies
+CREATE POLICY "salmon_entries_insert" ON public.salmon_entries FOR INSERT TO authenticated
+  WITH CHECK (public.has_permission(auth.uid(), 'salmon:entries:create'));
+CREATE POLICY "salmon_manipulations_insert" ON public.salmon_manipulations FOR INSERT TO authenticated
+  WITH CHECK (public.has_permission(auth.uid(), 'salmon:entries:create'));
+CREATE POLICY "salmon_daily_insert" ON public.salmon_daily_records FOR INSERT TO authenticated
+  WITH CHECK (public.has_permission(auth.uid(), 'salmon:entries:create'));
+CREATE POLICY "salmon_config_insert" ON public.salmon_config FOR INSERT TO authenticated
+  WITH CHECK (public.has_permission(auth.uid(), 'salmon:edit'));
+CREATE POLICY "salmon_targets_insert" ON public.salmon_purchase_targets FOR INSERT TO authenticated
+  WITH CHECK (public.has_permission(auth.uid(), 'salmon:entries:create'));
+
+-- UPDATE policies
+CREATE POLICY "salmon_entries_update" ON public.salmon_entries FOR UPDATE TO authenticated
+  USING (public.has_permission(auth.uid(), 'salmon:edit'));
+CREATE POLICY "salmon_manipulations_update" ON public.salmon_manipulations FOR UPDATE TO authenticated
+  USING (public.has_permission(auth.uid(), 'salmon:edit'));
+CREATE POLICY "salmon_daily_update" ON public.salmon_daily_records FOR UPDATE TO authenticated
+  USING (public.has_permission(auth.uid(), 'salmon:edit'));
+CREATE POLICY "salmon_config_update" ON public.salmon_config FOR UPDATE TO authenticated
+  USING (public.has_permission(auth.uid(), 'salmon:edit'));
+CREATE POLICY "salmon_targets_update" ON public.salmon_purchase_targets FOR UPDATE TO authenticated
+  USING (public.has_permission(auth.uid(), 'salmon:edit'));
+
+-- DELETE policies (soft delete preferred, but allow physical for admin cleanup)
+CREATE POLICY "salmon_entries_delete" ON public.salmon_entries FOR DELETE TO authenticated
+  USING (public.has_permission(auth.uid(), 'salmon:delete'));
+CREATE POLICY "salmon_manipulations_delete" ON public.salmon_manipulations FOR DELETE TO authenticated
+  USING (public.has_permission(auth.uid(), 'salmon:delete'));
+CREATE POLICY "salmon_daily_delete" ON public.salmon_daily_records FOR DELETE TO authenticated
+  USING (public.has_permission(auth.uid(), 'salmon:delete'));
+CREATE POLICY "salmon_targets_delete" ON public.salmon_purchase_targets FOR DELETE TO authenticated
+  USING (public.has_permission(auth.uid(), 'salmon:delete'));
+
+-- 6) AUDIT TRIGGERS (using existing audit_trigger_fn)
+
+CREATE TRIGGER trg_audit_salmon_entries AFTER INSERT OR UPDATE OR DELETE ON public.salmon_entries
+  FOR EACH ROW EXECUTE FUNCTION public.audit_trigger_fn('salmon', 'salmon_entries');
+CREATE TRIGGER trg_audit_salmon_manipulations AFTER INSERT OR UPDATE OR DELETE ON public.salmon_manipulations
+  FOR EACH ROW EXECUTE FUNCTION public.audit_trigger_fn('salmon', 'salmon_manipulations');
+CREATE TRIGGER trg_audit_salmon_daily AFTER INSERT OR UPDATE OR DELETE ON public.salmon_daily_records
+  FOR EACH ROW EXECUTE FUNCTION public.audit_trigger_fn('salmon', 'salmon_daily_records');
+CREATE TRIGGER trg_audit_salmon_config AFTER INSERT OR UPDATE OR DELETE ON public.salmon_config
+  FOR EACH ROW EXECUTE FUNCTION public.audit_trigger_fn('salmon', 'salmon_config');
+CREATE TRIGGER trg_audit_salmon_targets AFTER INSERT OR UPDATE OR DELETE ON public.salmon_purchase_targets
+  FOR EACH ROW EXECUTE FUNCTION public.audit_trigger_fn('salmon', 'salmon_purchase_targets');
+
+-- 7) Seed default config row
+INSERT INTO public.salmon_config (id) VALUES (gen_random_uuid());
+
+-- 8) Register salmon permissions in permissions table (if not exist)
+INSERT INTO public.permissions (key, module, action, description) VALUES
+  ('salmon:read', 'salmon', 'read', 'Visualizar módulo Salmão'),
+  ('salmon:entries:create', 'salmon', 'create', 'Criar entradas e manipulações de salmão'),
+  ('salmon:edit', 'salmon', 'edit', 'Editar registros de salmão'),
+  ('salmon:delete', 'salmon', 'delete', 'Excluir registros de salmão')
+ON CONFLICT (key) DO NOTHING;

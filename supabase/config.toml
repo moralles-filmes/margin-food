@@ -1,0 +1,34 @@
+project_id = "wuzxpbixprrgssoeeaez"
+
+[functions.inventario]
+verify_jwt = false
+
+[functions.cmv]
+verify_jwt = false
+
+[functions.ficha-tecnica]
+verify_jwt = false
+
+[functions.ai-chat]
+verify_jwt = false
+
+[functions.admin-users]
+verify_jwt = false
+
+[functions.requisicao-estoque]
+verify_jwt = false
+
+[functions.rh]
+verify_jwt = false
+
+[functions.purchase-requisitions]
+verify_jwt = false
+
+[functions.scheduled-jobs]
+verify_jwt = false
+
+[functions.admin-create-user]
+verify_jwt = false
+
+[functions.rbac-lint]
+verify_jwt = false

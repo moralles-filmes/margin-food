@@ -1,0 +1,138 @@
+
+-- Update financial RPCs to accept both legacy (finance:read/manage) and new granular permissions.
+-- Using OR logic so both old and new keys work during transition.
+
+-- get_fin_dashboard_summary: accept finance:read OR financeiro:dashboard:view
+CREATE OR REPLACE FUNCTION public.get_fin_dashboard_summary(p_start date, p_end date)
+ RETURNS json
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  _result json;
+  v_company uuid;
+BEGIN
+  v_company := public.assert_tenant();
+  IF NOT (public.has_permission(auth.uid(), 'finance:read') OR public.has_permission(auth.uid(), 'financeiro:dashboard:view')) THEN
+    RAISE EXCEPTION 'Sem permissão (financeiro:dashboard:view)';
+  END IF;
+
+  SELECT json_build_object(
+    'receita', COALESCE(SUM(CASE WHEN tipo='RECEITA' AND status='REALIZADO' THEN valor ELSE 0 END), 0),
+    'despesa', COALESCE(SUM(CASE WHEN tipo='DESPESA' AND status='REALIZADO' THEN valor ELSE 0 END), 0),
+    'a_receber', COALESCE(SUM(CASE WHEN tipo='RECEITA' AND status='PREVISTO' THEN valor ELSE 0 END), 0),
+    'a_pagar', COALESCE(SUM(CASE WHEN tipo='DESPESA' AND status='PREVISTO' THEN valor ELSE 0 END), 0),
+    'saldo_caixa', (
+      SELECT COALESCE(SUM(
+        CASE WHEN tipo='RECEITA' THEN valor WHEN tipo='DESPESA' THEN -valor ELSE 0 END
+      ), 0)
+      FROM public.fin_lancamentos
+      WHERE company_id = v_company
+        AND status='REALIZADO' AND tipo != 'TRANSFERENCIA' AND data_competencia < p_end
+    )
+  ) INTO _result
+  FROM public.fin_lancamentos
+  WHERE company_id = v_company
+    AND status != 'CANCELADO'
+    AND data_competencia >= p_start
+    AND data_competencia < p_end;
+
+  RETURN _result;
+END;
+$function$;
+
+-- list_fin_lancamentos_cursor: accept finance:read OR financeiro:lancamentos:view
+CREATE OR REPLACE FUNCTION public.list_fin_lancamentos_cursor(
+  p_start date DEFAULT NULL, p_end date DEFAULT NULL, p_status text DEFAULT NULL,
+  p_tipo text DEFAULT NULL, p_conta_id uuid DEFAULT NULL, p_search text DEFAULT NULL,
+  p_limit int DEFAULT 50, p_cursor_date date DEFAULT NULL, p_cursor_id uuid DEFAULT NULL
+)
+ RETURNS json
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  _items json;
+  _effective_limit int;
+  v_company uuid;
+BEGIN
+  v_company := public.assert_tenant();
+  IF NOT (public.has_permission(auth.uid(), 'finance:read') OR public.has_permission(auth.uid(), 'financeiro:lancamentos:view')) THEN
+    RAISE EXCEPTION 'Sem permissão (financeiro:lancamentos:view)';
+  END IF;
+
+  _effective_limit := LEAST(GREATEST(p_limit, 10), 200);
+
+  SELECT json_agg(row_to_json(t)) INTO _items
+  FROM (
+    SELECT
+      l.id, l.tipo, l.valor, l.data_competencia, l.descricao, l.status,
+      l.conta_id, l.conta_destino_id, l.categoria_id, l.centro_custo_id,
+      l.forma_pagamento, l.recorrente, l.observacoes, l.created_at, l.updated_at,
+      l.lancamento_pai_id
+    FROM public.fin_lancamentos l
+    WHERE l.company_id = v_company
+      AND l.status != 'CANCELADO'
+      AND (p_start IS NULL OR l.data_competencia >= p_start)
+      AND (p_end IS NULL OR l.data_competencia <= p_end)
+      AND (p_status IS NULL OR l.status = p_status)
+      AND (p_tipo IS NULL OR l.tipo = p_tipo)
+      AND (p_conta_id IS NULL OR l.conta_id = p_conta_id)
+      AND (p_search IS NULL OR l.descricao ILIKE '%' || p_search || '%')
+      AND (
+        p_cursor_date IS NULL
+        OR l.data_competencia < p_cursor_date
+        OR (l.data_competencia = p_cursor_date AND l.id < p_cursor_id)
+      )
+    ORDER BY l.data_competencia DESC, l.id DESC
+    LIMIT _effective_limit
+  ) t;
+
+  RETURN json_build_object(
+    'items', COALESCE(_items, '[]'::json),
+    'has_more', (SELECT json_array_length(COALESCE(_items, '[]'::json)) = _effective_limit)
+  );
+END;
+$function$;
+
+-- create_transfer: accept finance:manage OR financeiro:lancamentos:create
+CREATE OR REPLACE FUNCTION public.create_transfer(p_conta_origem uuid, p_conta_destino uuid, p_valor numeric, p_data date, p_descricao text, p_created_by uuid DEFAULT NULL)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE v_id uuid; v_company uuid;
+BEGIN
+  v_company := assert_tenant();
+  IF NOT (has_permission(auth.uid(), 'finance:manage') OR has_permission(auth.uid(), 'financeiro:lancamentos:create')) THEN
+    RAISE EXCEPTION 'Sem permissão (financeiro:lancamentos:create)';
+  END IF;
+  IF p_valor <= 0 THEN RAISE EXCEPTION 'Valor deve ser positivo'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM fin_contas WHERE id = p_conta_origem AND company_id = v_company) THEN RAISE EXCEPTION 'Conta origem não encontrada'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM fin_contas WHERE id = p_conta_destino AND company_id = v_company) THEN RAISE EXCEPTION 'Conta destino não encontrada'; END IF;
+  INSERT INTO fin_lancamentos (tipo, valor, data_competencia, descricao, conta_id, conta_destino_id, status, created_by, company_id)
+  VALUES ('TRANSFERENCIA', p_valor, p_data, COALESCE(p_descricao,'Transferência'), p_conta_origem, p_conta_destino, 'REALIZADO', COALESCE(p_created_by, auth.uid()), v_company)
+  RETURNING id INTO v_id;
+  RETURN jsonb_build_object('id', v_id);
+END; $function$;
+
+-- delete_transfer: accept finance:manage OR financeiro:lancamentos:delete
+CREATE OR REPLACE FUNCTION public.delete_transfer(p_lancamento_id uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE v_company uuid;
+BEGIN
+  v_company := assert_tenant();
+  IF NOT (has_permission(auth.uid(), 'finance:manage') OR has_permission(auth.uid(), 'financeiro:lancamentos:delete')) THEN
+    RAISE EXCEPTION 'Sem permissão (financeiro:lancamentos:delete)';
+  END IF;
+  DELETE FROM fin_lancamentos WHERE id = p_lancamento_id AND company_id = v_company AND tipo = 'TRANSFERENCIA';
+  IF NOT FOUND THEN RAISE EXCEPTION 'Transferência não encontrada'; END IF;
+  RETURN jsonb_build_object('ok', true);
+END; $function$;

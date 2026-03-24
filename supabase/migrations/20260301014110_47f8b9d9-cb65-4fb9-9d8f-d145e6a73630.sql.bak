@@ -1,0 +1,155 @@
+
+-- ============================================================
+-- 1) Add company_id to profiles + backfill + NOT NULL + FK
+-- ============================================================
+
+-- Add column (nullable first for backfill)
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS company_id uuid;
+
+-- Backfill all existing profiles to default company
+UPDATE public.profiles 
+SET company_id = '00000000-0000-0000-0000-000000000001' 
+WHERE company_id IS NULL;
+
+-- Make NOT NULL
+ALTER TABLE public.profiles ALTER COLUMN company_id SET NOT NULL;
+
+-- Set default for future inserts
+ALTER TABLE public.profiles ALTER COLUMN company_id SET DEFAULT '00000000-0000-0000-0000-000000000001';
+
+-- FK constraint
+ALTER TABLE public.profiles 
+ADD CONSTRAINT profiles_company_fk 
+FOREIGN KEY (company_id) REFERENCES public.companies(id);
+
+-- Index for lookups
+CREATE INDEX IF NOT EXISTS idx_profiles_company_id ON public.profiles(company_id);
+
+-- ============================================================
+-- 2) Update handle_new_user to include company_id
+-- ============================================================
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+BEGIN
+  INSERT INTO public.profiles (id, nome, email, company_id)
+  VALUES (
+    NEW.id, 
+    COALESCE(NEW.raw_user_meta_data->>'nome', ''), 
+    COALESCE(NEW.email, ''),
+    COALESCE(
+      (NEW.raw_user_meta_data->>'company_id')::uuid,
+      '00000000-0000-0000-0000-000000000001'::uuid
+    )
+  );
+  RETURN NEW;
+END;
+$$;
+
+-- ============================================================
+-- 3) get_current_company_id() — DYNAMIC (fail-closed)
+-- ============================================================
+CREATE OR REPLACE FUNCTION public.get_current_company_id()
+RETURNS uuid
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+DECLARE
+  v_company_id uuid;
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated — cannot resolve company.';
+  END IF;
+
+  SELECT company_id INTO v_company_id
+  FROM public.profiles
+  WHERE id = auth.uid();
+
+  IF v_company_id IS NULL THEN
+    RAISE EXCEPTION 'No profile or company_id found for user %. Access denied.', auth.uid();
+  END IF;
+
+  RETURN v_company_id;
+END;
+$$;
+
+-- ============================================================
+-- 4) Onboarding RPCs
+-- ============================================================
+
+-- 4a) Create company (admin only)
+CREATE OR REPLACE FUNCTION public.rpc_create_company(
+  p_nome text,
+  p_cnpj text DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+DECLARE
+  v_id uuid;
+BEGIN
+  IF NOT has_permission(auth.uid(), 'system:admin') THEN
+    RAISE EXCEPTION 'Sem permissão (system:admin).';
+  END IF;
+
+  INSERT INTO public.companies (nome, cnpj)
+  VALUES (p_nome, p_cnpj)
+  RETURNING id INTO v_id;
+
+  -- Audit
+  INSERT INTO public.audit_logs (module, action, entity, entity_id, actor_user_id, source, success, after)
+  VALUES ('system', 'create_company', 'companies', v_id::text, auth.uid(), 'rpc', true,
+    jsonb_build_object('nome', p_nome, 'cnpj', p_cnpj));
+
+  RETURN jsonb_build_object('id', v_id);
+END;
+$$;
+
+-- 4b) Set user company (admin only)
+CREATE OR REPLACE FUNCTION public.rpc_set_user_company(
+  p_user_id uuid,
+  p_company_id uuid
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+DECLARE
+  v_old_company uuid;
+BEGIN
+  IF NOT has_permission(auth.uid(), 'system:admin') THEN
+    RAISE EXCEPTION 'Sem permissão (system:admin).';
+  END IF;
+
+  -- Validate company exists
+  IF NOT EXISTS (SELECT 1 FROM public.companies WHERE id = p_company_id AND ativo = true) THEN
+    RAISE EXCEPTION 'Company não encontrada ou inativa.';
+  END IF;
+
+  -- Get current company for audit
+  SELECT company_id INTO v_old_company FROM public.profiles WHERE id = p_user_id;
+  IF v_old_company IS NULL THEN
+    RAISE EXCEPTION 'Usuário não encontrado.';
+  END IF;
+
+  -- Update
+  UPDATE public.profiles SET company_id = p_company_id, updated_at = now()
+  WHERE id = p_user_id;
+
+  -- Audit
+  INSERT INTO public.audit_logs (module, action, entity, entity_id, actor_user_id, source, success, before, after)
+  VALUES ('system', 'set_user_company', 'profiles', p_user_id::text, auth.uid(), 'rpc', true,
+    jsonb_build_object('company_id', v_old_company),
+    jsonb_build_object('company_id', p_company_id));
+
+  RETURN jsonb_build_object('ok', true, 'old_company', v_old_company, 'new_company', p_company_id);
+END;
+$$;

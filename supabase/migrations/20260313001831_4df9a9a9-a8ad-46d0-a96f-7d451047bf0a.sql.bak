@@ -1,0 +1,349 @@
+
+-- Fix 1: list_stock_transfers — replace row_to_jsonb with to_jsonb
+CREATE OR REPLACE FUNCTION public.list_stock_transfers(
+    p_start_date date DEFAULT ((now() - '30 days'::interval))::date,
+    p_end_date date DEFAULT (now())::date,
+    p_product_id uuid DEFAULT NULL::uuid,
+    p_location text DEFAULT NULL::text,
+    p_limit integer DEFAULT 50,
+    p_offset integer DEFAULT 0
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+DECLARE
+    v_company_id uuid;
+    v_transfers jsonb;
+    v_total bigint;
+BEGIN
+    SELECT company_id INTO v_company_id
+    FROM public.profiles
+    WHERE id = auth.uid();
+
+    IF v_company_id IS NULL THEN
+        RAISE EXCEPTION 'Tenant inválido';
+    END IF;
+
+    SELECT count(DISTINCT reference_id) INTO v_total
+    FROM public.movimentacoes_estoque
+    WHERE company_id = v_company_id
+      AND reference_type = 'INTERNAL_TRANSFER'
+      AND internal_transfer = true
+      AND direction = 'OUT'
+      AND status = 'ATIVO'
+      AND data >= p_start_date
+      AND data <= p_end_date
+      AND (p_product_id IS NULL OR produto_id = p_product_id)
+      AND (p_location IS NULL OR setor ILIKE '%' || p_location || '%');
+
+    SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY t.created_at DESC), '[]'::jsonb)
+    INTO v_transfers
+    FROM (
+        SELECT
+            m_out.reference_id AS transfer_group_id,
+            m_out.produto_id,
+            p.nome_produto,
+            p.unidade_medida,
+            p.categoria,
+            m_out.quantidade,
+            m_out.custo_unitario,
+            m_out.custo_total,
+            m_out.setor AS from_location,
+            m_in.setor AS to_location,
+            m_out.observacao,
+            m_out.created_by,
+            m_out.created_at,
+            m_out.data,
+            pr.email AS actor_email
+        FROM public.movimentacoes_estoque m_out
+        JOIN public.produtos p ON p.id = m_out.produto_id
+        LEFT JOIN public.movimentacoes_estoque m_in
+            ON m_in.reference_id = m_out.reference_id
+            AND m_in.reference_type = 'INTERNAL_TRANSFER'
+            AND m_in.direction = 'IN'
+            AND m_in.company_id = v_company_id
+            AND m_in.status = 'ATIVO'
+        LEFT JOIN public.profiles pr ON pr.id = m_out.created_by
+        WHERE m_out.company_id = v_company_id
+          AND m_out.reference_type = 'INTERNAL_TRANSFER'
+          AND m_out.internal_transfer = true
+          AND m_out.direction = 'OUT'
+          AND m_out.status = 'ATIVO'
+          AND m_out.data >= p_start_date
+          AND m_out.data <= p_end_date
+          AND (p_product_id IS NULL OR m_out.produto_id = p_product_id)
+          AND (p_location IS NULL OR m_out.setor ILIKE '%' || p_location || '%' OR m_in.setor ILIKE '%' || p_location || '%')
+        ORDER BY m_out.created_at DESC
+        LIMIT p_limit OFFSET p_offset
+    ) t;
+
+    RETURN jsonb_build_object(
+        'transfers', v_transfers,
+        'total', v_total
+    );
+END;
+$function$;
+
+-- Fix 2: list_movimentacoes_cursor — salmon_lot_id is text not uuid
+DROP FUNCTION IF EXISTS public.list_movimentacoes_cursor(text, uuid, text, text, date, date, boolean, timestamptz, uuid, integer);
+
+CREATE OR REPLACE FUNCTION public.list_movimentacoes_cursor(
+    p_direction text DEFAULT NULL::text,
+    p_produto_id uuid DEFAULT NULL::uuid,
+    p_categoria text DEFAULT NULL::text,
+    p_setor text DEFAULT NULL::text,
+    p_date_from date DEFAULT NULL::date,
+    p_date_to date DEFAULT NULL::date,
+    p_show_cancelled boolean DEFAULT false,
+    p_cursor_created_at timestamp with time zone DEFAULT NULL::timestamp with time zone,
+    p_cursor_id uuid DEFAULT NULL::uuid,
+    p_limit integer DEFAULT 50
+)
+RETURNS TABLE(
+    id uuid,
+    produto_id uuid,
+    data date,
+    tipo text,
+    quantidade numeric,
+    custo_unitario numeric,
+    custo_total numeric,
+    origem text,
+    referencia_id text,
+    observacao text,
+    created_by uuid,
+    created_at timestamp with time zone,
+    status text,
+    estorno_de_id uuid,
+    justificativa_cancelamento text,
+    justificativa_edicao text,
+    setor text,
+    reference_type text,
+    reference_id text,
+    internal_transfer boolean,
+    source_module text,
+    salmon_lot_id text,
+    direction text,
+    has_more boolean
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_actual_limit int := LEAST(COALESCE(p_limit, 50), 200);
+  v_company uuid;
+BEGIN
+  v_company := public.assert_tenant();
+
+  IF NOT public.has_any_permission(auth.uid(), ARRAY[
+    'stock:read',
+    'stock:movements:read',
+    'estoque:movimentacoes:view',
+    'estoque:geral:view',
+    'cmv:categoria:view',
+    'cmv:top-itens:view',
+    'cmv:setor:view',
+    'cmv:semanal:view',
+    'cmv:simulador:view',
+    'system:global:manage'
+  ]) THEN
+    RAISE EXCEPTION 'Insufficient permissions';
+  END IF;
+
+  RETURN QUERY
+  WITH filtered AS (
+    SELECT
+      m.id,
+      m.produto_id,
+      m.data,
+      m.tipo,
+      m.quantidade,
+      m.custo_unitario,
+      m.custo_total,
+      m.origem,
+      m.referencia_id,
+      m.observacao,
+      m.created_by,
+      m.created_at,
+      m.status,
+      m.estorno_de_id,
+      m.justificativa_cancelamento,
+      m.justificativa_edicao,
+      m.setor,
+      m.reference_type,
+      m.reference_id,
+      m.internal_transfer,
+      m.source_module,
+      m.salmon_lot_id,
+      m.direction
+    FROM public.movimentacoes_estoque m
+    WHERE m.company_id = v_company
+      AND (p_direction IS NULL OR m.direction = p_direction)
+      AND (p_produto_id IS NULL OR m.produto_id = p_produto_id)
+      AND (p_categoria IS NULL OR EXISTS (
+        SELECT 1
+        FROM public.produtos p
+        WHERE p.id = m.produto_id
+          AND p.company_id = v_company
+          AND p.categoria = p_categoria
+      ))
+      AND (p_setor IS NULL OR m.setor = p_setor)
+      AND (p_date_from IS NULL OR m.data >= p_date_from)
+      AND (p_date_to IS NULL OR m.data <= p_date_to)
+      AND (p_show_cancelled OR m.status = 'ATIVO')
+      AND (
+        p_cursor_created_at IS NULL
+        OR (m.created_at, m.id) < (
+          p_cursor_created_at,
+          COALESCE(p_cursor_id, '00000000-0000-0000-0000-000000000000'::uuid)
+        )
+      )
+    ORDER BY m.created_at DESC, m.id DESC
+    LIMIT v_actual_limit + 1
+  )
+  SELECT
+    f.id,
+    f.produto_id,
+    f.data,
+    f.tipo,
+    f.quantidade,
+    f.custo_unitario,
+    f.custo_total,
+    f.origem,
+    f.referencia_id,
+    f.observacao,
+    f.created_by,
+    f.created_at,
+    f.status,
+    f.estorno_de_id,
+    f.justificativa_cancelamento,
+    f.justificativa_edicao,
+    f.setor,
+    f.reference_type,
+    f.reference_id,
+    f.internal_transfer,
+    f.source_module,
+    f.salmon_lot_id,
+    f.direction,
+    (ROW_NUMBER() OVER () > v_actual_limit) AS has_more
+  FROM filtered f
+  LIMIT v_actual_limit;
+END;
+$function$;
+
+-- Fix 3: get_stock_dashboard — m.user_id does not exist, use m.created_by
+CREATE OR REPLACE FUNCTION public.get_stock_dashboard(p_days integer DEFAULT 30)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+DECLARE
+    v_company uuid;
+    v_result jsonb;
+    v_cutoff timestamptz;
+BEGIN
+    v_company := public.assert_tenant();
+    v_cutoff := now() - (p_days || ' days')::interval;
+
+    WITH saldos AS (
+        SELECT
+            m.produto_id,
+            SUM(CASE WHEN m.direction = 'IN' THEN m.quantidade ELSE -m.quantidade END) AS saldo
+        FROM public.movimentacoes_estoque m
+        WHERE m.company_id = v_company AND m.status = 'ATIVO'
+        GROUP BY m.produto_id
+    ),
+    produto_saldos AS (
+        SELECT
+            p.id,
+            p.nome_produto,
+            p.categoria,
+            p.unidade_medida,
+            p.estoque_minimo,
+            COALESCE(s.saldo, 0) AS saldo,
+            COALESCE(
+                NULLIF(p.avg30_cost_base_unit, 0),
+                NULLIF(p.last_cost_base_unit, 0),
+                NULLIF(p.default_cost_base_unit, 0),
+                0
+            ) AS custo_efetivo
+        FROM public.produtos p
+        LEFT JOIN saldos s ON s.produto_id = p.id
+        WHERE p.company_id = v_company AND p.ativo = true
+    ),
+    cat_dist AS (
+        SELECT jsonb_agg(jsonb_build_object(
+            'categoria', COALESCE(sub.categoria, 'Sem Categoria'),
+            'valor', sub.valor,
+            'qtd_itens', sub.qtd_itens
+        ) ORDER BY sub.valor DESC) AS data
+        FROM (
+            SELECT
+                COALESCE(NULLIF(ps.categoria, ''), 'Sem Categoria') AS categoria,
+                ROUND(SUM(ps.saldo * ps.custo_efetivo)::numeric, 2) AS valor,
+                COUNT(*)::int AS qtd_itens
+            FROM produto_saldos ps
+            WHERE ps.saldo > 0
+            GROUP BY 1
+        ) sub
+    ),
+    status_counts AS (
+        SELECT
+            COUNT(*) FILTER (WHERE ps.saldo > ps.estoque_minimo OR ps.estoque_minimo = 0) AS ok,
+            COUNT(*) FILTER (WHERE ps.saldo > 0 AND ps.saldo <= ps.estoque_minimo AND ps.estoque_minimo > 0) AS atencao,
+            COUNT(*) FILTER (WHERE ps.saldo > 0 AND ps.saldo <= (ps.estoque_minimo * 0.5) AND ps.estoque_minimo > 0) AS critico,
+            COUNT(*) FILTER (WHERE ps.saldo <= 0) AS sem_estoque,
+            COUNT(*) FILTER (WHERE ps.custo_efetivo = 0) AS sem_custo
+        FROM produto_saldos ps
+    ),
+    recent_mov AS (
+        SELECT jsonb_agg(sub.row_data ORDER BY sub.rn) AS data
+        FROM (
+            SELECT
+                ROW_NUMBER() OVER (ORDER BY m.created_at DESC) AS rn,
+                jsonb_build_object(
+                    'id', m.id,
+                    'data', m.created_at,
+                    'produto', p.nome_produto,
+                    'tipo', m.tipo,
+                    'quantidade', m.quantidade,
+                    'custo_unitario', m.custo_unitario,
+                    'unidade', p.unidade_medida,
+                    'usuario', pr.name
+                ) AS row_data
+            FROM public.movimentacoes_estoque m
+            JOIN public.produtos p ON p.id = m.produto_id
+            LEFT JOIN public.profiles pr ON pr.id = m.created_by
+            WHERE m.company_id = v_company AND m.status = 'ATIVO'
+              AND m.created_at >= v_cutoff
+            ORDER BY m.created_at DESC
+            LIMIT 10
+        ) sub
+    ),
+    totals AS (
+        SELECT
+            ROUND(SUM(ps.saldo * ps.custo_efetivo)::numeric, 2) AS valor_total,
+            COUNT(*)::int AS total_produtos,
+            COUNT(*) FILTER (WHERE ps.saldo > 0)::int AS produtos_com_saldo
+        FROM produto_saldos ps
+    )
+    SELECT jsonb_build_object(
+        'valor_total', COALESCE(t.valor_total, 0),
+        'total_produtos', t.total_produtos,
+        'produtos_com_saldo', t.produtos_com_saldo,
+        'ok', sc.ok,
+        'atencao', sc.atencao,
+        'critico', sc.critico,
+        'sem_estoque', sc.sem_estoque,
+        'sem_custo', sc.sem_custo,
+        'categorias', COALESCE(cd.data, '[]'::jsonb),
+        'movimentacoes', COALESCE(rm.data, '[]'::jsonb)
+    ) INTO v_result
+    FROM totals t, status_counts sc, cat_dist cd, recent_mov rm;
+
+    RETURN v_result;
+END;
+$function$;

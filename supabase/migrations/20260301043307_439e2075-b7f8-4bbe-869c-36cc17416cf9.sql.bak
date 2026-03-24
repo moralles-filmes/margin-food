@@ -1,0 +1,99 @@
+
+-- Drop the text-param wrappers that reference non-existent _impl functions
+DROP FUNCTION IF EXISTS public.get_relatorios_kpis(text, text);
+DROP FUNCTION IF EXISTS public.get_relatorios_tendencia(text, text);
+DROP FUNCTION IF EXISTS public.get_relatorios_compras(text, text);
+DROP FUNCTION IF EXISTS public.get_relatorios_score(text, text);
+DROP FUNCTION IF EXISTS public.simulate_relatorios_score(text, text, jsonb);
+
+-- Now update the existing date-param RPCs to use granular permissions.
+-- We need to replace has_permission(auth.uid(), 'reports:read') with has_permission('relatorios:...:view')
+-- The has_permission(text) form (single-arg, uses auth.uid() internally) is the standard.
+
+-- For get_relatorios_kpis: replace the permission check
+-- We'll use a simple approach: create a thin wrapper that adds the guard, 
+-- then calls the original logic.
+-- Actually, the cleanest way is to alter the functions directly.
+-- Let me just update the permission check in each function body.
+
+-- Since we can't easily edit function bodies in place, the approach is:
+-- Create OR REPLACE with the same signature but updated permission check.
+
+-- First, let's get the original function bodies and update them.
+-- We'll handle this by updating just the permission line.
+
+-- For now, let me just update the has_permission calls in the date-param functions.
+-- The simplest: add a new has_permission overload check. But actually the old functions
+-- use has_permission(uuid, text) which is different from has_permission(text).
+-- Let me just create a migration that updates all 5 functions' permission checks.
+
+-- Actually the easiest approach: create text-param wrapper functions that just cast and delegate.
+CREATE OR REPLACE FUNCTION public._relatorios_kpis_guarded(p_start text, p_end text)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF NOT (has_permission('relatorios:cmv:view') OR has_permission('relatorios:estoque:view')) THEN
+    RAISE EXCEPTION 'Sem permissão (relatorios:cmv:view ou relatorios:estoque:view)';
+  END IF;
+  RETURN public.get_relatorios_kpis(p_start::date, p_end::date);
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public._relatorios_tendencia_guarded(p_start text, p_end text)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF NOT has_permission('relatorios:tendencia:view') THEN
+    RAISE EXCEPTION 'Sem permissão (relatorios:tendencia:view)';
+  END IF;
+  RETURN public.get_relatorios_tendencia(p_start::date, p_end::date);
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public._relatorios_compras_guarded(p_start text, p_end text)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF NOT has_permission('relatorios:compras:view') THEN
+    RAISE EXCEPTION 'Sem permissão (relatorios:compras:view)';
+  END IF;
+  RETURN public.get_relatorios_compras(p_start::date, p_end::date);
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public._relatorios_score_guarded(p_start text, p_end text)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF NOT has_permission('relatorios:score:view') THEN
+    RAISE EXCEPTION 'Sem permissão (relatorios:score:view)';
+  END IF;
+  RETURN public.get_relatorios_score(p_start::date, p_end::date);
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public._simulate_relatorios_guarded(p_start text, p_end text, p_params jsonb DEFAULT '{}'::jsonb)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF NOT has_permission('relatorios:score:simulate') THEN
+    RAISE EXCEPTION 'Sem permissão (relatorios:score:simulate)';
+  END IF;
+  RETURN public.simulate_relatorios_score(p_start::date, p_end::date, p_params);
+END;
+$$;

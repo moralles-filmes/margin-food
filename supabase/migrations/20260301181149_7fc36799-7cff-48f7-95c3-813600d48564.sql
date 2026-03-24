@@ -1,0 +1,7 @@
+
+-- FORCE RLS on system tables
+ALTER TABLE public.companies FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.permissions FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.user_permissions FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.user_roles FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.role_permissions FORCE ROW LEVEL SECURITY;

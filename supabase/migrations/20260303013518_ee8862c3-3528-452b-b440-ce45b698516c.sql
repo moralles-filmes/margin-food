@@ -1,0 +1,3 @@
+
+ALTER TABLE public.produtos FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.stock_sku_counter FORCE ROW LEVEL SECURITY;

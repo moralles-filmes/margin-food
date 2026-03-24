@@ -1,0 +1,551 @@
+
+-- =============================================================
+-- FASE 2: Server-side KPIs for Relatórios Gerais + Dashboard Salmão
+-- =============================================================
+
+-- 1) RPC: get_relatorios_kpis (CMV + Estoque tabs)
+CREATE OR REPLACE FUNCTION public.get_relatorios_kpis(p_start date, p_end date)
+RETURNS jsonb
+LANGUAGE plpgsql
+STABLE SECURITY DEFINER
+SET search_path TO 'public'
+AS $fn$
+DECLARE
+  v_result jsonb;
+  v_faturamento numeric;
+  v_custo_total numeric;
+  v_custo_salmon numeric;
+  v_cmv_geral numeric;
+  v_cmv_salmon numeric;
+  v_margem numeric;
+  v_impacto numeric;
+  v_cmv_categorias jsonb;
+  v_tendencia jsonb;
+  v_valor_estoque numeric;
+  v_abaixo_minimo jsonb;
+  v_maiores_perdas jsonb;
+  v_ruptura numeric;
+  v_total_ativos int;
+  v_count_abaixo int;
+  v_giro numeric;
+  v_cobertura numeric;
+  v_consumo_periodo numeric;
+  v_semanas_periodo numeric;
+  v_parado_percent numeric;
+  v_count_parados int;
+BEGIN
+  IF NOT has_permission(auth.uid(), 'reports:read') THEN
+    RAISE EXCEPTION 'Sem permissão (reports:read).';
+  END IF;
+
+  -- ═══ CMV TAB ═══
+
+  -- Faturamento from salmon_daily_records
+  SELECT COALESCE(SUM(revenue), 0) INTO v_faturamento
+  FROM salmon_daily_records
+  WHERE record_date BETWEEN p_start AND p_end;
+
+  -- Custo consumido total: all consumption movements in period
+  -- Excludes CANCELADO, excludes ESTORNO types (they exist only for audit trail)
+  SELECT COALESCE(SUM(custo_total), 0) INTO v_custo_total
+  FROM movimentacoes_estoque
+  WHERE data BETWEEN p_start AND p_end
+    AND status = 'ATIVO'
+    AND tipo NOT IN ('ENTRADA_ESTORNO', 'SAIDA_ESTORNO')
+    AND direction = 'OUT';
+
+  -- Custo salmon: OUT movements from salmon module only
+  SELECT COALESCE(SUM(custo_total), 0) INTO v_custo_salmon
+  FROM movimentacoes_estoque
+  WHERE data BETWEEN p_start AND p_end
+    AND status = 'ATIVO'
+    AND tipo NOT IN ('ENTRADA_ESTORNO', 'SAIDA_ESTORNO')
+    AND direction = 'OUT'
+    AND source_module = 'salmon';
+
+  -- Derived KPIs
+  v_cmv_geral := CASE WHEN v_faturamento > 0 THEN ROUND(v_custo_total / v_faturamento * 100, 2) ELSE NULL END;
+  v_cmv_salmon := CASE WHEN v_faturamento > 0 THEN ROUND(v_custo_salmon / v_faturamento * 100, 2) ELSE NULL END;
+  v_margem := CASE WHEN v_cmv_geral IS NOT NULL THEN ROUND(100 - v_cmv_geral, 2) ELSE NULL END;
+  v_impacto := CASE WHEN v_custo_total > 0 THEN ROUND(v_custo_salmon / v_custo_total * 100, 2) ELSE NULL END;
+
+  -- CMV por categoria
+  SELECT COALESCE(jsonb_agg(row_to_json(sub)::jsonb ORDER BY sub.custo_consumido DESC), '[]'::jsonb)
+  INTO v_cmv_categorias
+  FROM (
+    SELECT
+      COALESCE(p.categoria, 'Outros') AS categoria,
+      ROUND(SUM(m.custo_total)::numeric, 2) AS custo_consumido,
+      CASE WHEN v_custo_total > 0
+        THEN ROUND(SUM(m.custo_total) / v_custo_total * 100, 2)
+        ELSE 0 END AS percent_do_total
+    FROM movimentacoes_estoque m
+    LEFT JOIN produtos p ON p.id = m.produto_id
+    WHERE m.data BETWEEN p_start AND p_end
+      AND m.status = 'ATIVO'
+      AND m.tipo NOT IN ('ENTRADA_ESTORNO', 'SAIDA_ESTORNO')
+      AND m.direction = 'OUT'
+    GROUP BY COALESCE(p.categoria, 'Outros')
+  ) sub;
+
+  -- Tendência CMV 3 meses (current month + 2 prior)
+  SELECT COALESCE(jsonb_agg(row_to_json(sub)::jsonb ORDER BY sub.ano, sub.mes), '[]'::jsonb)
+  INTO v_tendencia
+  FROM (
+    SELECT
+      g.ano, g.mes,
+      COALESCE(rev.total, 0) AS faturamento,
+      COALESCE(cost.total, 0) AS custo,
+      CASE WHEN COALESCE(rev.total, 0) > 0
+        THEN ROUND(COALESCE(cost.total, 0) / rev.total * 100, 2)
+        ELSE 0 END AS cmv_percent
+    FROM (
+      SELECT EXTRACT(YEAR FROM d)::int AS ano, EXTRACT(MONTH FROM d)::int AS mes,
+             date_trunc('month', d)::date AS m_start,
+             (date_trunc('month', d) + INTERVAL '1 month' - INTERVAL '1 day')::date AS m_end
+      FROM generate_series(
+        date_trunc('month', CURRENT_DATE - INTERVAL '2 months')::date,
+        date_trunc('month', CURRENT_DATE)::date,
+        '1 month'::interval
+      ) d
+    ) g
+    LEFT JOIN LATERAL (
+      SELECT SUM(revenue) AS total FROM salmon_daily_records
+      WHERE record_date BETWEEN g.m_start AND g.m_end
+    ) rev ON true
+    LEFT JOIN LATERAL (
+      SELECT SUM(custo_total) AS total FROM movimentacoes_estoque
+      WHERE data BETWEEN g.m_start AND g.m_end
+        AND status = 'ATIVO'
+        AND tipo NOT IN ('ENTRADA_ESTORNO', 'SAIDA_ESTORNO')
+        AND direction = 'OUT'
+    ) cost ON true
+  ) sub;
+
+  -- ═══ ESTOQUE TAB ═══
+
+  -- Valor total estoque (all active products, saldo × best available cost)
+  SELECT COALESCE(SUM(sub.saldo * sub.unit_cost), 0)
+  INTO v_valor_estoque
+  FROM (
+    SELECT
+      p.id,
+      COALESCE((
+        SELECT SUM(
+          CASE
+            WHEN m.tipo IN ('ENTRADA_ESTORNO','SAIDA_ESTORNO') THEN 0
+            WHEN m.direction = 'IN' THEN m.quantidade
+            ELSE -m.quantidade
+          END
+        )
+        FROM movimentacoes_estoque m
+        WHERE m.produto_id = p.id AND m.status = 'ATIVO'
+      ), 0) AS saldo,
+      COALESCE(
+        NULLIF(p.avg30_cost_base_unit, 0),
+        NULLIF(p.last_cost_base_unit, 0),
+        NULLIF(p.default_cost_base_unit, 0),
+        CASE WHEN COALESCE(p.fator_conversao_padrao, 1) > 0
+          THEN p.custo_padrao / COALESCE(NULLIF(p.fator_conversao_padrao, 0), 1)
+          ELSE 0 END
+      ) AS unit_cost
+    FROM produtos p
+    WHERE p.ativo = true
+  ) sub
+  WHERE sub.saldo > 0;
+
+  -- Itens abaixo do mínimo (top 5)
+  SELECT COALESCE(jsonb_agg(row_to_json(sub)::jsonb), '[]'::jsonb)
+  INTO v_abaixo_minimo
+  FROM (
+    SELECT
+      p.id AS produto_id,
+      p.nome_produto AS nome,
+      COALESCE(s.saldo, 0) AS saldo,
+      p.estoque_minimo AS minimo
+    FROM produtos p
+    LEFT JOIN LATERAL (
+      SELECT SUM(
+        CASE
+          WHEN m.tipo IN ('ENTRADA_ESTORNO','SAIDA_ESTORNO') THEN 0
+          WHEN m.direction = 'IN' THEN m.quantidade
+          ELSE -m.quantidade
+        END
+      ) AS saldo
+      FROM movimentacoes_estoque m
+      WHERE m.produto_id = p.id AND m.status = 'ATIVO'
+    ) s ON true
+    WHERE p.ativo = true
+      AND p.estoque_minimo > 0
+      AND COALESCE(s.saldo, 0) < p.estoque_minimo
+    ORDER BY (p.estoque_minimo - COALESCE(s.saldo, 0)) DESC
+    LIMIT 5
+  ) sub;
+
+  -- Count for ruptura
+  SELECT COUNT(*) INTO v_total_ativos FROM produtos WHERE ativo = true;
+
+  SELECT COUNT(*) INTO v_count_abaixo
+  FROM produtos p
+  WHERE p.ativo = true AND p.estoque_minimo > 0
+    AND COALESCE((
+      SELECT SUM(
+        CASE
+          WHEN m.tipo IN ('ENTRADA_ESTORNO','SAIDA_ESTORNO') THEN 0
+          WHEN m.direction = 'IN' THEN m.quantidade
+          ELSE -m.quantidade
+        END
+      )
+      FROM movimentacoes_estoque m
+      WHERE m.produto_id = p.id AND m.status = 'ATIVO'
+    ), 0) < p.estoque_minimo;
+
+  v_ruptura := CASE WHEN v_total_ativos > 0
+    THEN ROUND(v_count_abaixo::numeric / v_total_ativos * 100, 2) ELSE 0 END;
+
+  -- Maiores perdas top 5 (BAIXA_PERDA in period)
+  SELECT COALESCE(jsonb_agg(row_to_json(sub)::jsonb), '[]'::jsonb)
+  INTO v_maiores_perdas
+  FROM (
+    SELECT
+      p.id AS produto_id,
+      p.nome_produto AS nome,
+      ROUND(SUM(m.quantidade)::numeric, 2) AS perda_kg,
+      ROUND(SUM(m.custo_total)::numeric, 2) AS perda_valor
+    FROM movimentacoes_estoque m
+    JOIN produtos p ON p.id = m.produto_id
+    WHERE m.data BETWEEN p_start AND p_end
+      AND m.status = 'ATIVO'
+      AND m.tipo IN ('BAIXA_PERDA')
+      AND m.tipo NOT IN ('ENTRADA_ESTORNO', 'SAIDA_ESTORNO')
+    GROUP BY p.id, p.nome_produto
+    HAVING SUM(m.custo_total) > 0
+    ORDER BY SUM(m.custo_total) DESC
+    LIMIT 5
+  ) sub;
+
+  -- Giro & cobertura
+  v_semanas_periodo := GREATEST(1, EXTRACT(EPOCH FROM (p_end - p_start)) / (7 * 86400));
+
+  SELECT COALESCE(SUM(custo_total), 0) INTO v_consumo_periodo
+  FROM movimentacoes_estoque
+  WHERE data BETWEEN p_start AND p_end
+    AND status = 'ATIVO'
+    AND tipo NOT IN ('ENTRADA_ESTORNO', 'SAIDA_ESTORNO')
+    AND direction = 'OUT'
+    AND tipo = 'SAIDA';
+
+  v_giro := CASE WHEN v_valor_estoque > 0 THEN ROUND(v_custo_total / v_valor_estoque, 2) ELSE 0 END;
+
+  DECLARE v_consumo_semanal numeric;
+  BEGIN
+    v_consumo_semanal := v_consumo_periodo / v_semanas_periodo;
+    v_cobertura := CASE WHEN v_consumo_semanal > 0 THEN ROUND(v_valor_estoque / v_consumo_semanal, 1) ELSE 0 END;
+  END;
+
+  -- Estoque parado (products with stock > 0 but no movement in last 28 days)
+  SELECT COUNT(*) INTO v_count_parados
+  FROM produtos p
+  WHERE p.ativo = true
+    AND COALESCE((
+      SELECT SUM(
+        CASE
+          WHEN m.tipo IN ('ENTRADA_ESTORNO','SAIDA_ESTORNO') THEN 0
+          WHEN m.direction = 'IN' THEN m.quantidade
+          ELSE -m.quantidade
+        END
+      )
+      FROM movimentacoes_estoque m
+      WHERE m.produto_id = p.id AND m.status = 'ATIVO'
+    ), 0) > 0
+    AND NOT EXISTS (
+      SELECT 1 FROM movimentacoes_estoque m
+      WHERE m.produto_id = p.id AND m.status = 'ATIVO'
+        AND m.created_at >= (CURRENT_DATE - 28)
+    );
+
+  v_parado_percent := CASE WHEN v_total_ativos > 0
+    THEN ROUND(v_count_parados::numeric / v_total_ativos * 100, 2) ELSE 0 END;
+
+  -- ═══ ASSEMBLE ═══
+  v_result := jsonb_build_object(
+    -- CMV
+    'faturamento_total', ROUND(v_faturamento::numeric, 2),
+    'faturamento_source', 'salmon_daily_records',
+    'custo_consumido_total', ROUND(v_custo_total::numeric, 2),
+    'custo_salmon', ROUND(v_custo_salmon::numeric, 2),
+    'cmv_geral_percent', v_cmv_geral,
+    'cmv_salmon_percent', v_cmv_salmon,
+    'margem_bruta_percent', v_margem,
+    'impacto_salmon_percent', v_impacto,
+    'meta_cmv', 35,
+    'cmv_por_categoria', v_cmv_categorias,
+    'tendencia_cmv_3_meses', v_tendencia,
+    -- Estoque
+    'valor_total_estoque', ROUND(v_valor_estoque::numeric, 2),
+    'custo_source', 'avg30 > last > default > custo_padrao/fator',
+    'itens_abaixo_minimo_count', v_count_abaixo,
+    'itens_abaixo_minimo_top5', v_abaixo_minimo,
+    'maiores_perdas_top5', v_maiores_perdas,
+    'ruptura_percent', v_ruptura,
+    'giro_estoque', v_giro,
+    'cobertura_semanas', v_cobertura,
+    'parado_percent', v_parado_percent,
+    'parado_count', v_count_parados,
+    'total_ativos', v_total_ativos,
+    -- Perdas totais no período (salmon + geral)
+    'perdas_kg', (
+      SELECT COALESCE(SUM(quantidade), 0) FROM movimentacoes_estoque
+      WHERE data BETWEEN p_start AND p_end AND status = 'ATIVO'
+        AND tipo = 'BAIXA_PERDA'
+    ),
+    'perdas_valor', (
+      SELECT COALESCE(SUM(custo_total), 0) FROM movimentacoes_estoque
+      WHERE data BETWEEN p_start AND p_end AND status = 'ATIVO'
+        AND tipo = 'BAIXA_PERDA'
+    ),
+    'computed_at', now()
+  );
+
+  RETURN v_result;
+END;
+$fn$;
+
+
+-- 2) Extend get_salmon_dashboard_summary with missing fields
+CREATE OR REPLACE FUNCTION public.get_salmon_dashboard_summary(p_date_from date DEFAULT NULL::date, p_date_to date DEFAULT NULL::date)
+RETURNS jsonb
+LANGUAGE plpgsql
+STABLE SECURITY DEFINER
+SET search_path TO 'public'
+AS $fn$
+DECLARE
+  v_result jsonb;
+  v_produto_id uuid;
+  v_saldo_bruto numeric;
+  v_total_entries numeric;
+  v_total_value numeric;
+  v_avg_cost numeric;
+  v_total_manip_gross numeric;
+  v_total_clean numeric;
+  v_avg_yield numeric;
+  v_avg_loss numeric;
+  v_manip_count int;
+  v_avg_daily_consumption numeric;
+  v_days_remaining numeric;
+  v_from date;
+  v_to date;
+  -- New fields
+  v_perda_kg numeric;
+  v_perda_valor numeric;
+  v_consumido_kg numeric;
+  v_revenue numeric;
+  v_cmv_salmon numeric;
+  v_estoque_limpo numeric;
+  v_config RECORD;
+  v_fifo jsonb;
+  v_stale jsonb;
+BEGIN
+  IF NOT has_permission(auth.uid(), 'salmon:read') AND NOT has_permission(auth.uid(), 'reports:read') THEN
+    RAISE EXCEPTION 'Sem permissão (salmon:read ou reports:read).';
+  END IF;
+
+  v_from := COALESCE(p_date_from, CURRENT_DATE - INTERVAL '30 days');
+  v_to := COALESCE(p_date_to, CURRENT_DATE);
+
+  -- Get salmon product
+  SELECT id INTO v_produto_id FROM produtos WHERE is_salmon_raw_linked = true AND ativo = true LIMIT 1;
+
+  -- Gross balance from ledger
+  IF v_produto_id IS NOT NULL THEN
+    SELECT COALESCE(SUM(
+      CASE
+        WHEN tipo IN ('ENTRADA_ESTORNO','SAIDA_ESTORNO') THEN 0
+        WHEN direction = 'IN' THEN quantidade
+        ELSE -quantidade
+      END
+    ), 0) INTO v_saldo_bruto
+    FROM movimentacoes_estoque
+    WHERE produto_id = v_produto_id AND status = 'ATIVO';
+  ELSE
+    v_saldo_bruto := 0;
+  END IF;
+
+  -- Entries summary (period-filtered)
+  SELECT COALESCE(SUM(gross_kg), 0), COALESCE(SUM(total_value), 0)
+  INTO v_total_entries, v_total_value
+  FROM salmon_entries
+  WHERE status = 'ACTIVE' AND entry_date BETWEEN v_from AND v_to;
+
+  v_avg_cost := CASE WHEN v_total_entries > 0 THEN ROUND(v_total_value / v_total_entries, 4) ELSE 0 END;
+
+  -- Manipulations summary
+  SELECT
+    COALESCE(SUM(gross_out_kg), 0),
+    COALESCE(SUM(clean_in_kg), 0),
+    COALESCE(AVG(CASE WHEN gross_out_kg > 0 THEN clean_in_kg / gross_out_kg * 100 ELSE NULL END), 0),
+    COALESCE(AVG(CASE WHEN gross_out_kg > 0 THEN (gross_out_kg - clean_in_kg) / gross_out_kg * 100 ELSE NULL END), 0),
+    COUNT(*)
+  INTO v_total_manip_gross, v_total_clean, v_avg_yield, v_avg_loss, v_manip_count
+  FROM salmon_manipulations
+  WHERE status = 'ACTIVE' AND manipulation_date BETWEEN v_from AND v_to;
+
+  -- Perda (kg and valor)
+  SELECT
+    COALESCE(SUM(gross_out_kg - clean_in_kg), 0),
+    COALESCE(SUM(
+      (gross_out_kg - clean_in_kg) *
+      CASE WHEN gross_out_kg > 0 THEN cost_per_kg_gross ELSE 0 END
+    ), 0)
+  INTO v_perda_kg, v_perda_valor
+  FROM salmon_manipulations
+  WHERE status = 'ACTIVE' AND manipulation_date BETWEEN v_from AND v_to;
+
+  -- Consumido (clean - leftover)
+  SELECT COALESCE(SUM(clean_in_kg - COALESCE(leftover_kg, 0)), 0)
+  INTO v_consumido_kg
+  FROM salmon_manipulations
+  WHERE status = 'ACTIVE' AND manipulation_date BETWEEN v_from AND v_to;
+
+  -- Revenue for CMV
+  SELECT COALESCE(SUM(revenue), 0) INTO v_revenue
+  FROM salmon_daily_records
+  WHERE record_date BETWEEN v_from AND v_to;
+
+  -- CMV salmon: custo do consumo / revenue
+  DECLARE v_custo_consumo numeric;
+  BEGIN
+    SELECT COALESCE(SUM(
+      (clean_in_kg - COALESCE(leftover_kg, 0)) * cost_per_kg_gross
+    ), 0) INTO v_custo_consumo
+    FROM salmon_manipulations
+    WHERE status = 'ACTIVE' AND manipulation_date BETWEEN v_from AND v_to;
+
+    v_cmv_salmon := CASE WHEN v_revenue > 0 THEN ROUND(v_custo_consumo / v_revenue * 100, 2) ELSE NULL END;
+  END;
+
+  -- Avg daily consumption (last 30 days)
+  SELECT COALESCE(
+    SUM(clean_in_kg - COALESCE(leftover_kg, 0)) / GREATEST(COUNT(DISTINCT manipulation_date), 1),
+    0
+  ) INTO v_avg_daily_consumption
+  FROM salmon_manipulations
+  WHERE status = 'ACTIVE' AND manipulation_date >= CURRENT_DATE - 30;
+
+  v_days_remaining := CASE WHEN v_avg_daily_consumption > 0
+    THEN ROUND(GREATEST(v_saldo_bruto, 0) / v_avg_daily_consumption, 1)
+    ELSE -1 END;
+
+  -- Estoque limpo: sum of leftover from active manipulations that still have stock
+  -- This is approximate; we sum clean_in_kg for non-leftover-recorded + leftover_kg for recorded
+  SELECT COALESCE(SUM(
+    CASE WHEN leftover_kg > 0 THEN leftover_kg ELSE clean_in_kg END
+  ), 0) INTO v_estoque_limpo
+  FROM salmon_manipulations
+  WHERE status = 'ACTIVE';
+  -- Note: this is a simplified calculation; the real clean stock depends on consumption tracking
+
+  -- Config for expiry
+  SELECT
+    COALESCE(expiration_days, 2) AS expiration_days,
+    COALESCE(expiration_alert_days, 1) AS alert_days,
+    COALESCE(stale_days_limit, 7) AS stale_days,
+    COALESCE(min_gross_kg, 50) AS min_gross,
+    COALESCE(min_clean_kg, 30) AS min_clean
+  INTO v_config
+  FROM salmon_config
+  LIMIT 1;
+
+  IF v_config IS NULL THEN
+    v_config := ROW(2, 1, 7, 50, 30);
+  END IF;
+
+  -- FIFO recommended lots (top 3 with balance > 0)
+  SELECT COALESCE(jsonb_agg(row_to_json(sub)::jsonb), '[]'::jsonb)
+  INTO v_fifo
+  FROM (
+    SELECT
+      e.id AS entry_id,
+      e.lot,
+      e.sif,
+      e.supplier_name AS supplier,
+      e.entry_date,
+      ROUND((e.gross_kg - COALESCE(manip.total_gross, 0))::numeric, 2) AS balance_kg,
+      CASE WHEN e.gross_kg > 0 THEN ROUND(e.total_value / e.gross_kg, 4) ELSE 0 END AS cost_per_kg
+    FROM salmon_entries e
+    LEFT JOIN LATERAL (
+      SELECT SUM(gross_out_kg) AS total_gross
+      FROM salmon_manipulations
+      WHERE entry_id = e.id AND status = 'ACTIVE'
+    ) manip ON true
+    WHERE e.status = 'ACTIVE'
+      AND (e.gross_kg - COALESCE(manip.total_gross, 0)) > 0.01
+    ORDER BY e.entry_date ASC
+    LIMIT 3
+  ) sub;
+
+  -- Stale lots (balance > 0, no manipulation in stale_days_limit)
+  SELECT COALESCE(jsonb_agg(row_to_json(sub)::jsonb), '[]'::jsonb)
+  INTO v_stale
+  FROM (
+    SELECT
+      e.id AS entry_id,
+      e.lot,
+      e.supplier_name AS supplier,
+      ROUND((e.gross_kg - COALESCE(manip.total_gross, 0))::numeric, 2) AS balance_kg,
+      COALESCE(manip.last_date, e.entry_date) AS last_movement_date,
+      (CURRENT_DATE - COALESCE(manip.last_date, e.entry_date))::int AS days_since_movement
+    FROM salmon_entries e
+    LEFT JOIN LATERAL (
+      SELECT SUM(gross_out_kg) AS total_gross, MAX(manipulation_date) AS last_date
+      FROM salmon_manipulations
+      WHERE entry_id = e.id AND status = 'ACTIVE'
+    ) manip ON true
+    WHERE e.status = 'ACTIVE'
+      AND (e.gross_kg - COALESCE(manip.total_gross, 0)) > 0.01
+      AND (CURRENT_DATE - COALESCE(manip.last_date, e.entry_date)) >= v_config.stale_days
+    ORDER BY (CURRENT_DATE - COALESCE(manip.last_date, e.entry_date)) DESC
+    LIMIT 5
+  ) sub;
+
+  v_result := jsonb_build_object(
+    'period', jsonb_build_object('from', v_from, 'to', v_to),
+    -- Stock
+    'saldo_bruto_kg', ROUND(GREATEST(v_saldo_bruto, 0)::numeric, 2),
+    'estoque_limpo_kg', ROUND(GREATEST(v_estoque_limpo, 0)::numeric, 2),
+    'low_gross', GREATEST(v_saldo_bruto, 0) <= v_config.min_gross,
+    'low_clean', GREATEST(v_estoque_limpo, 0) <= v_config.min_clean,
+    'min_gross_kg', v_config.min_gross,
+    'min_clean_kg', v_config.min_clean,
+    -- Entries
+    'total_entries_kg', ROUND(v_total_entries::numeric, 2),
+    'total_value', ROUND(v_total_value::numeric, 2),
+    'avg_cost_per_kg', v_avg_cost,
+    'entries_count', (SELECT COUNT(*) FROM salmon_entries WHERE status = 'ACTIVE' AND entry_date BETWEEN v_from AND v_to),
+    -- Manipulations
+    'total_manipulated_kg', ROUND(v_total_manip_gross::numeric, 2),
+    'total_clean_kg', ROUND(v_total_clean::numeric, 2),
+    'consumido_kg', ROUND(v_consumido_kg::numeric, 2),
+    'avg_yield_percent', ROUND(v_avg_yield::numeric, 2),
+    'avg_loss_percent', ROUND(v_avg_loss::numeric, 2),
+    'manipulation_count', v_manip_count,
+    -- Loss
+    'perda_kg', ROUND(v_perda_kg::numeric, 2),
+    'perda_valor', ROUND(v_perda_valor::numeric, 2),
+    -- Consumption & forecast
+    'avg_daily_consumption_kg', ROUND(v_avg_daily_consumption::numeric, 2),
+    'days_remaining', v_days_remaining,
+    -- Revenue & CMV
+    'revenue', ROUND(v_revenue::numeric, 2),
+    'cmv_salmon_percent', v_cmv_salmon,
+    -- FIFO & stale
+    'fifo_recomendados', v_fifo,
+    'lotes_parados', v_stale,
+    -- Auditoria (localStorage-based, not available server-side)
+    'auditoria_compras_overrides', null,
+    'computed_at', now()
+  );
+
+  RETURN v_result;
+END;
+$fn$;

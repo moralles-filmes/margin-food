@@ -1,0 +1,175 @@
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+import { APP_NAME } from '@/lib/brand';
+import { fmtBRL } from '@/lib/money';
+import type { PurchaseOrder, PurchaseOrderItem } from '@/hooks/usePurchaseOrdersStore';
+
+interface Params {
+  order: PurchaseOrder;
+  items: PurchaseOrderItem[];
+  includePrice: boolean;
+  extraNotes: string;
+  orderCode: string;
+}
+
+export function gerarPDFPedidoFornecedor({ order, items, includePrice, extraNotes, orderCode }: Params) {
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const orderDate = new Date(order.created_at).toLocaleDateString('pt-BR');
+  let y = 15;
+
+  // ===== HEADER =====
+  doc.setFontSize(18);
+  doc.setFont('helvetica', 'bold');
+  doc.text(APP_NAME, 14, y);
+
+  doc.setFontSize(14);
+  doc.setTextColor(220, 80, 50);
+  doc.text('PEDIDO DE COMPRA', pageWidth - 14, y, { align: 'right' });
+  doc.setTextColor(0);
+
+  y += 10;
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Nº ${orderCode}`, 14, y);
+  doc.text(`Data: ${orderDate}`, pageWidth - 14, y, { align: 'right' });
+
+  y += 6;
+  doc.text(`Prioridade: ${order.priority}`, 14, y);
+  doc.text(`Tipo: ${order.type}`, pageWidth - 14, y, { align: 'right' });
+
+  // ===== DIVIDER =====
+  y += 5;
+  doc.setDrawColor(220, 80, 50);
+  doc.setLineWidth(0.5);
+  doc.line(14, y, pageWidth - 14, y);
+
+  // ===== FORNECEDOR =====
+  y += 8;
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  doc.text('FORNECEDOR', 14, y);
+  y += 6;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.text(order.supplier_name || '—', 14, y);
+
+  // ===== ENTREGA / PAGAMENTO =====
+  y += 10;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.text('ENTREGA / PAGAMENTO', 14, y);
+  y += 6;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+
+  const infoLines: string[] = [];
+  if (order.need_by_date) infoLines.push(`Data necessidade: ${order.need_by_date}`);
+  if (order.delivery_forecast_date) infoLines.push(`Previsão entrega: ${order.delivery_forecast_date}`);
+  if (order.payment_type) infoLines.push(`Pagamento: ${order.payment_type}`);
+  if (infoLines.length === 0) infoLines.push('Não informado');
+
+  infoLines.forEach(line => {
+    doc.text(line, 14, y);
+    y += 5;
+  });
+
+  // ===== OBSERVAÇÕES =====
+  const allNotes = [order.notes, extraNotes].filter(Boolean).join(' | ');
+  if (allNotes) {
+    y += 3;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.text('OBSERVAÇÕES', 14, y);
+    y += 6;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    const splitNotes = doc.splitTextToSize(allNotes, pageWidth - 28);
+    doc.text(splitNotes, 14, y);
+    y += splitNotes.length * 5;
+  }
+
+  // ===== TABLE =====
+  y += 5;
+
+  const head: string[] = ['#', 'Item', 'Unidade', 'Qtd'];
+  if (includePrice) head.push('Preço Unit.', 'Subtotal');
+
+  const body = items.map((item, idx) => {
+    const unit = item.purchase_unit_snapshot || item.unit_snapshot;
+    const cost = item.purchase_unit_cost_snapshot ?? item.estimated_unit_value;
+    const row: string[] = [
+      String(idx + 1),
+      item.name_snapshot,
+      unit,
+      String(item.qty_requested),
+    ];
+    if (includePrice) {
+      row.push(fmtBRL(cost));
+      row.push(fmtBRL(item.qty_requested * cost));
+    }
+    return row;
+  });
+
+  (doc as any).autoTable({
+    startY: y,
+    head: [head],
+    body,
+    styles: { fontSize: 8, cellPadding: 3 },
+    headStyles: { fillColor: [220, 80, 50], textColor: 255, fontStyle: 'bold' },
+    alternateRowStyles: { fillColor: [248, 248, 248] },
+    columnStyles: {
+      0: { cellWidth: 10, halign: 'center' },
+      3: { halign: 'center' },
+      ...(includePrice ? { 4: { halign: 'right' }, 5: { halign: 'right' } } : {}),
+    },
+  });
+
+  const finalY = (doc as any).lastAutoTable?.finalY || y + 40;
+
+  // ===== FOOTER SUMMARY =====
+  let fy = finalY + 8;
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  doc.text(`Total de itens: ${items.length}`, 14, fy);
+
+  if (includePrice) {
+    const total = items.reduce((s, i) => {
+      const cost = i.purchase_unit_cost_snapshot ?? i.estimated_unit_value;
+      return s + i.qty_requested * cost;
+    }, 0);
+    doc.text(`Total estimado: ${fmtBRL(total)}`, pageWidth - 14, fy, { align: 'right' });
+  }
+
+  // ===== CONFIRMATION MESSAGE =====
+  fy += 12;
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(9);
+  doc.setTextColor(100);
+  doc.text('Favor confirmar disponibilidade e prazo de entrega.', 14, fy);
+
+  // ===== SIGNATURE LINE =====
+  fy += 20;
+  if (fy < doc.internal.pageSize.getHeight() - 30) {
+    doc.setDrawColor(180);
+    doc.setLineWidth(0.3);
+    const sigX = pageWidth / 2 - 40;
+    doc.line(sigX, fy, sigX + 80, fy);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(120);
+    doc.text('Assinatura / Carimbo', pageWidth / 2, fy + 5, { align: 'center' });
+  }
+
+  // ===== GENERATED BY =====
+  doc.setFontSize(7);
+  doc.setTextColor(150);
+  doc.text(
+    `Gerado por ${APP_NAME} em ${new Date().toLocaleString('pt-BR')}`,
+    14,
+    doc.internal.pageSize.getHeight() - 8
+  );
+
+  const fileName = `Pedido_${orderCode}_${(order.supplier_name || 'sem-fornecedor').replace(/\s+/g, '_')}_${orderDate.replace(/\//g, '-')}.pdf`;
+  doc.save(fileName);
+}

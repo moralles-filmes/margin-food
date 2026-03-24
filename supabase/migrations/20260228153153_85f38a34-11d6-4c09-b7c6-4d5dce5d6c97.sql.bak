@@ -1,0 +1,127 @@
+
+-- 1) UNIQUE constraint on rh_colaboradores.user_id (prevents duplicate user_id)
+-- Must handle NULLs: UNIQUE allows multiple NULLs by default in PostgreSQL
+ALTER TABLE public.rh_colaboradores 
+  ADD CONSTRAINT rh_colaboradores_user_id_unique UNIQUE (user_id);
+
+-- 2) Performance indexes for 500+ colaboradores scenario
+CREATE INDEX IF NOT EXISTS idx_rh_ponto_registros_colab_data 
+  ON public.rh_ponto_registros (colaborador_id, data);
+
+CREATE INDEX IF NOT EXISTS idx_rh_ponto_registros_data 
+  ON public.rh_ponto_registros (data);
+
+CREATE INDEX IF NOT EXISTS idx_rh_ferias_afastamentos_colab_status 
+  ON public.rh_ferias_afastamentos (colaborador_id, status);
+
+CREATE INDEX IF NOT EXISTS idx_rh_ferias_afastamentos_datas 
+  ON public.rh_ferias_afastamentos (data_inicio, data_fim);
+
+CREATE INDEX IF NOT EXISTS idx_rh_documentos_colab 
+  ON public.rh_documentos (colaborador_id);
+
+CREATE INDEX IF NOT EXISTS idx_rh_colaboradores_status 
+  ON public.rh_colaboradores (status);
+
+CREATE INDEX IF NOT EXISTS idx_rh_colaboradores_user_id 
+  ON public.rh_colaboradores (user_id) WHERE user_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_rh_folha_pagamento_periodo 
+  ON public.rh_folha_pagamento (periodo);
+
+CREATE INDEX IF NOT EXISTS idx_rh_beneficios_colab_status 
+  ON public.rh_beneficios (colaborador_id, status);
+
+CREATE INDEX IF NOT EXISTS idx_rh_escala_slots_colab 
+  ON public.rh_escala_slots (colaborador_id);
+
+CREATE INDEX IF NOT EXISTS idx_rh_tarefas_responsavel 
+  ON public.rh_tarefas (responsavel_id);
+
+CREATE INDEX IF NOT EXISTS idx_rh_ocorrencias_colab 
+  ON public.rh_ocorrencias_disciplinares (colaborador_id);
+
+CREATE INDEX IF NOT EXISTS idx_rh_epis_colab 
+  ON public.rh_epis (colaborador_id);
+
+CREATE INDEX IF NOT EXISTS idx_rh_exames_colab 
+  ON public.rh_exames (colaborador_id);
+
+-- 3) Validation trigger: prevent duplicate ENTRADA on same day without SAIDA
+CREATE OR REPLACE FUNCTION public.validate_ponto_registro()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+DECLARE
+  v_last_tipo TEXT;
+  v_colab_status TEXT;
+BEGIN
+  -- Check collaborator is active
+  SELECT status INTO v_colab_status 
+  FROM rh_colaboradores WHERE id = NEW.colaborador_id;
+  
+  IF v_colab_status IS NULL THEN
+    RAISE EXCEPTION 'Colaborador não encontrado';
+  END IF;
+  
+  IF v_colab_status != 'ativo' THEN
+    RAISE EXCEPTION 'Colaborador inativo não pode registrar ponto';
+  END IF;
+
+  -- Check for duplicate ENTRADA without SAIDA
+  IF NEW.tipo = 'ENTRADA' THEN
+    SELECT tipo INTO v_last_tipo
+    FROM rh_ponto_registros
+    WHERE colaborador_id = NEW.colaborador_id
+      AND data = NEW.data
+    ORDER BY hora DESC
+    LIMIT 1;
+    
+    IF v_last_tipo = 'ENTRADA' OR v_last_tipo = 'FIM_INTERVALO' THEN
+      RAISE EXCEPTION 'Já existe uma entrada sem saída para esta data. Registre a saída primeiro.';
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_validate_ponto_registro
+  BEFORE INSERT ON public.rh_ponto_registros
+  FOR EACH ROW
+  EXECUTE FUNCTION public.validate_ponto_registro();
+
+-- 4) Prevent self-approval of ponto via RLS UPDATE restriction
+-- Employees cannot update the 'aprovado' field on their own records
+CREATE OR REPLACE FUNCTION public.validate_ponto_update()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+DECLARE
+  v_colab_user_id UUID;
+  v_caller_id UUID;
+BEGIN
+  v_caller_id := auth.uid();
+  
+  -- Get the user_id of the collaborator who owns this ponto
+  SELECT user_id INTO v_colab_user_id
+  FROM rh_colaboradores
+  WHERE id = NEW.colaborador_id;
+  
+  -- If caller is the owner and trying to set aprovado=true, block it
+  IF v_caller_id = v_colab_user_id AND NEW.aprovado = true AND (OLD.aprovado IS NULL OR OLD.aprovado = false) THEN
+    RAISE EXCEPTION 'Não é permitido aprovar o próprio ponto';
+  END IF;
+  
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_validate_ponto_update
+  BEFORE UPDATE ON public.rh_ponto_registros
+  FOR EACH ROW
+  EXECUTE FUNCTION public.validate_ponto_update();

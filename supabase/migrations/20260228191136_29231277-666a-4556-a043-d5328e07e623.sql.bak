@@ -1,0 +1,106 @@
+
+-- =============================================================
+-- HOTFIX FINAL: RBAC roles + Notifications governance + RPC upsert_supplier
+-- =============================================================
+
+-- 1) RBAC: Populate role_permissions for compras, compras_assistente, estoquista
+INSERT INTO role_permissions (role, permission_key) VALUES
+  ('compras', 'purchases:read'),
+  ('compras', 'purchases:create'),
+  ('compras', 'purchases:edit'),
+  ('compras', 'purchases:approve'),
+  ('compras', 'purchases:receiving:read'),
+  ('compras', 'purchases:receiving:manage'),
+  ('compras', 'purchases:receiving:confirm'),
+  ('compras', 'purchases:market:read'),
+  ('compras', 'purchases:market:edit'),
+  ('compras', 'purchases:confirmations:read'),
+  ('compras', 'suppliers:read'),
+  ('compras', 'suppliers:edit'),
+  ('compras', 'stock:read'),
+  ('compras', 'stock:movements:read'),
+  ('compras_assistente', 'purchases:read'),
+  ('compras_assistente', 'purchases:create'),
+  ('compras_assistente', 'purchases:market:read'),
+  ('compras_assistente', 'purchases:receiving:read'),
+  ('compras_assistente', 'suppliers:read'),
+  ('compras_assistente', 'stock:read'),
+  ('estoquista', 'purchases:read'),
+  ('estoquista', 'purchases:receiving:read'),
+  ('estoquista', 'purchases:receiving:confirm'),
+  ('estoquista', 'suppliers:read'),
+  ('estoquista', 'stock:read'),
+  ('estoquista', 'stock:edit'),
+  ('estoquista', 'stock:movements:read'),
+  ('estoquista', 'stock:movements:create')
+ON CONFLICT DO NOTHING;
+
+-- 2) Notifications: DELETE policy (recipient_user_id is UUID, auth.uid() is UUID)
+CREATE POLICY "Recipients can delete own notifications"
+  ON public.notifications FOR DELETE TO authenticated
+  USING (recipient_user_id = auth.uid());
+
+-- 3) Update mark_all_notifications_read with audit
+CREATE OR REPLACE FUNCTION public.mark_all_notifications_read()
+  RETURNS integer
+  LANGUAGE plpgsql
+  SECURITY DEFINER
+  SET search_path TO 'public'
+AS $$
+DECLARE
+  v_count INT;
+BEGIN
+  IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Não autenticado.'; END IF;
+
+  UPDATE notifications
+  SET read_at = now()
+  WHERE recipient_user_id = auth.uid()
+    AND read_at IS NULL;
+
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+
+  IF v_count > 0 THEN
+    PERFORM log_audit(
+      'rpc', 'notifications', 'notifications', NULL::uuid,
+      'MARK_ALL_READ', NULL,
+      jsonb_build_object('count', v_count, 'timestamp', now())
+    );
+  END IF;
+
+  RETURN v_count;
+END;
+$$;
+
+-- 4) RPC upsert_supplier
+CREATE OR REPLACE FUNCTION public.upsert_supplier(p_name text)
+  RETURNS uuid
+  LANGUAGE plpgsql
+  SECURITY DEFINER
+  SET search_path TO 'public'
+AS $$
+DECLARE
+  v_id uuid;
+BEGIN
+  IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Não autenticado.'; END IF;
+  IF NOT has_permission(auth.uid(), 'purchases:edit') AND NOT has_permission(auth.uid(), 'suppliers:edit') THEN
+    RAISE EXCEPTION 'Sem permissão para gerenciar fornecedores.';
+  END IF;
+
+  IF p_name IS NULL OR trim(p_name) = '' THEN
+    RAISE EXCEPTION 'Nome do fornecedor não pode ser vazio.';
+  END IF;
+
+  INSERT INTO suppliers (name)
+  VALUES (trim(p_name))
+  ON CONFLICT (name) DO UPDATE SET updated_at = now()
+  RETURNING id INTO v_id;
+
+  PERFORM log_audit(
+    'rpc', 'purchases', 'suppliers', v_id,
+    'UPSERT', NULL,
+    jsonb_build_object('name', trim(p_name))
+  );
+
+  RETURN v_id;
+END;
+$$;

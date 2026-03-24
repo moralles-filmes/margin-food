@@ -1,0 +1,183 @@
+
+-- ============================================================
+-- RPC: reopen_inventory
+-- ============================================================
+CREATE OR REPLACE FUNCTION public.reopen_inventory(
+  p_id uuid,
+  p_justificativa text
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+DECLARE
+  v_tenant uuid;
+  v_user_id uuid;
+  v_inv record;
+  v_before jsonb;
+  v_after jsonb;
+  v_deleted_moves int;
+BEGIN
+  -- 1. Tenant + auth
+  v_tenant := assert_tenant();
+  v_user_id := auth.uid();
+
+  -- 2. Permission check
+  IF NOT has_permission(v_user_id, 'inventario:auditoria:edit') THEN
+    RAISE EXCEPTION 'Forbidden: inventario:auditoria:edit required';
+  END IF;
+
+  -- 3. Lock row
+  SELECT * INTO v_inv
+    FROM inventarios
+   WHERE id = p_id
+     AND company_id = v_tenant
+     AND deleted_at IS NULL
+   FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Inventário não encontrado';
+  END IF;
+
+  IF v_inv.status NOT IN ('FINALIZADO', 'SOB_ANALISE') THEN
+    RAISE EXCEPTION 'Só é possível reabrir inventários FINALIZADO ou SOB_ANALISE (atual: %)', v_inv.status;
+  END IF;
+
+  -- 4. Snapshot before
+  v_before := jsonb_build_object(
+    'status', v_inv.status,
+    'finalizado_em', v_inv.finalizado_em,
+    'finalizado_por', v_inv.finalizado_por
+  );
+
+  -- 5. Revert stock adjustments
+  DELETE FROM movimentacoes_estoque
+   WHERE reference_type = 'INVENTARIO_AJUSTE'
+     AND reference_id = p_id
+     AND company_id = v_tenant;
+  GET DIAGNOSTICS v_deleted_moves = ROW_COUNT;
+
+  -- 6. Update inventory status
+  UPDATE inventarios
+     SET status = 'EM_REVISAO',
+         finalizado_em = NULL,
+         finalizado_por = NULL,
+         aprovado_por = NULL,
+         aprovacao_admin_em = NULL,
+         updated_at = now()
+   WHERE id = p_id
+     AND company_id = v_tenant;
+
+  v_after := jsonb_build_object(
+    'status', 'EM_REVISAO',
+    'movimentacoes_revertidas', v_deleted_moves
+  );
+
+  -- 7. Audit log
+  INSERT INTO audit_inventario_log (inventario_id, user_id, user_role, acao, antes, depois, ip_address)
+  VALUES (
+    p_id,
+    v_user_id,
+    COALESCE((SELECT role FROM profiles WHERE id = v_user_id), 'unknown'),
+    'REOPEN',
+    v_before,
+    v_after || jsonb_build_object('justificativa', p_justificativa),
+    ''
+  );
+
+  RETURN jsonb_build_object('success', true, 'movimentacoes_revertidas', v_deleted_moves);
+END;
+$$;
+
+-- ============================================================
+-- RPC: soft_delete_inventory
+-- ============================================================
+CREATE OR REPLACE FUNCTION public.soft_delete_inventory(
+  p_id uuid,
+  p_justificativa text
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+DECLARE
+  v_tenant uuid;
+  v_user_id uuid;
+  v_inv record;
+  v_before jsonb;
+  v_deleted_moves int := 0;
+  v_deleted_items int;
+BEGIN
+  -- 1. Tenant + auth
+  v_tenant := assert_tenant();
+  v_user_id := auth.uid();
+
+  -- 2. Permission check
+  IF NOT has_permission(v_user_id, 'inventario:lista:delete') THEN
+    RAISE EXCEPTION 'Forbidden: inventario:lista:delete required';
+  END IF;
+
+  -- 3. Lock row
+  SELECT * INTO v_inv
+    FROM inventarios
+   WHERE id = p_id
+     AND company_id = v_tenant
+     AND deleted_at IS NULL
+   FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Inventário não encontrado';
+  END IF;
+
+  -- 4. Snapshot before
+  v_before := jsonb_build_object(
+    'status', v_inv.status,
+    'finalizado_em', v_inv.finalizado_em
+  );
+
+  -- 5. If FINALIZADO, revert stock adjustments first
+  IF v_inv.status = 'FINALIZADO' THEN
+    DELETE FROM movimentacoes_estoque
+     WHERE reference_type = 'INVENTARIO_AJUSTE'
+       AND reference_id = p_id
+       AND company_id = v_tenant;
+    GET DIAGNOSTICS v_deleted_moves = ROW_COUNT;
+  END IF;
+
+  -- 6. Soft-delete inventory
+  UPDATE inventarios
+     SET deleted_at = now(),
+         deleted_by = v_user_id,
+         updated_at = now()
+   WHERE id = p_id
+     AND company_id = v_tenant;
+
+  -- 7. Soft-delete items
+  UPDATE inventario_itens
+     SET deleted_at = now(),
+         deleted_by = v_user_id
+   WHERE inventario_id = p_id
+     AND deleted_at IS NULL;
+  GET DIAGNOSTICS v_deleted_items = ROW_COUNT;
+
+  -- 8. Audit log
+  INSERT INTO audit_inventario_log (inventario_id, user_id, user_role, acao, antes, depois, ip_address)
+  VALUES (
+    p_id,
+    v_user_id,
+    COALESCE((SELECT role FROM profiles WHERE id = v_user_id), 'unknown'),
+    'DELETE_SOFT',
+    v_before,
+    jsonb_build_object(
+      'justificativa', p_justificativa,
+      'movimentacoes_revertidas', v_deleted_moves,
+      'itens_deletados', v_deleted_items
+    ),
+    ''
+  );
+
+  RETURN jsonb_build_object('success', true, 'movimentacoes_revertidas', v_deleted_moves, 'itens_deletados', v_deleted_items);
+END;
+$$;

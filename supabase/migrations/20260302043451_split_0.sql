@@ -1,0 +1,65 @@
+CREATE OR REPLACE FUNCTION finalize_inventory_atomic(p_id uuid, p_justificativa text)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+  v_tenant uuid; v_user_id uuid; v_inv record; v_item record;
+  v_before jsonb; v_after jsonb; v_adjustments_inserted int := 0;
+  v_diff numeric; v_fisica numeric; v_teorico numeric;
+  v_drift_total numeric := 0; v_valor_total_estoque numeric := 0;
+  v_acuracia numeric; v_user_role text;
+BEGIN
+  v_tenant := assert_tenant(); v_user_id := auth.uid();
+
+  IF length(COALESCE(p_justificativa, '')) < 10 THEN RAISE EXCEPTION 'Justificativa deve ter no mínimo 10 caracteres.'; END IF;
+  IF NOT has_any_permission(v_user_id, ARRAY['inventario:detalhe:close', 'system:global:manage']) THEN RAISE EXCEPTION 'Forbidden: inventario:detalhe:close required'; END IF;
+
+  SELECT * INTO v_inv FROM inventarios WHERE id = p_id AND company_id = v_tenant AND deleted_at IS NULL FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Inventário não encontrado ou pertence a outro tenant.'; END IF;
+
+  IF v_inv.status = 'FINALIZADO' THEN
+    RETURN jsonb_build_object('success', true, 'already_finalized', true, 'adjustments_inserted', 0, 'status', 'FINALIZADO');
+  END IF;
+  IF v_inv.status = 'SOB_ANALISE' THEN RAISE EXCEPTION 'Inventário sob análise — use aprovar_analise primeiro.'; END IF;
+  IF v_inv.status NOT IN ('EM_CONTAGEM', 'EM_REVISAO') THEN RAISE EXCEPTION 'Status atual (%) não permite fechamento.', v_inv.status; END IF;
+
+  v_before := jsonb_build_object('status', v_inv.status, 'item_count', (SELECT count(*) FROM inventario_itens WHERE inventario_id = p_id AND deleted_at IS NULL));
+
+  IF EXISTS (SELECT 1 FROM inventario_itens WHERE inventario_id = p_id AND deleted_at IS NULL AND contagem_fisica IS NULL) THEN
+    RAISE EXCEPTION 'Existem itens não contados. Finalize a contagem antes de fechar.';
+  END IF;
+
+  FOR v_item IN SELECT id, produto_id, contagem_fisica, saldo_teorico, custo_snapshot, diferenca_qtd, impacto_financeiro
+    FROM inventario_itens WHERE inventario_id = p_id AND deleted_at IS NULL FOR UPDATE
+  LOOP
+    v_fisica := COALESCE(v_item.contagem_fisica, 0);
+    v_teorico := COALESCE(v_item.saldo_teorico, 0);
+    v_diff := v_fisica - v_teorico;
+    v_valor_total_estoque := v_valor_total_estoque + abs(v_teorico * COALESCE(v_item.custo_snapshot, 0));
+    v_drift_total := v_drift_total + COALESCE(v_item.impacto_financeiro, 0);
+
+    IF v_diff > 0 THEN
+      INSERT INTO movimentacoes_estoque (company_id, produto_id, tipo, direction, quantidade, custo_unitario, custo_total, origem, referencia_id, data, observacao, reference_type, reference_id, created_by, status)
+      VALUES (v_tenant, v_item.produto_id, 'AJUSTE_INVENTARIO_POSITIVO', 'IN', v_diff, COALESCE(v_item.custo_snapshot, 0), v_diff * COALESCE(v_item.custo_snapshot, 0), 'INVENTARIO', p_id::text, v_inv.data, 'Ajuste inventário #' || left(p_id::text, 8) || ' item=' || left(v_item.id::text, 8), 'INVENTARIO_AJUSTE', p_id::text, v_user_id, 'ATIVO')
+      ON CONFLICT (reference_type, reference_id, produto_id, tipo) WHERE reference_type = 'INVENTARIO_AJUSTE' AND status = 'ATIVO' DO NOTHING;
+      IF FOUND THEN v_adjustments_inserted := v_adjustments_inserted + 1; END IF;
+    ELSIF v_diff < 0 THEN
+      INSERT INTO movimentacoes_estoque (company_id, produto_id, tipo, direction, quantidade, custo_unitario, custo_total, origem, referencia_id, data, observacao, reference_type, reference_id, created_by, status)
+      VALUES (v_tenant, v_item.produto_id, 'AJUSTE_INVENTARIO_NEGATIVO', 'OUT', abs(v_diff), COALESCE(v_item.custo_snapshot, 0), abs(v_diff) * COALESCE(v_item.custo_snapshot, 0), 'INVENTARIO', p_id::text, v_inv.data, 'Ajuste inventário #' || left(p_id::text, 8) || ' item=' || left(v_item.id::text, 8), 'INVENTARIO_AJUSTE', p_id::text, v_user_id, 'ATIVO')
+      ON CONFLICT (reference_type, reference_id, produto_id, tipo) WHERE reference_type = 'INVENTARIO_AJUSTE' AND status = 'ATIVO' DO NOTHING;
+      IF FOUND THEN v_adjustments_inserted := v_adjustments_inserted + 1; END IF;
+    END IF;
+  END LOOP;
+
+  v_acuracia := CASE WHEN v_valor_total_estoque > 0 THEN GREATEST(0, (1 - abs(v_drift_total) / v_valor_total_estoque) * 100) ELSE 100 END;
+
+  UPDATE inventarios SET status = 'FINALIZADO', finalizado_em = now(), finalizado_por = v_user_id, acuracia_percent = v_acuracia, drift_total_valor = v_drift_total, updated_at = now()
+  WHERE id = p_id AND company_id = v_tenant;
+
+  v_after := jsonb_build_object('status', 'FINALIZADO', 'adjustments_inserted', v_adjustments_inserted, 'acuracia', round(v_acuracia, 2), 'drift_total', round(v_drift_total, 2), 'justificativa', p_justificativa);
+  v_user_role := COALESCE((SELECT string_agg(role::text, ',') FROM user_roles WHERE user_id = v_user_id), 'unknown');
+
+  INSERT INTO audit_inventario_log (inventario_id, user_id, user_role, acao, antes, depois, ip_address)
+  VALUES (p_id, v_user_id, v_user_role, 'FINALIZAR_ATOMIC', v_before, v_after, '');
+
+  RETURN jsonb_build_object('success', true, 'already_finalized', false, 'adjustments_inserted', v_adjustments_inserted, 'acuracia', round(v_acuracia, 2), 'driftTotal', round(v_drift_total, 2), 'status', 'FINALIZADO');
+END;
+$$;

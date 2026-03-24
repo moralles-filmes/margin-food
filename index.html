@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MarginPro — Gestão Inteligente para Restaurantes</title>
+    <meta name="description" content="MarginPro é um sistema inteligente de gestão para restaurantes focado em controle de CMV, estoque, compras e aumento de margem.">
+    <meta name="author" content="MarginPro" />
+    
+    
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <script>
+      (function() {
+        var t = localStorage.getItem('app-theme');
+        if (t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+          document.documentElement.classList.remove('light');
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
+    <meta property="og:title" content="MarginPro — Gestão Inteligente para Restaurantes">
+  <meta name="twitter:title" content="MarginPro — Gestão Inteligente para Restaurantes">
+  <meta property="og:description" content="MarginPro é um sistema inteligente de gestão para restaurantes focado em controle de CMV, estoque, compras e aumento de margem.">
+  <meta name="twitter:description" content="MarginPro é um sistema inteligente de gestão para restaurantes focado em controle de CMV, estoque, compras e aumento de margem.">
+  <meta property="og:image" content="https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/9386d8e1-661b-4953-9bf3-49fa98794355/id-preview-882062a9--3c45747a-a3d4-4520-afde-c0268f708d9e.lovable.app-1772115038404.png">
+  <meta name="twitter:image" content="https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/9386d8e1-661b-4953-9bf3-49fa98794355/id-preview-882062a9--3c45747a-a3d4-4520-afde-c0268f708d9e.lovable.app-1772115038404.png">
+</head>
+  <body>
+    <div id="root"></div>
+    <script>
+      // Cleanup stale service workers
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          registrations.forEach(function(registration) {
+            registration.update();
+          });
+        });
+      }
+    </script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
