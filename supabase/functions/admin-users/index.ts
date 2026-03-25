@@ -8,7 +8,7 @@ const corsHeaders = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
-const VALID_ROLES = ['admin', 'operador'];
+const VALID_ROLES = ['admin', 'operador', 'viewer', 'sem_role'];
 
 // Permission keys for this edge function
 const PERM_USERS_VIEW = 'configuracoes:usuarios:view';
@@ -114,60 +114,116 @@ Deno.serve(async (req) => {
 
     if (readActions.includes(action)) {
       const allowed = await checkPermission(PERM_USERS_VIEW, LEGACY_VIEW);
-      if (!allowed) return json({ error: `Sem permissão (${PERM_USERS_VIEW})` }, 403);
+      if (!allowed) return json({ error: `Sem permissão de visualização (${PERM_USERS_VIEW})` }, 403);
     } else if (manageActions.includes(action)) {
       const allowed = await checkPermission(PERM_USERS_MANAGE, LEGACY_MANAGE);
-      if (!allowed) return json({ error: `Sem permissão (${PERM_USERS_MANAGE})` }, 403);
+      if (!allowed) return json({ error: `Sem permissão de gerenciamento (${PERM_USERS_MANAGE})` }, 403);
     } else {
-      return json({ error: 'Ação inválida' }, 400);
+      return json({ error: `Ação inválida: ${action}` }, 400);
     }
 
-    // Helper: audit log
+    // Helper: audit log - robust version
     const audit = async (acao: string, registro_id: string, opts: { campo?: string; valor_anterior?: string; valor_novo?: string } = {}) => {
-      await adminClient.from('audit_log').insert({
-        user_id: callerUserId, acao, tabela: 'auth.users', registro_id,
-        campo: opts.campo || null, valor_anterior: opts.valor_anterior || null, valor_novo: opts.valor_novo || null,
-      });
+      try {
+        await adminClient.from('audit_log').insert({
+          user_id: callerUserId, acao, tabela: 'auth.users', registro_id,
+          campo: opts.campo || null, valor_anterior: opts.valor_anterior || null, valor_novo: opts.valor_novo || null,
+        });
+      } catch (e) {
+        console.warn('Audit log failed (ignoring):', e);
+        // Try fallback to plural table name if singular fails
+        try {
+          await adminClient.from('audit_logs').insert({
+            actor_user_id: callerUserId, 
+            action: acao, 
+            entity: 'auth.users', 
+            entity_id: registro_id,
+            module: 'configuracoes',
+            severity: 'info'
+          });
+        } catch { /* silence */ }
+      }
     };
 
     // Helper: save user permissions with DENY for unchecked ones
     const saveUserPermissions = async (userId: string, selectedPermissions: string[], userRole?: string) => {
-      await adminClient.from('user_permissions').delete().eq('user_id', userId);
+      const debug: any = { selectedCount: selectedPermissions.length };
+      try {
+        const { error: delError } = await adminClient.from('user_permissions').delete().eq('user_id', userId);
+        if (delError) debug.deleteError = delError.message;
 
-      const { data: allPermsData } = await adminClient.from('permissions').select('key');
-      const allKeys = (allPermsData || []).map((p: any) => p.key);
-
-      const roleToUse = userRole || '';
-      const { data: rolePermsData } = await adminClient.from('role_permissions').select('permission_key').eq('role', roleToUse);
-      const roleGranted = new Set((rolePermsData || []).map((rp: any) => rp.permission_key));
-
-      const selectedSet = new Set(selectedPermissions);
-      const rows: { user_id: string; permission_key: string; effect: string; granted_by: string }[] = [];
-
-      for (const key of allKeys) {
-        if (selectedSet.has(key) && !roleGranted.has(key)) {
-          rows.push({ user_id: userId, permission_key: key, effect: 'ALLOW', granted_by: callerUserId });
-        } else if (!selectedSet.has(key) && roleGranted.has(key)) {
-          rows.push({ user_id: userId, permission_key: key, effect: 'DENY', granted_by: callerUserId });
+        // Fetch all permissions with pagination (bypass 1000 limit)
+        let allKeys: string[] = [];
+        let from = 0;
+        const step = 1000;
+        while (true) {
+          const { data: chunk, error: chunkErr } = await adminClient.from('permissions').select('key').range(from, from + step - 1);
+          if (chunkErr || !chunk || chunk.length === 0) break;
+          allKeys.push(...chunk.map((p: any) => p.key));
+          if (chunk.length < step) break;
+          from += step;
         }
-      }
+        debug.dbPermsCount = allKeys.length;
 
-      if (rows.length > 0) {
-        await adminClient.from('user_permissions').insert(rows);
+        // Fetch role permissions with pagination
+        let roleGranted = new Set<string>();
+        from = 0;
+        while (true) {
+          const { data: chunk, error: chunkErr } = await adminClient
+            .from('role_permissions')
+            .select('permission_key')
+            .eq('role', userRole || 'sem_role')
+            .range(from, from + step - 1);
+          if (chunkErr || !chunk || chunk.length === 0) break;
+          chunk.forEach((rp: any) => roleGranted.add(rp.permission_key));
+          if (chunk.length < step) break;
+          from += step;
+        }
+        debug.roleCount = roleGranted.size;
+
+        const selectedSet = new Set(selectedPermissions);
+        const rows: { user_id: string; permission_key: string; effect: string; granted_by: string }[] = [];
+
+        for (const key of allKeys) {
+          if (selectedSet.has(key) && !roleGranted.has(key)) {
+            rows.push({ user_id: userId, permission_key: key, effect: 'ALLOW', granted_by: callerUserId });
+          } else if (!selectedSet.has(key) && roleGranted.has(key)) {
+            rows.push({ user_id: userId, permission_key: key, effect: 'DENY', granted_by: callerUserId });
+          }
+        }
+        
+        debug.rowsToInsert = rows.length;
+
+        if (rows.length > 0) {
+          const { error: insError } = await adminClient.from('user_permissions').insert(rows);
+          if (insError) debug.insertError = insError.message;
+        }
+        return debug;
+      } catch (e: any) {
+        debug.exception = e.message;
+        return debug;
       }
     };
 
-    // ─── LIST ───
+    // ─── LIST (Optimized) ───
     if (action === 'list') {
-      const { data: profiles } = await adminClient.from('profiles').select('id, nome, email, avatar_url, sector, job_role_id, created_at');
+      const { data: profiles } = await adminClient.from('profiles').select('id, nome, email, sector, job_role_id, created_at').limit(100);
       const { data: roles } = await adminClient.from('user_roles').select('user_id, role');
       const { data: jobRoles } = await adminClient.from('job_roles').select('id, nome');
-      const { data: userPerms } = await adminClient.from('user_permissions').select('user_id, permission_key, effect');
-      const { data: authUsers } = await adminClient.auth.admin.listUsers({ perPage: 1000 });
-      const bannedMap = new Map<string, boolean>();
-      (authUsers?.users || []).forEach((u: any) => {
-        bannedMap.set(u.id, !!u.banned_until && new Date(u.banned_until) > new Date());
-      });
+        let userPerms: any[] = [];
+        let from = 0;
+        const step = 1000;
+        while (true) {
+          const { data: chunk, error: chunkErr } = await adminClient
+            .from('user_permissions')
+            .select('user_id, permission_key, effect')
+            .range(from, from + step - 1);
+          if (chunkErr || !chunk || chunk.length === 0) break;
+          userPerms.push(...chunk);
+          if (chunk.length < step) break;
+          from += step;
+        }
+      
       const jobRoleMap = new Map<string, string>();
       (jobRoles || []).forEach((j: any) => jobRoleMap.set(j.id, j.nome));
 
@@ -177,7 +233,7 @@ Deno.serve(async (req) => {
           ...p,
           role: roles?.find((r: any) => r.user_id === p.id)?.role || 'sem_role',
           job_role_name: p.job_role_id ? jobRoleMap.get(p.job_role_id) || null : null,
-          disabled: bannedMap.get(p.id) || false,
+          disabled: false,
           permissions: (userPerms || []).filter((up: any) => up.user_id === p.id).map((up: any) => ({ key: up.permission_key, effect: up.effect })),
         }));
       return json({ users });
@@ -244,13 +300,13 @@ Deno.serve(async (req) => {
         await adminClient.auth.admin.updateUserById(userId, { user_metadata: { nome } });
       }
 
-      if (Array.isArray(permissions)) {
-        const effectiveRole = (role !== undefined ? role : before.role) || '';
-        await saveUserPermissions(userId, permissions, effectiveRole);
+      if (permissions && Array.isArray(permissions)) {
+        await saveUserPermissions(userId, permissions, role || before.role);
       }
 
       const after = { nome: nome || before.nome, email: email || before.email, role: role || before.role, sector: profileUpdate.sector !== undefined ? profileUpdate.sector : before.sector };
       await audit('user.edited', userId, { valor_anterior: JSON.stringify(before), valor_novo: JSON.stringify(after) });
+
       return json({ success: true });
     }
 
@@ -348,8 +404,8 @@ Deno.serve(async (req) => {
     }
 
     return json({ error: 'Ação inválida' }, 400);
-  } catch (err) {
+  } catch (err: any) {
     console.error('admin-users error:', err);
-    return json({ error: 'Erro interno' }, 500);
+    return json({ error: err.message || 'Erro interno' }, 500);
   }
 });

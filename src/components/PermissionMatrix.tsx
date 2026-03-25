@@ -7,7 +7,7 @@ import { PERMISSION_TEMPLATES } from '@/lib/permissions';
 
 interface PermissionMatrixProps {
   selected: Set<string>;
-  onChange: (perms: Set<string>) => void;
+  onChange: React.Dispatch<React.SetStateAction<Set<string>>>;
 }
 
 function getModuleKeys(mod: ModuleManifest): string[] {
@@ -18,22 +18,26 @@ export default function PermissionMatrix({ selected, onChange }: PermissionMatri
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const toggle = useCallback((key: string) => {
-    const next = new Set(selected);
-    if (next.has(key)) next.delete(key); else next.add(key);
-    onChange(next);
-  }, [selected, onChange]);
+    onChange(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  }, [onChange]);
 
   const toggleModule = useCallback((mod: ModuleManifest) => {
     const keys = getModuleKeys(mod);
-    const allChecked = keys.every(k => selected.has(k));
-    const next = new Set(selected);
-    if (allChecked) {
-      keys.forEach(k => next.delete(k));
-    } else {
-      keys.forEach(k => next.add(k));
-    }
-    onChange(next);
-  }, [selected, onChange]);
+    onChange(prev => {
+      const next = new Set(prev);
+      const allChecked = keys.every(k => next.has(k));
+      if (allChecked) {
+        keys.forEach(k => next.delete(k));
+      } else {
+        keys.forEach(k => next.add(k));
+      }
+      return next;
+    });
+  }, [onChange]);
 
   const toggleExpand = (key: string) => {
     const next = new Set(expanded);

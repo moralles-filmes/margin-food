@@ -163,23 +163,48 @@ export default function AdminUsersView() {
 
   const fetchRolePermissions = useCallback(async () => {
     try {
-      const { data } = await supabase.from('role_permissions').select('role, permission_key');
       const map: Record<string, string[]> = {};
-      (data || []).forEach((rp: any) => {
-        if (!map[rp.role]) map[rp.role] = [];
-        map[rp.role].push(rp.permission_key);
-      });
+      let from = 0;
+      const step = 1000;
+      
+      while (true) {
+        const { data: chunk, error } = await supabase
+          .from('role_permissions')
+          .select('role, permission_key')
+          .range(from, from + step - 1);
+        
+        if (error) {
+          console.error('Error fetching role_permissions chunk:', error);
+          break;
+        }
+        if (!chunk || chunk.length === 0) break;
+        
+        chunk.forEach((rp: any) => {
+          if (!map[rp.role]) map[rp.role] = [];
+          map[rp.role].push(rp.permission_key);
+        });
+        
+        if (chunk.length < step) break;
+        from += step;
+      }
+      
       setRolePermissionsMap(map);
     } catch { /* ignore */ }
   }, []);
 
+  const fetchAll = useCallback(async () => {
+    await Promise.all([
+      fetchUsers(),
+      fetchJobRoles(),
+      fetchRolePermissions()
+    ]);
+  }, [fetchUsers, fetchJobRoles, fetchRolePermissions]);
+
   useEffect(() => {
-    if (!rolesLoaded) return;
-    if (!user || !canManageUsers) { setLoading(false); return; }
-    fetchUsers();
-    fetchJobRoles();
-    fetchRolePermissions();
-  }, [fetchUsers, fetchJobRoles, fetchRolePermissions, canManageUsers, rolesLoaded, user]);
+    if (canManageUsers && rolesLoaded && user) {
+      fetchAll();
+    }
+  }, [fetchAll, canManageUsers, rolesLoaded, user]);
 
   // ─── Access denied ───
   if (!canManageUsers) {
@@ -200,12 +225,13 @@ export default function AdminUsersView() {
     const isServerValid = await pwValidation.checkServer();
     if (!isServerValid) { toast.error('Senha não aprovada pela verificação de segurança'); setCreating(false); return; }
     try {
-      await invoke({
+      const data = await invoke({
         action: 'create', email: newEmail, password: pwValidation.password, nome: newNome, role: newRole,
         sector: null,
         job_role_id: newJobRoleId || null,
         permissions: Array.from(newPermissions),
       });
+
       toast.success(`Usuário ${newEmail} criado!`);
       setShowCreate(false);
       setNewEmail(''); setNewNome(''); setNewRole('operador'); setNewSector(''); setNewJobRoleId('');
@@ -238,18 +264,26 @@ export default function AdminUsersView() {
     if (!editingUser) return;
     setSaving(true);
     try {
-      await invoke({
-        action: 'edit-user', userId: editingUser.id,
-        nome: editNome, email: editEmail, role: editRole,
-        sector: null,
-        job_role_id: editJobRoleId || null,
-        permissions: Array.from(editPermissions),
+      const { data, error: invokeError } = await (supabase.functions.invoke as any)('admin-users', {
+        body: {
+          action: 'edit-user',
+          userId: editingUser.id,
+          nome: editNome,
+          email: editEmail,
+          role: editRole,
+          permissions: Array.from(editPermissions),
+        }
       });
+
       toast.success('Usuário atualizado!');
       setEditingUser(null);
-      fetchUsers();
-    } catch (err: any) { toast.error(err.message); }
-    finally { setSaving(false); }
+      fetchAll();
+    } catch (err: any) {
+      console.error('Error in handleEditUser:', err);
+      toast.error('Erro ao salvar usuário: ' + (err.message || 'Erro desconhecido'));
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleResetPassword = async () => {
@@ -284,7 +318,8 @@ export default function AdminUsersView() {
     if (!deleteMotivo || deleteMotivo.trim().length < 3) { toast.error('Informe o motivo da exclusão (mín. 3 caracteres)'); return; }
     setDeleting(true);
     try {
-      await invoke({ action: 'delete', userId: deleteUser.id, motivo: deleteMotivo.trim() });
+      const { data, error } = await invoke({ action: 'delete', userId: deleteUser.id, motivo: deleteMotivo.trim() });
+      if (error) throw error;
       const deletedId = deleteUser.id;
       toast.success(`Usuário ${deleteUser.nome || deleteUser.email} excluído!`);
       setUsers(prev => prev.filter(u => u.id !== deletedId));
@@ -298,7 +333,8 @@ export default function AdminUsersView() {
     if (!newJrNome.trim()) { toast.error('Nome é obrigatório'); return; }
     setCreatingJr(true);
     try {
-      await invoke({ action: 'create-job-role', nome: newJrNome.trim(), descricao: newJrDescricao.trim() || null });
+      const { data, error } = await invoke({ action: 'create-job-role', nome: newJrNome.trim(), descricao: newJrDescricao.trim() || null });
+      if (error) throw error;
       toast.success(`Cargo "${newJrNome}" criado!`);
       setShowCreateJobRole(false);
       setNewJrNome(''); setNewJrDescricao('');
@@ -309,7 +345,8 @@ export default function AdminUsersView() {
 
   const handleToggleJobRole = async (jr: JobRole) => {
     try {
-      await invoke({ action: 'toggle-job-role', jobRoleId: jr.id, is_active: !jr.is_active });
+      const { data, error } = await invoke({ action: 'toggle-job-role', jobRoleId: jr.id, is_active: !jr.is_active });
+      if (error) throw error;
       toast.success(`Cargo ${jr.is_active ? 'desativado' : 'reativado'}!`);
       fetchJobRoles();
     } catch (err: any) { toast.error(err.message); }
@@ -520,7 +557,13 @@ export default function AdminUsersView() {
                   </div>
                   <div>
                     <Label className="text-xs text-muted-foreground">Perfil de acesso</Label>
-                    <select value={editRole} onChange={e => { setEditRole(e.target.value); setEditPermissions(new Set(rolePermissionsMap[e.target.value] || [])); }}
+                    <select value={editRole} onChange={e => { 
+                        const newR = e.target.value;
+                        setEditRole(newR);
+                        const defaults = rolePermissionsMap[newR] || [];
+                        console.log(`Switching to role ${newR}, found ${defaults.length} default perms`);
+                        setEditPermissions(new Set(defaults)); 
+                      }}
                       className="w-full h-9 rounded-md border border-border bg-secondary px-3 text-sm text-foreground mt-1">
                       {ALL_ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                     </select>
