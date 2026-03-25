@@ -17,5 +17,7 @@ Este arquivo serve para sincronizar o progresso do desenvolvimento entre os dife
 - [ ] ...
 
 ## ✅ Concluído (Done)
+- [x] Rodada auditoria inicial de segurança (NPM audit e varredura de chaves).
+- [x] Atualizado pacote Node.js para mitigar vulnerabilidades.
 - [x] Configurar o repositório Git no MacBook e verificar funcionamento.
 - [x] Criar arquivo de controle `TAREFAS.md` para manter o contexto do assistente de IA em ambas as máquinas.
