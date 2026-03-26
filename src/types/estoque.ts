@@ -29,6 +29,7 @@ export interface ProdutoExtended extends Produto {
   lastMovementAt: string | null;
   isSalmonRawLinked: boolean;
   contaNoCmv: boolean;
+  saldoAtual: number;
 }
 
 /** Extended movimentação with audit/status fields */

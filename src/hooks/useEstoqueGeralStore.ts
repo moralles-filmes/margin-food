@@ -46,6 +46,7 @@ const PRODUTO_SELECT_COLUMNS = [
   'last_movement_at',
   'is_salmon_raw_linked',
   'conta_no_cmv',
+  'saldo_atual',
 ].join(', ');
 
 /** Raw DB row shape for produtos table */
@@ -86,6 +87,7 @@ interface ProdutoRow {
   last_movement_at: string | null;
   is_salmon_raw_linked: boolean | null;
   conta_no_cmv: boolean | null;
+  saldo_atual: number | null;
 }
 
 function dbToProduto(row: ProdutoRow): ProdutoExtended {
@@ -126,6 +128,7 @@ function dbToProduto(row: ProdutoRow): ProdutoExtended {
     lastMovementAt: row.last_movement_at || null,
     isSalmonRawLinked: !!row.is_salmon_raw_linked,
     contaNoCmv: row.conta_no_cmv ?? true,
+    saldoAtual: Number(row.saldo_atual) || 0,
   };
 }
 
@@ -333,15 +336,20 @@ export function useEstoqueGeralStore() {
       setProdTotalCount(mapped.length);
       setProdHasMore(false);
       setProdPage(0);
-      const ids = mapped.map(p => p.id);
-      await Promise.all([
-        ids.length > 0 ? fetchSaldos(ids) : Promise.resolve(),
-        fetchProdutoGlobalCounts(),
-      ]);
+
+      // Populate saldos state directly from cached column
+      const initialSaldos: Record<string, { saldo: number }> = {};
+      mapped.forEach(p => {
+        initialSaldos[p.id] = { saldo: p.saldoAtual ?? 0 };
+      });
+      setSaldos(initialSaldos);
+
+      // We still fetch global counts, but no longer need a separate heavy fetchSaldos for everything
+      await fetchProdutoGlobalCounts();
     } else {
       fetchProdutoGlobalCounts();
     }
-  }, [fetchSaldos, fetchProdutoGlobalCounts]);
+  }, [fetchProdutoGlobalCounts]);
 
   // === Fetch from DB with server-side filters (paginated, for catalog view) ===
   const fetchProdutos = useCallback(async (pageNum = 0, append = false, filters?: ProdFilters) => {
@@ -394,6 +402,16 @@ export function useEstoqueGeralStore() {
         else setProdutos(mapped);
         setProdPage(pageNum);
         const ids = mapped.filter(p => p.ativo).map(p => p.id);
+        
+        // Populate saldos state with existing saldo_atual for immediate UI update
+        const initialSaldos: Record<string, { saldo: number }> = {};
+        mapped.forEach(p => {
+          initialSaldos[p.id] = { saldo: p.saldoAtual ?? 0 };
+        });
+        setSaldos(prev => ({ ...prev, ...initialSaldos }));
+
+        // Still call fetchSaldos for active items to ensure latest consistency if needed, 
+        // but now it serves more as a refresh than a primary load.
         if (ids.length > 0) fetchSaldos(ids);
         if (!append) fetchProdutoGlobalCounts();
       }
