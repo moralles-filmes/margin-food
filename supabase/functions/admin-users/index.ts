@@ -207,22 +207,37 @@ Deno.serve(async (req) => {
 
     // ─── LIST (Optimized) ───
     if (action === 'list') {
-      const { data: profiles } = await adminClient.from('profiles').select('id, nome, email, sector, job_role_id, created_at').limit(100);
-      const { data: roles } = await adminClient.from('user_roles').select('user_id, role');
-      const { data: jobRoles } = await adminClient.from('job_roles').select('id, nome');
-        let userPerms: any[] = [];
-        let from = 0;
-        const step = 1000;
-        while (true) {
-          const { data: chunk, error: chunkErr } = await adminClient
-            .from('user_permissions')
-            .select('user_id, permission_key, effect')
-            .range(from, from + step - 1);
-          if (chunkErr || !chunk || chunk.length === 0) break;
-          userPerms.push(...chunk);
-          if (chunk.length < step) break;
-          from += step;
-        }
+      // 1. Filtrar perfis pertencentes APENAS à mesma company do caller (inquilino isolado)
+      const { data: profiles, error: profErr } = await adminClient
+        .from('profiles')
+        .select('id, nome, email, sector, job_role_id, created_at')
+        .eq('company_id', callerCompanyId)
+        .limit(1000);
+      if (profErr) return json({ error: profErr.message }, 500);
+
+      const profileIds = (profiles || []).map((p: any) => p.id);
+
+      // 2. Buscar roles apenas para esses IDs (evitamos baixar a tabela global)
+      const { data: roles } = await adminClient
+        .from('user_roles')
+        .select('user_id, role')
+        .in('user_id', profileIds.length > 0 ? profileIds : ['00000000-0000-0000-0000-000000000000']);
+
+      // 3. Buscar cargos (job_roles) apenas da empresa atual
+      const { data: jobRoles } = await adminClient
+        .from('job_roles')
+        .select('id, nome')
+        .eq('company_id', callerCompanyId);
+
+      // 4. Buscar permissões apenas para os perfis mapeados (sem loop global infinito)
+      let userPerms: any[] = [];
+      if (profileIds.length > 0) {
+        const { data: perms } = await adminClient
+          .from('user_permissions')
+          .select('user_id, permission_key, effect')
+          .in('user_id', profileIds);
+        userPerms = perms || [];
+      }
       
       const jobRoleMap = new Map<string, string>();
       (jobRoles || []).forEach((j: any) => jobRoleMap.set(j.id, j.nome));

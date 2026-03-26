@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Plus, Copy, ChevronDown, ChevronUp, Pencil, Trash2, X, Check, Calculator } from 'lucide-react';
 import { toast } from 'sonner';
 import PeriodFilter, { PeriodRange, getDefaultRange, filterByPeriod } from './PeriodFilter';
-import { QuickSupplierForm } from './SuppliersView';
+import QuickSupplierDialog from './compras/QuickSupplierDialog';
 import { endOfMonth } from 'date-fns';
 import { useMetaMensal, getMetaStatus, calcProjecao } from './MetaCompraCard';
 import { calcWeeklyIdeal, getWeekForDay } from './WeeklyBreakdown';
@@ -300,18 +300,19 @@ export default function EntriesView({ store }: EntriesViewProps) {
             </div>
             <div>
               <Label className="text-[11px] text-muted-foreground">Fornecedor</Label>
-              <select
-                value={form.supplier}
-                onChange={e => setForm(f => ({ ...f, supplier: e.target.value }))}
-                className="w-full h-10 rounded-md border border-border bg-secondary px-3 text-sm text-foreground"
-              >
-                <option value="">Selecione...</option>
-                {activeSuppliers.map(s => (
-                  <option key={s.id} value={s.name}>{s.name}</option>
-                ))}
-              </select>
-              <button type="button" onClick={() => setShowQuickSupplier(true)} className="text-[10px] text-primary hover:underline mt-0.5">+ Novo fornecedor</button>
-              {showQuickSupplier && <QuickSupplierForm onAdd={handleQuickSupplier} onCancel={() => setShowQuickSupplier(false)} />}
+              <div className="flex flex-col gap-1">
+                <select
+                  value={form.supplier}
+                  onChange={e => setForm(f => ({ ...f, supplier: e.target.value }))}
+                  className="w-full h-10 rounded-md border border-border bg-secondary px-3 text-sm text-foreground"
+                >
+                  <option value="">Selecione...</option>
+                  {activeSuppliers.map(s => (
+                    <option key={s.id} value={s.name}>{s.name}</option>
+                  ))}
+                </select>
+                <button type="button" onClick={() => setShowQuickSupplier(true)} className="text-[10px] text-primary hover:underline self-start">+ Novo fornecedor</button>
+              </div>
             </div>
             <div>
               <Label className="text-[11px] text-muted-foreground">Valor Total (R$)</Label>
@@ -456,6 +457,13 @@ export default function EntriesView({ store }: EntriesViewProps) {
           setEditingId(null);
           setShowForm(true);
           setShowSimulador(false);
+        }}
+      />
+      <QuickSupplierDialog 
+        open={showQuickSupplier}
+        onOpenChange={setShowQuickSupplier}
+        onSuccess={(name) => {
+          setForm(f => ({ ...f, supplier: name }));
         }}
       />
     </div>

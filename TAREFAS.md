@@ -17,7 +17,16 @@ Este arquivo serve para sincronizar o progresso do desenvolvimento entre os dife
 - [ ] ...
 
 ## ✅ Concluído (Done)
+- [x] Otimizada Edge Function 'admin-users' do Supabase para corrigir timeout de 10s.
 - [x] Rodada auditoria inicial de segurança (NPM audit e varredura de chaves).
+- [x] Otimização da página de Usuários (Timeout corrigido)
+- [x] Cadastro rápido de fornecedores em lançamentos (Concluído)
+  - [x] Criar componente `QuickSupplierDialog`
+  - [x] Integrar no `SupplierCombobox`
+  - [x] Integrar no `EntriesView` (Stoque/Salmon)
+  - [x] Ativar nas telas do Financeiro
+- [ ] Importação de itens do catálogo antigo (Aguardando arquivo do usuário)
+- [ ] Sincronização entre máquinas PC e MacBook
 - [x] Atualizado pacote Node.js para mitigar vulnerabilidades.
 - [x] Configurar o repositório Git no MacBook e verificar funcionamento.
 - [x] Criar arquivo de controle `TAREFAS.md` para manter o contexto do assistente de IA em ambas as máquinas.
