@@ -308,6 +308,7 @@ export function useEstoqueGeralStore() {
     let allData: ProdutoRow[] = [];
     let from = 0;
     let hasMore = true;
+    let hadError = false;
     while (hasMore) {
       const { data, error } = await supabase
         .from('produtos')
@@ -317,6 +318,7 @@ export function useEstoqueGeralStore() {
         .range(from, from + MAX_FETCH - 1);
       if (error) {
         console.error('[useEstoqueGeralStore] fetchAllProdutos error:', error.message, error);
+        hadError = true;
         break;
       }
       if (!data) break;
@@ -324,17 +326,21 @@ export function useEstoqueGeralStore() {
       hasMore = data.length === MAX_FETCH;
       from += MAX_FETCH;
     }
-    const mapped = allData.map(dbToProduto);
-    setProdutos(mapped);
-    setProdTotalCount(mapped.length);
-    setProdHasMore(false);
-    setProdPage(0);
-
-    const ids = mapped.map(p => p.id);
-    await Promise.all([
-      ids.length > 0 ? fetchSaldos(ids) : Promise.resolve(),
-      fetchProdutoGlobalCounts(),
-    ]);
+    // Only update produtos state if we got data — never overwrite catalog with empty on error
+    if (!hadError) {
+      const mapped = allData.map(dbToProduto);
+      setProdutos(mapped);
+      setProdTotalCount(mapped.length);
+      setProdHasMore(false);
+      setProdPage(0);
+      const ids = mapped.map(p => p.id);
+      await Promise.all([
+        ids.length > 0 ? fetchSaldos(ids) : Promise.resolve(),
+        fetchProdutoGlobalCounts(),
+      ]);
+    } else {
+      fetchProdutoGlobalCounts();
+    }
   }, [fetchSaldos, fetchProdutoGlobalCounts]);
 
   // === Fetch from DB with server-side filters (paginated, for catalog view) ===
