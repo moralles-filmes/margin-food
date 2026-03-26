@@ -98,7 +98,7 @@ export default function EstoqueGeralView() {
   const canCreateMov = useCan('estoque:movimentacoes:create');
   const canEditPricing = canEditCatalogo;
   const canViewSelector = canEditCatalogo || useCan('financeiro:dashboard:view');
-  const { produtos, saldos, movimentacoes, categorias, prodTotalCount, prodHasMore, prodPage, prodGlobalCounts } = store;
+  const { produtos, saldos, movimentacoes, categorias, prodTotalCount, prodHasMore, prodPage, prodGlobalCounts, prodCatalogLoading, prodCatalogError } = store;
 
   // Requisition pending count for badge — counts only requisitions with ≥1 SOLICITADO item
   const [reqPendingCount, setReqPendingCount] = useState(0);
@@ -895,7 +895,20 @@ export default function EstoqueGeralView() {
             </div>
           )}
 
-          {(() => {
+          {prodCatalogError && (
+            <div className="bg-destructive/10 border border-destructive/30 rounded-xl p-4 text-xs text-destructive">
+              Erro ao carregar catálogo: {prodCatalogError}
+            </div>
+          )}
+
+          {prodCatalogLoading && !prodCatalogError && (
+            <div className="flex items-center justify-center py-10 text-muted-foreground text-xs gap-2">
+              <div className="w-4 h-4 border-2 border-muted-foreground/30 border-t-primary rounded-full animate-spin" />
+              Carregando catálogo…
+            </div>
+          )}
+
+          {!prodCatalogLoading && !prodCatalogError && (() => {
             const displayList = catalogFiltered;
             return displayList.length > 0 ? (
             <>

@@ -248,6 +248,8 @@ export function useEstoqueGeralStore() {
   const [prodTotalCount, setProdTotalCount] = useState<number | null>(null);
   const [prodFilters, setProdFilters] = useState<ProdFilters>({});
   const [prodGlobalCounts, setProdGlobalCounts] = useState<ProductGlobalCounts>({ total: 0, active: 0, inactive: 0 });
+  const [prodCatalogLoading, setProdCatalogLoading] = useState(false);
+  const [prodCatalogError, setProdCatalogError] = useState<string | null>(null);
 
   // === Fetch saldos from RPC (server-side) ===
   const fetchSaldos = useCallback(async (produtoIds: string[]) => {
@@ -313,7 +315,11 @@ export function useEstoqueGeralStore() {
         .eq('ativo', true)
         .order('created_at', { ascending: false })
         .range(from, from + MAX_FETCH - 1);
-      if (error || !data) break;
+      if (error) {
+        console.error('[useEstoqueGeralStore] fetchAllProdutos error:', error.message, error);
+        break;
+      }
+      if (!data) break;
       allData = allData.concat(data as unknown as ProdutoRow[]);
       hasMore = data.length === MAX_FETCH;
       from += MAX_FETCH;
@@ -333,6 +339,8 @@ export function useEstoqueGeralStore() {
 
   // === Fetch from DB with server-side filters (paginated, for catalog view) ===
   const fetchProdutos = useCallback(async (pageNum = 0, append = false, filters?: ProdFilters) => {
+    setProdCatalogLoading(true);
+    setProdCatalogError(null);
     const f = filters ?? prodFilters;
     let query = supabase
       .from('produtos')
@@ -364,17 +372,31 @@ export function useEstoqueGeralStore() {
 
     query = query.range(pageNum * ESTOQUE_PAGE, (pageNum + 1) * ESTOQUE_PAGE - 1);
 
-    const { data, error, count } = await query;
-    if (!error && data) {
-      const mapped = (data as unknown as ProdutoRow[]).map(dbToProduto);
-      setProdHasMore(mapped.length === ESTOQUE_PAGE);
-      setProdTotalCount(count ?? null);
-      if (append) setProdutos(prev => [...prev, ...mapped]);
-      else setProdutos(mapped);
-      setProdPage(pageNum);
-      const ids = mapped.filter(p => p.ativo).map(p => p.id);
-      if (ids.length > 0) fetchSaldos(ids);
-      if (!append) fetchProdutoGlobalCounts();
+    try {
+      const { data, error, count } = await query;
+      console.log('[fetchProdutos] resultado:', { dataLen: data?.length, count, error: error?.message, filters: f });
+      if (error) {
+        console.error('[useEstoqueGeralStore] fetchProdutos error:', error.message, error);
+        setProdCatalogError(error.message);
+        return;
+      }
+      if (data) {
+        const mapped = (data as unknown as ProdutoRow[]).map(dbToProduto);
+        setProdHasMore(mapped.length === ESTOQUE_PAGE);
+        setProdTotalCount(count ?? null);
+        if (append) setProdutos(prev => [...prev, ...mapped]);
+        else setProdutos(mapped);
+        setProdPage(pageNum);
+        const ids = mapped.filter(p => p.ativo).map(p => p.id);
+        if (ids.length > 0) fetchSaldos(ids);
+        if (!append) fetchProdutoGlobalCounts();
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('[useEstoqueGeralStore] fetchProdutos exception:', msg, err);
+      setProdCatalogError(msg);
+    } finally {
+      setProdCatalogLoading(false);
     }
   }, [fetchSaldos, fetchProdutoGlobalCounts, prodFilters]);
 
@@ -690,7 +712,7 @@ export function useEstoqueGeralStore() {
 
   return {
     produtos, movimentacoes, saldos, saldosLoading, categorias, loading,
-    prodHasMore, prodTotalCount, prodPage, movHasMore, movTotalCount, movServerTotals, movFilters, prodFilters, prodGlobalCounts,
+    prodHasMore, prodTotalCount, prodPage, movHasMore, movTotalCount, movServerTotals, movFilters, prodFilters, prodGlobalCounts, prodCatalogLoading, prodCatalogError,
     addProduto, updateProduto, deleteProduto,
     addMovimentacao,
     refetch, refreshSaldos, fetchAllProdutos, loadMoreProdutos, goToProdPage, loadMoreMovimentacoes, updateMovFilters, updateProdFilters,
