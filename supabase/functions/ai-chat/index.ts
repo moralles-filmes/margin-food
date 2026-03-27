@@ -97,9 +97,9 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
 
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+    if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY not configured");
 
     const userClient = createClient(supabaseUrl, supabaseKey, {
       global: { headers: { Authorization: authHeader || "" } },
@@ -205,14 +205,14 @@ serve(async (req) => {
     const sanitizedContext = sanitizeDbString(context);
     const systemPrompt = buildSystemPrompt(agente, sanitizedContext);
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${GEMINI_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "gemini-2.0-flash",
         messages: [
           { role: "system", content: systemPrompt },
           ...messages,
@@ -222,12 +222,12 @@ serve(async (req) => {
     });
 
     if (!response.ok) {
-      const errorCode = response.status === 429 ? "RATE_LIMITED" : response.status === 402 ? "CREDITS_EXHAUSTED" : "GATEWAY_ERROR";
+      const errorCode = response.status === 429 ? "RATE_LIMITED" : response.status === 403 ? "INVALID_API_KEY" : "GATEWAY_ERROR";
       const errorMsg = response.status === 429
         ? "Limite de requisições excedido. Tente novamente em alguns segundos."
-        : response.status === 402
-        ? "Créditos insuficientes. Recarregue seus créditos."
-        : "Erro no gateway de IA";
+        : response.status === 403
+        ? "Chave de API inválida ou sem permissão."
+        : "Erro na API Gemini";
       const t = await response.text();
       structuredLog("error", requestId, { event: "gateway_error", status: response.status, error_code: errorCode, body: t.slice(0, 500) });
       return jsonResponse({ error: { code: errorCode, message: errorMsg } }, response.status >= 500 ? 500 : response.status, requestId);
