@@ -145,11 +145,20 @@ export default function ConciliacaoBancariaSection() {
 
   const loadLancamentos = async () => {
     setLoading(true);
-    // @enterprise-exception: chain cast needed because Supabase query builder loses type after conditional .or()
-    let query = supabase.from('fin_lancamentos').select('id, data_competencia, valor, tipo, descricao, conta_id, categoria_id, centro_custo_id, status, conciliado, conciliado_em, conciliado_por, created_at').eq('conta_id', contaSel).eq('status', 'REALIZADO').order('data_competencia', { ascending: false }).limit(200) as unknown as { or: (f: string) => unknown; eq: (col: string, val: unknown) => unknown; then: unknown; data?: LancamentoConciliacao[] };
-    if (filtro === 'pendentes') query = query.or('conciliado.is.null,conciliado.eq.false') as typeof query;
-    else if (filtro === 'conciliados') query = query.eq('conciliado', true) as typeof query;
-    const { data } = await (query as unknown as PromiseLike<{ data: LancamentoConciliacao[] | null }>);
+    // Fetch both pending and reconciled to have accurate counts in the UI
+    const { data, error } = await supabase
+      .from('fin_lancamentos')
+      .select('id, data_competencia, valor, tipo, descricao, conta_id, categoria_id, centro_custo_id, status, conciliado, conciliado_em, conciliado_por, created_at')
+      .eq('conta_id', contaSel)
+      .eq('status', 'REALIZADO')
+      .order('data_competencia', { ascending: false })
+      .limit(200);
+
+    if (error) {
+      console.error('Error loading lancamentos:', error);
+      toast.error('Erro ao carregar lançamentos');
+    }
+    
     setLancamentos(data || []);
     setLoading(false);
   };
@@ -503,13 +512,13 @@ export default function ConciliacaoBancariaSection() {
       // Mark line as done
       const originLabel = match.origin === 'conta_pagar' ? 'CP' : 'CR';
       const statusLabel = match.origin === 'conta_pagar' ? 'PAGO' : 'RECEBIDO';
-      setLinhas(prev => prev.map((l, i) => i === confirmDialog.linhaIndex ? {
-        ...l, matchId: `${originLabel}-done`, matchOrigin: undefined, matchDescricao: `${originLabel}: ${match.descricao} (${statusLabel})`, matchRaw: undefined, selecionada: false,
-      } : l));
+      // Remove line as it is now done
+      setLinhas(prev => prev.filter((_, i) => i !== confirmDialog.linhaIndex));
 
       emitDataEvent('financeiro:lancamentos');
       emitDataEvent('financeiro:contas_pagar');
       emitDataEvent('financeiro:contas_receber');
+      loadLancamentos(); // Update local list immediately
     } catch (err: any) {
       console.error(err);
       toast.error(err.message || 'Erro ao dar baixa');
@@ -584,7 +593,7 @@ export default function ConciliacaoBancariaSection() {
       const total = toImport.length + toReconcileLanc.length + pendingCP.length + pendingCR.length;
       toast.success(`${total} operação(ões) processada(s) com sucesso`);
       setLinhas([]);
-      if (view === 'conciliar') loadLancamentos();
+      loadLancamentos(); // Ensure any change is loaded into the 'conciliar' view immediately
       emitDataEvent('financeiro:lancamentos');
       emitDataEvent('financeiro:conciliacao');
       emitDataEvent('financeiro:contas_pagar');
@@ -646,13 +655,11 @@ export default function ConciliacaoBancariaSection() {
       if (error) throw error;
       const result = data as { saida_id?: string; entrada_id?: string } | null;
 
-      setLinhas(prev => prev.map((l, i) => i === transferDialog.linhaIndex
-        ? { ...l, matchId: result?.saida_id || 'transfer-done', matchDescricao: `Transferência: ${nOrigem} → ${nDestino}`, selecionada: false }
-        : l
-      ));
+      setLinhas(prev => prev.filter((_, i) => i !== transferDialog.linhaIndex));
 
       toast.success(`Transferência ${nOrigem} → ${nDestino} criada e conciliada!`);
       emitDataEvent('financeiro:lancamentos');
+      loadLancamentos(); // Update local list immediately
     } catch (err: any) {
       console.error(err);
       toast.error(err.message || 'Erro ao criar transferência');
@@ -899,7 +906,13 @@ export default function ConciliacaoBancariaSection() {
                 <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                   {contaSel ? 'Nenhum lançamento encontrado' : 'Selecione uma conta bancária'}
                 </TableCell></TableRow>
-              ) : lancamentos.map(item => (
+              ) : lancamentos
+                  .filter(l => {
+                    if (filtro === 'pendentes') return !l.conciliado;
+                    if (filtro === 'conciliados') return !!l.conciliado;
+                    return true;
+                  })
+                  .map(item => (
                 <TableRow key={item.id} className={item.conciliado ? 'opacity-80' : ''}>
                   <TableCell>
                     <Checkbox checked={!!item.conciliado} onCheckedChange={(v) => conciliar(item.id, !!v)} />
@@ -1226,16 +1239,9 @@ export default function ConciliacaoBancariaSection() {
         contaBancariaId={contaSel}
         onCreated={(result) => {
           const idx = criarDialog.linhaIndex;
-          const destinoLabel = result.destino === 'conta_pagar' ? 'CP' : result.destino === 'conta_receber' ? 'CR' : 'Lançamento';
-          setLinhas(prev => prev.map((l, i) => i === idx ? {
-            ...l,
-            matchId: `${destinoLabel}-done`,
-            matchDescricao: `${destinoLabel}: ${l.descricao} (Criado)`,
-            matchOrigin: undefined,
-            matchRaw: undefined,
-            selecionada: false,
-          } : l));
+          setLinhas(prev => prev.filter((_, i) => i !== idx));
           setCriarDialog({ open: false, linhaIndex: -1 });
+          loadLancamentos(); // Update local list immediately
         }}
       />
     </div>

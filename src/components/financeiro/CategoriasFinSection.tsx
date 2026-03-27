@@ -109,7 +109,7 @@ export default function CategoriasFinSection({ canCreate, canEdit, canDelete }: 
                 <button type="button" onClick={guardedClose} aria-label="Fechar" className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"><X className="w-4 h-4" /></button>
               </div>
             </DialogHeader>
-            <div className="space-y-3">
+            <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
               <div><Label>Nome</Label><Input value={form.nome} onChange={e => setForm({...form, nome: e.target.value})} /></div>
               <div><Label>Tipo</Label>
                 <Select value={form.tipo} onValueChange={v => setForm({...form, tipo: v})}>

@@ -50,7 +50,7 @@ export default function CategoryCombobox({
       <PopoverContent className="w-[280px] p-0" align="start">
         <Command filter={(value, search) => { if (!search) return 1; return normalizeSearchText(value).includes(normalizeSearchText(search)) ? 1 : 0; }}>
           <CommandInput placeholder="Buscar categoria..." />
-          <CommandList>
+          <CommandList className="max-h-[300px] overflow-y-auto">
             <CommandEmpty>Nenhuma categoria encontrada.</CommandEmpty>
             <CommandGroup>
               {options.map(opt => (

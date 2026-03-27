@@ -18,6 +18,7 @@ import { ArrowDown, ArrowUp, Settings2, X } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 import { CurrencyInput } from '@/components/ui/brl-input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -47,6 +48,7 @@ interface MovFormState {
   custoUnitario: string;
   observacao: string;
   setor: string;
+  usePurchaseUnit: boolean;
 }
 
 const SETORES = ['Cozinha', 'Salão', 'Limpeza', 'Sushi', 'Peixaria', 'Copa', 'Administrativo', 'Delivery'];
@@ -101,6 +103,7 @@ export default function NovaMovimentacaoModal({
     custoUnitario: '',
     observacao: '',
     setor: '',
+    usePurchaseUnit: false,
   };
 
   const [form, setForm] = useState<MovFormState>(emptyForm);
@@ -109,29 +112,6 @@ export default function NovaMovimentacaoModal({
   const [costLocked, setCostLocked] = useState(true);
   const [saving, setSaving] = useState(false);
   const initializedRef = useRef(false);
-
-  // Reset form when modal opens with a new preset
-  useEffect(() => {
-    if (open) {
-      const newForm = {
-        ...emptyForm,
-        tipo: PRESET_DEFAULTS[preset],
-      };
-      setForm(newForm);
-      setMovPrecoTotal('');
-      setMovQtdEmbalagem('1');
-      setCostLocked(true);
-      setSaving(false);
-      initializedRef.current = true;
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, preset]);
-
-  // Dirty guard
-  const { isDirty, showConfirm, guardedClose, confirmClose, cancelClose, markClean } = useFormDirtyGuard({
-    current: form,
-    onClose,
-  });
 
   // Product options
   const productOptions: ProductOption[] = useMemo(() =>
@@ -143,13 +123,39 @@ export default function NovaMovimentacaoModal({
     })),
     [produtos]
   );
-
+  
   const selectedProd = useMemo(() => produtos.find(p => p.id === form.produtoId), [form.produtoId, produtos]);
   const hasPurchaseUnit = useMemo(() => {
     if (!selectedProd) return false;
     const unCompra = selectedProd.unidadeCompra || selectedProd.unidadeMedida;
     return unCompra !== selectedProd.unidadeMedida;
   }, [selectedProd]);
+
+  // Reset form when modal opens with a new preset
+  useEffect(() => {
+    if (open) {
+      const newForm = {
+        ...emptyForm,
+        tipo: PRESET_DEFAULTS[preset],
+        // Default to Purchase Unit for ENTRADA (common for cases), but Base for others (SAIDA/AJUSTE)
+        usePurchaseUnit: preset === 'entrada' && hasPurchaseUnit,
+      };
+      setForm(newForm);
+      setMovPrecoTotal('');
+      setMovQtdEmbalagem('1');
+      setCostLocked(true);
+      setSaving(false);
+      initializedRef.current = true;
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, preset, hasPurchaseUnit]);
+
+  // Dirty guard
+  const { isDirty, showConfirm, guardedClose, confirmClose, cancelClose, markClean } = useFormDirtyGuard({
+    current: form,
+    onClose,
+  });
+
   const selectedFator = useMemo(() => selectedProd?.fatorConversaoPadrao || 1, [selectedProd]);
   const selectedUnCompra = useMemo(() => selectedProd?.unidadeCompra || selectedProd?.unidadeMedida || '', [selectedProd]);
 
@@ -195,8 +201,8 @@ export default function NovaMovimentacaoModal({
 
   const saidaBaseCalc = useMemo(() => {
     const qty = normalizeBRLMoneyToNumber(form.quantidade) || 0;
-    return hasPurchaseUnit ? qty * selectedFator : qty;
-  }, [form.quantidade, hasPurchaseUnit, selectedFator]);
+    return form.usePurchaseUnit ? qty * selectedFator : qty;
+  }, [form.quantidade, form.usePurchaseUnit, selectedFator]);
 
   const saidaTotalEstimate = useMemo(() => {
     const costUnit = normalizeBRLMoneyToNumber(form.custoUnitario) || 0;
@@ -221,9 +227,9 @@ export default function NovaMovimentacaoModal({
     let quantidadeBase: number;
     if (isEntrada) {
       if (qe <= 0) { toast.error('Fator de conversão deve ser > 0'); return; }
-      quantidadeBase = qty * qe;
+      quantidadeBase = form.usePurchaseUnit ? qty * qe : qty;
     } else {
-      quantidadeBase = hasPurchaseUnit ? qty * selectedFator : qty;
+      quantidadeBase = form.usePurchaseUnit ? qty * selectedFator : qty;
     }
 
     if (isSaida) {
@@ -341,19 +347,33 @@ export default function NovaMovimentacaoModal({
             )}
 
             {/* Quantidade */}
-            <div>
-              <Label className="text-[11px] text-muted-foreground">
-                {isEntrada
-                  ? `Qtd (${selectedUnCompra || 'Embalagens'})`
-                  : hasPurchaseUnit
-                    ? `Qtd (${selectedUnCompra})`
-                    : `Quantidade (${selectedProd?.unidadeMedida || 'un. base'})`} *
-              </Label>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label className="text-[11px] text-muted-foreground mr-1">
+                  Quantidade *
+                </Label>
+                {hasPurchaseUnit && (
+                  <div className="flex items-center gap-1.5 bg-secondary/80 px-1.5 py-0.5 rounded-md border border-border">
+                    <span className={`text-[9px] font-medium transition-colors ${!form.usePurchaseUnit ? 'text-primary' : 'text-muted-foreground'}`}>
+                      {selectedProd?.unidadeMedida}
+                    </span>
+                    <Switch
+                      checked={form.usePurchaseUnit}
+                      onCheckedChange={(v) => setForm(f => ({ ...f, usePurchaseUnit: v }))}
+                      className="scale-[0.6] h-4 w-7"
+                    />
+                    <span className={`text-[9px] font-medium transition-colors ${form.usePurchaseUnit ? 'text-primary' : 'text-muted-foreground'}`}>
+                      {selectedUnCompra}
+                    </span>
+                  </div>
+                )}
+              </div>
               <Input
                 type="text" inputMode="decimal"
                 value={form.quantidade}
                 onChange={e => setForm(f => ({ ...f, quantidade: e.target.value }))}
-                className="bg-secondary border-border text-foreground"
+                className="bg-secondary border-border text-foreground h-9"
+                placeholder={`Ex: 3 ${form.usePurchaseUnit ? selectedUnCompra : (selectedProd?.unidadeMedida || '')}`}
               />
             </div>
 

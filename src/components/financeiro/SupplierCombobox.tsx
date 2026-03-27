@@ -36,11 +36,14 @@ export default function SupplierCombobox({
   const [open, setOpen] = useState(false);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [search, setSearch] = useState('');
+  const [tempNewSupplier, setTempNewSupplier] = useState<{ id: string, name: string } | null>(null);
 
   const selected = useMemo(() => {
     if (textMode) return options.find(o => o.name === value);
-    return options.find(o => o.id === value);
-  }, [options, value, textMode]);
+    const found = options.find(o => o.id === value);
+    if (!found && tempNewSupplier && tempNewSupplier.id === value) return tempNewSupplier;
+    return found;
+  }, [options, value, textMode, tempNewSupplier]);
 
   return (
     <>
@@ -64,7 +67,7 @@ export default function SupplierCombobox({
               value={search}
               onValueChange={setSearch}
             />
-            <CommandList>
+            <CommandList className="max-h-[300px] overflow-y-auto">
               <CommandEmpty className="py-2 px-4">
                 <p className="text-xs text-muted-foreground mb-2">Nenhum fornecedor encontrado.</p>
                 {enableQuickAdd && (
@@ -129,6 +132,7 @@ export default function SupplierCombobox({
         onOpenChange={setShowQuickAdd}
         defaultName={search}
         onSuccess={(name, id) => {
+          setTempNewSupplier({ id, name });
           onValueChange(textMode ? name : id);
           setSearch('');
         }}

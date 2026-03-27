@@ -65,7 +65,7 @@ export default function StockLossesSection({ categorias }: { categorias: string[
   const [groupBy, setGroupBy] = useState<GroupBy>('daily');
   const [orderBy, setOrderBy] = useState<OrderBy>('cost');
   const [filterCategory, setFilterCategory] = useState('');
-  const [lossType, setLossType] = useState('__all__');
+  const [lossType, setLossType] = useState('all_losses');
 
   const { startDate, endDate } = useMemo(() => {
     if (periodPreset === 'custom' && customStart && customEnd) {
