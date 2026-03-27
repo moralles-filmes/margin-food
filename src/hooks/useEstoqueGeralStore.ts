@@ -281,26 +281,21 @@ export function useEstoqueGeralStore() {
 
   const fetchProdutoGlobalCounts = useCallback(async () => {
     try {
-      const [totalRes, activeRes, inactiveRes] = await Promise.all([
-        supabase.from('produtos').select('id', { count: 'exact', head: true }),
-        supabase.from('produtos').select('id', { count: 'exact', head: true }).eq('ativo', true),
-        supabase.from('produtos').select('id', { count: 'exact', head: true }).eq('ativo', false),
-      ]);
+      const { data, error } = await (supabase.rpc as any)('get_catalog_counts');
 
-      if (totalRes.error || activeRes.error || inactiveRes.error) {
-        console.warn('[useEstoqueGeralStore] Falha ao obter contagem global de produtos', {
-          total: totalRes.error?.message,
-          active: activeRes.error?.message,
-          inactive: inactiveRes.error?.message,
-        });
+      if (error) {
+        console.warn('[useEstoqueGeralStore] Falha ao obter contagem global de produtos via RPC', error.message);
         return;
       }
 
-      setProdGlobalCounts({
-        total: totalRes.count ?? 0,
-        active: activeRes.count ?? 0,
-        inactive: inactiveRes.count ?? 0,
-      });
+      if (data) {
+        const counts = data as any;
+        setProdGlobalCounts({
+          total: Number(counts.total) || 0,
+          active: Number(counts.active) || 0,
+          inactive: Number(counts.inactive) || 0,
+        });
+      }
     } catch (err) {
       console.error('[useEstoqueGeralStore] Erro ao obter contagem global de produtos:', err);
     }
@@ -358,7 +353,7 @@ export function useEstoqueGeralStore() {
     const f = filters ?? prodFilters;
     let query = supabase
       .from('produtos')
-      .select(PRODUTO_SELECT_COLUMNS, { count: 'exact' });
+      .select(PRODUTO_SELECT_COLUMNS); // Removido count: 'exact' para evitar timeout RLS
 
     // Server-side ordering
     const sort = f.sortBy || 'recent';
@@ -397,7 +392,8 @@ export function useEstoqueGeralStore() {
       if (data) {
         const mapped = (data as unknown as ProdutoRow[]).map(dbToProduto);
         setProdHasMore(mapped.length === ESTOQUE_PAGE);
-        setProdTotalCount(count ?? null);
+        // Usar contagem do estado global em vez do count:exact da query que gera timeout
+        setProdTotalCount(f.ativo === false ? prodGlobalCounts.inactive : (f.ativo === true ? prodGlobalCounts.active : prodGlobalCounts.total));
         if (append) setProdutos(prev => [...prev, ...mapped]);
         else setProdutos(mapped);
         setProdPage(pageNum);
@@ -410,9 +406,7 @@ export function useEstoqueGeralStore() {
         });
         setSaldos(prev => ({ ...prev, ...initialSaldos }));
 
-        // Still call fetchSaldos for active items to ensure latest consistency if needed, 
-        // but now it serves more as a refresh than a primary load.
-        if (ids.length > 0) fetchSaldos(ids);
+        // Removido fetchSaldos redundante — o saldo_atual já vem no fetchProdutos
         if (!append) fetchProdutoGlobalCounts();
       }
     } catch (err) {
