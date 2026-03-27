@@ -40,7 +40,7 @@ DO $$
 DECLARE
     r RECORD;
 BEGIN
-    FOR r IN SELECT id, company_id FROM public.produtos LOOP
+    FOR r IN SELECT id, company_id FROM public.produtos WHERE company_id != '00000000-0000-0000-0000-000000000001' LOOP
         PERFORM public.fn_recompute_product_saldo(r.id, r.company_id);
     END LOOP;
 END $$;

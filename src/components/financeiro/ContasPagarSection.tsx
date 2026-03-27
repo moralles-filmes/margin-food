@@ -233,9 +233,9 @@ export default function ContasPagarSection() {
         p_conta_id: form.conta_id || null,
         p_forma_pagamento: form.forma_pagamento,
         p_observacoes: form.observacoes || null,
-        p_rateios: JSON.stringify(rateiosPayload),
-        p_recorrencia: recorrencia ? JSON.stringify(recorrencia) : null,
-      } as any);
+        p_rateios: rateiosPayload,
+        p_recorrencia: recorrencia,
+      });
 
       if (error) { toast.error(error.message); return; }
       const result = data as any;

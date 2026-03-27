@@ -253,7 +253,7 @@ export default function ConciliacaoBancariaSection() {
       }
 
       // ──── Fetch all candidate data in parallel ────
-      const [lancRes, lancAllRes, cpRes, crRes] = await Promise.all([
+      const [lancRes, lancAllRes, cpRes, crRes, conciliadosRes] = await Promise.all([
         // Lancamentos from same account
         contaSel ? supabase.from('fin_lancamentos').select('id, data_competencia, valor, tipo, descricao, conciliado, conta_id')
           .eq('conta_id', contaSel).eq('status', 'REALIZADO').or('conciliado.is.null,conciliado.eq.false') : Promise.resolve({ data: [] }),
@@ -266,12 +266,22 @@ export default function ConciliacaoBancariaSection() {
         // Contas a receber (pendentes)
         supabase.from('fin_contas_receber').select('id, descricao, valor, data_vencimento, status, cliente, recorrente, recorrencia_config')
           .eq('status', 'A_RECEBER').order('data_vencimento'),
+        // Already reconciled lancamentos for this account (to skip re-processing)
+        contaSel ? supabase.from('fin_lancamentos').select('data_competencia, valor, tipo')
+          .eq('conta_id', contaSel).eq('conciliado', true).eq('status', 'REALIZADO') : Promise.resolve({ data: [] }),
       ]);
 
       const lancSameConta = ((lancRes as { data: LancamentoCandidate[] | null }).data || []) as LancamentoCandidate[];
       const lancAll = (lancAllRes.data || []) as LancamentoCandidate[];
       const contasPagar = (cpRes.data || []) as ContaPagarCandidate[];
       const contasReceber = (crRes.data || []) as ContaReceberCandidate[];
+
+      // Filter out lines already reconciled in this account
+      const conciliadosSet = new Set(
+        ((conciliadosRes.data || []) as { data_competencia: string; valor: number; tipo: string }[])
+          .map(l => `${l.data_competencia}|${Number(l.valor)}|${l.tipo}`)
+      );
+      parsed = parsed.filter(linha => !conciliadosSet.has(`${linha.data}|${linha.valor}|${linha.tipo}`));
 
       // Build unique set of all lancamentos (same account first for priority)
       const lancMap = new Map<string, LancamentoCandidate>();
