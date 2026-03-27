@@ -1,13 +1,12 @@
-import { ReactNode, useMemo, useState, useCallback } from 'react';
+import { ReactNode, useMemo, useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { TabId, MetaCompraMensal, SalmonEntry } from '@/types/salmon';
 import {
   Package, ShoppingCart, ClipboardList, Building2, Settings, AlertTriangle, BarChart3,
-  LayoutDashboard, Target, Menu, Moon, Sun, User, ChevronLeft, X, LogOut, Users, Fish, ClipboardCheck, TrendingDown, BookOpen, Brain, UserCheck, DollarSign, Shield
+  LayoutDashboard, Target, Menu, Moon, Sun, User, ChevronLeft, ChevronRight, X, LogOut, Users, Fish, ClipboardCheck, TrendingDown, BookOpen, Brain, UserCheck, DollarSign, Shield
 } from 'lucide-react';
 import NotificationBell from '@/components/NotificationBell';
 import { APP_NAME, APP_TAGLINE } from '@/lib/brand';
-import logoMarginPro from '@/assets/logo-marginpro.png';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/contexts/AuthContext';
@@ -134,10 +133,51 @@ export default function AppLayout({ children, activeTab, onTabChange, isOffline,
   const isMobile = useIsMobile();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    const saved = localStorage.getItem('app:sidebar:width');
+    return saved ? parseInt(saved, 10) : 240;
+  });
+  const [isResizing, setIsResizing] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const isSuperAdmin = permissionState === 'READY' && hasPermission('system:global:manage');
 
   const permissionsReady = permissionState === 'READY';
+
+  const startResizing = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  }, []);
+
+  const stopResizing = useCallback(() => {
+    setIsResizing(false);
+    localStorage.setItem('app:sidebar:width', sidebarWidth.toString());
+  }, [sidebarWidth]);
+
+  const resize = useCallback((e: MouseEvent) => {
+    if (isResizing) {
+      const newWidth = e.clientX;
+      if (newWidth >= 160 && newWidth <= 480) {
+        setSidebarWidth(newWidth);
+        if (sidebarCollapsed && newWidth > 100) {
+          setSidebarCollapsed(false);
+        }
+      }
+    }
+  }, [isResizing, sidebarCollapsed]);
+
+  useEffect(() => {
+    if (isResizing) {
+      window.addEventListener('mousemove', resize);
+      window.addEventListener('mouseup', stopResizing);
+    } else {
+      window.removeEventListener('mousemove', resize);
+      window.removeEventListener('mouseup', stopResizing);
+    }
+    return () => {
+      window.removeEventListener('mousemove', resize);
+      window.removeEventListener('mouseup', stopResizing);
+    };
+  }, [isResizing, resize, stopResizing]);
 
   // Check if a nav item is visible to the user — returns false if permissions not loaded
   // Uses the module registry to derive ALL granular keys and checks if user has ANY
@@ -180,25 +220,37 @@ export default function AppLayout({ children, activeTab, onTabChange, isOffline,
     if (isMobile) setSidebarOpen(false);
   };
 
-  const sidebarWidth = sidebarCollapsed ? 'w-16' : 'w-60';
-
   const sidebarContent = (
     <div className="flex flex-col h-full">
       {/* Logo */}
-      <div className={`flex items-center gap-3 px-4 py-5 border-b border-sidebar-border ${sidebarCollapsed ? 'justify-center px-2' : ''}`}>
-        <img src={logoMarginPro} alt="MarginPro" className={`${sidebarCollapsed ? 'w-8 h-8' : 'h-10'} object-contain`} />
-        {!sidebarCollapsed && (
-          <div className="min-w-0 sr-only">
-            <h1>MarginPro</h1>
+      <div className={`flex items-center gap-3 px-4 py-6 border-b border-sidebar-border/10 ${sidebarCollapsed ? 'justify-center px-2' : ''}`}>
+        {!sidebarCollapsed ? (
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shadow-lg shadow-primary/20 shrink-0">
+              <span className="text-white font-black text-xl tracking-tighter">M</span>
+            </div>
+            <div className="flex flex-col min-w-0">
+              <span className="text-[17px] font-black text-foreground leading-tight tracking-tight truncate">Margin <span className="text-primary font-bold">Food</span></span>
+              <span className="text-[9px] text-muted-foreground font-bold uppercase tracking-[0.2em] opacity-40 leading-none mt-0.5">Architect</span>
+            </div>
+          </div>
+        ) : (
+          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shadow-lg shadow-primary/20 shrink-0 scale-90">
+            <span className="text-white font-black text-xl tracking-tighter">M</span>
           </div>
         )}
-        {!isMobile && !sidebarCollapsed && (
-          <button onClick={() => setSidebarCollapsed(true)} className="ml-auto text-muted-foreground hover:text-foreground transition-colors">
+
+        {!isMobile && (
+          <button 
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)} 
+            className={`ml-auto text-muted-foreground hover:text-foreground transition-all duration-300 p-1.5 rounded-lg hover:bg-white/40
+              ${sidebarCollapsed ? 'rotate-180 ml-0 fixed left-12 bg-background shadow-md border border-border/50 z-[60]' : ''}`}
+          >
             <ChevronLeft className="w-4 h-4" />
           </button>
         )}
         {isMobile && (
-          <button onClick={() => setSidebarOpen(false)} className="ml-auto text-muted-foreground hover:text-foreground transition-colors">
+          <button onClick={() => setSidebarOpen(false)} className="ml-auto text-muted-foreground hover:text-foreground transition-colors p-1">
             <X className="w-4 h-4" />
           </button>
         )}
@@ -236,20 +288,20 @@ export default function AppLayout({ children, activeTab, onTabChange, isOffline,
                       <button
                         key={key}
                         onClick={() => handleNav(item.id)}
-                        className={`w-full flex items-center gap-3 rounded-lg transition-all duration-200 group relative
-                          ${sidebarCollapsed ? 'justify-center px-2 py-2.5' : 'px-3 py-2'}
+                        className={`w-full flex items-center gap-3 rounded-xl transition-all duration-300 group relative
+                          ${sidebarCollapsed ? 'justify-center px-2 py-3' : 'px-4 py-2.5'}
                           ${active
-                            ? 'bg-primary/10 text-primary font-medium'
-                            : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                            ? 'bg-card text-primary font-bold shadow-card border-border/50 border scale-[1.02]'
+                            : 'text-muted-foreground hover:bg-white/40 hover:text-foreground'
                           }`}
                         title={sidebarCollapsed ? item.label : undefined}
                       >
-                        {active && (
-                          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-primary rounded-r-full" />
-                        )}
-                        <Icon className="w-4 h-4 flex-shrink-0" />
+                        <Icon className={`w-4 h-4 flex-shrink-0 transition-transform duration-300 ${active ? 'scale-110' : 'group-hover:scale-110'}`} />
                         {!sidebarCollapsed && (
-                          <span className="text-sm truncate">{item.label}</span>
+                          <span className="text-[13px] truncate tracking-tight">{item.label}</span>
+                        )}
+                        {active && !sidebarCollapsed && (
+                          <div className="absolute right-3 w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
                         )}
                       </button>
                     );
@@ -282,23 +334,13 @@ export default function AppLayout({ children, activeTab, onTabChange, isOffline,
         )}
       </nav>
 
-      {/* Sidebar footer */}
-      {sidebarCollapsed && !isMobile && (
-        <div className="p-2 border-t border-sidebar-border">
-          <button onClick={() => setSidebarCollapsed(false)} className="w-full flex items-center justify-center p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
-            <Menu className="w-4 h-4" />
-          </button>
-        </div>
-      )}
-
-      {/* RBAC Diagnostic — hidden by default, toggle with Alt+Shift+D */}
-      {import.meta.env.DEV && !sidebarCollapsed && false && (
-        <div className="p-2 border-t border-sidebar-border text-[8px] text-muted-foreground/60 space-y-0.5 font-mono overflow-hidden">
-          <p>state: {rbacDebug.state}</p>
-          <p>roles: {rbacDebug.roles.join(', ') || '—'}</p>
-          <p>perms: {rbacDebug.permissions.join(', ') || '—'}</p>
-          <p>nonce: {rbacDebug.nonce.slice(0, 12)}</p>
-        </div>
+      {/* Resizer Handle */}
+      {!isMobile && (
+        <div
+          onMouseDown={startResizing}
+          className={`absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-primary/30 transition-colors z-50
+            ${isResizing ? 'bg-primary/40 w-2' : ''}`}
+        />
       )}
     </div>
   );
@@ -320,7 +362,13 @@ export default function AppLayout({ children, activeTab, onTabChange, isOffline,
           {sidebarContent}
         </aside>
       ) : (
-        <aside className={`sticky top-0 h-screen bg-sidebar border-r border-sidebar-border ${sidebarWidth} transition-all duration-200 flex-shrink-0`}>
+        <aside 
+          className={`sticky top-0 h-screen bg-sidebar border-r border-sidebar-border transition-all duration-200 flex-shrink-0 group overflow-visible`}
+          style={{ 
+            width: sidebarCollapsed ? '64px' : `${sidebarWidth}px`,
+            transition: isResizing ? 'none' : 'width 300ms cubic-bezier(0.4, 0, 0.2, 1)'
+          }}
+        >
           {sidebarContent}
         </aside>
       )}
@@ -328,15 +376,15 @@ export default function AppLayout({ children, activeTab, onTabChange, isOffline,
       {/* Main area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
-        <header className="sticky top-0 z-30 glass h-14 flex items-center justify-between px-4 lg:px-6">
-          <div className="flex items-center gap-3">
+        <header className="sticky top-0 z-30 bg-background/60 backdrop-blur-md h-16 flex items-center justify-between px-4 lg:px-8 transition-all">
+          <div className="flex items-center gap-4">
             {isMobile && (
-              <button onClick={() => setSidebarOpen(true)} className="text-muted-foreground hover:text-foreground transition-colors">
+              <button onClick={() => setSidebarOpen(true)} className="text-muted-foreground hover:text-foreground transition-colors p-2 rounded-lg hover:bg-accent">
                 <Menu className="w-5 h-5" />
               </button>
             )}
             <div>
-              <h2 className="text-base font-display font-bold text-foreground leading-none">{tabLabels[activeTab]}</h2>
+              <h2 className="text-xl font-bold text-foreground tracking-tight">{tabLabels[activeTab]}</h2>
             </div>
           </div>
 

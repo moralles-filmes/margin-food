@@ -1,6 +1,30 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-import { getReversalTipo, isEstornoMovement, isOriginalEntradaForReversal } from "./stock-reversal.ts";
+// ─── Inline logic from stock-reversal.ts ───
+export const ESTORNO_TYPES = new Set(["ENTRADA_ESTORNO", "SAIDA_ESTORNO"]);
+
+export interface StockMovementReversalCandidate {
+  tipo?: string | null;
+  origem?: string | null;
+  estorno_de_id?: string | null;
+}
+
+export function isEstornoMovement(movement: StockMovementReversalCandidate): boolean {
+  return Boolean(
+    movement.estorno_de_id ||
+      movement.origem === "ESTORNO" ||
+      (movement.tipo && ESTORNO_TYPES.has(movement.tipo))
+  );
+}
+
+export function isOriginalEntradaForReversal(tipo: string): boolean {
+  return tipo === "ENTRADA" || tipo === "AJUSTE" || tipo.startsWith("ENTRADA");
+}
+
+export function getReversalTipo(tipo: string): "SAIDA_ESTORNO" | "ENTRADA_ESTORNO" {
+  return isOriginalEntradaForReversal(tipo) ? "SAIDA_ESTORNO" : "ENTRADA_ESTORNO";
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -159,7 +183,7 @@ async function writeAudit(
 
 // ─── Main Handler ───────────────────────────────────────────────────────────
 
-Deno.serve(async (req) => {
+serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }

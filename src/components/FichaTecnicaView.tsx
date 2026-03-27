@@ -24,6 +24,7 @@ import {
   Plus, Trash2, Save, RefreshCw, Search, ChefHat, Layers, Package, ShoppingBag,
   DollarSign, TrendingUp, Calculator, BarChart3, Settings2, ArrowRight, X, Fish
 } from 'lucide-react';
+import SubTabBadge from '@/components/ui/SubTabBadge';
 
 import { fmtBRL, formatPercentBR } from '@/lib/formatters';
 const R$ = (v: number) => fmtBRL(v);
@@ -371,44 +372,56 @@ export default function FichaTecnicaView({ lotesLimpos = [] }: { lotesLimpos?: L
   return (
     <div className="space-y-4">
       <Tabs value={effectiveSubTab} onValueChange={setSubTab}>
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <TabsList className="flex flex-wrap w-full max-w-2xl">
+        <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+          <div className="flex items-center gap-1 overflow-x-auto pb-1 -mx-1 px-1">
             {visibleSubtabs.includes('pre-preparos') && (
-              <TabsTrigger value="pre_preparo" className="gap-1 text-xs">
+              <button onClick={() => setSubTab('pre_preparo')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all relative ${effectiveSubTab === 'pre_preparo' ? 'gradient-salmon text-primary-foreground shadow-md' : 'bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80'}`}>
                 <ChefHat className="w-3.5 h-3.5" />Pré-Preparos
-                <Badge variant="secondary" className="ml-1 text-[9px] px-1 py-0">{countPP}</Badge>
-              </TabsTrigger>
+                <SubTabBadge count={countPP} />
+              </button>
             )}
             {visibleSubtabs.includes('itens-prontos') && (
-              <TabsTrigger value="item_pronto" className="gap-1 text-xs">
+              <button onClick={() => setSubTab('item_pronto')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all relative ${effectiveSubTab === 'item_pronto' ? 'gradient-salmon text-primary-foreground shadow-md' : 'bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80'}`}>
                 <Layers className="w-3.5 h-3.5" />Itens Prontos
-                <Badge variant="secondary" className="ml-1 text-[9px] px-1 py-0">{countIP}</Badge>
-              </TabsTrigger>
+                <SubTabBadge count={countIP} />
+              </button>
             )}
             {visibleSubtabs.includes('produtos-finais') && (
-              <TabsTrigger value="produto_final" className="gap-1 text-xs">
+              <button onClick={() => setSubTab('produto_final')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all relative ${effectiveSubTab === 'produto_final' ? 'gradient-salmon text-primary-foreground shadow-md' : 'bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80'}`}>
                 <ShoppingBag className="w-3.5 h-3.5" />Produtos Finais
-                <Badge variant="secondary" className="ml-1 text-[9px] px-1 py-0">{countPF}</Badge>
-              </TabsTrigger>
+                <SubTabBadge count={countPF} />
+              </button>
             )}
             {visibleSubtabs.includes('canais') && (
-              <TabsTrigger value="canais" className="gap-1 text-xs"><Settings2 className="w-3.5 h-3.5" />Canais</TabsTrigger>
+              <button onClick={() => setSubTab('canais')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all relative ${effectiveSubTab === 'canais' ? 'gradient-salmon text-primary-foreground shadow-md' : 'bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80'}`}>
+                <Settings2 className="w-3.5 h-3.5" />Canais
+              </button>
             )}
             {visibleSubtabs.includes('analise') && (
-              <TabsTrigger value="analise" className="gap-1 text-xs"><BarChart3 className="w-3.5 h-3.5" />Análise</TabsTrigger>
+              <button onClick={() => setSubTab('analise')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all relative ${effectiveSubTab === 'analise' ? 'gradient-salmon text-primary-foreground shadow-md' : 'bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80'}`}>
+                <BarChart3 className="w-3.5 h-3.5" />Análise
+              </button>
             )}
             {visibleSubtabs.includes('markup') && (
-              <TabsTrigger value="markup" className="gap-1 text-xs"><Calculator className="w-3.5 h-3.5" />Markup</TabsTrigger>
+              <button onClick={() => setSubTab('markup')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all relative ${effectiveSubTab === 'markup' ? 'gradient-salmon text-primary-foreground shadow-md' : 'bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80'}`}>
+                <Calculator className="w-3.5 h-3.5" />Markup
+              </button>
             )}
-          </TabsList>
+          </div>
           {canManageMarkup && (
-            <Button size="sm" variant="outline" disabled={recalculating} onClick={async () => {
+            <Button size="sm" variant="outline" className="h-8 text-xs" disabled={recalculating} onClick={async () => {
               if (recalculating) return;
               setRecalculating(true);
               try { await invokeApi('recalcular_todos_custos'); toast.success('Custos recalculados'); loadAll(); }
               catch (e: any) { toast.error(e.message); }
               finally { setRecalculating(false); }
-            }}><RefreshCw className={`w-4 h-4 mr-1 ${recalculating ? 'animate-spin' : ''}`} />{recalculating ? 'Recalculando...' : 'Recalcular Todos'}</Button>
+            }}><RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${recalculating ? 'animate-spin' : ''}`} />{recalculating ? 'Recalculando...' : 'Recalcular Todos'}</Button>
           )}
         </div>
 

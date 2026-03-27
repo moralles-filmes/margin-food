@@ -1,4 +1,5 @@
-import { createClient } from 'npm:@supabase/supabase-js@2'
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -7,7 +8,7 @@ const corsHeaders = {
 
 const PAGE_SIZE = 50
 
-Deno.serve(async (req) => {
+serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
@@ -506,7 +507,7 @@ Deno.serve(async (req) => {
       const recentIds = finalizados.slice(0, 5).map(i => i.id)
       if (recentIds.length > 0) {
         const { data: recentItens } = await adminClient.from('inventario_itens')
-          .select('contado_por, impacto_financeiro, diferenca_percent')
+          .select('contado_por, impacto_financeiro, fisherman_divergence_percent:diferenca_percent')
           .in('inventario_id', recentIds).eq('company_id', companyId).is('deleted_at', null)
           .not('contado_por', 'is', null)
 
@@ -541,7 +542,6 @@ Deno.serve(async (req) => {
       }
       const safeJustificativa = justificativa.trim().slice(0, 500).replace(/<[^>]*>/g, '')
 
-      // IMPORTANT: this RPC depends on auth.uid()/assert_tenant(), so it must run with user context
       const { data: rpcResult, error: rpcErr } = await userClient.rpc('reopen_inventory', {
         p_id: id, p_justificativa: safeJustificativa
       })
@@ -558,14 +558,12 @@ Deno.serve(async (req) => {
       const deny = await requirePermission('inventario:lista:delete')
       if (deny) return deny
 
-      // Use atomic RPC (soft delete, preserves audit trail)
       const { id, justificativa } = payload
       if (!justificativa || justificativa.trim().length < 10) {
         return json({ error: 'Justificativa obrigatória (mínimo 10 caracteres)' }, 400)
       }
       const safeDelJustificativa = justificativa.trim().slice(0, 500).replace(/<[^>]*>/g, '')
 
-      // IMPORTANT: this RPC depends on auth.uid()/assert_tenant(), so it must run with user context
       const { data: rpcResult, error: rpcErr } = await userClient.rpc('soft_delete_inventory', {
         p_id: id, p_justificativa: safeDelJustificativa
       })
@@ -591,8 +589,6 @@ Deno.serve(async (req) => {
       return json({ logs: data || [] })
     }
 
-    // ===== CONFERENTES ACTIONS =====
-
     if (action === 'list_conferentes') {
       const canView = await hasAnyPermission('inventario:conferentes:view', 'inventario:conferentes:manage')
       if (!canView) return forbidden('Sem permissão para listar conferentes')
@@ -603,7 +599,6 @@ Deno.serve(async (req) => {
         .eq('company_id', companyId)
         .order('created_at')
 
-      // Enrich with profile names
       const userIds = (data || []).map((c: any) => c.user_id)
       let profileMap: Record<string, string> = {}
       if (userIds.length > 0) {
@@ -626,7 +621,6 @@ Deno.serve(async (req) => {
       const { user_id } = payload
       if (!user_id) return json({ error: 'user_id obrigatório' }, 400)
 
-      // Verify user belongs to same company
       const { data: targetProfile } = await adminClient.from('profiles').select('company_id').eq('id', user_id).single()
       if (!targetProfile || targetProfile.company_id !== companyId) return json({ error: 'Usuário não pertence a esta empresa' }, 400)
 
@@ -669,18 +663,15 @@ Deno.serve(async (req) => {
       const { inventario_id, conferente_user_id } = payload
       if (!inventario_id || !conferente_user_id) return json({ error: 'inventario_id e conferente_user_id obrigatórios' }, 400)
 
-      // Verify inventory exists and is not finalized
       const { data: inv } = await adminClient.from('inventarios')
         .select('status').eq('id', inventario_id).eq('company_id', companyId).is('deleted_at', null).single()
       if (!inv) return json({ error: 'Inventário não encontrado' }, 404)
       if (inv.status === 'FINALIZADO') return json({ error: 'Inventário já finalizado' }, 400)
 
-      // Verify conferente is in the allowed list
       const { data: conf } = await adminClient.from('inventario_conferentes')
         .select('id').eq('user_id', conferente_user_id).eq('company_id', companyId).maybeSingle()
       if (!conf) return json({ error: 'Usuário não está na lista de conferentes autorizados' }, 400)
 
-      // Update inventory
       await adminClient.from('inventarios').update({
         conferente_user_id: conferente_user_id,
         conferente_atribuido_em: new Date().toISOString(),
@@ -688,7 +679,6 @@ Deno.serve(async (req) => {
         status: 'EM_REVISAO',
       }).eq('id', inventario_id).eq('company_id', companyId)
 
-      // Create notification for the conferente
       await adminClient.from('notifications').insert({
         company_id: companyId,
         recipient_user_id: conferente_user_id,

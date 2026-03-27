@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { usePersistedTab } from '@/hooks/usePersistedTab';
 import { TabId } from '@/types/salmon';
@@ -7,19 +7,20 @@ import { EstoqueGeralStoreProvider, useEstoqueGeralStoreContext } from '@/contex
 import { useAuth } from '@/contexts/AuthContext';
 import type { AppPermission } from '@/contexts/AuthContext';
 import AppLayout from '@/components/AppLayout';
-import SalmonControlView from '@/components/SalmonControlView';
-import EstoqueGeralView from '@/components/EstoqueGeralView';
-import ComprasView from '@/components/ComprasView';
-import PlanningView from '@/components/PlanningView';
-import SuppliersView from '@/components/SuppliersView';
-import RelatoriosView from '@/components/RelatoriosView';
-import CmvView from '@/components/CmvView';
-import FichaTecnicaView from '@/components/FichaTecnicaView';
-import ConfiguracoesView from '@/components/ConfiguracoesView';
-import InventarioView from '@/components/InventarioView';
-import CentralIAView from '@/components/CentralIAView';
-import RhView from '@/components/RhView';
-import FinanceiroView from '@/components/FinanceiroView';
+
+const SalmonControlView = lazy(() => import('@/components/SalmonControlView'));
+const EstoqueGeralView = lazy(() => import('@/components/EstoqueGeralView'));
+const ComprasView = lazy(() => import('@/components/ComprasView'));
+const PlanningView = lazy(() => import('@/components/PlanningView'));
+const SuppliersView = lazy(() => import('@/components/SuppliersView'));
+const RelatoriosView = lazy(() => import('@/components/RelatoriosView'));
+const CmvView = lazy(() => import('@/components/CmvView'));
+const FichaTecnicaView = lazy(() => import('@/components/FichaTecnicaView'));
+const ConfiguracoesView = lazy(() => import('@/components/ConfiguracoesView'));
+const InventarioView = lazy(() => import('@/components/InventarioView'));
+const CentralIAView = lazy(() => import('@/components/CentralIAView'));
+const RhView = lazy(() => import('@/components/RhView'));
+const FinanceiroView = lazy(() => import('@/components/FinanceiroView'));
 import { Button } from '@/components/ui/button';
 import { RefreshCw, LogOut, AlertTriangle, ShieldAlert } from 'lucide-react';
 import { toast } from 'sonner';
@@ -265,19 +266,21 @@ const Index = () => {
 
   return (
     <AppLayout activeTab={activeTab} onTabChange={handleTabChange} isOffline={isOffline} entries={store.entries} metasCompra={store.metasCompra}>
-      {activeTab === 'salmon' && canAccessTab('salmon') && <SalmonControlView store={store} />}
-      {activeTab === 'estoque-geral' && canAccessTab('estoque-geral') && <EstoqueGeralView />}
-      {activeTab === 'inventario' && canAccessTab('inventario') && <InventarioView />}
-      {activeTab === 'compras' && canAccessTab('compras') && <ComprasView />}
-      {activeTab === 'planning' && canAccessTab('planning') && <PlanningView store={store} estoqueStore={estoqueStore} />}
-      {activeTab === 'suppliers' && canAccessTab('suppliers') && <SuppliersView store={store} />}
-      {activeTab === 'relatorios' && canAccessTab('relatorios') && <RelatoriosView />}
-      {activeTab === 'cmv' && canAccessTab('cmv') && <CmvView />}
-      {activeTab === 'ficha-tecnica' && canAccessTab('ficha-tecnica') && <FichaTecnicaView lotesLimpos={store.lotesLimpos} />}
-      {activeTab === 'ia' && canAccessTab('ia') && <CentralIAView />}
-      {activeTab === 'rh' && canAccessTab('rh') && <RhView />}
-      {activeTab === 'financeiro' && canAccessTab('financeiro') && <FinanceiroView />}
-      {activeTab === 'configuracoes' && canAccessTab('configuracoes') && <ConfiguracoesView store={store} />}
+      <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>}>
+        {activeTab === 'salmon' && canAccessTab('salmon') && <SalmonControlView store={store} />}
+        {activeTab === 'estoque-geral' && canAccessTab('estoque-geral') && <EstoqueGeralView />}
+        {activeTab === 'inventario' && canAccessTab('inventario') && <InventarioView />}
+        {activeTab === 'compras' && canAccessTab('compras') && <ComprasView />}
+        {activeTab === 'planning' && canAccessTab('planning') && <PlanningView store={store} estoqueStore={estoqueStore} />}
+        {activeTab === 'suppliers' && canAccessTab('suppliers') && <SuppliersView store={store} />}
+        {activeTab === 'relatorios' && canAccessTab('relatorios') && <RelatoriosView />}
+        {activeTab === 'cmv' && canAccessTab('cmv') && <CmvView />}
+        {activeTab === 'ficha-tecnica' && canAccessTab('ficha-tecnica') && <FichaTecnicaView lotesLimpos={store.lotesLimpos} />}
+        {activeTab === 'ia' && canAccessTab('ia') && <CentralIAView />}
+        {activeTab === 'rh' && canAccessTab('rh') && <RhView />}
+        {activeTab === 'financeiro' && canAccessTab('financeiro') && <FinanceiroView />}
+        {activeTab === 'configuracoes' && canAccessTab('configuracoes') && <ConfiguracoesView store={store} />}
+      </Suspense>
     </AppLayout>
   );
 };

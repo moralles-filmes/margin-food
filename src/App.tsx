@@ -15,17 +15,17 @@ import AdminPanel from "./pages/AdminPanel";
 import NotFound from "./pages/NotFound";
 import FloatingCalculator from "./components/FloatingCalculator";
 
-const AUTO_REFRESH_THROTTLE_MS = 15 * 1000;
+const AUTO_REFRESH_THROTTLE_MS = 2 * 60 * 1000; // 2 minutos
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      refetchOnWindowFocus: true,
+      refetchOnWindowFocus: false,
       refetchOnReconnect: true,
-      refetchOnMount: true,
+      refetchOnMount: false,
       retry: 1,
-      staleTime: 15 * 1000,
-      gcTime: 5 * 60 * 1000,
+      staleTime: 3 * 60 * 1000, // 3 minutos
+      gcTime: 10 * 60 * 1000,
     },
   },
 });
@@ -45,7 +45,8 @@ const App = () => {
       if (now - lastRefreshAt < AUTO_REFRESH_THROTTLE_MS) return;
 
       lastRefreshAt = now;
-      queryClient.invalidateQueries();
+      // Invalida apenas queries que já ficaram stale, sem forçar refetch de tudo
+      queryClient.invalidateQueries({ refetchType: 'none' });
       emitDataEvent('app:refresh');
     };
 

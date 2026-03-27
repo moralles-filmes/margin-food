@@ -86,34 +86,33 @@ export function useSalmonStore() {
   useEffect(() => {
     (async () => {
       try {
-        // Entries
-        const { data: dbEntries } = await supabase
-          .from('salmon_entries')
-          .select('*')
-          .eq('status', 'ACTIVE')
-          .order('entry_date', { ascending: false });
+        const [
+          { data: dbEntries },
+          { data: dbManips },
+          { data: dbConfig },
+          { data: dbDaily },
+          { data: dbSuppliers },
+          { data: dbMetas },
+          { data: dbMetasProv },
+          { data: dbAuditorias },
+        ] = await Promise.all([
+          supabase.from('salmon_entries').select('*').eq('status', 'ACTIVE').order('entry_date', { ascending: false }),
+          supabase.from('salmon_manipulations').select('*').eq('status', 'ACTIVE').order('manipulation_date', { ascending: false }),
+          supabase.from('salmon_config').select('*').limit(1).maybeSingle(),
+          supabase.from('salmon_daily_records').select('*').order('record_date', { ascending: false }),
+          supabase.from('suppliers').select('*').order('created_at', { ascending: false }),
+          supabase.from('planning_metas_compra').select('*').eq('ativo', true).order('year', { ascending: false }).order('month', { ascending: false }),
+          supabase.from('salmon_metas_provisionadas').select('*').order('created_at', { ascending: false }),
+          supabase.from('salmon_auditorias_compra').select('*').order('created_at', { ascending: false }),
+        ]);
 
         if (dbEntries && dbEntries.length > 0) {
           setEntries(dbEntries.map(mapDbEntry));
         }
 
-        // Manipulations
-        const { data: dbManips } = await supabase
-          .from('salmon_manipulations')
-          .select('*')
-          .eq('status', 'ACTIVE')
-          .order('manipulation_date', { ascending: false });
-
         if (dbManips && dbManips.length > 0) {
           setManipulations(dbManips.map(mapDbManipulation));
         }
-
-        // Config
-        const { data: dbConfig } = await supabase
-          .from('salmon_config')
-          .select('*')
-          .limit(1)
-          .maybeSingle();
 
         if (dbConfig) {
           setStockConfigState({
@@ -127,12 +126,6 @@ export function useSalmonStore() {
           });
         }
 
-        // Daily records from salmon_daily_records
-        const { data: dbDaily } = await supabase
-          .from('salmon_daily_records')
-          .select('*')
-          .order('record_date', { ascending: false });
-
         if (dbDaily && dbDaily.length > 0) {
           setDailyRecords(dbDaily.map(r => ({
             id: r.id,
@@ -142,12 +135,6 @@ export function useSalmonStore() {
             createdAt: r.created_at,
           })));
         }
-
-        // Suppliers from suppliers table
-        const { data: dbSuppliers } = await supabase
-          .from('suppliers')
-          .select('*')
-          .order('created_at', { ascending: false });
 
         if (dbSuppliers && dbSuppliers.length > 0) {
           setSuppliers(dbSuppliers.map((s: any) => ({
@@ -164,14 +151,6 @@ export function useSalmonStore() {
           })));
         }
 
-        // Metas Compra from planning_metas_compra
-        const { data: dbMetas } = await supabase
-          .from('planning_metas_compra')
-          .select('*')
-          .eq('ativo', true)
-          .order('year', { ascending: false })
-          .order('month', { ascending: false });
-
         if (dbMetas && dbMetas.length > 0) {
           setMetasCompra(dbMetas.map((m: any) => ({
             id: m.id,
@@ -184,12 +163,6 @@ export function useSalmonStore() {
           })));
         }
 
-        // Metas Provisionadas from salmon_metas_provisionadas
-        const { data: dbMetasProv } = await supabase
-          .from('salmon_metas_provisionadas')
-          .select('*')
-          .order('created_at', { ascending: false });
-
         if (dbMetasProv && dbMetasProv.length > 0) {
           setMetasProvisionadas(dbMetasProv.map((m: any) => ({
             id: m.id,
@@ -198,12 +171,6 @@ export function useSalmonStore() {
             createdAt: m.created_at,
           })));
         }
-
-        // Auditorias from salmon_auditorias_compra
-        const { data: dbAuditorias } = await supabase
-          .from('salmon_auditorias_compra')
-          .select('*')
-          .order('created_at', { ascending: false });
 
         if (dbAuditorias && dbAuditorias.length > 0) {
           setAuditorias(dbAuditorias.map((a: any) => ({
