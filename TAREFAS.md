@@ -25,8 +25,8 @@ Este arquivo serve para sincronizar o progresso do desenvolvimento entre os dife
   - [x] Integrar no `SupplierCombobox`
   - [x] Integrar no `EntriesView` (Stoque/Salmon)
   - [x] Ativar nas telas do Financeiro
-- [ ] Importação de itens do catálogo antigo (Aguardando arquivo do usuário)
-- [ ] Sincronização entre máquinas PC e MacBook
+- [x] Importação de itens do catálogo antigo (Concluído)
+- [x] Sincronização entre máquinas PC e MacBook (Concluído)
 - [x] Atualizado pacote Node.js para mitigar vulnerabilidades.
 - [x] Configurar o repositório Git no MacBook e verificar funcionamento.
 - [x] Criar arquivo de controle `TAREFAS.md` para manter o contexto do assistente de IA em ambas as máquinas.
