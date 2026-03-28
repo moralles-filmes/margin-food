@@ -76,9 +76,11 @@ margin-food/
 ## 🏗️ Arquitetura — Pontos Críticos
 
 ### Multi-tenancy
+- O sistema opera em modo **Single-Tenant** (consolidação finalizada em 2026-03-28)
+- Empresa Piloto: `MarginPro Oficial` (ID: `e6df6541-154e-4576-ad0c-86047bc57490`)
 - Toda tabela tem `company_id NOT NULL` — forçado por trigger (`trg_force_company_id`)
 - `get_current_company_id()` resolve: `auth.uid()` → `profiles.company_id`
-- UUID placeholder `00000000-0000-0000-0000-000000000001` é bloqueado por trigger
+- UUID placeholder `00000000-0000-0000-0000-000000000001` é mantido para fins de sistema mas bloqueado para operações comuns
 - **Nunca** confiar em `company_id` vindo do cliente — sempre do backend
 
 ### RLS (Row-Level Security)
@@ -165,19 +167,18 @@ margin-food/
 
 > **Mantenha esta seção atualizada após cada sessão de trabalho.**
 
-### 2026-03-27 — Correção Crítica: Divergência no Saldo Total de Estoque
-- Unificação da lógica de cálculo do valor financeiro de estoque para o método cumulativo (soma de entradas - soma de saídas).
-- Correção das RPCs `get_stock_summary` e `get_stock_dashboard` para eliminar discrepâncias entre cards de KPI e gráficos de categoria.
-- Resolução do bug de "duplicação de saída" causado por custos unitários inconsistentes via reconstrução de saldo.
-- Criação da migração `20260327220000_unify_stock_value_logic.sql`.
+### 2026-03-28 — Consolidação Single-Tenant e Limpeza de Dados
+- Execução da migração de limpeza (`20260328144800_cleanup_stale_companies.sql`) para remover todas as empresas exceto a "MarginPro Oficial" e o placeholder de sistema.
+- Remoção em cascata de todos os dados operacionais vinculados às empresas deletadas.
+- Verificação do banco de dados: restam apenas 2 registros na tabela `companies`.
+- Correção de turnos no Inventário para a empresa piloto.
+
 ### Pendente / Em Aberto
-- [x] Investigar divergência no Saldo Total em Estoque (R$ 59,60 vs R$ 104,30)
-- [x] Identificar causa da "duplicação" em saídas de Farinha Panko
-- [x] Unificar lógica de cálculo (Método Cumulativo via Movimentações)
-- [x] Atualizar RPC `get_stock_summary`
-- [x] Atualizar RPC `get_stock_dashboard` (KPI + Gráfico de Categorias)
-- [x] Criar migração consolidada `20260327220000_unify_stock_value_logic.sql`
-- [x] Validar consistência visual no Dashboard e cards de resumo
+- [x] Sincronizar remote local com o novo nome do repositório (`margin-food`)
+- [x] Corrigir turnos ausentes no módulo de Inventário
+- [x] Consolidar sistema para Single-Tenant (Remover empresas legadas)
+- [x] Atualizar arquivo de contexto `CLAUDE.md`
+- [ ] Monitorar integridade dos dados na empresa piloto após limpeza intensa
 
 ---
 

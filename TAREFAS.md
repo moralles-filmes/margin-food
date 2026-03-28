@@ -30,3 +30,8 @@ Este arquivo serve para sincronizar o progresso do desenvolvimento entre os dife
 - [x] Atualizado pacote Node.js para mitigar vulnerabilidades.
 - [x] Configurar o repositório Git no MacBook e verificar funcionamento.
 - [x] Criar arquivo de controle `TAREFAS.md` para manter o contexto do assistente de IA em ambas as máquinas.
+- [x] Sincronizar repositório local com o novo nome `margin-food`.
+- [x] Corrigir turnos ausentes no banco de dados para a empresa piloto (Migration SQL).
+- [x] Consolidar o sistema para **Single-Tenant** (Remoção de empresas legadas e dados órfãos).
+- [x] Verificar integridade do banco de dados pós-limpeza.
+- [x] Atualizar documentação centralizada (`CLAUDE.md`).
