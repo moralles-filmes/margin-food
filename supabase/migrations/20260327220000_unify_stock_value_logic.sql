@@ -1,3 +1,72 @@
+-- =========================================================
+-- CORREÇÃO: UNIFICAÇÃO DA LÓGICA DE VALOR DE ESTOQUE
+-- Data: 2026-03-27
+-- Objetivo: Garantir que todas as métricas de valor financeiro
+--           utilizem a soma das movimentações (Cumulative Ledger)
+--           em vez da reconstrução de saldo (Asset Reconstruction).
+-- =========================================================
+
+-- 1. Atualizar RPC get_stock_summary
+CREATE OR REPLACE FUNCTION public.get_stock_summary()
+RETURNS TABLE(total_stock_value numeric, items_count integer, missing_cost_items_count integer, updated_at timestamp with time zone)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+DECLARE
+    v_company uuid;
+BEGIN
+    v_company := public.assert_tenant();
+
+    IF NOT public.has_any_permission(auth.uid(), ARRAY[
+      'estoque:geral:view', 'estoque:movimentacoes:view', 'system:global:manage'
+    ]) THEN
+        RAISE EXCEPTION 'Insufficient permissions';
+    END IF;
+
+    RETURN QUERY
+    WITH product_data AS (
+        SELECT
+            p.id,
+            COALESCE(p.saldo_atual, 0) AS saldo,
+            COALESCE(
+                NULLIF(p.avg30_cost_base_unit, 0),
+                NULLIF(p.last_cost_base_unit, 0),
+                NULLIF(p.default_cost_base_unit, 0),
+                0
+            ) AS effective_cost
+        FROM public.produtos p
+        WHERE p.company_id = v_company
+          AND p.ativo = true
+    ),
+    ledger_value AS (
+        SELECT COALESCE(SUM(
+            CASE 
+                WHEN m.direction = 'IN' THEN m.custo_total
+                ELSE -m.custo_total
+            END
+        ), 0)::numeric AS total_val
+        FROM public.movimentacoes_estoque m
+        WHERE m.company_id = v_company 
+          AND m.status = 'ATIVO'
+          AND m.tipo NOT IN ('ENTRADA_ESTORNO', 'SAIDA_ESTORNO')
+    ),
+    active_totals AS (
+        SELECT 
+            COUNT(*)::integer AS cnt,
+            COALESCE(COUNT(CASE WHEN pd.effective_cost = 0 THEN 1 END), 0)::integer AS missing_costs
+        FROM product_data pd
+    )
+    SELECT
+        lv.total_val AS total_stock_value,
+        at.cnt AS items_count,
+        at.missing_costs AS missing_cost_items_count,
+        now() AS updated_at
+    FROM ledger_value lv, active_totals at;
+END;
+$function$;
+
+-- 2. Atualizar RPC get_stock_dashboard
 CREATE OR REPLACE FUNCTION public.get_stock_dashboard(
     p_days integer DEFAULT 30
 )
@@ -14,31 +83,20 @@ BEGIN
     v_company := public.assert_tenant();
     v_cutoff := now() - (p_days || ' days')::interval;
 
-    WITH saldos AS (
-        SELECT
+    WITH ledgers AS (
+        SELECT 
             m.produto_id,
-            SUM(
-              CASE
-                WHEN m.tipo IN ('ENTRADA_ESTORNO', 'SAIDA_ESTORNO') THEN 0
-                WHEN m.direction = 'IN' THEN m.quantidade
-                ELSE -m.quantidade
-              END
-            ) AS saldo
-        FROM public.movimentacoes_estoque m
-        WHERE m.company_id = v_company AND m.status = 'ATIVO'
-        GROUP BY m.produto_id
-    ),
-    ledger_value AS (
-        SELECT COALESCE(ROUND(SUM(
-            CASE
-                WHEN m.direction = 'IN' THEN m.custo_total
-                ELSE -m.custo_total
-            END
-        )::numeric, 2), 0) AS valor_total
+            SUM(CASE WHEN m.direction = 'IN' THEN m.quantidade ELSE -m.quantidade END) as saldo_qtd,
+            SUM(CASE WHEN m.direction = 'IN' THEN m.custo_total ELSE -m.custo_total END) as saldo_vlr
         FROM public.movimentacoes_estoque m
         WHERE m.company_id = v_company 
           AND m.status = 'ATIVO'
           AND m.tipo NOT IN ('ENTRADA_ESTORNO', 'SAIDA_ESTORNO')
+        GROUP BY m.produto_id
+    ),
+    ledger_value AS (
+        SELECT COALESCE(SUM(saldo_vlr)::numeric, 0) AS valor_total
+        FROM ledgers
     ),
     produto_saldos AS (
         SELECT
@@ -47,7 +105,7 @@ BEGIN
             p.categoria,
             p.unidade_medida,
             p.estoque_minimo,
-            COALESCE(s.saldo, 0) AS saldo,
+            COALESCE(l.saldo_qtd, 0) AS saldo,
             COALESCE(
                 NULLIF(p.avg30_cost_base_unit, 0),
                 NULLIF(p.last_cost_base_unit, 0),
@@ -55,7 +113,7 @@ BEGIN
                 0
             ) AS custo_efetivo
         FROM public.produtos p
-        LEFT JOIN saldos s ON s.produto_id = p.id
+        LEFT JOIN ledgers l ON l.produto_id = p.id
         WHERE p.company_id = v_company AND p.ativo = true
     ),
     cat_dist AS (
@@ -66,22 +124,13 @@ BEGIN
         ) ORDER BY sub.valor DESC), '[]'::jsonb) AS data
         FROM (
             SELECT
-                COALESCE(NULLIF(p.categoria, ''), 'Sem Categoria') AS categoria,
-                ROUND(SUM(
-                    CASE 
-                        WHEN m.direction = 'IN' THEN m.custo_total 
-                        ELSE -m.custo_total 
-                    END
-                )::numeric, 2) AS valor,
-                COUNT(DISTINCT p.id)::int AS qtd_itens
-            FROM public.movimentacoes_estoque m
-            JOIN public.produtos p ON p.id = m.produto_id
-            WHERE m.company_id = v_company 
-              AND m.status = 'ATIVO'
-              AND m.tipo NOT IN ('ENTRADA_ESTORNO', 'SAIDA_ESTORNO')
-              AND p.ativo = true
+                COALESCE(NULLIF(ps.categoria, ''), 'Sem Categoria') AS categoria,
+                ROUND(SUM(l.saldo_vlr)::numeric, 2) AS valor,
+                COUNT(DISTINCT ps.id)::int AS qtd_itens
+            FROM produto_saldos ps
+            JOIN ledgers l ON l.produto_id = ps.id
+            WHERE l.saldo_qtd > 0
             GROUP BY 1
-            HAVING SUM(CASE WHEN m.direction = 'IN' THEN m.quantidade ELSE -m.quantidade END) > 0
         ) sub
     ),
     status_counts AS (
@@ -160,4 +209,4 @@ BEGIN
 END;
 $$;
 
--- Fix get_stock_consumption_history: exclude estornos from consumption data
+NOTIFY pgrst, 'reload schema';

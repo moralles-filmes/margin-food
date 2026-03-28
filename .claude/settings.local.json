@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C \"c:/Users/morae/OneDrive/Desktop/APPs AI/2. Aplicativos - Moralles/1. Moralles Food/margin-food\" remote -v)",
+      "Bash(grep -l \"get_stock_summary\" \"c:/Users/morae/OneDrive/Desktop/APPs AI/2. Aplicativos - Moralles/1. Moralles Food/margin-food/supabase/migrations/20260321\"*.sql)",
+      "Bash(grep -l \"get_stock_summary\" \"c:/Users/morae/OneDrive/Desktop/APPs AI/2. Aplicativos - Moralles/1. Moralles Food/margin-food/supabase/migrations/202603\"[2-9]*.sql)",
+      "Bash(grep -rn \"get_stock_summary\\\\|total_stock_value\" c:/Users/morae/OneDrive/Desktop/APPs AI/2. Aplicativos - Moralles/1. Moralles Food/margin-food/supabase/migrations/20260321*.sql)",
+      "Bash(grep -rn \"CREATE.*TRIGGER\\\\|CREATE OR REPLACE FUNCTION\" c:/Users/morae/OneDrive/Desktop/APPs AI/2. Aplicativos - Moralles/1. Moralles Food/margin-food/supabase/migrations/20260321*.sql)",
+      "Bash(grep -rn \"CREATE.*TRIGGER\\\\|FUNCTION.*trigger\\\\|INSERT INTO movimentacoes\" c:/Users/morae/OneDrive/Desktop/APPs AI/2. Aplicativos - Moralles/1. Moralles Food/margin-food/supabase/migrations/20260321003558*.sql c:/Users/morae/OneDrive/Desktop/APPs AI/2. Aplicativos - Moralles/1. Moralles Food/margin-food/supabase/migrations/20260321003559*.sql c:/Users/morae/OneDrive/Desktop/APPs AI/2. Aplicativos - Moralles/1. Moralles Food/margin-food/supabase/migrations/20260321005957*.sql)",
+      "Bash(grep -n \"movPrecoTotal\\\\|precoTotal\\\\|Preço Total\\\\|Custo Total\\\\|R$/un\\\\|por embalagem\\\\|por caixa\" \"c:/Users/morae/OneDrive/Desktop/APPs AI/2. Aplicativos - Moralles/1. Moralles Food/margin-food/src/components/estoque/NovaMovimentacaoModal.tsx\")"
+    ]
+  }
+}
