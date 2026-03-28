@@ -178,14 +178,23 @@ serve(async (req) => {
       })
       if (rpcErr) throw rpcErr
 
+      // Handle both return formats: plain UUID (new RPC) or object (legacy RPC)
+      const inventarioId = typeof rpcResult === 'string' ? rpcResult : rpcResult?.inventario_id || rpcResult
+      if (!inventarioId) throw new Error('RPC não retornou o ID do inventário')
+
       // Load the created inventory for response
       const { data: inv } = await adminClient.from('inventarios')
-        .select('*').eq('id', rpcResult.inventario_id).eq('company_id', companyId).single()
+        .select('*').eq('id', inventarioId).eq('company_id', companyId).single()
+
+      // Count items that were created
+      const { count: itensCount } = await adminClient.from('inventario_itens')
+        .select('id', { count: 'exact', head: true })
+        .eq('inventario_id', inventarioId).eq('company_id', companyId)
 
       return json({
         inventario: inv,
-        itensCount: rpcResult.itens_count,
-        idempotent: rpcResult.idempotent || false,
+        itensCount: itensCount || 0,
+        idempotent: typeof rpcResult === 'object' ? (rpcResult?.idempotent || false) : false,
       })
     }
 

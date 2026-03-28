@@ -124,12 +124,11 @@ export default function ProductSearchCombobox({
             {options.map(opt => (
               <CommandItem
                 key={opt.id}
-                value={
-                  opt.label +
-                  (opt.sublabel ? ' ' + opt.sublabel : '') +
-                  (opt.keywords ? ' ' + opt.keywords : '')
-                }
-                onSelect={() => handleSelect(opt.id)}
+                value={`${opt.id}|${opt.label} ${opt.sublabel || ''} ${opt.keywords || ''}`.trim()}
+                onSelect={(currValue) => {
+                  const id = currValue.split('|')[0];
+                  handleSelect(id);
+                }}
                 className="text-xs gap-1.5"
               >
                 <Check

@@ -314,12 +314,18 @@ export function useEstoqueGeralStore() {
         .eq('ativo', true)
         .order('created_at', { ascending: false })
         .range(from, from + MAX_FETCH - 1);
+
       if (error) {
         console.error('[useEstoqueGeralStore] fetchAllProdutos error:', error.message, error);
+        // Se for erro de permissão, tentamos silenciar para não travar o loop dependendo do contexto
+        if (error.code === '42501' || error.message.includes('permission denied')) {
+           hadError = true;
+           break;
+        }
         hadError = true;
         break;
       }
-      if (!data) break;
+      if (!data || data.length === 0) break;
       allData = allData.concat(data as unknown as ProdutoRow[]);
       hasMore = data.length === MAX_FETCH;
       from += MAX_FETCH;

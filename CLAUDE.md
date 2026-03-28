@@ -76,8 +76,19 @@ margin-food/
 ## 🏗️ Arquitetura — Pontos Críticos
 
 ### Multi-tenancy
-- O sistema opera em modo **Single-Tenant** (consolidação finalizada em 2026-03-28)
-- Empresa Piloto: `MarginPro Oficial` (ID: `e6df6541-154e-4576-ad0c-86047bc57490`)
+- **Fix Inventário Geral — Criação e Seleção de Produtos (2026-03-28):**
+  - Corrigido bug de seleção de produtos no modal de Movimentação: `useEffect` com dependência `hasPurchaseUnit` resetava o formulário ao selecionar produtos com unidade de compra diferente.
+  - Adicionada coluna `idempotency_key` na tabela `inventarios` (faltava).
+  - Adicionada coluna `company_id` na tabela `audit_inventario_log` (faltava).
+  - Edge Function `inventario` atualizada para tratar retorno `uuid` da RPC `create_inventory_atomic`.
+  - Migração de permissões (GRANTs + RLS) re-aplicada na tabela `produtos`.
+  - Deploy da Edge Function `inventario` no Supabase remoto.
+- **Fix Módulo Inventário & Tenant Integrity (2026-03-28):**
+  - Execução de migrações para sincronizar `profiles` e `turnos` com a empresa piloto.
+  - Reparo de 1450+ registros órfãos (`company_id IS NULL`) vinculados agora ao pilot.
+  - Otimização da RPC `create_inventory_atomic` para evitar timeouts durante a criação de inventários completos.
+  - Resolução de invisibilidade de produtos no Catálogo e Movimentações.
+- **Limpeza de Dados Single-Tenant (2026-03-28):** Executada migração de limpeza profunda para manter apenas a empresa piloto `MarginPro Oficial`.
 - Toda tabela tem `company_id NOT NULL` — forçado por trigger (`trg_force_company_id`)
 - `get_current_company_id()` resolve: `auth.uid()` → `profiles.company_id`
 - UUID placeholder `00000000-0000-0000-0000-000000000001` é mantido para fins de sistema mas bloqueado para operações comuns

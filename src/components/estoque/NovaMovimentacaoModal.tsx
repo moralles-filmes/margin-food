@@ -137,8 +137,7 @@ export default function NovaMovimentacaoModal({
       const newForm = {
         ...emptyForm,
         tipo: PRESET_DEFAULTS[preset],
-        // Default to Purchase Unit for ENTRADA (common for cases), but Base for others (SAIDA/AJUSTE)
-        usePurchaseUnit: preset === 'entrada' && hasPurchaseUnit,
+        usePurchaseUnit: false,
       };
       setForm(newForm);
       setMovPrecoTotal('');
@@ -148,7 +147,16 @@ export default function NovaMovimentacaoModal({
       initializedRef.current = true;
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, preset, hasPurchaseUnit]);
+  }, [open, preset]);
+
+  // Auto-toggle usePurchaseUnit when a product with a different purchase unit is selected
+  useEffect(() => {
+    if (!open || !initializedRef.current) return;
+    if (preset === 'entrada' && hasPurchaseUnit) {
+      setForm(f => ({ ...f, usePurchaseUnit: true }));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.produtoId]);
 
   // Dirty guard
   const { isDirty, showConfirm, guardedClose, confirmClose, cancelClose, markClean } = useFormDirtyGuard({
