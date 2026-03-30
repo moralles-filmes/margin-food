@@ -14,6 +14,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandInput, CommandList, CommandEmpty, CommandItem } from '@/components/ui/command';
 import { toast } from 'sonner';
+import { fmtBRL, formatDateBR, formatDateTimeBR } from '@/lib/formatters';
 import UserMentionSelect from '@/components/UserMentionSelect';
 import ProductSearchCombobox, { type ProductOption } from '@/components/ui/ProductSearchCombobox';
 import SubTabBadge from '@/components/ui/SubTabBadge';
@@ -78,7 +79,7 @@ export default function PedidosComprasMercadoView() {
       return {
         id: p.id,
         label: p.nomeProduto,
-        sublabel: `(${purchaseUnit}) — R$ ${purchaseCost.toFixed(2)}`,
+        sublabel: `(${purchaseUnit}) — ${fmtBRL(purchaseCost)}`,
         keywords: p.sku || '',
       };
     }),
@@ -561,7 +562,7 @@ export default function PedidosComprasMercadoView() {
             <div className="flex items-center gap-2">
               {renderActionMenu(selectedOrder)}
               <div className="text-right text-xs text-muted-foreground">
-                <p>Criado: {new Date(selectedOrder.created_at).toLocaleDateString('pt-BR')}</p>
+                <p>Criado: {formatDateBR(new Date(selectedOrder.created_at))}</p>
                 {selectedOrder.need_by_date && <p>Necessidade: {selectedOrder.need_by_date}</p>}
                 {selectedOrder.supplier_name && <p>Forn: {selectedOrder.supplier_name}</p>}
               </div>
@@ -573,11 +574,11 @@ export default function PedidosComprasMercadoView() {
           <div className="grid grid-cols-2 gap-3 mb-4">
             <div className="bg-secondary/50 rounded-lg p-3">
               <p className="text-[10px] text-muted-foreground">Total Estimado</p>
-              <p className="text-lg font-bold text-foreground">R$ {selectedOrder.total_estimated.toFixed(2)}</p>
+              <p className="text-lg font-bold text-foreground">{fmtBRL(selectedOrder.total_estimated)}</p>
             </div>
             <div className="bg-secondary/50 rounded-lg p-3">
               <p className="text-[10px] text-muted-foreground">Total Confirmado</p>
-              <p className="text-lg font-bold text-foreground">R$ {selectedOrder.total_confirmed.toFixed(2)}</p>
+              <p className="text-lg font-bold text-foreground">{fmtBRL(selectedOrder.total_confirmed)}</p>
             </div>
           </div>
 
@@ -637,7 +638,7 @@ export default function PedidosComprasMercadoView() {
                           {item.name_snapshot}
                         </p>
                         <p className="text-[10px] text-muted-foreground">
-                          {item.qty_requested} {item.unit_snapshot} × R$ {item.estimated_unit_value.toFixed(2)} = R$ {(item.qty_requested * item.estimated_unit_value).toFixed(2)}
+                          {item.qty_requested} {item.unit_snapshot} × {fmtBRL(item.estimated_unit_value)} = {fmtBRL(item.qty_requested * item.estimated_unit_value)}
                         </p>
                         {item.received_status === 'RECEIVED' && (
                           <p className="text-[10px] text-success mt-0.5">✓ Recebido: {item.qty_received} {item.unit_snapshot}</p>
@@ -817,7 +818,7 @@ export default function PedidosComprasMercadoView() {
             </div>
             <div>
               <Label className="text-[10px] text-muted-foreground">Categorias</Label>
-              <Popover>
+              <Popover modal>
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="w-full justify-between text-xs mt-1 font-normal h-auto min-h-[36px] py-1.5">
                     {parseCategories(form.category).length > 0 ? (
@@ -858,7 +859,7 @@ export default function PedidosComprasMercadoView() {
             </div>
             <div>
               <Label className="text-[10px] text-muted-foreground">Fornecedor {form.type === 'FORNECEDOR' ? '*' : '(opcional)'}</Label>
-              <Popover open={supplierOpen} onOpenChange={setSupplierOpen}>
+              <Popover open={supplierOpen} onOpenChange={setSupplierOpen} modal>
                 <PopoverTrigger asChild>
                   <Button variant="outline" role="combobox" aria-expanded={supplierOpen}
                     className="w-full justify-between text-xs mt-1 font-normal h-9">
@@ -947,7 +948,7 @@ export default function PedidosComprasMercadoView() {
                 {editLockedItems.map(item => (
                   <div key={item.id} className="flex items-center justify-between bg-success/5 border border-success/20 rounded-lg px-3 py-1.5 text-xs">
                     <span className="text-muted-foreground">🔒 {item.name_snapshot}</span>
-                    <span className="text-muted-foreground">{item.qty_received} {item.unit_snapshot} recebidos — R$ {(item.qty_received * item.estimated_unit_value).toFixed(2)}</span>
+                    <span className="text-muted-foreground">{item.qty_received} {item.unit_snapshot} recebidos — {fmtBRL(item.qty_received * item.estimated_unit_value)}</span>
                   </div>
                 ))}
               </div>
@@ -981,14 +982,14 @@ export default function PedidosComprasMercadoView() {
                 <div key={i} className="flex items-center justify-between bg-secondary/50 rounded-lg px-3 py-1.5 text-xs">
                   <span className="text-foreground">{item.name_snapshot}</span>
                   <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground">{item.qty_requested} {item.unit_snapshot} × R$ {item.estimated_unit_value.toFixed(2)}</span>
-                    <span className="font-bold text-foreground">R$ {(item.qty_requested * item.estimated_unit_value).toFixed(2)}</span>
+                    <span className="text-muted-foreground">{item.qty_requested} {item.unit_snapshot} × {fmtBRL(item.estimated_unit_value)}</span>
+                    <span className="font-bold text-foreground">{fmtBRL(item.qty_requested * item.estimated_unit_value)}</span>
                     <button onClick={() => setFormItems(prev => prev.filter((_, j) => j !== i))} className="text-destructive"><X className="w-3 h-3" /></button>
                   </div>
                 </div>
               ))}
               <p className="text-right text-xs font-bold text-foreground pt-1">
-                Total estimado: R$ {(totalEstimado + lockedTotal).toFixed(2)}
+                Total estimado: {fmtBRL(totalEstimado + lockedTotal)}
               </p>
             </div>
           )}
@@ -1045,7 +1046,7 @@ export default function PedidosComprasMercadoView() {
                       )}
                       {order.supplier_name && <span className="text-[9px] text-muted-foreground">• {order.supplier_name}</span>}
                       <span className="text-[9px] text-muted-foreground">
-                        R$ {(order.total_confirmed || order.total_estimated).toFixed(2)}
+                        {fmtBRL(order.total_confirmed || order.total_estimated)}
                       </span>
                     </div>
                   </button>
@@ -1058,7 +1059,7 @@ export default function PedidosComprasMercadoView() {
                     {acked ? (
                       <div className="flex items-center gap-1.5 text-success">
                         <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>Ciência confirmada em {new Date(order.not_delivered_ack_at!).toLocaleString('pt-BR')}</span>
+                        <span>Ciência confirmada em {formatDateTimeBR(new Date(order.not_delivered_ack_at!))}</span>
                       </div>
                     ) : (
                       <div className="flex items-center justify-between gap-2">

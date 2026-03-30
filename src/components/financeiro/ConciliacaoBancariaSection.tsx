@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { CurrencyInput } from '@/components/ui/brl-input';
-import { fmtBRL } from '@/lib/money';
+import { fmtBRL, formatDateBR, parseLocalDate } from '@/lib/formatters';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -14,7 +14,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import { formatDateBR } from '@/lib/datetime';
 import { Upload, CheckCircle, Save, RefreshCw, ArrowRight, Receipt, Eye, Plus, Trash2, PieChart, ArrowRightLeft, Search, CreditCard, FileText } from 'lucide-react';
 import CriarLancamentoExtratoDialog from '@/components/financeiro/CriarLancamentoExtratoDialog';
 import type { ContaBancariaRef, CategoriaFinRef, CentroCustoRef, LancamentoConciliacao, LancamentoCandidate, ContaPagarCandidate, ContaReceberCandidate } from '@/types/financeiro';
@@ -770,7 +769,7 @@ export default function ConciliacaoBancariaSection() {
                             />
                           )}
                         </TableCell>
-                        <TableCell className="font-mono text-sm">{linha.data}</TableCell>
+                        <TableCell className="font-mono text-sm">{formatDateBR(parseLocalDate(linha.data))}</TableCell>
                         <TableCell className="max-w-[220px]">
                           <span className="font-medium truncate block">{linha.descricao}</span>
                           {hasMatch && (
@@ -927,7 +926,7 @@ export default function ConciliacaoBancariaSection() {
                   <TableCell>
                     <Checkbox checked={!!item.conciliado} onCheckedChange={(v) => conciliar(item.id, !!v)} />
                   </TableCell>
-                  <TableCell className="font-mono text-sm">{item.data_competencia}</TableCell>
+                  <TableCell className="font-mono text-sm">{formatDateBR(parseLocalDate(item.data_competencia))}</TableCell>
                   <TableCell className="font-medium max-w-[200px] truncate">{item.descricao}</TableCell>
                   <TableCell>
                     <Badge variant={item.tipo === 'RECEITA' ? 'default' : 'destructive'}>{item.tipo}</Badge>
@@ -970,7 +969,7 @@ export default function ConciliacaoBancariaSection() {
                       <div>
                         <p className="text-[10px] text-muted-foreground font-medium uppercase">Linha do Extrato</p>
                         <p className="text-sm font-medium">{linha.descricao}</p>
-                        <p className="text-xs text-muted-foreground">{linha.data}</p>
+                        <p className="text-xs text-muted-foreground">{formatDateBR(parseLocalDate(linha.data))}</p>
                       </div>
                       <div className="text-right">
                         <p className="text-lg font-bold">{fmt(linha.valor)}</p>
@@ -997,7 +996,7 @@ export default function ConciliacaoBancariaSection() {
                             </div>
                             <p className="text-sm font-medium truncate">{s.descricao}</p>
                             <div className="flex items-center gap-3 text-[11px] text-muted-foreground mt-0.5">
-                              <span>Data: {s.data}</span>
+                              <span>Data: {formatDateBR(parseLocalDate(s.data))}</span>
                               {s.extra && <span>• {s.extra}</span>}
                             </div>
                           </div>
@@ -1041,7 +1040,7 @@ export default function ConciliacaoBancariaSection() {
                   <div className="flex justify-between items-center">
                     <div>
                       <p className="text-sm font-medium">{linhas[rateioDialog.linhaIndex].descricao}</p>
-                      <p className="text-xs text-muted-foreground">{linhas[rateioDialog.linhaIndex].data}</p>
+                      <p className="text-xs text-muted-foreground">{formatDateBR(parseLocalDate(linhas[rateioDialog.linhaIndex].data))}</p>
                     </div>
                     <div className="text-right">
                       <p className="text-lg font-bold">{fmt(rateioValorTotal)}</p>
@@ -1136,7 +1135,7 @@ export default function ConciliacaoBancariaSection() {
                       <p className="font-semibold">{match.descricao}</p>
                       {match.extra && <p className="text-muted-foreground text-xs">{match.extra}</p>}
                       <p className={`text-lg font-bold mt-1 ${isCP ? 'text-destructive' : 'text-success'}`}>{fmt(match.valor)}</p>
-                      <p className="text-xs text-muted-foreground">Vencimento: {match.data}</p>
+                      <p className="text-xs text-muted-foreground">Vencimento: {formatDateBR(parseLocalDate(match.data))}</p>
                       {'recorrente' in match.raw && match.raw.recorrente && (
                         <Badge variant="outline" className="mt-2 text-[10px]">🔄 Recorrente</Badge>
                       )}
@@ -1147,7 +1146,7 @@ export default function ConciliacaoBancariaSection() {
                       <p className="text-[10px] text-muted-foreground mb-1 font-medium uppercase">Extrato Bancário</p>
                       <p className="font-semibold">{linha?.descricao}</p>
                       <p className={`text-lg font-bold mt-1 ${isCP ? 'text-destructive' : 'text-success'}`}>{linha ? fmt(linha.valor) : '—'}</p>
-                      <p className="text-xs text-muted-foreground">Data: {linha?.data}</p>
+                      <p className="text-xs text-muted-foreground">Data: {linha ? formatDateBR(parseLocalDate(linha.data)) : ''}</p>
                     </CardContent>
                   </Card>
                 </div>
@@ -1192,7 +1191,7 @@ export default function ConciliacaoBancariaSection() {
                     <div className="flex justify-between items-center">
                       <div>
                         <p className="text-sm font-medium">{linha.descricao}</p>
-                        <p className="text-xs text-muted-foreground">{linha.data}</p>
+                         <p className="text-xs text-muted-foreground">{formatDateBR(parseLocalDate(linha.data))}</p>
                       </div>
                       <div className="text-right">
                         <p className="text-lg font-bold">{fmt(linha.valor)}</p>

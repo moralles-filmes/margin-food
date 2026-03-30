@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { CurrencyInput } from '@/components/ui/brl-input';
 import { DecimalInput } from '@/components/ui/decimal-input';
-import { fmtBRL } from '@/lib/money';
+import { fmtBRL, formatFixedBR } from '@/lib/formatters';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
@@ -386,7 +386,7 @@ export default function MovimentacoesSection({
             <Package className="w-3.5 h-3.5 text-muted-foreground" />
             <p className="text-[10px] text-muted-foreground">Qtd Total</p>
           </div>
-          <p className="text-lg font-bold text-foreground">{(serverTotals ? serverTotals.totalQtd : totalQtd).toFixed(1)}</p>
+          <p className="text-lg font-bold text-foreground">{formatFixedBR(serverTotals ? serverTotals.totalQtd : totalQtd, 1)}</p>
         </div>
         <div className="bg-card border border-border rounded-xl p-3 text-center">
           <div className="flex items-center justify-center gap-1.5 mb-1">
@@ -480,8 +480,8 @@ export default function MovimentacoesSection({
                           <>
                             <p className={`text-sm font-bold ${isCancelled ? 'text-muted-foreground' : direction === 'entradas' ? 'text-success' : 'text-destructive'}`}>
                               {showDual
-                                ? `${sign}${qtyPurchase.toFixed(1)} ${unCompra}`
-                                : `${sign}${m.quantidade} ${prod?.unidadeMedida || ''}`}
+                                ? `${sign}${formatFixedBR(qtyPurchase, 1)} ${unCompra}`
+                                : `${sign}${formatFixedBR(m.quantidade, 1)} ${prod?.unidadeMedida || ''}`}
                             </p>
                             {showDual && (
                               <p className="text-[9px] text-muted-foreground">({m.quantidade} {prod?.unidadeMedida})</p>
@@ -638,7 +638,7 @@ export default function MovimentacoesSection({
             <div className="space-y-3">
               <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-3 text-xs space-y-1">
                 <p className="font-medium text-foreground">{getProdNome(cancelMov.produtoId)}</p>
-                <p className="text-muted-foreground">{cancelMov.tipo} • {cancelMov.quantidade} • R$ {cancelMov.custoTotal.toFixed(2)}</p>
+                <p className="text-muted-foreground">{cancelMov.tipo} • {formatFixedBR(cancelMov.quantidade, 2)} • {fmtBRL(cancelMov.custoTotal)}</p>
                 <p className="text-destructive text-[10px]">⚠️ Será criado um lançamento de estorno inverso. O saldo retornará ao estado anterior.</p>
               </div>
               <div>

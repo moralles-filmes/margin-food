@@ -11,8 +11,7 @@ import { AlertTriangle, AlertCircle, RefreshCw, TrendingDown, DollarSign, Shield
 import { supabase } from '@/integrations/supabase/client';
 import EmptyState from '@/components/ui/EmptyState';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Cell, PieChart, Pie, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { fmtBRL, fmtBRLCompact } from '@/lib/money';
-import { formatFixedBR } from '@/lib/formatters';
+import { fmtBRL, fmtBRLCompact, formatFixedBR, formatPercentBR } from '@/lib/formatters';
 
 interface RankedItem {
   produto_id: string; nome_produto: string; categoria: string; unidade_medida: string;
@@ -319,7 +318,7 @@ export default function StockTopConsumedSection({ categorias }: { categorias: st
               return (
                 <ResponsiveContainer width="100%" height={260}>
                   <PieChart>
-                    <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} innerRadius={40} paddingAngle={2} label={({ name, percent }) => `${name.length > 12 ? name.slice(0, 12) + '…' : name} ${(percent * 100).toFixed(0)}%`} labelLine={false} className="text-[9px]">
+                    <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} innerRadius={40} paddingAngle={2} label={({ name, percent }) => `${name.length > 12 ? name.slice(0, 12) + '…' : name} ${formatPercentBR(percent * 100, 0)}`} labelLine={false} className="text-[9px]">
                       {pieData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
                     </Pie>
                     <Tooltip formatter={(v: number) => formatQty(v)} />
@@ -347,7 +346,7 @@ export default function StockTopConsumedSection({ categorias }: { categorias: st
               return (
                 <ResponsiveContainer width="100%" height={260}>
                   <PieChart>
-                    <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} innerRadius={40} paddingAngle={2} label={({ name, percent }) => `${name.length > 12 ? name.slice(0, 12) + '…' : name} ${(percent * 100).toFixed(0)}%`} labelLine={false} className="text-[9px]">
+                    <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} innerRadius={40} paddingAngle={2} label={({ name, percent }) => `${name.length > 12 ? name.slice(0, 12) + '…' : name} ${formatPercentBR(percent * 100, 0)}`} labelLine={false} className="text-[9px]">
                       {pieData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
                     </Pie>
                     <Tooltip formatter={(v: number) => formatQty(v)} />

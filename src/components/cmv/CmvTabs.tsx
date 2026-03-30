@@ -4,16 +4,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart as RPieChart, Pie, Cell } from 'recharts';
 import CmvRankingTable from './CmvRankingTable';
 import type { CmvResult, RankingItem } from './types';
-import { fmtBRL, fmtBRLRaw } from '@/lib/money';
+import { formatFixedBR, fmtBRL, formatPercentBR } from '@/lib/formatters';
 
 const COLORS = [
   'hsl(var(--primary))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))',
   'hsl(var(--chart-4))', 'hsl(var(--chart-5))', 'hsl(var(--accent))',
 ];
-import { formatFixedBR } from '@/lib/formatters';
 
 function fmt(v: number) {
-  return formatFixedBR(v, 2);
+  return fmtBRL(v);
 }
 
 interface CmvTabsProps {
@@ -46,7 +45,7 @@ export default function CmvTabs({ cmvData, visibleSubtabs, ranking, errorRanking
               {cmvData.cmvPorCategoria.length > 0 ? (
                 <ResponsiveContainer width="100%" height={250}>
                   <RPieChart>
-                    <Pie data={cmvData.cmvPorCategoria} dataKey="custo" nameKey="categoria" cx="50%" cy="50%" outerRadius={80} label={({ categoria, percentCmv }) => `${categoria} ${percentCmv}%`}>
+                    <Pie data={cmvData.cmvPorCategoria} dataKey="custo" nameKey="categoria" cx="50%" cy="50%" outerRadius={80} label={({ categoria, percentCmv }) => `${categoria} ${formatPercentBR(percentCmv)}`}>
                       {cmvData.cmvPorCategoria.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                     </Pie>
                     <Tooltip formatter={(v: number) => fmtBRL(v)} />
@@ -71,7 +70,7 @@ export default function CmvTabs({ cmvData, visibleSubtabs, ranking, errorRanking
                     <TableRow key={c.categoria}>
                       <TableCell className="text-sm">{c.categoria}</TableCell>
                       <TableCell className="text-right text-sm">{fmtBRL(c.custo)}</TableCell>
-                      <TableCell className="text-right text-sm font-medium">{c.percentCmv}%</TableCell>
+                      <TableCell className="text-right text-sm font-medium">{formatPercentBR(c.percentCmv)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -114,8 +113,7 @@ export default function CmvTabs({ cmvData, visibleSubtabs, ranking, errorRanking
                   {(cmvData.cmvPorSetor || []).map((s: any) => (
                     <TableRow key={s.setor}>
                       <TableCell className="text-sm font-medium">{s.setor}</TableCell>
-                      <TableCell className="text-right text-sm">R$ {fmt(s.custo)}</TableCell>
-                      <TableCell className="text-right text-sm font-medium">{s.percentCmv}%</TableCell>
+                      <TableCell className="text-right text-sm font-medium">{formatPercentBR(s.percentCmv)}</TableCell>
                     </TableRow>
                   ))}
                   {(cmvData.cmvPorSetor || []).length === 0 && (

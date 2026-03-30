@@ -10,8 +10,7 @@ import { DecimalInput, parseDecimal } from '@/components/ui/decimal-input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useModuleAccess } from '@/permissions/hooks';
 import { useCan } from '@/permissions/hooks';
-import { fmtBRL, formatNumberToBRL } from '@/lib/money';
-import { formatIntegerBR, formatPercentBR, formatFixedBR } from '@/lib/formatters';
+import { fmtBRL, formatPercentBR, formatFixedBR, formatIntegerBR, parseLocalDate } from '@/lib/formatters';
 
 function fmt(n: number) { return formatIntegerBR(n); }
 const fmtR$ = fmtBRL;
@@ -149,7 +148,7 @@ export default function RelatoriosView() {
         {visibleSubtabs.includes('cmv') && (
           <TabsContent value="cmv" className="space-y-4 mt-3">
             <div className="grid grid-cols-2 gap-2">
-              <KPICard label="🔥 CMV Geral" value={fmtPctNullable(data.cmvGeral)} sub={`Meta: ${data.metaCMV}%`} variant={data.cmvGeral != null && data.cmvGeral > data.metaCMV ? 'destructive' : 'success'} />
+              <KPICard label="🔥 CMV Geral" value={fmtPctNullable(data.cmvGeral)} sub={`Meta: ${formatPercentBR(data.metaCMV)}`} variant={data.cmvGeral != null && data.cmvGeral > data.metaCMV ? 'destructive' : 'success'} />
               <KPICard label="CMV Salmão" value={fmtPctNullable(data.cmvSalmao)} variant="salmon" />
               <KPICard label="Margem Bruta" value={fmtPctNullable(data.margemBruta)} variant="success" />
               <KPICard label="Impacto Salmão" value={fmtPctNullable(data.impactoSalmao)} sub="no CMV total" variant="gold" />
@@ -290,9 +289,9 @@ export default function RelatoriosView() {
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-[11px]">
                     <div><p className="text-[10px] text-muted-foreground">Ticket Médio</p><p className="font-bold text-foreground">{fmtR$(f.ticketMedio)}</p></div>
-                    <div><p className="text-[10px] text-muted-foreground">Freq. Semanal</p><p className="font-bold text-foreground">{f.freqSemanal.toFixed(1)}x</p></div>
+                    <div><p className="text-[10px] text-muted-foreground">Freq. Semanal</p><p className="font-bold text-foreground">{formatFixedBR(f.freqSemanal, 1)}x</p></div>
                     <div><p className="text-[10px] text-muted-foreground">Preço Médio/kg</p><p className="font-bold text-foreground">{fmtR$(f.precoMedio)}</p></div>
-                    <div><p className="text-[10px] text-muted-foreground">Variação Preço</p><p className={`font-bold ${Math.abs(f.variacaoPreco) > 10 ? 'text-destructive' : 'text-success'}`}>{fmtPct(f.variacaoPreco)}</p></div>
+                    <div><p className="text-[10px] text-muted-foreground">Variação Preço</p><p className={`font-bold ${Math.abs(f.variacaoPreco) > 10 ? 'text-destructive' : 'text-success'}`}>{formatPercentBR(f.variacaoPreco)}</p></div>
                     <div className="col-span-2"><p className="text-[10px] text-muted-foreground">Impacto Financeiro</p><p className="font-bold text-warning">{fmtR$(f.impactoFinanceiro)}</p></div>
                   </div>
                 </div>
@@ -345,7 +344,7 @@ export default function RelatoriosView() {
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                       <XAxis dataKey="semana" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} />
                       <YAxis tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} unit="%" />
-                      <Tooltip contentStyle={chartTooltipStyle} formatter={(v: unknown) => [safeFmt(v, n => `${n.toFixed(1)}%`), 'CMV']} />
+                      <Tooltip contentStyle={chartTooltipStyle} formatter={(v: unknown) => [safeFmt(v, n => formatPercentBR(n)), 'CMV']} />
                       <Line type="monotone" dataKey="cmv" stroke="hsl(var(--accent))" strokeWidth={2} dot={{ fill: 'hsl(var(--accent))', r: 4 }} />
                     </LineChart>
                   </ResponsiveContainer>
@@ -362,7 +361,7 @@ export default function RelatoriosView() {
                           <span className="text-muted-foreground">{fmtR$(c.anterior)}</span>
                           <span className="text-foreground font-bold">{fmtR$(c.atual)}</span>
                           <span className={`text-[10px] font-bold ${diff > 0 ? (c.label === 'Faturamento' ? 'text-success' : 'text-destructive') : (c.label === 'Faturamento' ? 'text-destructive' : 'text-success')}`}>
-                            {diff > 0 ? '↑' : '↓'} {Math.abs(diff).toFixed(0)}%
+                            {diff > 0 ? '↑' : '↓'} {formatPercentBR(Math.abs(diff))}
                           </span>
                         </div>
                       </div>
@@ -505,7 +504,7 @@ export default function RelatoriosView() {
                   </div>
                   {data.projecaoAlerta && (
                     <div className="bg-destructive/10 border border-destructive/30 rounded-lg px-3 py-2 mt-1">
-                      <p className="text-[11px] text-destructive font-medium">⚠️ Alerta estratégico: projeção de custo ultrapassa a meta de CMV de {data.metaCMV}%</p>
+                      <p className="text-[11px] text-destructive font-medium">⚠️ Alerta estratégico: projeção de custo ultrapassa a meta de CMV de {formatPercentBR(data.metaCMV)}</p>
                     </div>
                   )}
                 </div>

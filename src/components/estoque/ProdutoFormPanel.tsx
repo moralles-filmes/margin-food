@@ -13,7 +13,7 @@ import { BRLInput } from '@/components/ui/brl-input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { fmtBRL } from '@/lib/money';
+import { fmtBRL, formatFixedBR } from '@/lib/formatters';
 import { toast } from 'sonner';
 import { TenantError } from '@/lib/tenant';
 import type { Produto } from '@/types/salmon';
@@ -351,14 +351,14 @@ export default function ProdutoFormPanel({
                   <Label className="text-[11px] text-muted-foreground">Mínimo ({prodForm.unidadeCompra}) *</Label>
                   <BRLInput numericValue={prodForm.minPurchaseQty} onNumericChange={v => setProdForm(f => ({ ...f, minPurchaseQty: v }))} className="bg-secondary border-border text-foreground" />
                   {prodForm.minPurchaseQty > 0 && (
-                    <p className="text-[9px] text-muted-foreground mt-0.5">= {(prodForm.minPurchaseQty * prodForm.fatorConversaoPadrao).toFixed(1)} {prodForm.unidadeMedida}</p>
+                    <p className="text-[9px] text-muted-foreground mt-0.5">= {formatFixedBR(prodForm.minPurchaseQty * prodForm.fatorConversaoPadrao, 1)} {prodForm.unidadeMedida}</p>
                   )}
                 </div>
                 <div>
                   <Label className="text-[11px] text-muted-foreground">Ideal ({prodForm.unidadeCompra})</Label>
                   <BRLInput numericValue={prodForm.idealPurchaseQty} onNumericChange={v => setProdForm(f => ({ ...f, idealPurchaseQty: v }))} className="bg-secondary border-border text-foreground" />
                   {prodForm.idealPurchaseQty > 0 && (
-                    <p className="text-[9px] text-muted-foreground mt-0.5">= {(prodForm.idealPurchaseQty * prodForm.fatorConversaoPadrao).toFixed(1)} {prodForm.unidadeMedida}</p>
+                    <p className="text-[9px] text-muted-foreground mt-0.5">= {formatFixedBR(prodForm.idealPurchaseQty * prodForm.fatorConversaoPadrao, 1)} {prodForm.unidadeMedida}</p>
                   )}
                 </div>
               </>

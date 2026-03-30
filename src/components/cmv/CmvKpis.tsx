@@ -2,8 +2,7 @@ import {
   TrendingDown, TrendingUp, DollarSign, Calculator, Percent, PieChart, BarChart3,
 } from 'lucide-react';
 import type { CmvResult } from './types';
-import { fmtBRL } from '@/lib/money';
-import { formatPercentBR } from '@/lib/formatters';
+import { fmtBRL, formatPercentBR } from '@/lib/formatters';
 import KpiCard from '@/components/ui/KpiCard';
 import type { KpiVariant } from '@/components/ui/KpiCard';
 

@@ -12,7 +12,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { Upload, FileText, CheckCircle, XCircle, Save } from 'lucide-react';
-import { fmtBRL } from '@/lib/money';
+import { fmtBRL, formatDateBR, parseLocalDate } from '@/lib/formatters';
 
 interface LinhaExtrato {
   data: string;
@@ -268,7 +268,7 @@ export default function ImportacaoExtratoSection() {
                       onCheckedChange={(v) => setLinhas(prev => prev.map((l, j) => j === i ? { ...l, selecionada: !!v } : l))}
                     />
                   </TableCell>
-                  <TableCell className="font-mono text-sm">{linha.data}</TableCell>
+                  <TableCell className="font-mono text-sm">{formatDateBR(parseLocalDate(linha.data))}</TableCell>
                   <TableCell className="font-medium max-w-[250px] truncate">{linha.descricao}</TableCell>
                   <TableCell>
                     <Badge variant={linha.tipo === 'RECEITA' ? 'default' : 'destructive'}>{linha.tipo}</Badge>

@@ -11,7 +11,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useCan } from '@/permissions/hooks';
 import { toast } from 'sonner';
 import { RefreshCw, Repeat, Play, ExternalLink, ShieldX, Download, FileText } from 'lucide-react';
-import { fmtBRL } from '@/lib/money';
+import { fmtBRL, todayBR, formatInBR } from '@/lib/formatters';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import * as XLSX from 'xlsx';
 
 // ─── Types ───
@@ -111,14 +113,13 @@ export default function RecorrenciasSection({ onNavigate }: Props) {
 
   const now = new Date();
   const [mesAno, setMesAno] = useState(() => {
-    const br = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
-    return br.substring(0, 7);
+    return todayBR().substring(0, 7);
   });
 
   const monthOptions = Array.from({ length: 12 }, (_, i) => {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-    const label = d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+    const label = format(d, 'MMMM, yyyy', { locale: ptBR });
     return { value, label: label.charAt(0).toUpperCase() + label.slice(1) };
   });
 

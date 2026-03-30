@@ -1,6 +1,7 @@
 import { Lightbulb, Zap, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { SmartSuggestion } from '@/types/salmon';
+import { formatFixedBR } from '@/lib/formatters';
 
 interface Props {
   suggestion: SmartSuggestion | null;
@@ -36,15 +37,15 @@ export default function SmartSuggestionCard({ suggestion, onUseSuggestion }: Pro
       <div className="grid grid-cols-3 gap-3">
         <div className="text-center bg-secondary/50 rounded-lg p-2.5">
           <p className="text-[10px] text-muted-foreground">Kg limpo</p>
-          <p className="text-lg font-display font-bold text-success">{suggestion.kgLimpoSugerido}</p>
+          <p className="text-lg font-display font-bold text-success">{formatFixedBR(suggestion.kgLimpoSugerido, 1)}</p>
         </div>
         <div className="text-center bg-secondary/50 rounded-lg p-2.5">
           <p className="text-[10px] text-muted-foreground">Kg bruto</p>
-          <p className="text-lg font-display font-bold text-foreground">{suggestion.kgBrutoSugerido}</p>
+          <p className="text-lg font-display font-bold text-foreground">{formatFixedBR(suggestion.kgBrutoSugerido, 1)}</p>
         </div>
         <div className="text-center bg-secondary/50 rounded-lg p-2.5">
           <p className="text-[10px] text-muted-foreground">Peixes</p>
-          <p className="text-lg font-display font-bold text-primary">{suggestion.peixesSugeridos}</p>
+          <p className="text-lg font-display font-bold text-primary">{formatFixedBR(suggestion.peixesSugeridos, 1)}</p>
         </div>
       </div>
 
@@ -56,10 +57,10 @@ export default function SmartSuggestionCard({ suggestion, onUseSuggestion }: Pro
       {!suggestion.fallback && (
         <div className="flex gap-2 text-[10px]">
           {suggestion.fatorSemanaMes !== undefined && (
-            <span className="px-1.5 py-0.5 rounded bg-warning/10 text-warning">Fator semana: ×{suggestion.fatorSemanaMes.toFixed(2)}</span>
+            <span className="px-1.5 py-0.5 rounded bg-warning/10 text-warning">Fator semana: ×{formatFixedBR(suggestion.fatorSemanaMes, 2)}</span>
           )}
           {suggestion.ajustePressao !== undefined && (
-            <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary">Pressão: ×{suggestion.ajustePressao.toFixed(2)}</span>
+            <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary">Pressão: ×{formatFixedBR(suggestion.ajustePressao, 2)}</span>
           )}
           {suggestion.historicoBase !== undefined && (
             <span className="px-1.5 py-0.5 rounded bg-secondary text-muted-foreground">{suggestion.historicoBase} registros</span>

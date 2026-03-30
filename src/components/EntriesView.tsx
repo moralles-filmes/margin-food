@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useCan } from '@/permissions/hooks';
-import { normalizeBRLMoneyToNumber } from '@/lib/money';
 import { useSalmonStore } from '@/hooks/useSalmonStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,8 +13,7 @@ import { useMetaMensal, getMetaStatus, calcProjecao } from './MetaCompraCard';
 import { calcWeeklyIdeal, getWeekForDay } from './WeeklyBreakdown';
 import PurchaseRadar from './PurchaseRadar';
 import SimuladorCompra from './SimuladorCompra';
-import { todayBR, formatInBR, formatDisplayBR } from '@/lib/datetime';
-import { parseLocalDate } from '@/lib/dateUtils';
+import { todayBR, formatInBR, formatDateBR, fmtBRL, formatFixedBR, formatDecimalBR, normalizeBRLMoneyToNumber, parseLocalDate } from '@/lib/formatters';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,8 +25,6 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
-import { fmtBRL, formatNumberToBRL } from '@/lib/money';
-import { formatDecimalBR } from '@/lib/formatters';
 const fmtR = (v: number) => fmtBRL(v);
 
 interface EntriesViewProps {
@@ -128,7 +124,7 @@ export default function EntriesView({ store }: EntriesViewProps) {
           overrideMotivo: auditOverride?.motivo || '',
           createdBy: 'Operador',
           overrideUser: isOverride ? 'Operador' : '',
-          overrideAt: isOverride ? todayBR() + 'T00:00:00Z' : '', // local-only audit timestamp
+          overrideAt: isOverride ? todayBR() + 'T00:00:00Z' : '',
         });
       }
     }
@@ -292,7 +288,7 @@ export default function EntriesView({ store }: EntriesViewProps) {
             <div>
               <Label className="text-[11px] text-muted-foreground">Lote</Label>
               <Input value={form.lot} onChange={e => setForm(f => ({ ...f, lot: e.target.value }))} list="lots" placeholder="Lote" className="bg-secondary border-border text-foreground" />
-              <datalist id="lots">{lots.map(l => <option key={l} value={l} />)}</datalist>
+              <datalist id="lots">{lots.map(l => <option key={l} value={String(l)} />)}</datalist>
             </div>
             <div>
               <Label className="text-[11px] text-muted-foreground">SIF</Label>
@@ -357,8 +353,8 @@ export default function EntriesView({ store }: EntriesViewProps) {
                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-secondary text-muted-foreground">{entry.lot}</span>
                 </div>
                 <div className="flex items-center gap-3 mt-1">
-                  <span className="text-xs text-muted-foreground">{formatDisplayBR(parseLocalDate(entry.date))}</span>
-                  <span className="text-xs text-primary font-medium">{entry.grossKg} kg</span>
+                  <span className="text-xs text-muted-foreground">{formatDateBR(parseLocalDate(entry.date))}</span>
+                  <span className="text-xs text-primary font-medium">{formatFixedBR(entry.grossKg, 1)} kg</span>
                   <span className="text-xs text-warning font-medium">{fmtBRL(entry.totalValue)}</span>
                 </div>
               </div>
@@ -368,9 +364,9 @@ export default function EntriesView({ store }: EntriesViewProps) {
               <div className="px-3 pb-3 border-t border-border/50 pt-2 space-y-2 animate-scale-in">
                 <div className="grid grid-cols-3 gap-2 text-[11px]">
                   <div><span className="text-muted-foreground">SIF:</span> <span className="text-foreground">{entry.sif || '—'}</span></div>
-                  <div><span className="text-muted-foreground">Caixas:</span> <span className="text-foreground">{entry.boxes}</span></div>
-                  <div><span className="text-muted-foreground">Peixes:</span> <span className="text-foreground">{entry.units}</span></div>
-                  <div><span className="text-muted-foreground">R$/kg:</span> <span className="text-primary">{formatDecimalBR(entry.pricePerKg || (entry.totalValue / entry.grossKg), 2)}</span></div>
+                  <div><span className="text-muted-foreground">Caixas:</span> <span className="text-foreground">{formatFixedBR(entry.boxes, 0)}</span></div>
+                  <div><span className="text-muted-foreground">Peixes:</span> <span className="text-foreground">{formatFixedBR(entry.units, 0)}</span></div>
+                  <div><span className="text-muted-foreground">R$/kg:</span> <span className="text-primary">{fmtBRL(entry.pricePerKg || (entry.totalValue / entry.grossKg))}</span></div>
                 </div>
                 {entry.notes && <p className="text-[11px] text-muted-foreground italic">{entry.notes}</p>}
                 <div className="flex gap-2 pt-1">

@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Plus, Edit, Trash2, X } from 'lucide-react';
 import { useFormDirtyGuard } from '@/hooks/useFormDirtyGuard';
 import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
+import TableActions from '@/components/ui/TableActions';
 
 interface CategoriaRow {
   id: string;
@@ -21,6 +22,7 @@ interface CategoriaRow {
   grupo: string | null;
   linha_dre: string | null;
   centro_custo_padrao_id: string | null;
+  updated_at: string;
 }
 
 interface CentroRef {
@@ -41,6 +43,7 @@ export default function CategoriasFinSection({ canCreate, canEdit, canDelete }: 
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
+  const [editUpdatedAt, setEditUpdatedAt] = useState<string | null>(null);
   const [form, setForm] = useState({ nome: '', tipo: 'despesa', grupo: '', linha_dre: '', centro_custo_padrao_id: '' });
 
   useEffect(() => { load(); }, []);
@@ -48,7 +51,7 @@ export default function CategoriasFinSection({ canCreate, canEdit, canDelete }: 
   const load = async () => {
     setLoading(true);
     const [catRes, ccRes] = await Promise.all([
-      supabase.from('fin_categorias').select('id, nome, tipo, grupo, linha_dre, centro_custo_padrao_id').eq('ativo', true).order('nome'),
+      supabase.from('fin_categorias').select('id, nome, tipo, grupo, linha_dre, centro_custo_padrao_id, updated_at').eq('ativo', true).order('nome'),
       supabase.from('fin_centros_custo').select('id, nome').eq('ativo', true).order('nome'),
     ]);
     setItems((catRes.data || []) as CategoriaRow[]);
@@ -58,12 +61,14 @@ export default function CategoriasFinSection({ canCreate, canEdit, canDelete }: 
 
   const openEdit = (item: CategoriaRow) => {
     setEditId(item.id);
+    setEditUpdatedAt(item.updated_at);
     setForm({ nome: item.nome, tipo: item.tipo, grupo: item.grupo || '', linha_dre: item.linha_dre || '', centro_custo_padrao_id: item.centro_custo_padrao_id || '' });
     setShowForm(true);
   };
 
   const handleCloseForm = () => {
     setEditId(null);
+    setEditUpdatedAt(null);
     setForm({ nome: '', tipo: 'despesa', grupo: '', linha_dre: '', centro_custo_padrao_id: '' });
     setShowForm(false);
   };
@@ -73,7 +78,15 @@ export default function CategoriasFinSection({ canCreate, canEdit, canDelete }: 
     if (!form.nome.trim()) { toast.error('Nome obrigatório'); return; }
     const payload = { ...form, centro_custo_padrao_id: form.centro_custo_padrao_id || null };
     if (editId) {
-      const { error } = await supabase.from('fin_categorias').update(payload).eq('id', editId);
+      const { error } = await (supabase.rpc as any)('_guarded_update_categoria', {
+        p_id: editId,
+        p_nome: form.nome,
+        p_tipo: form.tipo,
+        p_grupo: form.grupo || '',
+        p_linha_dre: form.linha_dre || '',
+        p_centro_custo_padrao_id: form.centro_custo_padrao_id || null,
+        p_expected_updated_at: editUpdatedAt
+      });
       if (error) { toast.error(error.message); return; }
       toast.success('Categoria atualizada');
     } else {
@@ -87,7 +100,7 @@ export default function CategoriasFinSection({ canCreate, canEdit, canDelete }: 
   };
 
   const remove = async (id: string) => {
-    const { error } = await supabase.from('fin_categorias').update({ ativo: false }).eq('id', id);
+    const { error } = await (supabase.rpc as any)('_guarded_delete_categoria', { p_id: id });
     if (error) { toast.error(error.message); return; }
     toast.success('Categoria removida');
     load();
@@ -160,10 +173,14 @@ export default function CategoriasFinSection({ canCreate, canEdit, canDelete }: 
               <TableCell className="text-muted-foreground">{item.linha_dre || '—'}</TableCell>
               <TableCell className="text-muted-foreground text-xs">{item.centro_custo_padrao_id ? centroNome(item.centro_custo_padrao_id) : '—'}</TableCell>
               <TableCell>
-                 <div className="flex gap-1">
-                   {canEdit && <Button size="icon" variant="ghost" onClick={() => openEdit(item)}><Edit className="w-4 h-4" /></Button>}
-                   {canDelete && <Button size="icon" variant="ghost" onClick={() => remove(item.id)}><Trash2 className="w-4 h-4 text-destructive" /></Button>}
-                 </div>
+                <TableActions
+                  canEditOverride={canEdit}
+                  canDeleteOverride={canDelete}
+                  onEdit={() => openEdit(item)}
+                  onDelete={() => remove(item.id)}
+                  deleteConfirmTitle="Remover Categoria"
+                  deleteConfirmDescription={`Tem certeza que deseja remover a categoria "${item.nome}"?`}
+                />
               </TableCell>
             </TableRow>
           ))}

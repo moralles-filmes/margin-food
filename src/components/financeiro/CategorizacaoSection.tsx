@@ -13,7 +13,7 @@ import { useCan } from '@/permissions';
 import { emitDataEvent, useDataEvent } from '@/lib/dataEvents';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { toast } from 'sonner';
-import { fmtBRL } from '@/lib/money';
+import { fmtBRL, formatDateBR, parseLocalDate } from '@/lib/formatters';
 import { Plus, Edit, Trash2, Tag, Zap, FileWarning, ShieldX, Search, RefreshCw, X } from 'lucide-react';
 import { useFormDirtyGuard } from '@/hooks/useFormDirtyGuard';
 import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';

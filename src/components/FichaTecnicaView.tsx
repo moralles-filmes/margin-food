@@ -26,9 +26,10 @@ import {
 } from 'lucide-react';
 import SubTabBadge from '@/components/ui/SubTabBadge';
 
-import { fmtBRL, formatPercentBR } from '@/lib/formatters';
+import { fmtBRL, formatPercentBR, formatFixedBR } from '@/lib/formatters';
 const R$ = (v: number) => fmtBRL(v);
 const pct = (v: number) => formatPercentBR(v);
+const qty = (v: number, d = 1) => formatFixedBR(v, d);
 
 type ComponenteTipo = 'PRE_PREPARO' | 'ITEM_PRONTO' | 'PRODUTO_FINAL';
 
@@ -303,7 +304,7 @@ export default function FichaTecnicaView({ lotesLimpos = [] }: { lotesLimpos?: L
       const latestLot = lotesLimpos
         .filter(l => l.kgRestante > 0 && l.status !== 'VENCIDO')
         .sort((a, b) => b.dataManipulacao.localeCompare(a.dataManipulacao))[0];
-      const info = latestLot ? `Lote de ${latestLot.dataManipulacao} — R$${localSalmonCost.toFixed(2)}/kg limpo` : '';
+      const info = latestLot ? `Lote de ${latestLot.dataManipulacao} — ${R$(localSalmonCost)}/kg limpo` : '';
       invokeApi('sync_preco_salmao_auto', { preco_kg_limpo: localSalmonCost, lote_info: info })
         .then(() => setSalmonRef(prev => ({ ...prev, preco: localSalmonCost, preco_auto: localSalmonCost, origem: 'lote_recente', info })))
         .catch(() => {}); // silent
@@ -859,7 +860,7 @@ function ComponenteFormDialog({ open, onClose, componente, forcedTipo, component
                                 const kg = grams / 1000;
                                 setBomItens(prev => prev.map((it, i) => i === idx ? { ...it, quantidade: kg, quantidade_original: grams, unidade_original: 'g' } : it));
                               }} />
-                            <span className="text-[10px] text-muted-foreground">g = {(item.quantidade || 0).toFixed(3)}kg</span>
+                            <span className="text-[10px] text-muted-foreground">g = {qty(item.quantidade || 0, 3)}kg</span>
                           </div>
                         ) : (
                           <DecimalInput className="w-20 h-7 text-xs text-right" value={String(item.quantidade)}
@@ -994,7 +995,7 @@ function DetalheDialog({ open, onClose, componente, itens, custo }: {
               <p className="text-[10px] text-muted-foreground">Custo total</p>
             </div>
             <div className="bg-muted/50 rounded-lg p-3 text-center">
-              <p className="text-lg font-bold text-foreground">{rendLiq.toFixed(1)} {componente.unidade_rendimento}</p>
+              <p className="text-lg font-bold text-foreground">{qty(rendLiq, 1)} {componente.unidade_rendimento}</p>
               <p className="text-[10px] text-muted-foreground">Rendimento líq.</p>
             </div>
           </div>
@@ -1139,7 +1140,7 @@ function PrecificacaoDialog({ open, onClose, componente, canais, onSaved }: {
                     <TableCell className={`text-xs text-right font-medium ${a.lucroBruto < 0 ? 'text-destructive' : ''}`}>{R$(a.lucroBruto)}</TableCell>
                     <TableCell className={`text-xs text-right ${a.margemLiquida < 0 ? 'text-destructive' : ''}`}>{pct(a.margemLiquida)}</TableCell>
                     <TableCell className="text-xs text-right">{pct(a.cmvPercent)}</TableCell>
-                    <TableCell className="text-xs text-right">{a.markup.toFixed(2)}x</TableCell>
+                    <TableCell className="text-xs text-right">{qty(a.markup, 2)}x</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

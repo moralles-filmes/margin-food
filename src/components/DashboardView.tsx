@@ -7,11 +7,8 @@ import { eachWeekOfInterval, endOfWeek } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { TabId } from '@/types/salmon';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { todayBR, formatInBR, formatFixedBR, fmtBRL, formatPercentBR, formatIntegerBR, formatDecimalBR } from '@/lib/formatters';
 import ValidadeAlertCard from './ValidadeAlertCard';
-import { todayBR, formatInBR } from '@/lib/datetime';
-import { parseLocalDate } from '@/lib/dateUtils';
-import { fmtBRL } from '@/lib/money';
-import { formatDecimalBR, formatPercentBR, formatIntegerBR } from '@/lib/formatters';
 import KpiCard from '@/components/ui/KpiCard';
 import type { KpiVariant } from '@/components/ui/KpiCard';
 
@@ -114,15 +111,15 @@ export default function DashboardView({ store, onNavigate }: DashboardViewProps)
       {(dash.lowGross || dash.lowClean) && (
         <div className="bg-destructive/10 border border-destructive/30 rounded-xl p-3 animate-scale-in">
           <p className="text-xs font-semibold text-destructive">⚠️ Estoque Baixo!</p>
-          {dash.lowGross && <p className="text-[11px] text-destructive/80 mt-1">Bruto: {dash.saldoBrutoKg.toFixed(1)} kg (mín: {dash.minGrossKg} kg)</p>}
-          {dash.lowClean && <p className="text-[11px] text-destructive/80 mt-0.5">Limpo: {dash.estoqueLimpoKg.toFixed(1)} kg (mín: {dash.minCleanKg} kg)</p>}
+          {dash.lowGross && <p className="text-[11px] text-destructive/80 mt-1">Bruto: {formatFixedBR(dash.saldoBrutoKg, 1)} kg (mín: {dash.minGrossKg} kg)</p>}
+          {dash.lowClean && <p className="text-[11px] text-destructive/80 mt-0.5">Limpo: {formatFixedBR(dash.estoqueLimpoKg, 1)} kg (mín: {dash.minCleanKg} kg)</p>}
         </div>
       )}
 
       {dash.daysRemaining > 0 && dash.daysRemaining < 7 && (
         <div className="bg-warning/10 border border-warning/30 rounded-xl p-3 animate-scale-in">
           <p className="text-xs font-semibold text-warning">📈 Previsão de Compra</p>
-          <p className="text-[11px] text-muted-foreground mt-1">Estoque acaba em ~{dash.daysRemaining} dias • Consumo: {dash.avgDailyConsumptionKg.toFixed(1)} kg/dia</p>
+          <p className="text-[11px] text-muted-foreground mt-1">Estoque acaba em ~{dash.daysRemaining} dias • Consumo: {formatFixedBR(dash.avgDailyConsumptionKg, 1)} kg/dia</p>
         </div>
       )}
 
@@ -137,7 +134,7 @@ export default function DashboardView({ store, onNavigate }: DashboardViewProps)
         <div className="grid grid-cols-3 gap-3">
           <div>
             <p className="text-[10px] text-muted-foreground">Disponível</p>
-            <p className="text-lg font-display font-bold text-success">{dash.estoqueLimpoKg.toFixed(1)} kg</p>
+            <p className="text-lg font-display font-bold text-success">{formatFixedBR(dash.estoqueLimpoKg, 1)} kg</p>
           </div>
           <div>
             <p className="text-[10px] text-muted-foreground">Lotes ativos</p>
@@ -146,9 +143,9 @@ export default function DashboardView({ store, onNavigate }: DashboardViewProps)
           <div>
             <p className="text-[10px] text-muted-foreground">Em risco</p>
             <p className={`text-lg font-display font-bold ${emRisco.length > 0 ? 'text-destructive' : 'text-success'}`}>
-              {kgEmRisco.toFixed(1)} kg
+              {formatFixedBR(kgEmRisco, 1)} kg
             </p>
-            {valorEmRisco > 0 && <p className="text-[10px] text-destructive">R$ {valorEmRisco.toFixed(0)}</p>}
+            {valorEmRisco > 0 && <p className="text-[10px] text-destructive">{fmtBRL(valorEmRisco)}</p>}
           </div>
         </div>
       </div>
@@ -161,10 +158,10 @@ export default function DashboardView({ store, onNavigate }: DashboardViewProps)
           </p>
           <div className="grid grid-cols-4 gap-2 text-[11px]">
             <div><p className="text-[10px] text-muted-foreground">Meta</p><p className="font-bold text-foreground">{metaProv.metaGramasPorCliente}g</p></div>
-            <div><p className="text-[10px] text-muted-foreground">Realizado</p><p className="font-bold text-foreground">{realGramasCliente.toFixed(0)}g</p></div>
+            <div><p className="text-[10px] text-muted-foreground">Realizado</p><p className="font-bold text-foreground">{formatFixedBR(realGramasCliente, 0)}g</p></div>
             <div><p className="text-[10px] text-muted-foreground">Diferença</p>
               <p className={`font-bold ${realGramasCliente > metaProv.metaGramasPorCliente * 1.1 ? 'text-destructive' : 'text-success'}`}>
-                {(realGramasCliente - metaProv.metaGramasPorCliente).toFixed(0)}g
+                {formatFixedBR(realGramasCliente - metaProv.metaGramasPorCliente, 0)}g
               </p>
             </div>
             <div><p className="text-[10px] text-muted-foreground">Status</p>
@@ -211,7 +208,7 @@ export default function DashboardView({ store, onNavigate }: DashboardViewProps)
             </div>
             <div className="grid grid-cols-2 gap-3 text-[11px]">
               <div><p className="text-[10px] text-muted-foreground">Overrides</p><p className="text-base font-display font-bold text-destructive">{overrides.length}</p></div>
-              <div><p className="text-[10px] text-muted-foreground">Valor total</p><p className="text-base font-display font-bold text-foreground">R$ {overrides.reduce((s, a) => s + a.valorTotal, 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</p></div>
+              <div><p className="text-[10px] text-muted-foreground">Valor total</p><p className="text-base font-display font-bold text-foreground">{fmtBRL(overrides.reduce((s, a) => s + a.valorTotal, 0))}</p></div>
             </div>
           </div>
         );
@@ -232,7 +229,7 @@ export default function DashboardView({ store, onNavigate }: DashboardViewProps)
                   <span className="text-foreground font-medium">{lot.lot || '—'}</span>
                   <span className="text-muted-foreground">{lot.supplier}</span>
                 </div>
-                <span className="text-primary font-bold">{lot.balance_kg.toFixed(1)} kg</span>
+                <span className="text-primary font-bold">{formatFixedBR(lot.balance_kg, 1)} kg</span>
               </div>
             ))}
           </div>
@@ -245,7 +242,7 @@ export default function DashboardView({ store, onNavigate }: DashboardViewProps)
                     <span className="text-foreground font-medium">{lot.lot || '—'}</span>
                     <span className="text-destructive text-[10px]">{lot.days_since_movement}d parado</span>
                   </div>
-                  <span className="text-muted-foreground">{lot.balance_kg.toFixed(1)} kg</span>
+                  <span className="text-muted-foreground">{formatFixedBR(lot.balance_kg, 1)} kg</span>
                 </div>
               ))}
             </div>
@@ -261,7 +258,7 @@ export default function DashboardView({ store, onNavigate }: DashboardViewProps)
         <div className="grid grid-cols-2 gap-3">
           <div><p className="text-[10px] text-muted-foreground">Custo médio/kg bruto</p><p className="text-lg font-display font-bold text-foreground">{fmtBRL(dash.avgCostPerKg)}</p></div>
           <div><p className="text-[10px] text-muted-foreground">Custo médio/kg limpo</p><p className="text-lg font-display font-bold text-warning">{fmtBRL(dash.custoMedioKgLimpo)}</p></div>
-          <div><p className="text-[10px] text-muted-foreground">CMV Salmão (%)</p><p className={`text-lg font-display font-bold ${cmv > 35 ? 'text-destructive' : 'text-success'}`}>{cmv.toFixed(1)}%</p></div>
+          <div><p className="text-[10px] text-muted-foreground">CMV Salmão (%)</p><p className={`text-lg font-display font-bold ${cmv > 35 ? 'text-destructive' : 'text-success'}`}>{formatPercentBR(cmv)}</p></div>
           <div><p className="text-[10px] text-muted-foreground">Custo total período</p><p className="text-lg font-display font-bold text-foreground">{fmtBRL(dash.totalValue)}</p></div>
         </div>
       </div>
@@ -273,9 +270,9 @@ export default function DashboardView({ store, onNavigate }: DashboardViewProps)
             <TrendingDown className="w-3.5 h-3.5 text-destructive" /> Perdas no Período
           </p>
           <div className="grid grid-cols-2 gap-3">
-            <div><p className="text-[10px] text-muted-foreground">Perda total (kg)</p><p className="text-lg font-display font-bold text-destructive">{dash.perdaKg.toFixed(1)} kg</p></div>
+            <div><p className="text-[10px] text-muted-foreground">Perda total (kg)</p><p className="text-lg font-display font-bold text-destructive">{formatFixedBR(dash.perdaKg, 1)} kg</p></div>
             <div><p className="text-[10px] text-muted-foreground">Perda total (R$)</p><p className="text-lg font-display font-bold text-destructive">{fmtBRL(dash.perdaValor)}</p></div>
-            <div><p className="text-[10px] text-muted-foreground">Aproveitamento médio</p><p className="text-lg font-display font-bold text-success">{dash.avgYieldPercent.toFixed(1)}%</p></div>
+            <div><p className="text-[10px] text-muted-foreground">Aproveitamento médio</p><p className="text-lg font-display font-bold text-success">{formatPercentBR(dash.avgYieldPercent)}</p></div>
             <div><p className="text-[10px] text-muted-foreground">Custo perdido no mês</p><p className="text-lg font-display font-bold text-destructive">{fmtBRL(monthLossValue)}</p></div>
           </div>
           {weeklyLossData.length > 0 && (
@@ -302,10 +299,10 @@ export default function DashboardView({ store, onNavigate }: DashboardViewProps)
             <Clock className="w-3.5 h-3.5 text-destructive" /> Risco Financeiro (Validade)
           </p>
           <div className="grid grid-cols-2 gap-3">
-            <div><p className="text-[10px] text-muted-foreground">Kg vencido</p><p className="text-lg font-display font-bold text-destructive">{vencidos.reduce((s, l) => s + l.kgRestante, 0).toFixed(1)} kg</p></div>
-            <div><p className="text-[10px] text-muted-foreground">Kg vencendo</p><p className="text-lg font-display font-bold text-warning">{venceHoje.reduce((s, l) => s + l.kgRestante, 0).toFixed(1)} kg</p></div>
-            <div><p className="text-[10px] text-muted-foreground">R$ em risco</p><p className="text-lg font-display font-bold text-destructive">R$ {valorEmRisco.toFixed(2)}</p></div>
-            <div><p className="text-[10px] text-muted-foreground">% estoque em risco</p><p className="text-lg font-display font-bold text-destructive">{dash.estoqueLimpoKg > 0 ? ((kgEmRisco / dash.estoqueLimpoKg) * 100).toFixed(0) : 0}%</p></div>
+            <div><p className="text-[10px] text-muted-foreground">Kg vencido</p><p className="text-lg font-display font-bold text-destructive">{formatFixedBR(vencidos.reduce((s, l) => s + l.kgRestante, 0), 1)} kg</p></div>
+            <div><p className="text-[10px] text-muted-foreground">Kg vencendo</p><p className="text-lg font-display font-bold text-warning">{formatFixedBR(venceHoje.reduce((s, l) => s + l.kgRestante, 0), 1)} kg</p></div>
+            <div><p className="text-[10px] text-muted-foreground">R$ em risco</p><p className="text-lg font-display font-bold text-destructive">{fmtBRL(valorEmRisco)}</p></div>
+            <div><p className="text-[10px] text-muted-foreground">% estoque em risco</p><p className="text-lg font-display font-bold text-destructive">{dash.estoqueLimpoKg > 0 ? formatPercentBR((kgEmRisco / dash.estoqueLimpoKg) * 100) : formatPercentBR(0)}</p></div>
           </div>
         </div>
       )}

@@ -10,8 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
 import { useCan } from '@/permissions/hooks';
 import { toast } from 'sonner';
-import { formatDateBR } from '@/lib/datetime';
-import { fmtBRL } from '@/lib/money';
+import { formatDateBR, todayBR, fmtBRL, formatPercentBR } from '@/lib/formatters';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -72,7 +71,7 @@ function DeltaBadge({ current, previous, invert = false }: { current: number; pr
       !isPositive && !isNegative && 'text-muted-foreground bg-muted'
     )}>
       <Icon className="w-2.5 h-2.5" />
-      {Math.abs(pct).toFixed(1)}%
+      {formatPercentBR(Math.abs(pct), 1)}
     </span>
   );
 }
@@ -96,15 +95,14 @@ export default function DashboardFinanceiroSection({ onNavigate }: { onNavigate?
 
   const now = new Date();
   const [mesAno, setMesAno] = useState(() => {
-    const br = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
-    return br.substring(0, 7);
+    return todayBR().substring(0, 7);
   });
   const [selectedDate, setSelectedDate] = useState<Date>(now);
 
   const monthOptions = Array.from({ length: 12 }, (_, i) => {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-    const label = d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+    const label = format(d, 'MMMM, yyyy', { locale: ptBR });
     return { value, label: label.charAt(0).toUpperCase() + label.slice(1) };
   });
 

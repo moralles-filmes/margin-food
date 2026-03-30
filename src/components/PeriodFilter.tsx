@@ -3,8 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Calendar, ChevronDown } from 'lucide-react';
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
-import { formatDisplayBR, formatInBR, todayBR } from '@/lib/datetime';
-import { parseLocalDate } from '@/lib/dateUtils';
+import { todayBR, formatInBR, formatDateBR, parseLocalDate } from '@/lib/formatters';
 
 export type PeriodType = 'day' | 'week' | 'month' | 'year' | 'custom';
 
@@ -34,7 +33,7 @@ function getRange(type: PeriodType, customStart?: Date, customEnd?: Date): Perio
       return { 
         start: customStart || startOfMonth(now), 
         end: customEnd || endOfDay(now), 
-        label: `${formatDisplayBR(customStart || now)} - ${formatDisplayBR(customEnd || now)}` 
+        label: `${formatDateBR(customStart || now)} - ${formatDateBR(customEnd || now)}` 
       };
   }
 }
@@ -122,7 +121,7 @@ export default function PeriodFilter({ onChange, current }: PeriodFilterProps) {
 
       <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
         <Calendar className="w-3 h-3" />
-        <span>{formatDisplayBR(current.start)} a {formatDisplayBR(current.end)}</span>
+        <span>{formatDateBR(current.start)} — {formatDateBR(current.end)}</span>
       </div>
     </div>
   );

@@ -8,8 +8,7 @@ import { CurrencyInput } from '@/components/ui/brl-input';
 import { DollarSign, Settings2, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
 import { startOfMonth, endOfMonth, getDaysInMonth } from 'date-fns';
 import { getWeeksOfMonth } from './WeeklyBreakdown';
-import { parseLocalDate } from '@/lib/dateUtils';
-import { formatDateBR, formatInBR } from '@/lib/datetime';
+import { formatDateBR, formatInBR, fmtBRL, formatPercentBR, parseLocalDate } from '@/lib/formatters';
 
 export function getMetaStatus(percent: number, amarelo: number, vermelho: number) {
   if (percent >= vermelho) return 'estourado';
@@ -134,7 +133,6 @@ interface MetaCompraCardProps {
   spendLoading?: boolean;
 }
 
-import { fmtBRL, formatPercentBR } from '@/lib/formatters';
 const fmtR = (v: number) => fmtBRL(v);
 
 export default function MetaCompraCard({ entries, metas, onSaveMeta, targetMonth, compact, periodIsMonth = true, categoria = 'salmao', canManage = true, saving = false, serverGasto, spendLoading }: MetaCompraCardProps) {

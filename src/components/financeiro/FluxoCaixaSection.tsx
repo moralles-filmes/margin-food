@@ -10,8 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { DollarSign, TrendingUp, TrendingDown, Activity, FileDown, Ban } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { gerarPDFFluxoCaixa } from '@/lib/pdfFinanceiro';
-import { formatDateBR } from '@/lib/datetime';
-import { fmtBRL } from '@/lib/formatters';
+import { fmtBRL, formatDateBR, parseLocalDate } from '@/lib/formatters';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 
@@ -50,11 +49,6 @@ const origemBadge: Record<string, { text: string; cls: string }> = {
   conta_receber: { text: 'Conta a Receber', cls: 'bg-success/10 text-success border-success/20' },
 };
 
-function fmtDateBR(d: string) {
-  if (!d) return '—';
-  const [y, m, day] = d.split('-');
-  return `${day}/${m}/${y}`;
-}
 
 function SkeletonRows() {
   return (<>{Array.from({ length: 6 }).map((_, i) => (
@@ -134,7 +128,7 @@ export default function FluxoCaixaSection() {
 
   const exportExcel = () => {
     const rows = filteredFluxo.map(d => ({
-      Data: fmtDateBR(d.data),
+      Data: formatDateBR(parseLocalDate(d.data)),
       Entradas: d.entradas,
       Saídas: d.saidas,
       'Prev. Entradas': d.prev_entradas,
@@ -236,7 +230,7 @@ export default function FluxoCaixaSection() {
                 <TableRow className="cursor-pointer hover:bg-muted/60" onClick={() => toggleExpand(d.data)}>
                   <TableCell className="font-mono text-sm">
                     <span className="mr-1 text-muted-foreground">{isExpanded ? '▾' : '▸'}</span>
-                    {fmtDateBR(d.data)}
+                    {formatDateBR(parseLocalDate(d.data))}
                   </TableCell>
                   {modo !== 'previsto' && <TableCell className="text-right text-success">{d.entradas > 0 ? fmt(d.entradas) : '—'}</TableCell>}
                   {modo !== 'previsto' && <TableCell className="text-right text-destructive">{d.saidas > 0 ? fmt(d.saidas) : '—'}</TableCell>}

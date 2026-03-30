@@ -7,7 +7,17 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useCan, useModuleAccess } from '@/permissions/hooks';
 import { toast } from 'sonner';
-import { fmtBRL } from '@/lib/formatters';
+import { formatFixedBR, fmtBRL, formatPercentBR, formatDateBR, formatInBR, todayBR, parseLocalDate } from '@/lib/formatters';
+
+const COLORS = [
+  'hsl(var(--primary))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))',
+  'hsl(var(--chart-4))', 'hsl(var(--chart-5))', 'hsl(var(--accent))',
+];
+
+function fmt(v: number) {
+  return fmtBRL(v);
+}
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -29,7 +39,6 @@ import {
 import { format, differenceInMinutes, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-import { todayBR, formatDateBR, formatInBR } from '@/lib/datetime';
 import EscalasSection from '@/components/rh/EscalasSection';
 import TarefasSection from '@/components/rh/TarefasSection';
 import OnboardingSection from '@/components/rh/OnboardingSection';
@@ -702,7 +711,7 @@ function RhViewInner({ visibleSubtabs, user }: {
               <PopoverTrigger asChild>
                 <Button variant="outline" size="sm" className="h-8 text-xs gap-1">
                   <CalendarIcon className="w-3.5 h-3.5" />
-                  {format(pontoDate, 'dd/MM/yyyy', { locale: ptBR })}
+                  {formatDateBR(pontoDate)}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
@@ -714,7 +723,7 @@ function RhViewInner({ visibleSubtabs, user }: {
           {/* Ponto table */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Registros — {format(pontoDate, 'dd/MM/yyyy', { locale: ptBR })}</CardTitle>
+              <CardTitle className="text-sm">Registros — {formatDateBR(pontoDate)}</CardTitle>
             </CardHeader>
             <CardContent>
               {pontos.length === 0 ? (

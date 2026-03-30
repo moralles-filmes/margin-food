@@ -3,7 +3,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { subMonths, endOfMonth } from 'date-fns';
-import { formatInBR, formatDateBR } from '@/lib/datetime';
+import { formatInBR, formatDateBR } from '@/lib/formatters';
 import { FileDown, FileSpreadsheet, ShieldAlert } from 'lucide-react';
 import { exportDemonstrativoPDF, exportDemonstrativoExcel } from '@/lib/exportDemonstrativo';
 import { useDataEvent } from '@/lib/dataEvents';
@@ -79,7 +79,8 @@ export default function DRESection() {
 
   const formatMonthLabel = (value: string) => {
     const d = new Date(value + '-01');
-    return new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(d);
+    const label = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(d);
+    return label.charAt(0).toUpperCase() + label.slice(1);
   };
 
   const exportOpts = {

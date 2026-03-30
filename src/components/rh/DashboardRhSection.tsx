@@ -14,6 +14,21 @@ import { cn } from '@/lib/utils';
 import { formatFixedBR, fmtBRL, formatPercentBR } from '@/lib/formatters';
 import GlobalKpiCard from '@/components/ui/KpiCard';
 
+const COLORS = [
+  'hsl(var(--primary))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))',
+  'hsl(var(--chart-4))', 'hsl(var(--chart-5))', 'hsl(var(--accent))',
+];
+
+function fmtCurrency(v: number) {
+  return fmtBRL(v);
+}
+
+function fmtPercent(v: number) {
+  return formatPercentBR(v);
+}
+
+const R = (v: number) => fmtBRL(v);
+
 interface Colaborador {
   id: string;
   nome: string;
@@ -34,17 +49,6 @@ interface Props {
 const SETOR_LABELS: Record<string, string> = {
   cozinha: 'Cozinha', sushi: 'Sushi', limpeza: 'Limpeza', salao: 'Salão', copa: 'Copa'
 };
-
-const COLORS = [
-  'hsl(var(--primary))',
-  'hsl(var(--chart-2))',
-  'hsl(var(--chart-3))',
-  'hsl(var(--chart-4))',
-  'hsl(var(--chart-5))',
-  'hsl(220, 70%, 55%)',
-];
-
-const R = (v: number) => formatFixedBR(v, 2);
 
 export default function DashboardRhSection({ colaboradores }: Props) {
   const [periodo, setPeriodo] = useState(() => {
@@ -141,7 +145,7 @@ export default function DashboardRhSection({ colaboradores }: Props) {
       .slice(0, 10)
       .map(b => ({
         nome: colaboradores.find(c => c.id === b.colaborador_id)?.nome?.split(' ')[0] || '?',
-        horas: Number(b.horas_extras.toFixed(1)),
+        horas: Number(formatFixedBR(b.horas_extras, 1).replace(',', '.')),
       }));
   }, [bancoHoras, colaboradores]);
 
@@ -269,7 +273,7 @@ export default function DashboardRhSection({ colaboradores }: Props) {
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis type="number" tick={{ fontSize: 10 }} className="fill-muted-foreground" />
                   <YAxis dataKey="nome" type="category" width={60} tick={{ fontSize: 10 }} className="fill-muted-foreground" />
-                  <Tooltip formatter={(v: number) => `${v}h`} />
+                  <Tooltip formatter={(v: number) => `${formatFixedBR(v, 1)}h`} />
                   <Bar dataKey="horas" fill="hsl(var(--chart-2))" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -288,19 +292,19 @@ export default function DashboardRhSection({ colaboradores }: Props) {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
               <div>
                 <p className="text-xs text-muted-foreground">Total Proventos</p>
-                <p className="text-lg font-bold text-success">R$ {R(totalProventos)}</p>
+                <p className="text-lg font-bold text-success">{R(totalProventos)}</p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Total Descontos</p>
-                <p className="text-lg font-bold text-destructive">R$ {R(totalDescontos)}</p>
+                <p className="text-lg font-bold text-destructive">{R(totalDescontos)}</p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Líquido Total</p>
-                <p className="text-lg font-bold text-primary">R$ {R(totalFolha)}</p>
+                <p className="text-lg font-bold text-primary">{R(totalFolha)}</p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Benefícios</p>
-                <p className="text-lg font-bold">R$ {R(custoBeneficios)}</p>
+                <p className="text-lg font-bold">{R(custoBeneficios)}</p>
               </div>
             </div>
           </CardContent>

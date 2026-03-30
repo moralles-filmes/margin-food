@@ -10,8 +10,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } f
 import { Trash2, RefreshCw, DollarSign, AlertTriangle, Package, Calendar } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, LineChart, Line, Cell, PieChart, Pie } from 'recharts';
-import { fmtBRL, fmtBRLCompact } from '@/lib/money';
-import { formatFixedBR } from '@/lib/formatters';
+import { fmtBRL, fmtBRLCompact, formatFixedBR, formatDateBR, formatInBR } from '@/lib/formatters';
 
 interface LossData {
   quantidade_total: number;
@@ -101,10 +100,10 @@ export default function StockLossesSection({ categorias }: { categorias: string[
   useEffect(() => { fetchData(); }, [fetchData]);
 
   const formatPeriodLabel = (period: string) => {
-    const d = new Date(period + 'T00:00:00');
-    if (groupBy === 'monthly') return d.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
-    if (groupBy === 'weekly') return `Sem ${d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`;
-    return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    const d = new Date(period + 'T12:00:00');
+    if (groupBy === 'monthly') return formatInBR(d, 'MMM/yy');
+    if (groupBy === 'weekly') return `Sem ${formatInBR(d, 'dd/MM')}`;
+    return formatInBR(d, 'dd/MM');
   };
 
   return (
@@ -374,7 +373,7 @@ export default function StockLossesSection({ categorias }: { categorias: string[
                         </div>
                       </TableCell>
                       <TableCell className="text-[11px] py-1.5 text-muted-foreground">
-                        {p.ultimo_registro ? new Date(p.ultimo_registro).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '—'}
+                        {p.ultimo_registro ? formatDateBR(new Date(p.ultimo_registro)).substring(0, 5) : '—'}
                       </TableCell>
                       <TableCell className="text-[11px] py-1.5 text-center">
                         <Badge variant={p.produto_ativo ? 'default' : 'outline'} className="text-[8px] px-1 py-0">

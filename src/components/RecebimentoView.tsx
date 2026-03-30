@@ -12,6 +12,7 @@ import {
   Package, Check, ChevronRight, AlertTriangle, CheckCircle2,
   XCircle, Inbox, Search, Eye, Truck, ArrowRight,
 } from 'lucide-react';
+import { formatDateBR, formatDateTimeBR } from '@/lib/formatters';
 
 const STATUS_RECEB: Record<string, { label: string; color: string }> = {
   AGUARDANDO_RECEBIMENTO: { label: 'Aguardando Recebimento', color: 'bg-warning/15 text-warning' },
@@ -130,8 +131,8 @@ export default function RecebimentoView() {
               </div>
             </div>
             <div className="text-right text-xs text-muted-foreground">
-              <p>Criado: {new Date(selectedRec.created_at).toLocaleDateString('pt-BR')}</p>
-              {selectedRec.recebido_em && <p>Recebido: {new Date(selectedRec.recebido_em).toLocaleDateString('pt-BR')}</p>}
+              <p>Criado: {formatDateBR(new Date(selectedRec.created_at))}</p>
+              {selectedRec.recebido_em && <p>Recebido: {formatDateBR(new Date(selectedRec.recebido_em))}</p>}
             </div>
           </div>
 
@@ -317,7 +318,7 @@ export default function RecebimentoView() {
                       <div>
                         <p className="text-xs font-medium text-foreground">{c.mensagem}</p>
                         <p className="text-[10px] text-muted-foreground mt-0.5">
-                          {new Date(c.criado_em).toLocaleDateString('pt-BR')} {new Date(c.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                          {formatDateTimeBR(new Date(c.criado_em))}
                         </p>
                       </div>
                       {!isVisto && (
@@ -378,7 +379,7 @@ export default function RecebimentoView() {
                       <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-semibold ${sc.color}`}>{sc.label}</span>
                       {solic && <span className="text-[9px] text-muted-foreground">{solic.tipo}</span>}
                       <span className="text-[9px] text-muted-foreground">
-                        {new Date(r.created_at).toLocaleDateString('pt-BR')}
+                        {formatDateBR(new Date(r.created_at))}
                       </span>
                     </div>
                   </div>

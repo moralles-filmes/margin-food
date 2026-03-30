@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { supabase } from '@/integrations/supabase/client';
 import { parseUTCToBR } from '@/lib/datetime';
-import { fmtBRL } from '@/lib/money';
+import { fmtBRL } from '@/lib/formatters';
 import { useDataEvent } from '@/lib/dataEvents';
 
 interface StockSummary {

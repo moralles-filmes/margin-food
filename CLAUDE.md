@@ -178,17 +178,41 @@ margin-food/
 
 > **Mantenha esta seção atualizada após cada sessão de trabalho.**
 
+### 2026-03-28 — Fix Scroll em Dropdowns (cmdk 1.x)
+- Corrigido bug de scroll em **todos os dropdowns/comboboxes** do sistema.
+- Causa: cmdk 1.x aplica inline styles (`overflow: hidden; height: var(--cmdk-list-height)`) que impedem scroll dentro de Radix Popover.
+- Correção: Override global em `index.css` com `[cmdk-list] { max-height: 300px !important; overflow: auto !important; }`.
+- Componentes afetados: `ProductSearchCombobox`, `CategoryCombobox`, `SupplierCombobox`, `PedidosComprasMercadoView`.
+
 ### 2026-03-28 — Consolidação Single-Tenant e Limpeza de Dados
 - Execução da migração de limpeza (`20260328144800_cleanup_stale_companies.sql`) para remover todas as empresas exceto a "MarginPro Oficial" e o placeholder de sistema.
 - Remoção em cascata de todos os dados operacionais vinculados às empresas deletadas.
 - Verificação do banco de dados: restam apenas 2 registros na tabela `companies`.
 - Correção de turnos no Inventário para a empresa piloto.
 
+### Componentes Padronizados
+- **TableActions**: Localizado em `components/ui/TableActions.tsx`. Deve ser usado em todas as tabelas de gerenciamento para fornecer botões de Editar e Excluir consistentes, com suporte a permissões RBAC e diálogos de confirmação integrados.
+- **FormCloseConfirmDialog**: Usado em conjunto com `useFormDirtyGuard` para prevenir perda de dados em formulários.
+
+### 2026-03-30 — Padronização de CRUD Financeiro (Hardening)
+- **Módulos Padronizados**: `Contas a Pagar`, `Contas a Receber`, `Categorias`, `Centros de Custo`, `Plano de Contas` e `Contas Bancárias`.
+- **Hardening de Segurança**: Implementação de 12+ RPCs `_guarded_` que exigem `assert_tenant()`, `has_permission()` e registram logs na `fin_audit_logs`.
+- **Interface**: Adoção sistêmica do componente `TableActions` para operações de edição e exclusão.
+- **Optimistic Locking**: Implementado em todas as edições financeiras via campo `updated_at`.
+
+### 2026-03-30 — Fix Salmon Module Tenant Isolation
+- **RPCs Tenantizadas**: `create_salmon_entry_atomic`, `cancel_salmon_entry_atomic`, `create_salmon_manipulation_atomic`, `cancel_salmon_manipulation_atomic` — todas com `assert_tenant()` e `company_id` explícito.
+- **Função `ensure_salmon_raw_product()`**: Tenantizada — busca e cria produto salmão bruto por `company_id`.
+- **`get_current_company_id()`**: Atualizada para não retornar placeholder; fallback dinâmico para primeira empresa ativa.
+- **`assert_tenant()`**: Reforçada — bloqueia placeholder UUID e exige perfil com empresa vinculada.
+- **Schema Repair**: `supplier_item_prices` ganhou colunas `company_id` e `supplier_uuid`; unique constraints atualizadas para incluir `company_id`.
+- **Frontend**: Sem alterações — `useSalmonStore.ts` usa wrappers `_guarded` que delegam para `*_atomic`, que resolvem tenant internamente.
+
 ### Pendente / Em Aberto
-- [x] Sincronizar remote local com o novo nome do repositório (`margin-food`)
 - [x] Corrigir turnos ausentes no módulo de Inventário
 - [x] Consolidar sistema para Single-Tenant (Remover empresas legadas)
-- [x] Atualizar arquivo de contexto `CLAUDE.md`
+- [x] Padronizar CRUD de todos os módulos financeiros (Contas, Categorias, Centros, Plano)
+- [x] Fix Salmon Module Tenant Isolation
 - [ ] Monitorar integridade dos dados na empresa piloto após limpeza intensa
 
 ---

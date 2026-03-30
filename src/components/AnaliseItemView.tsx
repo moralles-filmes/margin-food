@@ -9,9 +9,10 @@ import { ArrowUpDown, Package, Loader2, AlertTriangle, Search } from 'lucide-rea
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 
-import { fmtBRL, formatPercentBR } from '@/lib/formatters';
+import { fmtBRL, formatPercentBR, formatFixedBR } from '@/lib/formatters';
 function fmtR$(n: number) { return fmtBRL(n); }
 function fmtPct(n: number) { return formatPercentBR(n); }
+function fmtQty(n: number, d = 1) { return formatFixedBR(n, d); }
 
 const chartTooltipStyle = { background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '11px', color: 'hsl(var(--foreground))' };
 
@@ -141,9 +142,9 @@ export default function AnaliseItemView({ period }: Props) {
         perdas_qtd: Number(r.perdas_qtd ?? 0),
         // Derived fields not in RPC — compute safely
         cobertura_semanas: Number(r.giro ?? 0) > 0
-          ? Math.round((Number(r.saldo ?? r.saldo_atual ?? 0) / (Number(r.consumo_periodo ?? 0) / 4 || 1)) * 10) / 10
+          ? Number(formatFixedBR(Number(r.saldo ?? r.saldo_atual ?? 0) / (Number(r.consumo_periodo ?? 0) / 4 || 1), 1).replace(',', '.'))
           : 0,
-        percent_cmv: 0, // will be computed below
+        percent_cmv: 0,
         last_movement_at: String(r.cursor_created_at ?? r.last_movement_at ?? ''),
       }));
       // Compute percent_cmv relative to total
@@ -259,7 +260,7 @@ export default function AnaliseItemView({ period }: Props) {
             <div className="bg-card border border-warning/20 rounded-xl p-3 animate-fade-up">
               <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Menor Giro</p>
               <p className="text-sm font-bold text-warning truncate">{summary.menor_giro.nome}</p>
-              <p className="text-xs text-muted-foreground">Giro: {(summary.menor_giro.valor ?? 0).toFixed(2)}</p>
+              <p className="text-xs text-muted-foreground">Giro: {fmtQty(summary.menor_giro.valor ?? 0, 2)}</p>
             </div>
           )}
           {summary.maior_desperdicio && summary.maior_desperdicio.valor > 0 && (
@@ -316,9 +317,9 @@ export default function AnaliseItemView({ period }: Props) {
                     <TableCell className={`px-2 py-2 font-bold ${item.variacao_percent > 5 ? 'text-destructive' : item.variacao_percent < -5 ? 'text-success' : 'text-foreground'}`}>
                       {item.variacao_percent > 0 ? '↑' : item.variacao_percent < 0 ? '↓' : '→'} {fmtPct(Math.abs(item.variacao_percent))}
                     </TableCell>
-                    <TableCell className="px-2 py-2">{item.consumo_periodo.toFixed(1)}</TableCell>
-                    <TableCell className="px-2 py-2">{item.giro.toFixed(2)}</TableCell>
-                    <TableCell className="px-2 py-2">{item.cobertura_semanas.toFixed(1)}</TableCell>
+                    <TableCell className="px-2 py-2">{fmtQty(item.consumo_periodo)}</TableCell>
+                    <TableCell className="px-2 py-2">{fmtQty(item.giro, 2)}</TableCell>
+                    <TableCell className="px-2 py-2">{fmtQty(item.cobertura_semanas)}</TableCell>
                     <TableCell className={`px-2 py-2 font-bold ${item.percent_cmv > 10 ? 'text-destructive' : 'text-foreground'}`}>{fmtPct(item.percent_cmv)}</TableCell>
                     <TableCell className={`px-2 py-2 ${item.desperdicio_percent > 5 ? 'text-destructive font-bold' : 'text-foreground'}`}>{fmtPct(item.desperdicio_percent)}</TableCell>
                   </TableRow>
@@ -353,7 +354,7 @@ export default function AnaliseItemView({ period }: Props) {
           <RankingCard title="🏆 Maior Custo Total" items={(summary.top_custo || []).map(i => ({ nome: i.nome, valor: fmtR$(i.valor) }))} />
           <RankingCard title="📈 Maior Aumento de Preço" items={(summary.top_variacao || []).map(i => ({ nome: i.nome, valor: `↑ ${fmtPct(i.valor)}` }))} />
           <RankingCard title="🔥 Maior Impacto no CMV" items={(summary.top_cmv || []).map(i => ({ nome: i.nome, valor: fmtPct(i.valor) }))} />
-          <RankingCard title="📉 Menor Giro" items={(summary.top_menor_giro || []).map(i => ({ nome: i.nome, valor: (i.valor ?? 0).toFixed(2) }))} />
+          <RankingCard title="📉 Menor Giro" items={(summary.top_menor_giro || []).map(i => ({ nome: i.nome, valor: fmtQty(i.valor ?? 0, 2) }))} />
         </div>
       )}
 
@@ -378,7 +379,7 @@ export default function AnaliseItemView({ period }: Props) {
                 {/* KPIs */}
                 <div className="grid grid-cols-3 gap-2">
                   <MiniKPI label="Custo Base" value={fmtR$(detail.custo_base)} />
-                  <MiniKPI label="Saldo Atual" value={detail.saldo_atual.toFixed(1)} />
+                  <MiniKPI label="Saldo Atual" value={fmtQty(detail.saldo_atual)} />
                   <MiniKPI label="Val. Estoque" value={fmtR$(detail.saldo_atual * detail.custo_base)} />
                 </div>
 
@@ -390,7 +391,7 @@ export default function AnaliseItemView({ period }: Props) {
                       <div key={i} className="flex items-center justify-between text-[11px] py-1 border-b border-border/20 last:border-0">
                         <span className="text-foreground">{b.tipo}</span>
                         <div className="flex items-center gap-3">
-                          <span className="text-muted-foreground">{b.qtd.toFixed(1)}</span>
+                          <span className="text-muted-foreground">{fmtQty(b.qtd)}</span>
                           <span className="font-bold text-primary">{fmtR$(b.custo)}</span>
                         </div>
                       </div>
@@ -423,7 +424,7 @@ export default function AnaliseItemView({ period }: Props) {
                         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                         <XAxis dataKey="semana" tick={{ fontSize: 9, fill: 'hsl(var(--muted-foreground))' }} />
                         <YAxis tick={{ fontSize: 9, fill: 'hsl(var(--muted-foreground))' }} />
-                        <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => [v.toFixed(1), 'Consumo']} />
+                        <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => [fmtQty(v), 'Consumo']} />
                         <Bar dataKey="consumo" fill="hsl(var(--accent))" radius={[4, 4, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>

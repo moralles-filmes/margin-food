@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { fmtBRL } from '@/lib/money';
+import { fmtBRL, formatInBR, formatDecimalBR } from '@/lib/formatters';
 import { BRLInput } from '@/components/ui/brl-input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,6 @@ import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { subMonths } from 'date-fns';
-import { formatInBR } from '@/lib/datetime';
 import { Plus, Target, AlertTriangle, Pencil, Trash2, FileDown, FileSpreadsheet, Copy, Loader2, ShieldAlert, X } from 'lucide-react';
 import { useFormDirtyGuard } from '@/hooks/useFormDirtyGuard';
 import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
@@ -46,7 +45,8 @@ interface Categoria {
 
 function formatMonthBR(value: string): string {
   const d = new Date(value + '-01');
-  return new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(d);
+  const label = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(d);
+  return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
 function NoAccess() {
@@ -236,7 +236,7 @@ export default function OrcamentoSection() {
   // ── Totals ──
   const totalOrcado = items.reduce((s, c) => s + c.valorOrcado, 0);
   const totalRealizado = items.reduce((s, c) => s + c.valorRealizado, 0);
-  const pctGlobal = totalOrcado > 0 ? ((totalRealizado / totalOrcado) * 100).toFixed(1) : '—';
+  const pctGlobal = totalOrcado > 0 ? formatDecimalBR((totalRealizado / totalOrcado) * 100, 1) : '—';
 
   const fmt = fmtBRL;
 

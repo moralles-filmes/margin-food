@@ -9,8 +9,7 @@ import { parseDecimal } from '@/components/ui/decimal-input';
 import { Users, TrendingUp, Fish, Target, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import PeriodFilter, { PeriodRange, getDefaultRange, filterByPeriod } from './PeriodFilter';
-import { todayBR, formatInBR, formatDisplayBR } from '@/lib/datetime';
-import { parseLocalDate } from '@/lib/dateUtils';
+import { todayBR, formatInBR, formatDateBR, formatDecimalBR, formatPercentBR, parseLocalDate } from '@/lib/formatters';
 
 function parseLocalDateGoals(d: string) { const [y, m, dd] = d.split('-').map(Number); return new Date(y, m - 1, dd); }
 
@@ -110,19 +109,19 @@ export default function GoalsView({ store }: GoalsViewProps) {
             </div>
             <div className="bg-secondary/50 rounded-lg p-2 text-center">
               <p className="text-[10px] text-muted-foreground">Realizado</p>
-              <p className="text-sm font-bold text-foreground">{realGramas.toFixed(0)}g</p>
+               <p className="text-sm font-bold text-foreground">{formatDecimalBR(realGramas, 0)}g</p>
             </div>
             <div className="bg-secondary/50 rounded-lg p-2 text-center">
               <p className="text-[10px] text-muted-foreground">Diferença</p>
-              <p className={`text-sm font-bold ${diffGramas > 0 ? 'text-destructive' : 'text-success'}`}>{diffGramas > 0 ? '+' : ''}{diffGramas.toFixed(0)}g</p>
+              <p className={`text-sm font-bold ${diffGramas > 0 ? 'text-destructive' : 'text-success'}`}>{diffGramas > 0 ? '+' : ''}{formatDecimalBR(diffGramas, 0)}g</p>
             </div>
             <div className="bg-secondary/50 rounded-lg p-2 text-center">
               <p className="text-[10px] text-muted-foreground">% desvio</p>
-              <p className={`text-sm font-bold ${pctDiff > 10 ? 'text-destructive' : pctDiff > 0 ? 'text-warning' : 'text-success'}`}>{pctDiff > 0 ? '+' : ''}{pctDiff.toFixed(1)}%</p>
+              <p className={`text-sm font-bold ${pctDiff > 10 ? 'text-destructive' : pctDiff > 0 ? 'text-warning' : 'text-success'}`}>{pctDiff > 0 ? '+' : ''}{formatPercentBR(pctDiff / 100)}</p>
             </div>
           </div>
           <div className="text-[10px] text-muted-foreground">
-            {monthCustomers} clientes • {monthConsumed.toFixed(1)} kg consumido no mês
+            {monthCustomers} clientes • {formatDecimalBR(monthConsumed, 1)} kg consumido no mês
           </div>
         </div>
       )}
@@ -174,8 +173,8 @@ export default function GoalsView({ store }: GoalsViewProps) {
         </div>
         <div className="bg-card border border-border rounded-xl p-3">
           <div className="flex items-center gap-1.5 mb-1"><Fish className="w-3.5 h-3.5 text-primary" /><span className="text-[10px] text-muted-foreground uppercase tracking-wider">g/Cliente</span></div>
-          <p className="text-lg font-display font-bold text-foreground">{(kgPerCustomer * 1000).toFixed(0)}g</p>
-          <p className="text-[10px] text-muted-foreground">{fishPerCustomer.toFixed(1)} peixes/cliente</p>
+          <p className="text-lg font-display font-bold text-foreground">{formatDecimalBR(kgPerCustomer * 1000, 0)}g</p>
+          <p className="text-[10px] text-muted-foreground">{formatDecimalBR(fishPerCustomer, 1)} peixes/cliente</p>
         </div>
       </div>
 
@@ -184,7 +183,7 @@ export default function GoalsView({ store }: GoalsViewProps) {
         {filtered.map((r, i) => (
           <div key={r.id} className="bg-card border border-border rounded-xl p-3 flex items-center justify-between animate-fade-up" style={{ animationDelay: `${i * 50}ms` }}>
             <div>
-              <p className="text-xs text-muted-foreground">{formatDisplayBR(parseLocalDate(r.date))}</p>
+              <p className="text-xs text-muted-foreground">{formatDateBR(parseLocalDate(r.date))}</p>
               <div className="flex items-center gap-3 mt-0.5">
                 <span className="text-sm text-foreground">{r.customers} clientes</span>
               </div>

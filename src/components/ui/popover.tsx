@@ -7,11 +7,18 @@ const Popover = PopoverPrimitive.Root;
 
 const PopoverTrigger = PopoverPrimitive.Trigger;
 
+const PopoverAnchor = PopoverPrimitive.Anchor;
+
 const PopoverContent = React.forwardRef<
   React.ElementRef<typeof PopoverPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof PopoverPrimitive.Content>
->(({ className, align = "center", sideOffset = 4, ...props }, ref) => (
-  <PopoverPrimitive.Portal>
+  React.ComponentPropsWithoutRef<typeof PopoverPrimitive.Content> & {
+    /** Set to false to skip Portal (needed inside Dialog/Sheet for scroll to work) */
+    usePortal?: boolean;
+    /** Container element for the Portal */
+    container?: HTMLElement | null;
+  }
+>(({ className, align = "center", sideOffset = 4, usePortal = true, container, ...props }, ref) => {
+  const content = (
     <PopoverPrimitive.Content
       ref={ref}
       align={align}
@@ -22,8 +29,16 @@ const PopoverContent = React.forwardRef<
       )}
       {...props}
     />
-  </PopoverPrimitive.Portal>
-));
+  );
+
+  if (!usePortal) return content;
+
+  return (
+    <PopoverPrimitive.Portal container={container}>
+      {content}
+    </PopoverPrimitive.Portal>
+  );
+});
 PopoverContent.displayName = PopoverPrimitive.Content.displayName;
 
-export { Popover, PopoverTrigger, PopoverContent };
+export { Popover, PopoverTrigger, PopoverContent, PopoverAnchor };

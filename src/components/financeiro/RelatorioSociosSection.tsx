@@ -5,9 +5,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { subMonths } from 'date-fns';
-import { formatInBR, formatDateTimeBR } from '@/lib/datetime';
+import { formatInBR, formatDateTimeBR, fmtBRL, parseLocalDate, formatDateBR, formatPercentBR } from '@/lib/formatters';
 import { FileDown, FileSpreadsheet, TrendingUp, TrendingDown, DollarSign, BarChart3, Loader2, CheckCircle2, AlertTriangle, ShieldX } from 'lucide-react';
-import { fmtBRL } from '@/lib/money';
 import { useDataEvent } from '@/lib/dataEvents';
 import { useCan } from '@/permissions/hooks';
 import jsPDF from 'jspdf';
@@ -103,7 +102,7 @@ export default function RelatorioSociosSection() {
 
   const fmt = fmtBRL;
   // RULE FIN-MARGEM: official percentage calculation
-  const pct = (v: number, base: number) => base > 0 ? `${((v / base) * 100).toFixed(1)}%` : '—';
+  const pct = (v: number, base: number) => base > 0 ? formatPercentBR((v / base) * 100, 1) : '—';
   // Note: core margem is calculated server-side per FIN-MARGEM rule
 
   // ── PDF Export ──

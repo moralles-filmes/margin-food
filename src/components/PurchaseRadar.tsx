@@ -4,8 +4,7 @@ import { getDaysInMonth } from 'date-fns';
 import { Radar, TrendingUp, AlertTriangle, CheckCircle2, BarChart3, Activity } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { getWeeksOfMonth, calcWeeklyIdeal, WeekData } from './WeeklyBreakdown';
-import { parseLocalDate } from '@/lib/dateUtils';
-import { fmtBRL } from '@/lib/money';
+import { parseLocalDate, fmtBRL, formatPercentBR, formatFixedBR } from '@/lib/formatters';
 
 const fmtR = fmtBRL;
 
@@ -190,7 +189,7 @@ export default function PurchaseRadar({ entries, targetMonth, compact, metas, co
           ))}
           <p className={`flex items-center gap-1 ${estabColor[estabilidadeStatus]}`}>
             <Activity className="w-3 h-3" />
-            Estabilidade: {(estabilidade * 100).toFixed(0)}%
+            Estabilidade: {formatPercentBR(estabilidade * 100)}
           </p>
         </div>
       </div>
@@ -254,7 +253,7 @@ export default function PurchaseRadar({ entries, targetMonth, compact, metas, co
                     <span className="text-foreground font-medium">{fmtR(w.gasto)}</span>
                     {w.ideal > 0 && (
                       <span className={`text-[10px] ${w.diff >= 0 ? 'text-success' : 'text-destructive'}`}>
-                        {w.diff >= 0 ? `Sobra ${fmtR(w.diff)}` : `Acima ${fmtR(Math.abs(w.diff))}`}
+                        {w.diff >= 0 ? `Sobra ${fmtBRL(w.diff)}` : `Acima ${fmtBRL(Math.abs(w.diff))}`}
                       </span>
                     )}
                   </div>
@@ -274,7 +273,7 @@ export default function PurchaseRadar({ entries, targetMonth, compact, metas, co
             </div>
             <div className="flex items-center gap-3">
               <span className={`text-2xl font-bold ${estabColor[estabilidadeStatus]}`}>
-                {(estabilidade * 100).toFixed(0)}%
+                {formatPercentBR(estabilidade * 100)}
               </span>
               <div className="flex-1">
                 <div className="h-2 rounded-full bg-secondary overflow-hidden">
@@ -298,7 +297,7 @@ export default function PurchaseRadar({ entries, targetMonth, compact, metas, co
             <div className="flex items-center justify-between">
               <span className="text-[11px] text-muted-foreground">Semana com maior concentração</span>
               <span className={`text-sm font-bold ${concColor[concentracaoStatus]}`}>
-                {concentracaoMax.label} — {concentracaoMax.pct.toFixed(0)}%
+                {concentracaoMax.label} — {formatPercentBR(concentracaoMax.pct)}
               </span>
             </div>
             <p className="text-[10px] text-muted-foreground">{concentracaoLabel}</p>
@@ -328,7 +327,7 @@ export default function PurchaseRadar({ entries, targetMonth, compact, metas, co
                     />
                   </div>
                   <span className="w-16 text-right text-muted-foreground">{fmtR(w.value)}</span>
-                  <span className="w-8 text-right text-muted-foreground">{w.pct.toFixed(0)}%</span>
+                  <span className="w-8 text-right text-muted-foreground">{formatPercentBR(w.pct)}</span>
                 </div>
               ))}
             </div>

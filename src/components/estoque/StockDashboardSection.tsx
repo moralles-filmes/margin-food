@@ -9,8 +9,7 @@ import { DollarSign, Package, AlertTriangle, AlertCircle, TrendingDown, RefreshC
 import { supabase } from '@/integrations/supabase/client';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import StockInactivityAlert from './StockInactivityAlert';
-import { fmtBRL, fmtBRLCompact } from '@/lib/money';
-import { formatDecimalBR, formatIntegerBR } from '@/lib/formatters';
+import { fmtBRL, fmtBRLCompact, formatDecimalBR, formatIntegerBR, parseUTCToBR } from '@/lib/formatters';
 import KpiCard from '@/components/ui/KpiCard';
 import StatusBadge from '@/components/ui/StatusBadge';
 import type { StockHealthStatus } from '@/domain/estoque/rules';
@@ -384,7 +383,7 @@ export default function StockDashboardSection({ categorias, onNavigate }: Props)
                   {data.movimentacoes.map((mov) => (
                     <TableRow key={mov.id}>
                       <TableCell className="text-[11px] py-1.5">
-                        {mov.data ? new Date(mov.data).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}
+                        {mov.data ? parseUTCToBR(mov.data).substring(0, 16) : '—'}
                       </TableCell>
                       <TableCell className="text-[11px] py-1.5 font-medium max-w-[160px] truncate">{mov.produto}</TableCell>
                       <TableCell className="text-[11px] py-1.5">

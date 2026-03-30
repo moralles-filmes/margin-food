@@ -6,12 +6,12 @@ import { useEstoqueGeralStoreContext } from '@/contexts/EstoqueGeralStoreContext
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DecimalInput } from '@/components/ui/decimal-input';
-import { normalizeBRLMoneyToNumber } from '@/lib/money';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
+import { fmtBRL, formatDateBR, normalizeBRLMoneyToNumber } from '@/lib/formatters';
 import { Crown, Award, Medal, Search, Plus, Inbox, ArrowUp, BarChart3, Loader2, ChevronDown } from 'lucide-react';
 
 const CATEGORIAS = ['Peixe', 'Oriental', 'Bebidas', 'Limpeza', 'Embalagens', 'Cozinha', 'Descartáveis', 'Proteínas', 'Hortifruti', 'Outros'];
@@ -217,15 +217,15 @@ export default function RankingFornecedoresView() {
                 <p className="text-xs font-semibold text-foreground truncate">{r.supplier_name}</p>
                 <p className="text-[10px] text-muted-foreground">
                   {r.items_count} {Number(r.items_count) === 1 ? 'item' : 'itens'} com preço
-                  {r.last_updated_at && ` • ${new Date(r.last_updated_at).toLocaleDateString('pt-BR')}`}
+                  {r.last_updated_at && ` • ${formatDateBR(new Date(r.last_updated_at))}`}
                 </p>
               </div>
               <div className="text-right">
-                <p className="text-sm font-bold text-foreground">R$ {Number(r.avg_unit_cost).toFixed(2)}</p>
+                <p className="text-sm font-bold text-foreground">{fmtBRL(r.avg_unit_cost)}</p>
                 <p className="text-[9px] text-muted-foreground">média/item</p>
                 {Number(r.min_unit_cost) !== Number(r.max_unit_cost) && (
                   <p className="text-[8px] text-muted-foreground">
-                    R$ {Number(r.min_unit_cost).toFixed(2)} – R$ {Number(r.max_unit_cost).toFixed(2)}
+                    {fmtBRL(r.min_unit_cost)} – {fmtBRL(r.max_unit_cost)}
                   </p>
                 )}
               </div>

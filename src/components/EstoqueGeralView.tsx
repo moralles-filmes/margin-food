@@ -24,7 +24,7 @@ function showTenantErrorToast(msg: string) {
 import { Package, Search, Filter, Plus, ArrowUpDown, AlertTriangle, CheckCircle, TrendingDown, Inbox, ClipboardList, BarChart3, Edit2, Trash2, X, Check, Eye, ArrowDown, ArrowUp, Minus, Calculator, RefreshCw, ShoppingCart, Settings2, Shield, Copy, MoreVertical, Power, PowerOff, LayoutDashboard, ArrowLeftRight, Brain } from 'lucide-react';
 import SubTabBadge from '@/components/ui/SubTabBadge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { normalizeBRLMoneyToNumber, fmtBRL } from '@/lib/money';
+import { normalizeBRLMoneyToNumber, fmtBRL } from '@/lib/formatters';
 import { formatDecimalBR, formatIntegerBR, formatFixedBR } from '@/lib/formatters';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -413,7 +413,7 @@ export default function EstoqueGeralView() {
     if (isSaida) {
       const saldoAtual = saldos[movForm.produtoId]?.saldo || 0;
       if (quantidadeBase > saldoAtual) {
-        toast.error(`Estoque insuficiente! Disponível: ${formatDecimalBR(saldoAtual, 2)} ${selectedProd?.unidadeMedida || ''}`);
+        toast.error(`Estoque insuficiente! Disponível: ${formatFixedBR(saldoAtual, 2)} ${selectedProd?.unidadeMedida || ''}`);
         return;
       }
     }
@@ -666,13 +666,13 @@ export default function EstoqueGeralView() {
                               <p className="text-base font-display font-bold text-foreground">
                                 {formatStockLayers(layers)}
                               </p>
-                              <p className="text-[10px] text-muted-foreground">({formatDecimalBR(p.saldo, 2)} {p.unidadeMedida})</p>
+                              <p className="text-[10px] text-muted-foreground">({formatFixedBR(p.saldo, 2)} {p.unidadeMedida})</p>
                             </>
                           );
                         }
                         return (
                           <p className="text-base font-display font-bold text-foreground">
-                            {formatDecimalBR(p.saldo, p.unidadeMedida === 'KG' || p.unidadeMedida === 'L' ? 2 : 0)} {p.unidadeMedida}
+                            {formatFixedBR(p.saldo, p.unidadeMedida === 'KG' || p.unidadeMedida === 'L' ? 2 : 0)} {p.unidadeMedida}
                           </p>
                         );
                       })()}
@@ -696,9 +696,9 @@ export default function EstoqueGeralView() {
                       const idealP = showDual && fator > 0 ? p.estoqueIdeal / fator : 0;
                       return (
                         <>
-                          <span>Mín: {showDual ? `${minP.toFixed(1)} ${unCompra} (${p.estoqueMinimo} ${p.unidadeMedida})` : `${p.estoqueMinimo} ${p.unidadeMedida}`}</span>
-                          {p.estoqueIdeal > 0 && <span>Ideal: {showDual ? `${idealP.toFixed(1)} ${unCompra} (${p.estoqueIdeal} ${p.unidadeMedida})` : `${p.estoqueIdeal} ${p.unidadeMedida}`}</span>}
-                          {p.status === 'critico' && showDual && <span className="text-destructive font-medium">abaixo do mínimo ({minP.toFixed(1)} {unCompra})</span>}
+                          <span>Mín: {showDual ? `${formatFixedBR(minP, 1)} ${unCompra} (${p.estoqueMinimo} ${p.unidadeMedida})` : `${p.estoqueMinimo} ${p.unidadeMedida}`}</span>
+                          {p.estoqueIdeal > 0 && <span>Ideal: {showDual ? `${formatFixedBR(idealP, 1)} ${unCompra} (${p.estoqueIdeal} ${p.unidadeMedida})` : `${p.estoqueIdeal} ${p.unidadeMedida}`}</span>}
+                          {p.status === 'critico' && showDual && <span className="text-destructive font-medium">abaixo do mínimo ({formatFixedBR(minP, 1)} {unCompra})</span>}
                         </>
                       );
                     })()}
@@ -941,7 +941,7 @@ export default function EstoqueGeralView() {
                           const fator = p.fatorConversaoPadrao || 1;
                           const unCompra = p.unidadeCompra || p.unidadeMedida;
                           const layers = decomposeStockLayers(saldo, fator, unCompra, p.unidadeMedida);
-                          const label = layers.hasLayers ? formatStockLayers(layers) : `${saldo.toFixed(1)} ${p.unidadeMedida}`;
+                          const label = layers.hasLayers ? formatStockLayers(layers) : `${formatFixedBR(saldo, 1)} ${p.unidadeMedida}`;
                           return <><span>•</span><span className={isNoStock ? 'text-destructive font-medium' : isLowStock ? 'text-warning font-medium' : ''}>{label}</span></>;
                         })()}
                       </div>

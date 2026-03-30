@@ -8,7 +8,7 @@ import { FileDown, Copy, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import { PurchaseOrder, PurchaseOrderItem } from '@/hooks/usePurchaseOrdersStore';
 import { gerarPDFPedidoFornecedor } from '@/lib/pdfPedidoFornecedor';
-import { fmtBRL } from '@/lib/money';
+import { fmtBRL, formatDateBR, formatFixedBR } from '@/lib/formatters';
 
 interface Props {
   open: boolean;
@@ -22,7 +22,7 @@ export default function ExportPedidoModal({ open, onOpenChange, order, items }: 
   const [extraNotes, setExtraNotes] = useState('');
 
   const orderCode = `PC-${order.id.slice(0, 6).toUpperCase()}`;
-  const orderDate = new Date(order.created_at).toLocaleDateString('pt-BR');
+  const orderDate = formatDateBR(new Date(order.created_at));
 
   const buildWhatsAppText = () => {
     let text = `*PEDIDO DE COMPRA*\n`;
@@ -79,8 +79,10 @@ export default function ExportPedidoModal({ open, onOpenChange, order, items }: 
     const rows = items.map(i => {
       const unit = i.purchase_unit_snapshot || i.unit_snapshot;
       const cost = i.purchase_unit_cost_snapshot ?? i.estimated_unit_value;
-      const row = [i.name_snapshot, unit, String(i.qty_requested)];
-      if (includePrice) row.push(cost.toFixed(2), (i.qty_requested * cost).toFixed(2));
+      const row = [i.name_snapshot, unit, formatFixedBR(i.qty_requested, 2)];
+      if (includePrice) {
+        row.push(formatFixedBR(cost, 2), formatFixedBR(i.qty_requested * cost, 2));
+      }
       return row;
     });
     const csv = [header, ...rows].map(r => r.map(c => `"${c}"`).join(';')).join('\n');

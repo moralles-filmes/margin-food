@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Plus, Edit, Trash2, X } from 'lucide-react';
 import { useFormDirtyGuard } from '@/hooks/useFormDirtyGuard';
 import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
+import TableActions from '@/components/ui/TableActions';
 
 interface PlanoContaRow {
   id: string;
@@ -20,6 +21,8 @@ interface PlanoContaRow {
   nome: string;
   tipo: string;
   natureza: string;
+  linha_dre: string | null;
+  updated_at: string;
 }
 
 interface Props {
@@ -34,25 +37,28 @@ export default function PlanoContasFinSection({ canCreate, canEdit, canDelete }:
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
+  const [editUpdatedAt, setEditUpdatedAt] = useState<string | null>(null);
   const [form, setForm] = useState({ codigo: '', nome: '', tipo: 'despesa', natureza: 'operacional', linha_dre: '' });
 
   useEffect(() => { load(); }, []);
 
   const load = async () => {
     setLoading(true);
-    const { data } = await supabase.from('fin_plano_contas').select('id, codigo, nome, tipo, natureza').eq('ativo', true).order('codigo');
+    const { data } = await supabase.from('fin_plano_contas').select('id, codigo, nome, tipo, natureza, linha_dre, updated_at').eq('ativo', true).order('codigo');
     setItems((data || []) as PlanoContaRow[]);
     setLoading(false);
   };
 
   const openEdit = (item: PlanoContaRow) => {
     setEditId(item.id);
-    setForm({ codigo: item.codigo, nome: item.nome, tipo: item.tipo, natureza: item.natureza, linha_dre: '' });
+    setEditUpdatedAt(item.updated_at);
+    setForm({ codigo: item.codigo, nome: item.nome, tipo: item.tipo, natureza: item.natureza, linha_dre: item.linha_dre || '' });
     setShowForm(true);
   };
 
   const handleCloseForm = () => {
     setEditId(null);
+    setEditUpdatedAt(null);
     setForm({ codigo: '', nome: '', tipo: 'despesa', natureza: 'operacional', linha_dre: '' });
     setShowForm(false);
   };
@@ -63,7 +69,15 @@ export default function PlanoContasFinSection({ canCreate, canEdit, canDelete }:
   const save = async () => {
     if (!form.codigo.trim() || !form.nome.trim()) { toast.error('Código e nome obrigatórios'); return; }
     if (editId) {
-      const { error } = await supabase.from('fin_plano_contas').update({ ...form }).eq('id', editId);
+      const { error } = await (supabase.rpc as any)('_guarded_update_plano_contas', {
+        p_id: editId,
+        p_codigo: form.codigo,
+        p_nome: form.nome,
+        p_tipo: form.tipo,
+        p_natureza: form.natureza,
+        p_linha_dre: form.linha_dre || '',
+        p_expected_updated_at: editUpdatedAt
+      });
       if (error) { toast.error(error.message); return; }
       toast.success('Conta atualizada');
     } else {
@@ -77,7 +91,7 @@ export default function PlanoContasFinSection({ canCreate, canEdit, canDelete }:
   };
 
   const remove = async (id: string) => {
-    const { error } = await supabase.from('fin_plano_contas').update({ ativo: false }).eq('id', id);
+    const { error } = await (supabase.rpc as any)('_guarded_delete_plano_contas', { p_id: id });
     if (error) { toast.error(error.message); return; }
     toast.success('Conta removida');
     load();
@@ -152,10 +166,14 @@ export default function PlanoContasFinSection({ canCreate, canEdit, canDelete }:
               <TableCell><Badge variant="outline">{item.tipo}</Badge></TableCell>
               <TableCell className="text-muted-foreground">{item.natureza}</TableCell>
               <TableCell>
-                 <div className="flex gap-1">
-                   {canEdit && <Button size="icon" variant="ghost" onClick={() => openEdit(item)}><Edit className="w-4 h-4" /></Button>}
-                   {canDelete && <Button size="icon" variant="ghost" onClick={() => remove(item.id)}><Trash2 className="w-4 h-4 text-destructive" /></Button>}
-                 </div>
+                <TableActions
+                  canEditOverride={canEdit}
+                  canDeleteOverride={canDelete}
+                  onEdit={() => openEdit(item)}
+                  onDelete={() => remove(item.id)}
+                  deleteConfirmTitle="Remover do Plano de Contas"
+                  deleteConfirmDescription={`Tem certeza que deseja remover a conta "${item.nome}"?`}
+                />
               </TableCell>
             </TableRow>
           ))}

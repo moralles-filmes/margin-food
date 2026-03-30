@@ -17,8 +17,7 @@ import { useFormDirtyGuard } from '@/hooks/useFormDirtyGuard';
 import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
 import { startOfMonth, endOfMonth } from 'date-fns';
 import { formatDateBR, formatDisplayBR, todayBR } from '@/lib/datetime';
-import { fmtBRL } from '@/lib/money';
-import { normalizeBRLMoneyToNumber } from '@/lib/money';
+import { fmtBRL, normalizeBRLMoneyToNumber, formatFixedBR, parseLocalDate } from '@/lib/formatters';
 import { useCan } from '@/permissions/hooks';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { APP_NAME } from '@/lib/brand';
@@ -243,7 +242,7 @@ export default function FechamentoCaixaSection() {
     [...items]
       .sort((a, b) => a.data.localeCompare(b.data))
       .map(r => ({
-        data: formatDisplayDate(r.data),
+        data: formatDateBR(parseLocalDate(r.data)),
         liquido: Number(r.faturamento_liquido),
       })),
     [items]
@@ -259,7 +258,7 @@ export default function FechamentoCaixaSection() {
       doc.setFontSize(16);
       doc.text(APP_NAME, 14, 15);
       doc.setFontSize(10);
-      doc.text(`Fechamento de Caixa — ${formatDisplayDate(startDate)} a ${formatDisplayDate(endDate)}`, 14, 22);
+      doc.text(`Fechamento de Caixa — ${formatDateBR(parseLocalDate(startDate))} a ${formatDateBR(parseLocalDate(endDate))}`, 14, 22);
       doc.setFontSize(8);
       doc.text(`Dias: ${items.length} | Bruto: ${fmtBRL(totalBruto)} | Líquido: ${fmtBRL(totalLiquido)}`, 14, 28);
 
@@ -267,7 +266,7 @@ export default function FechamentoCaixaSection() {
         startY: 35,
         head: [['Data', 'Bruto', 'Taxas', 'Descontos', 'Líquido', 'Observação']],
         body: items.map(r => [
-          formatDisplayDate(r.data),
+          formatDateBR(parseLocalDate(r.data)),
           fmtBRL(Number(r.faturamento_bruto)),
           fmtBRL(Number(r.taxas)),
           fmtBRL(Number(r.descontos)),
@@ -295,7 +294,7 @@ export default function FechamentoCaixaSection() {
     setExportingExcel(true);
     try {
       const rows = items.map(r => ({
-        Data: formatDisplayDate(r.data),
+        Data: formatDateBR(parseLocalDate(r.data)),
         'Faturamento Bruto': Number(r.faturamento_bruto),
         Taxas: Number(r.taxas),
         Descontos: Number(r.descontos),
@@ -461,7 +460,7 @@ export default function FechamentoCaixaSection() {
               <AreaChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                 <XAxis dataKey="data" tick={{ fontSize: 10 }} className="text-muted-foreground" />
-                <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} className="text-muted-foreground" />
+                <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `${formatFixedBR(v / 1000, 0)}k`} className="text-muted-foreground" />
                 <RTooltip formatter={(v: number) => fmtBRL(v)} />
                 <Area type="monotone" dataKey="liquido" className="fill-primary/20 stroke-primary" strokeWidth={2} />
               </AreaChart>
@@ -499,7 +498,7 @@ export default function FechamentoCaixaSection() {
             </TableCell></TableRow>
           ) : items.map(row => (
             <TableRow key={row.id}>
-              <TableCell className="font-mono text-sm">{formatDisplayDate(row.data)}</TableCell>
+              <TableCell className="font-mono text-sm">{formatDateBR(parseLocalDate(row.data))}</TableCell>
               <TableCell className="text-right font-medium text-success">{fmtBRL(Number(row.faturamento_bruto))}</TableCell>
               <TableCell className="text-right text-muted-foreground">{fmtBRL(Number(row.taxas))}</TableCell>
               <TableCell className="text-right text-muted-foreground">{fmtBRL(Number(row.descontos))}</TableCell>
@@ -530,9 +529,3 @@ export default function FechamentoCaixaSection() {
   );
 }
 
-/** Format yyyy-MM-dd to dd/MM/yyyy */
-function formatDisplayDate(isoDate: string): string {
-  if (!isoDate || isoDate.length < 10) return isoDate;
-  const [y, m, d] = isoDate.split('-');
-  return `${d}/${m}/${y}`;
-}

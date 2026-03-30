@@ -5,8 +5,7 @@ import { useCan } from '@/permissions';
 import { emitDataEvent, useDataEvent } from '@/lib/dataEvents';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { toast } from 'sonner';
-import { todayBR, formatDateBR } from '@/lib/datetime';
-import { fmtBRL } from '@/lib/money';
+import { fmtBRL, formatDateBR, formatPercentBR, todayBR, parseLocalDate } from '@/lib/formatters';
 import { BRLInput } from '@/components/ui/brl-input';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
@@ -65,11 +64,6 @@ interface CentroCustoRef { id: string; nome: string }
 interface ContaRef { id: string; nome: string }
 
 // ─── Helpers ───
-function fmtDateBR(d: string) {
-  if (!d) return '—';
-  const [y, m, day] = d.split('-');
-  return `${day}/${m}/${y}`;
-}
 
 function NoAccess() {
   return (
@@ -447,7 +441,7 @@ export default function LivroRazaoSection({ initialContaId }: LivroRazaoProps = 
   // ─── Export ───
   const exportExcel = () => {
     const rows = items.map(item => ({
-      data_competencia: fmtDateBR(item.data_competencia),
+      data_competencia: formatDateBR(parseLocalDate(item.data_competencia)),
       descricao: item.descricao || '',
       tipo: item.tipo,
       status: item.status,
@@ -558,7 +552,7 @@ export default function LivroRazaoSection({ initialContaId }: LivroRazaoProps = 
               const orig = ORIGEM_LABEL[item.origem || (item.tipo === 'TRANSFERENCIA' ? 'transferencia' : 'manual')] || ORIGEM_LABEL.manual;
               return (
                 <TableRow key={item.id}>
-                  <TableCell className="font-mono text-sm">{fmtDateBR(item.data_competencia)}</TableCell>
+                  <TableCell className="font-mono text-sm">{formatDateBR(parseLocalDate(item.data_competencia))}</TableCell>
                   <TableCell className="font-medium max-w-[250px]">
                     {item.recorrente && <Repeat className="w-3 h-3 inline mr-1 text-muted-foreground" />}
                     <span className="truncate block">{item.descricao}</span>
@@ -745,7 +739,7 @@ export default function LivroRazaoSection({ initialContaId }: LivroRazaoProps = 
                                 }} showPrefix className="h-8 text-xs" />
                               </TableCell>
                               <TableCell className="p-1 text-xs text-muted-foreground text-center">
-                                {line.percentual ? `${line.percentual}%` : '—'}
+                                {line.percentual ? formatPercentBR(line.percentual, 1) : '—'}
                               </TableCell>
                               <TableCell className="p-1">
                                 <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => removeRateioLine(line.key)}>

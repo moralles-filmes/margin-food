@@ -9,7 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { RefreshCw, TrendingUp, TrendingDown, Wallet, FileDown, Ban, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
-import { fmtBRL, fmtBRLCompact } from '@/lib/money';
+import { fmtBRL, fmtBRLCompact, formatDateBR, parseLocalDate } from '@/lib/formatters';
 import { useCan } from '@/permissions/hooks';
 import { useDataEvent } from '@/lib/dataEvents';
 import * as XLSX from 'xlsx';
@@ -50,11 +50,6 @@ function SkeletonKpis() {
   );
 }
 
-function fmtDateBR(d: string) {
-  if (!d) return '—';
-  const [y, m, day] = d.split('-');
-  return `${day}/${m}/${y}`;
-}
 
 export default function ProjecaoFluxoSection() {
   const canView = useCan('financeiro:projecao:view');
@@ -134,7 +129,7 @@ export default function ProjecaoFluxoSection() {
     setExportingExcel(true);
     try {
       const rows = timeline.map(d => ({
-        Data: fmtDateBR(d.data),
+        Data: formatDateBR(parseLocalDate(d.data)),
         Entradas: d.entradas,
         Saídas: d.saidas,
         Saldo: d.saldo,
@@ -164,7 +159,7 @@ export default function ProjecaoFluxoSection() {
         startY: 30,
         head: [['Data', 'Entradas', 'Saídas', 'Saldo']],
         body: timeline.map(d => [
-          fmtDateBR(d.data),
+          formatDateBR(parseLocalDate(d.data)),
           fmt(d.entradas),
           fmt(d.saidas),
           fmt(d.saldo),
@@ -291,7 +286,7 @@ export default function ProjecaoFluxoSection() {
                   <YAxis tick={{ fontSize: 10 }} tickFormatter={fmtShort} className="text-muted-foreground" />
                   <Tooltip
                     formatter={(value: number, name: string) => [fmt(value), name === 'saldo' ? 'Saldo' : name === 'entradas' ? 'Entradas' : 'Saídas']}
-                    labelFormatter={l => `Data: ${fmtDateBR(String(l))}`}
+                    labelFormatter={l => `Data: ${formatDateBR(parseLocalDate(String(l)))}`}
                   />
                   <ReferenceLine y={0} stroke="hsl(var(--destructive))" strokeDasharray="3 3" />
                   <Area type="monotone" dataKey="saldo" stroke="hsl(var(--primary))" fill="hsl(var(--primary) / 0.2)" strokeWidth={2} />

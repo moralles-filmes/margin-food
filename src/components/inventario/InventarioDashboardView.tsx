@@ -89,7 +89,7 @@ export default function InventarioDashboardView({ dashboard: d, onBack, onOpenDe
                     <span className="text-foreground">{turno}</span>
                     <span className={`font-bold ${val < 0 ? 'text-destructive' : 'text-success'}`}>
                       {val < 0 ? <TrendingDown className="w-3 h-3 inline mr-1" /> : <TrendingUp className="w-3 h-3 inline mr-1" />}
-                      R$ {val.toFixed(2)}
+                      {fmtBRL(val)}
                     </span>
                   </div>
                 ))}
@@ -108,7 +108,7 @@ export default function InventarioDashboardView({ dashboard: d, onBack, onOpenDe
                       <span className="text-foreground font-medium">{data.nome}</span>
                       <span className="text-[10px] text-muted-foreground ml-2">{data.count} itens</span>
                     </div>
-                    <span className="text-destructive font-bold">R$ {data.total.toFixed(2)}</span>
+                    <span className="text-destructive font-bold">{fmtBRL(data.total)}</span>
                   </div>
                 ))}
               </div>
@@ -123,7 +123,7 @@ export default function InventarioDashboardView({ dashboard: d, onBack, onOpenDe
                 {Object.entries(d.categoriasDrift).sort((a, b) => a[1] - b[1]).map(([cat, val]) => (
                   <div key={cat} className="flex items-center justify-between text-xs">
                     <span className="text-foreground">{cat}</span>
-                    <span className={`font-bold ${val < 0 ? 'text-destructive' : 'text-success'}`}>R$ {val.toFixed(2)}</span>
+                    <span className={`font-bold ${val < 0 ? 'text-destructive' : 'text-success'}`}>{fmtBRL(val)}</span>
                   </div>
                 ))}
               </div>
@@ -155,7 +155,7 @@ export default function InventarioDashboardView({ dashboard: d, onBack, onOpenDe
                 {d.topCriticos.map(item => (
                   <div key={item.id} className="flex items-center justify-between bg-destructive/5 rounded-lg p-2.5">
                     <span className="text-xs text-foreground font-medium">{item.produtos?.nome_produto || 'Item'}</span>
-                    <span className="text-xs text-destructive font-bold">R$ {Number(item.impacto_financeiro).toFixed(2)}</span>
+                    <span className="text-xs text-destructive font-bold">{fmtBRL(item.impacto_financeiro)}</span>
                   </div>
                 ))}
               </div>

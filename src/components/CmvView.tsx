@@ -5,9 +5,17 @@ import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useCan, useModuleAccess } from '@/permissions/hooks';
 import { startOfMonth, endOfMonth } from 'date-fns';
-import { formatDateBR, formatInBR } from '@/lib/datetime';
-import { parseLocalDate } from '@/lib/dateUtils';
-import { formatFixedBR } from '@/lib/formatters';
+import { formatDateBR, formatInBR, formatFixedBR, fmtBRL, parseLocalDate, formatPercentBR } from '@/lib/formatters';
+
+const COLORS = [
+  'hsl(var(--primary))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))',
+  'hsl(var(--chart-4))', 'hsl(var(--chart-5))', 'hsl(var(--accent))',
+];
+
+function fmt(v: number) {
+  return fmtBRL(v);
+}
+
 import { AlertTriangle, Calculator, Lightbulb } from 'lucide-react';
 import { DecimalInput } from '@/components/ui/decimal-input';
 import { toast } from 'sonner';
@@ -187,7 +195,11 @@ export default function CmvView() {
     const newCusto = cmvData.custoTotal * (1 - redDesp / 100) * (1 - redCusto / 100);
     const newCmv = (newCusto / cmvData.faturamento) * 100;
     const economia = cmvData.custoTotal - newCusto;
-    return { newCmv: Math.round(newCmv * 100) / 100, economia: Math.round(economia * 100) / 100, newMargem: Math.round((100 - newCmv) * 100) / 100 };
+    return {
+      newCmv, 
+      economia, 
+      newMargem: 100 - newCmv
+    };
   }, [cmvData, simDesperdicioReduce, simCustoReduce]);
 
   const insights = useMemo(() => {
@@ -200,12 +212,12 @@ export default function CmvView() {
       msgs.push(`Categoria "${top.categoria}" é a maior responsável pelo custo (${top.percentCmv}%).`);
     }
     if (meta && cmvData.cmvTotalPct > meta.meta_cmv_total) {
-      msgs.push(`CMV ${cmvData.cmvTotalPct}% está acima da meta de ${meta.meta_cmv_total}%. Ação recomendada.`);
+      msgs.push(`CMV ${formatPercentBR(cmvData.cmvTotalPct)} está acima da meta de ${formatPercentBR(meta.meta_cmv_total)}. Ação recomendada.`);
     }
     return msgs;
   }, [cmvData, meta]);
 
-  const fmt = (v: number) => formatFixedBR(v, 2);
+  const fmt = (v: number) => fmtBRL(v);
 
   return (
     <div className="space-y-6">
@@ -298,9 +310,9 @@ export default function CmvView() {
             </div>
             {simResult && (
               <div className="bg-muted/50 rounded-lg p-3 space-y-1">
-                <p className="text-sm"><strong>Novo CMV:</strong> {simResult.newCmv}%</p>
-                <p className="text-sm"><strong>Economia:</strong> R$ {fmt(simResult.economia)}</p>
-                <p className="text-sm"><strong>Nova Margem:</strong> {simResult.newMargem}%</p>
+                <p className="text-sm"><strong>Novo CMV:</strong> {formatPercentBR(simResult.newCmv)}</p>
+                <p className="text-sm"><strong>Economia:</strong> {fmtBRL(simResult.economia)}</p>
+                <p className="text-sm"><strong>Nova Margem:</strong> {formatPercentBR(simResult.newMargem)}</p>
               </div>
             )}
           </CardContent>

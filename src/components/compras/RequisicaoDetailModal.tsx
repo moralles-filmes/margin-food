@@ -12,7 +12,7 @@ import { PurchaseRequisition, PurchaseRequisitionItem, AuditEntry, usePurchaseRe
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { APP_NAME } from '@/lib/brand';
-import { fmtBRL } from '@/lib/formatters';
+import { fmtBRL, formatFixedBR, formatDateTimeBR } from '@/lib/formatters';
 
 interface Props {
   requisitionId: string | null;
@@ -136,7 +136,7 @@ export default function RequisicaoDetailModal({ requisitionId, open, onClose, ca
     const items = (req.purchase_requisition_items || []).filter((i) => !i.is_ignored);
     const headers = 'Produto;Quantidade;Unidade;Preco Referencia;Subtotal;Prioridade\n';
     const rows = items.map((i) =>
-      `${i.produto_nome || i.produtos?.nome_produto || '—'};${i.quantidade_escolhida};${i.unidade};${(i.preco_referencia || 0).toFixed(2)};${(i.subtotal || 0).toFixed(2)};${i.prioridade}`
+      `${i.produto_nome || i.produtos?.nome_produto || '—'};${i.quantidade_escolhida};${i.unidade};${formatFixedBR(i.preco_referencia || 0, 2)};${formatFixedBR(i.subtotal || 0, 2)};${i.prioridade}`
     ).join('\n');
     const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -257,7 +257,7 @@ export default function RequisicaoDetailModal({ requisitionId, open, onClose, ca
                           ) : (
                             <>
                               <span className="text-xs text-muted-foreground">{item.quantidade_escolhida} {item.unidade}</span>
-                              {item.preco_referencia > 0 && <span className="text-xs font-medium text-foreground">R$ {item.subtotal?.toFixed(2)}</span>}
+                              {item.preco_referencia > 0 && <span className="text-xs font-medium text-foreground">{fmtBRL(item.subtotal || 0)}</span>}
                             </>
                           )}
                           {!editing && (
@@ -296,7 +296,7 @@ export default function RequisicaoDetailModal({ requisitionId, open, onClose, ca
               {/* Total */}
               <div className="flex justify-end mt-3 pt-2 border-t border-border">
                 <p className="text-sm font-bold text-foreground">
-                  Total: R$ {(req.purchase_requisition_items || []).filter((i) => !i.is_ignored).reduce((s, i) => s + (i.subtotal || 0), 0).toFixed(2)}
+                  Total: {fmtBRL((req.purchase_requisition_items || []).filter((i) => !i.is_ignored).reduce((s, i) => s + (i.subtotal || 0), 0))}
                 </p>
               </div>
             </TabsContent>
@@ -340,7 +340,7 @@ export default function RequisicaoDetailModal({ requisitionId, open, onClose, ca
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <p className="text-xs font-medium text-foreground">{a.acao}</p>
-                        <span className="text-[10px] text-muted-foreground">{new Date(a.created_at).toLocaleString('pt-BR')}</span>
+                        <span className="text-[10px] text-muted-foreground">{formatDateTimeBR(new Date(a.created_at))}</span>
                       </div>
                       <div className="flex items-center gap-1 mt-0.5">
                         <User className="w-3 h-3 text-muted-foreground" />

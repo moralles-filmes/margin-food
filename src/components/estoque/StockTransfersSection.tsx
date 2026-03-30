@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { ArrowRight, ArrowLeftRight, Loader2, Package, MapPin, RefreshCw, Search } from 'lucide-react';
 import { format, subDays } from 'date-fns';
+import { fmtBRL, formatFixedBR } from '@/lib/formatters';
 
 interface Transfer {
   transfer_group_id: string;
@@ -107,7 +108,7 @@ export default function StockTransfersSection({ categorias, locais }: Props) {
     const qty = Number(formQty);
     if (!qty || qty <= 0) { toast.error('Quantidade deve ser maior que zero'); return; }
     if (qty > selectedSaldo) {
-      toast.error(`Saldo insuficiente! Disponível: ${selectedSaldo.toFixed(2)} ${selectedProd?.unidadeMedida || ''}`);
+      toast.error(`Saldo insuficiente! Disponível: ${formatFixedBR(selectedSaldo, 2)} ${selectedProd?.unidadeMedida || ''}`);
       return;
     }
 
@@ -174,7 +175,7 @@ export default function StockTransfersSection({ categorias, locais }: Props) {
               </Select>
               {formProduct && (
                 <p className="text-[10px] text-muted-foreground mt-1">
-                  Saldo disponível: <span className="font-bold text-foreground">{selectedSaldo.toFixed(2)} {selectedProd?.unidadeMedida}</span>
+                  Saldo disponível: <span className="font-bold text-foreground">{formatFixedBR(selectedSaldo, 2)} {selectedProd?.unidadeMedida}</span>
                 </p>
               )}
             </div>
@@ -241,13 +242,13 @@ export default function StockTransfersSection({ categorias, locais }: Props) {
               <div className="text-center">
                 <MapPin className="w-3.5 h-3.5 mx-auto text-destructive mb-0.5" />
                 <p className="font-medium text-foreground">{formFrom}</p>
-                <p className="text-[10px] text-destructive">-{Number(formQty).toFixed(2)} {selectedProd?.unidadeMedida}</p>
+                <p className="text-[10px] text-destructive">-{formatFixedBR(Number(formQty), 2)} {selectedProd?.unidadeMedida}</p>
               </div>
               <ArrowRight className="w-5 h-5 text-primary" />
               <div className="text-center">
                 <MapPin className="w-3.5 h-3.5 mx-auto text-success mb-0.5" />
                 <p className="font-medium text-foreground">{formTo}</p>
-                <p className="text-[10px] text-success">+{Number(formQty).toFixed(2)} {selectedProd?.unidadeMedida}</p>
+                <p className="text-[10px] text-success">+{formatFixedBR(Number(formQty), 2)} {selectedProd?.unidadeMedida}</p>
               </div>
             </div>
           )}
@@ -360,10 +361,10 @@ export default function StockTransfersSection({ categorias, locais }: Props) {
                       </div>
                     </td>
                     <td className="p-2 text-right font-mono font-medium text-foreground whitespace-nowrap">
-                      {t.quantidade.toFixed(2)} {t.unidade_medida}
+                      {formatFixedBR(t.quantidade, 2)} {t.unidade_medida}
                     </td>
                     <td className="p-2 text-right font-mono text-muted-foreground whitespace-nowrap">
-                      R$ {t.custo_total.toFixed(2)}
+                      {fmtBRL(t.custo_total)}
                     </td>
                     <td className="p-2 max-w-[150px]">
                       <p className="text-muted-foreground truncate">

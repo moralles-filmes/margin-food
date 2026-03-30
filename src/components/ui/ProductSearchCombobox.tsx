@@ -32,6 +32,8 @@ interface ProductSearchComboboxProps {
   className?: string;
   /** Show clear button when a value is selected */
   allowClear?: boolean;
+  /** Set to true when combobox is used inside a Dialog/Sheet */
+  modal?: boolean;
 }
 
 export default function ProductSearchCombobox({
@@ -44,6 +46,7 @@ export default function ProductSearchCombobox({
   disabled = false,
   className,
   allowClear = true,
+  modal = true,
 }: ProductSearchComboboxProps) {
   const [open, setOpen] = useState(false);
 
@@ -65,7 +68,7 @@ export default function ProductSearchCombobox({
   );
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen} modal={modal}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"

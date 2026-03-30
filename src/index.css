@@ -8,6 +8,14 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Fix cmdk 1.x scroll bug ──
+   cmdk applies inline styles (overflow: hidden; height: var(--cmdk-list-height))
+   that prevent scrolling inside Radix Popover/Dialog. This override restores it. */
+[cmdk-list] {
+  max-height: 300px !important;
+  overflow: auto !important;
+}
+
 @layer base {
   :root {
     --background: 230 40% 98%;

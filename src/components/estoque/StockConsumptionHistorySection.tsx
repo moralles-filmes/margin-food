@@ -7,9 +7,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
 import { TrendingDown, TrendingUp, Minus, RefreshCw, BarChart3, Package, DollarSign, Calendar } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { formatFixedBR } from '@/lib/formatters';
+import { formatFixedBR, formatDateBR, formatInBR, fmtBRL } from '@/lib/formatters';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, LineChart, Line, ResponsiveContainer, Cell } from 'recharts';
-import { fmtBRL } from '@/lib/money';
 
 interface ConsumptionData {
   consumo_total: number;
@@ -85,10 +84,10 @@ export default function StockConsumptionHistorySection({ categorias }: { categor
   useEffect(() => { fetchData(); }, [fetchData]);
 
   const formatPeriodLabel = (period: string) => {
-    const d = new Date(period + 'T00:00:00');
-    if (groupBy === 'monthly') return d.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
-    if (groupBy === 'weekly') return `Sem ${d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`;
-    return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    const d = new Date(period + 'T12:00:00');
+    if (groupBy === 'monthly') return formatInBR(d, 'MMM/yy');
+    if (groupBy === 'weekly') return `Sem ${formatInBR(d, 'dd/MM')}`;
+    return formatInBR(d, 'dd/MM');
   };
 
   // Unique products for filter dropdown
@@ -190,7 +189,9 @@ export default function StockConsumptionHistorySection({ categorias }: { categor
               <Calendar className="w-4 h-4 text-muted-foreground" />
               <span className="text-[10px] text-muted-foreground font-medium">Período</span>
             </div>
-            <p className="text-sm font-bold text-foreground">{new Date(startDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} – {new Date(endDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}</p>
+            <p className="text-sm font-bold text-foreground">
+              {formatInBR(new Date(startDate + 'T12:00:00'), 'dd/MM')} – {formatInBR(new Date(endDate + 'T12:00:00'), 'dd/MM')}
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -284,7 +285,7 @@ export default function StockConsumptionHistorySection({ categorias }: { categor
                         {formatCurrency(p.custo_total)}
                       </TableCell>
                       <TableCell className="text-[11px] py-1.5 text-muted-foreground">
-                        {p.ultimo_consumo ? new Date(p.ultimo_consumo + 'T00:00:00').toLocaleDateString('pt-BR') : '—'}
+                        {p.ultimo_consumo ? formatDateBR(new Date(p.ultimo_consumo + 'T12:00:00')) : '—'}
                       </TableCell>
                     </TableRow>
                   ))}

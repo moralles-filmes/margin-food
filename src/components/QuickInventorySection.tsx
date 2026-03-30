@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Search, Loader2, ClipboardCheck, Package, CheckCircle, AlertTriangle, Zap, RotateCcw, Trash2 } from 'lucide-react';
+import { fmtBRL, formatFixedBR } from '@/lib/formatters';
 
 interface CountedItem {
   productId: string;
@@ -198,7 +199,7 @@ export default function QuickInventorySection() {
               <p className="text-[10px] text-muted-foreground">Ajustes gerados</p>
             </div>
             <div className="bg-secondary rounded-lg p-3">
-              <p className="text-lg font-bold text-foreground">R$ {saveResult.total_impact.toFixed(2)}</p>
+              <p className="text-lg font-bold text-foreground">{fmtBRL(saveResult.total_impact)}</p>
               <p className="text-[10px] text-muted-foreground">Impacto financeiro</p>
             </div>
           </div>
@@ -304,7 +305,7 @@ export default function QuickInventorySection() {
                     <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
                       <span>{item.categoria}</span>
                       <span>·</span>
-                      <span>Teórico: {item.saldoTeorico.toFixed(2)} {item.unidadeMedida}</span>
+                      <span>Teórico: {formatFixedBR(item.saldoTeorico, 2)} {item.unidadeMedida}</span>
                     </div>
                   </div>
 
@@ -324,7 +325,7 @@ export default function QuickInventorySection() {
 
                     {hasDiff && (
                       <Badge className={`text-[9px] px-1.5 h-5 ${diff > 0 ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
-                        {diff > 0 ? '+' : ''}{diff.toFixed(2)}
+                        {diff > 0 ? '+' : ''}{formatFixedBR(diff, 2)}
                       </Badge>
                     )}
 

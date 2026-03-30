@@ -1,13 +1,11 @@
 import { useMemo } from 'react';
 import { SalmonEntry, MetaCompraMensal } from '@/types/salmon';
-import { parseLocalDate } from '@/lib/dateUtils';
-import { todayBR } from '@/lib/datetime';
+import { todayBR, formatDateBR, formatInBR, fmtBRL, formatPercentBR, formatDecimalBR, parseLocalDate } from '@/lib/formatters';
 import { getWeeksOfMonth, WeekDef } from './WeeklyBreakdown';
 import { Gauge, TrendingUp, Activity, ShieldAlert, BarChart3, Info } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
 
-import { fmtBRL, formatPercentBR, formatDecimalBR } from '@/lib/formatters';
 const fmtR = (v: number) => fmtBRL(v);
 
 export interface PressureConfig {
@@ -334,7 +332,7 @@ export default function BudgetPressure({ entries, targetMonth, metas, config, ca
             analysis.pressaoStatus === 'critico' ? 'text-destructive'
               : analysis.pressaoStatus === 'pressionado' ? 'text-warning' : 'text-success'
           }`}>
-            {(analysis.pressaoAjustada * 100).toFixed(0)}%
+            {formatDecimalBR(analysis.pressaoAjustada * 100, 0)}%
           </span>
           <MiniBar value={analysis.pressaoAjustada} max={config?.limitePressaoVermelha || 1.15}
             color={analysis.pressaoStatus === 'critico' ? 'bg-destructive' : analysis.pressaoStatus === 'pressionado' ? 'bg-warning' : 'bg-success'} />
@@ -365,8 +363,8 @@ export default function BudgetPressure({ entries, targetMonth, metas, config, ca
               {analysis.maiorDesvioSemana && (
                 <p className="text-[10px] text-muted-foreground">
                   {analysis.maiorDesvioSemana.delta > 0
-                    ? `Você concentrou mais compras em ${analysis.maiorDesvioSemana.label} do que o normal (+${(analysis.maiorDesvioSemana.delta * 100).toFixed(0)}pp)`
-                    : `Você reduziu compras em ${analysis.maiorDesvioSemana.label} em relação ao padrão (${(analysis.maiorDesvioSemana.delta * 100).toFixed(0)}pp)`
+                    ? `Você concentrou mais compras em ${analysis.maiorDesvioSemana.label} do que o normal (+${formatDecimalBR(analysis.maiorDesvioSemana.delta * 100, 0)}pp)`
+                    : `Você reduziu compras em ${analysis.maiorDesvioSemana.label} em relação ao padrão (${formatDecimalBR(analysis.maiorDesvioSemana.delta * 100, 0)}pp)`
                   }
                 </p>
               )}
@@ -375,7 +373,7 @@ export default function BudgetPressure({ entries, targetMonth, metas, config, ca
             <p className="text-[11px] text-success font-medium">✅ Padrão dentro do esperado.</p>
           )}
 
-          <p className="text-[10px] text-muted-foreground">Desvio acumulado: {(analysis.desvioTotal * 100).toFixed(1)}% (limite: {(cfg.limitForaPadraoPercent * 100).toFixed(0)}%)</p>
+          <p className="text-[10px] text-muted-foreground">Desvio acumulado: {formatPercentBR(analysis.desvioTotal)} (limite: {formatPercentBR(cfg.limitForaPadraoPercent)})</p>
         </div>
       )}
 
@@ -393,7 +391,7 @@ export default function BudgetPressure({ entries, targetMonth, metas, config, ca
               analysis.consistenciaStatus === 'alta' ? 'text-success'
                 : analysis.consistenciaStatus === 'media' ? 'text-warning' : 'text-destructive'
             }`}>
-              {(analysis.indiceConsistencia * 100).toFixed(0)}%
+              {formatDecimalBR(analysis.indiceConsistencia * 100, 0)}%
             </span>
             <MiniBar value={analysis.indiceConsistencia} max={1}
               color={analysis.consistenciaStatus === 'alta' ? 'bg-success' : analysis.consistenciaStatus === 'media' ? 'bg-warning' : 'bg-destructive'} />
@@ -437,7 +435,7 @@ export default function BudgetPressure({ entries, targetMonth, metas, config, ca
           <div className="flex items-center gap-2">
             <span className={`text-lg font-bold font-display ${
               analysis.riscoStatus === 'alto' ? 'text-destructive' : analysis.riscoStatus === 'medio' ? 'text-warning' : 'text-success'
-            }`}>{(analysis.risco * 100).toFixed(0)}%</span>
+            }`}>{formatDecimalBR(analysis.risco * 100, 0)}%</span>
             <StatusBadge status={analysis.riscoStatus} label={riscoLabels[analysis.riscoStatus]} />
           </div>
           <span className={`text-[10px] font-medium ${analysis.projecaoFinal <= metaValor ? 'text-success' : 'text-destructive'}`}>
@@ -449,8 +447,8 @@ export default function BudgetPressure({ entries, targetMonth, metas, config, ca
 
         {analysis.historicoSuficiente && (
           <div className="text-[9px] text-muted-foreground space-y-0.5 pt-1 border-t border-border/50">
-            <p>Cenário histórico: {fmtR(analysis.projecaoHist)} (peso {(analysis.indiceConsistencia * 100).toFixed(0)}%)</p>
-            <p>Cenário tendência: {fmtR(analysis.projecaoTend)} (peso {((1 - analysis.indiceConsistencia) * 100).toFixed(0)}%)</p>
+            <p>Cenário histórico: {fmtR(analysis.projecaoHist)} (peso {formatDecimalBR(analysis.indiceConsistencia * 100, 0)}%)</p>
+            <p>Cenário tendência: {fmtR(analysis.projecaoTend)} (peso {formatDecimalBR((1 - analysis.indiceConsistencia) * 100, 0)}%)</p>
           </div>
         )}
 

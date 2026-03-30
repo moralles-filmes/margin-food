@@ -6,10 +6,15 @@ import { DecimalInput } from '@/components/ui/decimal-input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Target, RefreshCw } from 'lucide-react';
 import type { CmvResult, MetaCmv } from './types';
-import { formatFixedBR } from '@/lib/formatters';
+import { formatFixedBR, fmtBRL, formatPercentBR } from '@/lib/formatters';
+
+const COLORS = [
+  'hsl(var(--primary))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))',
+  'hsl(var(--chart-4))', 'hsl(var(--chart-5))', 'hsl(var(--accent))',
+];
 
 function fmt(v: number) {
-  return formatFixedBR(v, 2);
+  return fmtBRL(v);
 }
 
 function statusBadge(status: string) {
@@ -80,20 +85,20 @@ export default function CmvMetasDialog({
         <div className="grid grid-cols-3 gap-4">
           <div className="text-center">
             <p className="text-xs text-muted-foreground mb-1">CMV Geral</p>
-            <p className="text-lg font-bold">{fmt(cmvData.cmvGeralPct)}%</p>
-            <p className="text-xs text-muted-foreground">Meta: {meta.meta_cmv_geral}%</p>
+            <p className="text-lg font-bold">{formatPercentBR(cmvData.cmvGeralPct)}</p>
+            <p className="text-xs text-muted-foreground">Meta: {formatPercentBR(meta.meta_cmv_geral)}</p>
             {statusBadge(getMetaStatus(cmvData.cmvGeralPct, meta.meta_cmv_geral))}
           </div>
           <div className="text-center">
             <p className="text-xs text-muted-foreground mb-1">CMV Salmão</p>
-            <p className="text-lg font-bold">{fmt(cmvData.cmvSalmaoPct)}%</p>
-            <p className="text-xs text-muted-foreground">Meta: {meta.meta_cmv_salmao}%</p>
+            <p className="text-lg font-bold">{formatPercentBR(cmvData.cmvSalmaoPct)}</p>
+            <p className="text-xs text-muted-foreground">Meta: {formatPercentBR(meta.meta_cmv_salmao)}</p>
             {statusBadge(getMetaStatus(cmvData.cmvSalmaoPct, meta.meta_cmv_salmao))}
           </div>
           <div className="text-center">
             <p className="text-xs text-muted-foreground mb-1">CMV Total</p>
-            <p className="text-lg font-bold">{fmt(cmvData.cmvTotalPct)}%</p>
-            <p className="text-xs text-muted-foreground">Meta: {meta.meta_cmv_total}%</p>
+            <p className="text-lg font-bold">{formatPercentBR(cmvData.cmvTotalPct)}</p>
+            <p className="text-xs text-muted-foreground">Meta: {formatPercentBR(meta.meta_cmv_total)}</p>
             {statusBadge(getMetaStatus(cmvData.cmvTotalPct, meta.meta_cmv_total))}
           </div>
         </div>

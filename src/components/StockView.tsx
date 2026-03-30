@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { fmtBRL } from '@/lib/money';
+import { fmtBRL, formatFixedBR, formatDateBR, formatInBR, parseLocalDate } from '@/lib/formatters';
 import { useSalmonStore } from '@/hooks/useSalmonStore';
 import { Warehouse, Droplets, Clock, Settings2, Check, AlertTriangle, Zap, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -7,10 +7,7 @@ import { Label } from '@/components/ui/label';
 import { DecimalInput, parseDecimal } from '@/components/ui/decimal-input';
 import { toast } from 'sonner';
 import PeriodFilter, { PeriodRange, getDefaultRange, filterByPeriod } from './PeriodFilter';
-import { formatDisplayBR, formatInBR } from '@/lib/datetime';
 import ValidadeAlertCard from './ValidadeAlertCard';
-
-function parseLocalDate(d: string) { const [y, m, dd] = d.split('-').map(Number); return new Date(y, m - 1, dd); }
 
 interface StockViewProps {
   store: ReturnType<typeof useSalmonStore>;
@@ -90,7 +87,7 @@ export default function StockView({ store, onStartManipulation }: StockViewProps
               <div>
                 <span className="text-xs font-semibold text-foreground">{lot.lot || 'Sem lote'}</span>
                 <span className="text-[10px] text-muted-foreground ml-2">{lot.supplier}</span>
-                <p className="text-[10px] text-destructive">⚠️ Parado há {lot.daysSinceMovement} dias — saldo {lot.balanceKg.toFixed(1)} kg</p>
+                <p className="text-[10px] text-destructive">⚠️ Parado há {lot.daysSinceMovement} dias — saldo {formatFixedBR(lot.balanceKg, 1)} kg</p>
               </div>
               {onStartManipulation && (
                 <Button size="sm" variant="outline" className="h-7 text-[10px] border-primary/30 text-primary gap-1" onClick={() => onStartManipulation(lot.entryId)}>
@@ -113,11 +110,11 @@ export default function StockView({ store, onStartManipulation }: StockViewProps
           </div>
           <div>
             <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Estoque Bruto</p>
-            {lowGross && <p className="text-[10px] text-destructive">⚠️ Abaixo do mínimo ({stockConfig.minGrossKg} kg)</p>}
+            {lowGross && <p className="text-[10px] text-destructive">⚠️ Abaixo do mínimo ({formatFixedBR(stockConfig.minGrossKg, 1)} kg)</p>}
           </div>
         </div>
         <div className="grid grid-cols-3 gap-3">
-          <div><p className="text-2xl font-display font-bold text-foreground">{stock.grossKg.toFixed(1)}</p><p className="text-[10px] text-muted-foreground">kg disponível</p></div>
+          <div><p className="text-2xl font-display font-bold text-foreground">{formatFixedBR(stock.grossKg, 1)}</p><p className="text-[10px] text-muted-foreground">kg disponível</p></div>
           <div><p className="text-lg font-display font-bold text-warning">{fmtBRL(stock.grossValue)}</p><p className="text-[10px] text-muted-foreground">valor estoque</p></div>
           <div><p className="text-lg font-display font-bold text-primary">{fmtBRL(stock.avgCostPerKg)}</p><p className="text-[10px] text-muted-foreground">custo médio/kg</p></div>
         </div>
@@ -131,13 +128,13 @@ export default function StockView({ store, onStartManipulation }: StockViewProps
           </div>
           <div>
             <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Estoque Limpo</p>
-            {lowClean && <p className="text-[10px] text-destructive">⚠️ Abaixo do mínimo ({stockConfig.minCleanKg} kg)</p>}
+            {lowClean && <p className="text-[10px] text-destructive">⚠️ Abaixo do mínimo ({formatFixedBR(stockConfig.minCleanKg, 1)} kg)</p>}
           </div>
         </div>
         <div className="grid grid-cols-3 gap-3">
-          <div><p className="text-2xl font-display font-bold text-foreground">{stock.cleanKg.toFixed(1)}</p><p className="text-[10px] text-muted-foreground">kg limpo</p></div>
+          <div><p className="text-2xl font-display font-bold text-foreground">{formatFixedBR(stock.cleanKg, 1)}</p><p className="text-[10px] text-muted-foreground">kg limpo</p></div>
           <div><p className="text-lg font-display font-bold text-foreground flex items-center gap-1"><Clock className="w-3.5 h-3.5 text-muted-foreground" />{daysRemaining !== Infinity ? daysRemaining : '∞'}</p><p className="text-[10px] text-muted-foreground">dias restantes</p></div>
-          <div><p className="text-lg font-display font-bold text-foreground">{avgDailyConsumption.toFixed(1)}</p><p className="text-[10px] text-muted-foreground">kg/dia consumo</p></div>
+          <div><p className="text-lg font-display font-bold text-foreground">{formatFixedBR(avgDailyConsumption, 1)}</p><p className="text-[10px] text-muted-foreground">kg/dia consumo</p></div>
         </div>
 
         {/* Clean lots detail */}
@@ -152,11 +149,11 @@ export default function StockView({ store, onStartManipulation }: StockViewProps
                   <span className="text-muted-foreground">{l.fornecedor}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-success font-bold">{l.kgRestante.toFixed(1)} kg</span>
+                  <span className="text-success font-bold">{formatFixedBR(l.kgRestante, 1)} kg</span>
                   <span className={`text-[9px] px-1.5 py-0.5 rounded ${l.status === 'FRESCO' ? 'bg-success/10 text-success' : l.status === 'VENCE_HOJE' ? 'bg-warning/10 text-warning' : 'bg-destructive/10 text-destructive'}`}>
                     {l.status === 'FRESCO' ? 'Fresco' : l.status === 'VENCE_HOJE' ? 'Vence hoje' : 'Vencido'}
                   </span>
-                  <span className="text-[10px] text-muted-foreground">Val: {formatInBR(parseLocalDate(l.dataValidade), 'dd/MM')}</span>
+                  <span className="text-[10px] text-muted-foreground">Val: {formatDateBR(parseLocalDate(l.dataValidade))}</span>
                 </div>
               </div>
             ))}
@@ -171,7 +168,7 @@ export default function StockView({ store, onStartManipulation }: StockViewProps
           {movements.slice(0, 15).map(item => (
             <div key={item.id} className="flex items-center gap-2 text-[11px]">
               <div className={`w-1.5 h-1.5 rounded-full ${item.type === 'in' ? 'bg-success' : 'bg-primary'}`} />
-              <span className="text-muted-foreground">{formatDisplayBR(parseLocalDate(item.date))}</span>
+              <span className="text-muted-foreground">{formatDateBR(parseLocalDate(item.date))}</span>
               <span className="text-foreground">{item.desc}</span>
             </div>
           ))}

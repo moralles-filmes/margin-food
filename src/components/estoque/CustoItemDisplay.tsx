@@ -3,8 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { TrendingUp, TrendingDown, Minus, Calendar, Truck, Info } from 'lucide-react';
-import { formatDisplayBR } from '@/lib/datetime';
-import { fmtBRL, formatDecimalBR } from '@/lib/formatters';
+import { fmtBRL, formatDecimalBR, formatDateBR } from '@/lib/formatters';
 import type { ProdutoExtended } from '@/types/estoque';
 
 const fmt = (v: number) => fmtBRL(v);
@@ -122,7 +121,7 @@ export default function CustoItemDisplay({ produto: p, saldoBase, showSelector =
               <p className="text-[10px] font-semibold text-foreground">🛒 Última Compra</p>
               {p.lastPurchaseDate && (
                 <span className="text-[9px] text-muted-foreground flex items-center gap-1">
-                  <Calendar className="w-3 h-3" /> {formatDisplayBR(new Date(p.lastPurchaseDate))}
+                  <Calendar className="w-3 h-3" /> {formatDateBR(new Date(p.lastPurchaseDate))}
                 </span>
               )}
             </div>
@@ -205,7 +204,7 @@ export default function CustoItemDisplay({ produto: p, saldoBase, showSelector =
         <div className="flex items-center justify-between text-[10px]">
           <span className="text-muted-foreground">Estoque atual</span>
           <span className="font-semibold text-foreground">
-            {showDual ? `${formatDecimalBR(saldoPurchase, 1)} ${unCompra} (${formatDecimalBR(saldoBase, 1)} ${p.unidadeMedida})` : `${formatDecimalBR(saldoBase, saldoBase % 1 === 0 ? 0 : 1)} ${p.unidadeMedida}`}
+            {showDual ? `${formatDecimalBR(saldoPurchase, 1)} ${unCompra} (${formatDecimalBR(saldoBase, 1)} ${p.unidadeMedida})` : `${formatDecimalBR(saldoBase, Number.isInteger(saldoBase) ? 0 : 1)} ${p.unidadeMedida}`}
           </span>
         </div>
         <div className="flex items-center justify-between text-[10px]">

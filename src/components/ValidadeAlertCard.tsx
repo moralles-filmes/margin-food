@@ -1,7 +1,7 @@
 import { AlertTriangle, Clock, ShieldAlert } from 'lucide-react';
 import { LoteSalmaoLimpo } from '@/types/salmon';
 import { format } from 'date-fns';
-import { fmtBRL } from '@/lib/money';
+import { fmtBRL, formatFixedBR } from '@/lib/formatters';
 
 function parseLocalDate(d: string) {
   const [y, m, dd] = d.split('-').map(Number);
@@ -40,8 +40,8 @@ export default function ValidadeAlertCard({ lotesLimpos, onPrioritize }: Props) 
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-card rounded-lg p-2.5">
           <p className="text-[10px] text-muted-foreground">Kg em risco</p>
-          <p className="text-lg font-display font-bold text-destructive">{kgRisco.toFixed(1)} kg</p>
-          <p className="text-[10px] text-muted-foreground">{pctRisco.toFixed(0)}% do estoque limpo</p>
+          <p className="text-lg font-display font-bold text-destructive">{formatFixedBR(kgRisco, 1)} kg</p>
+          <p className="text-[10px] text-muted-foreground">{formatFixedBR(pctRisco, 0)}% do estoque limpo</p>
         </div>
         <div className="bg-card rounded-lg p-2.5">
           <p className="text-[10px] text-muted-foreground">R$ em risco</p>
@@ -57,7 +57,7 @@ export default function ValidadeAlertCard({ lotesLimpos, onPrioritize }: Props) 
               <div key={l.manipulacaoId} className="flex items-center justify-between bg-card rounded-lg p-2 mb-1">
                 <div className="text-[11px]">
                   <span className="font-medium text-foreground">{l.lote || '—'}</span>
-                  <span className="text-muted-foreground ml-2">{l.kgRestante.toFixed(1)} kg</span>
+                  <span className="text-muted-foreground ml-2">{formatFixedBR(l.kgRestante, 1)} kg</span>
                   <span className="text-destructive ml-2">Val: {format(parseLocalDate(l.dataValidade), 'dd/MM')}</span>
                 </div>
               </div>
@@ -74,7 +74,7 @@ export default function ValidadeAlertCard({ lotesLimpos, onPrioritize }: Props) 
               <div key={l.manipulacaoId} className="flex items-center justify-between bg-card rounded-lg p-2 mb-1">
                 <div className="text-[11px]">
                   <span className="font-medium text-foreground">{l.lote || '—'}</span>
-                  <span className="text-muted-foreground ml-2">{l.kgRestante.toFixed(1)} kg</span>
+                  <span className="text-muted-foreground ml-2">{formatFixedBR(l.kgRestante, 1)} kg</span>
                   <span className="text-warning ml-2">Val: {format(parseLocalDate(l.dataValidade), 'dd/MM')}</span>
                 </div>
                 {onPrioritize && (

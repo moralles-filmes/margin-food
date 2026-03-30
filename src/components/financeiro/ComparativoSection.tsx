@@ -9,10 +9,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { formatInBR } from '@/lib/datetime';
+import { formatInBR, fmtBRL, formatPercentBR, formatDecimalBR, formatDateBR } from '@/lib/formatters';
 import { subMonths } from 'date-fns';
 import { RefreshCw, ArrowRight, Equal, FileDown, Ban, AlertTriangle } from 'lucide-react';
-import { fmtBRL, formatPercentBR } from '@/lib/formatters';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { fmtBRLCompact } from '@/lib/money';
 import { useCan } from '@/permissions/hooks';
@@ -168,9 +167,9 @@ export default function ComparativoSection() {
       // Comparativo
       const compRows = linhas.map(l => ({
         Indicador: l.label,
-        [mesALabel]: l.isNum ? l.a : l.isPct ? `${l.a.toFixed(1)}%` : l.a,
-        [mesBLabel]: l.isNum ? l.b : l.isPct ? `${l.b.toFixed(1)}%` : l.b,
-        'Variação': l.isPct ? `${(l.pp ?? 0).toFixed(1)}pp` : variacao(l.pct ?? 0),
+        [mesALabel]: l.isNum ? l.a : l.isPct ? `${formatDecimalBR(l.a, 1)}%` : l.a,
+        [mesBLabel]: l.isNum ? l.b : l.isPct ? `${formatDecimalBR(l.b, 1)}%` : l.b,
+        'Variação': l.isPct ? `${formatDecimalBR(l.pp ?? 0, 1)}pp` : variacao(l.pct ?? 0),
       }));
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(compRows), 'Comparativo');
 
@@ -180,7 +179,7 @@ export default function ComparativoSection() {
           Categoria: c.categoria,
           [mesALabel]: c.valor_a,
           [mesBLabel]: c.valor_b,
-          'Variação %': c.variacao_pct.toFixed(1),
+          'Variação %': formatDecimalBR(c.variacao_pct, 1),
         }));
         XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(catRows), 'Categorias');
       }
@@ -208,9 +207,9 @@ export default function ComparativoSection() {
         head: [['Indicador', mesALabel, mesBLabel, 'Variação']],
         body: linhas.map(l => [
           l.label,
-          l.isNum ? String(l.a) : l.isPct ? `${l.a.toFixed(1)}%` : fmt(l.a),
-          l.isNum ? String(l.b) : l.isPct ? `${l.b.toFixed(1)}%` : fmt(l.b),
-          l.isPct ? `${(l.pp ?? 0).toFixed(1)}pp` : variacao(l.pct ?? 0),
+          l.isNum ? String(l.a) : l.isPct ? `${formatDecimalBR(l.a, 1)}%` : fmt(l.a),
+          l.isNum ? String(l.b) : l.isPct ? `${formatDecimalBR(l.b, 1)}%` : fmt(l.b),
+          l.isPct ? `${formatDecimalBR(l.pp ?? 0, 1)}pp` : variacao(l.pct ?? 0),
         ]),
         styles: { fontSize: 8 },
         headStyles: { fillColor: [30, 41, 59] },
@@ -227,7 +226,7 @@ export default function ComparativoSection() {
             c.categoria,
             fmt(c.valor_a),
             fmt(c.valor_b),
-            `${c.variacao_pct.toFixed(1)}%`,
+            `${formatDecimalBR(c.variacao_pct, 1)}%`,
           ]),
           styles: { fontSize: 8 },
           headStyles: { fillColor: [30, 41, 59] },
@@ -318,18 +317,18 @@ export default function ComparativoSection() {
                         <div className="text-right">
                           <p className="text-xs text-muted-foreground">{mesALabel}</p>
                           <p className="font-bold">
-                            {linha.isNum ? linha.a : linha.isPct ? `${linha.a.toFixed(1)}%` : fmt(linha.a)}
+                            {linha.isNum ? linha.a : linha.isPct ? `${formatDecimalBR(linha.a, 1)}%` : fmt(linha.a)}
                           </p>
                         </div>
                         <div className="text-right">
                           <p className="text-xs text-muted-foreground">{mesBLabel}</p>
                           <p className="font-bold">
-                            {linha.isNum ? linha.b : linha.isPct ? `${linha.b.toFixed(1)}%` : fmt(linha.b)}
+                            {linha.isNum ? linha.b : linha.isPct ? `${formatDecimalBR(linha.b, 1)}%` : fmt(linha.b)}
                           </p>
                         </div>
                         <Badge variant="outline" className={`${color} min-w-[70px] justify-center`}>
                           {linha.isPct
-                            ? `${(linha.pp ?? 0).toFixed(1)}pp`
+                            ? `${formatDecimalBR(linha.pp ?? 0, 1)}pp`
                             : variacao(linha.pct ?? 0)
                           }
                         </Badge>

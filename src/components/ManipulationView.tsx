@@ -9,11 +9,10 @@ import { useCan } from '@/permissions/hooks';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import PeriodFilter, { PeriodRange, getDefaultRange, filterByPeriod } from './PeriodFilter';
-import { formatDisplayBR } from '@/lib/datetime';
+import { todayBR, formatInBR, formatDateBR, fmtBRL, formatPercentBR, formatFixedBR, formatDecimalBR, normalizeBRLMoneyToNumber } from '@/lib/formatters';
 import SmartSuggestionCard from './SmartSuggestionCard';
 import EtiquetaModal from './EtiquetaModal';
 import { Manipulation } from '@/types/salmon';
-import { todayBR } from '@/lib/datetime';
 
 function parseLocalDate(dateStr: string): Date {
   const [y, m, d] = dateStr.split('-').map(Number);
@@ -175,7 +174,7 @@ export default function ManipulationView({ store, preSelectedEntryId, onClearPre
 
   const confirmStep = () => {
     if (step === 0 && !wizard.entryId) { toast.error('Selecione um lote'); return; }
-    if (step === 4 && exceedsLotStock) { toast.error(`Kg bruto excede saldo do lote (${effectiveLotBalance.toFixed(1)} kg)`); return; }
+    if (step === 4 && exceedsLotStock) { toast.error(`Kg bruto excede saldo do lote (${formatFixedBR(effectiveLotBalance, 1)} kg)`); return; }
     if (step === 5 && cleanKg > grossKg) { toast.error('Kg limpo não pode ser maior que bruto'); return; }
     const newConfirmed = [...confirmed];
     newConfirmed[step] = true;
@@ -242,7 +241,7 @@ export default function ManipulationView({ store, preSelectedEntryId, onClearPre
     try {
       await recordLeftover(m.id, kg);
       const consumoReal = m.cleanKg - kg;
-      toast.success(`Sobra: ${kg} kg • Consumo real: ${consumoReal.toFixed(1)} kg`);
+      toast.success(`Sobra: ${kg} kg • Consumo real: ${formatFixedBR(consumoReal, 1)} kg`);
       setLeftoverForm(null);
     } catch {
       // error already toasted in store
@@ -279,7 +278,7 @@ export default function ManipulationView({ store, preSelectedEntryId, onClearPre
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-display font-bold text-foreground">Manipulação</h2>
-          <p className="text-xs text-muted-foreground">Estoque bruto: {stock.grossKg.toFixed(1)} kg • Limpo: {stock.cleanKg.toFixed(1)} kg</p>
+          <p className="text-xs text-muted-foreground">Estoque bruto: {formatFixedBR(stock.grossKg, 1)} kg • Limpo: {formatFixedBR(stock.cleanKg, 1)} kg</p>
         </div>
         {!showWizard && canCreate && (
           <Button onClick={() => startNewWizard()} size="sm" className="gradient-salmon text-primary-foreground border-0 gap-1.5">
@@ -335,7 +334,7 @@ export default function ManipulationView({ store, preSelectedEntryId, onClearPre
                           <Zap className="w-4 h-4 text-success shrink-0" />
                           <div className="flex-1">
                             <span className="text-xs font-bold text-success">Usar FIFO (recomendado)</span>
-                            <p className="text-[10px] text-muted-foreground">{fifoLot.lot || 'Sem lote'} • {fifoLot.supplier} • {fifoLot.balanceKg.toFixed(1)} kg</p>
+                            <p className="text-[10px] text-muted-foreground">{fifoLot.lot || 'Sem lote'} • {fifoLot.supplier} • {formatFixedBR(fifoLot.balanceKg, 1)} kg</p>
                           </div>
                         </button>
                       )}
@@ -353,14 +352,14 @@ export default function ManipulationView({ store, preSelectedEntryId, onClearPre
                                 {isFifo(lot.entryId) && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-success/15 text-success font-bold">FIFO</span>}
                                 {lot.isStale && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-destructive/15 text-destructive">Parado {lot.daysSinceMovement}d</span>}
                               </div>
-                              <span className="text-xs font-bold text-primary">{lot.balanceKg.toFixed(1)} kg</span>
+                              <span className="text-xs font-bold text-primary">{formatFixedBR(lot.balanceKg, 1)} kg</span>
                             </div>
                             <div className="flex items-center gap-2 mt-1 text-[11px] text-muted-foreground">
                               <span>SIF: {lot.sif || '—'}</span><span>•</span><span>{lot.supplier || '—'}</span><span>•</span>
-                              <span>{formatDisplayBR(parseLocalDate(lot.entryDate))}</span><span>•</span>
-                              <span className="text-warning">R$ {lot.costPerKgBruto.toFixed(2)}/kg</span>
+                              <span>{formatDateBR(parseLocalDate(lot.entryDate))}</span><span>•</span>
+                              <span className="text-warning">{fmtBRL(lot.costPerKgBruto)}/kg</span>
                             </div>
-                            {lot.avgYield !== undefined && <div className="text-[10px] text-warning mt-1">Rend. histórico: {lot.avgYield.toFixed(1)}%</div>}
+                            {lot.avgYield !== undefined && <div className="text-[10px] text-warning mt-1">Rend. histórico: {formatPercentBR(lot.avgYield)}</div>}
                           </button>
                         ))}
                       </div>
@@ -376,12 +375,12 @@ export default function ManipulationView({ store, preSelectedEntryId, onClearPre
                           {isSupplierInactive && <span className="text-[9px] px-1 py-0.5 rounded bg-destructive/10 text-destructive">Inativo</span>}
                         </span>
                         <span className="text-muted-foreground">SIF:</span><span className="text-foreground">{selectedLot.sif || '—'}</span>
-                        <span className="text-muted-foreground">Saldo:</span><span className="text-primary font-bold">{selectedLot.balanceKg.toFixed(1)} kg</span>
-                        <span className="text-muted-foreground">Custo/kg:</span><span className="text-warning font-bold">R$ {selectedLot.costPerKgBruto.toFixed(2)}</span>
-                        <span className="text-muted-foreground">Entrada:</span><span className="text-foreground">{formatDisplayBR(parseLocalDate(selectedLot.entryDate))}</span>
+                        <span className="text-muted-foreground">Saldo:</span><span className="text-primary font-bold">{formatFixedBR(selectedLot.balanceKg, 1)} kg</span>
+                        <span className="text-muted-foreground">Custo/kg:</span><span className="text-warning font-bold">{fmtBRL(selectedLot.costPerKgBruto)}</span>
+                        <span className="text-muted-foreground">Entrada:</span><span className="text-foreground">{formatDateBR(parseLocalDate(selectedLot.entryDate))}</span>
                       </div>
                       {supplierHistory && (
-                        <p className="text-[10px] text-warning mt-1">📊 Fornecedor: {supplierHistory.avgYield.toFixed(1)}% rendimento ({supplierHistory.count} manip.)</p>
+                        <p className="text-[10px] text-warning mt-1">📊 Fornecedor: {formatPercentBR(supplierHistory.avgYield)} rendimento ({supplierHistory.count} manip.)</p>
                       )}
                     </div>
                   )}
@@ -417,8 +416,8 @@ export default function ManipulationView({ store, preSelectedEntryId, onClearPre
               {step === 4 && (
                 <div className="space-y-2">
                   <DecimalInput value={wizard.grossKg} onValueChange={(raw) => setWizard(w => ({ ...w, grossKg: raw }))} maxDecimals={1} placeholder="0,0" className={`bg-card border-border text-foreground ${exceedsLotStock ? 'border-destructive' : ''}`} autoFocus />
-                  {exceedsLotStock && <p className="text-[10px] text-destructive flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Excede saldo ({effectiveLotBalance.toFixed(1)} kg)</p>}
-                  <p className="text-[10px] text-muted-foreground">Saldo: {effectiveLotBalance.toFixed(1)} kg • Custo: R$ {lotCostPerKg.toFixed(2)}/kg</p>
+                  {exceedsLotStock && <p className="text-[10px] text-destructive flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Excede saldo ({formatFixedBR(effectiveLotBalance, 1)} kg)</p>}
+                  <p className="text-[10px] text-muted-foreground">Saldo: {formatFixedBR(effectiveLotBalance, 1)} kg • Custo: {fmtBRL(lotCostPerKg)}/kg</p>
                 </div>
               )}
 
@@ -458,20 +457,20 @@ export default function ManipulationView({ store, preSelectedEntryId, onClearPre
               <div className="mt-3 p-2.5 rounded-lg bg-secondary/30 space-y-2">
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">📦 Dados Operacionais</p>
                 <div className="grid grid-cols-2 gap-2">
-                  <div className="text-center"><p className="text-[10px] text-muted-foreground">Kg Bruto</p><p className="text-sm font-bold text-foreground">{grossKg.toFixed(1)} kg</p></div>
-                  <div className="text-center"><p className="text-[10px] text-muted-foreground">Kg Limpo</p><p className="text-sm font-bold text-success">{cleanKg.toFixed(1)} kg</p></div>
-                  <div className="text-center"><p className="text-[10px] text-muted-foreground">Perda</p><p className="text-sm font-bold text-destructive">{lossKg.toFixed(1)} kg ({lossPercent.toFixed(1)}%)</p></div>
-                  <div className="text-center"><p className="text-[10px] text-muted-foreground">Aproveitamento</p><p className="text-sm font-bold text-success">{yieldPercent.toFixed(1)}%</p></div>
+                  <div className="text-center"><p className="text-[10px] text-muted-foreground">Kg Bruto</p><p className="text-sm font-bold text-foreground">{formatFixedBR(grossKg, 1)} kg</p></div>
+                  <div className="text-center"><p className="text-[10px] text-muted-foreground">Kg Limpo</p><p className="text-sm font-bold text-success">{formatFixedBR(cleanKg, 1)} kg</p></div>
+                  <div className="text-center"><p className="text-[10px] text-muted-foreground">Perda</p><p className="text-sm font-bold text-destructive">{formatFixedBR(lossKg, 1)} kg ({formatPercentBR(lossPercent)})</p></div>
+                  <div className="text-center"><p className="text-[10px] text-muted-foreground">Aproveitamento</p><p className="text-sm font-bold text-success">{formatPercentBR(yieldPercent)}</p></div>
                 </div>
 
                 <div className="border-t border-border/30 pt-2">
                   <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">💰 Dados Financeiros</p>
                   <div className="grid grid-cols-3 gap-2 mt-1">
-                    <div className="text-center"><p className="text-[10px] text-muted-foreground">Valor bruto</p><p className="text-sm font-bold text-foreground">R$ {valorTotalBrutoPreview.toFixed(2)}</p></div>
-                    <div className="text-center"><p className="text-[10px] text-muted-foreground">Aproveitado</p><p className="text-sm font-bold text-success">R$ {valorTotalLimpoPreview.toFixed(2)}</p></div>
+                    <div className="text-center"><p className="text-[10px] text-muted-foreground">Valor bruto</p><p className="text-sm font-bold text-foreground">{fmtBRL(valorTotalBrutoPreview)}</p></div>
+                    <div className="text-center"><p className="text-[10px] text-muted-foreground">Aproveitado</p><p className="text-sm font-bold text-success">{fmtBRL(valorTotalLimpoPreview)}</p></div>
                     <div className="text-center"><p className="text-[10px] text-muted-foreground">Perda R$</p>
                       <p className={`text-sm font-bold ${(lossPercent > perdaPercentAlerta || perdaValorPreview > perdaValorAlerta) ? 'text-destructive animate-pulse' : 'text-destructive'}`}>
-                        R$ {perdaValorPreview.toFixed(2)}
+                        {fmtBRL(perdaValorPreview)}
                       </p>
                     </div>
                   </div>
@@ -484,14 +483,14 @@ export default function ManipulationView({ store, preSelectedEntryId, onClearPre
                 </div>
 
                 <div className="border-t border-border/30 pt-2 grid grid-cols-2 gap-2">
-                  <div className="text-center"><p className="text-[10px] text-muted-foreground">Custo manipulação</p><p className="text-sm font-bold text-warning">R$ {custoManipulacao.toFixed(2)}</p></div>
-                  <div className="text-center"><p className="text-[10px] text-muted-foreground">Custo/kg limpo</p><p className="text-sm font-bold text-warning">R$ {custoKgLimpo.toFixed(2)}</p></div>
+                  <div className="text-center"><p className="text-[10px] text-muted-foreground">Custo manipulação</p><p className="text-sm font-bold text-warning">{fmtBRL(custoManipulacao)}</p></div>
+                  <div className="text-center"><p className="text-[10px] text-muted-foreground">Custo/kg limpo</p><p className="text-sm font-bold text-warning">{fmtBRL(custoKgLimpo)}</p></div>
                 </div>
 
                 {/* Validity preview */}
                 <div className="border-t border-border/30 pt-2 text-center">
                   <p className="text-[10px] text-muted-foreground">📅 Validade estimada</p>
-                  <p className="text-sm font-bold text-warning">{formatDisplayBR(parseLocalDate(getDataValidade(selectedDate)))}</p>
+                  <p className="text-sm font-bold text-warning">{formatDateBR(parseLocalDate(getDataValidade(selectedDate)))}</p>
                 </div>
               </div>
             )}
@@ -534,7 +533,7 @@ export default function ManipulationView({ store, preSelectedEntryId, onClearPre
                 {m.divergenciaLote && <span className="text-[9px] px-1 py-0.5 rounded bg-destructive/10 text-destructive">⚠ Divergência</span>}
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="text-xs text-muted-foreground">{formatDisplayBR(parseLocalDate(m.date))}</span>
+                <span className="text-xs text-muted-foreground">{formatDateBR(parseLocalDate(m.date))}</span>
                 <button onClick={() => setEtiquetaManip(m)} className="p-1.5 rounded-lg text-muted-foreground hover:bg-warning/10 hover:text-warning" title="Imprimir etiqueta">
                   <Printer className="w-3.5 h-3.5" />
                 </button>
@@ -568,10 +567,10 @@ export default function ManipulationView({ store, preSelectedEntryId, onClearPre
               <div><span className="text-muted-foreground">Limpo</span><br /><span className="font-medium text-success">{m.cleanKg} kg</span></div>
               <div>
                 <span className="text-muted-foreground">Perda</span><br />
-                <span className="font-medium text-destructive">{m.lossKg.toFixed(1)} kg • {m.lossPercent.toFixed(1)}%</span>
+                <span className="font-medium text-destructive">{formatFixedBR(m.lossKg, 1)} kg • {formatPercentBR(m.lossPercent)}</span>
                 {m.perdaValor != null && (
                   <span className={`block font-bold ${((m.lossPercent > perdaPercentAlerta) || ((m.perdaValor || 0) > perdaValorAlerta)) ? 'text-destructive' : 'text-destructive/70'}`}>
-                    R$ {m.perdaValor.toFixed(2)}
+                    {fmtBRL(m.perdaValor)}
                   </span>
                 )}
               </div>
@@ -580,10 +579,10 @@ export default function ManipulationView({ store, preSelectedEntryId, onClearPre
             {/* Financial row */}
             {m.valorTotalBruto != null && (
               <div className="grid grid-cols-3 gap-1.5 text-[11px] mt-1.5 pt-1.5 border-t border-border/30">
-                <div><span className="text-muted-foreground">Valor bruto</span><p className="font-medium text-foreground">R$ {(m.valorTotalBruto || 0).toFixed(2)}</p></div>
-                <div><span className="text-muted-foreground">Aproveitado</span><p className="font-medium text-success">R$ {(m.valorTotalLimpo || 0).toFixed(2)}</p></div>
+                <div><span className="text-muted-foreground">Valor bruto</span><p className="font-medium text-foreground">{fmtBRL(m.valorTotalBruto || 0)}</p></div>
+                <div><span className="text-muted-foreground">Aproveitado</span><p className="font-medium text-success">{fmtBRL(m.valorTotalLimpo || 0)}</p></div>
                 <div><span className="text-muted-foreground">Perda R$</span>
-                  <p className={`font-bold ${((m.lossPercent > perdaPercentAlerta) || ((m.perdaValor || 0) > perdaValorAlerta)) ? 'text-destructive' : 'text-destructive/70'}`}>R$ {(m.perdaValor || 0).toFixed(2)}</p>
+                  <p className={`font-bold ${((m.lossPercent > perdaPercentAlerta) || ((m.perdaValor || 0) > perdaValorAlerta)) ? 'text-destructive' : 'text-destructive/70'}`}>{fmtBRL(m.perdaValor || 0)}</p>
                 </div>
               </div>
             )}
@@ -591,15 +590,15 @@ export default function ManipulationView({ store, preSelectedEntryId, onClearPre
             {/* Cost row */}
             {m.custoManipulacao != null && (
               <div className="grid grid-cols-3 gap-1.5 text-[11px] mt-1.5 pt-1.5 border-t border-border/30">
-                <div className="flex items-center gap-1"><DollarSign className="w-3 h-3 text-warning" /><span className="text-muted-foreground">Custo:</span> <span className="font-medium text-warning">R$ {m.custoManipulacao.toFixed(2)}</span></div>
-                <div><span className="text-muted-foreground">R$/kg bruto:</span> <span className="font-medium text-foreground">R$ {(m.custoKgBrutoLote || 0).toFixed(2)}</span></div>
-                <div><span className="text-muted-foreground">R$/kg limpo:</span> <span className="font-medium text-warning">R$ {(m.custoKgLimpo || 0).toFixed(2)}</span></div>
+                <div className="flex items-center gap-1"><DollarSign className="w-3 h-3 text-warning" /><span className="text-muted-foreground">Custo:</span> <span className="font-medium text-warning">{fmtBRL(m.custoManipulacao)}</span></div>
+                <div><span className="text-muted-foreground">R$/kg bruto:</span> <span className="font-medium text-foreground">{fmtBRL(m.custoKgBrutoLote || 0)}</span></div>
+                <div><span className="text-muted-foreground">R$/kg limpo:</span> <span className="font-medium text-warning">{fmtBRL(m.custoKgLimpo || 0)}</span></div>
               </div>
             )}
 
             <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/50">
               <div className="flex items-center gap-3 text-[11px]">
-                <span className="text-muted-foreground">Rend: <span className="text-primary font-medium">{m.yieldPercent.toFixed(1)}%</span></span>
+                <span className="text-muted-foreground">Rend: <span className="text-primary font-medium">{formatPercentBR(m.yieldPercent)}</span></span>
                 {m.leftoverRecorded && <span className="text-warning">🧊 Sobra: {m.leftoverKg} kg</span>}
                 {!m.leftoverRecorded && <span className="text-muted-foreground text-[10px]">📦 Em estoque limpo</span>}
               </div>

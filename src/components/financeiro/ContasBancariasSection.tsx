@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useFormDirtyGuard } from '@/hooks/useFormDirtyGuard';
 import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
+import TableActions from '@/components/ui/TableActions';
 import * as XLSX from 'xlsx';
 
 // ─── Types ───
@@ -197,17 +198,17 @@ export default function ContasBancariasSection({ onNavigateExtrato }: ContasBanc
       };
 
       if (editId) {
-        // Optimistic locking
-        let query = supabase.from('fin_contas').update(payload).eq('id', editId);
-        if (editUpdatedAt) {
-          query = query.eq('updated_at', editUpdatedAt);
-        }
-        const { data, error } = await query.select('id');
+        const { error } = await (supabase.rpc as any)('_guarded_update_conta', {
+          p_id: editId,
+          p_nome: form.nome,
+          p_tipo: form.tipo,
+          p_banco: form.banco || '',
+          p_agencia: form.agencia || '',
+          p_numero_conta: form.numero_conta || '',
+          p_saldo_inicial: form.saldo_inicial,
+          p_expected_updated_at: editUpdatedAt
+        });
         if (error) { toast.error(error.message); return; }
-        if (!data || data.length === 0) {
-          toast.error('Registro foi alterado por outro usuário. Atualize a tela.');
-          return;
-        }
         toast.success('Conta atualizada');
       } else {
         const { error } = await supabase.from('fin_contas').insert({ ...payload, created_by: user?.id });
@@ -253,15 +254,14 @@ export default function ContasBancariasSection({ onNavigateExtrato }: ContasBanc
     });
     if (!ok) return;
 
-    setSaving(true);
     try {
-      const { error } = await supabase.from('fin_contas').update({ ativo: false }).eq('id', item.id);
-      if (error) { toast.error(error.message); return; }
-      toast.success('Conta desativada');
+      const { error } = await (supabase.rpc as any)('_guarded_delete_conta', { p_id: item.id });
+      if (error) throw error;
+      toast.success('Conta desativada com sucesso');
       load();
       emitDataEvent('financeiro:contas');
-    } finally {
-      setSaving(false);
+    } catch (error: any) {
+      toast.error(error.message || 'Erro ao desativar conta');
     }
   };
 
@@ -359,17 +359,15 @@ export default function ContasBancariasSection({ onNavigateExtrato }: ContasBanc
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-base">{item.nome}</CardTitle>
                       <div className="flex items-center gap-1">
-                        <Badge variant="outline">{TIPO_LABEL[item.tipo] || item.tipo}</Badge>
-                        {canEdit && (
-                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(item)} disabled={saving}>
-                            <Edit className="w-3.5 h-3.5" />
-                          </Button>
-                        )}
-                        {canDelete && (
-                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => deactivate(item)} disabled={saving}>
-                            <Trash2 className="w-3.5 h-3.5 text-destructive" />
-                          </Button>
-                        )}
+                        <Badge variant="outline" className="mr-1">{TIPO_LABEL[item.tipo] || item.tipo}</Badge>
+                        <TableActions
+                          canEditOverride={canEdit}
+                          canDeleteOverride={canDelete}
+                          onEdit={() => openEdit(item)}
+                          onDelete={() => deactivate(item)}
+                          hideConfirm={true}
+                          isDeleting={saving}
+                        />
                       </div>
                     </div>
                     {item.banco && (

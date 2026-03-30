@@ -19,6 +19,8 @@ interface CategoryComboboxProps {
   placeholder?: string;
   className?: string;
   disabled?: boolean;
+  /** Set to true when combobox is used inside a Dialog/Sheet */
+  modal?: boolean;
 }
 
 export default function CategoryCombobox({
@@ -28,13 +30,14 @@ export default function CategoryCombobox({
   placeholder = 'Pesquisar categoria...',
   className,
   disabled,
+  modal = true,
 }: CategoryComboboxProps) {
   const [open, setOpen] = useState(false);
 
   const selected = useMemo(() => options.find(o => o.id === value), [options, value]);
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen} modal={modal}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"

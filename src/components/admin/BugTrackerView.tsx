@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Label } from '@/components/ui/label';
 import { Bug, Plus, Loader2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
+import { formatDateBR } from '@/lib/formatters';
 
 const MODULES = ['estoque','financeiro','compras','auth','relatorios','admin','edge','rh','planning','salmon','ficha_tecnica','geral'] as const;
 const SEVERITIES = ['low','medium','high','critical'] as const;
@@ -215,7 +216,7 @@ export default function BugTrackerView() {
                     </div>
                     <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
                       <span>{bug.module}</span>
-                      <span>{new Date(bug.created_at).toLocaleDateString('pt-BR')}</span>
+                      <span>{formatDateBR(new Date(bug.created_at))}</span>
                       {bug.notes && <span className="truncate max-w-40">📝 {bug.notes}</span>}
                     </div>
                   </div>

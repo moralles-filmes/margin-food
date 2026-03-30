@@ -25,10 +25,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import ProductSearchCombobox, { type ProductOption } from '@/components/ui/ProductSearchCombobox';
 import { useFormDirtyGuard } from '@/hooks/useFormDirtyGuard';
 import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
-import { normalizeBRLMoneyToNumber, fmtBRL } from '@/lib/money';
-import { formatFixedBR } from '@/lib/formatters';
+import { formatFixedBR, formatDateBR, todayBR, fmtBRL, normalizeBRLMoneyToNumber } from '@/lib/formatters';
 import { toast } from 'sonner';
-import { todayBR } from '@/lib/datetime';
 import { TenantError } from '@/lib/tenant';
 import { getCostOrigin, getCostLabel, getActiveCostBase, getActiveCostPurchase } from '@/components/estoque/CustoItemDisplay';
 import { Badge } from '@/components/ui/badge';
@@ -412,22 +410,22 @@ export default function NovaMovimentacaoModal({
                 </div>
                 {saidaCostInfo.hasCost ? (
                   <div className="flex items-center gap-4 text-xs flex-wrap">
-                    <div>
-                      <span className="text-muted-foreground">R$ / {selectedProd.unidadeMedida}: </span>
-                      <span className="font-bold text-foreground">{fmtBRL(saidaCostInfo.costBase)}</span>
-                    </div>
-                    {hasPurchaseUnit && (
                       <div>
-                        <span className="text-muted-foreground">R$ / {selectedUnCompra}: </span>
-                        <span className="font-bold text-foreground">{fmtBRL(saidaCostInfo.costPurchase)}</span>
+                        <span className="text-muted-foreground">R$/{selectedProd.unidadeMedida}: </span>
+                        <span className="font-bold text-foreground">{fmtBRL(saidaCostInfo.costBase)}</span>
                       </div>
-                    )}
-                    {saidaBaseCalc > 0 && (
-                      <div>
-                        <span className="text-muted-foreground">Total: </span>
-                        <span className="font-bold text-primary">{fmtBRL(saidaTotalEstimate)}</span>
-                      </div>
-                    )}
+                      {hasPurchaseUnit && (
+                        <div>
+                          <span className="text-muted-foreground">R$/{selectedUnCompra}: </span>
+                          <span className="font-bold text-foreground">{fmtBRL(saidaCostInfo.costPurchase)}</span>
+                        </div>
+                      )}
+                      {saidaBaseCalc > 0 && (
+                        <div>
+                          <span className="text-muted-foreground">Total: </span>
+                          <span className="font-bold text-primary">{fmtBRL(saidaTotalEstimate)}</span>
+                        </div>
+                      )}
                   </div>
                 ) : (
                   <p className="text-[10px] text-destructive font-medium">⚠️ Item sem custo cadastrado. Registre uma entrada ou custo padrão.</p>
@@ -455,12 +453,12 @@ export default function NovaMovimentacaoModal({
                     <p className="text-[10px] text-muted-foreground">Qtd Base</p>
                     <p className="text-sm font-bold text-foreground">{formatFixedBR(quantidadeBaseCalc, 2)} {selectedProd?.unidadeMedida || ''}</p>
                   </div>
-                  <div className="text-center">
-                    <p className="text-[10px] text-muted-foreground">R$ / {selectedProd?.unidadeMedida || 'base'}</p>
+                   <div className="text-center">
+                    <p className="text-[10px] text-muted-foreground">R$/{selectedProd?.unidadeMedida || 'base'}</p>
                     <p className="text-sm font-bold text-primary">{precoBaseCalc > 0 ? fmtBRL(precoBaseCalc) : '—'}</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-[10px] text-muted-foreground">R$ / {selectedUnCompra || 'emb.'}</p>
+                    <p className="text-[10px] text-muted-foreground">R$/{selectedUnCompra || 'emb.'}</p>
                     <p className="text-sm font-bold text-foreground">{movPrecoTotal ? fmtBRL(normalizeBRLMoneyToNumber(movPrecoTotal) || 0) : '—'}</p>
                   </div>
                   <div className="text-center">

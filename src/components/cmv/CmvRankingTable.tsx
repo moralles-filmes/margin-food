@@ -3,10 +3,10 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { RefreshCw, ChevronDown } from 'lucide-react';
 import type { RankingItem } from './types';
-import { formatFixedBR } from '@/lib/formatters';
+import { formatFixedBR, formatPercentBR, fmtBRL } from '@/lib/formatters';
 
 function fmt(v: number) {
-  return formatFixedBR(v, 2);
+  return fmtBRL(v);
 }
 
 interface CmvRankingTableProps {
@@ -61,7 +61,7 @@ export default function CmvRankingTable({ ranking, errorRanking, onRetry, hasMor
                     <TableCell className="text-sm font-medium">{r.nome}</TableCell>
                     <TableCell className="text-sm">{r.categoria}</TableCell>
                     <TableCell className="text-right text-sm">{fmt(r.custoConsumido)}</TableCell>
-                    <TableCell className="text-right text-sm font-medium">{r.percentCmv}%</TableCell>
+                    <TableCell className="text-right text-sm font-medium">{formatPercentBR(r.percentCmv)}</TableCell>
                     <TableCell className="text-right text-sm">{fmt(r.quantidade)}</TableCell>
                     <TableCell className="text-right text-sm">{fmt(r.custoMedioSnapshot)}</TableCell>
                   </TableRow>

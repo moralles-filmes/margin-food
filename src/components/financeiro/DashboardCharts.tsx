@@ -7,7 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from 'recharts';
 import { subMonths, startOfMonth, endOfMonth } from 'date-fns';
 import { formatDateBR, formatInBR } from '@/lib/datetime';
-import { fmtBRL } from '@/lib/formatters';
+import { fmtBRL, formatDecimalBR } from '@/lib/formatters';
 import { toast } from 'sonner';
 import { AlertTriangle } from 'lucide-react';
 
@@ -159,7 +159,7 @@ export default function DashboardCharts() {
               <BarChart data={evolucao_mensal}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-border/30" />
                 <XAxis dataKey="mesLabel" fontSize={11} />
-                <YAxis fontSize={11} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} />
+                <YAxis fontSize={11} tickFormatter={v => `${formatDecimalBR(v / 1000, 0)}k`} />
                 <Tooltip formatter={(v: number) => fmt(v)} />
                 <Legend />
                 <Bar dataKey="receitas" name="Receitas" fill="#22c55e" radius={[4, 4, 0, 0]} />
@@ -176,7 +176,7 @@ export default function DashboardCharts() {
               <LineChart data={evolucao_mensal}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-border/30" />
                 <XAxis dataKey="mesLabel" fontSize={11} />
-                <YAxis fontSize={11} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} />
+                <YAxis fontSize={11} tickFormatter={v => `${formatDecimalBR(v / 1000, 0)}k`} />
                 <Tooltip formatter={(v: number) => fmt(v)} />
                 <Line type="monotone" dataKey="resultado" name="Resultado" stroke="#3b82f6" strokeWidth={2} dot={{ r: 4 }} />
               </LineChart>
@@ -193,7 +193,7 @@ export default function DashboardCharts() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <ResponsiveContainer width="100%" height={240}>
                   <PieChart>
-                    <Pie data={despesas_por_categoria} dataKey="valor" nameKey="nome" cx="50%" cy="50%" outerRadius={90} label={({ nome, percent }) => `${String(nome).slice(0, 15)} ${(percent * 100).toFixed(0)}%`} labelLine={false} fontSize={10}>
+                    <Pie data={despesas_por_categoria} dataKey="valor" nameKey="nome" cx="50%" cy="50%" outerRadius={90} label={({ nome, percent }) => `${String(nome).slice(0, 15)} ${formatDecimalBR(percent * 100, 0)}%`} labelLine={false} fontSize={10}>
                       {despesas_por_categoria.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
                     </Pie>
                     <Tooltip formatter={(v: number) => fmt(v)} />

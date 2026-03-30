@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { fmtBRL } from '@/lib/money';
+import { fmtBRL, formatDateBR } from '@/lib/formatters';
 import { useMercadoStore, SolicMercado, SolicMercadoItem, Aprovacao } from '@/hooks/useMercadoStore';
 import { useRecebimentoStore } from '@/hooks/useRecebimentoStore';
 import { Button } from '@/components/ui/button';
@@ -48,7 +48,7 @@ export default function MercadoSazonaisView() {
     store.produtos.map(p => ({
       id: p.id,
       label: p.nome_produto,
-      sublabel: `${p.unidade_medida} — R$ ${(p.custo_padrao || 0).toFixed(2)}`,
+      sublabel: `${p.unidade_medida} — ${fmtBRL(p.custo_padrao || 0)}`,
       keywords: p.sku || '',
     })),
     [store.produtos]
@@ -269,7 +269,7 @@ export default function MercadoSazonaisView() {
               </div>
             </div>
             <div className="text-right text-xs text-muted-foreground">
-              <p>Criado: {new Date(selectedSolic.created_at).toLocaleDateString('pt-BR')}</p>
+              <p>Criado: {formatDateBR(new Date(selectedSolic.created_at))}</p>
               {selectedSolic.data_necessidade && <p>Necessidade: {selectedSolic.data_necessidade}</p>}
             </div>
           </div>
@@ -302,7 +302,7 @@ export default function MercadoSazonaisView() {
                 <span className="text-xs font-bold">{aprovCount}/2 aprovações</span>
                 {solicAprovacoes.map(a => (
                   <span key={a.id} className={`text-[10px] px-2 py-0.5 rounded-full ${a.decisao === 'APROVADO' ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>
-                    {a.decisao} — {new Date(a.aprovado_em).toLocaleDateString('pt-BR')}
+                    {a.decisao} — {formatDateBR(new Date(a.aprovado_em))}
                   </span>
                 ))}
               </div>
@@ -631,13 +631,13 @@ export default function MercadoSazonaisView() {
                   </span>
                   <div className="flex items-center gap-2">
                     <span className="text-muted-foreground">{item.quantidade_solicitada} {item.unidade_medida}</span>
-                    {item.preco_unitario && <span className="text-muted-foreground">R$ {item.preco_unitario.toFixed(2)}</span>}
+                    {item.preco_unitario && <span className="text-muted-foreground">{fmtBRL(item.preco_unitario)}</span>}
                     <button onClick={() => setFormItems(prev => prev.filter((_, j) => j !== i))} className="text-destructive"><X className="w-3 h-3" /></button>
                   </div>
                 </div>
               ))}
               <p className="text-right text-[10px] text-muted-foreground">
-                Estimado: R$ {formItems.reduce((s, i) => s + (i.quantidade_solicitada * (i.preco_unitario || 0)), 0).toFixed(2)}
+                Estimado: {fmtBRL(formItems.reduce((s, i) => s + (i.quantidade_solicitada * (i.preco_unitario || 0)), 0))}
               </p>
             </div>
           )}
@@ -679,7 +679,7 @@ export default function MercadoSazonaisView() {
                       <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-semibold ${PRIORIDADE_COLORS[s.prioridade]}`}>{s.prioridade}</span>
                       <span className="text-[9px] text-muted-foreground">{s.tipo}</span>
                       <span className="text-[9px] text-muted-foreground">
-                        R$ {(s.total_real || s.total_estimado).toFixed(2)}
+                        {fmtBRL(s.total_real || s.total_estimado)}
                       </span>
                     </div>
                   </div>

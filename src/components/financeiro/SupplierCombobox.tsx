@@ -21,6 +21,8 @@ interface SupplierComboboxProps {
   /** If true, the value is a text string (legacy), not a UUID */
   textMode?: boolean;
   enableQuickAdd?: boolean;
+  /** Set to true when combobox is used inside a Dialog/Sheet */
+  modal?: boolean;
 }
 
 export default function SupplierCombobox({
@@ -32,6 +34,7 @@ export default function SupplierCombobox({
   disabled,
   textMode,
   enableQuickAdd = true,
+  modal = true,
 }: SupplierComboboxProps) {
   const [open, setOpen] = useState(false);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
@@ -47,7 +50,7 @@ export default function SupplierCombobox({
 
   return (
     <>
-      <Popover open={open} onOpenChange={setOpen}>
+      <Popover open={open} onOpenChange={setOpen} modal={modal}>
         <PopoverTrigger asChild>
           <Button
             variant="outline"

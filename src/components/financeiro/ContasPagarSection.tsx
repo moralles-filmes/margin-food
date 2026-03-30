@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { CursorListResponse, FinStatusCounts } from '@/types/financeiro';
 import { emitDataEvent, useDataEvent } from '@/lib/dataEvents';
-import { fmtBRL } from '@/lib/money';
+import { fmtBRL, formatDateBR, formatPercentBR, parseLocalDate } from '@/lib/formatters';
 import { BRLInput } from '@/components/ui/brl-input';
 import { useCan } from '@/permissions/hooks';
 import { Button } from '@/components/ui/button';
@@ -22,6 +22,7 @@ import { gerarPDFContasPagar } from '@/lib/pdfFinanceiro';
 import { todayBR, formatDisplayBR } from '@/lib/datetime';
 import CategoryCombobox from './CategoryCombobox';
 import SupplierCombobox from './SupplierCombobox';
+import TableActions from '@/components/ui/TableActions';
 import * as XLSX from 'xlsx';
 
 /* ─── Types ─── */
@@ -60,11 +61,6 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: typeof
 
 const PAGE_SIZE = 50;
 
-function fmtDateBR(d: string) {
-  if (!d) return '—';
-  const [y, m, day] = d.split('-');
-  return `${day}/${m}/${y}`;
-}
 
 function SkeletonRows() {
   return (<>{Array.from({ length: 5 }).map((_, i) => (
@@ -111,6 +107,8 @@ export default function ContasPagarSection() {
     recorrente: false, frequencia: 'mensal', parcelas: 0,
   });
   const [rateioLines, setRateioLines] = useState<RateioLine[]>([]);
+  const [editingItem, setEditingItem] = useState<ContaPagar | null>(null);
+  const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
 
   useEffect(() => { if (canView) load(); }, [canView]);
   useEffect(() => { if (!canView) return; setCursorDate(null); setCursorId(null); setItems([]); loadPage(null, null); loadTotals(); }, [filtroStatus, canView]);
@@ -185,9 +183,79 @@ export default function ContasPagarSection() {
   const handleCloseForm = () => {
     setForm({ descricao: '', valor: 0, data_vencimento: todayBR(), data_competencia: '', fornecedor: '', supplier_id: '', categoria_id: '', centro_custo_id: '', conta_id: '', forma_pagamento: 'boleto', observacoes: '', recorrente: false, frequencia: 'mensal', parcelas: 0 });
     setRateioLines([]);
+    setEditingItem(null);
     setShowForm(false);
   };
   const { showConfirm, guardedClose, confirmClose, cancelClose } = useFormDirtyGuard({ current: form, onClose: handleCloseForm });
+
+  const handleEdit = async (item: ContaPagar) => {
+    setLoading(true);
+    try {
+      // Fetch full record to get details not in list
+      const { data: detail, error: detailErr } = await supabase
+        .from('fin_contas_pagar')
+        .select('*')
+        .eq('id', item.id)
+        .single();
+      
+      if (detailErr) throw detailErr;
+
+      // Fetch rateios
+      const { data: rates, error: rateErr } = await supabase
+        .from('fin_lancamento_rateios')
+        .select('*')
+        .eq('lancamento_id', item.id);
+      
+      if (rateErr) throw rateErr;
+
+      setEditingItem(detail);
+      setForm({
+        descricao: detail.descricao,
+        valor: detail.valor,
+        data_vencimento: detail.data_vencimento,
+        data_competencia: detail.data_competencia || '',
+        fornecedor: detail.fornecedor || '',
+        supplier_id: detail.supplier_id || '',
+        categoria_id: detail.categoria_id || '',
+        centro_custo_id: detail.centro_custo_id || '',
+        conta_id: detail.conta_id || '',
+        forma_pagamento: detail.forma_pagamento || 'boleto',
+        observacoes: detail.observacoes || '',
+        recorrente: detail.recorrente || false,
+        frequencia: (detail.recorrencia_config as any)?.frequencia || 'mensal',
+        parcelas: (detail.recorrencia_config as any)?.parcelas || 0,
+      });
+
+      setRateioLines(rates.map(r => ({
+        key: r.id,
+        categoria_id: r.categoria_id,
+        centro_custo_id: r.centro_custo_id,
+        valor: r.valor,
+        percentual: r.percentual,
+      })));
+
+      setShowForm(true);
+    } catch (err: any) {
+      toast.error('Erro ao carregar detalhes: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (item: ContaPagar) => {
+    setIsDeletingId(item.id);
+    try {
+      const { error } = await (supabase.rpc as any)('_guarded_delete_conta_pagar', { p_id: item.id });
+      if (error) throw error;
+      toast.success('Conta excluída');
+      load();
+      emitDataEvent('financeiro:pagar');
+    } catch (err: any) {
+      toast.error('Erro ao excluir: ' + err.message);
+    } finally {
+      setIsDeletingId(null);
+    }
+  };
 
   /* ─── Save via RPC ─── */
   const save = async () => {
@@ -221,7 +289,8 @@ export default function ContasPagarSection() {
         ? { frequencia: form.frequencia, parcelas: form.parcelas || null, parcelas_geradas: 0 }
         : null;
 
-      const { data, error } = await supabase.rpc('_guarded_create_conta_pagar', {
+      const { data, error } = await (supabase.rpc as any)(editingItem ? '_guarded_update_conta_pagar' : '_guarded_create_conta_pagar', {
+        p_id: editingItem?.id, // Only used in update
         p_descricao: form.descricao,
         p_valor: form.valor,
         p_fornecedor: fornecedor,
@@ -233,15 +302,18 @@ export default function ContasPagarSection() {
         p_conta_id: form.conta_id || null,
         p_forma_pagamento: form.forma_pagamento,
         p_observacoes: form.observacoes || null,
-        p_rateios: rateiosPayload,
-        p_recorrencia: recorrencia,
+        p_rateios: JSON.stringify(rateiosPayload),
+        p_recorrencia: recorrencia ? JSON.stringify(recorrencia) : null,
+        p_expected_updated_at: editingItem?.updated_at, // Only used in update
       });
 
       if (error) { toast.error(error.message); return; }
       const result = data as any;
-      const statusMsg = result?.status === 'AGUARDANDO_APROVACAO'
-        ? 'Conta criada — aguardando aprovação'
-        : 'Conta a pagar criada';
+      const statusMsg = editingItem 
+        ? 'Conta atualizada'
+        : result?.status === 'AGUARDANDO_APROVACAO'
+          ? 'Conta criada — aguardando aprovação'
+          : 'Conta a pagar criada';
       toast.success(statusMsg);
       handleCloseForm();
       load();
@@ -292,7 +364,7 @@ export default function ContasPagarSection() {
       Fornecedor: i.fornecedor || '',
       Valor: i.valor,
       Status: STATUS_CONFIG[i.status]?.label || i.status,
-      Vencimento: fmtDateBR(i.data_vencimento),
+      Vencimento: formatDateBR(parseLocalDate(i.data_vencimento)),
     }));
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
@@ -341,7 +413,7 @@ export default function ContasPagarSection() {
               <DialogContent className="max-w-lg">
                 <DialogHeader>
                   <div className="flex items-center justify-between">
-                    <DialogTitle>Nova Conta a Pagar</DialogTitle>
+                    <DialogTitle>{editingItem ? 'Editar Conta a Pagar' : 'Nova Conta a Pagar'}</DialogTitle>
                     <button type="button" onClick={guardedClose} aria-label="Fechar" className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"><X className="w-4 h-4" /></button>
                   </div>
                 </DialogHeader>
@@ -404,7 +476,7 @@ export default function ContasPagarSection() {
                                     updateRateioLine(line.key, 'percentual', Math.round(pct * 10) / 10);
                                   }} showPrefix className="h-8 text-xs" />
                                 </TableCell>
-                                <TableCell className="p-1 text-xs text-muted-foreground text-center">{line.percentual ? `${line.percentual}%` : '—'}</TableCell>
+                                <TableCell className="p-1 text-xs text-muted-foreground text-center">{line.percentual ? formatPercentBR(line.percentual, 1) : '—'}</TableCell>
                                 <TableCell className="p-1"><Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => removeRateioLine(line.key)}><Trash2 className="w-3 h-3 text-destructive" /></Button></TableCell>
                               </TableRow>
                             ))}
@@ -467,7 +539,7 @@ export default function ContasPagarSection() {
                   </div>
 
                   <Button onClick={save} className="w-full" disabled={saving || (rateioLines.length > 0 && !rateioValido)}>
-                    {saving ? 'Criando...' : 'Criar Conta a Pagar'}
+                    {saving ? (editingItem ? 'Salvando...' : 'Criando...') : (editingItem ? 'Salvar Alterações' : 'Criar Conta a Pagar')}
                   </Button>
                 </div>
               </DialogContent>
@@ -497,18 +569,27 @@ export default function ContasPagarSection() {
             const isVencida = item.data_vencimento < today && !['PAGO', 'CANCELADO'].includes(item.status);
             return (
               <TableRow key={item.id} className={isVencida ? 'bg-destructive/5' : ''}>
-                <TableCell className={`font-mono text-sm ${isVencida ? 'text-destructive font-bold' : ''}`}>{fmtDateBR(item.data_vencimento)}</TableCell>
+                <TableCell className={`font-mono text-sm ${isVencida ? 'text-destructive font-bold' : ''}`}>{formatDateBR(parseLocalDate(item.data_vencimento))}</TableCell>
                 <TableCell className="font-medium max-w-[200px] truncate">{item.descricao}</TableCell>
                 <TableCell className="text-muted-foreground">{item.fornecedor || '—'}</TableCell>
                 <TableCell className="font-bold text-destructive">{fmt(item.valor)}</TableCell>
                 <TableCell><span className={`text-xs px-2 py-0.5 rounded-full border ${sc.color}`}>{sc.label}</span></TableCell>
-                <TableCell>
-                  <div className="flex gap-1">
+                 <TableCell>
+                  <div className="flex gap-1 items-center justify-end">
                     {item.status === 'AGUARDANDO_APROVACAO' && canApprove && (
                       <Button size="sm" variant="outline" onClick={() => aprovar(item)} disabled={saving} className="text-xs h-7">Aprovar</Button>
                     )}
                     {item.status === 'APROVADO' && (
                       <Button size="sm" variant="default" onClick={() => pagar(item)} disabled={saving} className="text-xs h-7">Pagar</Button>
+                    )}
+                    {(['RASCUNHO', 'AGUARDANDO_APROVACAO', 'APROVADO', 'VENCIDO'].includes(item.status)) && (
+                      <TableActions
+                        onEdit={() => handleEdit(item)}
+                        onDelete={() => handleDelete(item)}
+                        editPermission="financeiro:pagar:edit"
+                        deletePermission="financeiro:pagar:delete"
+                        isDeleting={isDeletingId === item.id}
+                      />
                     )}
                   </div>
                 </TableCell>
