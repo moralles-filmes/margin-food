@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import SearchableSelect from '@/components/ui/SearchableSelect';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
@@ -340,17 +341,26 @@ export default function OnboardingSection({ colaboradores, canManage }: Props) {
               <div className="grid gap-3">
                 <div>
                   <Label>Colaborador *</Label>
-                  <Select value={formColabId} onValueChange={setFormColabId}>
-                    <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                    <SelectContent>{colaboradores.map(c => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}</SelectContent>
-                  </Select>
+                  <SearchableSelect
+                    value={formColabId}
+                    onValueChange={setFormColabId}
+                    options={colaboradores.map(c => ({ value: c.id, label: c.nome }))}
+                    placeholder="Selecione..."
+                    searchPlaceholder="Buscar colaborador..."
+                    modal
+                    allowClear={false}
+                  />
                 </div>
                 <div>
                   <Label>Mentor (opcional)</Label>
-                  <Select value={formMentorId} onValueChange={setFormMentorId}>
-                    <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                    <SelectContent>{colaboradores.map(c => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}</SelectContent>
-                  </Select>
+                  <SearchableSelect
+                    value={formMentorId}
+                    onValueChange={setFormMentorId}
+                    options={colaboradores.map(c => ({ value: c.id, label: c.nome }))}
+                    placeholder="Selecione..."
+                    searchPlaceholder="Buscar mentor..."
+                    modal
+                  />
                 </div>
                 <Button onClick={handleCreate}>Criar Onboarding</Button>
               </div>

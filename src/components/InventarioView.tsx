@@ -9,6 +9,7 @@ import { DecimalInput } from '@/components/ui/decimal-input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import SearchableSelect from '@/components/ui/SearchableSelect';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -988,16 +989,15 @@ function ConferentesManagementView({ conferentes, loading, canManage, onAdd, onR
         <div className="bg-card border border-border rounded-xl p-4 space-y-3">
           <p className="text-xs font-semibold text-foreground">Adicionar Conferente</p>
           <div className="flex gap-2">
-            <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-              <SelectTrigger className="flex-1 bg-secondary border-border text-xs">
-                <SelectValue placeholder={loadingProfiles ? 'Carregando...' : 'Selecione um usuário'} />
-              </SelectTrigger>
-              <SelectContent>
-                {availableProfiles.map(p => (
-                  <SelectItem key={p.id} value={p.id}>{p.nome || p.email}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              value={selectedUserId}
+              onValueChange={setSelectedUserId}
+              options={availableProfiles.map(p => ({ value: p.id, label: p.nome || p.email }))}
+              placeholder={loadingProfiles ? 'Carregando...' : 'Selecione um usuário'}
+              searchPlaceholder="Buscar usuário..."
+              className="flex-1 bg-secondary border-border text-xs"
+              allowClear={false}
+            />
             <Button size="sm" className="gap-1.5 text-xs" onClick={handleAdd} disabled={!selectedUserId || loading}>
               <UserPlus className="w-3.5 h-3.5" /> Adicionar
             </Button>

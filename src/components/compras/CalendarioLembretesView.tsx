@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import SearchableSelect from '@/components/ui/SearchableSelect';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
@@ -343,13 +344,15 @@ export default function CalendarioLembretesView() {
 
             <div>
               <Label className="text-xs">Fornecedor (opcional)</Label>
-              <Select value={form.supplier_id} onValueChange={v => setForm(f => ({ ...f, supplier_id: v === '__none__' ? '' : v }))}>
-                <SelectTrigger className="text-sm"><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">Nenhum</SelectItem>
-                  {activeSuppliers.map(s => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={form.supplier_id}
+                onValueChange={v => setForm(f => ({ ...f, supplier_id: v === '__none__' ? '' : v }))}
+                options={[{ value: '__none__', label: 'Nenhum' }, ...activeSuppliers.map(s => ({ value: s.name, label: s.name }))]}
+                placeholder="Selecione..."
+                searchPlaceholder="Buscar fornecedor..."
+                className="text-sm"
+                modal
+              />
             </div>
 
             <div>

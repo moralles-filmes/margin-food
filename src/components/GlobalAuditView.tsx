@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import SearchableSelect from '@/components/ui/SearchableSelect';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -209,17 +210,25 @@ export default function GlobalAuditView() {
             </div>
             <div>
               <Label className="text-[10px] text-muted-foreground">Módulo</Label>
-              <Select value={moduleFilter} onValueChange={setModuleFilter}>
-                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                <SelectContent>{MODULES.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>
-              </Select>
+              <SearchableSelect
+                value={moduleFilter}
+                onValueChange={setModuleFilter}
+                options={MODULES.map(m => ({ value: m.value, label: m.label }))}
+                placeholder="Todos"
+                searchPlaceholder="Buscar módulo..."
+                className="h-8 text-xs"
+              />
             </div>
             <div>
               <Label className="text-[10px] text-muted-foreground">Ação</Label>
-              <Select value={actionFilter} onValueChange={setActionFilter}>
-                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                <SelectContent>{ACTIONS.map(a => <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>)}</SelectContent>
-              </Select>
+              <SearchableSelect
+                value={actionFilter}
+                onValueChange={setActionFilter}
+                options={ACTIONS.map(a => ({ value: a.value, label: a.label }))}
+                placeholder="Todas"
+                searchPlaceholder="Buscar ação..."
+                className="h-8 text-xs"
+              />
             </div>
             <div>
               <Label className="text-[10px] text-muted-foreground">Busca</Label>

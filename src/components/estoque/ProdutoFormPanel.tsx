@@ -13,6 +13,7 @@ import { BRLInput } from '@/components/ui/brl-input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import SearchableSelect from '@/components/ui/SearchableSelect';
 import { fmtBRL, formatFixedBR } from '@/lib/formatters';
 import { toast } from 'sonner';
 import { TenantError } from '@/lib/tenant';
@@ -203,10 +204,15 @@ export default function ProdutoFormPanel({
         </div>
         <div>
           <Label className="text-[11px] text-muted-foreground">Categoria</Label>
-          <Select value={prodForm.categoria} onValueChange={v => setProdForm(f => ({ ...f, categoria: v }))}>
-            <SelectTrigger className="bg-secondary border-border text-foreground"><SelectValue placeholder="Selecione" /></SelectTrigger>
-            <SelectContent>{categorias.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-          </Select>
+          <SearchableSelect
+            value={prodForm.categoria}
+            onValueChange={v => setProdForm(f => ({ ...f, categoria: v }))}
+            options={categorias.map(c => ({ value: c, label: c }))}
+            placeholder="Selecione"
+            searchPlaceholder="Buscar categoria..."
+            className="bg-secondary border-border text-foreground"
+            allowClear={false}
+          />
         </div>
         <div>
           <Label className="text-[11px] text-muted-foreground">Unidade Base (contábil)</Label>
@@ -319,10 +325,15 @@ export default function ProdutoFormPanel({
         </div>
         <div>
           <Label className="text-[11px] text-muted-foreground">Local</Label>
-          <Select value={prodForm.localEstoque} onValueChange={v => setProdForm(f => ({ ...f, localEstoque: v }))}>
-            <SelectTrigger className="bg-secondary border-border text-foreground"><SelectValue placeholder="Selecione" /></SelectTrigger>
-            <SelectContent>{locais.map(l => <SelectItem key={l} value={l}>{l}</SelectItem>)}</SelectContent>
-          </Select>
+          <SearchableSelect
+            value={prodForm.localEstoque}
+            onValueChange={v => setProdForm(f => ({ ...f, localEstoque: v }))}
+            options={locais.map(l => ({ value: l, label: l }))}
+            placeholder="Selecione"
+            searchPlaceholder="Buscar local..."
+            className="bg-secondary border-border text-foreground"
+            allowClear={false}
+          />
         </div>
         {/* Min/Ideal section */}
         <div className="col-span-2 space-y-2">

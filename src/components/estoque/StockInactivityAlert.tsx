@@ -4,6 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import SearchableSelect from '@/components/ui/SearchableSelect';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
@@ -102,16 +103,14 @@ export default function StockInactivityAlert({ categorias }: { categorias: strin
           <div className="px-3 pb-3 space-y-3 border-t border-border pt-3">
             {/* Filters */}
             <div className="flex items-center gap-2 flex-wrap">
-              <Select value={filterCat || 'all'} onValueChange={v => setFilterCat(v === 'all' ? '' : v)}>
-                <SelectTrigger className="w-32 h-7 text-[10px] bg-secondary border-border">
-                  <Filter className="w-3 h-3 mr-1" />
-                  <SelectValue placeholder="Categoria" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas</SelectItem>
-                  {categorias.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={filterCat || 'all'}
+                onValueChange={v => setFilterCat(v === 'all' ? '' : v)}
+                options={[{ value: 'all', label: 'Todas' }, ...categorias.map(c => ({ value: c, label: c }))]}
+                placeholder="Categoria"
+                searchPlaceholder="Buscar categoria..."
+                className="w-32 h-7 text-[10px] bg-secondary border-border"
+              />
               <div className="flex items-center gap-1.5">
                 <Switch id="only-stock" checked={onlyWithStock} onCheckedChange={setOnlyWithStock} className="scale-75" />
                 <Label htmlFor="only-stock" className="text-[10px] text-muted-foreground cursor-pointer">Apenas com estoque</Label>

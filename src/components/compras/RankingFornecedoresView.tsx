@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { DecimalInput } from '@/components/ui/decimal-input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import SearchableSelect from '@/components/ui/SearchableSelect';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
@@ -254,17 +255,19 @@ export default function RankingFornecedoresView() {
             </div>
             <div>
               <Label className="text-xs">Produto *</Label>
-              <Select value={priceForm.stock_item_id} onValueChange={v => {
-                const prod = produtos.find(p => p.id === v);
-                setPriceForm(f => ({ ...f, stock_item_id: v, purchase_unit: prod?.unidadeCompra || prod?.unidadeMedida || 'UN' }));
-              }}>
-                <SelectTrigger className="text-sm"><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                <SelectContent>
-                  {produtos.filter(p => p.ativo).map(p => (
-                    <SelectItem key={p.id} value={p.id}>{p.nomeProduto} ({p.unidadeCompra || p.unidadeMedida})</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={priceForm.stock_item_id}
+                onValueChange={v => {
+                  const prod = produtos.find(p => p.id === v);
+                  setPriceForm(f => ({ ...f, stock_item_id: v, purchase_unit: prod?.unidadeCompra || prod?.unidadeMedida || 'UN' }));
+                }}
+                options={produtos.filter(p => p.ativo).map(p => ({ value: p.id, label: `${p.nomeProduto} (${p.unidadeCompra || p.unidadeMedida})` }))}
+                placeholder="Selecione..."
+                searchPlaceholder="Buscar produto..."
+                className="text-sm"
+                modal
+                allowClear={false}
+              />
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>

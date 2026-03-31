@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import SearchableSelect from '@/components/ui/SearchableSelect';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -154,15 +155,14 @@ export default function SimuladorCompraGeral() {
             </div>
             <div>
               <Label className="text-[11px] text-muted-foreground">Categoria</Label>
-              <Select value={categoria || 'all'} onValueChange={v => setCategoria(v === 'all' ? '' : v)}>
-                <SelectTrigger className="bg-secondary border-border text-foreground"><SelectValue placeholder="Todas" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas</SelectItem>
-                  {['Oriental', 'Bebidas', 'Limpeza', 'Embalagens', 'Cozinha', 'Descartáveis', 'Proteínas', 'Hortifruti', 'Outros'].map(c => (
-                    <SelectItem key={c} value={c}>{c}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={categoria || 'all'}
+                onValueChange={v => setCategoria(v === 'all' ? '' : v)}
+                options={[{ value: 'all', label: 'Todas' }, ...['Oriental', 'Bebidas', 'Limpeza', 'Embalagens', 'Cozinha', 'Descartáveis', 'Proteínas', 'Hortifruti', 'Outros'].map(c => ({ value: c, label: c }))]}
+                placeholder="Todas"
+                searchPlaceholder="Buscar categoria..."
+                className="bg-secondary border-border text-foreground"
+              />
             </div>
             <div className="flex flex-col justify-end gap-2">
               <div className="flex items-center gap-2">

@@ -65,6 +65,19 @@ interface Requisicao {
 
 const SETORES = ['Cozinha', 'Sushi', 'Limpeza', 'Salão', 'Copa'];
 
+async function extractEdgeFnErrorMessage(error: unknown, fallback: string): Promise<string> {
+  try {
+    if (error && typeof error === 'object' && 'context' in error) {
+      const resp = (error as { context: Response }).context;
+      if (resp && typeof resp.json === 'function') {
+        const body = await resp.json();
+        return body?.message || body?.error || fallback;
+      }
+    }
+  } catch { /* ignore parse errors */ }
+  return fallback;
+}
+
 type FormMode = 'none' | 'manual' | 'lista-fixa';
 
 type ManualItem = {
@@ -299,7 +312,12 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
           quantidade_aprovada: qtd,
         },
       });
-      if (error) throw error;
+
+      if (error) {
+        const msg = await extractEdgeFnErrorMessage(error, 'Erro ao atender item');
+        toast.error(msg);
+        return;
+      }
 
       const result = data as {
         success?: boolean;
@@ -330,7 +348,12 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
       const { data, error } = await supabase.functions.invoke('requisicao-estoque', {
         body: { action: 'atender_item', requisicao_id: reqId, item_id: itemId },
       });
-      if (error) throw error;
+
+      if (error) {
+        const msg = await extractEdgeFnErrorMessage(error, 'Erro ao atender item');
+        toast.error(msg);
+        return;
+      }
 
       const result = data as {
         success?: boolean;
@@ -377,7 +400,11 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
           motivo_recusa: motivo,
         },
       });
-      if (error) throw error;
+      if (error) {
+        const msg = await extractEdgeFnErrorMessage(error, 'Erro ao recusar item');
+        toast.error(msg);
+        return;
+      }
       if (data?.success) {
         toast.success(data.mensagem);
         setRejectDialog(null);
@@ -401,7 +428,11 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
       const { data, error } = await supabase.functions.invoke('requisicao-estoque', {
         body: { action: 'atender', requisicao_id: reqId },
       });
-      if (error) throw error;
+      if (error) {
+        const msg = await extractEdgeFnErrorMessage(error, 'Erro ao atender requisição');
+        toast.error(msg);
+        return;
+      }
       if (data?.success) {
         toast.success(data.mensagem, { duration: 5000 });
         loadRequisicoes();

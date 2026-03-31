@@ -8,6 +8,7 @@ import { DecimalInput } from '@/components/ui/decimal-input';
 import { fmtBRL, formatFixedBR } from '@/lib/formatters';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import SearchableSelect from '@/components/ui/SearchableSelect';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Produto, MovimentacaoEstoque } from '@/types/salmon';
@@ -320,23 +321,25 @@ export default function MovimentacoesSection({
           <div className="grid grid-cols-2 gap-2">
             <div>
               <Label className="text-[10px] text-muted-foreground">Produto</Label>
-              <Select value={filterProduto} onValueChange={setFilterProduto}>
-                <SelectTrigger className="h-8 text-xs bg-secondary border-border"><SelectValue placeholder="Todos" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  {produtos.filter(p => p.ativo).map(p => <SelectItem key={p.id} value={p.id}>{p.nomeProduto}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={filterProduto}
+                onValueChange={setFilterProduto}
+                options={[{ value: 'all', label: 'Todos' }, ...produtos.filter(p => p.ativo).map(p => ({ value: p.id, label: p.nomeProduto }))]}
+                placeholder="Todos"
+                searchPlaceholder="Buscar produto..."
+                className="h-8 text-xs bg-secondary border-border"
+              />
             </div>
             <div>
               <Label className="text-[10px] text-muted-foreground">Categoria</Label>
-              <Select value={filterCategoria} onValueChange={setFilterCategoria}>
-                <SelectTrigger className="h-8 text-xs bg-secondary border-border"><SelectValue placeholder="Todas" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas</SelectItem>
-                  {categorias.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={filterCategoria}
+                onValueChange={setFilterCategoria}
+                options={[{ value: 'all', label: 'Todas' }, ...categorias.map(c => ({ value: c, label: c }))]}
+                placeholder="Todas"
+                searchPlaceholder="Buscar categoria..."
+                className="h-8 text-xs bg-secondary border-border"
+              />
             </div>
             {direction === 'saidas' && (
               <div>

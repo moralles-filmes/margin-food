@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import SearchableSelect from '@/components/ui/SearchableSelect';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
 import { Trash2, RefreshCw, DollarSign, AlertTriangle, Package, Calendar } from 'lucide-react';
@@ -166,13 +167,14 @@ export default function StockLossesSection({ categorias }: { categorias: string[
         </div>
         <div>
           <label className="text-[10px] text-muted-foreground font-medium mb-1 block">Categoria</label>
-          <Select value={filterCategory || '__all__'} onValueChange={(v) => setFilterCategory(v === '__all__' ? '' : v)}>
-            <SelectTrigger className="h-7 w-32 text-xs"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all__">Todas</SelectItem>
-              {categorias.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          <SearchableSelect
+            value={filterCategory || '__all__'}
+            onValueChange={(v) => setFilterCategory(v === '__all__' ? '' : v)}
+            options={[{ value: '__all__', label: 'Todas' }, ...categorias.map(c => ({ value: c, label: c }))]}
+            placeholder="Todas"
+            searchPlaceholder="Buscar categoria..."
+            className="h-7 w-32 text-xs"
+          />
         </div>
         <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={fetchData} disabled={loading}>
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />

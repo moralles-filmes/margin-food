@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import SearchableSelect from '@/components/ui/SearchableSelect';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { ArrowRight, ArrowLeftRight, Loader2, Package, MapPin, RefreshCw, Search } from 'lucide-react';
@@ -161,18 +162,15 @@ export default function StockTransfersSection({ categorias, locais }: Props) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="sm:col-span-2">
               <Label className="text-xs">Produto</Label>
-              <Select value={formProduct} onValueChange={setFormProduct}>
-                <SelectTrigger className="h-9 text-xs bg-secondary border-border">
-                  <SelectValue placeholder="Selecione o produto" />
-                </SelectTrigger>
-                <SelectContent>
-                  {activeProdutos.map(p => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.nomeProduto} ({p.unidadeMedida})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={formProduct}
+                onValueChange={setFormProduct}
+                options={activeProdutos.map(p => ({ value: p.id, label: `${p.nomeProduto} (${p.unidadeMedida})` }))}
+                placeholder="Selecione o produto"
+                searchPlaceholder="Buscar produto..."
+                className="h-9 text-xs bg-secondary border-border"
+                allowClear={false}
+              />
               {formProduct && (
                 <p className="text-[10px] text-muted-foreground mt-1">
                   Saldo disponível: <span className="font-bold text-foreground">{formatFixedBR(selectedSaldo, 2)} {selectedProd?.unidadeMedida}</span>
@@ -182,30 +180,28 @@ export default function StockTransfersSection({ categorias, locais }: Props) {
 
             <div>
               <Label className="text-xs">Local de Origem</Label>
-              <Select value={formFrom} onValueChange={setFormFrom}>
-                <SelectTrigger className="h-9 text-xs bg-secondary border-border">
-                  <SelectValue placeholder="De onde sai" />
-                </SelectTrigger>
-                <SelectContent>
-                  {locais.map(l => (
-                    <SelectItem key={l} value={l} disabled={l === formTo}>{l}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={formFrom}
+                onValueChange={setFormFrom}
+                options={locais.filter(l => l !== formTo).map(l => ({ value: l, label: l }))}
+                placeholder="De onde sai"
+                searchPlaceholder="Buscar local..."
+                className="h-9 text-xs bg-secondary border-border"
+                allowClear={false}
+              />
             </div>
 
             <div>
               <Label className="text-xs">Local de Destino</Label>
-              <Select value={formTo} onValueChange={setFormTo}>
-                <SelectTrigger className="h-9 text-xs bg-secondary border-border">
-                  <SelectValue placeholder="Para onde vai" />
-                </SelectTrigger>
-                <SelectContent>
-                  {locais.map(l => (
-                    <SelectItem key={l} value={l} disabled={l === formFrom}>{l}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={formTo}
+                onValueChange={setFormTo}
+                options={locais.filter(l => l !== formFrom).map(l => ({ value: l, label: l }))}
+                placeholder="Para onde vai"
+                searchPlaceholder="Buscar local..."
+                className="h-9 text-xs bg-secondary border-border"
+                allowClear={false}
+              />
             </div>
 
             <div>
@@ -279,29 +275,23 @@ export default function StockTransfersSection({ categorias, locais }: Props) {
           </SelectContent>
         </Select>
 
-        <Select value={filterProduct} onValueChange={v => setFilterProduct(v === 'all' ? '' : v)}>
-          <SelectTrigger className="w-36 h-8 text-xs bg-secondary border-border">
-            <SelectValue placeholder="Produto" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos produtos</SelectItem>
-            {activeProdutos.map(p => (
-              <SelectItem key={p.id} value={p.id}>{p.nomeProduto}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <SearchableSelect
+          value={filterProduct || 'all'}
+          onValueChange={v => setFilterProduct(v === 'all' ? '' : v)}
+          options={[{ value: 'all', label: 'Todos produtos' }, ...activeProdutos.map(p => ({ value: p.id, label: p.nomeProduto }))]}
+          placeholder="Produto"
+          searchPlaceholder="Buscar produto..."
+          className="w-36 h-8 text-xs bg-secondary border-border"
+        />
 
-        <Select value={filterLocation} onValueChange={v => setFilterLocation(v === 'all' ? '' : v)}>
-          <SelectTrigger className="w-28 h-8 text-xs bg-secondary border-border">
-            <SelectValue placeholder="Local" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos locais</SelectItem>
-            {locais.map(l => (
-              <SelectItem key={l} value={l}>{l}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <SearchableSelect
+          value={filterLocation || 'all'}
+          onValueChange={v => setFilterLocation(v === 'all' ? '' : v)}
+          options={[{ value: 'all', label: 'Todos locais' }, ...locais.map(l => ({ value: l, label: l }))]}
+          placeholder="Local"
+          searchPlaceholder="Buscar local..."
+          className="w-28 h-8 text-xs bg-secondary border-border"
+        />
 
         <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => fetchTransfers(0)}>
           <RefreshCw className="w-3 h-3 mr-1" />
