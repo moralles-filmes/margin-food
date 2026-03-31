@@ -405,13 +405,26 @@ export function usePurchaseOrdersStore() {
       return;
     }
 
-    const rpcItems = receivableItems.map(i => ({
-      order_item_id: i.id,
-      status: i.received_status === 'NOT_DELIVERED' ? 'NOT_DELIVERED' : 'RECEIVED',
-      qty_received: i.qty_received,
-      unit_cost: i.estimated_unit_value,
-      reason: i.not_delivered_reason || undefined,
-    }));
+    // Include NOT_AVAILABLE items (from shopping) as NOT_DELIVERED in the RPC call
+    // so the RPC can correctly determine the order status
+    const notAvailableItems = items.filter(i => i.shopping_status === 'NOT_AVAILABLE');
+
+    const rpcItems = [
+      ...receivableItems.map(i => ({
+        order_item_id: i.id,
+        status: i.received_status === 'NOT_DELIVERED' ? 'NOT_DELIVERED' : 'RECEIVED',
+        qty_received: i.qty_received,
+        unit_cost: i.estimated_unit_value,
+        reason: i.not_delivered_reason || undefined,
+      })),
+      ...notAvailableItems.map(i => ({
+        order_item_id: i.id,
+        status: 'NOT_DELIVERED' as const,
+        qty_received: 0,
+        unit_cost: i.estimated_unit_value,
+        reason: i.not_delivered_reason || i.shopping_note || 'Indisponível na compra',
+      })),
+    ];
 
     const { data: result, error } = await supabase.rpc('receive_purchase_order_atomic', {
       p_order_id: orderId,

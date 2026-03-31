@@ -17,6 +17,13 @@ Este arquivo serve para sincronizar o progresso do desenvolvimento entre os dife
 (Nenhuma tarefa em progresso)
 
 ## ✅ Concluído (Done)
+- [x] **Fix Itens Indisponíveis → Não Entregues (2026-03-31)**
+    - Bug: itens marcados "indisponível" no Checklist de Compra não faziam o pedido ir para "Não Entregues" — iam direto para "Concluídos"
+    - Fix Backend: RPC `receive_purchase_order_atomic` agora consulta TODOS os itens do pedido para determinar status (não só o batch atual)
+    - Fix Frontend: `confirmReceiving` agora inclui itens NOT_AVAILABLE como NOT_DELIVERED no RPC call
+    - UI: Adicionada seção "Indisponíveis na compra" em vermelho na tela de recebimento com observação do checklist
+    - Migração: `20260331150834_fix_receive_status_not_available.sql`
+    - Arquivos: `PedidosComprasMercadoView.tsx`, `usePurchaseOrdersStore.ts`
 - [x] **Fix Saldo Estoque & Requisições (2026-03-31)**
     - Corrigida divergência entre `fn_recompute_product_saldo` (cache) e `attend_requisicao_item_atomic` (RPC) — ambas agora ignoram estornos (`ENTRADA_ESTORNO`/`SAIDA_ESTORNO`)
     - Migrações: `20260331132000_fix_saldo_cache_estorno.sql`, `20260331133000_fix_saldo_revert_and_fix_rpc.sql`

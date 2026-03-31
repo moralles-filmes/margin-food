@@ -178,6 +178,15 @@ margin-food/
 
 > **Mantenha esta seção atualizada após cada sessão de trabalho.**
 
+### 2026-03-31 — Fix Itens Indisponíveis não iam para "Não Entregues" + Exibição no Recebimento
+- **Bug**: Itens marcados como "indisponível" no Checklist de Compra não faziam o pedido ir para a aba "Não Entregues" após recebimento — iam direto para "Concluídos".
+- **Causa raiz**: `receive_purchase_order_atomic` determinava status final baseado apenas nos itens do batch atual (`p_items`). Itens já marcados como `NOT_DELIVERED` na fase de shopping não eram incluídos no batch do frontend, então `v_items_not_delivered = 0` → status = `COMPLETED` em vez de `PARTIAL`.
+- **Fix Backend (RPC)**: Status determination agora consulta TODOS os itens do pedido no banco (`SELECT ... FROM purchase_order_items WHERE order_id = ...`) em vez de contar apenas os do batch.
+- **Fix Frontend (confirmReceiving)**: `usePurchaseOrdersStore.ts` agora inclui itens NOT_AVAILABLE como NOT_DELIVERED no RPC call, garantindo contagem correta em ambos os lados.
+- **UI Recebimento**: Adicionada seção "Indisponíveis na compra" em vermelho na tela de recebimento (`PedidosComprasMercadoView.tsx`), exibindo nome, quantidade, valor e observação do checklist.
+- **Migração**: `20260331150834_fix_receive_status_not_available.sql`
+- **Arquivos afetados**: `PedidosComprasMercadoView.tsx`, `usePurchaseOrdersStore.ts`
+
 ### 2026-03-31 — Fix Saldo Estoque + Requisições + SearchableSelect Global
 - **Fix Saldo Cache vs RPC**: `fn_recompute_product_saldo` e `attend_requisicao_item_atomic` estavam com fórmulas divergentes — cache ignorava estornos corretamente, mas a RPC contava todos. Alinhadas ambas para ignorar `ENTRADA_ESTORNO`/`SAIDA_ESTORNO`.
 - **Fix Error Handling Requisições**: Mensagens de erro do backend (Edge Function) agora são exibidas no frontend via `extractEdgeFnErrorMessage()` — antes, o toast mostrava apenas "Erro ao atender item" genérico.

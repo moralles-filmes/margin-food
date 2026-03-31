@@ -448,6 +448,11 @@ export default function PedidosComprasMercadoView() {
     return orderItems;
   }, [selectedOrder, orderItems]);
 
+  const unavailableItems = useMemo(() => {
+    if (!selectedOrder) return [];
+    return orderItems.filter(i => (i as any).shopping_status === 'NOT_AVAILABLE');
+  }, [selectedOrder, orderItems]);
+
   const hasReceivedItems = deleteItems.some(i => i.qty_received > 0);
 
   // ===== DELETE CONFIRMATION DIALOG =====
@@ -700,6 +705,34 @@ export default function PedidosComprasMercadoView() {
               );
             })}
           </div>
+
+          {/* Itens indisponíveis no checklist */}
+          {unavailableItems.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-border">
+              <h4 className="text-sm font-semibold text-destructive mb-3 flex items-center gap-2">
+                <XCircle className="w-4 h-4" />
+                Indisponíveis na compra ({unavailableItems.length})
+              </h4>
+              <div className="space-y-2">
+                {unavailableItems.map(item => (
+                  <div key={item.id} className="border border-destructive/30 bg-destructive/5 rounded-lg p-3">
+                    <div className="flex items-start gap-3">
+                      <XCircle className="w-5 h-5 text-destructive mt-0.5 shrink-0" />
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{item.name_snapshot}</p>
+                        <p className="text-[10px] text-muted-foreground">
+                          {item.qty_requested} {item.unit_snapshot} × {fmtBRL(item.estimated_unit_value)} = {fmtBRL(item.qty_requested * item.estimated_unit_value)}
+                        </p>
+                        <p className="text-[10px] text-destructive mt-0.5">
+                          ✗ Indisponível{item.shopping_note ? `: ${item.shopping_note}` : ''}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
