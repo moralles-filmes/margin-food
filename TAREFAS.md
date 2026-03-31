@@ -17,6 +17,17 @@ Este arquivo serve para sincronizar o progresso do desenvolvimento entre os dife
 (Nenhuma tarefa em progresso)
 
 ## ✅ Concluído (Done)
+- [x] **Fix Saldo Estoque & Requisições (2026-03-31)**
+    - Corrigida divergência entre `fn_recompute_product_saldo` (cache) e `attend_requisicao_item_atomic` (RPC) — ambas agora ignoram estornos (`ENTRADA_ESTORNO`/`SAIDA_ESTORNO`)
+    - Migrações: `20260331132000_fix_saldo_cache_estorno.sql`, `20260331133000_fix_saldo_revert_and_fix_rpc.sql`
+    - Recomputados todos os saldos de produtos no banco
+- [x] **Fix Error Handling Requisições (2026-03-31)**
+    - Frontend agora extrai mensagens reais do backend via `extractEdgeFnErrorMessage()` em vez de mostrar toast genérico
+    - Corrigido em `handleConfirmAttend`, `handleAtenderItemDirect`, `handleAtenderTodos`, `handleConfirmReject`
+- [x] **SearchableSelect Global (2026-03-31)**
+    - Criado componente genérico `components/ui/SearchableSelect.tsx` (Popover + Command/cmdk com campo de busca)
+    - Aplicado em 13 arquivos / 25+ selects: produtos, categorias, locais, usuários, fornecedores, módulos, ações
+    - Arquivos: `MovimentacoesSection`, `StockLossesSection`, `StockTopConsumedSection`, `StockInactivityAlert`, `SimuladorCompraGeral`, `StockConsumptionHistorySection`, `StockTransfersSection`, `RankingFornecedoresView`, `InventarioView`, `OnboardingSection`, `ProdutoFormPanel`, `CalendarioLembretesView`, `GlobalAuditView`
 - [x] **Fix Salmon Module Tenant Isolation**
     - RPCs `create_salmon_entry_atomic`, `cancel_salmon_entry_atomic`, `create_salmon_manipulation_atomic`, `cancel_salmon_manipulation_atomic` atualizadas com `assert_tenant()` e `company_id` explícito em todos os INSERTs/UPDATEs
     - Função `ensure_salmon_raw_product()` tenantizada
