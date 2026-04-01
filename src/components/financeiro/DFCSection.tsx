@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { subMonths, startOfMonth, endOfMonth } from 'date-fns';
 import { formatDateBR, formatInBR } from '@/lib/formatters';
+import { formatDateBR as formatDateISO } from '@/lib/datetime';
 import { FileDown, FileSpreadsheet, ShieldAlert } from 'lucide-react';
 import { exportDemonstrativoPDF, exportDemonstrativoExcel } from '@/lib/exportDemonstrativo';
 import { useDataEvent } from '@/lib/dataEvents';
@@ -58,8 +59,8 @@ export default function DFCSection() {
     setLoading(true);
     const m = Number(meses);
     const periodoInicio = startOfMonth(subMonths(new Date(), m - 1));
-    const inicio = formatDateBR(periodoInicio);
-    const fim = formatDateBR(endOfMonth(new Date()));
+    const inicio = formatDateISO(periodoInicio);
+    const fim = formatDateISO(endOfMonth(new Date()));
 
     const startLabel = formatInBR(periodoInicio, 'MMM/yy');
     const endLabel = formatInBR(new Date(), 'MMM/yy');

@@ -261,7 +261,7 @@ export default function ContasReceberSection() {
       else if (form.categoria_id) catId = form.categoria_id;
       if (form.centro_custo_id && !ccId) ccId = form.centro_custo_id;
 
-      const rateiosPayload = rateioLines.length > 1
+      const rateiosPayload = rateioLines.length > 0
         ? rateioLines.map(r => ({ categoria_id: r.categoria_id || null, centro_custo_id: r.centro_custo_id || null, valor: r.valor, percentual: r.percentual }))
         : [];
 
@@ -282,8 +282,8 @@ export default function ContasReceberSection() {
         p_conta_id: form.conta_id || null,
         p_forma_pagamento: form.forma_pagamento,
         p_observacoes: form.observacoes || null,
-        p_rateios: JSON.stringify(rateiosPayload),
-        p_recorrencia: recorrencia ? JSON.stringify(recorrencia) : null,
+        p_rateios: rateiosPayload,
+        p_recorrencia: recorrencia || null,
         p_expected_updated_at: editingItem?.updated_at, // Only used in update
       });
 

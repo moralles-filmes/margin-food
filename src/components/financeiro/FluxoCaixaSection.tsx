@@ -11,6 +11,7 @@ import { DollarSign, TrendingUp, TrendingDown, Activity, FileDown, Ban } from 'l
 import { Button } from '@/components/ui/button';
 import { gerarPDFFluxoCaixa } from '@/lib/pdfFinanceiro';
 import { fmtBRL, formatDateBR, parseLocalDate } from '@/lib/formatters';
+import { formatDateBR as formatDateISO } from '@/lib/datetime';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 
@@ -47,6 +48,8 @@ const origemBadge: Record<string, { text: string; cls: string }> = {
   transferencia: { text: 'Transferência', cls: 'bg-accent text-accent-foreground border-border' },
   conta_pagar: { text: 'Conta a Pagar', cls: 'bg-warning/10 text-warning border-warning/20' },
   conta_receber: { text: 'Conta a Receber', cls: 'bg-success/10 text-success border-success/20' },
+  conta_pagar_vencida: { text: 'Pagar (Vencida)', cls: 'bg-destructive/10 text-destructive border-destructive/20' },
+  conta_receber_vencida: { text: 'Receber (Vencida)', cls: 'bg-destructive/10 text-destructive border-destructive/20' },
 };
 
 
@@ -82,8 +85,8 @@ export default function FluxoCaixaSection() {
     if (!canView) return;
     setLoading(true);
     const hoje = new Date();
-    const inicio = formatDateBR(new Date(hoje.getFullYear(), hoje.getMonth(), 1));
-    const fimProj = formatDateBR(new Date(hoje.getFullYear(), hoje.getMonth() + 2, 0));
+    const inicio = formatDateISO(new Date(hoje.getFullYear(), hoje.getMonth(), 1));
+    const fimProj = formatDateISO(new Date(hoje.getFullYear(), hoje.getMonth() + 2, 0));
 
     const { data, error } = await supabase.rpc('get_fin_cashflow', { p_inicio: inicio, p_fim: fimProj });
     if (error) { toast.error('Erro ao carregar fluxo de caixa'); console.error(error); setLoading(false); return; }
@@ -180,6 +183,18 @@ export default function FluxoCaixaSection() {
             <Card><CardContent className="p-4">
               <div className="flex items-center gap-2 mb-1"><TrendingDown className="w-4 h-4 text-destructive" /><span className="text-[11px] text-muted-foreground">Saídas Realizadas</span></div>
               <p className="text-lg font-bold text-destructive">{fmt(totais.saidas)}</p>
+            </CardContent></Card>
+          </>
+        )}
+        {modo === 'previsto' && (
+          <>
+            <Card><CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-1"><TrendingUp className="w-4 h-4 text-success/80" /><span className="text-[11px] text-muted-foreground">Prev. Entradas</span></div>
+              <p className="text-lg font-bold text-success/80">{fmt(totais.prev_entradas)}</p>
+            </CardContent></Card>
+            <Card><CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-1"><TrendingDown className="w-4 h-4 text-destructive/80" /><span className="text-[11px] text-muted-foreground">Prev. Saídas</span></div>
+              <p className="text-lg font-bold text-destructive/80">{fmt(totais.prev_saidas)}</p>
             </CardContent></Card>
           </>
         )}

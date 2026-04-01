@@ -11,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useCan } from '@/permissions/hooks';
 import { toast } from 'sonner';
 import { formatDateBR, todayBR, fmtBRL, formatPercentBR } from '@/lib/formatters';
+import { formatDateBR as formatDateISO } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -122,7 +123,7 @@ export default function DashboardFinanceiroSection({ onNavigate }: { onNavigate?
         startDate = periodoInicio;
         const endD = new Date(periodoFim + 'T12:00:00');
         endD.setDate(endD.getDate() + 1);
-        endDateFinal = formatDateBR(endD);
+        endDateFinal = formatDateISO(endD);
       } else if (filterType === 'dia') {
         startDate = format(selectedDate, 'yyyy-MM-dd');
         const nextDay = new Date(selectedDate);

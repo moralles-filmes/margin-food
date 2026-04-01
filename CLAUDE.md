@@ -178,6 +178,17 @@ margin-food/
 
 > **Mantenha esta seção atualizada após cada sessão de trabalho.**
 
+### 2026-04-01 — Fix Fluxo de Caixa: formato de datas, contas vencidas e cards "Só Previsto"
+- **Bug 1 — RPC falhava**: `formatDateBR` de `@/lib/formatters` retorna `dd/MM/yyyy` (display), mas era passado como parâmetro para RPCs PostgreSQL que esperam `yyyy-MM-dd`. Afetava `get_fin_cashflow`, `get_fin_dfc_summary` e `get_fin_dashboard_summary`.
+- **Fix**: Importar `formatDateBR` de `@/lib/datetime` (retorna `yyyy-MM-dd`) para parâmetros de RPC em `FluxoCaixaSection`, `DFCSection` e `DashboardFinanceiroSection`.
+- **Bug 2 — Contas vencidas não apareciam**: A RPC `get_fin_cashflow` filtrava contas a pagar por `status IN ('APROVADO', 'AGUARDANDO_APROVACAO')` e contas a receber por `status = 'A_RECEBER'`, excluindo contas vencidas.
+- **Fix**: Contas com `data_vencimento < CURRENT_DATE` e status pendente (não PAGO/CANCELADO/RASCUNHO) agora aparecem no fluxo de caixa independente do período selecionado, com badge "Pagar (Vencida)" / "Receber (Vencida)" em vermelho.
+- **Bug 3 — Cards sumiam em "Só Previsto"**: Ao selecionar modo "Só Previsto", apenas o card "Saldo Projetado" era exibido.
+- **Fix**: Adicionados cards "Prev. Entradas" e "Prev. Saídas" visíveis exclusivamente no modo "Só Previsto".
+- **Fix Contas a Pagar/Receber**: Corrigido envio de rateios (`rateioLines.length > 1` → `> 0`) e remoção de `JSON.stringify` redundante nos payloads de RPC. Adicionada coluna Categoria na tabela de Contas a Pagar.
+- **Migrações**: `20260331170000_fix_cashflow_include_vencido.sql`, `20260401001000_fix_cashflow_vencido_any_period.sql`, `20260401001500_fix_cashflow_auto_detect_vencido.sql`
+- **Arquivos afetados**: `FluxoCaixaSection.tsx`, `DFCSection.tsx`, `DashboardFinanceiroSection.tsx`, `ContasPagarSection.tsx`, `ContasReceberSection.tsx`
+
 ### 2026-03-31 — Fix Itens Indisponíveis não iam para "Não Entregues" + Exibição no Recebimento
 - **Bug**: Itens marcados como "indisponível" no Checklist de Compra não faziam o pedido ir para a aba "Não Entregues" após recebimento — iam direto para "Concluídos".
 - **Causa raiz**: `receive_purchase_order_atomic` determinava status final baseado apenas nos itens do batch atual (`p_items`). Itens já marcados como `NOT_DELIVERED` na fase de shopping não eram incluídos no batch do frontend, então `v_items_not_delivered = 0` → status = `COMPLETED` em vez de `PARTIAL`.

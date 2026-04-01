@@ -17,6 +17,14 @@ Este arquivo serve para sincronizar o progresso do desenvolvimento entre os dife
 (Nenhuma tarefa em progresso)
 
 ## ✅ Concluído (Done)
+- [x] **Fix Fluxo de Caixa — Datas, Contas Vencidas e Cards (2026-04-01)**
+    - Fix formato de datas: RPCs recebiam `dd/MM/yyyy` em vez de `yyyy-MM-dd` (afetava FluxoCaixa, DFC e Dashboard)
+    - Contas vencidas (data_vencimento < hoje) agora aparecem no fluxo de caixa independente do período
+    - Cards "Prev. Entradas" e "Prev. Saídas" exibidos no modo "Só Previsto"
+    - Coluna Categoria adicionada na tabela de Contas a Pagar
+    - Fix rateios payload (length > 0) e remoção de JSON.stringify redundante
+    - Migrações: `20260331170000`, `20260401001000`, `20260401001500`
+    - Arquivos: `FluxoCaixaSection`, `DFCSection`, `DashboardFinanceiroSection`, `ContasPagarSection`, `ContasReceberSection`
 - [x] **Fix Itens Indisponíveis → Não Entregues (2026-03-31)**
     - Bug: itens marcados "indisponível" no Checklist de Compra não faziam o pedido ir para "Não Entregues" — iam direto para "Concluídos"
     - Fix Backend: RPC `receive_purchase_order_atomic` agora consulta TODOS os itens do pedido para determinar status (não só o batch atual)

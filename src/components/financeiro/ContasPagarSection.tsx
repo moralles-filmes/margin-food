@@ -15,7 +15,7 @@ import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Plus, AlertTriangle, CheckCircle, Clock, Ban, FileDown, RefreshCw, Trash2, Repeat, X } from 'lucide-react';
+import { Plus, AlertTriangle, CheckCircle, Clock, Ban, FileDown, RefreshCw, Trash2, Repeat } from 'lucide-react';
 import { useFormDirtyGuard } from '@/hooks/useFormDirtyGuard';
 import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
 import { gerarPDFContasPagar } from '@/lib/pdfFinanceiro';
@@ -65,7 +65,7 @@ const PAGE_SIZE = 50;
 function SkeletonRows() {
   return (<>{Array.from({ length: 5 }).map((_, i) => (
     <TableRow key={i}>
-      {Array.from({ length: 6 }).map((_, j) => (
+      {Array.from({ length: 7 }).map((_, j) => (
         <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
       ))}
     </TableRow>
@@ -281,7 +281,7 @@ export default function ContasPagarSection() {
         fornecedor = form.fornecedor;
       }
 
-      const rateiosPayload = rateioLines.length > 1
+      const rateiosPayload = rateioLines.length > 0
         ? rateioLines.map(r => ({ categoria_id: r.categoria_id || null, centro_custo_id: r.centro_custo_id || null, valor: r.valor, percentual: r.percentual }))
         : [];
 
@@ -302,8 +302,8 @@ export default function ContasPagarSection() {
         p_conta_id: form.conta_id || null,
         p_forma_pagamento: form.forma_pagamento,
         p_observacoes: form.observacoes || null,
-        p_rateios: JSON.stringify(rateiosPayload),
-        p_recorrencia: recorrencia ? JSON.stringify(recorrencia) : null,
+        p_rateios: rateiosPayload,
+        p_recorrencia: recorrencia || null,
         p_expected_updated_at: editingItem?.updated_at, // Only used in update
       });
 
@@ -412,10 +412,7 @@ export default function ContasPagarSection() {
               <DialogTrigger asChild><Button size="sm"><Plus className="w-4 h-4 mr-1" /> Nova Conta</Button></DialogTrigger>
               <DialogContent className="max-w-lg">
                 <DialogHeader>
-                  <div className="flex items-center justify-between">
-                    <DialogTitle>{editingItem ? 'Editar Conta a Pagar' : 'Nova Conta a Pagar'}</DialogTitle>
-                    <button type="button" onClick={guardedClose} aria-label="Fechar" className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"><X className="w-4 h-4" /></button>
-                  </div>
+                  <DialogTitle>{editingItem ? 'Editar Conta a Pagar' : 'Nova Conta a Pagar'}</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
                   <div><Label>Descrição</Label><Input value={form.descricao} onChange={e => setForm({...form, descricao: e.target.value})} /></div>
@@ -554,6 +551,7 @@ export default function ContasPagarSection() {
             <TableHead>Vencimento</TableHead>
             <TableHead>Descrição</TableHead>
             <TableHead>Fornecedor</TableHead>
+            <TableHead>Categoria</TableHead>
             <TableHead>Valor</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Ações</TableHead>
@@ -563,7 +561,7 @@ export default function ContasPagarSection() {
           {loading && items.length === 0 ? (
             <SkeletonRows />
           ) : items.length === 0 ? (
-            <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Nenhuma conta a pagar</TableCell></TableRow>
+            <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">Nenhuma conta a pagar</TableCell></TableRow>
           ) : items.map(item => {
             const sc = STATUS_CONFIG[item.status] || STATUS_CONFIG.RASCUNHO;
             const isVencida = item.data_vencimento < today && !['PAGO', 'CANCELADO'].includes(item.status);
@@ -572,6 +570,7 @@ export default function ContasPagarSection() {
                 <TableCell className={`font-mono text-sm ${isVencida ? 'text-destructive font-bold' : ''}`}>{formatDateBR(parseLocalDate(item.data_vencimento))}</TableCell>
                 <TableCell className="font-medium max-w-[200px] truncate">{item.descricao}</TableCell>
                 <TableCell className="text-muted-foreground">{item.fornecedor || '—'}</TableCell>
+                <TableCell className="text-sm text-muted-foreground">{item.categoria_id ? (categorias.find(c => c.id === item.categoria_id)?.nome || '—') : '—'}</TableCell>
                 <TableCell className="font-bold text-destructive">{fmt(item.valor)}</TableCell>
                 <TableCell><span className={`text-xs px-2 py-0.5 rounded-full border ${sc.color}`}>{sc.label}</span></TableCell>
                  <TableCell>
