@@ -93,13 +93,14 @@ Deno.serve(async (req) => {
 
       // Audit
       const { data: callerProfile } = await adminClient.from('profiles').select('company_id').eq('id', callerUserId).single();
-      await adminClient.from('admin_actions_log').insert({
+      await adminClient.from('audit_logs').insert({
         actor_user_id: callerUserId,
         company_id: callerProfile?.company_id || company_id,
         action: 'COMPANY_ADMIN_CREATED',
-        target_user_id: authUser.id,
-        target_email: trimmedEmail,
-        details: { nome, target_company_id: company_id, target_company_name: company.nome },
+        module: 'admin',
+        entity: 'profiles',
+        entity_id: authUser.id,
+        metadata: { nome, target_company_id: company_id, target_company_name: company.nome, target_email: trimmedEmail },
       });
 
       return json({
