@@ -6,11 +6,12 @@ import { useCan } from '@/permissions/hooks';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ShieldAlert, RefreshCw, Database, User, Shield, Wrench, Play, Trash2, Bug, ArrowLeft } from 'lucide-react';
+import { ShieldAlert, RefreshCw, Database, User, Shield, Wrench, Play, Trash2, Bug, ArrowLeft, Building2 } from 'lucide-react';
 import { toast } from 'sonner';
 import CheckupSuiteCard from '@/components/admin/CheckupSuiteCard';
 import AccessManagementCard from '@/components/admin/AccessManagementCard';
 import BugTrackerView, { useCriticalBugCount } from '@/components/admin/BugTrackerView';
+import AdminCompaniesView from '@/components/admin/AdminCompaniesView';
 
 type RpcResult = { data: unknown; error: string | null; loading: boolean };
 
@@ -96,6 +97,9 @@ export default function AdminPanel() {
         <Tabs defaultValue="dashboard" className="w-full">
           <TabsList className="mb-4">
             <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+            <TabsTrigger value="companies" className="gap-1.5">
+              <Building2 className="w-3 h-3" /> Empresas
+            </TabsTrigger>
             <TabsTrigger value="bugs" className="gap-1.5">
               <Bug className="w-3 h-3" /> Bug Tracker
               {criticalBugs > 0 && (
@@ -238,6 +242,10 @@ export default function AdminPanel() {
                 </CardContent>
               </Card>
             </div>
+          </TabsContent>
+
+          <TabsContent value="companies">
+            <AdminCompaniesView />
           </TabsContent>
 
           <TabsContent value="bugs">

@@ -463,6 +463,12 @@ export const MODULE_MANIFESTS: ModuleManifest[] = [
       { key: 'performance', label: 'Performance', actions: VIEW_ONLY },
       { key: 'auditoria-seguranca', label: 'Auditoria Segurança', actions: VIEW_ONLY },
       { key: 'auditoria-compras', label: 'Auditoria Compras', actions: VIEW_ONLY },
+      { key: 'empresas', label: 'Empresas', actions: [
+        { action: 'view', label: 'Ver' },
+        { action: 'create', label: 'Criar' },
+        { action: 'edit', label: 'Editar' },
+        { action: 'delete', label: 'Desativar' },
+      ]},
     ],
   },
 ];

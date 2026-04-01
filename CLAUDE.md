@@ -160,6 +160,7 @@ margin-food/
 | `rh` | Recursos humanos |
 | `purchase-requisitions` | Ordens de compra |
 | `scheduled-jobs` | Jobs em background (cron) |
+| `admin-companies` | Gestão multi-tenant de empresas |
 
 ---
 
@@ -177,6 +178,31 @@ margin-food/
 ## 🔄 Últimas Atualizações
 
 > **Mantenha esta seção atualizada após cada sessão de trabalho.**
+
+### 2026-04-01 — Multi-Tenant Onboarding (Gestão de Empresas)
+- **Hardened `get_current_company_id()`**: Removido fallback perigoso que retornava "primeira empresa ativa" — com múltiplos tenants, isso causaria vazamento de dados. Agora retorna `NULL` se o perfil não tem `company_id` válido.
+- **Nova RPC `onboard_new_company()`**: Cria empresa + seed de cargos padrão + audit log. Aceita `p_admin_user_id` opcional para vincular admin existente.
+- **Nova RPC `update_company()`**: Edita nome, CNPJ, ativo/inativo com validação de CNPJ duplicado e bloqueio do placeholder.
+- **Nova RPC `list_companies()`**: Lista empresas com contagem de usuários, somente para super-admins (`system:global:manage`).
+- **Nova Edge Function `admin-companies`**: Ação `create-first-user` cria o primeiro admin de uma empresa nova, atribuindo `company_id` da empresa alvo (não do caller).
+- **Novo componente `AdminCompaniesView`**: Cards com nome, CNPJ, status, total de usuários. Dialogs para criar/editar empresa e criar admin.
+- **Nova aba "Empresas"** no Painel Admin (`AdminPanel.tsx`).
+- **Permissões registradas**: `configuracoes:empresas:{view,create,edit,delete}` no `registry.ts`.
+- **Migração**: `20260401200000_multi_tenant_onboarding.sql`
+- **Arquivos afetados**: `AdminCompaniesView.tsx`, `AdminPanel.tsx`, `registry.ts`, `admin-companies/index.ts`
+
+### 2026-04-01 — Hardening de Sincronização Financeira (Lançamentos <> CP/CR)
+- **Guard contra deleção de espelhos**: Nova RPC `_guarded_delete_lancamento` bloqueia exclusão de lançamentos com `origem IN ('espelho_cp','espelho_cr')` e lançamentos conciliados.
+- **Estorno de CP/CR**: Novas RPCs `_guarded_estornar_conta_pagar` e `_guarded_estornar_conta_receber`. Botões "Estornar" adicionados nas tabelas de CP e CR.
+- **Rateio no espelho**: RPCs de pagamento/recebimento agora copiam linhas de rateios para o lançamento espelho.
+- **Validação de conta bancária**: Todas as RPCs de pagamento/recebimento validam que `conta_bancaria_id` pertence à empresa.
+- **Auditoria de integridade**: Nova RPC `fin_audit_integrity_check()` detecta 10 tipos de inconsistência.
+- **Migração**: `20260401140000_financial_sync_hardening.sql`
+
+### 2026-04-01 — Fix entidade_id type mismatch nas RPCs auxiliares do Financeiro
+- **Bug**: 8 RPCs auxiliares inseriam `p_id::text` na coluna `entidade_id` (tipo `uuid`) da `fin_audit_logs`.
+- **Fix**: Removido cast `::text` em todas as 8 RPCs.
+- **Migração**: `20260401120000_fix_auxiliary_audit_entidade_id_type.sql`
 
 ### 2026-04-01 — Fix Fluxo de Caixa: formato de datas, contas vencidas e cards "Só Previsto"
 - **Bug 1 — RPC falhava**: `formatDateBR` de `@/lib/formatters` retorna `dd/MM/yyyy` (display), mas era passado como parâmetro para RPCs PostgreSQL que esperam `yyyy-MM-dd`. Afetava `get_fin_cashflow`, `get_fin_dfc_summary` e `get_fin_dashboard_summary`.
@@ -240,7 +266,9 @@ margin-food/
 - [x] Consolidar sistema para Single-Tenant (Remover empresas legadas)
 - [x] Padronizar CRUD de todos os módulos financeiros (Contas, Categorias, Centros, Plano)
 - [x] Fix Salmon Module Tenant Isolation
-- [ ] Monitorar integridade dos dados na empresa piloto após limpeza intensa
+- [x] Implementar Multi-Tenant Onboarding (Gestão de Empresas)
+- [ ] Monitorar integridade dos dados na empresa piloto após ativação multi-tenant
+- [ ] Testar fluxo completo: criar empresa → criar admin → login admin → criar usuários
 
 ---
 

@@ -11,12 +11,31 @@ Este arquivo serve para sincronizar o progresso do desenvolvimento entre os dife
 ---
 
 ## 🚀 Próximas Tarefas (To-Do)
-(Nenhuma tarefa pendente)
+- [ ] Monitorar integridade dos dados na empresa piloto após ativação multi-tenant
+- [ ] Testar fluxo completo: criar empresa → criar admin → login admin → criar usuários
 
 ## 🔄 Em Progresso (Doing)
 (Nenhuma tarefa em progresso)
 
 ## ✅ Concluído (Done)
+- [x] **Multi-Tenant Onboarding — Gestão de Empresas (2026-04-01)**
+    - Hardened `get_current_company_id()`: removido fallback perigoso que retornava "primeira empresa ativa" — agora retorna NULL se perfil sem empresa
+    - Nova RPC `onboard_new_company()`: cria empresa + seed de cargos padrão + audit log
+    - Nova RPC `update_company()`: edita nome, CNPJ, ativo/inativo com validação de CNPJ duplicado
+    - Nova RPC `list_companies()`: lista empresas com contagem de usuários (super-admin only)
+    - Nova Edge Function `admin-companies`: ação `create-first-user` para criar admin de nova empresa
+    - Novo componente `AdminCompaniesView`: CRUD completo com cards, dialogs de criar/editar empresa e criar admin
+    - Nova aba "Empresas" no Painel Admin
+    - Permissões registradas: `configuracoes:empresas:{view,create,edit,delete}`
+    - Migração: `20260401200000_multi_tenant_onboarding.sql`
+    - Arquivos: `AdminCompaniesView.tsx`, `AdminPanel.tsx`, `registry.ts`, `admin-companies/index.ts`
+- [x] **Hardening de Sincronização Financeira (2026-04-01)**
+    - Guard contra deleção de espelhos, estorno de CP/CR, rateio no espelho, validação de conta bancária
+    - Auditoria de integridade `fin_audit_integrity_check()`
+    - Migração: `20260401140000_financial_sync_hardening.sql`
+- [x] **Fix entidade_id type mismatch RPCs auxiliares (2026-04-01)**
+    - Removido cast `::text` em 8 RPCs que inseriam UUID como text na `fin_audit_logs`
+    - Migração: `20260401120000_fix_auxiliary_audit_entidade_id_type.sql`
 - [x] **Fix Fluxo de Caixa — Datas, Contas Vencidas e Cards (2026-04-01)**
     - Fix formato de datas: RPCs recebiam `dd/MM/yyyy` em vez de `yyyy-MM-dd` (afetava FluxoCaixa, DFC e Dashboard)
     - Contas vencidas (data_vencimento < hoje) agora aparecem no fluxo de caixa independente do período
