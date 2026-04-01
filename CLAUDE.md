@@ -188,7 +188,8 @@ margin-food/
 - **Novo componente `AdminCompaniesView`**: Cards com nome, CNPJ, status, total de usuários. Dialogs para criar/editar empresa e criar admin.
 - **Nova aba "Empresas"** no Painel Admin (`AdminPanel.tsx`).
 - **Permissões registradas**: `configuracoes:empresas:{view,create,edit,delete}` no `registry.ts`.
-- **Migração**: `20260401200000_multi_tenant_onboarding.sql`
+- **Fix audit table**: RPCs usavam `admin_actions_log` (inexistente) — corrigido para `audit_logs`. Migração: `20260401210000_fix_onboarding_audit_table.sql`.
+- **Migrações**: `20260401200000_multi_tenant_onboarding.sql`, `20260401210000_fix_onboarding_audit_table.sql`
 - **Arquivos afetados**: `AdminCompaniesView.tsx`, `AdminPanel.tsx`, `registry.ts`, `admin-companies/index.ts`
 
 ### 2026-04-01 — Hardening de Sincronização Financeira (Lançamentos <> CP/CR)
