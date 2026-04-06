@@ -187,7 +187,7 @@ margin-food/
 
 ### 2026-04-06 — Esconder módulo "Sistema" do PermissionMatrix para não-super-admins
 - **Bug**: Admins regulares de empresa viam o módulo "Sistema" (com `system:global:manage`) na árvore de permissões ao editar/criar usuários em Configurações > Usuários, podendo conceder acesso super-admin indevidamente.
-- **Fix**: `PermissionMatrix.tsx` agora usa `useCan('system:global:manage')` para filtrar o módulo `system` — só aparece para o super-admin.
+- **Fix**: `PermissionMatrix.tsx` agora filtra o módulo `system` usando `effectivePermissions.includes('system:global:manage')` diretamente (sem `useCan`, que resolvia `true` via fallback legado `system:admin` → `system:global:manage` no `LEGACY_PERMISSION_MAP`).
 - **Arquivo afetado**: `PermissionMatrix.tsx`
 
 ### 2026-04-06 — Exibir nome da empresa na sidebar (substituir "Architect")
