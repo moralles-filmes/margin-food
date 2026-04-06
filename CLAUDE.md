@@ -13,7 +13,7 @@
 | Supabase Project ID | `wuzxpbixprrgssoeeaez` |
 | Supabase URL | `https://wuzxpbixprrgssoeeaez.supabase.co` |
 | Supabase Dashboard | `https://supabase.com/dashboard/project/wuzxpbixprrgssoeeaez` |
-| Deploy | Lovable Cloud (auto-deploy no push para `main`) |
+| Deploy | Vercel (auto-deploy no push para `main`) |
 
 ---
 
@@ -178,6 +178,21 @@ margin-food/
 ## 🔄 Últimas Atualizações
 
 > **Mantenha esta seção atualizada após cada sessão de trabalho.**
+
+### 2026-04-01 — Fix Fluxo de Caixa/Dashboard (mês errado) + Estorno de Pagamentos
+- **Bug 1 — Pagamento em mês errado**: Espelhos criados por `pay_conta_pagar` e `receive_conta_receber` usavam `data_vencimento` como `data_competencia`. Quando uma conta vencida era paga, o lançamento aparecia no mês do vencimento (ex: março) em vez do mês do pagamento real (ex: abril) — afetando Fluxo de Caixa e Dashboard.
+- **Fix**: `data_competencia` agora usa `CURRENT_DATE` (data real do pagamento). Dados existentes corrigidos via UPDATE.
+- **Feature — Botão Estornar**: Adicionado botão "Estornar" em Contas a Pagar (status PAGO) e Contas a Receber (status RECEBIDO). Usa RPCs `_guarded_estornar_conta_pagar` e `_guarded_estornar_conta_receber` que já existiam mas não tinham UI. O estorno reverte o status para APROVADO/A_RECEBER e cancela o lançamento espelho.
+- **Migração**: `20260401230000_fix_espelho_data_competencia.sql`
+- **Arquivos frontend**: `ContasPagarSection.tsx`, `ContasReceberSection.tsx`
+
+### 2026-04-01 — Fix Type Mismatches nas RPCs Financeiras
+- **Bug 1 — Optimistic Locking**: `pay_conta_pagar` e `receive_conta_receber` comparavam `updated_at::text` (formato PostgreSQL `2026-04-01 10:15:30+00`) com o valor retornado por `row_to_json()` (formato ISO 8601 `2026-04-01T10:15:30+00:00`). A comparação textual **nunca batia**, bloqueando todos os pagamentos/recebimentos com erro "Registro alterado por outro usuário. Recarregue."
+- **Fix 1**: Substituída comparação textual por comparação tipada: `v_item.updated_at != p_expected_updated_at::timestamptz`.
+- **Bug 2 — CURRENT_DATE::text**: `pay_conta_pagar`, `receive_conta_receber` e `reconcile_receive_conta_receber` usavam `CURRENT_DATE::text` e `p_data_recebimento::text` em colunas `date`, causando erro "column is of type date but expression is of type text".
+- **Fix 2**: Removidos casts `::text` desnecessários — `CURRENT_DATE` e `p_data_recebimento` já são `date`.
+- **Bug 3 — entidade_id::text**: `fin_audit_logs.entidade_id` é `uuid`, mas RPCs inseriam `p_id::text`. Corrigido em `pay_conta_pagar`, `receive_conta_receber`, `reconcile_pay_conta_pagar` e `reconcile_receive_conta_receber`.
+- **Migrações**: `20260401220000_fix_optimistic_lock_timestamp_format.sql`, `20260401223000_fix_type_mismatches_financial_rpcs.sql`
 
 ### 2026-04-01 — Multi-Tenant Onboarding (Gestão de Empresas)
 - **Hardened `get_current_company_id()`**: Removido fallback perigoso que retornava "primeira empresa ativa" — com múltiplos tenants, isso causaria vazamento de dados. Agora retorna `NULL` se o perfil não tem `company_id` válido.

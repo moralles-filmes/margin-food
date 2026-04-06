@@ -174,7 +174,7 @@ export default function CriarLancamentoExtratoDialog({ open, onOpenChange, linha
           p_tipo: tipo,
           p_conta_id: contaBancariaId,
           p_user_id: user?.id,
-          p_rateio_linhas: rateioPayload ? JSON.stringify(rateioPayload) : null,
+          p_rateio_linhas: rateioPayload || null,
         });
         if (error) throw error;
 
@@ -231,7 +231,7 @@ export default function CriarLancamentoExtratoDialog({ open, onOpenChange, linha
           p_tipo: 'DESPESA',
           p_conta_id: contaBancariaId,
           p_user_id: user?.id,
-          p_rateio_linhas: rateioPayload ? JSON.stringify(rateioPayload) : null,
+          p_rateio_linhas: rateioPayload || null,
         });
         if (lancError) console.warn('Lancamento mirror for CP:', lancError.message);
 
@@ -288,7 +288,7 @@ export default function CriarLancamentoExtratoDialog({ open, onOpenChange, linha
           p_tipo: 'RECEITA',
           p_conta_id: contaBancariaId,
           p_user_id: user?.id,
-          p_rateio_linhas: rateioPayload ? JSON.stringify(rateioPayload) : null,
+          p_rateio_linhas: rateioPayload || null,
         });
         if (lancError) console.warn('Lancamento mirror for CR:', lancError.message);
 

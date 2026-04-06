@@ -568,7 +568,7 @@ export default function ConciliacaoBancariaSection() {
           const { error } = await supabase.rpc('reconcile_import_lancamento', {
             p_data: l.data, p_descricao: l.descricao, p_valor: l.valor, p_tipo: l.tipo,
             p_conta_id: contaSel, p_user_id: user?.id,
-            p_rateio_linhas: rateioPayload ? JSON.stringify(rateioPayload) : null,
+            p_rateio_linhas: rateioPayload || null,
           });
           if (error) throw error;
         }

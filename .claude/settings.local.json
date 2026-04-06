@@ -9,7 +9,10 @@
       "Bash(grep -rn \"CREATE.*TRIGGER\\\\|FUNCTION.*trigger\\\\|INSERT INTO movimentacoes\" c:/Users/morae/OneDrive/Desktop/APPs AI/2. Aplicativos - Moralles/1. Moralles Food/margin-food/supabase/migrations/20260321003558*.sql c:/Users/morae/OneDrive/Desktop/APPs AI/2. Aplicativos - Moralles/1. Moralles Food/margin-food/supabase/migrations/20260321003559*.sql c:/Users/morae/OneDrive/Desktop/APPs AI/2. Aplicativos - Moralles/1. Moralles Food/margin-food/supabase/migrations/20260321005957*.sql)",
       "Bash(grep -n \"movPrecoTotal\\\\|precoTotal\\\\|Preço Total\\\\|Custo Total\\\\|R$/un\\\\|por embalagem\\\\|por caixa\" \"c:/Users/morae/OneDrive/Desktop/APPs AI/2. Aplicativos - Moralles/1. Moralles Food/margin-food/src/components/estoque/NovaMovimentacaoModal.tsx\")",
       "Bash(bun run:*)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx vite:*)",
+      "Bash(npx supabase:*)"
     ]
   }
 }

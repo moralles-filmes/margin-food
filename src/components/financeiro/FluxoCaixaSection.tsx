@@ -4,10 +4,9 @@ import { useCan } from '@/permissions/hooks';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
-import { DollarSign, TrendingUp, TrendingDown, Activity, FileDown, Ban } from 'lucide-react';
+import { DollarSign, TrendingUp, TrendingDown, Activity, FileDown, Ban, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { gerarPDFFluxoCaixa } from '@/lib/pdfFinanceiro';
 import { fmtBRL, formatDateBR, parseLocalDate } from '@/lib/formatters';
@@ -16,7 +15,17 @@ import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 
 /* ─── Types ─── */
+export type EntidadeTipo = 'lancamento' | 'conta_pagar' | 'conta_receber';
+
+export interface FluxoNavigateParams {
+  tab: 'lancamentos' | 'pagar' | 'receber';
+  dateFrom: string; // yyyy-MM-dd
+  dateTo: string;   // yyyy-MM-dd
+}
+
 interface Detalhe {
+  id?: string;
+  entidade_tipo?: EntidadeTipo;
   tipo: 'realizado' | 'previsto';
   descricao: string;
   valor: number;
@@ -38,6 +47,10 @@ interface Totais {
   saidas: number;
   prev_entradas: number;
   prev_saidas: number;
+}
+
+interface FluxoCaixaProps {
+  onNavigate?: (params: FluxoNavigateParams) => void;
 }
 
 const origemBadge: Record<string, { text: string; cls: string }> = {
@@ -71,7 +84,7 @@ function NoAccess() {
   );
 }
 
-export default function FluxoCaixaSection() {
+export default function FluxoCaixaSection({ onNavigate }: FluxoCaixaProps) {
   const canView = useCan('financeiro:fluxo:view');
   const canExport = useCan('financeiro:fluxo:export');
 
@@ -80,6 +93,19 @@ export default function FluxoCaixaSection() {
   const [loading, setLoading] = useState(true);
   const [modo, setModo] = useState<'realizado' | 'previsto' | 'ambos'>('ambos');
   const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
+
+  const navigateToDate = (date: string) => {
+    if (!onNavigate) return;
+    onNavigate({ tab: 'lancamentos', dateFrom: date, dateTo: date });
+  };
+
+  const navigateToDetail = (det: Detalhe, date: string) => {
+    if (!onNavigate || !det.entidade_tipo) return;
+    const tab = det.entidade_tipo === 'conta_pagar' ? 'pagar'
+      : det.entidade_tipo === 'conta_receber' ? 'receber'
+      : 'lancamentos';
+    onNavigate({ tab, dateFrom: date, dateTo: date });
+  };
 
   const load = useCallback(async () => {
     if (!canView) return;
@@ -246,6 +272,16 @@ export default function FluxoCaixaSection() {
                   <TableCell className="font-mono text-sm">
                     <span className="mr-1 text-muted-foreground">{isExpanded ? '▾' : '▸'}</span>
                     {formatDateBR(parseLocalDate(d.data))}
+                    {onNavigate && (
+                      <Button
+                        variant="ghost" size="icon"
+                        className="h-5 w-5 ml-1 inline-flex align-middle"
+                        title="Ver lançamentos do dia"
+                        onClick={e => { e.stopPropagation(); navigateToDate(d.data); }}
+                      >
+                        <ExternalLink className="w-3 h-3 text-muted-foreground" />
+                      </Button>
+                    )}
                   </TableCell>
                   {modo !== 'previsto' && <TableCell className="text-right text-success">{d.entradas > 0 ? fmt(d.entradas) : '—'}</TableCell>}
                   {modo !== 'previsto' && <TableCell className="text-right text-destructive">{d.saidas > 0 ? fmt(d.saidas) : '—'}</TableCell>}
@@ -257,8 +293,15 @@ export default function FluxoCaixaSection() {
                   const ob = origemBadge[det.origem] || origemBadge.manual;
                   const colCount = 2 + (modo !== 'previsto' ? 2 : 0) + (modo !== 'realizado' ? 2 : 0);
                   return (
-                    <TableRow key={`${d.data}-det-${i}`} className="bg-muted/20">
-                      <TableCell className="pl-8 text-xs text-muted-foreground truncate max-w-[200px]">{det.descricao || '(sem descrição)'}</TableCell>
+                    <TableRow
+                      key={`${d.data}-det-${i}`}
+                      className={`bg-muted/20 ${onNavigate && det.entidade_tipo ? 'cursor-pointer hover:bg-muted/40' : ''}`}
+                      onClick={() => onNavigate && det.entidade_tipo && navigateToDetail(det, d.data)}
+                    >
+                      <TableCell className="pl-8 text-xs text-muted-foreground truncate max-w-[200px]">
+                        {onNavigate && det.entidade_tipo && <ExternalLink className="w-3 h-3 inline mr-1 opacity-40" />}
+                        {det.descricao || '(sem descrição)'}
+                      </TableCell>
                       <TableCell colSpan={colCount - 2} className="text-right">
                         <span className={`text-xs font-medium ${det.natureza === 'entrada' ? 'text-success' : 'text-destructive'}`}>
                           {det.natureza === 'entrada' ? '+' : '-'} {fmt(det.valor)}

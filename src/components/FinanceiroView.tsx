@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import ContasPagarSection from '@/components/financeiro/ContasPagarSection';
 import ContasReceberSection from '@/components/financeiro/ContasReceberSection';
-import FluxoCaixaSection from '@/components/financeiro/FluxoCaixaSection';
+import FluxoCaixaSection, { type FluxoNavigateParams } from '@/components/financeiro/FluxoCaixaSection';
 import DRESection from '@/components/financeiro/DRESection';
 import DFCSection from '@/components/financeiro/DFCSection';
 import DashboardFinanceiroSection from '@/components/financeiro/DashboardFinanceiroSection';
@@ -64,7 +64,7 @@ function CadastrosBase() {
 // ContasBancarias extracted to src/components/financeiro/ContasBancariasSection.tsx
 
 // LancamentosSection wrapper - LivroRazaoSection extracted to src/components/financeiro/LivroRazaoSection.tsx
-function LancamentosSection({ initialContaId }: { initialContaId?: string }) {
+function LancamentosSection({ initialContaId, initialDateFrom, initialDateTo }: { initialContaId?: string; initialDateFrom?: string; initialDateTo?: string }) {
   const [innerTab, setInnerTab] = useState<'razao' | 'conciliacao'>('razao');
   return (
     <div className="space-y-4">
@@ -72,7 +72,7 @@ function LancamentosSection({ initialContaId }: { initialContaId?: string }) {
         <Button variant={innerTab === 'razao' ? 'default' : 'outline'} size="sm" onClick={() => setInnerTab('razao')}>Livro Razão</Button>
         <Button variant={innerTab === 'conciliacao' ? 'default' : 'outline'} size="sm" onClick={() => setInnerTab('conciliacao')}>Conciliação Bancária</Button>
       </div>
-      {innerTab === 'razao' ? <LivroRazaoSection initialContaId={initialContaId} /> : <ConciliacaoBancariaSection />}
+      {innerTab === 'razao' ? <LivroRazaoSection initialContaId={initialContaId} initialDateFrom={initialDateFrom} initialDateTo={initialDateTo} /> : <ConciliacaoBancariaSection />}
     </div>
   );
 }
@@ -129,6 +129,8 @@ const TAB_REGISTRY_MAP: Record<FinSubTab, string> = {
 export default function FinanceiroView() {
   const [activeTab, setActiveTab] = usePersistedTab<FinSubTab>('app:tab:financeiro', 'dashboard');
   const [extratoContaId, setExtratoContaId] = useState<string | undefined>(undefined);
+  const [fluxoDateFrom, setFluxoDateFrom] = useState<string | undefined>(undefined);
+  const [fluxoDateTo, setFluxoDateTo] = useState<string | undefined>(undefined);
   const { visibleSubtabs } = useModuleAccess('financeiro');
 
   // Contas a Pagar pending count
@@ -147,10 +149,19 @@ export default function FinanceiroView() {
     setActiveTab('lancamentos');
   }, [setActiveTab]);
 
-  // Clear extrato filter when navigating away from lancamentos
+  // Handle navigation from Fluxo de Caixa
+  const handleFluxoNavigate = useCallback((params: FluxoNavigateParams) => {
+    setFluxoDateFrom(params.dateFrom);
+    setFluxoDateTo(params.dateTo);
+    setActiveTab(params.tab as FinSubTab);
+  }, [setActiveTab]);
+
+  // Clear filters when navigating away
   useEffect(() => {
     if (activeTab !== 'lancamentos') {
       setExtratoContaId(undefined);
+      setFluxoDateFrom(undefined);
+      setFluxoDateTo(undefined);
     }
   }, [activeTab]);
 
@@ -225,10 +236,10 @@ export default function FinanceiroView() {
         <TabsContent value="fechamento"><FechamentoCaixaSection /></TabsContent>
         <TabsContent value="cadastros"><CadastrosBase /></TabsContent>
         <TabsContent value="contas"><ContasBancariasSection onNavigateExtrato={handleNavigateExtrato} /></TabsContent>
-        <TabsContent value="lancamentos"><LancamentosSection initialContaId={extratoContaId} /></TabsContent>
+        <TabsContent value="lancamentos"><LancamentosSection initialContaId={extratoContaId} initialDateFrom={fluxoDateFrom} initialDateTo={fluxoDateTo} /></TabsContent>
         <TabsContent value="pagar"><ContasPagarSection /></TabsContent>
         <TabsContent value="receber"><ContasReceberSection /></TabsContent>
-        <TabsContent value="fluxo"><FluxoCaixaSection /></TabsContent>
+        <TabsContent value="fluxo"><FluxoCaixaSection onNavigate={handleFluxoNavigate} /></TabsContent>
         <TabsContent value="dre"><DREDFCSection /></TabsContent>
         <TabsContent value="orcamento"><OrcamentoSection /></TabsContent>
         {/* conciliacao now inside LancamentosSection */}

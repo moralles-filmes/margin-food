@@ -1,27 +1,22 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { CursorListResponse, FinStatusCounts } from '@/types/financeiro';
 import { emitDataEvent, useDataEvent } from '@/lib/dataEvents';
-import { fmtBRL, formatDateBR, formatPercentBR, parseLocalDate } from '@/lib/formatters';
-import { BRLInput } from '@/components/ui/brl-input';
+import { fmtBRL, formatDateBR, parseLocalDate } from '@/lib/formatters';
 import { useCan } from '@/permissions/hooks';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Plus, FileDown, RefreshCw, Trash2, Repeat, Ban, X } from 'lucide-react';
+import { Plus, FileDown, RefreshCw, Ban, Undo2 } from 'lucide-react';
 import { useFormDirtyGuard } from '@/hooks/useFormDirtyGuard';
 import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
 import { gerarPDFContasReceber } from '@/lib/pdfFinanceiro';
 import { todayBR } from '@/lib/datetime';
-import CategoryCombobox from './CategoryCombobox';
 import TableActions from '@/components/ui/TableActions';
+import ContaDetailDialog, { type ContaDetailData, type ContaDetailRateio } from './ContaDetailDialog';
+import ContaFormDialog, { type ContaFormData, type RateioLine } from './ContaFormDialog';
 import * as XLSX from 'xlsx';
 
 /* ─── Types ─── */
@@ -34,14 +29,6 @@ interface ContaReceber {
   data_vencimento: string;
   categoria_id: string | null;
   updated_at: string;
-}
-
-interface RateioLine {
-  key: string;
-  categoria_id: string;
-  centro_custo_id: string;
-  valor: number;
-  percentual: number;
 }
 
 interface Categoria { id: string; nome: string; tipo: string; codigo: string | null; centro_custo_padrao_id: string | null; }
@@ -57,7 +44,6 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
 };
 
 const PAGE_SIZE = 50;
-
 
 function SkeletonRows() {
   return (<>{Array.from({ length: 5 }).map((_, i) => (
@@ -96,7 +82,7 @@ export default function ContasReceberSection() {
   const [cursorId, setCursorId] = useState<string | null>(null);
   const [serverTotals, setServerTotals] = useState({ totalPendente: 0, vencidas: 0 });
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<ContaFormData>({
     descricao: '', valor: 0, data_vencimento: todayBR(), data_competencia: '',
     cliente: '', categoria_id: '', centro_custo_id: '', conta_id: '', forma_pagamento: 'pix', observacoes: '',
     recorrente: false, frequencia: 'mensal', parcelas: 0,
@@ -104,6 +90,11 @@ export default function ContasReceberSection() {
   const [rateioLines, setRateioLines] = useState<RateioLine[]>([]);
   const [editingItem, setEditingItem] = useState<ContaReceber | null>(null);
   const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
+
+  // Detail dialog state
+  const [showDetail, setShowDetail] = useState(false);
+  const [detailData, setDetailData] = useState<ContaDetailData | null>(null);
+  const [detailRawItem, setDetailRawItem] = useState<ContaReceber | null>(null);
 
   useEffect(() => { if (canView) load(); }, [canView]);
   useEffect(() => { if (!canView) return; setCursorDate(null); setCursorId(null); setItems([]); loadPage(null, null); loadTotals(); }, [filtroStatus, canView]);
@@ -149,30 +140,60 @@ export default function ContasReceberSection() {
     loadTotals();
   };
 
-  /* ─── Rateio helpers ─── */
-  const addRateioLine = () => setRateioLines(prev => [...prev, { key: crypto.randomUUID(), categoria_id: '', centro_custo_id: '', valor: 0, percentual: 0 }]);
-  const removeRateioLine = (key: string) => setRateioLines(prev => prev.filter(l => l.key !== key));
-  const updateRateioLine = (key: string, field: string, value: any) => {
-    setRateioLines(prev => prev.map(l => {
-      if (l.key !== key) return l;
-      const updated = { ...l, [field]: value };
-      if (field === 'categoria_id') {
-        const cat = categorias.find(c => c.id === value);
-        if (cat?.centro_custo_padrao_id) updated.centro_custo_id = cat.centro_custo_padrao_id;
-      }
-      return updated;
-    }));
-  };
-  const ratearIgualmente = () => {
-    if (rateioLines.length === 0) return;
-    const perLine = Math.floor((form.valor / rateioLines.length) * 100) / 100;
-    const remainder = form.valor - perLine * rateioLines.length;
-    setRateioLines(prev => prev.map((l, i) => ({ ...l, valor: i === 0 ? perLine + Math.round(remainder * 100) / 100 : perLine, percentual: Math.round((100 / prev.length) * 10) / 10 })));
-  };
-  const totalRateio = rateioLines.reduce((s, l) => s + Number(l.valor || 0), 0);
-  const diffRateio = form.valor - totalRateio;
-  const rateioValido = rateioLines.length === 0 || Math.abs(diffRateio) < 0.01;
+  /* ─── Detail view ─── */
+  const openDetail = async (item: ContaReceber) => {
+    try {
+      const { data: detail, error: detailErr } = await supabase
+        .from('fin_contas_receber')
+        .select('*')
+        .eq('id', item.id)
+        .single();
+      if (detailErr) throw detailErr;
 
+      const { data: rates } = await supabase
+        .from('fin_lancamento_rateios')
+        .select('*, fin_categorias(nome), fin_centros_custo(nome)')
+        .eq('lancamento_id', item.id);
+
+      const rateios: ContaDetailRateio[] = (rates || []).map((r: any) => ({
+        categoria_nome: r.fin_categorias?.nome || categorias.find(c => c.id === r.categoria_id)?.nome || '-',
+        centro_custo_nome: r.fin_centros_custo?.nome || centros.find(c => c.id === r.centro_custo_id)?.nome || '',
+        valor: r.valor,
+        percentual: r.percentual,
+      }));
+
+      if (rateios.length === 0 && detail.categoria_id) {
+        const catName = categorias.find(c => c.id === detail.categoria_id)?.nome || '-';
+        const ccName = detail.centro_custo_id ? centros.find(c => c.id === detail.centro_custo_id)?.nome || '' : '';
+        rateios.push({ categoria_nome: catName, centro_custo_nome: ccName, valor: detail.valor, percentual: 100 });
+      }
+
+      setDetailData({
+        id: detail.id,
+        descricao: detail.descricao,
+        valor: detail.valor,
+        status: detail.status,
+        data_competencia: detail.data_competencia || detail.data_vencimento,
+        data_vencimento: detail.data_vencimento,
+        data_pagamento: detail.data_recebimento,
+        forma_pagamento: detail.forma_pagamento,
+        cliente: detail.cliente,
+        conta_nome: detail.conta_id ? contas.find(c => c.id === detail.conta_id)?.nome || null : null,
+        categoria_nome: detail.categoria_id ? categorias.find(c => c.id === detail.categoria_id)?.nome || null : (rateios.length > 1 ? `${rateios.length} informadas` : null),
+        centro_custo_nome: detail.centro_custo_id ? centros.find(c => c.id === detail.centro_custo_id)?.nome || null : null,
+        observacoes: detail.observacoes,
+        recorrente: detail.recorrente,
+        rateios,
+        updated_at: detail.updated_at,
+      });
+      setDetailRawItem(item);
+      setShowDetail(true);
+    } catch (err: any) {
+      toast.error('Erro ao carregar detalhes: ' + err.message);
+    }
+  };
+
+  /* ─── Form close/reset ─── */
   const handleCloseForm = () => {
     setForm({ descricao: '', valor: 0, data_vencimento: todayBR(), data_competencia: '', cliente: '', categoria_id: '', centro_custo_id: '', conta_id: '', forma_pagamento: 'pix', observacoes: '', recorrente: false, frequencia: 'mensal', parcelas: 0 });
     setRateioLines([]);
@@ -189,14 +210,12 @@ export default function ContasReceberSection() {
         .select('*')
         .eq('id', item.id)
         .single();
-      
       if (detailErr) throw detailErr;
 
       const { data: rates, error: rateErr } = await supabase
         .from('fin_lancamento_rateios')
         .select('*')
         .eq('lancamento_id', item.id);
-      
       if (rateErr) throw rateErr;
 
       setEditingItem(detail);
@@ -215,15 +234,14 @@ export default function ContasReceberSection() {
         frequencia: (detail.recorrencia_config as any)?.frequencia || 'mensal',
         parcelas: (detail.recorrencia_config as any)?.parcelas || 0,
       });
-
-      setRateioLines(rates.map(r => ({
+      setRateioLines(rates.map((r: any) => ({
         key: r.id,
         categoria_id: r.categoria_id,
         centro_custo_id: r.centro_custo_id,
         valor: r.valor,
         percentual: r.percentual,
       })));
-
+      setShowDetail(false);
       setShowForm(true);
     } catch (err: any) {
       toast.error('Erro ao carregar detalhes: ' + err.message);
@@ -237,7 +255,7 @@ export default function ContasReceberSection() {
     try {
       const { error } = await (supabase.rpc as any)('_guarded_delete_conta_receber', { p_id: item.id });
       if (error) throw error;
-      toast.success('Conta excluída');
+      toast.success('Conta excluida');
       load();
       emitDataEvent('financeiro:receber');
     } catch (err: any) {
@@ -250,7 +268,8 @@ export default function ContasReceberSection() {
   /* ─── Save via RPC ─── */
   const save = async () => {
     if (saving) return;
-    if (!form.descricao.trim() || form.valor <= 0) { toast.error('Descrição e valor obrigatórios'); return; }
+    if (!form.descricao.trim() || form.valor <= 0) { toast.error('Descricao e valor obrigatorios'); return; }
+    const rateioValido = rateioLines.length === 0 || Math.abs(form.valor - rateioLines.reduce((s, l) => s + Number(l.valor || 0), 0)) < 0.01;
     if (rateioLines.length > 0 && !rateioValido) { toast.error('Rateio incompleto'); return; }
 
     setSaving(true);
@@ -269,9 +288,8 @@ export default function ContasReceberSection() {
         ? { frequencia: form.frequencia, parcelas: form.parcelas || null, parcelas_geradas: 0 }
         : null;
 
-      // @enterprise-exception: as unknown needed — RPC expects Json for p_rateios/p_recorrencia but we send objects
       const { error } = await (supabase.rpc as any)(editingItem ? '_guarded_update_conta_receber' : '_guarded_create_conta_receber', {
-        p_id: editingItem?.id, // Only used in update
+        p_id: editingItem?.id,
         p_descricao: form.descricao,
         p_cliente: form.cliente || null,
         p_valor: form.valor,
@@ -284,7 +302,7 @@ export default function ContasReceberSection() {
         p_observacoes: form.observacoes || null,
         p_rateios: rateiosPayload,
         p_recorrencia: recorrencia || null,
-        p_expected_updated_at: editingItem?.updated_at, // Only used in update
+        p_expected_updated_at: editingItem?.updated_at,
       });
 
       if (error) { toast.error(error.message); return; }
@@ -298,14 +316,35 @@ export default function ContasReceberSection() {
     }
   };
 
-  /* ─── Receive (existing RPC) ─── */
-  const receber = async (item: ContaReceber) => {
-    if (saving) return;
+  /* ─── Receive ─── */
+  const receber = async (item?: ContaReceber) => {
+    const target = item || detailRawItem;
+    if (saving || !target) return;
     setSaving(true);
     try {
-      const { error } = await supabase.rpc('receive_conta_receber', { p_id: item.id, p_expected_updated_at: item.updated_at });
+      const { error } = await supabase.rpc('receive_conta_receber', { p_id: target.id, p_expected_updated_at: target.updated_at });
       if (error) { toast.error(error.message); load(); return; }
-      toast.success('Recebimento registrado + lançamento gerado');
+      toast.success('Recebimento registrado + lancamento gerado');
+      setShowDetail(false);
+      load();
+      emitDataEvent('financeiro:receber');
+      emitDataEvent('financeiro:lancamentos');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  /* ─── Estornar ─── */
+  const estornar = async (item?: ContaReceber) => {
+    const target = item || detailRawItem;
+    if (saving || !target) return;
+    if (!confirm('Deseja estornar este recebimento? O lancamento espelho sera cancelado e a conta voltara ao status A Receber.')) return;
+    setSaving(true);
+    try {
+      const { error } = await supabase.rpc('_guarded_estornar_conta_receber', { p_id: target.id } as any);
+      if (error) { toast.error(error.message); load(); return; }
+      toast.success('Recebimento estornado');
+      setShowDetail(false);
       load();
       emitDataEvent('financeiro:receber');
       emitDataEvent('financeiro:lancamentos');
@@ -317,7 +356,7 @@ export default function ContasReceberSection() {
   /* ─── Export ─── */
   const exportExcel = () => {
     const rows = items.map(i => ({
-      Descrição: i.descricao,
+      Descricao: i.descricao,
       Cliente: i.cliente || '',
       Valor: i.valor,
       Status: STATUS_CONFIG[i.status]?.label || i.status,
@@ -363,136 +402,9 @@ export default function ContasReceberSection() {
             </SelectContent>
           </Select>
           {canCreate && (
-            <Dialog open={showForm} onOpenChange={(o) => { if (!o) guardedClose(); else setShowForm(true); }}>
-              <DialogTrigger asChild><Button size="sm"><Plus className="w-4 h-4 mr-1" /> Nova Conta</Button></DialogTrigger>
-              <DialogContent className="max-w-lg">
-                <DialogHeader>
-                  <div className="flex items-center justify-between">
-                    <DialogTitle>{editingItem ? 'Editar Conta a Receber' : 'Nova Conta a Receber'}</DialogTitle>
-                    <button type="button" onClick={guardedClose} aria-label="Fechar" className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"><X className="w-4 h-4" /></button>
-                  </div>
-                </DialogHeader>
-                <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
-                  <div><Label>Descrição</Label><Input value={form.descricao} onChange={e => setForm({...form, descricao: e.target.value})} /></div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div><Label>Valor (R$)</Label><BRLInput numericValue={form.valor} onNumericChange={v => setForm({...form, valor: v})} showPrefix /></div>
-                    <div><Label>Vencimento</Label><Input type="date" value={form.data_vencimento} onChange={e => setForm({...form, data_vencimento: e.target.value})} /></div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div><Label>Data Competência</Label><Input type="date" value={form.data_competencia} onChange={e => setForm({...form, data_competencia: e.target.value})} /></div>
-                    <div><Label>Cliente</Label><Input value={form.cliente} onChange={e => setForm({...form, cliente: e.target.value})} /></div>
-                  </div>
-
-                  {/* Rateio por Categoria */}
-                  <div className="border border-border rounded-lg p-3 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-sm font-semibold">Rateio por Categoria</Label>
-                      <div className="flex gap-1">
-                        {rateioLines.length > 1 && form.valor > 0 && (
-                          <Button type="button" size="sm" variant="outline" onClick={ratearIgualmente} className="text-xs h-7">🧮 Ratear Igual</Button>
-                        )}
-                        <Button type="button" size="sm" variant="outline" onClick={addRateioLine} className="text-xs h-7"><Plus className="w-3 h-3 mr-1" /> Linha</Button>
-                      </div>
-                    </div>
-                    {rateioLines.length === 0 ? (
-                      <p className="text-xs text-muted-foreground text-center py-2">Nenhuma linha de rateio. Clique "+ Linha" para categorizar.</p>
-                    ) : (
-                      <>
-                        <Table>
-                          <TableHeader><TableRow>
-                            <TableHead className="text-xs">Categoria</TableHead>
-                            <TableHead className="text-xs">Centro Custo</TableHead>
-                            <TableHead className="text-xs w-24">Valor</TableHead>
-                            <TableHead className="text-xs w-16">%</TableHead>
-                            <TableHead className="text-xs w-8"></TableHead>
-                          </TableRow></TableHeader>
-                          <TableBody>
-                            {rateioLines.map(line => (
-                              <TableRow key={line.key}>
-                                <TableCell className="p-1">
-                                  <CategoryCombobox value={line.categoria_id} onValueChange={v => updateRateioLine(line.key, 'categoria_id', v)} options={categorias.filter(c => c.tipo === 'receita')} />
-                                </TableCell>
-                                <TableCell className="p-1">
-                                  <Select value={line.centro_custo_id} onValueChange={v => updateRateioLine(line.key, 'centro_custo_id', v)}>
-                                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Auto" /></SelectTrigger>
-                                    <SelectContent>{centros.map(c => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}</SelectContent>
-                                  </Select>
-                                </TableCell>
-                                <TableCell className="p-1">
-                                  <BRLInput numericValue={line.valor || 0} onNumericChange={val => {
-                                    const pct = form.valor > 0 ? (val / form.valor) * 100 : 0;
-                                    updateRateioLine(line.key, 'valor', val);
-                                    updateRateioLine(line.key, 'percentual', Math.round(pct * 10) / 10);
-                                  }} showPrefix className="h-8 text-xs" />
-                                </TableCell>
-                                <TableCell className="p-1 text-xs text-muted-foreground text-center">{line.percentual ? formatPercentBR(line.percentual, 1) : '—'}</TableCell>
-                                <TableCell className="p-1"><Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => removeRateioLine(line.key)}><Trash2 className="w-3 h-3 text-destructive" /></Button></TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                        <div className="flex items-center justify-between text-xs px-1">
-                          <span className="text-muted-foreground">Total rateado: <strong>{fmt(totalRateio)}</strong></span>
-                          {Math.abs(diffRateio) >= 0.01 && <span className="text-destructive font-medium">Diferença: {fmt(diffRateio)}</span>}
-                          {Math.abs(diffRateio) < 0.01 && rateioLines.length > 0 && <span className="text-success font-medium">✅ Rateio fechado</span>}
-                        </div>
-                      </>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div><Label>Conta</Label>
-                      <Select value={form.conta_id} onValueChange={v => setForm({...form, conta_id: v})}>
-                        <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                        <SelectContent>{contas.map(c => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}</SelectContent>
-                      </Select>
-                    </div>
-                    <div><Label>Forma</Label>
-                      <Select value={form.forma_pagamento} onValueChange={v => setForm({...form, forma_pagamento: v})}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="pix">PIX</SelectItem>
-                          <SelectItem value="boleto">Boleto</SelectItem>
-                          <SelectItem value="dinheiro">Dinheiro</SelectItem>
-                          <SelectItem value="cartao">Cartão</SelectItem>
-                          <SelectItem value="transferencia">Transferência</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div><Label>Observações</Label><Textarea value={form.observacoes} onChange={e => setForm({...form, observacoes: e.target.value})} /></div>
-
-                  {/* Recorrência */}
-                  <div className="border-t border-border pt-3 mt-1">
-                    <div className="flex items-center justify-between">
-                      <Label className="flex items-center gap-2"><Repeat className="w-4 h-4 text-muted-foreground" /> Recorrente</Label>
-                      <Switch checked={form.recorrente} onCheckedChange={v => setForm({...form, recorrente: v})} />
-                    </div>
-                    {form.recorrente && (
-                      <div className="grid grid-cols-2 gap-3 mt-3">
-                        <div><Label>Frequência</Label>
-                          <Select value={form.frequencia} onValueChange={v => setForm({...form, frequencia: v})}>
-                            <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="mensal">Mensal</SelectItem>
-                              <SelectItem value="semanal">Semanal</SelectItem>
-                              <SelectItem value="quinzenal">Quinzenal</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div><Label>Parcelas (0 = ∞)</Label>
-                          <Input type="text" inputMode="numeric" value={form.parcelas || ''} onChange={e => setForm({...form, parcelas: parseInt(e.target.value, 10) || 0})} placeholder="0" />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <Button onClick={save} className="w-full" disabled={saving || (rateioLines.length > 0 && !rateioValido)}>
-                    {saving ? (editingItem ? 'Salvando...' : 'Criando...') : (editingItem ? 'Salvar Alterações' : 'Criar Conta a Receber')}
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
+            <Button size="sm" onClick={() => { handleCloseForm(); setShowForm(true); }}>
+              <Plus className="w-4 h-4 mr-1" /> Nova Conta
+            </Button>
           )}
         </div>
       </div>
@@ -501,11 +413,11 @@ export default function ContasReceberSection() {
         <TableHeader>
           <TableRow>
             <TableHead>Vencimento</TableHead>
-            <TableHead>Descrição</TableHead>
+            <TableHead>Descricao</TableHead>
             <TableHead>Cliente</TableHead>
             <TableHead>Valor</TableHead>
             <TableHead>Status</TableHead>
-            <TableHead>Ações</TableHead>
+            <TableHead>Acoes</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -517,16 +429,25 @@ export default function ContasReceberSection() {
             const sc = STATUS_CONFIG[item.status] || STATUS_CONFIG.RASCUNHO;
             const isVencida = item.data_vencimento < today && !['RECEBIDO', 'CANCELADO'].includes(item.status);
             return (
-              <TableRow key={item.id} className={isVencida ? 'bg-destructive/5' : ''}>
+              <TableRow
+                key={item.id}
+                className={`cursor-pointer hover:bg-muted/50 ${isVencida ? 'bg-destructive/5' : ''}`}
+                onClick={() => openDetail(item)}
+              >
                 <TableCell className={`font-mono text-sm ${isVencida ? 'text-destructive font-bold' : ''}`}>{formatDateBR(parseLocalDate(item.data_vencimento))}</TableCell>
                 <TableCell className="font-medium max-w-[200px] truncate">{item.descricao}</TableCell>
-                <TableCell className="text-muted-foreground">{item.cliente || '—'}</TableCell>
+                <TableCell className="text-muted-foreground">{item.cliente || '-'}</TableCell>
                 <TableCell className="font-bold text-success">{fmt(item.valor)}</TableCell>
                 <TableCell><span className={`text-xs px-2 py-0.5 rounded-full border ${sc.color}`}>{sc.label}</span></TableCell>
                 <TableCell>
-                  <div className="flex gap-1 items-center justify-end">
+                  <div className="flex gap-1 items-center justify-end" onClick={e => e.stopPropagation()}>
                     {item.status === 'A_RECEBER' && canEdit && (
                       <Button size="sm" variant="default" onClick={() => receber(item)} disabled={saving} className="text-xs h-7">Receber</Button>
+                    )}
+                    {item.status === 'RECEBIDO' && (
+                      <Button size="sm" variant="outline" onClick={() => estornar(item)} disabled={saving} className="text-xs h-7 text-warning border-warning/30 hover:bg-warning/10">
+                        <Undo2 className="w-3 h-3 mr-1" />Estornar
+                      </Button>
                     )}
                     {(item.status === 'A_RECEBER' || item.status === 'VENCIDO' || item.status === 'RASCUNHO') && (
                       <TableActions
@@ -553,6 +474,38 @@ export default function ContasReceberSection() {
           </Button>
         </div>
       )}
+
+      {/* Detail Dialog */}
+      <ContaDetailDialog
+        open={showDetail}
+        onOpenChange={setShowDetail}
+        data={detailData}
+        variant="receber"
+        canEdit={canEdit}
+        saving={saving}
+        onEdit={() => detailRawItem && handleEdit(detailRawItem)}
+        onPay={() => receber()}
+        onEstornar={() => estornar()}
+      />
+
+      {/* Form Dialog */}
+      <ContaFormDialog
+        open={showForm}
+        onOpenChange={o => { if (!o) guardedClose(); }}
+        variant="receber"
+        form={form}
+        onFormChange={setForm}
+        rateioLines={rateioLines}
+        onRateioLinesChange={setRateioLines}
+        categorias={categorias}
+        centros={centros}
+        contas={contas}
+        isEditing={!!editingItem}
+        saving={saving}
+        onSave={save}
+        onClose={guardedClose}
+      />
+
       <FormCloseConfirmDialog open={showConfirm} onConfirmLeave={confirmClose} onCancelLeave={cancelClose} />
     </div>
   );
