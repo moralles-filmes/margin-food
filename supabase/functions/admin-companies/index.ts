@@ -88,7 +88,7 @@ Deno.serve(async (req) => {
       // Assign admin role
       await adminClient.from('user_roles').upsert(
         { user_id: authUser.id, role: 'admin' },
-        { onConflict: 'user_id' }
+        { onConflict: 'user_id,role' }
       );
 
       // Audit

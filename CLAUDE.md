@@ -104,7 +104,7 @@ margin-food/
 - Ações padrão (11): `view, create, edit, delete, export, manage, audit, approve, configure, execute, admin`
 - Registry em `src/permissions/registry.ts` — fonte única da verdade
 - Sync via `rpc_sync_permissions_from_registry()`
-- 100+ permissões registradas
+- 200+ permissões granulares registradas (sincronizadas com banco via migração)
 
 ### Autenticação
 - JWT Supabase Auth — validado via Bearer token nas Edge Functions
@@ -178,6 +178,16 @@ margin-food/
 ## 🔄 Últimas Atualizações
 
 > **Mantenha esta seção atualizada após cada sessão de trabalho.**
+
+### 2026-04-06 — Fix "Acesso negado" para Admin de Nova Empresa (Multi-Tenant)
+- **Bug 1 — Permissões desatualizadas**: Ao criar uma nova empresa e um admin para ela, o admin recebia "Acesso negado" em todos os módulos. A tabela `role_permissions` para o role `admin` só continha chaves no formato antigo (`stock:read`, `finance:manage`), mas o frontend verifica chaves no formato novo/granular (`estoque:dashboard:view`, `financeiro:dashboard:view`). O super-admin não era afetado porque `system:global:manage` bypassa todas as checagens.
+- **Fix 1**: Migração que insere todas as ~200 permissões granulares do registry na tabela `permissions` e concede ao role `admin` (e `diretor`, `gerente_geral`) todas as permissões exceto `system:global:manage`.
+- **Bug 2 — Role não atribuído**: A Edge Function `admin-companies` usava `onConflict: 'user_id'` no upsert de `user_roles`, mas a constraint unique é `(user_id, role)`. O upsert falhava silenciosamente e o usuário ficava sem role.
+- **Fix 2**: Corrigido `onConflict` para `'user_id,role'` na Edge Function. Deploy realizado.
+- **Bug 3 — Admin via acesso ao Painel Admin**: O role `admin` tinha `system:global:manage` herdado do seed original, dando acesso indevido ao Painel Admin (reservado para super-admins).
+- **Fix 3**: Removido `system:global:manage` do role `admin`/`diretor`/`gerente_geral` em `role_permissions`. Super-admin (`morallesfilms@gmail.com`) agora recebe `system:global:manage` via `user_permissions` (grant direto, independente de role).
+- **Migração**: `20260406190000_seed_granular_permissions_admin.sql`
+- **Arquivos afetados**: `supabase/functions/admin-companies/index.ts`
 
 ### 2026-04-06 — Card "Saldo Acumulado" no Fluxo de Caixa
 - **Feature**: Adicionado card "Saldo Acumulado" no Fluxo de Caixa, que considera o saldo inicial das contas bancárias ativas + todos os lançamentos realizados/conciliados até o fim do período. Mesma lógica do "Saldo em Caixa" do Dashboard.
