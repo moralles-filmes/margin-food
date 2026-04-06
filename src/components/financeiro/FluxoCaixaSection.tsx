@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
-import { DollarSign, TrendingUp, TrendingDown, Activity, FileDown, Ban, ExternalLink } from 'lucide-react';
+import { DollarSign, TrendingUp, TrendingDown, Activity, FileDown, Ban, ExternalLink, Wallet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { gerarPDFFluxoCaixa } from '@/lib/pdfFinanceiro';
 import { fmtBRL, formatDateBR, parseLocalDate } from '@/lib/formatters';
@@ -47,6 +47,7 @@ interface Totais {
   saidas: number;
   prev_entradas: number;
   prev_saidas: number;
+  saldo_acumulado: number;
 }
 
 interface FluxoCaixaProps {
@@ -119,7 +120,7 @@ export default function FluxoCaixaSection({ onNavigate }: FluxoCaixaProps) {
     // RULE FIN-FLUXO: RPC is the source of truth for daily cash flow
     const result = data as unknown as { dias?: DiaCashflow[]; totais?: Totais } | null;
     setDias(result?.dias || []);
-    setTotais(result?.totais || { entradas: 0, saidas: 0, prev_entradas: 0, prev_saidas: 0 });
+    setTotais(result?.totais || { entradas: 0, saidas: 0, prev_entradas: 0, prev_saidas: 0, saldo_acumulado: 0 });
     setLoading(false);
   }, [canView]);
 
@@ -199,7 +200,7 @@ export default function FluxoCaixaSection({ onNavigate }: FluxoCaixaProps) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
         {modo !== 'previsto' && (
           <>
             <Card><CardContent className="p-4">
@@ -230,6 +231,10 @@ export default function FluxoCaixaSection({ onNavigate }: FluxoCaixaProps) {
             <p className={`text-lg font-bold ${saldoAcumulado >= 0 ? 'text-success' : 'text-destructive'}`}>{fmt(saldoAcumulado)}</p>
           </CardContent></Card>
         )}
+        <Card><CardContent className="p-4">
+          <div className="flex items-center gap-2 mb-1"><Wallet className="w-4 h-4 text-primary" /><span className="text-[11px] text-muted-foreground">Saldo Acumulado</span></div>
+          <p className={`text-lg font-bold ${totais.saldo_acumulado >= 0 ? 'text-success' : 'text-destructive'}`}>{fmt(totais.saldo_acumulado)}</p>
+        </CardContent></Card>
         <Card><CardContent className="p-4">
           <div className="flex items-center gap-2 mb-1"><Activity className="w-4 h-4 text-warning" /><span className="text-[11px] text-muted-foreground">Saldo Projetado</span></div>
           <p className={`text-lg font-bold ${saldoProjetado >= 0 ? 'text-success' : 'text-destructive'}`}>{fmt(saldoProjetado)}</p>

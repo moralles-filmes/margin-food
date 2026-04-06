@@ -179,6 +179,13 @@ margin-food/
 
 > **Mantenha esta seção atualizada após cada sessão de trabalho.**
 
+### 2026-04-06 — Card "Saldo Acumulado" no Fluxo de Caixa
+- **Feature**: Adicionado card "Saldo Acumulado" no Fluxo de Caixa, que considera o saldo inicial das contas bancárias ativas + todos os lançamentos realizados/conciliados até o fim do período. Mesma lógica do "Saldo em Caixa" do Dashboard.
+- **Backend**: RPC `get_fin_cashflow` agora retorna `saldo_acumulado` no objeto `totais`.
+- **Frontend**: Novo card com ícone `Wallet`, visível em todos os modos (Realizado, Previsto, Ambos). Grid ajustado para `lg:grid-cols-5`.
+- **Migração**: `20260406180000_cashflow_saldo_acumulado.sql`
+- **Arquivos afetados**: `FluxoCaixaSection.tsx`
+
 ### 2026-04-06 — Fix Duplo botão "X" nos Dialogs do Financeiro
 - **Bug**: Dialogs do módulo financeiro exibiam dois botões "X" de fechar. O `DialogContent` do shadcn/ui já renderiza um X nativo via `DialogPrimitive.Close`, e 10 componentes adicionavam manualmente outro botão X.
 - **Fix**: Removidos os botões X manuais e imports de `X` do lucide-react desnecessários em todos os 10 arquivos. O `onOpenChange` de cada Dialog já estava configurado para chamar `guardedClose`/`onClose`, então o X nativo do Radix continua disparando a mesma lógica (incluindo confirmação de dirty form).
