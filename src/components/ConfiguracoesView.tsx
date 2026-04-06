@@ -5,8 +5,6 @@ import SecurityAuditView from './SecurityAuditView';
 import GlobalAuditView from './GlobalAuditView';
 import PerformanceMonitorView from './PerformanceMonitorView';
 import AdminUsersView from './AdminUsersView';
-import SalmonMigrationWizard from './SalmonMigrationWizard';
-import SalmonReconciliationReport from './SalmonReconciliationReport';
 import { useSalmonStore } from '@/hooks/useSalmonStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCan, useModuleAccess } from '@/permissions';
@@ -115,12 +113,6 @@ export default function ConfiguracoesView({ store }: Props) {
               <div className="bg-secondary rounded-lg p-3"><p className="text-muted-foreground">Auditorias</p><p className="text-lg font-bold text-foreground">{store.auditorias.length}</p></div>
             </div>
           </div>
-          {canManageGeral && (
-            <SalmonMigrationWizard onComplete={() => store.reloadFromDb?.()} />
-          )}
-          {canManageGeral && (
-            <SalmonReconciliationReport />
-          )}
         </div>
       )}
 
