@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo } from 'react';
 import { MODULE_MANIFESTS, type ModuleManifest } from '@/permissions/registry';
+import { useCan } from '@/permissions/hooks';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { ChevronDown, ChevronRight, Zap } from 'lucide-react';
@@ -16,6 +17,7 @@ function getModuleKeys(mod: ModuleManifest): string[] {
 
 export default function PermissionMatrix({ selected, onChange }: PermissionMatrixProps) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const isSuperAdmin = useCan('system:global:manage');
 
   const toggle = useCallback((key: string) => {
     onChange(prev => {
@@ -73,7 +75,7 @@ export default function PermissionMatrix({ selected, onChange }: PermissionMatri
 
       {/* Module tree — new granular structure */}
       <div className="border border-border rounded-lg divide-y divide-border max-h-[400px] overflow-y-auto">
-        {MODULE_MANIFESTS.map(mod => {
+        {MODULE_MANIFESTS.filter(mod => mod.key !== 'system' || isSuperAdmin).map(mod => {
           const moduleKeys = getModuleKeys(mod);
           const allChecked = moduleKeys.length > 0 && moduleKeys.every(k => selected.has(k));
           const someChecked = moduleKeys.some(k => selected.has(k));
