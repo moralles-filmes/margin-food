@@ -43,12 +43,13 @@ const TAB_MODULE_MAP: Record<TabId, string> = {
   rh: 'rh',
   financeiro: 'financeiro',
   configuracoes: 'configuracoes',
+  'configuracoes-usuarios': 'configuracoes',
 };
 
 // Priority order for default tab selection
 const TAB_PRIORITY: TabId[] = [
   'salmon', 'estoque-geral', 'relatorios', 'compras', 'inventario',
-  'cmv', 'ficha-tecnica', 'planning', 'ia', 'rh', 'financeiro', 'configuracoes',
+  'cmv', 'ficha-tecnica', 'planning', 'ia', 'rh', 'financeiro', 'configuracoes-usuarios', 'configuracoes',
 ];
 
 const Index = () => {
@@ -82,6 +83,7 @@ const Index = () => {
     rh: rhAccess.canView,
     financeiro: financeiroAccess.canView,
     configuracoes: configAccess.canView,
+    'configuracoes-usuarios': configAccess.canView,
   }), [salmonAccess, estoqueAccess, inventarioAccess, comprasAccess, cmvAccess, fichaAccess, planningAccess, relatoriosAccess, iaAccess, rhAccess, financeiroAccess, configAccess]);
   const navigate = useNavigate();
   const location = useLocation();
@@ -279,6 +281,7 @@ const Index = () => {
         {activeTab === 'ia' && canAccessTab('ia') && <CentralIAView />}
         {activeTab === 'rh' && canAccessTab('rh') && <RhView />}
         {activeTab === 'financeiro' && canAccessTab('financeiro') && <FinanceiroView />}
+        {activeTab === 'configuracoes-usuarios' && canAccessTab('configuracoes-usuarios') && <ConfiguracoesView store={store} initialSubTab="usuarios" />}
         {activeTab === 'configuracoes' && canAccessTab('configuracoes') && <ConfiguracoesView store={store} />}
       </Suspense>
     </AppLayout>

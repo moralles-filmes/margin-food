@@ -179,6 +179,12 @@ margin-food/
 
 > **Mantenha esta seção atualizada após cada sessão de trabalho.**
 
+### 2026-04-06 — Fix Sidebar: "Usuários" e "Configurações" selecionando ambas ao mesmo tempo
+- **Bug**: Na seção ADMINISTRAÇÃO da sidebar, clicar em "Usuários" ou "Configurações" selecionava ambos os itens simultaneamente. Clicar em "Usuários" redirecionava para "Configurações - Geral" em vez da subtab "Usuários".
+- **Causa**: Ambos os itens tinham `id: 'configuracoes'` no array de navegação do `AppLayout.tsx`. O `activeTab` era comparado com `item.id` para destacar o item ativo, então ambos ficavam ativos. `ConfiguracoesView` sempre iniciava com `activeView: 'geral'`.
+- **Fix**: Criado `TabId` separado `'configuracoes-usuarios'` para o item "Usuários". `ConfiguracoesView` agora aceita prop `initialSubTab` para abrir diretamente na subtab correta.
+- **Arquivos afetados**: `salmon.ts` (tipo TabId), `AppLayout.tsx` (sidebar items + tabLabels), `Index.tsx` (mapeamentos + renderização), `ConfiguracoesView.tsx` (prop initialSubTab)
+
 ### 2026-04-06 — Esconder módulo "Sistema" do PermissionMatrix para não-super-admins
 - **Bug**: Admins regulares de empresa viam o módulo "Sistema" (com `system:global:manage`) na árvore de permissões ao editar/criar usuários em Configurações > Usuários, podendo conceder acesso super-admin indevidamente.
 - **Fix**: `PermissionMatrix.tsx` agora usa `useCan('system:global:manage')` para filtrar o módulo `system` — só aparece para o super-admin.

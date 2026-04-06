@@ -99,7 +99,7 @@ const navSections: NavSection[] = [
   {
     title: 'ADMINISTRAÇÃO',
     items: [
-      { id: 'configuracoes', label: 'Usuários', icon: Users, moduleKey: 'configuracoes', extraPermissions: ['configuracoes:usuarios:view', 'configuracoes:usuarios:manage'] },
+      { id: 'configuracoes-usuarios', label: 'Usuários', icon: Users, moduleKey: 'configuracoes', extraPermissions: ['configuracoes:usuarios:view', 'configuracoes:usuarios:manage'] },
       { id: 'configuracoes', label: 'Configurações', icon: Settings, moduleKey: 'configuracoes', extraPermissions: ['configuracoes:geral:view', 'configuracoes:geral:manage'] },
     ],
   },
@@ -123,6 +123,7 @@ const tabLabels: Record<TabId, string> = {
   ia: 'Central de IA',
   rh: 'RH — Pessoas',
   financeiro: 'Financeiro',
+  'configuracoes-usuarios': 'Usuários',
   configuracoes: 'Configurações',
 };
 

@@ -166,7 +166,7 @@ export interface SmartSuggestion {
   explicacao: string;
 }
 
-export type TabId = 'salmon' | 'estoque-geral' | 'inventario' | 'compras' | 'planning' | 'suppliers' | 'relatorios' | 'cmv' | 'ficha-tecnica' | 'configuracoes' | 'ia' | 'rh' | 'financeiro';
+export type TabId = 'salmon' | 'estoque-geral' | 'inventario' | 'compras' | 'planning' | 'suppliers' | 'relatorios' | 'cmv' | 'ficha-tecnica' | 'configuracoes' | 'configuracoes-usuarios' | 'ia' | 'rh' | 'financeiro';
 
 export type SalmonSubTab = 'dashboard' | 'entries' | 'manipulation' | 'stock' | 'goals' | 'planning-salmon';
 

@@ -37,10 +37,11 @@ const allSubViews: { id: SubView; label: string; icon: typeof Settings; registry
 
 interface Props {
   store: ReturnType<typeof useSalmonStore>;
+  initialSubTab?: SubView;
 }
 
-export default function ConfiguracoesView({ store }: Props) {
-  const [activeView, setActiveView] = useState<SubView>('geral');
+export default function ConfiguracoesView({ store, initialSubTab }: Props) {
+  const [activeView, setActiveView] = useState<SubView>(initialSubTab ?? 'geral');
   const { stockConfig, setStockConfig } = store;
   const { } = useAuth();
   const { visibleSubtabs } = useModuleAccess('configuracoes');
