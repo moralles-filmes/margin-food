@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo } from 'react';
 import { MODULE_MANIFESTS, type ModuleManifest } from '@/permissions/registry';
-import { useCan } from '@/permissions/hooks';
+import { useAuth } from '@/contexts/AuthContext';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { ChevronDown, ChevronRight, Zap } from 'lucide-react';
@@ -17,7 +17,8 @@ function getModuleKeys(mod: ModuleManifest): string[] {
 
 export default function PermissionMatrix({ selected, onChange }: PermissionMatrixProps) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const isSuperAdmin = useCan('system:global:manage');
+  const { effectivePermissions } = useAuth();
+  const isSuperAdmin = effectivePermissions.includes('system:global:manage');
 
   const toggle = useCallback((key: string) => {
     onChange(prev => {
