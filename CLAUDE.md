@@ -179,6 +179,11 @@ margin-food/
 
 > **Mantenha esta seção atualizada após cada sessão de trabalho.**
 
+### 2026-04-06 — Fix Duplo botão "X" nos Dialogs do Financeiro
+- **Bug**: Dialogs do módulo financeiro exibiam dois botões "X" de fechar. O `DialogContent` do shadcn/ui já renderiza um X nativo via `DialogPrimitive.Close`, e 10 componentes adicionavam manualmente outro botão X.
+- **Fix**: Removidos os botões X manuais e imports de `X` do lucide-react desnecessários em todos os 10 arquivos. O `onOpenChange` de cada Dialog já estava configurado para chamar `guardedClose`/`onClose`, então o X nativo do Radix continua disparando a mesma lógica (incluindo confirmação de dirty form).
+- **Arquivos afetados**: `ContaFormDialog.tsx`, `ContaDetailDialog.tsx`, `CadastroBaseTree.tsx`, `CategoriasFinSection.tsx`, `CategorizacaoSection.tsx`, `CentrosCustoFinSection.tsx`, `ContasBancariasSection.tsx`, `FechamentoCaixaSection.tsx`, `OrcamentoSection.tsx`, `PlanoContasFinSection.tsx`
+
 ### 2026-04-06 — Fix Lançamentos: navegação do Fluxo de Caixa + filtro de data vazio
 - **Bug 1 — Fluxo de Caixa não filtrava data**: Clicar em um dia no Fluxo de Caixa redirecionava para Lançamentos, mas `LivroRazaoSection` não aceitava `initialDateFrom`/`initialDateTo` nas props — as datas eram descartadas e o filtro sempre mostrava os últimos 30 dias.
 - **Fix 1**: Adicionadas props `initialDateFrom` e `initialDateTo` em `LivroRazaoProps` e usadas para inicializar `filtroDataDe`/`filtroDataAte`.
