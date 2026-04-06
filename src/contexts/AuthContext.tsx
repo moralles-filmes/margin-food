@@ -70,6 +70,7 @@ interface ProfileData {
   sector: string | null;
   job_role_id: string | null;
   company_id: string | null;
+  company_name: string | null;
 }
 
 interface AuthContextType {
@@ -135,11 +136,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchProfile = useCallback(async (userId: string) => {
     const { data, error } = await supabase
       .from('profiles')
-      .select('nome, email, avatar_url, sector, job_role_id, company_id')
+      .select('nome, email, avatar_url, sector, job_role_id, company_id, companies(nome)')
       .eq('id', userId)
       .maybeSingle();
     if (error) throw error;
-    return data as ProfileData;
+    const companyNome = (data as any)?.companies?.nome ?? null;
+    return { ...data, company_name: companyNome } as ProfileData;
   }, []);
 
   const fetchEffectivePermissions = useCallback(async (userId: string): Promise<string[]> => {

@@ -231,7 +231,7 @@ export default function AppLayout({ children, activeTab, onTabChange, isOffline,
             </div>
             <div className="flex flex-col min-w-0">
               <span className="text-[17px] font-black text-foreground leading-tight tracking-tight truncate">Margin <span className="text-primary font-bold">Food</span></span>
-              <span className="text-[9px] text-muted-foreground font-bold uppercase tracking-[0.2em] opacity-40 leading-none mt-0.5">Architect</span>
+              <span className="text-[9px] text-muted-foreground font-bold uppercase tracking-[0.2em] opacity-40 leading-none mt-0.5">{profile?.company_name || 'Margin Food'}</span>
             </div>
           </div>
         ) : (
