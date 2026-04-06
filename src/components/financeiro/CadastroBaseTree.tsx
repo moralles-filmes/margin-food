@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   ChevronRight, ChevronDown, Plus, Edit, Trash2, FolderTree,
-  FileText, Wand2, Search, Download, ShieldAlert, X, ArrowUp, ArrowDown, GripVertical
+  FileText, Wand2, Search, Download, ShieldAlert, ArrowUp, ArrowDown, GripVertical
 } from 'lucide-react';
 import { useFormDirtyGuard } from '@/hooks/useFormDirtyGuard';
 import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
@@ -742,10 +742,7 @@ export default function CadastroBaseTree() {
       <Dialog open={showForm} onOpenChange={(open) => { if (!open) guardedClose(); }}>
         <DialogContent>
           <DialogHeader>
-            <div className="flex items-center justify-between">
-              <DialogTitle>{editId ? 'Editar Categoria' : 'Nova Categoria'}</DialogTitle>
-              <button type="button" onClick={guardedClose} aria-label="Fechar" className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"><X className="w-4 h-4" /></button>
-            </div>
+            <DialogTitle>{editId ? 'Editar Categoria' : 'Nova Categoria'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">

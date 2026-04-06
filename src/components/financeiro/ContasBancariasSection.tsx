@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
-  Plus, Edit, Trash2, Landmark, Search, Download, ShieldAlert, FileText, X
+  Plus, Edit, Trash2, Landmark, Search, Download, ShieldAlert, FileText
 } from 'lucide-react';
 import { useFormDirtyGuard } from '@/hooks/useFormDirtyGuard';
 import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
@@ -404,10 +404,7 @@ export default function ContasBancariasSection({ onNavigateExtrato }: ContasBanc
       <Dialog open={showForm} onOpenChange={open => { if (!open) guardedClose(); }}>
         <DialogContent>
           <DialogHeader>
-            <div className="flex items-center justify-between">
-              <DialogTitle>{editId ? 'Editar Conta' : 'Nova Conta / Caixa'}</DialogTitle>
-              <button type="button" onClick={guardedClose} aria-label="Fechar" className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"><X className="w-4 h-4" /></button>
-            </div>
+            <DialogTitle>{editId ? 'Editar Conta' : 'Nova Conta / Caixa'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div>

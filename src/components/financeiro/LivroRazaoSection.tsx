@@ -5,7 +5,8 @@ import { useCan } from '@/permissions';
 import { emitDataEvent, useDataEvent } from '@/lib/dataEvents';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { toast } from 'sonner';
-import { fmtBRL, formatDateBR, todayBR, parseLocalDate } from '@/lib/formatters';
+import { fmtBRL, todayBR, parseLocalDate } from '@/lib/formatters';
+import { formatDateBR } from '@/lib/datetime';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -92,9 +93,11 @@ const STATUS_COLOR: Record<string, string> = {
 
 interface LivroRazaoProps {
   initialContaId?: string;
+  initialDateFrom?: string;
+  initialDateTo?: string;
 }
 
-export default function LivroRazaoSection({ initialContaId }: LivroRazaoProps = {}) {
+export default function LivroRazaoSection({ initialContaId, initialDateFrom, initialDateTo }: LivroRazaoProps = {}) {
   const { user } = useAuth();
   const canView = useCan('financeiro:lancamentos:view');
   const canCreate = useCan('financeiro:lancamentos:create');
@@ -117,10 +120,11 @@ export default function LivroRazaoSection({ initialContaId }: LivroRazaoProps = 
   const [filtroOrigem, setFiltroOrigem] = useState('todos');
   const [filtroConta, setFiltroConta] = useState(initialContaId || 'todos');
   const [filtroDataDe, setFiltroDataDe] = useState(() => {
+    if (initialDateFrom) return initialDateFrom;
     const d = new Date(); d.setDate(d.getDate() - 30);
     return formatDateBR(d);
   });
-  const [filtroDataAte, setFiltroDataAte] = useState(() => todayBR());
+  const [filtroDataAte, setFiltroDataAte] = useState(() => initialDateTo || todayBR());
 
   const PAGE_SIZE = 50;
   const [hasMore, setHasMore] = useState(false);
@@ -148,8 +152,8 @@ export default function LivroRazaoSection({ initialContaId }: LivroRazaoProps = 
   const loadPage = useCallback(async (cDate: string | null, cId: string | null) => {
     setLoading(true);
     const { data, error } = await supabase.rpc('list_fin_lancamentos_cursor', {
-      p_start: filtroDataDe,
-      p_end: filtroDataAte,
+      p_start: filtroDataDe || null,
+      p_end: filtroDataAte || null,
       p_tipo: filtroTipo !== 'todos' ? filtroTipo : null,
       p_conta_id: filtroConta !== 'todos' ? filtroConta : null,
       p_origem: filtroOrigem !== 'todos' ? filtroOrigem : null,

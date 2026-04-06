@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus, Edit, Trash2, X } from 'lucide-react';
+import { Plus, Edit, Trash2 } from 'lucide-react';
 import { useFormDirtyGuard } from '@/hooks/useFormDirtyGuard';
 import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
 import TableActions from '@/components/ui/TableActions';
@@ -106,12 +106,7 @@ export default function PlanoContasFinSection({ canCreate, canEdit, canDelete }:
           <DialogTrigger asChild><Button size="sm"><Plus className="w-4 h-4 mr-1" /> Nova Conta</Button></DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <div className="flex items-center justify-between">
-                <DialogTitle>{editId ? 'Editar Conta' : 'Nova Conta Contábil'}</DialogTitle>
-                <button type="button" onClick={guardedClose} aria-label="Fechar" className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
+              <DialogTitle>{editId ? 'Editar Conta' : 'Nova Conta Contábil'}</DialogTitle>
             </DialogHeader>
             <div className="space-y-3">
               <div><Label>Código</Label><Input value={form.codigo} onChange={e => setForm({...form, codigo: e.target.value})} placeholder="Ex: 1.1.01" /></div>

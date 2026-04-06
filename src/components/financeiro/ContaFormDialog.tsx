@@ -12,7 +12,7 @@ import { BRLInput } from '@/components/ui/brl-input';
 import { fmtBRL, formatPercentBR } from '@/lib/formatters';
 import CategoryCombobox from './CategoryCombobox';
 import SupplierCombobox from './SupplierCombobox';
-import { Plus, Trash2, X, Repeat } from 'lucide-react';
+import { Plus, Trash2, Repeat } from 'lucide-react';
 
 /* ─── Types ─── */
 export type ContaFormVariant = 'pagar' | 'receber' | 'lancamento';
@@ -161,17 +161,10 @@ export default function ContaFormDialog({
     <Dialog open={open} onOpenChange={o => { if (!o) onClose(); }}>
       <DialogContent className="max-w-3xl p-0 gap-0 max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b">
+        <div className="flex items-center px-6 py-4 border-b">
           <h2 className="text-lg font-semibold text-foreground">
             {isEditing ? `Editar ${titleLabel}` : `Nova ${variant === 'pagar' ? 'despesa' : variant === 'receber' ? 'receita' : (form.tipo === 'RECEITA' ? 'receita' : form.tipo === 'TRANSFERENCIA' ? 'transferencia' : 'despesa')}`}
           </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
         </div>
 
         {/* Content */}

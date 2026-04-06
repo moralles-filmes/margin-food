@@ -10,7 +10,7 @@ import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { subMonths } from 'date-fns';
-import { Plus, Target, AlertTriangle, Pencil, Trash2, FileDown, FileSpreadsheet, Copy, Loader2, ShieldAlert, X } from 'lucide-react';
+import { Plus, Target, AlertTriangle, Pencil, Trash2, FileDown, FileSpreadsheet, Copy, Loader2, ShieldAlert } from 'lucide-react';
 import { useFormDirtyGuard } from '@/hooks/useFormDirtyGuard';
 import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
 import { useDataEvent, emitDataEvent } from '@/lib/dataEvents';
@@ -406,10 +406,7 @@ export default function OrcamentoSection() {
       <Dialog open={dialogOpen} onOpenChange={(open) => { if (!open) guardedOrcClose(); else setDialogOpen(true); }}>
         <DialogContent>
           <DialogHeader>
-            <div className="flex items-center justify-between">
-              <DialogTitle>{editingId ? 'Editar Orçamento' : 'Novo Orçamento'}</DialogTitle>
-              <button type="button" onClick={guardedOrcClose} aria-label="Fechar" className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"><X className="w-4 h-4" /></button>
-            </div>
+            <DialogTitle>{editingId ? 'Editar Orçamento' : 'Novo Orçamento'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div>

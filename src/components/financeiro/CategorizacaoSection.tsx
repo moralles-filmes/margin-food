@@ -14,7 +14,7 @@ import { emitDataEvent, useDataEvent } from '@/lib/dataEvents';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { toast } from 'sonner';
 import { fmtBRL, formatDateBR, parseLocalDate } from '@/lib/formatters';
-import { Plus, Edit, Trash2, Tag, Zap, FileWarning, ShieldX, Search, RefreshCw, X } from 'lucide-react';
+import { Plus, Edit, Trash2, Tag, Zap, FileWarning, ShieldX, Search, RefreshCw } from 'lucide-react';
 import { useFormDirtyGuard } from '@/hooks/useFormDirtyGuard';
 import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
 
@@ -344,10 +344,7 @@ export default function CategorizacaoSection() {
       <Dialog open={showForm} onOpenChange={v => { if (!v) guardedClose(); else setShowForm(true); }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <div className="flex items-center justify-between">
-              <DialogTitle>{editId ? 'Editar Regra' : 'Nova Regra de Categorização'}</DialogTitle>
-              <button type="button" onClick={guardedClose} aria-label="Fechar" className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"><X className="w-4 h-4" /></button>
-            </div>
+            <DialogTitle>{editId ? 'Editar Regra' : 'Nova Regra de Categorização'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div>

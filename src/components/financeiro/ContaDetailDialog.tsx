@@ -5,7 +5,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { fmtBRL, formatDateBR, formatPercentBR, parseLocalDate } from '@/lib/formatters';
 import {
-  X, Pencil, DollarSign, Undo2,
+  Pencil, DollarSign, Undo2,
   CheckCircle, Clock, AlertTriangle, Ban,
 } from 'lucide-react';
 
@@ -140,17 +140,10 @@ export default function ContaDetailDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl p-0 gap-0 max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b">
+        <div className="flex items-center px-6 py-4 border-b">
           <h2 className="text-lg font-semibold text-foreground">
             Detalhes da {entityLabel}
           </h2>
-          <button
-            type="button"
-            onClick={() => onOpenChange(false)}
-            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
         </div>
 
         {/* Content */}

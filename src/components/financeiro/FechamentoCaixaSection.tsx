@@ -12,7 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
 import { cacheInvalidate } from '@/components/cmv/cmvCache';
 import { toast } from 'sonner';
-import { Plus, Edit, Trash2, RefreshCw, DollarSign, Calendar, FileDown, FileSpreadsheet, AlertTriangle, X } from 'lucide-react';
+import { Plus, Edit, Trash2, RefreshCw, DollarSign, Calendar, FileDown, FileSpreadsheet, AlertTriangle } from 'lucide-react';
 import { useFormDirtyGuard } from '@/hooks/useFormDirtyGuard';
 import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
 import { startOfMonth, endOfMonth } from 'date-fns';
@@ -364,10 +364,7 @@ export default function FechamentoCaixaSection() {
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <div className="flex items-center justify-between">
-                    <DialogTitle>{editId ? 'Editar Fechamento' : 'Novo Fechamento'}</DialogTitle>
-                    <button type="button" onClick={guardedClose} aria-label="Fechar" className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"><X className="w-4 h-4" /></button>
-                  </div>
+                  <DialogTitle>{editId ? 'Editar Fechamento' : 'Novo Fechamento'}</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-3">
                   <div>

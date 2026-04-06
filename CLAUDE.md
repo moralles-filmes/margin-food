@@ -179,6 +179,14 @@ margin-food/
 
 > **Mantenha esta seção atualizada após cada sessão de trabalho.**
 
+### 2026-04-06 — Fix Lançamentos: navegação do Fluxo de Caixa + filtro de data vazio
+- **Bug 1 — Fluxo de Caixa não filtrava data**: Clicar em um dia no Fluxo de Caixa redirecionava para Lançamentos, mas `LivroRazaoSection` não aceitava `initialDateFrom`/`initialDateTo` nas props — as datas eram descartadas e o filtro sempre mostrava os últimos 30 dias.
+- **Fix 1**: Adicionadas props `initialDateFrom` e `initialDateTo` em `LivroRazaoProps` e usadas para inicializar `filtroDataDe`/`filtroDataAte`.
+- **Bug 2 — Filtro com data vazia**: Quando o campo "De" era limpo, `filtroDataDe` virava `""` e era enviado como `p_start: ""` para a RPC. PostgreSQL não conseguia converter `""` para `date`/null, retornando zero resultados. A SQL já tratava `NULL` corretamente (`p_start IS NULL OR ...`).
+- **Fix 2**: `p_start: filtroDataDe || null` e `p_end: filtroDataAte || null` — agora envia `null` quando vazio.
+- **Fix 3 — Import formatDateBR**: `LivroRazaoSection` importava `formatDateBR` de `@/lib/formatters` (alias para `formatDisplayBR`, formato `dd/MM/yyyy`). Corrigido para importar de `@/lib/datetime` (formato `yyyy-MM-dd`), compatível com `<input type="date">`.
+- **Arquivo**: `LivroRazaoSection.tsx`
+
 ### 2026-04-01 — Fix Fluxo de Caixa/Dashboard (mês errado) + Estorno de Pagamentos
 - **Bug 1 — Pagamento em mês errado**: Espelhos criados por `pay_conta_pagar` e `receive_conta_receber` usavam `data_vencimento` como `data_competencia`. Quando uma conta vencida era paga, o lançamento aparecia no mês do vencimento (ex: março) em vez do mês do pagamento real (ex: abril) — afetando Fluxo de Caixa e Dashboard.
 - **Fix**: `data_competencia` agora usa `CURRENT_DATE` (data real do pagamento). Dados existentes corrigidos via UPDATE.
