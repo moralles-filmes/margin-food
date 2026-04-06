@@ -179,6 +179,19 @@ margin-food/
 
 > **Mantenha esta seção atualizada após cada sessão de trabalho.**
 
+### 2026-04-06 — Exibir nome da empresa na sidebar (substituir "Architect")
+- **Antes**: Sidebar exibia "ARCHITECT" hardcoded abaixo do logo "Margin Food".
+- **Fix**: Agora exibe o nome da empresa do usuário logado (ex: "MarginPro Oficial", "Royal Parma"). Fallback "Margin Food" se `company_name` for null.
+- **AuthContext**: `ProfileData` ganhou campo `company_name`. Query de profile expandida com JOIN `companies(nome)` para buscar o nome da empresa sem query adicional.
+- **Arquivos afetados**: `AuthContext.tsx`, `AppLayout.tsx`
+
+### 2026-04-06 — Remover Migração e Reconciliação Salmão das Configurações
+- **Remoção**: Removidos utilitários legados da aba Configurações > Geral que não tinham mais utilidade operacional.
+- **SalmonMigrationWizard**: migração one-time do localStorage para o banco — já concluída (tela mostrava "Nenhum dado local encontrado").
+- **SalmonReconciliationReport**: diagnóstico técnico de reconciliação de saldos — sem valor para o usuário na UI de configurações.
+- **Arquivos deletados**: `SalmonMigrationWizard.tsx`, `SalmonReconciliationReport.tsx`
+- **Arquivo editado**: `ConfiguracoesView.tsx` (removidos imports e renderização)
+
 ### 2026-04-06 — Fix "Acesso negado" para Admin de Nova Empresa (Multi-Tenant)
 - **Bug 1 — Permissões desatualizadas**: Ao criar uma nova empresa e um admin para ela, o admin recebia "Acesso negado" em todos os módulos. A tabela `role_permissions` para o role `admin` só continha chaves no formato antigo (`stock:read`, `finance:manage`), mas o frontend verifica chaves no formato novo/granular (`estoque:dashboard:view`, `financeiro:dashboard:view`). O super-admin não era afetado porque `system:global:manage` bypassa todas as checagens.
 - **Fix 1**: Migração que insere todas as ~200 permissões granulares do registry na tabela `permissions` e concede ao role `admin` (e `diretor`, `gerente_geral`) todas as permissões exceto `system:global:manage`.
