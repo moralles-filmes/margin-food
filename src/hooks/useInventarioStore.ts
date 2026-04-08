@@ -44,7 +44,13 @@ export interface InventarioItem {
   contagem_inicio: string | null;
   contagem_fim: string | null;
   justificativa: string;
-  produtos?: { nome_produto: string; categoria: string } | null;
+  produtos?: {
+    nome_produto: string;
+    categoria: string;
+    unidade_medida: string | null;
+    unidade_compra: string | null;
+    fator_conversao_padrao: number | null;
+  } | null;
 }
 
 export interface Turno {
