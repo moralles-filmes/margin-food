@@ -21,6 +21,7 @@ import {
 import { todayBR, formatDisplayBR, formatInBR, parseUTCToBR } from '@/lib/datetime';
 import { parseLocalDate } from '@/lib/dateUtils';
 import { fmtBRL, formatPercentBR } from '@/lib/formatters';
+import { decomposeStockLayers, formatStockLayers } from '@/lib/unitConversions';
 import { supabase } from '@/integrations/supabase/client';
 import QuickInventorySection from './QuickInventorySection';
 import InventarioDashboardView from './inventario/InventarioDashboardView';
@@ -889,37 +890,84 @@ function ItemRow({ item, canCount, onSave, classColor }: {
   onSave: (val: number) => Promise<any>;
   classColor: (c: string) => string;
 }) {
+  const unidade = item.produtos?.unidade_medida ?? 'UN';
+  const unidadeCompra = item.produtos?.unidade_compra || unidade;
+  const fator = item.produtos?.fator_conversao_padrao || 1;
+  const hasDual = unidadeCompra.toUpperCase() !== unidade.toUpperCase() && fator !== 1;
+
+  // Convert base-unit values to purchase units for display (same as EstoqueGeralView)
+  const teoricoBase = Number(item.saldo_teorico);
+  const teoricoLayers = decomposeStockLayers(teoricoBase, fator, unidadeCompra, unidade);
+
+  // contagem_fisica is stored in base units — convert to purchase units for display
+  const fisicaBase = item.contagem_fisica !== null ? Number(item.contagem_fisica) : null;
+  const fisicaLayers = fisicaBase !== null ? decomposeStockLayers(fisicaBase, fator, unidadeCompra, unidade) : null;
+
+  // Input state in purchase units (user types in purchase unit, we convert on save)
+  const toDisplayVal = (baseVal: number | null) => {
+    if (baseVal === null) return '';
+    if (!hasDual) return String(baseVal);
+    return String(parseFloat((baseVal / fator).toFixed(4)));
+  };
+
   const [editing, setEditing] = useState(false);
-  const [value, setValue] = useState(item.contagem_fisica !== null ? String(item.contagem_fisica) : '');
+  const [value, setValue] = useState(toDisplayVal(item.contagem_fisica));
 
   const handleBlur = async () => {
-    if (value === '' || value === String(item.contagem_fisica)) { setEditing(false); return; }
+    const displayPrev = toDisplayVal(item.contagem_fisica);
+    if (value === '' || value === displayPrev) { setEditing(false); return; }
     const parsed = parseFloat(value.replace(',', '.'));
     if (isNaN(parsed) || parsed < 0) { setEditing(false); return; }
-    await onSave(parsed);
+    // Convert purchase units back to base units before saving
+    const baseVal = hasDual ? parseFloat((parsed * fator).toFixed(4)) : parsed;
+    await onSave(baseVal);
     setEditing(false);
   };
 
   const nome = item.produtos?.nome_produto || 'Item sem nome';
+  // diferenca_qtd is in base units from backend — convert to purchase units for display
+  const difPurchase = hasDual ? Number(item.diferenca_qtd) / fator : Number(item.diferenca_qtd);
 
   return (
     <tr className="border-b border-border/30 hover:bg-muted/20">
-      <td className="p-3 text-foreground font-medium">{nome}</td>
-      <td className="p-3 text-right text-muted-foreground">{Number(item.saldo_teorico).toFixed(1)}</td>
+      <td className="p-3">
+        <div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-foreground font-medium">{nome}</span>
+            <Badge className="text-[9px] bg-primary/10 text-primary font-mono px-1 py-0">
+              {unidadeCompra}
+            </Badge>
+          </div>
+          {hasDual && (
+            <p className="text-[10px] text-muted-foreground mt-0.5">
+              1 {unidadeCompra} = {fator} {unidade}
+            </p>
+          )}
+        </div>
+      </td>
+      <td className="p-3 text-right text-muted-foreground">
+        {teoricoLayers.hasLayers ? formatStockLayers(teoricoLayers) : `${teoricoBase.toFixed(1)} ${unidade}`}
+      </td>
       <td className="p-3 text-right">
         {canCount && !editing ? (
           <button onClick={() => setEditing(true)} className="text-primary underline cursor-pointer">
-            {item.contagem_fisica !== null ? Number(item.contagem_fisica).toFixed(1) : '—'}
+            {fisicaLayers !== null
+              ? (fisicaLayers.hasLayers ? formatStockLayers(fisicaLayers) : `${(fisicaBase!).toFixed(1)}`)
+              : '—'}
           </button>
         ) : canCount && editing ? (
           <DecimalInput value={value} onValueChange={(raw) => setValue(raw)} onBlur={handleBlur}
             onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === 'Enter') handleBlur(); }} autoFocus className="w-20 h-7 text-xs text-right ml-auto bg-secondary border-border" />
         ) : (
-          <span>{item.contagem_fisica !== null ? Number(item.contagem_fisica).toFixed(1) : '—'}</span>
+          <span>
+            {fisicaLayers !== null
+              ? (fisicaLayers.hasLayers ? formatStockLayers(fisicaLayers) : `${(fisicaBase!).toFixed(1)}`)
+              : '—'}
+          </span>
         )}
       </td>
-      <td className={`p-3 text-right font-bold ${Number(item.diferenca_qtd) < 0 ? 'text-destructive' : Number(item.diferenca_qtd) > 0 ? 'text-success' : 'text-muted-foreground'}`}>
-        {item.contagem_fisica !== null ? Number(item.diferenca_qtd).toFixed(1) : '—'}
+      <td className={`p-3 text-right font-bold ${difPurchase < 0 ? 'text-destructive' : difPurchase > 0 ? 'text-success' : 'text-muted-foreground'}`}>
+        {item.contagem_fisica !== null ? `${difPurchase >= 0 ? '+' : ''}${parseFloat(difPurchase.toFixed(2))} ${unidadeCompra}` : '—'}
       </td>
       <td className={`p-3 text-right ${classColor(item.classificacao)}`}>
         {item.contagem_fisica !== null ? formatPercentBR(Number(item.diferenca_percent)) : '—'}
