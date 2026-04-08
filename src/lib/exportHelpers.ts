@@ -11,8 +11,6 @@
  *   import { exportTableToPdf, exportTableToExcel } from '@/lib/exportHelpers';
  */
 
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
 import { APP_NAME } from '@/lib/brand';
 import { todayBR } from '@/lib/datetime';
 import { toast } from 'sonner';
@@ -58,6 +56,8 @@ export function exportFileName(module: string, section: string, ext: string): st
  */
 export async function exportTableToPdf(options: ExportOptions): Promise<boolean> {
   try {
+    const { default: jsPDF } = await import('jspdf');
+    await import('jspdf-autotable');
     const doc = new jsPDF();
     const { title, subtitle, columns, rows, summaryRows, module, section } = options;
 

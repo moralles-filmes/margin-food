@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -8,12 +8,13 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { PwaUpdatePrompt } from "@/components/PwaUpdatePrompt";
 import { emitDataEvent } from "@/lib/dataEvents";
-import Index from "./pages/Index";
-import Login from "./pages/Login";
-import ResetPassword from "./pages/ResetPassword";
-import AdminPanel from "./pages/AdminPanel";
-import NotFound from "./pages/NotFound";
-import FloatingCalculator from "./components/FloatingCalculator";
+
+const Index = lazy(() => import("./pages/Index"));
+const Login = lazy(() => import("./pages/Login"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const AdminPanel = lazy(() => import("./pages/AdminPanel"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const FloatingCalculator = lazy(() => import("./components/FloatingCalculator"));
 
 const AUTO_REFRESH_THROTTLE_MS = 2 * 60 * 1000; // 2 minutos
 
@@ -77,19 +78,21 @@ const App = () => {
           <Sonner />
           <PwaUpdatePrompt />
           <BrowserRouter>
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/reset-password" element={<ResetPassword />} />
-              <Route path="/compras" element={<Index />} />
-              <Route path="/fornecedores" element={<Index />} />
-              <Route path="/recebimentos" element={<Index />} />
-              <Route path="/mercados-sazonais" element={<Index />} />
-              <Route path="/confirmacoes-recebimento" element={<Index />} />
-              <Route path="/admin" element={<AdminPanel />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-            <FloatingCalculator />
+            <Suspense fallback={<div className="h-screen bg-background" />}>
+              <Routes>
+                <Route path="/" element={<Index />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="/compras" element={<Index />} />
+                <Route path="/fornecedores" element={<Index />} />
+                <Route path="/recebimentos" element={<Index />} />
+                <Route path="/mercados-sazonais" element={<Index />} />
+                <Route path="/confirmacoes-recebimento" element={<Index />} />
+                <Route path="/admin" element={<AdminPanel />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+              <FloatingCalculator />
+            </Suspense>
           </BrowserRouter>
         </TooltipProvider>
       </AuthProvider>

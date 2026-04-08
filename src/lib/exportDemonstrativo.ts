@@ -3,9 +3,6 @@
  * Builds flat row arrays from the same data used by DemonstrativoTree,
  * then generates PDF (jsPDF + autoTable) or Excel (xlsx).
  */
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
-import * as XLSX from 'xlsx';
 import { buildTree, type CatNode } from '@/components/financeiro/CadastroBaseTree';
 import { fmtBRL } from '@/lib/formatters';
 import { APP_NAME } from '@/lib/brand';
@@ -96,7 +93,9 @@ function buildExportRows(opts: BuildOptions): { rows: ExportRow[]; receitaTotal:
 
 const HEADER_COLOR: [number, number, number] = [30, 41, 59];
 
-export function exportDemonstrativoPDF(opts: BuildOptions & { titulo: string; periodo: string }) {
+export async function exportDemonstrativoPDF(opts: BuildOptions & { titulo: string; periodo: string }) {
+  const { default: jsPDF } = await import('jspdf');
+  await import('jspdf-autotable');
   const { rows, receitaTotal } = buildExportRows(opts);
   const doc = new jsPDF();
 
@@ -155,7 +154,8 @@ export function exportDemonstrativoPDF(opts: BuildOptions & { titulo: string; pe
 
 // ── Excel Export ──
 
-export function exportDemonstrativoExcel(opts: BuildOptions & { titulo: string; periodo: string }) {
+export async function exportDemonstrativoExcel(opts: BuildOptions & { titulo: string; periodo: string }) {
+  const XLSX = await import('xlsx');
   const { rows, receitaTotal } = buildExportRows(opts);
   const showPct = opts.showPctReceita && receitaTotal > 0;
 
