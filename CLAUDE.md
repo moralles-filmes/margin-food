@@ -179,6 +179,15 @@ margin-food/
 
 > **Mantenha esta seção atualizada após cada sessão de trabalho.**
 
+### 2026-04-09 — Fix Tela Branca ao Acessar o Sistema (ChunkLoadError + ErrorBoundary)
+- **Bug**: Ao acessar o sistema, a tela ficava branca. Ctrl+R resolvia.
+- **Causa raiz**: Após deploy no Vercel, o Service Worker antigo ainda servia o `index.html` cacheado. Esse HTML referenciava chunks JS com hashes antigas. O React tentava importar componentes lazy (13+ views) usando as novas hashes → `ChunkLoadError`. Sem Error Boundary, o Suspense ficava no fallback invisível (`div` com background), parecendo tela branca.
+- **Fix — 3 camadas de defesa**:
+  1. **`main.tsx`**: Listeners globais de `error` + `unhandledrejection` antes do React montar → detecta chunk errors e recarrega 1x (flag `chunk-reload-attempted` no `sessionStorage` evita loop).
+  2. **`App.tsx`**: `ErrorBoundary` de classe envolve o `BrowserRouter` → na 1ª falha recarrega, na 2ª exibe botão "Recarregar" visível ao usuário.
+  3. **`index.html`**: Script inline puro → após 8s, se `#root` estiver vazio, recarrega 1x (flag `wsd-reload-attempted`).
+- **Arquivos afetados**: `src/main.tsx`, `src/App.tsx`, `index.html`
+
 ### 2026-04-06 — Fix Sidebar: "Usuários" e "Configurações" selecionando ambas ao mesmo tempo
 - **Bug**: Na seção ADMINISTRAÇÃO da sidebar, clicar em "Usuários" ou "Configurações" selecionava ambos os itens simultaneamente. Clicar em "Usuários" redirecionava para "Configurações - Geral" em vez da subtab "Usuários".
 - **Causa**: Ambos os itens tinham `id: 'configuracoes'` no array de navegação do `AppLayout.tsx`. O `activeTab` era comparado com `item.id` para destacar o item ativo, então ambos ficavam ativos. `ConfiguracoesView` sempre iniciava com `activeView: 'geral'`.
