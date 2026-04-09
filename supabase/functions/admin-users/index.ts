@@ -184,7 +184,8 @@ Deno.serve(async (req) => {
         const selectedSet = new Set(selectedPermissions);
         const rows: { user_id: string; permission_key: string; effect: string; granted_by: string }[] = [];
 
-        for (const key of allKeys) {
+        const allConsideredKeys = new Set([...allKeys, ...Array.from(roleGranted)]);
+        for (const key of allConsideredKeys) {
           if (selectedSet.has(key) && !roleGranted.has(key)) {
             rows.push({ user_id: userId, permission_key: key, effect: 'ALLOW', granted_by: callerUserId });
           } else if (!selectedSet.has(key) && roleGranted.has(key)) {
@@ -267,11 +268,13 @@ Deno.serve(async (req) => {
 
       await adminClient.from('user_roles').insert({ user_id: newUser.user.id, role });
 
-      const profileUpdate: Record<string, any> = {};
+      const profileUpdate: Record<string, any> = {
+        company_id: callerCompanyId,
+        nome,
+        email,
+      };
       if (job_role_id) profileUpdate.job_role_id = job_role_id;
-      if (Object.keys(profileUpdate).length > 0) {
-        await adminClient.from('profiles').update(profileUpdate).eq('id', newUser.user.id);
-      }
+      await adminClient.from('profiles').update(profileUpdate).eq('id', newUser.user.id);
 
       if (Array.isArray(permissions) && permissions.length > 0) {
         await saveUserPermissions(newUser.user.id, permissions, role);

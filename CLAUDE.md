@@ -179,6 +179,24 @@ margin-food/
 
 > **Mantenha esta seção atualizada após cada sessão de trabalho.**
 
+### 2026-04-09 — Fix 3 Bugs: Usuário empresa errada + Sub-abas RBAC + RLS Requisições
+
+#### Bug 1 — Usuário criado na empresa errada (admin-users)
+- **Causa**: `admin-users` Edge Function criava auth user sem `company_id` nos metadados. O trigger `handle_new_user()` fazia fallback para a empresa mais recentemente criada (REN SUSHI) em vez da empresa do admin logado.
+- **Fix**: Profile update após criação agora é incondicional e sempre inclui `company_id: callerCompanyId`, `nome` e `email` — sobrescrevendo o que o trigger errou.
+- **Arquivo afetado**: `supabase/functions/admin-users/index.ts` (ação `create`, linhas ~270-274)
+- **Remediação**: `UPDATE profiles SET company_id = '<MORALLES_UUID>' WHERE email = 'estoquistafood@gmail.com'` executado no Supabase SQL Editor.
+
+#### Bug 2 — Todas as sub-abas visíveis mesmo com permissões restritas
+- **Causa**: `saveUserPermissions` percorria apenas `allKeys` (tabela `permissions`) para gerar DENY. Chaves presentes em `role_permissions` mas ausentes da tabela `permissions` não recebiam DENY, permanecendo ativas via role grant.
+- **Fix**: Loop agora percorre `allKeys UNION roleGranted`, garantindo DENY para todas as permissões do role que foram desmarcadas.
+- **Arquivo afetado**: `supabase/functions/admin-users/index.ts` (função `saveUserPermissions`, linha ~187)
+
+#### Bug 3 — "Erro ao carregar requisições" no módulo Estoque
+- **Causa**: RLS em `requisicoes_estoque` e `requisicao_estoque_itens` usava chave legada `stock:requisitions:read`. A função `has_permission` no banco faz verificação direta (sem mapeamento legado). Usuários com `estoque:requisicoes:view` ou `system:global:manage` eram bloqueados.
+- **Fix**: Migração que substitui as políticas antigas pelas novas com chaves granulares (`estoque:requisicoes:view/create/approve`) + chaves legadas de fallback + bypass `system:global:manage`.
+- **Migração**: `20260409180000_fix_rls_requisicoes_permissions.sql`
+
 ### 2026-04-09 — Clone Catálogo Moralles → REN SUSHI
 - **Ação**: Copiado catálogo completo da Moralles (MarginPro Oficial) para a empresa REN SUSHI.
 - **O que foi copiado**: 21 categorias (`stock_categories`), 7 locais de estoque (`stock_locations`), 236 produtos (`produtos`).
