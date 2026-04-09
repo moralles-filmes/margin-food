@@ -222,6 +222,24 @@ margin-food/
 - **Migração**: `20260406190000_seed_granular_permissions_admin.sql`
 - **Arquivos afetados**: `supabase/functions/admin-companies/index.ts`
 
+### 2026-04-09 — Fix Catálogo: "0 itens encontrados" (stale closure)
+- **Bug**: Catálogo mostrava "0 itens encontrados" mesmo com produtos visíveis. Afetava empresas novas (ex: Royal Parma) na primeira abertura do catálogo.
+- **Causa**: `fetchProdutos` useCallback capturava `prodGlobalCounts` com valor inicial `{0,0,0}` via stale closure — `prodGlobalCounts` não estava no array de dependências.
+- **Fix**: `fetchProdutoGlobalCounts` agora retorna `Promise<ProductGlobalCounts>`. Em `fetchProdutos`, usa `await fetchProdutoGlobalCounts()` e aplica o valor retornado diretamente em `setProdTotalCount`, eliminando a dependência do estado stale.
+- **Arquivo**: `src/hooks/useEstoqueGeralStore.ts`
+
+### 2026-04-09 — Fix Dados Royal Parma: produtos vinculados a categorias da Moralles
+- **Problema**: Produtos criados na Royal Parma antes do fix de RLS estavam vinculados ao campo `categoria` com valores de categorias da Moralles (ex: "Insumos", "Hortifruti"). Após o fix de isolamento, o catálogo mostrava produtos mas o filtro de categoria mostrava opções erradas.
+- **Fix**: Migração `20260409130000_fix_royal_parma_categories.sql` — cria categoria "Geral" na Royal Parma e atualiza os 13 produtos para usar essa categoria.
+- **Royal Parma company_id**: `c064aa98-5120-4eaf-97a2-8dbc5cfbeee7`
+
+### 2026-04-09 — Fix Isolamento Multi-Tenant: RLS sem company_id
+- **Problema**: 7 tabelas tinham `company_id` na coluna mas RLS checava apenas permissão (`has_permission(uid, 'stock:read')`), sem filtrar por empresa. Um usuário da Empresa A podia ler/editar dados da Empresa B.
+- **Caso especial `rh_escalas`**: políticas corretas existiam mas antigas (incluindo bypass `status = 'publicada'` cross-tenant) ainda estavam ativas — em RLS, basta uma policy autorizar para conceder acesso.
+- **Migração**: `20260409120000_fix_rls_tenant_isolation.sql` — remove todas as policies históricas das 7 tabelas e recria com `company_id = get_current_company_id()` + chaves granulares + legadas + `system:global:manage`.
+- **Tabelas corrigidas**: `stock_categories`, `stock_locations`, `fin_categorias`, `fin_centros_custo`, `turnos`, `rh_escalas`, `job_roles`
+- **Frontend (defesa em profundidade)**: Adicionado `.eq('company_id', ...)` nas queries diretas de `StockCadastrosSection.tsx`, `CategoriasFinSection.tsx`, `EscalasSection.tsx`. Também adicionado `company_id` explícito nos INSERTs desses componentes.
+
 ### 2026-04-06 — Card "Saldo Acumulado" no Fluxo de Caixa
 - **Feature**: Adicionado card "Saldo Acumulado" no Fluxo de Caixa, que considera o saldo inicial das contas bancárias ativas + todos os lançamentos realizados/conciliados até o fim do período. Mesma lógica do "Saldo em Caixa" do Dashboard.
 - **Backend**: RPC `get_fin_cashflow` agora retorna `saldo_acumulado` no objeto `totais`.

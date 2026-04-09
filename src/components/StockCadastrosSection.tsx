@@ -40,7 +40,7 @@ const LOCATION_TYPES = [
 ];
 
 export default function StockCadastrosSection() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [tab, setTab] = useState('categorias');
   const { confirm, ConfirmDialog } = useConfirmDialog();
 
@@ -66,6 +66,7 @@ export default function StockCadastrosSection() {
     const { data } = await supabase
       .from('stock_categories')
       .select('id, name, description, is_active, sort_order, created_at')
+      .eq('company_id', profile?.company_id ?? '')
       .order('sort_order', { ascending: true })
       .order('name', { ascending: true });
     setCategories((data as StockCategory[]) || []);
@@ -78,6 +79,7 @@ export default function StockCadastrosSection() {
     const { data } = await supabase
       .from('stock_locations')
       .select('id, name, type, notes, is_active, created_at')
+      .eq('company_id', profile?.company_id ?? '')
       .order('name', { ascending: true });
     setLocations((data as StockLocation[]) || []);
     setLoadingLoc(false);
@@ -121,7 +123,7 @@ export default function StockCadastrosSection() {
         const maxOrder = categories.reduce((max, c) => Math.max(max, c.sort_order), 0);
         const { data, error } = await supabase
           .from('stock_categories')
-          .insert({ name: catForm.name.trim(), description: catForm.description || null, sort_order: maxOrder + 1, created_by: user?.id })
+          .insert({ name: catForm.name.trim(), description: catForm.description || null, sort_order: maxOrder + 1, created_by: user?.id, company_id: profile?.company_id })
           .select('id')
           .single();
         if (error) throw error;
@@ -185,7 +187,7 @@ export default function StockCadastrosSection() {
       } else {
         const { data, error } = await supabase
           .from('stock_locations')
-          .insert({ name: locForm.name.trim(), type: locForm.type || null, notes: locForm.notes || null, created_by: user?.id })
+          .insert({ name: locForm.name.trim(), type: locForm.type || null, notes: locForm.notes || null, created_by: user?.id, company_id: profile?.company_id })
           .select('id')
           .single();
         if (error) throw error;

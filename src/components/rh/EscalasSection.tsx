@@ -71,7 +71,7 @@ interface Props {
 }
 
 export default function EscalasSection({ colaboradores, canManage }: Props) {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [setor, setSetor] = useState('salao');
   const [escala, setEscala] = useState<Escala | null>(null);
@@ -100,6 +100,7 @@ export default function EscalasSection({ colaboradores, canManage }: Props) {
     const { data: escalaData } = await supabase
       .from('rh_escalas')
       .select('id, setor, semana_inicio, status, custo_projetado, observacoes, created_at, created_by')
+      .eq('company_id', profile?.company_id ?? '')
       .eq('semana_inicio', weekStartStr)
       .eq('setor', setor)
       .maybeSingle();
@@ -144,6 +145,7 @@ export default function EscalasSection({ colaboradores, canManage }: Props) {
         semana_inicio: weekStartStr,
         setor,
         created_by: user?.id,
+        company_id: profile?.company_id,
       }).select().single();
       if (error) { toast.error('Erro: ' + error.message); return; }
       toast.success('Escala criada!');

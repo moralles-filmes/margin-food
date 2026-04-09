@@ -279,26 +279,30 @@ export function useEstoqueGeralStore() {
     setSaldosLoading(false);
   }, []);
 
-  const fetchProdutoGlobalCounts = useCallback(async () => {
+  const fetchProdutoGlobalCounts = useCallback(async (): Promise<ProductGlobalCounts> => {
+    const fallback: ProductGlobalCounts = { total: 0, active: 0, inactive: 0 };
     try {
       const { data, error } = await (supabase.rpc as any)('get_catalog_counts');
 
       if (error) {
         console.warn('[useEstoqueGeralStore] Falha ao obter contagem global de produtos via RPC', error.message);
-        return;
+        return fallback;
       }
 
       if (data) {
         const counts = data as any;
-        setProdGlobalCounts({
+        const result: ProductGlobalCounts = {
           total: Number(counts.total) || 0,
           active: Number(counts.active) || 0,
           inactive: Number(counts.inactive) || 0,
-        });
+        };
+        setProdGlobalCounts(result);
+        return result;
       }
     } catch (err) {
       console.error('[useEstoqueGeralStore] Erro ao obter contagem global de produtos:', err);
     }
+    return fallback;
   }, []);
 
   // === Fetch ALL active products (for dashboard/saldo/overview views) ===
@@ -398,13 +402,10 @@ export function useEstoqueGeralStore() {
       if (data) {
         const mapped = (data as unknown as ProdutoRow[]).map(dbToProduto);
         setProdHasMore(mapped.length === ESTOQUE_PAGE);
-        // Usar contagem do estado global em vez do count:exact da query que gera timeout
-        setProdTotalCount(f.ativo === false ? prodGlobalCounts.inactive : (f.ativo === true ? prodGlobalCounts.active : prodGlobalCounts.total));
         if (append) setProdutos(prev => [...prev, ...mapped]);
         else setProdutos(mapped);
         setProdPage(pageNum);
-        const ids = mapped.filter(p => p.ativo).map(p => p.id);
-        
+
         // Populate saldos state with existing saldo_atual for immediate UI update
         const initialSaldos: Record<string, { saldo: number }> = {};
         mapped.forEach(p => {
@@ -412,8 +413,11 @@ export function useEstoqueGeralStore() {
         });
         setSaldos(prev => ({ ...prev, ...initialSaldos }));
 
-        // Removido fetchSaldos redundante — o saldo_atual já vem no fetchProdutos
-        if (!append) fetchProdutoGlobalCounts();
+        // Buscar contagens frescas e usar o valor retornado diretamente (evita stale closure)
+        if (!append) {
+          const freshCounts = await fetchProdutoGlobalCounts();
+          setProdTotalCount(f.ativo === false ? freshCounts.inactive : (f.ativo === true ? freshCounts.active : freshCounts.total));
+        }
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

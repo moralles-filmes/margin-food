@@ -37,7 +37,7 @@ interface Props {
 }
 
 export default function CategoriasFinSection({ canCreate, canEdit, canDelete }: Props) {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [items, setItems] = useState<CategoriaRow[]>([]);
   const [centros, setCentros] = useState<CentroRef[]>([]);
   const [loading, setLoading] = useState(true);
@@ -51,8 +51,8 @@ export default function CategoriasFinSection({ canCreate, canEdit, canDelete }: 
   const load = async () => {
     setLoading(true);
     const [catRes, ccRes] = await Promise.all([
-      supabase.from('fin_categorias').select('id, nome, tipo, grupo, linha_dre, centro_custo_padrao_id, updated_at').eq('ativo', true).order('nome'),
-      supabase.from('fin_centros_custo').select('id, nome').eq('ativo', true).order('nome'),
+      supabase.from('fin_categorias').select('id, nome, tipo, grupo, linha_dre, centro_custo_padrao_id, updated_at').eq('ativo', true).eq('company_id', profile?.company_id ?? '').order('nome'),
+      supabase.from('fin_centros_custo').select('id, nome').eq('ativo', true).eq('company_id', profile?.company_id ?? '').order('nome'),
     ]);
     setItems((catRes.data || []) as CategoriaRow[]);
     setCentros((ccRes.data || []) as CentroRef[]);
@@ -90,7 +90,7 @@ export default function CategoriasFinSection({ canCreate, canEdit, canDelete }: 
       if (error) { toast.error(error.message); return; }
       toast.success('Categoria atualizada');
     } else {
-      const { error } = await supabase.from('fin_categorias').insert({ ...payload, created_by: user?.id });
+      const { error } = await supabase.from('fin_categorias').insert({ ...payload, created_by: user?.id, company_id: profile?.company_id });
       if (error) { toast.error(error.message); return; }
       toast.success('Categoria criada');
     }
