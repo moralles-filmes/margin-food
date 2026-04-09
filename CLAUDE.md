@@ -179,6 +179,14 @@ margin-food/
 
 > **Mantenha esta seção atualizada após cada sessão de trabalho.**
 
+### 2026-04-09 — Clone Catálogo Moralles → REN SUSHI
+- **Ação**: Copiado catálogo completo da Moralles (MarginPro Oficial) para a empresa REN SUSHI.
+- **O que foi copiado**: 21 categorias (`stock_categories`), 7 locais de estoque (`stock_locations`), 236 produtos (`produtos`).
+- **O que NÃO foi copiado**: saldo atual (zerado), histórico de movimentações, vinculação salmão (`is_salmon_raw_linked = false`).
+- **Técnica**: Migração SQL com `DISABLE TRIGGER USER` nas 3 tabelas (necessário pois `assert_tenant()` exige `auth.uid()` mas migrações rodam sem sessão auth). Idempotente via `ON CONFLICT DO NOTHING` em categorias/locais e `NOT EXISTS` por nome em produtos.
+- **Migração**: `20260409150000_clone_catalog_moralles_to_ren_sushi.sql`
+- **REN SUSHI company_id**: `de57a3ff-10f9-4b98-b6be-7bdab791c3f3`
+
 ### 2026-04-09 — Fix Tela Branca ao Acessar o Sistema (ChunkLoadError + ErrorBoundary)
 - **Bug**: Ao acessar o sistema, a tela ficava branca. Ctrl+R resolvia.
 - **Causa raiz**: Após deploy no Vercel, o Service Worker antigo ainda servia o `index.html` cacheado. Esse HTML referenciava chunks JS com hashes antigas. O React tentava importar componentes lazy (13+ views) usando as novas hashes → `ChunkLoadError`. Sem Error Boundary, o Suspense ficava no fallback invisível (`div` com background), parecendo tela branca.
