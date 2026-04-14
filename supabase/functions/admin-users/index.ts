@@ -81,6 +81,10 @@ Deno.serve(async (req) => {
 
     // ─── Permission check helper ───
     const checkPermission = async (requiredPerm: string, legacyAliases: string[]): Promise<boolean> => {
+      // Super-admin bypass: system:global:manage grants everything
+      const { data: isSuperAdmin } = await adminClient.rpc('has_permission', { _user_id: callerUserId, _permission: 'system:global:manage' });
+      if (isSuperAdmin === true) return true;
+
       // Check new granular permission
       const { data: hasPerm } = await adminClient.rpc('has_permission', { _user_id: callerUserId, _permission: requiredPerm });
       if (hasPerm === true) return true;
