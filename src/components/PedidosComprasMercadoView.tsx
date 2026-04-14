@@ -24,6 +24,7 @@ import {
   Truck, MoreVertical, Pencil, Trash2, Eye, Building2, ChevronsUpDown, FileDown
 } from 'lucide-react';
 import ExportPedidoModal from '@/components/compras/ExportPedidoModal';
+import { supabase } from '@/integrations/supabase/client';
 
 type SubTab = 'pedidos' | 'recebimento' | 'concluidos' | 'nao-entregues';
 
@@ -44,7 +45,6 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: typeof
   CANCELLED: { label: 'Cancelado', color: 'bg-muted text-muted-foreground', icon: XCircle },
 };
 
-const CATEGORIAS = ['Peixe', 'Oriental', 'Bebidas', 'Limpeza', 'Embalagens', 'Cozinha', 'Descartáveis', 'Proteínas', 'Hortifruti', 'Outros'];
 
 /** Parse comma-separated category string into array */
 function parseCategories(raw: string): string[] {
@@ -99,6 +99,21 @@ export default function PedidosComprasMercadoView() {
   const [filterType, setFilterType] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
   const [filterPriority, setFilterPriority] = useState('');
+
+  // Categorias buscadas do banco (stock_categories) — NÃO usar lista hardcoded.
+  // RLS garante isolamento por empresa automaticamente.
+  const [dbCategorias, setDbCategorias] = useState<string[]>([]);
+  useEffect(() => {
+    supabase
+      .from('stock_categories')
+      .select('name')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true })
+      .order('name', { ascending: true })
+      .then(({ data }) => {
+        if (data) setDbCategorias(data.map((c: { name: string }) => c.name));
+      });
+  }, []);
   const [supplierOpen, setSupplierOpen] = useState(false);
 
   const toggleCategory = useCallback((cat: string) => {
@@ -802,7 +817,7 @@ export default function PedidosComprasMercadoView() {
             <SelectTrigger className="w-28 text-xs h-8"><SelectValue placeholder="Categoria" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas</SelectItem>
-              {CATEGORIAS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              {dbCategorias.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
             </SelectContent>
           </Select>
         )}
@@ -876,7 +891,7 @@ export default function PedidosComprasMercadoView() {
                     <CommandInput placeholder="Buscar categoria..." className="text-xs" />
                     <CommandList>
                       <CommandEmpty className="text-xs py-4 text-center text-muted-foreground">Nenhuma categoria encontrada.</CommandEmpty>
-                      {CATEGORIAS.map(cat => {
+                      {dbCategorias.map(cat => {
                         const selected = parseCategories(form.category).includes(cat);
                         return (
                           <CommandItem key={cat} value={cat} onSelect={() => toggleCategory(cat)} className="text-xs gap-1.5">

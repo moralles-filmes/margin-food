@@ -179,6 +179,15 @@ margin-food/
 
 > **Mantenha esta seção atualizada após cada sessão de trabalho.**
 
+### 2026-04-14 — Fix Categorias Hardcoded em Nova Solicitação de Compras
+
+- **Bug**: No fluxo COMPRAS → PEDIDOS & COMPRAS MERCADO → NOVA SOLICITAÇÃO, o dropdown de "Categorias" exibia apenas 10 categorias fixas. Empresas com mais categorias (ex: REN SUSHI, com 21 categorias clonadas) não viam as categorias extras.
+- **Causa**: `PedidosComprasMercadoView.tsx` usava array hardcoded `CATEGORIAS` em vez de buscar do banco. O array era usado em dois lugares: Popover da Nova Solicitação e Select de filtro nas abas Concluídos/Não Entregues.
+- **Por que apareceu agora**: Antes do clone do catálogo para REN SUSHI, a Moralles tinha exatamente as mesmas 10 categorias do array — o bug era invisível. Com multi-tenant e catálogos diferentes por empresa, o problema ficou evidente.
+- **Fix**: Adicionado fetch dinâmico de `stock_categories` com `is_active = true`, ordenado por `sort_order` e `name`. RLS da tabela garante isolamento por empresa automaticamente.
+- **Arquivo afetado**: `src/components/PedidosComprasMercadoView.tsx` (removida constante `CATEGORIAS`, adicionados `useState<string[]>` + `useEffect` com query ao banco)
+- **Blindagem**: Comentário no código deixa explícito que categorias devem vir do banco. Nunca adicionar lista hardcoded de categorias — sempre usar `stock_categories`.
+
 ### 2026-04-09 — Fix 3 Bugs: Usuário empresa errada + Sub-abas RBAC + RLS Requisições
 
 #### Bug 1 — Usuário criado na empresa errada (admin-users)
