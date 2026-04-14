@@ -179,6 +179,18 @@ margin-food/
 
 > **Mantenha esta seção atualizada após cada sessão de trabalho.**
 
+### 2026-04-14 — Fix Vazamento Multi-Tenant: Usuários de Outras Empresas em Dropdowns
+
+- **Bug**: Dropdown "Responsável" em Compras → Nova Solicitação exibia usuários de TODAS as empresas (ex: usuários da REN SUSHI apareciam para usuários da Moralles). Usuários excluídos (soft-deleted) também apareciam.
+- **Causa 1 — RPC sem filtro**: `list_profiles_minimal()` era `SECURITY DEFINER` sem filtro de `company_id`, retornando todos os profiles do banco. Usada por `UserMentionSelect`, `GlobalAuditView`, `InventarioView` e `RhView`.
+- **Causa 2 — RLS permissiva**: A migration `20260324154500_repair_profiles.sql` recriava a policy `"Users can read all profiles"` com `USING(true)`. Em RLS, qualquer policy que permita acesso garante acesso — nulificando as policies granulares de `20260301175412`.
+- **Fix**: Nova migration `20260414120000_fix_profiles_rls_and_rpc.sql`:
+  - Remove policies permissivas (`"Users can read all profiles"`, `"Authenticated can read profiles"`, `"Users can read own profile"`)
+  - Cria policy `profiles_select_company_member`: qualquer membro lê apenas profiles da SUA empresa, excluindo `[EXCLUÍDO]%`
+  - Substitui `list_profiles_minimal()` com filtros por `company_id` e `nome NOT ILIKE '[EXCLUÍDO]%'`
+- **Sem mudanças de frontend**: todos os componentes afetados já usavam a RPC — corrigir a RPC corrige todos automaticamente.
+- **Políticas ativas após fix**: `profiles_select_own`, `profiles_select_admin_company`, `profiles_select_company_member`, `profiles_update_own`
+
 ### 2026-04-14 — Fix Categorias Hardcoded em Nova Solicitação de Compras
 
 - **Bug**: No fluxo COMPRAS → PEDIDOS & COMPRAS MERCADO → NOVA SOLICITAÇÃO, o dropdown de "Categorias" exibia apenas 10 categorias fixas. Empresas com mais categorias (ex: REN SUSHI, com 21 categorias clonadas) não viam as categorias extras.
