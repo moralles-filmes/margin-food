@@ -383,20 +383,20 @@ Deno.serve(async (req) => {
       if (!motivo || motivo.trim().length < 3) return json({ error: 'Motivo da exclusão é obrigatório (mín. 3 caracteres)' }, 400);
       if (userId === callerUserId) return json({ error: 'Não é possível excluir a si mesmo' }, 400);
 
+      // Busca dados antes de deletar (para o log de auditoria)
       const { data: profile } = await adminClient.from('profiles').select('nome, email').eq('id', userId).single();
       const { data: roleRow } = await adminClient.from('user_roles').select('role').eq('user_id', userId).single();
 
-      const { error: banError } = await adminClient.auth.admin.updateUserById(userId, { ban_duration: '876600h' });
-      if (banError) return json({ error: banError.message }, 500);
-
-      await adminClient.from('user_roles').delete().eq('user_id', userId);
-      await adminClient.from('user_permissions').delete().eq('user_id', userId);
-      await adminClient.from('profiles').update({ nome: `[EXCLUÍDO] ${profile?.nome || ''}` }).eq('id', userId);
-
+      // Grava auditoria ANTES de deletar para garantir captura dos dados
       await audit('user.deleted', userId, {
         valor_anterior: JSON.stringify({ nome: profile?.nome, email: profile?.email, role: roleRow?.role }),
         valor_novo: JSON.stringify({ motivo }),
       });
+
+      // Hard delete do auth user — CASCADE remove profiles, user_roles e user_permissions automaticamente
+      const { error: deleteError } = await adminClient.auth.admin.deleteUser(userId);
+      if (deleteError) return json({ error: deleteError.message }, 500);
+
       return json({ success: true });
     }
 

@@ -179,6 +179,21 @@ margin-food/
 
 > **Mantenha esta seção atualizada após cada sessão de trabalho.**
 
+### 2026-04-14 — Fix FK ON DELETE SET NULL para Preservar Histórico ao Excluir Usuários
+
+- **Problema**: Ao fazer hard delete de um usuário, o banco bloqueava com erro de FK se o usuário tinha movimentações, pedidos de compra, orçamentos, etc. vinculados.
+- **Causa**: 10 tabelas tinham colunas `created_by`/`solicitante_user_id`/etc. referenciando `auth.users(id)` sem `ON DELETE` definido — o padrão do PostgreSQL é `RESTRICT`, bloqueando a deleção.
+- **Fix** (`20260414150000_fix_fk_on_delete_set_null_users.sql`): Todas as FKs alteradas para `ON DELETE SET NULL`. Duas colunas `NOT NULL` (`solic_compra_mercado.solicitante_user_id` e `aprovacoes_solic_compra_mercado.aprovado_por_user_id`) tiveram a restrição removida para permitir o `SET NULL`.
+- **Resultado**: Ao excluir um usuário, todos os registros históricos são preservados — apenas o campo `created_by`/`user_id` fica `null`. O Supabase Auth deleta o usuário e o banco limpa as referências automaticamente via CASCADE/SET NULL.
+- **Tabelas corrigidas**: `movimentacoes_estoque`, `solic_compra_mercado` (2 colunas), `solic_compra_mercado_item`, `aprovacoes_solic_compra_mercado`, `fin_orcamentos`, `job_roles`, `user_permissions`, `stock_categories`, `stock_locations`.
+
+### 2026-04-14 — Fix Hard Delete de Usuário (não sumia do Supabase Auth)
+
+- **Bug**: Ao excluir um usuário em Configurações → Usuários, o usuário não era removido do Supabase Auth — aparecia no dashboard do Supabase com status "banned".
+- **Causa**: O fluxo anterior fazia apenas soft-delete: banimento de 876.600h (`ban_duration: '876600h'`), prefixo `[EXCLUÍDO]` no nome do perfil e deleção manual de `user_roles`/`user_permissions`. O registro em `auth.users` permanecia.
+- **Fix** (`admin-users/index.ts`): Ação `delete` substituída por hard delete real via `adminClient.auth.admin.deleteUser(userId)`. Como `profiles`, `user_roles` e `user_permissions` têm `ON DELETE CASCADE` sobre `auth.users.id`, o banco limpa tudo automaticamente. O log de auditoria é gravado **antes** da deleção para garantir captura dos dados.
+- **Deploy**: Edge Function `admin-users` redeploy realizado.
+
 ### 2026-04-14 — Fix Erro Genérico ao Criar Usuário ("Edge Function returned a non-2xx status code")
 
 - **Bug**: Ao tentar criar um novo usuário em Configurações → Usuários, o toast exibia sempre `"Edge Function returned a non-2xx status code"` em vez da mensagem real do erro.
