@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { UserPlus, Shield, Ban, CheckCircle, Loader2, Pencil, KeyRound, Power, Trash2, Briefcase, Plus } from 'lucide-react';
+import { UserPlus, Shield, Ban, CheckCircle, Loader2, Pencil, KeyRound, Power, Trash2, Briefcase, Plus, X } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle,
@@ -100,10 +100,20 @@ export default function AdminUsersView() {
   // ─── Helpers ───
   const invoke = async (body: Record<string, any>) => {
     const parseInvokeError = async (error: any) => {
-      const msg = error?.context && typeof error.context.json === 'function'
-        ? await error.context.json().then((b: any) => b?.error).catch(() => undefined)
-        : undefined;
-      return msg || error?.message || 'Erro';
+      try {
+        if (error?.context) {
+          // Read as text first (stream can only be read once)
+          const text = await error.context.text();
+          if (text) {
+            try {
+              const parsed = JSON.parse(text);
+              if (parsed?.error) return parsed.error;
+            } catch { }
+            return text;
+          }
+        }
+      } catch { }
+      return error?.message || 'Erro';
     };
 
     const runInvoke = async (accessToken?: string) => {
@@ -124,12 +134,11 @@ export default function AdminUsersView() {
           const retried = await runInvoke(refreshed.session.access_token);
           data = retried.data;
           error = retried.error;
+          if (error) throw new Error(await parseInvokeError(error));
         }
+      } else {
+        throw new Error(firstMsg);
       }
-    }
-
-    if (error) {
-      throw new Error(await parseInvokeError(error));
     }
 
     if (data?.error) throw new Error(data.error);
@@ -476,6 +485,7 @@ export default function AdminUsersView() {
       {/* ─── CREATE USER DIALOG ─── */}
       <AlertDialog open={showCreate} onOpenChange={setShowCreate}>
         <AlertDialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <button onClick={() => setShowCreate(false)} className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"><X className="h-4 w-4" /><span className="sr-only">Fechar</span></button>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <UserPlus className="w-4 h-4 text-primary" /> Criar Novo Usuário
@@ -539,6 +549,7 @@ export default function AdminUsersView() {
       {/* ─── EDIT USER DIALOG ─── */}
       <AlertDialog open={!!editingUser} onOpenChange={open => !open && setEditingUser(null)}>
         <AlertDialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <button onClick={() => setEditingUser(null)} className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"><X className="h-4 w-4" /><span className="sr-only">Fechar</span></button>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <Pencil className="w-4 h-4 text-primary" /> Editar Usuário
@@ -598,6 +609,7 @@ export default function AdminUsersView() {
       {/* ─── RESET PASSWORD DIALOG ─── */}
       <AlertDialog open={!!resetUser} onOpenChange={open => { if (!open) { setResetUser(null); resetPw.setPassword(''); } }}>
         <AlertDialogContent>
+          <button onClick={() => { setResetUser(null); resetPw.setPassword(''); }} className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"><X className="h-4 w-4" /><span className="sr-only">Fechar</span></button>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <KeyRound className="w-4 h-4 text-primary" /> Resetar Senha
@@ -628,6 +640,7 @@ export default function AdminUsersView() {
       {/* ─── DELETE USER DIALOG ─── */}
       <AlertDialog open={!!deleteUser} onOpenChange={open => { if (!open) { setDeleteUser(null); setDeleteMotivo(''); } }}>
         <AlertDialogContent>
+          <button onClick={() => { setDeleteUser(null); setDeleteMotivo(''); }} className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"><X className="h-4 w-4" /><span className="sr-only">Fechar</span></button>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2 text-destructive">
               <Trash2 className="w-4 h-4" /> Excluir Usuário
@@ -658,6 +671,7 @@ export default function AdminUsersView() {
       {/* ─── CREATE JOB ROLE DIALOG ─── */}
       <AlertDialog open={showCreateJobRole} onOpenChange={setShowCreateJobRole}>
         <AlertDialogContent>
+          <button onClick={() => setShowCreateJobRole(false)} className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"><X className="h-4 w-4" /><span className="sr-only">Fechar</span></button>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <Briefcase className="w-4 h-4 text-primary" /> Novo Cargo

@@ -179,6 +179,13 @@ margin-food/
 
 > **Mantenha esta seção atualizada após cada sessão de trabalho.**
 
+### 2026-04-14 — Fix Botão X Ausente nos Dialogs de Usuários (AdminUsersView)
+
+- **Bug**: Os 5 `AlertDialog` em Configurações → Usuários não exibiam botão X para fechar (Criar Novo Usuário, Editar Usuário, Resetar Senha, Excluir Usuário, Novo Cargo).
+- **Causa**: O componente `AlertDialog` do shadcn/ui **não renderiza** botão X por padrão, ao contrário do `Dialog` que tem `DialogPrimitive.Close` embutido. Por design do Radix UI, AlertDialog é pensado para confirmações com ações explícitas.
+- **Fix**: Adicionado botão X absolutamente posicionado (`absolute right-4 top-4`) dentro de cada `AlertDialogContent`, com o mesmo estilo do `DialogContent` nativo. Cada botão chama o handler de fechamento correto para limpar o estado associado.
+- **Arquivo afetado**: `src/components/AdminUsersView.tsx` (import de `X` adicionado + 5 botões X inseridos)
+
 ### 2026-04-14 — Fix Vazamento Multi-Tenant: Usuários de Outras Empresas em Dropdowns
 
 - **Bug**: Dropdown "Responsável" em Compras → Nova Solicitação exibia usuários de TODAS as empresas (ex: usuários da REN SUSHI apareciam para usuários da Moralles). Usuários excluídos (soft-deleted) também apareciam.
