@@ -179,6 +179,17 @@ margin-food/
 
 > **Mantenha esta seção atualizada após cada sessão de trabalho.**
 
+### 2026-04-14 — Fix Erro Genérico ao Criar Usuário ("Edge Function returned a non-2xx status code")
+
+- **Bug**: Ao tentar criar um novo usuário em Configurações → Usuários, o toast exibia sempre `"Edge Function returned a non-2xx status code"` em vez da mensagem real do erro.
+- **Causa 1 — Double-consume do body stream**: A função `parseInvokeError` no frontend lia o corpo da Response HTTP duas vezes:
+  - 1ª leitura: na checagem `isAuthError` (linha 118) — `error.context.json()` consumia o stream
+  - 2ª leitura: para lançar o erro (linha 132) — stream já consumido, `.json()` lançava exceção, catch retornava `undefined`, e o fallback era `error.message` genérico
+- **Causa 2 — Bypass ausente para super-admin**: A edge function `admin-users` não verificava `system:global:manage` no `checkPermission`. Super-admins sem role `admin` explícita podiam ser bloqueados com 403.
+- **Fix Frontend** (`AdminUsersView.tsx`): `parseInvokeError` reescrito para ler o body como `.text()` uma única vez e reutilizar o resultado. Erros não-auth agora lançam imediatamente com `firstMsg` (já parseado), evitando segunda leitura.
+- **Fix Edge Function** (`admin-users/index.ts`): Adicionado check de `system:global:manage` como primeira verificação em `checkPermission` — super-admins passam independente de role ou permissão granular.
+- **Deploy**: Edge Function `admin-users` redeploy realizado (versão 22).
+
 ### 2026-04-14 — Fix Botão X Ausente nos Dialogs de Usuários (AdminUsersView)
 
 - **Bug**: Os 5 `AlertDialog` em Configurações → Usuários não exibiam botão X para fechar (Criar Novo Usuário, Editar Usuário, Resetar Senha, Excluir Usuário, Novo Cargo).
