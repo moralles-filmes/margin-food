@@ -15,27 +15,25 @@ CREATE TABLE IF NOT EXISTS public.fin_conciliacao_ignoradas (
 
 ALTER TABLE public.fin_conciliacao_ignoradas ENABLE ROW LEVEL SECURITY;
 
--- Garante company_id via trigger padrão do projeto
-CREATE TRIGGER trg_force_company_id_conciliacao_ignoradas
-  BEFORE INSERT ON public.fin_conciliacao_ignoradas
-  FOR EACH ROW EXECUTE FUNCTION public.force_company_id();
-
 -- RLS: cada membro acessa apenas dados da própria empresa
 CREATE POLICY "conciliacao_ignoradas_company_rls"
   ON public.fin_conciliacao_ignoradas
+  FOR ALL
   USING (company_id = public.get_current_company_id())
   WITH CHECK (company_id = public.get_current_company_id());
 
 -- Super-admin bypass
 CREATE POLICY "conciliacao_ignoradas_superadmin"
   ON public.fin_conciliacao_ignoradas
+  FOR ALL
   USING (public.has_permission(auth.uid(), 'system:global:manage'));
 
 -- Index para lookup rápido na re-importação de OFX
 CREATE INDEX idx_conciliacao_ignoradas_conta_data
   ON public.fin_conciliacao_ignoradas (company_id, conta_id, data);
 
--- RPC para ignorar uma entrada do extrato
+-- RPC para ignorar uma entrada do extrato.
+-- company_id é resolvido via get_current_company_id() — mesmo padrão das outras RPCs financeiras.
 CREATE OR REPLACE FUNCTION public.reconcile_ignorar_lancamento(
   p_conta_id  uuid,
   p_data      date,
@@ -50,7 +48,8 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
 DECLARE
-  v_id uuid;
+  v_id         uuid;
+  v_company_id uuid;
 BEGIN
   IF NOT (
     public.has_permission(p_user_id, 'finance:manage') OR
@@ -59,10 +58,15 @@ BEGIN
     RAISE EXCEPTION 'Permissão negada: finance:manage necessário';
   END IF;
 
+  v_company_id := public.get_current_company_id();
+  IF v_company_id IS NULL THEN
+    RAISE EXCEPTION 'Empresa não encontrada para o usuário atual';
+  END IF;
+
   INSERT INTO public.fin_conciliacao_ignoradas
-    (conta_id, data, valor, tipo, descricao, ignorado_por)
+    (company_id, conta_id, data, valor, tipo, descricao, ignorado_por)
   VALUES
-    (p_conta_id, p_data, p_valor, p_tipo, p_descricao, p_user_id)
+    (v_company_id, p_conta_id, p_data, p_valor, p_tipo, p_descricao, p_user_id)
   RETURNING id INTO v_id;
 
   RETURN jsonb_build_object('status', 'ok', 'id', v_id);

@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import { Upload, CheckCircle, Save, RefreshCw, ArrowRight, Receipt, Eye, Plus, Trash2, PieChart, ArrowRightLeft, Search, CreditCard, FileText } from 'lucide-react';
+import { Upload, CheckCircle, Save, RefreshCw, ArrowRight, Receipt, Eye, Plus, Trash2, PieChart, ArrowRightLeft, Search, CreditCard, FileText, EyeOff, X } from 'lucide-react';
 import CriarLancamentoExtratoDialog from '@/components/financeiro/CriarLancamentoExtratoDialog';
 import type { ContaBancariaRef, CategoriaFinRef, CentroCustoRef, LancamentoConciliacao, LancamentoCandidate, ContaPagarCandidate, ContaReceberCandidate } from '@/types/financeiro';
 
@@ -43,6 +43,8 @@ interface LinhaExtrato {
   matchRaw?: MatchSuggestion['raw'];
   suggestions?: MatchSuggestion[];
   rateioLinhas?: RateioLinha[];
+  jaConciliada?: boolean;
+  ignorada?: boolean;
 }
 
 interface RateioLinha {
@@ -56,15 +58,13 @@ interface RateioLinha {
 /* ───────── Scoring helper ───────── */
 function computeScore(extratoValor: number, extratoData: string, extratoDesc: string, candidateValor: number, candidateData: string, candidateDesc: string): number {
   let score = 0;
-  // Value match (0-50 points)
   const diff = Math.abs(candidateValor - extratoValor);
   const tolerance = Math.max(extratoValor * 0.01, 0.01);
   if (diff < 0.01) score += 50;
   else if (diff <= tolerance) score += 40;
   else if (diff <= extratoValor * 0.05) score += 20;
-  else return 0; // too different
+  else return 0;
 
-  // Date proximity (0-30 points)
   const d1 = new Date(extratoData);
   const d2 = new Date(candidateData);
   const daysDiff = Math.abs((d1.getTime() - d2.getTime()) / 86400000);
@@ -72,9 +72,8 @@ function computeScore(extratoValor: number, extratoData: string, extratoDesc: st
   else if (daysDiff <= 1) score += 25;
   else if (daysDiff <= 3) score += 15;
   else if (daysDiff <= 7) score += 5;
-  else return 0; // too far
+  else return 0;
 
-  // Description similarity (0-20 points)
   if (extratoDesc && candidateDesc) {
     const a = extratoDesc.toLowerCase().trim();
     const b = candidateDesc.toLowerCase().trim();
@@ -91,6 +90,24 @@ function computeScore(extratoValor: number, extratoData: string, extratoDesc: st
   return score;
 }
 
+/* ───────── sessionStorage helpers ───────── */
+const SESSION_KEY = (contaId: string) => `conciliacao_linhas_${contaId}`;
+
+function saveLinhas(contaId: string, linhas: LinhaExtrato[]) {
+  try { sessionStorage.setItem(SESSION_KEY(contaId), JSON.stringify(linhas)); } catch {}
+}
+
+function loadLinhas(contaId: string): LinhaExtrato[] | null {
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY(contaId));
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function clearLinhas(contaId: string) {
+  try { sessionStorage.removeItem(SESSION_KEY(contaId)); } catch {}
+}
+
 export default function ConciliacaoBancariaSection() {
   const { user } = useAuth();
   const [contas, setContas] = useState<ContaBancariaRef[]>([]);
@@ -98,32 +115,36 @@ export default function ConciliacaoBancariaSection() {
   const [loading, setLoading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const [linhas, setLinhas] = useState<LinhaExtrato[]>([]);
+  const [linhas, setLinhasState] = useState<LinhaExtrato[]>([]);
   const [importando, setImportando] = useState(false);
 
   const [lancamentos, setLancamentos] = useState<LancamentoConciliacao[]>([]);
   const [filtro, setFiltro] = useState<'pendentes' | 'conciliados' | 'todos'>('pendentes');
   const [view, setView] = useState<'importar' | 'conciliar'>('conciliar');
 
-  // Confirmation dialogs
   const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; linhaIndex: number; match: MatchSuggestion | null }>({ open: false, linhaIndex: -1, match: null });
   const [processando, setProcessando] = useState(false);
 
-  // Suggestions dialog
   const [suggestionsDialog, setSuggestionsDialog] = useState<{ open: boolean; linhaIndex: number }>({ open: false, linhaIndex: -1 });
 
-  // Rateio dialog state
   const [rateioDialog, setRateioDialog] = useState<{ open: boolean; linhaIndex: number }>({ open: false, linhaIndex: -1 });
   const [rateioLinhas, setRateioLinhas] = useState<RateioLinha[]>([]);
   const [categorias, setCategorias] = useState<CategoriaFinRef[]>([]);
   const [centrosCusto, setCentrosCusto] = useState<CentroCustoRef[]>([]);
 
-  // Transfer dialog state
   const [transferDialog, setTransferDialog] = useState<{ open: boolean; linhaIndex: number }>({ open: false, linhaIndex: -1 });
   const [transferContaDestino, setTransferContaDestino] = useState('');
 
-  // Create lancamento from extrato dialog
   const [criarDialog, setCriarDialog] = useState<{ open: boolean; linhaIndex: number }>({ open: false, linhaIndex: -1 });
+
+  // Wrapper: atualiza state e persiste no sessionStorage
+  const setLinhas = (updater: LinhaExtrato[] | ((prev: LinhaExtrato[]) => LinhaExtrato[])) => {
+    setLinhasState(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      if (contaSel) saveLinhas(contaSel, next);
+      return next;
+    });
+  };
 
   useEffect(() => {
     supabase.from('fin_contas').select('id, nome').eq('ativo', true).order('nome')
@@ -140,11 +161,20 @@ export default function ConciliacaoBancariaSection() {
     });
   }, []);
 
+  // Restaura linhas do sessionStorage quando a conta é selecionada
+  useEffect(() => {
+    if (!contaSel) return;
+    const saved = loadLinhas(contaSel);
+    if (saved && saved.length > 0) {
+      setLinhasState(saved);
+      if (view !== 'importar') setView('importar');
+    }
+  }, [contaSel]);
+
   useEffect(() => { if (contaSel && view === 'conciliar') loadLancamentos(); }, [contaSel, filtro, view]);
 
   const loadLancamentos = async () => {
     setLoading(true);
-    // Fetch both pending and reconciled to have accurate counts in the UI
     const { data, error } = await supabase
       .from('fin_lancamentos')
       .select('id, data_competencia, valor, tipo, descricao, conta_id, categoria_id, centro_custo_id, status, conciliado, conciliado_em, conciliado_por, created_at')
@@ -157,14 +187,18 @@ export default function ConciliacaoBancariaSection() {
       console.error('Error loading lancamentos:', error);
       toast.error('Erro ao carregar lançamentos');
     }
-    
+
     setLancamentos(data || []);
     setLoading(false);
   };
 
   const conciliar = async (id: string, value: boolean) => {
     if (value) {
-      const { error } = await supabase.rpc('reconcile_batch_lancamentos', { p_lancamento_ids: [id] });
+      // Fix: p_user_id é obrigatório na RPC
+      const { error } = await supabase.rpc('reconcile_batch_lancamentos', {
+        p_lancamento_ids: [id],
+        p_user_id: user?.id,
+      });
       if (error) { toast.error(error.message); return; }
     } else {
       await (supabase.from('fin_lancamentos').update({ conciliado: false, conciliado_em: null, conciliado_por: null } as Record<string, unknown>) as unknown as { eq: (col: string, val: string) => Promise<unknown> }).eq('id', id);
@@ -178,7 +212,11 @@ export default function ConciliacaoBancariaSection() {
     const pendentes = lancamentos.filter(l => !l.conciliado);
     if (pendentes.length === 0) return;
     const ids = pendentes.map(l => l.id);
-    const { data, error } = await supabase.rpc('reconcile_batch_lancamentos', { p_lancamento_ids: ids });
+    // Fix: p_user_id é obrigatório na RPC
+    const { data, error } = await supabase.rpc('reconcile_batch_lancamentos', {
+      p_lancamento_ids: ids,
+      p_user_id: user?.id,
+    });
     if (error) { toast.error(error.message); return; }
     const count = (data as unknown as { reconciled_count?: number } | null)?.reconciled_count || ids.length;
     setLancamentos(prev => prev.map(l => ids.includes(l.id) ? { ...l, conciliado: true } : l));
@@ -251,23 +289,21 @@ export default function ConciliacaoBancariaSection() {
         return;
       }
 
-      // ──── Fetch all candidate data in parallel ────
-      const [lancRes, lancAllRes, cpRes, crRes, conciliadosRes] = await Promise.all([
-        // Lancamentos from same account
+      // Busca dados para match + entradas já conciliadas + entradas ignoradas
+      const [lancRes, lancAllRes, cpRes, crRes, conciliadosRes, ignoradasRes] = await Promise.all([
         contaSel ? supabase.from('fin_lancamentos').select('id, data_competencia, valor, tipo, descricao, conciliado, conta_id')
           .eq('conta_id', contaSel).eq('status', 'REALIZADO').or('conciliado.is.null,conciliado.eq.false') : Promise.resolve({ data: [] }),
-        // Lancamentos from ANY account (for broader matching)
         supabase.from('fin_lancamentos').select('id, data_competencia, valor, tipo, descricao, conciliado, conta_id')
           .eq('status', 'REALIZADO').or('conciliado.is.null,conciliado.eq.false').limit(500),
-        // Contas a pagar (pendentes)
         supabase.from('fin_contas_pagar').select('id, descricao, valor, data_vencimento, status, fornecedor, recorrente, recorrencia_config')
           .in('status', ['AGUARDANDO_APROVACAO', 'APROVADO']).order('data_vencimento'),
-        // Contas a receber (pendentes)
         supabase.from('fin_contas_receber').select('id, descricao, valor, data_vencimento, status, cliente, recorrente, recorrencia_config')
           .eq('status', 'A_RECEBER').order('data_vencimento'),
-        // Already reconciled lancamentos for this account (to skip re-processing)
         contaSel ? supabase.from('fin_lancamentos').select('data_competencia, valor, tipo')
           .eq('conta_id', contaSel).eq('conciliado', true).eq('status', 'REALIZADO') : Promise.resolve({ data: [] }),
+        // Entradas ignoradas para esta conta
+        contaSel ? supabase.from('fin_conciliacao_ignoradas').select('data, valor, tipo, descricao')
+          .eq('conta_id', contaSel) : Promise.resolve({ data: [] }),
       ]);
 
       const lancSameConta = ((lancRes as { data: LancamentoCandidate[] | null }).data || []) as LancamentoCandidate[];
@@ -275,14 +311,18 @@ export default function ConciliacaoBancariaSection() {
       const contasPagar = (cpRes.data || []) as ContaPagarCandidate[];
       const contasReceber = (crRes.data || []) as ContaReceberCandidate[];
 
-      // Filter out lines already reconciled in this account
+      // Já conciliadas — mostrar com badge em vez de filtrar silenciosamente
       const conciliadosSet = new Set(
         ((conciliadosRes.data || []) as { data_competencia: string; valor: number; tipo: string }[])
           .map(l => `${l.data_competencia}|${Number(l.valor)}|${l.tipo}`)
       );
-      parsed = parsed.filter(linha => !conciliadosSet.has(`${linha.data}|${linha.valor}|${linha.tipo}`));
 
-      // Build unique set of all lancamentos (same account first for priority)
+      // Ignoradas — mostrar com badge "Ignorado"
+      const ignoradasSet = new Set(
+        ((ignoradasRes.data || []) as { data: string; valor: number; tipo: string; descricao: string | null }[])
+          .map(l => `${l.data}|${Number(l.valor)}|${l.tipo}`)
+      );
+
       const lancMap = new Map<string, LancamentoCandidate>();
       for (const l of lancSameConta) lancMap.set(l.id, { ...l, _sameAccount: true });
       for (const l of lancAll) { if (!lancMap.has(l.id)) lancMap.set(l.id, { ...l, _sameAccount: false }); }
@@ -291,15 +331,26 @@ export default function ConciliacaoBancariaSection() {
       const usedIds = new Set<string>();
 
       parsed = parsed.map(linha => {
+        const key = `${linha.data}|${linha.valor}|${linha.tipo}`;
+
+        // Já conciliada — exibir informativo, sem ação
+        if (conciliadosSet.has(key)) {
+          return { ...linha, selecionada: false, jaConciliada: true };
+        }
+
+        // Ignorada — exibir informativo, sem ação
+        if (ignoradasSet.has(key)) {
+          return { ...linha, selecionada: false, ignorada: true };
+        }
+
         const suggestions: MatchSuggestion[] = [];
 
-        // 1) Match with lancamentos (same account gets score boost)
         for (const ex of allLancamentos) {
           if (usedIds.has(`lanc-${ex.id}`)) continue;
           if (ex.tipo !== linha.tipo) continue;
           let score = computeScore(linha.valor, linha.data, linha.descricao, Number(ex.valor), ex.data_competencia, ex.descricao || '');
           if (score === 0) continue;
-          if (ex._sameAccount) score += 10; // bonus for same account
+          if (ex._sameAccount) score += 10;
           suggestions.push({
             id: ex.id, origin: 'lancamento', descricao: ex.descricao || '(sem desc.)',
             valor: Number(ex.valor), data: ex.data_competencia,
@@ -308,7 +359,6 @@ export default function ConciliacaoBancariaSection() {
           });
         }
 
-        // 2) Match DESPESA with contas a pagar
         if (linha.tipo === 'DESPESA') {
           for (const cp of contasPagar) {
             if (usedIds.has(`cp-${cp.id}`)) continue;
@@ -322,7 +372,6 @@ export default function ConciliacaoBancariaSection() {
           }
         }
 
-        // 3) Match RECEITA with contas a receber
         if (linha.tipo === 'RECEITA') {
           for (const cr of contasReceber) {
             if (usedIds.has(`cr-${cr.id}`)) continue;
@@ -336,10 +385,8 @@ export default function ConciliacaoBancariaSection() {
           }
         }
 
-        // Sort by score descending
         suggestions.sort((a, b) => b.score - a.score);
 
-        // Auto-select best match if score is high enough
         const best = suggestions[0];
         if (best && best.score >= 60) {
           usedIds.add(`${best.origin === 'lancamento' ? 'lanc' : best.origin === 'conta_pagar' ? 'cp' : 'cr'}-${best.id}`);
@@ -360,18 +407,22 @@ export default function ConciliacaoBancariaSection() {
       const matchedLanc = parsed.filter(l => l.matchOrigin === 'lancamento').length;
       const matchedCP = parsed.filter(l => l.matchOrigin === 'conta_pagar').length;
       const matchedCR = parsed.filter(l => l.matchOrigin === 'conta_receber').length;
-      const withSuggestions = parsed.filter(l => !l.matchId && l.suggestions && l.suggestions.length > 0).length;
-      const unmatched = parsed.length - matchedLanc - matchedCP - matchedCR;
-      
+      const jaConciliadas = parsed.filter(l => l.jaConciliada).length;
+      const ignoradas = parsed.filter(l => l.ignorada).length;
+      const withSuggestions = parsed.filter(l => !l.matchId && !l.jaConciliada && !l.ignorada && l.suggestions && l.suggestions.length > 0).length;
+      const unmatched = parsed.length - matchedLanc - matchedCP - matchedCR - jaConciliadas - ignoradas;
+
       let msg = `${parsed.length} transações: `;
       const parts: string[] = [];
       if (matchedLanc > 0) parts.push(`${matchedLanc} match lançamento`);
       if (matchedCP > 0) parts.push(`${matchedCP} match contas a pagar`);
       if (matchedCR > 0) parts.push(`${matchedCR} match contas a receber`);
+      if (jaConciliadas > 0) parts.push(`${jaConciliadas} já conciliada(s)`);
+      if (ignoradas > 0) parts.push(`${ignoradas} ignorada(s)`);
       if (withSuggestions > 0) parts.push(`${withSuggestions} com sugestões`);
-      parts.push(`${unmatched - withSuggestions} novas`);
+      parts.push(`${unmatched - withSuggestions} nova(s)`);
       toast.success(msg + parts.join(', '));
-      
+
       setLinhas(parsed);
     } catch (err) {
       console.error(err);
@@ -379,6 +430,32 @@ export default function ConciliacaoBancariaSection() {
     }
     setLoading(false);
     if (fileRef.current) fileRef.current.value = '';
+  };
+
+  const limparExtrato = () => {
+    setLinhasState([]);
+    if (contaSel) clearLinhas(contaSel);
+  };
+
+  // ========== Ignorar linha ==========
+  const ignorarLinha = async (i: number) => {
+    const linha = linhas[i];
+    if (!linha || !contaSel) return;
+    try {
+      const { error } = await supabase.rpc('reconcile_ignorar_lancamento', {
+        p_conta_id: contaSel,
+        p_data: linha.data,
+        p_valor: linha.valor,
+        p_tipo: linha.tipo,
+        p_descricao: linha.descricao,
+        p_user_id: user?.id,
+      });
+      if (error) throw error;
+      setLinhas(prev => prev.filter((_, j) => j !== i));
+      toast.success('Entrada ignorada. Não aparecerá em reimportações.');
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao ignorar entrada');
+    }
   };
 
   // ========== Rateio Functions ==========
@@ -452,7 +529,6 @@ export default function ConciliacaoBancariaSection() {
     toast.success('Rateio configurado com sucesso!');
   };
 
-  // ========== Select a suggestion ========== 
   const selectSuggestion = (linhaIndex: number, suggestion: MatchSuggestion) => {
     setLinhas(prev => prev.map((l, i) => i === linhaIndex ? {
       ...l,
@@ -476,7 +552,7 @@ export default function ConciliacaoBancariaSection() {
     } : l));
   };
 
-  // ========== Confirm baixa ========== 
+  // ========== Confirm baixa ==========
   const confirmarBaixa = async () => {
     const match = confirmDialog.match;
     if (!match) return;
@@ -518,16 +594,12 @@ export default function ConciliacaoBancariaSection() {
         }
       }
 
-      // Mark line as done
-      const originLabel = match.origin === 'conta_pagar' ? 'CP' : 'CR';
-      const statusLabel = match.origin === 'conta_pagar' ? 'PAGO' : 'RECEBIDO';
-      // Remove line as it is now done
       setLinhas(prev => prev.filter((_, i) => i !== confirmDialog.linhaIndex));
 
       emitDataEvent('financeiro:lancamentos');
       emitDataEvent('financeiro:contas_pagar');
       emitDataEvent('financeiro:contas_receber');
-      loadLancamentos(); // Update local list immediately
+      loadLancamentos();
     } catch (err: any) {
       console.error(err);
       toast.error(err.message || 'Erro ao dar baixa');
@@ -539,9 +611,8 @@ export default function ConciliacaoBancariaSection() {
   const importarEConciliar = async () => {
     if (!contaSel) { toast.error('Selecione uma conta bancária'); return; }
 
-    const toImport = linhas.filter(l => l.selecionada && !l.matchId);
-    const toReconcileLanc = linhas.filter(l => l.matchId && l.matchOrigin === 'lancamento');
-    // CP/CR matches that haven't been processed yet need baixa first
+    const toImport = linhas.filter(l => l.selecionada && !l.matchId && !l.jaConciliada && !l.ignorada);
+    const toReconcileLanc = linhas.filter(l => l.matchId && l.matchOrigin === 'lancamento' && !l.jaConciliada);
     const pendingCP = linhas.filter(l => l.matchId && l.matchOrigin === 'conta_pagar');
     const pendingCR = linhas.filter(l => l.matchId && l.matchOrigin === 'conta_receber');
 
@@ -552,7 +623,6 @@ export default function ConciliacaoBancariaSection() {
 
     setImportando(true);
     try {
-      // 1) Import new lines
       if (toImport.length > 0) {
         for (const l of toImport) {
           const rateioPayload = l.rateioLinhas && l.rateioLinhas.length > 0
@@ -574,14 +644,16 @@ export default function ConciliacaoBancariaSection() {
         }
       }
 
-      // 2) Reconcile matched lancamentos
       if (toReconcileLanc.length > 0) {
         const matchIds = toReconcileLanc.map(l => l.matchId!);
-        const { error } = await supabase.rpc('reconcile_batch_lancamentos', { p_lancamento_ids: matchIds });
+        // Fix: p_user_id é obrigatório na RPC
+        const { error } = await supabase.rpc('reconcile_batch_lancamentos', {
+          p_lancamento_ids: matchIds,
+          p_user_id: user?.id,
+        });
         if (error) throw error;
       }
 
-      // 3) Baixa contas a pagar
       for (const l of pendingCP) {
         const { error } = await supabase.rpc('reconcile_pay_conta_pagar', {
           p_conta_pagar_id: l.matchId!, p_conta_bancaria_id: contaSel,
@@ -590,7 +662,6 @@ export default function ConciliacaoBancariaSection() {
         if (error) throw error;
       }
 
-      // 4) Baixa contas a receber
       for (const l of pendingCR) {
         const { error } = await supabase.rpc('reconcile_receive_conta_receber', {
           p_conta_receber_id: l.matchId!, p_conta_bancaria_id: contaSel,
@@ -601,8 +672,9 @@ export default function ConciliacaoBancariaSection() {
 
       const total = toImport.length + toReconcileLanc.length + pendingCP.length + pendingCR.length;
       toast.success(`${total} operação(ões) processada(s) com sucesso`);
-      setLinhas([]);
-      loadLancamentos(); // Ensure any change is loaded into the 'conciliar' view immediately
+      setLinhasState([]);
+      clearLinhas(contaSel);
+      loadLancamentos();
       emitDataEvent('financeiro:lancamentos');
       emitDataEvent('financeiro:conciliacao');
       emitDataEvent('financeiro:contas_pagar');
@@ -615,15 +687,15 @@ export default function ConciliacaoBancariaSection() {
   };
 
   const toggleAll = (checked: boolean) => {
-    setLinhas(prev => prev.map(l => l.matchId ? l : { ...l, selecionada: checked }));
+    setLinhas(prev => prev.map(l => (l.matchId || l.jaConciliada || l.ignorada) ? l : { ...l, selecionada: checked }));
   };
 
   const fmt = fmtBRL;
   const pendentes = lancamentos.filter(l => !l.conciliado).length;
   const conciliados = lancamentos.filter(l => l.conciliado).length;
-  const selecionadas = linhas.filter(l => l.selecionada && !l.matchId);
-  const matchedTotal = linhas.filter(l => l.matchId).length;
-  const withSuggestions = linhas.filter(l => !l.matchId && l.suggestions && l.suggestions.length > 0).length;
+  const selecionadas = linhas.filter(l => l.selecionada && !l.matchId && !l.jaConciliada && !l.ignorada);
+  const matchedTotal = linhas.filter(l => l.matchId && !l.jaConciliada).length;
+  const withSuggestions = linhas.filter(l => !l.matchId && !l.jaConciliada && !l.ignorada && l.suggestions && l.suggestions.length > 0).length;
 
   const rateioValorTotal = linhas[rateioDialog.linhaIndex]?.valor || 0;
   const rateioTotalAtual = rateioLinhas.reduce((s, l) => s + Number(l.valor || 0), 0);
@@ -662,13 +734,12 @@ export default function ConciliacaoBancariaSection() {
         p_conta_origem_id: contaOrigemId, p_conta_destino_id: contaDestinoId, p_user_id: user?.id,
       });
       if (error) throw error;
-      const result = data as { saida_id?: string; entrada_id?: string } | null;
 
       setLinhas(prev => prev.filter((_, i) => i !== transferDialog.linhaIndex));
 
       toast.success(`Transferência ${nOrigem} → ${nDestino} criada e conciliada!`);
       emitDataEvent('financeiro:lancamentos');
-      loadLancamentos(); // Update local list immediately
+      loadLancamentos();
     } catch (err: any) {
       console.error(err);
       toast.error(err.message || 'Erro ao criar transferência');
@@ -711,9 +782,14 @@ export default function ConciliacaoBancariaSection() {
                   <Label>Arquivo (CSV / OFX / QFX)</Label>
                   <Input ref={fileRef} type="file" accept=".csv,.ofx,.qfx,.txt" onChange={handleFile} disabled={loading} className="max-w-[280px]" />
                 </div>
+                {linhas.length > 0 && (
+                  <Button variant="ghost" size="sm" className="text-destructive h-9" onClick={limparExtrato}>
+                    <X className="w-4 h-4 mr-1" /> Limpar Extrato
+                  </Button>
+                )}
               </div>
               <p className="text-[11px] text-muted-foreground mt-2">
-                O sistema cruza automaticamente com lançamentos, <strong>contas a pagar</strong> e <strong>contas a receber</strong> pendentes. Clique em <Search className="w-3 h-3 inline" /> para ver sugestões alternativas.
+                O sistema cruza automaticamente com lançamentos, <strong>contas a pagar</strong> e <strong>contas a receber</strong> pendentes. Use <EyeOff className="w-3 h-3 inline" /> para ignorar entradas que não devem gerar lançamento.
               </p>
             </CardContent>
           </Card>
@@ -725,6 +801,12 @@ export default function ConciliacaoBancariaSection() {
                   <Badge variant="outline" className="bg-success/10 text-success border-success/20">{matchedTotal} match</Badge>
                   {withSuggestions > 0 && <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/20">{withSuggestions} com sugestões</Badge>}
                   <Badge variant="outline">{selecionadas.length} nova(s)</Badge>
+                  {linhas.filter(l => l.jaConciliada).length > 0 && (
+                    <Badge variant="outline" className="bg-muted text-muted-foreground">{linhas.filter(l => l.jaConciliada).length} já conciliada(s)</Badge>
+                  )}
+                  {linhas.filter(l => l.ignorada).length > 0 && (
+                    <Badge variant="outline" className="bg-muted text-muted-foreground">{linhas.filter(l => l.ignorada).length} ignorada(s)</Badge>
+                  )}
                   <Badge variant="outline">{linhas.length} total</Badge>
                 </div>
                 <div className="flex gap-2">
@@ -754,12 +836,24 @@ export default function ConciliacaoBancariaSection() {
                     const isDone = linha.matchId?.endsWith('-done');
                     const hasMatch = !!linha.matchId && !isDone;
                     const hasSuggestions = !linha.matchId && linha.suggestions && linha.suggestions.length > 0;
+                    const isJaConciliada = !!linha.jaConciliada;
+                    const isIgnorada = !!linha.ignorada;
+                    const isInactive = isJaConciliada || isIgnorada;
 
                     return (
-                      <TableRow key={i} className={isDone ? 'bg-success/5 opacity-70' : hasMatch ? 'bg-success/5' : hasSuggestions ? 'bg-amber-500/5' : !linha.selecionada ? 'opacity-70' : ''}>
+                      <TableRow key={i} className={
+                        isDone ? 'bg-success/5 opacity-70' :
+                        isJaConciliada ? 'bg-muted/30 opacity-60' :
+                        isIgnorada ? 'bg-muted/30 opacity-50' :
+                        hasMatch ? 'bg-success/5' :
+                        hasSuggestions ? 'bg-amber-500/5' :
+                        !linha.selecionada ? 'opacity-70' : ''
+                      }>
                         <TableCell>
-                          {isDone ? (
+                          {isDone || isJaConciliada ? (
                             <CheckCircle className="w-4 h-4 text-success" />
+                          ) : isIgnorada ? (
+                            <EyeOff className="w-4 h-4 text-muted-foreground" />
                           ) : hasMatch ? (
                             <CheckCircle className="w-4 h-4 text-success" />
                           ) : (
@@ -778,12 +872,17 @@ export default function ConciliacaoBancariaSection() {
                               {linha.matchOrigin && <span className="ml-1">{getOriginBadge(linha.matchOrigin)}</span>}
                             </span>
                           )}
-                          {isDone && (
-                            <span className="text-[10px] text-success flex items-center gap-1 mt-0.5">
-                              <CheckCircle className="w-3 h-3" /> {linha.matchDescricao}
+                          {isJaConciliada && (
+                            <span className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
+                              <CheckCircle className="w-3 h-3" /> Já conciliada anteriormente
                             </span>
                           )}
-                          {hasSuggestions && (
+                          {isIgnorada && (
+                            <span className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
+                              <EyeOff className="w-3 h-3" /> Marcada como ignorada
+                            </span>
+                          )}
+                          {hasSuggestions && !isInactive && (
                             <span className="text-[10px] text-amber-600 flex items-center gap-1 mt-0.5">
                               <Search className="w-3 h-3" /> {linha.suggestions!.length} sugestão(ões) disponível(is)
                             </span>
@@ -796,51 +895,59 @@ export default function ConciliacaoBancariaSection() {
                           {linha.tipo === 'RECEITA' ? '+' : '-'} {fmt(linha.valor)}
                         </TableCell>
                         <TableCell>
-                          <div className="flex gap-1">
-                            {/* View/change suggestions */}
-                            {!isDone && linha.suggestions && linha.suggestions.length > 0 && (
-                              <Button size="sm" variant={hasMatch ? 'default' : 'outline'} className="h-7 text-xs"
-                                onClick={() => setSuggestionsDialog({ open: true, linhaIndex: i })}>
-                                <Search className="w-3 h-3 mr-1" />
-                                {hasMatch ? 'Alterar' : `${linha.suggestions.length} sugestão`}
-                              </Button>
-                            )}
-                            {/* Clear match */}
-                            {hasMatch && (
-                              <Button size="sm" variant="ghost" className="h-7 text-xs text-destructive" onClick={() => clearMatch(i)}>✕</Button>
-                            )}
-                            {/* Confirm baixa for CP/CR */}
-                            {hasMatch && (linha.matchOrigin === 'conta_pagar' || linha.matchOrigin === 'conta_receber') && (
-                              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => {
-                                const suggestion = linha.suggestions?.find(s => s.id === linha.matchId) || {
-                                  id: linha.matchId!, origin: linha.matchOrigin!, descricao: linha.matchDescricao || '',
-                                  valor: linha.valor, data: linha.data, score: 0, raw: linha.matchRaw,
-                                };
-                                setConfirmDialog({ open: true, linhaIndex: i, match: suggestion });
-                              }}>
-                                <CreditCard className="w-3 h-3 mr-1" /> Baixar
-                              </Button>
-                            )}
-                            {/* Rateio and transfer for unmatched */}
-                            {!hasMatch && !isDone && (
-                              <>
-                                <Button size="sm" variant={linha.rateioLinhas && linha.rateioLinhas.length > 1 ? 'default' : 'outline'} className="h-7 text-xs" onClick={() => openRateio(i)}>
-                                  <PieChart className="w-3 h-3 mr-1" />
-                                  {linha.rateioLinhas && linha.rateioLinhas.length > 1 ? `${linha.rateioLinhas.length} cat.` : 'Ratear'}
+                          {isInactive ? null : (
+                            <div className="flex gap-1">
+                              {!isDone && linha.suggestions && linha.suggestions.length > 0 && (
+                                <Button size="sm" variant={hasMatch ? 'default' : 'outline'} className="h-7 text-xs"
+                                  onClick={() => setSuggestionsDialog({ open: true, linhaIndex: i })}>
+                                  <Search className="w-3 h-3 mr-1" />
+                                  {hasMatch ? 'Alterar' : `${linha.suggestions.length} sugestão`}
                                 </Button>
-                                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { setTransferDialog({ open: true, linhaIndex: i }); setTransferContaDestino(''); }}>
-                                  <ArrowRightLeft className="w-3 h-3 mr-1" /> Transf.
+                              )}
+                              {hasMatch && (
+                                <Button size="sm" variant="ghost" className="h-7 text-xs text-destructive" onClick={() => clearMatch(i)}>✕</Button>
+                              )}
+                              {hasMatch && (linha.matchOrigin === 'conta_pagar' || linha.matchOrigin === 'conta_receber') && (
+                                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => {
+                                  const suggestion = linha.suggestions?.find(s => s.id === linha.matchId) || {
+                                    id: linha.matchId!, origin: linha.matchOrigin!, descricao: linha.matchDescricao || '',
+                                    valor: linha.valor, data: linha.data, score: 0, raw: linha.matchRaw,
+                                  };
+                                  setConfirmDialog({ open: true, linhaIndex: i, match: suggestion });
+                                }}>
+                                  <CreditCard className="w-3 h-3 mr-1" /> Baixar
                                 </Button>
-                                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setCriarDialog({ open: true, linhaIndex: i })}>
-                                  <FileText className="w-3 h-3 mr-1" /> Criar
+                              )}
+                              {!hasMatch && !isDone && (
+                                <>
+                                  <Button size="sm" variant={linha.rateioLinhas && linha.rateioLinhas.length > 1 ? 'default' : 'outline'} className="h-7 text-xs" onClick={() => openRateio(i)}>
+                                    <PieChart className="w-3 h-3 mr-1" />
+                                    {linha.rateioLinhas && linha.rateioLinhas.length > 1 ? `${linha.rateioLinhas.length} cat.` : 'Ratear'}
+                                  </Button>
+                                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { setTransferDialog({ open: true, linhaIndex: i }); setTransferContaDestino(''); }}>
+                                    <ArrowRightLeft className="w-3 h-3 mr-1" /> Transf.
+                                  </Button>
+                                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setCriarDialog({ open: true, linhaIndex: i })}>
+                                    <FileText className="w-3 h-3 mr-1" /> Criar
+                                  </Button>
+                                </>
+                              )}
+                              {/* Botão Ignorar — disponível para qualquer entrada ainda não processada */}
+                              {!isDone && (
+                                <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground hover:text-destructive" title="Ignorar esta entrada — não criará lançamento" onClick={() => ignorarLinha(i)}>
+                                  <EyeOff className="w-3 h-3" />
                                 </Button>
-                              </>
-                            )}
-                          </div>
+                              )}
+                            </div>
+                          )}
                         </TableCell>
                         <TableCell>
                           {isDone ? (
                             <Badge className="bg-success/10 text-success border-success/20 text-[10px]">Concluído</Badge>
+                          ) : isJaConciliada ? (
+                            <Badge variant="outline" className="text-[10px] text-muted-foreground">Já Conciliado</Badge>
+                          ) : isIgnorada ? (
+                            <Badge variant="outline" className="text-[10px] text-muted-foreground">Ignorado</Badge>
                           ) : hasMatch ? (
                             <Badge className="bg-success/10 text-success border-success/20 text-[10px]">Match</Badge>
                           ) : hasSuggestions ? (
@@ -962,7 +1069,6 @@ export default function ConciliacaoBancariaSection() {
             const suggestions = linha.suggestions || [];
             return (
               <div className="space-y-4">
-                {/* Extrato line info */}
                 <Card className="border-primary/20">
                   <CardContent className="p-3">
                     <div className="flex justify-between items-center">
@@ -979,7 +1085,6 @@ export default function ConciliacaoBancariaSection() {
                   </CardContent>
                 </Card>
 
-                {/* Suggestions list */}
                 <div className="space-y-2">
                   {suggestions.length === 0 ? (
                     <p className="text-center text-muted-foreground py-4">Nenhuma sugestão encontrada</p>
@@ -1240,6 +1345,7 @@ export default function ConciliacaoBancariaSection() {
           })()}
         </DialogContent>
       </Dialog>
+
       {/* ========== CREATE LANCAMENTO FROM EXTRATO ========== */}
       <CriarLancamentoExtratoDialog
         open={criarDialog.open}
@@ -1250,7 +1356,7 @@ export default function ConciliacaoBancariaSection() {
           const idx = criarDialog.linhaIndex;
           setLinhas(prev => prev.filter((_, i) => i !== idx));
           setCriarDialog({ open: false, linhaIndex: -1 });
-          loadLancamentos(); // Update local list immediately
+          loadLancamentos();
         }}
       />
     </div>

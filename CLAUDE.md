@@ -194,12 +194,22 @@ margin-food/
   - `AuditoriaFinSection`, `ComparativoSection`, `RelatorioSociosSection`, `ProjecaoFluxoSection`, `KPIsSection`, `OrcamentoSection`, `ConciliacaoBancariaSection`
 - **Arquivos afetados**: `src/lib/swRecovery.ts` (novo), `src/App.tsx`, `src/main.tsx`, `src/components/FinanceiroView.tsx`, `vite.config.ts`
 
-### 2026-04-17 — Migration: Tabela `fin_conciliacao_ignoradas`
+### 2026-04-17 — Fix Conciliação Bancária: 3 Problemas Corrigidos
 
-- Nova tabela para persistir entradas de extrato OFX que o usuário optou por ignorar na conciliação bancária (ex: PIX enviado e devolvido no mesmo dia).
-- Campos: `company_id`, `conta_id`, `data`, `valor`, `tipo` (RECEITA/DESPESA), `descricao`, `ignorado_por`.
-- RLS habilitado com policy por empresa + trigger `trg_force_company_id`.
-- **Migração**: `20260417120000_add_conciliacao_ignoradas.sql`
+#### Bug 1 — Linhas do OFX sumiam ao sair da página
+- **Causa**: Estado React (`useState`) sem persistência — ao desmontar o componente, as linhas importadas do extrato eram perdidas.
+- **Fix**: Linhas salvas no `sessionStorage` (chave `conciliacao_linhas_<contaId>`). Ao voltar com a mesma conta selecionada, o estado é restaurado. Botão "Limpar Extrato" para reset manual.
+- **Extra**: Ao reimportar o mesmo OFX, entradas já conciliadas aparecem com badge "Já Conciliado" em vez de serem filtradas silenciosamente.
+
+#### Bug 2 — Checkbox "Conciliar" marcava na UI mas não persistia no banco
+- **Causa**: `reconcile_batch_lancamentos` exige `p_user_id uuid` obrigatório, mas o frontend chamava sem esse parâmetro em 3 locais — RPC falhava silenciosamente.
+- **Fix**: Adicionado `p_user_id: user?.id` nas funções `conciliar()`, `conciliarTodos()` e `importarEConciliar()`.
+
+#### Feature — Botão "Ignorar" entrada do extrato bancário
+- **Caso de uso**: PIX enviado e devolvido — usuário precisa ignorar ambos sem gerar despesa/receita.
+- **Backend** (`20260417120000_add_conciliacao_ignoradas.sql`): Nova tabela `fin_conciliacao_ignoradas` (RLS por empresa) + RPC `reconcile_ignorar_lancamento`.
+- **Frontend**: Botão `EyeOff` em cada linha do extrato. Em reimportações, entradas ignoradas aparecem com badge "Ignorado" sem botões de ação.
+- **Arquivo afetado**: `src/components/financeiro/ConciliacaoBancariaSection.tsx`
 
 ### 2026-04-14 — Fix FK ON DELETE SET NULL para Preservar Histórico ao Excluir Usuários
 
