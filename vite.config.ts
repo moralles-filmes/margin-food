@@ -65,6 +65,7 @@ export default defineConfig(({ mode }) => ({
           'vendor-query': ['@tanstack/react-query'],
           'vendor-supabase': ['@supabase/supabase-js'],
           'vendor-charts': ['recharts'],
+          'vendor-xlsx': ['xlsx'],
           'vendor-radix': [
             '@radix-ui/react-accordion',
             '@radix-ui/react-alert-dialog',

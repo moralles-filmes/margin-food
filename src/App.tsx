@@ -8,6 +8,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { PwaUpdatePrompt } from "@/components/PwaUpdatePrompt";
 import { emitDataEvent } from "@/lib/dataEvents";
+import { clearSwAndReload } from "@/lib/swRecovery";
 
 const Index = lazy(() => import("./pages/Index"));
 const Login = lazy(() => import("./pages/Login"));
@@ -30,14 +31,16 @@ function isChunkErr(error: unknown): boolean {
   );
 }
 
+
 class ErrorBoundary extends Component<
   { children: ReactNode },
-  { hasError: boolean; isChunk: boolean }
+  { hasError: boolean; isChunk: boolean; errorMessage: string }
 > {
-  state = { hasError: false, isChunk: false };
+  state = { hasError: false, isChunk: false, errorMessage: '' };
 
   static getDerivedStateFromError(error: unknown) {
-    return { hasError: true, isChunk: isChunkErr(error) };
+    const msg = error instanceof Error ? error.message : String(error ?? '');
+    return { hasError: true, isChunk: isChunkErr(error), errorMessage: msg };
   }
 
   componentDidCatch(error: unknown) {
@@ -49,7 +52,10 @@ class ErrorBoundary extends Component<
           window.location.reload();
           return;
         }
-      } catch { window.location.reload(); return; }
+        // Second consecutive chunk error: SW is likely stale — clear and reload
+        sessionStorage.removeItem(CHUNK_RELOAD_KEY);
+        void clearSwAndReload();
+      } catch { void clearSwAndReload(); }
     }
   }
 
@@ -62,11 +68,16 @@ class ErrorBoundary extends Component<
             ? 'Falha ao carregar recursos do sistema.'
             : 'Ocorreu um erro inesperado.'}
         </p>
+        {this.state.errorMessage && (
+          <p className="text-xs text-muted-foreground max-w-md break-all font-mono">
+            {this.state.errorMessage}
+          </p>
+        )}
         <button
           className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm"
           onClick={() => {
             try { sessionStorage.removeItem(CHUNK_RELOAD_KEY); } catch {}
-            window.location.reload();
+            void clearSwAndReload();
           }}
         >
           Recarregar

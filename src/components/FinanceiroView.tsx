@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
 import SubTabBadge from '@/components/ui/SubTabBadge';
 import { usePersistedTab } from '@/hooks/usePersistedTab';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -18,16 +18,16 @@ import FluxoCaixaSection, { type FluxoNavigateParams } from '@/components/financ
 import DRESection from '@/components/financeiro/DRESection';
 import DFCSection from '@/components/financeiro/DFCSection';
 import DashboardFinanceiroSection from '@/components/financeiro/DashboardFinanceiroSection';
-import OrcamentoSection from '@/components/financeiro/OrcamentoSection';
-import ConciliacaoBancariaSection from '@/components/financeiro/ConciliacaoBancariaSection';
+const OrcamentoSection = lazy(() => import('@/components/financeiro/OrcamentoSection'));
+const ConciliacaoBancariaSection = lazy(() => import('@/components/financeiro/ConciliacaoBancariaSection'));
 import AlertasSection from '@/components/financeiro/AlertasSection';
 import RecorrenciasSection from '@/components/financeiro/RecorrenciasSection';
 import CategorizacaoSection from '@/components/financeiro/CategorizacaoSection';
-import RelatorioSociosSection from '@/components/financeiro/RelatorioSociosSection';
-import ProjecaoFluxoSection from '@/components/financeiro/ProjecaoFluxoSection';
-import KPIsSection from '@/components/financeiro/KPIsSection';
-import AuditoriaFinSection from '@/components/financeiro/AuditoriaFinSection';
-import ComparativoSection from '@/components/financeiro/ComparativoSection';
+const RelatorioSociosSection = lazy(() => import('@/components/financeiro/RelatorioSociosSection'));
+const ProjecaoFluxoSection = lazy(() => import('@/components/financeiro/ProjecaoFluxoSection'));
+const KPIsSection = lazy(() => import('@/components/financeiro/KPIsSection'));
+const AuditoriaFinSection = lazy(() => import('@/components/financeiro/AuditoriaFinSection'));
+const ComparativoSection = lazy(() => import('@/components/financeiro/ComparativoSection'));
 import FechamentoCaixaSection from '@/components/financeiro/FechamentoCaixaSection';
 import CadastroBaseTree from '@/components/financeiro/CadastroBaseTree';
 import ContasBancariasSection from '@/components/financeiro/ContasBancariasSection';
@@ -72,7 +72,7 @@ function LancamentosSection({ initialContaId, initialDateFrom, initialDateTo }: 
         <Button variant={innerTab === 'razao' ? 'default' : 'outline'} size="sm" onClick={() => setInnerTab('razao')}>Livro Razão</Button>
         <Button variant={innerTab === 'conciliacao' ? 'default' : 'outline'} size="sm" onClick={() => setInnerTab('conciliacao')}>Conciliação Bancária</Button>
       </div>
-      {innerTab === 'razao' ? <LivroRazaoSection initialContaId={initialContaId} initialDateFrom={initialDateFrom} initialDateTo={initialDateTo} /> : <ConciliacaoBancariaSection />}
+      {innerTab === 'razao' ? <LivroRazaoSection initialContaId={initialContaId} initialDateFrom={initialDateFrom} initialDateTo={initialDateTo} /> : <Suspense fallback={<FinSpinner />}><ConciliacaoBancariaSection /></Suspense>}
     </div>
   );
 }
@@ -98,6 +98,14 @@ function NoAccess({ perm }: { perm: string }) {
       <Shield className="w-12 h-12 mx-auto text-destructive/30 mb-3" />
       <p className="text-sm font-medium text-foreground">Sem Permissão</p>
       <p className="text-xs text-muted-foreground">Você não possui a permissão <code className="text-[10px] bg-muted px-1 rounded">{perm}</code>.</p>
+    </div>
+  );
+}
+
+function FinSpinner() {
+  return (
+    <div className="flex items-center justify-center py-20">
+      <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
     </div>
   );
 }
@@ -241,16 +249,16 @@ export default function FinanceiroView() {
         <TabsContent value="receber"><ContasReceberSection /></TabsContent>
         <TabsContent value="fluxo"><FluxoCaixaSection onNavigate={handleFluxoNavigate} /></TabsContent>
         <TabsContent value="dre"><DREDFCSection /></TabsContent>
-        <TabsContent value="orcamento"><OrcamentoSection /></TabsContent>
+        <TabsContent value="orcamento"><Suspense fallback={<FinSpinner />}><OrcamentoSection /></Suspense></TabsContent>
         {/* conciliacao now inside LancamentosSection */}
         <TabsContent value="alertas"><AlertasSection onNavigate={(t) => setActiveTab(t as FinSubTab)} /></TabsContent>
         <TabsContent value="recorrencias"><RecorrenciasSection onNavigate={(t) => setActiveTab(t as FinSubTab)} /></TabsContent>
         <TabsContent value="categorizacao"><CategorizacaoSection /></TabsContent>
-        <TabsContent value="relatorio_socios"><RelatorioSociosSection /></TabsContent>
-        <TabsContent value="projecao"><ProjecaoFluxoSection /></TabsContent>
-        <TabsContent value="kpis"><KPIsSection /></TabsContent>
-        <TabsContent value="auditoria"><AuditoriaFinSection /></TabsContent>
-        <TabsContent value="comparativo"><ComparativoSection /></TabsContent>
+        <TabsContent value="relatorio_socios"><Suspense fallback={<FinSpinner />}><RelatorioSociosSection /></Suspense></TabsContent>
+        <TabsContent value="projecao"><Suspense fallback={<FinSpinner />}><ProjecaoFluxoSection /></Suspense></TabsContent>
+        <TabsContent value="kpis"><Suspense fallback={<FinSpinner />}><KPIsSection /></Suspense></TabsContent>
+        <TabsContent value="auditoria"><Suspense fallback={<FinSpinner />}><AuditoriaFinSection /></Suspense></TabsContent>
+        <TabsContent value="comparativo"><Suspense fallback={<FinSpinner />}><ComparativoSection /></Suspense></TabsContent>
       </Tabs>
     </div>
   );

@@ -179,6 +179,28 @@ margin-food/
 
 > **Mantenha esta seção atualizada após cada sessão de trabalho.**
 
+### 2026-04-17 — Fix Service Worker Travado + Otimização de Bundle (FinanceiroView 728KB → 196KB)
+
+#### Fix Service Worker persistente
+- **Problema**: Sistema mostrava "Ocorreu um erro inesperado" em produção mesmo após clicar Recarregar. `window.location.reload()` não bypassa o cache do SW — o SW continuava servindo assets de uma versão anterior.
+- **Fix**: Criado `src/lib/swRecovery.ts` com `clearSwAndReload()`: desregistra todos os SWs ativos e limpa todos os caches (Cache API) antes de recarregar.
+- **Integrado em**: `src/App.tsx` (botão Recarregar do ErrorBoundary) e `src/main.tsx` (chunk errors persistentes na segunda tentativa).
+- **Extra**: ErrorBoundary agora exibe a mensagem real do erro JS na UI (antes era sempre genérico "Ocorreu um erro inesperado" sem detalhes).
+
+#### Otimização de bundle
+- **FinanceiroView**: 728KB → 196KB (73% de redução). Principal causa: `xlsx` era staticament importado por 16+ componentes financeiros e bundleado junto com o view.
+- **Fix vite.config.ts**: Adicionado `'vendor-xlsx': ['xlsx']` em `manualChunks` — xlsx (429KB) agora é chunk de vendor separado, cacheado indefinidamente, nunca re-bundleado.
+- **Lazy loading de seções raras**: 7 seções do FinanceiroView convertidas de static para `React.lazy` (carregam apenas quando o tab é aberto):
+  - `AuditoriaFinSection`, `ComparativoSection`, `RelatorioSociosSection`, `ProjecaoFluxoSection`, `KPIsSection`, `OrcamentoSection`, `ConciliacaoBancariaSection`
+- **Arquivos afetados**: `src/lib/swRecovery.ts` (novo), `src/App.tsx`, `src/main.tsx`, `src/components/FinanceiroView.tsx`, `vite.config.ts`
+
+### 2026-04-17 — Migration: Tabela `fin_conciliacao_ignoradas`
+
+- Nova tabela para persistir entradas de extrato OFX que o usuário optou por ignorar na conciliação bancária (ex: PIX enviado e devolvido no mesmo dia).
+- Campos: `company_id`, `conta_id`, `data`, `valor`, `tipo` (RECEITA/DESPESA), `descricao`, `ignorado_por`.
+- RLS habilitado com policy por empresa + trigger `trg_force_company_id`.
+- **Migração**: `20260417120000_add_conciliacao_ignoradas.sql`
+
 ### 2026-04-14 — Fix FK ON DELETE SET NULL para Preservar Histórico ao Excluir Usuários
 
 - **Problema**: Ao fazer hard delete de um usuário, o banco bloqueava com erro de FK se o usuário tinha movimentações, pedidos de compra, orçamentos, etc. vinculados.
