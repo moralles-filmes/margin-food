@@ -194,10 +194,8 @@ export default function ConciliacaoBancariaSection() {
 
   const conciliar = async (id: string, value: boolean) => {
     if (value) {
-      // Fix: p_user_id é obrigatório na RPC
       const { error } = await supabase.rpc('reconcile_batch_lancamentos', {
         p_lancamento_ids: [id],
-        p_user_id: user?.id,
       });
       if (error) { toast.error(error.message); return; }
     } else {
@@ -212,10 +210,8 @@ export default function ConciliacaoBancariaSection() {
     const pendentes = lancamentos.filter(l => !l.conciliado);
     if (pendentes.length === 0) return;
     const ids = pendentes.map(l => l.id);
-    // Fix: p_user_id é obrigatório na RPC
     const { data, error } = await supabase.rpc('reconcile_batch_lancamentos', {
       p_lancamento_ids: ids,
-      p_user_id: user?.id,
     });
     if (error) { toast.error(error.message); return; }
     const count = (data as unknown as { reconciled_count?: number } | null)?.reconciled_count || ids.length;
@@ -646,10 +642,8 @@ export default function ConciliacaoBancariaSection() {
 
       if (toReconcileLanc.length > 0) {
         const matchIds = toReconcileLanc.map(l => l.matchId!);
-        // Fix: p_user_id é obrigatório na RPC
         const { error } = await supabase.rpc('reconcile_batch_lancamentos', {
           p_lancamento_ids: matchIds,
-          p_user_id: user?.id,
         });
         if (error) throw error;
       }

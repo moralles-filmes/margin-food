@@ -179,6 +179,13 @@ margin-food/
 
 > **Mantenha esta seção atualizada após cada sessão de trabalho.**
 
+### 2026-04-23 — Fix Conciliação Bancária: erro "reconcile_batch_lancamentos(p_lancamento_ids, p_user_id)"
+
+- **Problema**: Ao clicar para conciliar um lançamento em Financeiro → Lançamentos → Conciliação Bancária, aparecia o erro "Could not find the function public.reconcile_batch_lancamentos(p_lancamento_ids, p_user_id) in the schema cache".
+- **Causa**: Conflito entre dois fixes anteriores. A migração `20260303030306` endureceu a função removendo o parâmetro `p_user_id` (usa `auth.uid()` internamente). Porém o fix de frontend de 2026-04-17 havia adicionado `p_user_id: user?.id` em 3 chamadas RPC — gerando mismatch de assinatura.
+- **Fix**: Removido `p_user_id: user?.id` das 3 chamadas a `reconcile_batch_lancamentos` em `ConciliacaoBancariaSection.tsx` (funções `conciliar()`, `conciliarTodos()` e `processarEConciliar()`).
+- **Arquivo afetado**: `src/components/financeiro/ConciliacaoBancariaSection.tsx`
+
 ### 2026-04-17 — Fix Service Worker Travado + Otimização de Bundle (FinanceiroView 728KB → 196KB)
 
 #### Fix Service Worker persistente
