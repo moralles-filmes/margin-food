@@ -331,8 +331,8 @@ export default function CriarLancamentoExtratoDialog({ open, onOpenChange, linha
   if (!linha) return null;
 
   const filteredCategorias = categorias.filter(c => {
-    if (destino === 'conta_receber' && tipo === 'RECEITA') return c.tipo === 'RECEITA' || !c.tipo;
-    if (destino === 'conta_pagar' && tipo === 'DESPESA') return c.tipo === 'DESPESA' || !c.tipo;
+    if (tipo === 'RECEITA') return c.tipo === 'receita' || !c.tipo;
+    if (tipo === 'DESPESA') return c.tipo === 'despesa' || !c.tipo;
     return true;
   });
 

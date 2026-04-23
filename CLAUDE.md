@@ -186,6 +186,19 @@ margin-food/
 - **Fix**: Removido `p_user_id: user?.id` das 3 chamadas a `reconcile_batch_lancamentos` em `ConciliacaoBancariaSection.tsx` (funções `conciliar()`, `conciliarTodos()` e `processarEConciliar()`).
 - **Arquivo afetado**: `src/components/financeiro/ConciliacaoBancariaSection.tsx`
 
+### 2026-04-23 — Fix Conciliação Bancária: Filtro de Categorias + idempotency_key
+
+#### Bug 1 — Dropdown de Categoria exibia todas as categorias independente do tipo (RECEITA/DESPESA)
+- **Causa 1**: Filtro `filteredCategorias` em `CriarLancamentoExtratoDialog.tsx` só ativava para `destino === 'conta_receber'` ou `destino === 'conta_pagar'`. Quando `destino === 'lancamento'` (o padrão), o `return true` exibia todas as categorias.
+- **Causa 2**: Comparação usava maiúsculo `c.tipo === 'RECEITA'`/`'DESPESA'`, mas `fin_categorias.tipo` armazena minúsculo `'receita'`/`'despesa'` — a comparação nunca batia, exibindo tudo.
+- **Fix**: Filtro agora atua exclusivamente sobre o `tipo` da transação (independente de `destino`) com comparação em minúsculo.
+- **Arquivo afetado**: `src/components/financeiro/CriarLancamentoExtratoDialog.tsx` (linhas 333–337)
+
+#### Bug 2 — "column 'idempotency_key' does not exist" ao clicar em Criar e Conciliar
+- **Causa**: A RPC `reconcile_import_lancamento` foi redefinida na migration `20260314191751_restore_ledger_origem.sql` para usar `idempotency_key` em `fin_lancamentos` (idempotência via MD5), mas a coluna nunca foi adicionada à tabela. A migration original que adicionaria a coluna (`20260303031002_…sql.bak`) foi arquivada sem ser aplicada.
+- **Fix**: Nova migration `20260423000000_add_idempotency_key_fin_lancamentos.sql` — adiciona coluna `idempotency_key text` + índice único em `(company_id, idempotency_key) WHERE idempotency_key IS NOT NULL`. Aplicada no Supabase remoto.
+- **Arquivos afetados**: `supabase/migrations/20260423000000_add_idempotency_key_fin_lancamentos.sql` (novo), `src/components/financeiro/CriarLancamentoExtratoDialog.tsx`
+
 ### 2026-04-17 — Fix Service Worker Travado + Otimização de Bundle (FinanceiroView 728KB → 196KB)
 
 #### Fix Service Worker persistente
