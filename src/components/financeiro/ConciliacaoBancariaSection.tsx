@@ -114,6 +114,7 @@ export default function ConciliacaoBancariaSection() {
   const [contaSel, setContaSel] = useState('');
   const [loading, setLoading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [nomeArquivo, setNomeArquivo] = useState<string>('');
 
   const [linhas, setLinhasState] = useState<LinhaExtrato[]>([]);
   const [importando, setImportando] = useState(false);
@@ -273,6 +274,7 @@ export default function ConciliacaoBancariaSection() {
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setNomeArquivo(file.name);
     setLoading(true);
     try {
       const text = await file.text();
@@ -426,10 +428,12 @@ export default function ConciliacaoBancariaSection() {
     }
     setLoading(false);
     if (fileRef.current) fileRef.current.value = '';
+    setNomeArquivo('');
   };
 
   const limparExtrato = () => {
     setLinhasState([]);
+    setNomeArquivo('');
     if (contaSel) clearLinhas(contaSel);
   };
 
@@ -774,7 +778,23 @@ export default function ConciliacaoBancariaSection() {
               <div className="flex items-end gap-3 flex-wrap">
                 <div>
                   <Label>Arquivo (CSV / OFX / QFX)</Label>
-                  <Input ref={fileRef} type="file" accept=".csv,.ofx,.qfx,.txt" onChange={handleFile} disabled={loading} className="max-w-[280px]" />
+                  <label className={`flex items-center gap-2 cursor-pointer${loading ? ' opacity-50 pointer-events-none' : ''}`}>
+                    <input
+                      ref={fileRef}
+                      type="file"
+                      accept=".csv,.ofx,.qfx,.txt"
+                      onChange={handleFile}
+                      disabled={loading}
+                      className="hidden"
+                    />
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-input bg-background text-sm font-medium text-primary hover:bg-accent hover:text-accent-foreground transition-colors">
+                      <Upload className="w-3.5 h-3.5" />
+                      Escolher arquivo
+                    </span>
+                    <span className="text-sm text-muted-foreground truncate max-w-[200px]">
+                      {nomeArquivo || 'Nenhum arquivo selecionado'}
+                    </span>
+                  </label>
                 </div>
                 {linhas.length > 0 && (
                   <Button variant="ghost" size="sm" className="text-destructive h-9" onClick={limparExtrato}>

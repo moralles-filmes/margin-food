@@ -179,6 +179,13 @@ margin-food/
 
 > **Mantenha esta seção atualizada após cada sessão de trabalho.**
 
+### 2026-04-23 — Melhoria UI: Input de arquivo em português na Conciliação Bancária
+
+- **Mudança**: O `<Input type="file">` nativo (que exibia "Choose File / No file chosen" em inglês pelo browser) foi substituído por um botão estilizado personalizado.
+- **Implementação**: Input nativo oculto (`hidden`) + `<label>` com botão "Escolher arquivo" (ícone `Upload` + borda/hover) + texto ao lado mostrando o nome do arquivo ou "Nenhum arquivo selecionado".
+- **Estado adicionado**: `nomeArquivo` (string) — atualizado em `handleFile`, resetado em `handleFile` (após processar) e em `limparExtrato`.
+- **Arquivo afetado**: `src/components/financeiro/ConciliacaoBancariaSection.tsx`
+
 ### 2026-04-23 — Fix Conciliação Bancária: erro "reconcile_batch_lancamentos(p_lancamento_ids, p_user_id)"
 
 - **Problema**: Ao clicar para conciliar um lançamento em Financeiro → Lançamentos → Conciliação Bancária, aparecia o erro "Could not find the function public.reconcile_batch_lancamentos(p_lancamento_ids, p_user_id) in the schema cache".
