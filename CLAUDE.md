@@ -179,6 +179,12 @@ margin-food/
 
 > **Mantenha esta seção atualizada após cada sessão de trabalho.**
 
+### 2026-04-29 — Auditoria Multi-Tenant + Fix RLS faturamento_periodos_legacy
+- Auditoria multi-tenant completa do projeto: validou resolver canônico, FORCE RLS, triggers `force_company_id`, edge functions (todas validam JWT e derivam `companyId` server-side), e ausência de VIEWs e `service_role` no frontend.
+- Confirmado que o fix de `profiles` RLS já foi aplicado em `20260414120000_fix_profiles_rls_and_rpc.sql` (commit `fd8f6de`) — `profiles_select_company_member` substitui a policy wide-open e a RPC `list_profiles_minimal()` foi corrigida.
+- Identificado resíduo: policy `"legacy_select_all"` em `faturamento_periodos_legacy` (criada em `20260301180830:140`) permitia leitura cross-tenant. Criada migração `20260429000001_fix_faturamento_legacy_rls.sql` que dropa a policy wide-open, aplica FORCE RLS defensivo, cria SELECT scoped por tenant e bloqueia writes (tabela é histórica somente-leitura).
+- Itens não-bloqueantes identificados na auditoria (próximas tarefas): adicionar `CRON_SECRET` em `supabase/functions/scheduled-jobs/index.ts`, remover `company_id` de payloads do frontend (BugTracker, ListaFixaSetor, permissions/hooks), dropar tabelas `*_bkp_reset_20260301` e `z_canary_test`.
+
 ### 2026-04-23 — Melhoria UI: Input de arquivo em português na Conciliação Bancária
 
 - **Mudança**: O `<Input type="file">` nativo (que exibia "Choose File / No file chosen" em inglês pelo browser) foi substituído por um botão estilizado personalizado.
@@ -505,6 +511,11 @@ margin-food/
 - [x] Implementar Multi-Tenant Onboarding (Gestão de Empresas)
 - [ ] Monitorar integridade dos dados na empresa piloto após ativação multi-tenant
 - [ ] Testar fluxo completo: criar empresa → criar admin → login admin → criar usuários
+- [ ] Aplicar migração `20260429000001_fix_faturamento_legacy_rls.sql` em produção (`supabase db push`)
+- [ ] Validar isolamento: logar como user do tenant A e tentar `GET /rest/v1/faturamento_periodos_legacy` — deve retornar só registros do mesmo tenant
+- [ ] Adicionar `CRON_SECRET` em `scheduled-jobs/index.ts` (validar header `Authorization: Bearer ${CRON_SECRET}`)
+- [ ] Remover `company_id` dos 3 payloads do frontend (BugTracker, ListaFixaSetor, permissions/hooks) — defesa em profundidade
+- [ ] Dropar tabelas `*_bkp_reset_20260301` (18 tabelas, snapshot tem ~14 meses) e `z_canary_test`
 
 ---
 
