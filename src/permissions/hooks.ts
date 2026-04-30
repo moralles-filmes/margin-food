@@ -38,7 +38,6 @@ function logLegacyUsage(legacyKey: string, resolvedTo: string[], userId?: string
   try {
     supabase.from('rbac_legacy_usage').insert({
       user_id: userId || null,
-      company_id: companyId || null,
       legacy_key: legacyKey,
       resolved_to: resolvedTo,
       context: 'ui',

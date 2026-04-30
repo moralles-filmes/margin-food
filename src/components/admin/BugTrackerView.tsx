@@ -49,7 +49,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function BugTrackerView() {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const [bugs, setBugs] = useState<SystemBug[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -140,7 +140,6 @@ export default function BugTrackerView() {
           severity: form.severity,
           status: form.status,
           notes: form.notes || null,
-          company_id: profile?.company_id,
           created_by: user?.id,
         });
       if (error) toast.error('Erro: ' + error.message);

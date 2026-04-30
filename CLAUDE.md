@@ -513,8 +513,8 @@ margin-food/
 - [ ] Testar fluxo completo: criar empresa → criar admin → login admin → criar usuários
 - [ ] Aplicar migração `20260429000001_fix_faturamento_legacy_rls.sql` em produção (`supabase db push`)
 - [ ] Validar isolamento: logar como user do tenant A e tentar `GET /rest/v1/faturamento_periodos_legacy` — deve retornar só registros do mesmo tenant
-- [ ] Adicionar `CRON_SECRET` em `scheduled-jobs/index.ts` (validar header `Authorization: Bearer ${CRON_SECRET}`)
-- [ ] Remover `company_id` dos 3 payloads do frontend (BugTracker, ListaFixaSetor, permissions/hooks) — defesa em profundidade
+- [x] Adicionar `CRON_SECRET` em `scheduled-jobs/index.ts` (validar header `Authorization: Bearer ${CRON_SECRET}`) — feito em 2026-04-29
+- [x] Remover `company_id` dos payloads do frontend (BugTracker, ListaFixaSetor [2 inserts], permissions/hooks) — feito em 2026-04-29
 - [ ] Dropar tabelas `*_bkp_reset_20260301` (18 tabelas, snapshot tem ~14 meses) e `z_canary_test`
 
 ---

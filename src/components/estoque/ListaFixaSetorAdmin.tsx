@@ -112,7 +112,7 @@ export default function ListaFixaSetorAdmin({ produtos }: Props) {
     try {
       const { data, error } = await supabase
         .from('listas_fixas_setor')
-        .insert({ setor: selectedSetor, nome: `Lista ${selectedSetor}`, created_by: user.id, company_id: companyId })
+        .insert({ setor: selectedSetor, nome: `Lista ${selectedSetor}`, created_by: user.id })
         .select('id, setor, nome, ativo, created_at')
         .single();
       if (error) throw error;
@@ -142,7 +142,6 @@ export default function ListaFixaSetorAdmin({ produtos }: Props) {
           produto_id: produtoId,
           ordem: maxOrdem + 1,
           observacao: '',
-          company_id: companyId,
         })
         .select('id, lista_fixa_id, produto_id, ordem, observacao')
         .single();
