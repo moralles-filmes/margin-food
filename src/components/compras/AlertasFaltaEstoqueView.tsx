@@ -129,7 +129,8 @@ export default function AlertasFaltaEstoqueView() {
       if (error) throw error;
       toast.success(`Alerta de "${alerta.produto_nome}" confirmado.`);
       await load();
-    } catch {
+    } catch (e) {
+      console.error('[alertas-estoque.confirm]', e);
       toast.error('Erro ao confirmar alerta');
     } finally {
       setConfirming(null);

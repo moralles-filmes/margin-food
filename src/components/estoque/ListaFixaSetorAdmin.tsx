@@ -148,7 +148,8 @@ export default function ListaFixaSetorAdmin({ produtos }: Props) {
       if (error) throw error;
       setItems(prev => [...prev, data as ListaFixaItem]);
       toast.success('Produto adicionado');
-    } catch {
+    } catch (e) {
+      console.error('[lista-fixa.addProduct]', e);
       toast.error('Erro ao adicionar produto');
     }
   };
@@ -162,7 +163,8 @@ export default function ListaFixaSetorAdmin({ produtos }: Props) {
       if (error) throw error;
       setItems(prev => prev.filter(i => i.id !== itemId));
       toast.success('Produto removido');
-    } catch {
+    } catch (e) {
+      console.error('[lista-fixa.removeProduct]', e);
       toast.error('Erro ao remover');
     }
   };
@@ -200,7 +202,8 @@ export default function ListaFixaSetorAdmin({ produtos }: Props) {
       if (error) throw error;
       setListas(prev => prev.map(l => l.id === currentLista.id ? { ...l, ativo: newAtivo } : l));
       toast.success(newAtivo ? 'Lista ativada' : 'Lista desativada');
-    } catch {
+    } catch (e) {
+      console.error('[lista-fixa.toggleAtivo]', e);
       toast.error('Erro ao alterar status');
     }
   };
