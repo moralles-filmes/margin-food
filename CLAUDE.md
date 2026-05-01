@@ -179,6 +179,18 @@ margin-food/
 
 > **Mantenha esta seção atualizada após cada sessão de trabalho.**
 
+### 2026-05-01 — Cleanup de Drift de Migração + Hardening RLS faturamento_periodos_legacy
+- **Problema 1 — Drift**: O histórico de migrações do Supabase tinha drift acumulado: 2 migrações remote-only (`20260423154703`, `20260501163238`) aplicadas via SQL Editor / MCP que não tinham arquivos locais correspondentes, bloqueando `supabase db push`. Além disso, a migration `20260429000001_fix_faturamento_legacy_rls.sql` (vazamento cross-tenant em tabela histórica) estava pendente desde a auditoria de 29/04.
+- **Verificação de equivalência**: Antes de qualquer reparo, conteúdo de `20260423154703` (remote) foi consultado em `supabase_migrations.schema_migrations` e confirmou ser idêntico a `20260423000000_add_idempotency_key_fin_lancamentos.sql` (local). Mesmo procedimento para `20260501163238` (remote) ↔ `20260501120000_seed_default_turnos_all_companies.sql` (local).
+- **Reparos aplicados** (apenas tabela de tracking, nenhum schema afetado):
+  - `migration repair --status applied 20260423000000`
+  - `migration repair --status reverted 20260423154703`
+  - `migration repair --status applied 20260501120000`
+  - `migration repair --status reverted 20260501163238`
+- **Push final**: `supabase db push --include-all` aplicou `20260429000001_fix_faturamento_legacy_rls.sql` em produção.
+- **Problema 2 — Bypass cross-tenant residual**: A migration `20260429000001` dropou apenas a policy wide-open `legacy_select_all`, mas deixou ativas 4 policies legadas que NÃO filtravam por tenant: `fin_read_faturamento` (SELECT) e `fin_manage_{insert,update,delete}_faturamento`. Em RLS, policies do mesmo cmd são combinadas com OR — então qualquer usuário com `finance:read` ainda bypassava o `faturamento_legacy_select_own_tenant` e lia dados cross-tenant. Da mesma forma, `finance:manage` bypassava os blocks de write.
+- **Fix** (`20260501170000_drop_legacy_fin_policies_faturamento.sql`): Dropa as 4 policies legadas com guarda defensiva (RAISE EXCEPTION se a policy tenant-scoped não existir, evitando deixar a tabela sem SELECT). Estado final: apenas 4 policies — `select_own_tenant` (tenant-scoped) + 3 `block_*` (writes proibidos). **Leak cross-tenant fechado.**
+
 ### 2026-05-01 — Fix Inventário: turnos não apareciam em empresas não-piloto
 - **Bug**: Royal Parma e REN SUSHI (e qualquer empresa nova criada via `onboard_new_company`) não conseguiam criar inventários — o dropdown "Turno" vinha vazio e o botão "Criar" ficava desabilitado (validação `!formTurno`).
 - **Causa raiz**: `20260328111500_add_default_turnos.sql` semeou turnos default apenas para a primeira empresa (`SELECT ... LIMIT 1`, a piloto MarginPro Oficial). A RPC `onboard_new_company()` em `20260401200000_multi_tenant_onboarding.sql` semeia `companies + user_roles + job_roles + audit log` mas **não cria turnos**. A migração de clone Moralles→REN SUSHI também não copiou turnos.
