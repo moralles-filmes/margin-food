@@ -179,6 +179,16 @@ margin-food/
 
 > **Mantenha esta seção atualizada após cada sessão de trabalho.**
 
+### 2026-05-01 — Fix Inventário: turnos não apareciam em empresas não-piloto
+- **Bug**: Royal Parma e REN SUSHI (e qualquer empresa nova criada via `onboard_new_company`) não conseguiam criar inventários — o dropdown "Turno" vinha vazio e o botão "Criar" ficava desabilitado (validação `!formTurno`).
+- **Causa raiz**: `20260328111500_add_default_turnos.sql` semeou turnos default apenas para a primeira empresa (`SELECT ... LIMIT 1`, a piloto MarginPro Oficial). A RPC `onboard_new_company()` em `20260401200000_multi_tenant_onboarding.sql` semeia `companies + user_roles + job_roles + audit log` mas **não cria turnos**. A migração de clone Moralles→REN SUSHI também não copiou turnos.
+- **Diagnóstico técnico**: A Edge Function `inventario` action `list_turnos` usa `adminClient` (service_role) com `.eq('company_id', companyId)` — RLS não está envolvida, os dados literalmente não existem para essas empresas. `create_inventory_atomic` exige `p_turno_id` obrigatório (sem DEFAULT).
+- **Fix** (`20260501120000_seed_default_turnos_all_companies.sql`):
+  - **Backfill idempotente**: itera sobre todas empresas ativas (exceto placeholder) que não têm turnos ativos e insere os 4 defaults (Manhã 07-15, Tarde 15-23, Noite 23-07, Geral 00-23:59) usando os mesmos horários da migração original.
+  - **Forward-fix**: `CREATE OR REPLACE FUNCTION onboard_new_company()` adiciona o INSERT de turnos logo após o INSERT da empresa, antes da audit log — toda nova empresa criada doravante recebe os defaults automaticamente.
+- **Notas técnicas**: Não há trigger `force_company_id` em `turnos` (só em `produtos`), INSERT explícito é seguro. Não há unique constraint em `(company_id, nome)`, idempotência via `WHERE NOT EXISTS`. Função é `SECURITY DEFINER`, bypass natural de RLS.
+- **Validação pendente**: logar como admin da Royal Parma → Inventário → Novo Inventário e confirmar que o dropdown de turnos aparece preenchido.
+
 ### 2026-04-29 — Auditoria Multi-Tenant + Fix RLS faturamento_periodos_legacy
 - Auditoria multi-tenant completa do projeto: validou resolver canônico, FORCE RLS, triggers `force_company_id`, edge functions (todas validam JWT e derivam `companyId` server-side), e ausência de VIEWs e `service_role` no frontend.
 - Confirmado que o fix de `profiles` RLS já foi aplicado em `20260414120000_fix_profiles_rls_and_rpc.sql` (commit `fd8f6de`) — `profiles_select_company_member` substitui a policy wide-open e a RPC `list_profiles_minimal()` foi corrigida.
