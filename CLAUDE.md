@@ -179,6 +179,35 @@ margin-food/
 
 > **Mantenha esta seção atualizada após cada sessão de trabalho.**
 
+### 2026-05-01 — Varredura Funcional Completa do Frontend (16 findings, 4 ondas)
+
+- **Auditoria** delegada ao subagent `code-health:functional-auditor` (7 detectores em paralelo: phantom buttons, broken routes, mocked data, stubs, empty handlers, TODOs, código comentado). Relatório completo em `docs/audits/functional-audit-2026-05-01.md`.
+- **Resultado**: 0 broken routes, 0 dados mockados em produção, 0 phantom buttons em módulos reais. Achou: 2 BLOCKERs (debug log + catch silencioso crítico), 6 HIGHs (catches vazios em admin + templates stub), 5 MEDIUMs (catches sem binding) e 3 LOWs.
+
+#### Onda 1 — BLOCKERs
+- **B1** [AdminUsersView.tsx:575]: `console.log` de debug que vazava estrutura de permissões (nome de role + contagem de defaults) ao trocar perfil de acesso → removido.
+- **B2** [FichaTecnicaView.tsx:310]: `.catch(() => {})` no `sync_preco_salmao_auto` mascarava falhas silenciosas, causando divergência entre UI e banco no CMV → trocado por `console.warn` rastreável com tag `[salmon-price-sync]`.
+
+#### Onda 2 — HIGHs
+- **H1** [AdminUsersView.tsx:170,201]: `fetchJobRoles` e `fetchRolePermissions` ignoravam erros silenciosamente (`catch { /* ignore */ }`), deixando dropdowns vazios sem aviso → agora propagam, logam (`console.error`) e mostram `toast.error`.
+- **H2** [admin/AccessManagementCard.tsx:74]: `catch {}` vazio no carregamento do log de auditoria → mesma estratégia (propaga, loga, toast).
+- **H3** [AdminUsersView.tsx:111,115]: 2 catches vazios aninhados em `parseInvokeError` → ganham bindings (`parseErr`, `ctxErr`) e `console.debug` para rastreabilidade.
+- **H4** [FichaTecnicaView.tsx:97-115] `invokeApi`: lógica frágil de re-throw condicional (`if (parseErr.message !== msg) throw parseErr`) que podia engolir `FORBIDDEN_TENANT`/`NOT_FOUND` se mensagens coincidissem → refactor remove try/catch desnecessário, throws sempre propagam linearmente.
+- **H5/H6** + **M3/M4** — `src/components/templates/` removido inteiro (4 arquivos: `CrudSectionTemplate.tsx`, `AnalyticsSectionTemplate.tsx`, `DashboardSectionTemplate.tsx`, `index.ts`). Confirmado via grep que ninguém importava. O `CrudSectionTemplate.handleCreate` exibia `toast.success('Item criado')` sem persistir nada — risco de cópia acidental para produção. 16 TODOs eliminados.
+
+#### Onda 3 — MEDIUMs
+- **M1** [estoque/ListaFixaSetorAdmin.tsx:151,165,203]: 3 catches sem binding (`catch {`) → ganham `catch (e)` + `console.error` com tags `[lista-fixa.addProduct]`, `[lista-fixa.removeProduct]`, `[lista-fixa.toggleAtivo]`. Toast continua igual; agora há rastreabilidade.
+- **M2** [compras/AlertasFaltaEstoqueView.tsx:132]: mesmo tratamento, tag `[alertas-estoque.confirm]`.
+
+#### Onda 4 — LOWs
+- **L1** [financeiro/ConciliacaoBancariaSection.tsx:97,104,108]: 3 catches em sessionStorage helpers (`saveLinhas`/`loadLinhas`/`clearLinhas`) ganham `catch (_)` + comentário explicando que sessionStorage indisponível (modo privado/quota) é cenário aceito.
+- **L2** [financeiro/CategorizacaoSection.tsx:160,250]: 2 catches em validação de regex ganham `catch (_)` para descarte intencional.
+
+#### Verificação
+- `npx tsc --noEmit` — passa em todas as 4 ondas
+- `bun run build` — passou em 17.30s, PWA gerado com 143 entries
+- Cada onda foi commitada separadamente (`4e2b247`, `2fd4b7f`, `a82e64a`, `b1ad29b`) para revisão isolada de cada nível de severidade.
+
 ### 2026-05-01 — Cleanup de Drift de Migração + Hardening RLS faturamento_periodos_legacy
 - **Problema 1 — Drift**: O histórico de migrações do Supabase tinha drift acumulado: 2 migrações remote-only (`20260423154703`, `20260501163238`) aplicadas via SQL Editor / MCP que não tinham arquivos locais correspondentes, bloqueando `supabase db push`. Além disso, a migration `20260429000001_fix_faturamento_legacy_rls.sql` (vazamento cross-tenant em tabela histórica) estava pendente desde a auditoria de 29/04.
 - **Verificação de equivalência**: Antes de qualquer reparo, conteúdo de `20260423154703` (remote) foi consultado em `supabase_migrations.schema_migrations` e confirmou ser idêntico a `20260423000000_add_idempotency_key_fin_lancamentos.sql` (local). Mesmo procedimento para `20260501163238` (remote) ↔ `20260501120000_seed_default_turnos_all_companies.sql` (local).
