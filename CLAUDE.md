@@ -179,6 +179,18 @@ margin-food/
 
 > **Mantenha esta seção atualizada após cada sessão de trabalho.**
 
+### 2026-05-01 — Fix "Erro ao salvar produto" no cadastro do Estoque (defasagem de SKU counter)
+
+- **Bug**: Ao cadastrar produto novo no Estoque/Catálogo, toast genérico `"Erro ao salvar produto"` sem detalhe. DevTools revelou `23505 unique violation produtos_company_sku_unique` — `generate_next_sku` retornava SKU já existente.
+- **Causa raiz**: `stock_sku_counter` ficou defasado em relação a `produtos.sku`. A migration `20260326000001_importacao_catalogo_produtos.sql` (236 produtos via `DISABLE TRIGGER USER`) e o clone Moralles→REN SUSHI inseriram SKUs MP-0001..MP-0240 sem incrementar o counter por empresa. Diagnóstico via `execute_sql`: Moralles tinha `next_value=5` mas `MAX(sku)=240`, defasado 235; Ren Sushi `next_value=15` vs 240 (defasado 225); Royal Parma OK (56=56).
+- **Visibilidade prévia**: O catch em `ProdutoFormPanel.tsx:161-168` só lia `err.message`, ignorando `err.code`/`err.details`/`err.hint` do `PostgrestError`. Mensagem do Postgres ficava invisível para o usuário e operador.
+- **Fix em 3 camadas**:
+  1. **Visibilidade** — novo helper [src/lib/supabaseErrors.ts](src/lib/supabaseErrors.ts) `extractSupabaseErrorMessage(err, fallback)` que combina `message + details + hint + code` em string legível. Adotado em `ProdutoFormPanel.tsx` e `console.error('[produto.save.create|update]', err)` antes do toast. Em `useEstoqueGeralStore.ts`, `addProduto`/`updateProduto`/`deleteProduto` ganham `console.error` com tag rastreável antes de propagar o erro.
+  2. **Backfill one-time** — `20260501190000_fix_generate_next_sku_skip_existing.sql` itera `(company_id, prefix)` distintos em `produtos`, calcula `MAX((substring sku))` e faz UPSERT em `stock_sku_counter` com `next_value = GREATEST(existing, calculated_max)`. Pós-migration: Moralles=240, Ren Sushi=240, Royal Parma=56.
+  3. **Hardening da função** — `generate_next_sku` agora tem loop de retry: incrementa o counter, gera candidato, verifica `EXISTS produtos.sku = candidate`, repete (até 1000 tentativas). Defesa contra futuros imports/restores que voltem a desincronizar o counter. UPDATE com RETURNING garante lock implícito → seguro contra concorrência.
+- **Padrão MarginPro**: Backfill filtra `company_id <> placeholder UUID` por causa do trigger `trg_block_placeholder_company`.
+- **Validação pós-fix**: TS limpo, build OK (17.05s, 143 PWA entries). Smoke test pendente: usuário deve cadastrar novo produto e confirmar SKU MP-0241 (próximo após o max).
+
 ### 2026-05-01 — Varredura Funcional Completa do Frontend (16 findings, 4 ondas)
 
 - **Auditoria** delegada ao subagent `code-health:functional-auditor` (7 detectores em paralelo: phantom buttons, broken routes, mocked data, stubs, empty handlers, TODOs, código comentado). Relatório completo em `docs/audits/functional-audit-2026-05-01.md`.

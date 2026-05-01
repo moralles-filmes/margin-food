@@ -645,7 +645,10 @@ export function useEstoqueGeralStore() {
       })
       .select()
       .single();
-    if (error) throw error;
+    if (error) {
+      console.error('[useEstoqueGeralStore.addProduto] insert error', error);
+      throw error;
+    }
     const newProd = dbToProduto(data as unknown as ProdutoRow);
     setProdutos(prev => [newProd, ...prev]);
     setSaldos(prev => ({ ...prev, [newProd.id]: { saldo: 0 } }));
@@ -684,7 +687,10 @@ export function useEstoqueGeralStore() {
     if (updates.conversionMode !== undefined) dbUpdates.conversion_mode = updates.conversionMode;
 
     const { error } = await supabase.from('produtos').update(dbUpdates).eq('id', id);
-    if (error) throw error;
+    if (error) {
+      console.error('[useEstoqueGeralStore.updateProduto] update error', error);
+      throw error;
+    }
     setProdutos(prev => prev.map(p => p.id === id ? { ...p, ...updates } as ProdutoExtended : p));
     fetchProdutoGlobalCounts();
     emitDataEvent('estoque:produtos');
@@ -692,7 +698,10 @@ export function useEstoqueGeralStore() {
 
   const deleteProduto = useCallback(async (id: string) => {
     const { error } = await supabase.from('produtos').update({ ativo: false }).eq('id', id);
-    if (error) throw error;
+    if (error) {
+      console.error('[useEstoqueGeralStore.deleteProduto] update(ativo=false) error', error);
+      throw error;
+    }
     setProdutos(prev => prev.map(p => p.id === id ? { ...p, ativo: false } : p));
     fetchProdutoGlobalCounts();
     emitDataEvent('estoque:produtos');

@@ -17,6 +17,7 @@ import SearchableSelect from '@/components/ui/SearchableSelect';
 import { fmtBRL, formatFixedBR } from '@/lib/formatters';
 import { toast } from 'sonner';
 import { TenantError } from '@/lib/tenant';
+import { extractSupabaseErrorMessage } from '@/lib/supabaseErrors';
 import type { Produto } from '@/types/salmon';
 import type { ProdutoExtended, ProdutoFormData } from '@/types/estoque';
 import type { ProdutoCreateInput, ProdutoUpdateInput } from '@/hooks/useEstoqueGeralStore';
@@ -159,11 +160,14 @@ export default function ProdutoFormPanel({
         }
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : '';
-      if (err instanceof TenantError || isTenantErrorMessage(msg)) {
-        toast.error(msg || 'Seu usuário não está vinculado a uma empresa válida.');
+      // Logar sempre — message sozinho perde code/details/hint do PostgrestError
+      const tag = editProdId ? '[produto.save.update]' : '[produto.save.create]';
+      console.error(tag, err);
+      const baseMsg = err instanceof Error ? err.message : '';
+      if (err instanceof TenantError || isTenantErrorMessage(baseMsg)) {
+        toast.error(baseMsg || 'Seu usuário não está vinculado a uma empresa válida.');
       } else {
-        toast.error(msg || 'Erro ao salvar produto');
+        toast.error(extractSupabaseErrorMessage(err, 'Erro ao salvar produto'));
       }
     }
     setSaving(false);
