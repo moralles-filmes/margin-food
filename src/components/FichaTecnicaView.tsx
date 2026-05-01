@@ -307,7 +307,7 @@ export default function FichaTecnicaView({ lotesLimpos = [] }: { lotesLimpos?: L
       const info = latestLot ? `Lote de ${latestLot.dataManipulacao} — ${R$(localSalmonCost)}/kg limpo` : '';
       invokeApi('sync_preco_salmao_auto', { preco_kg_limpo: localSalmonCost, lote_info: info })
         .then(() => setSalmonRef(prev => ({ ...prev, preco: localSalmonCost, preco_auto: localSalmonCost, origem: 'lote_recente', info })))
-        .catch(() => {}); // silent
+        .catch((e) => console.warn('[salmon-price-sync] falha ao sincronizar preço do salmão com o backend:', e));
     }
   }, [localSalmonCost]);
 

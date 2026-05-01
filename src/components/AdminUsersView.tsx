@@ -568,12 +568,11 @@ export default function AdminUsersView() {
                   </div>
                   <div>
                     <Label className="text-xs text-muted-foreground">Perfil de acesso</Label>
-                    <select value={editRole} onChange={e => { 
+                    <select value={editRole} onChange={e => {
                         const newR = e.target.value;
                         setEditRole(newR);
                         const defaults = rolePermissionsMap[newR] || [];
-                        console.log(`Switching to role ${newR}, found ${defaults.length} default perms`);
-                        setEditPermissions(new Set(defaults)); 
+                        setEditPermissions(new Set(defaults));
                       }}
                       className="w-full h-9 rounded-md border border-border bg-secondary px-3 text-sm text-foreground mt-1">
                       {ALL_ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
