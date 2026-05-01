@@ -179,6 +179,14 @@ margin-food/
 
 > **Mantenha esta seção atualizada após cada sessão de trabalho.**
 
+### 2026-05-01 — Hardening Dashboards Round 2 (3 achados da Fase 4 endereçados)
+
+Após o fix do "Abaixo do Mínimo", aplicada rodada de hardening nos 3 achados não-bloqueantes da auditoria Fase 4:
+
+- **`get_fin_dashboard_charts` agora inclui status `CONCILIADO`** ([20260501201044](supabase/migrations/20260501201044_fix_fin_dashboard_charts_include_conciliado.sql)). A função filtrava apenas `status='REALIZADO'` em 3 lugares (evolução mensal + 2 ramos de despesas por categoria), enquanto `get_fin_dashboard_summary` e `get_fin_kpis` usam `IN ('REALIZADO','CONCILIADO')`. Resultado: gráficos do dashboard financeiro mostravam valores menores que os cards de resumo do mesmo período. Agora alinhado em `IN ('REALIZADO','CONCILIADO')` em todos os 3 ramos. Permissão também padronizada para `has_any_permission(['finance:read', 'financeiro:dashboard:view', 'system:global:manage'])`.
+- **FORCE RLS em `salmon_auditorias_compra` + `salmon_metas_provisionadas`** ([20260501201233](supabase/migrations/20260501201233_force_rls_salmon_aux_tables.sql)). Ambas tinham `rls_enabled=true` mas `force=false` — owners e service_role bypassavam a policy `"Tenant isolation"` (`cmd=ALL`, `qual=company_id=get_current_company_id()`) que já existia. Agora `FORCE` aplicado, padronizado com o resto do schema. Sem mudanças de código frontend.
+- **`relatorio_socios_resumo` padronizada** ([20260501201358](supabase/migrations/20260501201358_harden_relatorio_socios_resumo.sql)). 2 problemas: (1) resolvia tenant via JOIN manual em `profiles` em vez de `assert_tenant()` — perdia validações centrais (placeholder UUID, perfil sem empresa); (2) **não checava permissão** antes das queries — qualquer usuário autenticado da empresa lia receita/despesa/resultado/top categorias sem RBAC. Agora usa `assert_tenant()` + `has_any_permission(['financeiro:relatorio-socios:view', 'finance:read', 'system:global:manage'])`. Validado: chave granular já existia no `permissions` e roles `admin`/`diretor` já tinham acesso — nenhum usuário existente perde permissão. Lógica de negócio (rateios, intervalos, status `REALIZADO+CONCILIADO`) preservada integralmente.
+
 ### 2026-05-01 — Fix Dashboards: produtos positivos aparecendo "Abaixo do Mínimo" (Relatórios + Estoque)
 
 - **Bug**: Em Relatórios Gerais, produtos com saldo positivo no Estoque Geral apareciam no alerta "Abaixo do Mínimo". Reproduzido em produção: 31 falsos alertas na Moralles, 87 na Ren Sushi (Royal Parma intacta).
