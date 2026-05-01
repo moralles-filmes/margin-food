@@ -65,13 +65,17 @@ export default function AccessManagementCard() {
 
   const fetchAudit = useCallback(async () => {
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('admin_actions_log')
         .select('id, created_at, actor_user_id, action, target_email, details')
         .order('created_at', { ascending: false })
         .limit(20);
+      if (error) throw error;
       setAuditLogs((data as AuditEntry[]) || []);
-    } catch {}
+    } catch (e) {
+      console.error('[AccessManagementCard.fetchAudit]', e);
+      toast.error('Não foi possível carregar o log de auditoria.');
+    }
   }, []);
 
   useEffect(() => {

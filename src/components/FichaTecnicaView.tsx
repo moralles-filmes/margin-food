@@ -100,15 +100,10 @@ async function invokeApi(action: string, payload: any = {}) {
   });
   if (error) {
     const msg = error.message || 'Erro na API';
-    // Parse structured error from edge function
-    try {
-      const parsed = typeof data === 'object' && data?.error ? data.error : null;
-      if (parsed?.code === 'FORBIDDEN_TENANT') throw new Error('Sem acesso — este recurso não pertence ao seu tenant.');
-      if (parsed?.code === 'NOT_FOUND') throw new Error('Recurso não encontrado.');
-      if (parsed?.message) throw new Error(parsed.message);
-    } catch (parseErr: any) {
-      if (parseErr.message !== msg) throw parseErr;
-    }
+    const parsed = typeof data === 'object' && data?.error ? data.error : null;
+    if (parsed?.code === 'FORBIDDEN_TENANT') throw new Error('Sem acesso — este recurso não pertence ao seu tenant.');
+    if (parsed?.code === 'NOT_FOUND') throw new Error('Recurso não encontrado.');
+    if (parsed?.message) throw new Error(parsed.message);
     throw new Error(msg);
   }
   return data;

@@ -108,11 +108,15 @@ export default function AdminUsersView() {
             try {
               const parsed = JSON.parse(text);
               if (parsed?.error) return parsed.error;
-            } catch { }
+            } catch (parseErr) {
+              console.debug('[parseInvokeError] JSON inválido, usando texto bruto:', parseErr);
+            }
             return text;
           }
         }
-      } catch { }
+      } catch (ctxErr) {
+        console.debug('[parseInvokeError] falha ao ler context:', ctxErr);
+      }
       return error?.message || 'Erro';
     };
 
@@ -165,9 +169,13 @@ export default function AdminUsersView() {
 
   const fetchJobRoles = useCallback(async () => {
     try {
-      const { data } = await supabase.from('job_roles').select('id, nome, descricao, is_active, created_at').order('nome');
+      const { data, error } = await supabase.from('job_roles').select('id, nome, descricao, is_active, created_at').order('nome');
+      if (error) throw error;
       setJobRoles((data || []) as { id: string; nome: string; descricao: string | null; is_active: boolean; created_at: string }[]);
-    } catch { /* ignore */ }
+    } catch (e) {
+      console.error('[fetchJobRoles]', e);
+      toast.error('Erro ao carregar cargos. Recarregue a página se o dropdown de cargos estiver vazio.');
+    }
   }, []);
 
   const fetchRolePermissions = useCallback(async () => {
@@ -198,7 +206,10 @@ export default function AdminUsersView() {
       }
       
       setRolePermissionsMap(map);
-    } catch { /* ignore */ }
+    } catch (e) {
+      console.error('[fetchRolePermissions]', e);
+      toast.error('Erro ao carregar permissões dos perfis. Recarregue a página.');
+    }
   }, []);
 
   const fetchAll = useCallback(async () => {
