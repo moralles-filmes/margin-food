@@ -94,18 +94,18 @@ function computeScore(extratoValor: number, extratoData: string, extratoDesc: st
 const SESSION_KEY = (contaId: string) => `conciliacao_linhas_${contaId}`;
 
 function saveLinhas(contaId: string, linhas: LinhaExtrato[]) {
-  try { sessionStorage.setItem(SESSION_KEY(contaId), JSON.stringify(linhas)); } catch {}
+  try { sessionStorage.setItem(SESSION_KEY(contaId), JSON.stringify(linhas)); } catch (_) { /* sessionStorage indisponível (modo privado/quota) — dados ficam só em memória */ }
 }
 
 function loadLinhas(contaId: string): LinhaExtrato[] | null {
   try {
     const raw = sessionStorage.getItem(SESSION_KEY(contaId));
     return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
+  } catch (_) { /* sessionStorage indisponível — sem persistência entre navegações */ return null; }
 }
 
 function clearLinhas(contaId: string) {
-  try { sessionStorage.removeItem(SESSION_KEY(contaId)); } catch {}
+  try { sessionStorage.removeItem(SESSION_KEY(contaId)); } catch (_) { /* sessionStorage indisponível */ }
 }
 
 export default function ConciliacaoBancariaSection() {

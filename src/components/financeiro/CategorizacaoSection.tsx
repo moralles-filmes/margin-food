@@ -159,7 +159,7 @@ export default function CategorizacaoSection() {
     if (form.tipo_match === 'regex') {
       try {
         new RegExp(form.padrao);
-      } catch {
+      } catch (_) {
         toast.error('Regex inválido. Corrija o padrão antes de salvar.');
         return;
       }
@@ -247,7 +247,7 @@ export default function CategorizacaoSection() {
       return;
     }
     if (form.tipo_match === 'regex') {
-      try { new RegExp(form.padrao); } catch {
+      try { new RegExp(form.padrao); } catch (_) {
         toast.error('Regex inválido');
         return;
       }
