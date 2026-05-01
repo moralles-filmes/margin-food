@@ -179,6 +179,24 @@ margin-food/
 
 > **Mantenha esta seção atualizada após cada sessão de trabalho.**
 
+### 2026-05-01 — Fix Dashboards: produtos positivos aparecendo "Abaixo do Mínimo" (Relatórios + Estoque)
+
+- **Bug**: Em Relatórios Gerais, produtos com saldo positivo no Estoque Geral apareciam no alerta "Abaixo do Mínimo". Reproduzido em produção: 31 falsos alertas na Moralles, 87 na Ren Sushi (Royal Parma intacta).
+- **Causa raiz** — fórmula de saldo divergente entre cache e RPC:
+  - **Trigger canônico** [`fn_recompute_product_saldo`](supabase/migrations/20260331133000_fix_saldo_revert_and_fix_rpc.sql#L21-L32) mantém `produtos.saldo_atual` decidindo entrada/saída por **`m.direction = 'IN'`**.
+  - **RPC `get_relatorios_kpis`** ([20260321011743](supabase/migrations/20260321011743_ca89316b-e0dd-41bd-9144-caa8bcb22512.sql)) recalculava saldo inline em 4 pontos usando **`me.tipo LIKE 'ENTRADA%' OR me.tipo = 'AJUSTE' OR me.tipo LIKE '%DEVOLUCAO%'`**. Tipos como `AJUSTE_INVENTARIO_POSITIVO` (introduzido pelos fixes de inventário de 2026-03-28) caíam no `ELSE -me.quantidade` virando saída fantasma. Cenário real validado: produto "Shoyu blister Delivery" tinha 1 movimentação `AJUSTE_INVENTARIO_POSITIVO direction=IN qtd=240` → cache=+240, recalc buggy=-240, alerta falso disparado (mínimo=20).
+  - **Bug paralelo descoberto** em `get_stock_dashboard` ([20260312230807](supabase/migrations/20260312230807_04fb19d3-b22f-4461-add7-6f9c58577484.sql#L18-L25)): usava `direction` mas **não ignorava `ENTRADA_ESTORNO`/`SAIDA_ESTORNO`**, contaminando contadores OK/Atenção/Crítico/Sem Estoque do Estoque Geral.
+- **Por que apareceu agora**: A migration `20260328111500_add_default_turnos.sql` e os fixes de inventário criaram movimentações com tipo `AJUSTE_INVENTARIO_POSITIVO` (e clones REN SUSHI/Royal Parma trouxeram saldos novos via inventários). Antes o catálogo só tinha tipos `ENTRADA_*`/`SAIDA_*` simples, então o bug latente nunca aparecia.
+- **Fix em 2 migrations**:
+  1. [`20260501195715_fix_relatorios_kpis_use_saldo_cache.sql`](supabase/migrations/20260501195715_fix_relatorios_kpis_use_saldo_cache.sql) — refatora `get_relatorios_kpis` para usar `produtos.saldo_atual` direto nos 4 blocos (`v_valor_estoque`, `v_count_abaixo`, `v_abaixo_minimo`, `v_count_parados`). Filtro defensivo `p.estoque_minimo > 0` para excluir produtos sem mínimo cadastrado dos alertas. Inclui DO-block sanity de auditoria que detecta cache divergente da fórmula canônica e dispara `fn_recompute_product_saldo` (validado: 0 divergências em todas as 3 empresas — cache 100% íntegro).
+  2. [`20260501195743_fix_stock_dashboard_use_saldo_cache.sql`](supabase/migrations/20260501195743_fix_stock_dashboard_use_saldo_cache.sql) — refatora `get_stock_dashboard` para usar `p.saldo_atual` na CTE `produto_saldos`, eliminando a CTE `saldos` que recalculava sem ignorar estornos.
+- **Princípio aplicado**: `produtos.saldo_atual` é a fonte da verdade. Toda RPC de leitura deve consumir o cache em vez de recalcular inline — evita divergência e melhora performance (uma RPC fica O(N) em vez de O(N²) com subquery por produto).
+- **Sanity Fase 4 (read-only)**: Auditadas `get_fin_dashboard_summary` (limpa), `get_fin_kpis` (limpa). Achados separados (não bloqueantes, virarão tarefas próprias):
+  - `get_fin_dashboard_charts` filtra apenas `status='REALIZADO'` enquanto summary/KPIs usam `IN ('REALIZADO','CONCILIADO')` — drift entre gráfico e cards.
+  - `relatorio_socios_resumo` resolve tenant via JOIN manual em `profiles` em vez de `assert_tenant()` e não checa `has_permission()` antes das queries.
+  - `salmon_auditorias_compra` e `salmon_metas_provisionadas` têm `rls_enabled=true` mas `force=false` E zero policies SELECT — protegidas por DENY default, mas fora do padrão MarginPro.
+  - 13 "BLOCKERs" reportados pelo subagent em queries client-side de Salmão/RH (ausência de `.eq('company_id')`) **foram falsos alarmes**: validado via `pg_class.relrowsecurity` que todas as 12 tabelas têm RLS forçada + policy SELECT scoped — defesa em profundidade do banco cobre.
+
 ### 2026-05-01 — Fix Definitivo Busca Accent-Insensitive (sistema inteiro + blindagem)
 
 - **Bug recorrente**: Buscar `salmao`, `acucar`, `oleo` (sem acento) não encontrava `Salmão`, `Açúcar`, `Óleo`. Já tinha sido corrigido em **2026-03-31 (commit `834ccad`)** com helpers `normalizeSearchText()`/`includesNormalized()` em [src/lib/utils.ts:12-26](src/lib/utils.ts#L12-L26), mas regrediu porque a adoção foi parcial e não havia lint/regra forçando o padrão.
