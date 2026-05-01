@@ -32,6 +32,7 @@ import {
   Eye,
 } from 'lucide-react';
 import { parseUTCToBR } from '@/lib/datetime';
+import { includesNormalized } from '@/lib/utils';
 
 interface AlertaFalta {
   id: string;
@@ -100,10 +101,9 @@ export default function AlertasFaltaEstoqueView() {
 
   const filtered = useMemo(() => {
     if (!search.trim()) return alertas;
-    const term = search.toLowerCase();
     return alertas.filter(a =>
-      a.produto_nome.toLowerCase().includes(term) ||
-      a.setor_solicitante.toLowerCase().includes(term)
+      includesNormalized(a.produto_nome, search) ||
+      includesNormalized(a.setor_solicitante, search)
     );
   }, [alertas, search]);
 

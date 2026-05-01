@@ -6,6 +6,7 @@ import type { ProdutoExtended, MovimentacaoExtended, ProdutoFormData } from '@/t
 import { todayBR } from '@/lib/datetime';
 import { resolveCompanyIdOrThrow } from '@/lib/tenant';
 import { narrowRows } from '@/lib/guards';
+import { normalizeSearchText } from '@/lib/utils';
 
 // ── DB → Frontend mappers ──
 
@@ -382,8 +383,11 @@ export function useEstoqueGeralStore() {
       query = query.eq('ativo', f.ativo);
     }
     if (f.search?.trim()) {
-      const term = f.search.trim().replace(/[%_\\]/g, '\\$&');
-      query = query.or(`nome_produto.ilike.%${term}%,sku.ilike.%${term}%`);
+      // Busca accent-insensitive: usa colunas geradas *_unaccent + termo normalizado
+      // (ILIKE no Postgres é case-insensitive mas NÃO remove acentos).
+      const term = normalizeSearchText(f.search.trim()).replace(/[%_\\]/g, '\\$&');
+      // eslint-disable-next-line no-restricted-syntax -- coluna *_unaccent já normalizada
+      query = query.or(`nome_produto_unaccent.ilike.%${term}%,sku_unaccent.ilike.%${term}%`);
     }
     if (f.categoria) {
       query = query.eq('categoria', f.categoria);

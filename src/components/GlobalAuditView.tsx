@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ShieldCheck, Search, ChevronDown, Eye, Filter, Download } from 'lucide-react';
 import { format, subDays } from 'date-fns';
-import { cn } from '@/lib/utils';
+import { cn, normalizeSearchText } from '@/lib/utils';
 import { CursorState } from '@/hooks/useCursorPagination';
 
 interface AuditLog {
@@ -108,7 +108,13 @@ export default function GlobalAuditView() {
 
     if (moduleFilter !== 'all') query = query.eq('module', moduleFilter);
     if (actionFilter !== 'all') query = query.eq('action', actionFilter);
-    if (search) query = query.or(`entity.ilike.%${search}%,entity_id::text.ilike.%${search}%`);
+    if (search) {
+      // Busca accent-insensitive via coluna gerada entity_unaccent.
+      // entity_id é uuid::text — não tem acentos, mas case-insensitive via ILIKE.
+      const term = normalizeSearchText(search).replace(/[%_\\]/g, '\\$&');
+      // eslint-disable-next-line no-restricted-syntax -- entity_unaccent já normalizada; entity_id é uuid::text sem acentos
+      query = query.or(`entity_unaccent.ilike.%${term}%,entity_id::text.ilike.%${term}%`);
+    }
 
     // Cursor-based: fetch records older than cursor
     if (cursor) {

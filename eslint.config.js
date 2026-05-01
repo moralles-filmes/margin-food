@@ -21,6 +21,30 @@ export default tseslint.config(
       ...reactHooks.configs.recommended.rules,
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
       "@typescript-eslint/no-unused-vars": "off",
+      // Blindagem de busca accent-insensitive — ver CLAUDE.md "Padrões de Busca de Texto"
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector:
+            "CallExpression[callee.property.name='includes'][callee.object.callee.property.name='toLowerCase']",
+          message:
+            "Não use .toLowerCase().includes() para busca de texto. ILIKE/lowercase NÃO remove acentos. Use includesNormalized() de '@/lib/utils' (accent-insensitive). Para casos não-busca (URL/erro/IDs), justifique com // eslint-disable-next-line no-restricted-syntax -- <motivo>.",
+        },
+        {
+          selector:
+            "CallExpression[callee.property.name='ilike']",
+          message:
+            "PostgREST .ilike() é case-insensitive mas NÃO accent-insensitive. Use a coluna gerada *_unaccent + normalizeSearchText() do termo cliente-side. Se a coluna NÃO tem acentos (uuid::text, email, codigo), justifique com // eslint-disable-next-line no-restricted-syntax -- <motivo>.",
+        },
+        {
+          // Detecta strings com padrão `coluna.ilike.%termo%` em chamadas
+          // .or('...') / .filter('...'). PostgREST não normaliza acentos.
+          // Permitido apenas para colunas *_unaccent com disable inline.
+          selector: "TemplateElement[value.raw=/\\.ilike\\./], Literal[value=/\\.ilike\\./]",
+          message:
+            "String com `.ilike.` em .or()/.filter() do PostgREST não é accent-insensitive. Use coluna *_unaccent + normalizeSearchText(). Se a coluna NÃO tem acentos, justifique com // eslint-disable-next-line no-restricted-syntax -- <motivo>.",
+        },
+      ],
     },
   },
 );

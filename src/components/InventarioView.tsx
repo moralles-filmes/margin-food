@@ -27,6 +27,7 @@ import QuickInventorySection from './QuickInventorySection';
 import InventarioDashboardView from './inventario/InventarioDashboardView';
 import InventarioAuditView from './inventario/InventarioAuditView';
 import { narrowRows } from '@/lib/guards';
+import { includesNormalized } from '@/lib/utils';
 
 type SubView = 'list' | 'create' | 'detail' | 'dashboard' | 'audit' | 'conferentes' | 'rapido';
 
@@ -517,7 +518,7 @@ export default function InventarioView() {
 
     const filteredItems = itens.filter(i => {
       const nome = i.produtos?.nome_produto || '';
-      if (searchTerm && !nome.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+      if (searchTerm && !includesNormalized(nome, searchTerm)) return false;
       if (filterCategoria && i.produtos?.categoria !== filterCategoria) return false;
       if (filterLocal && i.produtos?.local_estoque !== filterLocal) return false;
       return true;

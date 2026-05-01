@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { Plus, X, Check, Inbox, AlertTriangle, ShoppingCart, RefreshCw, Ban, Search, ClipboardList, ChevronDown, ChevronUp, Edit3 } from 'lucide-react';
 import { parseUTCToBR } from '@/lib/datetime';
+import { includesNormalized } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -148,10 +149,10 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
 
     if (!productSearch.trim()) return active;
 
-    const term = productSearch.toLowerCase().trim();
+    const term = productSearch.trim();
     return active.filter(({ product }) =>
-      product.nomeProduto.toLowerCase().includes(term) ||
-      (product.sku && product.sku.toLowerCase().includes(term)),
+      includesNormalized(product.nomeProduto, term) ||
+      (product.sku ? includesNormalized(product.sku, term) : false),
     );
   }, [produtos, productSearch]);
 

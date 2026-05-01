@@ -295,6 +295,7 @@ function checkMissingExportImpl() {
   for (const perm of exportPerms) {
     const mod = perm.split(':')[0];
     const has = compFiles.some(f => {
+      // eslint-disable-next-line no-restricted-syntax -- match em path de arquivo (sem acentos)
       if (!relative(ROOT, f).toLowerCase().includes(mod)) return false;
       const src = readFile(f);
       return src.includes('export') && (src.includes('download') || src.includes('csv') || src.includes('pdf') || src.includes('xlsx') || src.includes('Export') || src.includes('Exportar'));

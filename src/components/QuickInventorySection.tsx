@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Search, Loader2, ClipboardCheck, Package, CheckCircle, AlertTriangle, Zap, RotateCcw, Trash2 } from 'lucide-react';
 import { fmtBRL, formatFixedBR } from '@/lib/formatters';
+import { normalizeSearchText } from '@/lib/utils';
 
 interface CountedItem {
   productId: string;
@@ -64,8 +65,10 @@ export default function QuickInventorySection() {
       .limit(20);
 
     if (term.trim()) {
-      const safeTerm = term.trim().replace(/[%_\\]/g, '\\$&');
-      query = query.or(`nome_produto.ilike.%${safeTerm}%,sku.ilike.%${safeTerm}%`);
+      // Busca accent-insensitive via colunas geradas *_unaccent
+      const safeTerm = normalizeSearchText(term.trim()).replace(/[%_\\]/g, '\\$&');
+      // eslint-disable-next-line no-restricted-syntax -- coluna *_unaccent já normalizada
+      query = query.or(`nome_produto_unaccent.ilike.%${safeTerm}%,sku_unaccent.ilike.%${safeTerm}%`);
     }
     if (cat) {
       query = query.eq('categoria', cat);

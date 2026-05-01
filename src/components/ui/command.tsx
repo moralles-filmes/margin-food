@@ -6,6 +6,17 @@ import { Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 
+// IMPORTANTE: o filtro padrão do cmdk é case-insensitive mas NÃO remove acentos.
+// Ao usar <Command> com itens de UI (produtos, categorias, fornecedores, etc.),
+// SEMPRE passe a prop `filter` com normalização de acentos:
+//
+//   <Command filter={(value, search) =>
+//     normalizeSearchText(value).includes(normalizeSearchText(search)) ? 1 : 0
+//   }>
+//
+// `normalizeSearchText` está em '@/lib/utils'. Padrão de busca documentado em
+// CLAUDE.md → "Padrões de Busca de Texto".
+
 const Command = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive>,
   React.ComponentPropsWithoutRef<typeof CommandPrimitive>

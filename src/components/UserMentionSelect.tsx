@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { X, AtSign } from 'lucide-react';
+import { includesNormalized } from '@/lib/utils';
 
 interface UserOption {
   id: string;
@@ -38,10 +39,10 @@ export default function UserMentionSelect({ value, onChange, placeholder = 'Busc
   }, [value, users, selectedUser]);
 
   const filtered = useMemo(() => {
-    const q = search.replace('@', '').toLowerCase();
+    const q = search.replace('@', '');
     if (!q) return users.slice(0, 10);
     return users.filter(u =>
-      u.nome.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)
+      includesNormalized(u.nome, q) || includesNormalized(u.email, q)
     ).slice(0, 10);
   }, [users, search]);
 

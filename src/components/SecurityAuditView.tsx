@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatDateBR } from '@/lib/datetime';
 import { exportTableToExcel } from '@/lib/exportHelpers';
+import { includesNormalized } from '@/lib/utils';
 
 interface AuditEntry {
   id: string;
@@ -50,14 +51,13 @@ export default function SecurityAuditView() {
 
   const filtered = useMemo(() => {
     let list = entries;
-    if (filterAction) list = list.filter(e => e.acao.includes(filterAction));
+    if (filterAction) list = list.filter(e => includesNormalized(e.acao, filterAction));
     if (filterSearch) {
-      const s = filterSearch.toLowerCase();
       list = list.filter(e =>
-        e.acao.toLowerCase().includes(s) ||
-        e.tabela.toLowerCase().includes(s) ||
-        (e.valor_novo || '').toLowerCase().includes(s) ||
-        (e.valor_anterior || '').toLowerCase().includes(s)
+        includesNormalized(e.acao, filterSearch) ||
+        includesNormalized(e.tabela, filterSearch) ||
+        includesNormalized(e.valor_novo || '', filterSearch) ||
+        includesNormalized(e.valor_anterior || '', filterSearch)
       );
     }
     return list;

@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { useFormDirtyGuard } from '@/hooks/useFormDirtyGuard';
 import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
-import { cn } from '@/lib/utils';
+import { cn, includesNormalized } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 
 // ─── Types ───
@@ -85,12 +85,11 @@ function createsCycle(nodeId: string, newParentId: string | null, allNodes: CatR
 
 function filterTree(nodes: CatNode[], search: string): CatNode[] {
   if (!search) return nodes;
-  const lc = search.toLowerCase();
   const filter = (list: CatNode[]): CatNode[] => {
     const result: CatNode[] = [];
     for (const node of list) {
       const filteredChildren = filter(node.children);
-      if (node.nome.toLowerCase().includes(lc) || node.codigo.toLowerCase().includes(lc) || filteredChildren.length > 0) {
+      if (includesNormalized(node.nome, search) || includesNormalized(node.codigo, search) || filteredChildren.length > 0) {
         result.push({ ...node, children: filteredChildren });
       }
     }

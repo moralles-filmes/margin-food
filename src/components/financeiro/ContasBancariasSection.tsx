@@ -22,6 +22,7 @@ import { useFormDirtyGuard } from '@/hooks/useFormDirtyGuard';
 import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
 import TableActions from '@/components/ui/TableActions';
 import * as XLSX from 'xlsx';
+import { includesNormalized } from '@/lib/utils';
 
 // ─── Types ───
 interface ContaBancaria {
@@ -154,7 +155,7 @@ export default function ContasBancariasSection({ onNavigateExtrato }: ContasBanc
 
   // ─── Filtering ───
   const filtered = items.filter(c => {
-    const matchSearch = !search || c.nome.toLowerCase().includes(search.toLowerCase()) || (c.banco || '').toLowerCase().includes(search.toLowerCase());
+    const matchSearch = !search || includesNormalized(c.nome, search) || includesNormalized(c.banco || '', search);
     const matchTipo = tipoFiltro === 'ALL' || c.tipo === tipoFiltro;
     return matchSearch && matchTipo;
   });

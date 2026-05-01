@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { fmtBRL, formatDateBR } from '@/lib/formatters';
+import { includesNormalized } from '@/lib/utils';
 import { useMercadoStore, SolicMercado, SolicMercadoItem, Aprovacao } from '@/hooks/useMercadoStore';
 import { useRecebimentoStore } from '@/hooks/useRecebimentoStore';
 import { Button } from '@/components/ui/button';
@@ -101,7 +102,7 @@ export default function MercadoSazonaisView() {
       if (filterStatus && s.status !== filterStatus) return false;
       if (filterTipo && s.tipo !== filterTipo) return false;
       if (filterPrioridade && s.prioridade !== filterPrioridade) return false;
-      if (searchText && !s.titulo.toLowerCase().includes(searchText.toLowerCase())) return false;
+      if (searchText && !includesNormalized(s.titulo, searchText)) return false;
       return true;
     });
   }, [store.solicitacoes, filterStatus, filterTipo, filterPrioridade, searchText]);

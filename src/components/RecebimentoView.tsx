@@ -13,6 +13,7 @@ import {
   XCircle, Inbox, Search, Eye, Truck, ArrowRight,
 } from 'lucide-react';
 import { formatDateBR, formatDateTimeBR } from '@/lib/formatters';
+import { includesNormalized } from '@/lib/utils';
 
 const STATUS_RECEB: Record<string, { label: string; color: string }> = {
   AGUARDANDO_RECEBIMENTO: { label: 'Aguardando Recebimento', color: 'bg-warning/15 text-warning' },
@@ -59,7 +60,7 @@ export default function RecebimentoView() {
       if (filterStatus && r.status !== filterStatus) return false;
       if (searchText) {
         const solic = solicMap[r.solicitacao_id];
-        if (!solic?.titulo.toLowerCase().includes(searchText.toLowerCase())) return false;
+        if (!solic || !includesNormalized(solic.titulo, searchText)) return false;
       }
       return true;
     });

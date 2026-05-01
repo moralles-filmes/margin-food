@@ -179,6 +179,34 @@ margin-food/
 
 > **Mantenha esta seção atualizada após cada sessão de trabalho.**
 
+### 2026-05-01 — Fix Definitivo Busca Accent-Insensitive (sistema inteiro + blindagem)
+
+- **Bug recorrente**: Buscar `salmao`, `acucar`, `oleo` (sem acento) não encontrava `Salmão`, `Açúcar`, `Óleo`. Já tinha sido corrigido em **2026-03-31 (commit `834ccad`)** com helpers `normalizeSearchText()`/`includesNormalized()` em [src/lib/utils.ts:12-26](src/lib/utils.ts#L12-L26), mas regrediu porque a adoção foi parcial e não havia lint/regra forçando o padrão.
+- **Causa-raiz da regressão**: Sem ESLint rule, sem documentação obrigatória, sem code-review check. **9 componentes client-side** continuaram com `.toLowerCase().includes()` (case-insensitive mas accent-sensitive) e **3 buscas server-side** (Catálogo Estoque, Inventário Rápido, Auditoria Global) usavam `.ilike()` direto — `ILIKE` no Postgres é case-insensitive mas **NÃO** remove acentos. Componentes criados depois do fix nasceram bugados.
+
+#### Correção em 3 fases
+
+**Fase 1 — 9 componentes client-side**: substituídos `.toLowerCase().includes()` por `includesNormalized()` em [MercadoSazonaisView.tsx:104](src/components/MercadoSazonaisView.tsx#L104), [RecebimentoView.tsx:62](src/components/RecebimentoView.tsx#L62), [AlertasFaltaEstoqueView.tsx:105-106](src/components/compras/AlertasFaltaEstoqueView.tsx#L105-L106), [InventarioView.tsx:520](src/components/InventarioView.tsx#L520), [SecurityAuditView.tsx:53,57-60](src/components/SecurityAuditView.tsx#L53-L60), [UserMentionSelect.tsx:44](src/components/UserMentionSelect.tsx#L44), [RequisicaoEstoqueSection.tsx:153-154](src/components/RequisicaoEstoqueSection.tsx#L153-L154), [CadastroBaseTree.tsx:93](src/components/financeiro/CadastroBaseTree.tsx#L93), [ContasBancariasSection.tsx:157](src/components/financeiro/ContasBancariasSection.tsx#L157).
+
+**Fase 2 — Backend (colunas geradas + índices GIN trigram)**:
+- Migration [`20260501200000_add_unaccent_search_columns.sql`](supabase/migrations/20260501200000_add_unaccent_search_columns.sql): wrapper `public.immutable_unaccent(text)` (a função `unaccent` da extensão é STABLE — não pode ser usada em `GENERATED STORED`/índices, então criamos versão IMMUTABLE com a forma de 2 args + `regdictionary` constante). Colunas geradas `nome_produto_unaccent` e `sku_unaccent` em `produtos`, `entity_unaccent` em `audit_logs`. Extensão `pg_trgm` instalada. Índices `idx_*_unaccent_trgm` (GIN trigram) para ILIKE com substring rápido.
+- Migration [`20260501200001_add_unaccent_ficha_componentes.sql`](supabase/migrations/20260501200001_add_unaccent_ficha_componentes.sql): mesmo tratamento para `ficha_componentes.nome` (Edge Function `ficha-tecnica` action `list_componentes` tinha o mesmo bug em [supabase/functions/ficha-tecnica/index.ts:609](supabase/functions/ficha-tecnica/index.ts#L609)).
+- Frontend: 3 hooks/components ([useEstoqueGeralStore.ts:386-391](src/hooks/useEstoqueGeralStore.ts#L386-L391), [QuickInventorySection.tsx:66-72](src/components/QuickInventorySection.tsx#L66-L72), [GlobalAuditView.tsx:111-116](src/components/GlobalAuditView.tsx#L111-L116)) agora usam `*_unaccent.ilike` + `normalizeSearchText()` no termo enviado.
+- Edge Function [`ficha-tecnica/index.ts:609-619`](supabase/functions/ficha-tecnica/index.ts#L609-L619) usa `ilike('nome_unaccent', ...)` com normalização inline (Deno não importa de `@/lib/utils`).
+
+**Fase 3 — Blindagem para impedir nova regressão**:
+- ESLint `no-restricted-syntax` em [eslint.config.js](eslint.config.js): 3 seletores bloqueantes — `.toLowerCase().includes()`, `.ilike(...)` (chamada direta) e `Literal/TemplateElement` contendo `.ilike.` (cobre `or('col.ilike.val')`). Mensagens explicam a regra e como justificar disable inline. Linting pós-fix: zero violações.
+- Nova seção **"Padrões de Busca de Texto (OBRIGATÓRIO)"** em [CLAUDE.md](CLAUDE.md) abaixo de "Componentes Padronizados".
+- Comentário no topo de [src/components/ui/command.tsx](src/components/ui/command.tsx) avisando que `<Command>` precisa de `filter` custom (já é o padrão nos 5 usos atuais).
+- Disables inline justificados nos 4 usos legítimos (3 com colunas `*_unaccent` + 1 path de arquivo em `scripts/rbac-lint.ts`).
+
+#### Verificação
+- TS clean (`npx tsc --noEmit`).
+- 10/10 testes em [src/test/search-normalize.test.ts](src/test/search-normalize.test.ts).
+- Smoke test SQL: `SELECT * FROM produtos WHERE nome_produto_unaccent ILIKE '%salmao%'` retorna `Salmão Fresco` e `Poupa De Salmão` ✅.
+- Build OK em 24.89s, PWA com 143 entries.
+- ESLint: zero violações de `no-restricted-syntax`.
+
 ### 2026-05-01 — Fix "Erro ao salvar produto" no cadastro do Estoque (defasagem de SKU counter)
 
 - **Bug**: Ao cadastrar produto novo no Estoque/Catálogo, toast genérico `"Erro ao salvar produto"` sem detalhe. DevTools revelou `23505 unique violation produtos_company_sku_unique` — `generate_next_sku` retornava SKU já existente.
@@ -551,6 +579,17 @@ margin-food/
 - **TableActions**: Localizado em `components/ui/TableActions.tsx`. Deve ser usado em todas as tabelas de gerenciamento para fornecer botões de Editar e Excluir consistentes, com suporte a permissões RBAC e diálogos de confirmação integrados.
 - **FormCloseConfirmDialog**: Usado em conjunto com `useFormDirtyGuard` para prevenir perda de dados em formulários.
 - **SearchableSelect**: Localizado em `components/ui/SearchableSelect.tsx`. Deve ser usado em todos os selects com 10+ opções (produtos, categorias, locais, usuários, fornecedores). Props: `value`, `onValueChange`, `options: {value, label}[]`, `placeholder`, `searchPlaceholder`, `modal` (true para uso dentro de Dialog).
+
+### Padrões de Busca de Texto (OBRIGATÓRIO)
+
+> Bloqueado por ESLint (`no-restricted-syntax`). Toda nova busca de texto na UI **DEVE** seguir este padrão.
+
+- **Cliente:** SEMPRE usar `includesNormalized(haystack, needle)` ou `normalizeSearchText(text)` de `@/lib/utils`. **NUNCA** `.toLowerCase().includes()`.
+- **Servidor (PostgREST `.ilike()` / `.or('col.ilike.val')` / RPC):** SEMPRE buscar em coluna `*_unaccent` (gerada como `lower(immutable_unaccent(...))`) e normalizar o termo cliente-side com `normalizeSearchText()` antes de enviar. Razão: `ILIKE` no Postgres é case-insensitive mas **NÃO** remove acentos.
+- **Combobox / cmdk `<Command>`:** SEMPRE passar prop `filter={(val, search) => normalizeSearchText(val).includes(normalizeSearchText(search)) ? 1 : 0}`. O default do cmdk não normaliza acentos.
+- **Edge Function (Deno):** mesma regra — usar coluna `*_unaccent` e normalizar termo inline (não há import de `@/lib/utils` em Deno).
+- **Nova tabela com coluna pesquisável por usuário:** adicionar coluna gerada `*_unaccent` e índice `gin (col_unaccent gin_trgm_ops)` na **mesma migration** que cria a tabela. Wrapper `public.immutable_unaccent(text)` já existe.
+- **Casos legítimos não-busca** (path de arquivo, uuid::text, código sem acento): justificar com `// eslint-disable-next-line no-restricted-syntax -- <motivo>`.
 
 ### 2026-03-30 — Padronização de CRUD Financeiro (Hardening)
 - **Módulos Padronizados**: `Contas a Pagar`, `Contas a Receber`, `Categorias`, `Centros de Custo`, `Plano de Contas` e `Contas Bancárias`.

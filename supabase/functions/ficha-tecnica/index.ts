@@ -606,7 +606,18 @@ async function listarComponentes(client: any, companyId: string, payload: any) {
   if (tipo) query = query.eq('tipo', tipo)
   if (categoria) query = query.eq('categoria', categoria)
   if (ativo !== undefined) query = query.eq('ativo', ativo)
-  if (search) query = query.ilike('nome', `%${search}%`)
+  if (search) {
+    // Busca accent-insensitive: usa coluna gerada nome_unaccent + termo normalizado.
+    // ILIKE no Postgres é case-insensitive mas NÃO remove acentos. Coluna gerada
+    // criada em migration 20260501200001_add_unaccent_ficha_componentes.sql.
+    const safeTerm = String(search)
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .toLowerCase()
+      .replace(/[%_\\]/g, '\\$&')
+    // eslint-disable-next-line no-restricted-syntax -- coluna nome_unaccent já normalizada
+    query = query.ilike('nome_unaccent', `%${safeTerm}%`)
+  }
 
   // Cursor-based pagination (cursor = last component name + id)
   if (cursor?.nome && cursor?.id) {
