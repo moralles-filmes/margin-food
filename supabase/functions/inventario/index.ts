@@ -136,7 +136,7 @@ serve(async (req) => {
       const { id } = payload
       const [invRes, itensRes] = await Promise.all([
         adminClient.from('inventarios').select('*, turnos(nome)').eq('id', id).eq('company_id', companyId).is('deleted_at', null).single(),
-        adminClient.from('inventario_itens').select('*, produtos:produto_id(nome_produto, categoria, unidade_medida, unidade_compra, fator_conversao_padrao)')
+        adminClient.from('inventario_itens').select('*, produtos:produto_id(nome_produto, categoria, local_estoque, unidade_medida, unidade_compra, fator_conversao_padrao)')
           .eq('inventario_id', id).eq('company_id', companyId).is('deleted_at', null).order('created_at'),
       ])
       if (invRes.error) throw invRes.error

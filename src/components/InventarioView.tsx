@@ -60,6 +60,8 @@ export default function InventarioView() {
 
   const [subView, setSubView] = useState<SubView>('list');
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterCategoria, setFilterCategoria] = useState<string>('');
+  const [filterLocal, setFilterLocal] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState('');
   const [turnoFilter, setTurnoFilter] = useState('');
   const [justificativa, setJustificativa] = useState('');
@@ -96,6 +98,12 @@ export default function InventarioView() {
       store.loadTurnos();
     }
   }, [subView, store.turnos.length, store.loadTurnos]);
+
+  useEffect(() => {
+    setSearchTerm('');
+    setFilterCategoria('');
+    setFilterLocal('');
+  }, [store.currentInventario?.id]);
 
   const handleCreate = async () => {
     if (!formTurno) { return; }
@@ -499,10 +507,20 @@ export default function InventarioView() {
     const isFinalizado = inv.status === 'FINALIZADO';
     const isSobAnalise = inv.status === 'SOB_ANALISE';
 
+    const categoriaOptions = Array.from(
+      new Set(itens.map(i => i.produtos?.categoria).filter(Boolean) as string[])
+    ).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+
+    const localOptions = Array.from(
+      new Set(itens.map(i => i.produtos?.local_estoque).filter(Boolean) as string[])
+    ).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+
     const filteredItems = itens.filter(i => {
-      if (!searchTerm) return true;
       const nome = i.produtos?.nome_produto || '';
-      return nome.toLowerCase().includes(searchTerm.toLowerCase());
+      if (searchTerm && !nome.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+      if (filterCategoria && i.produtos?.categoria !== filterCategoria) return false;
+      if (filterLocal && i.produtos?.local_estoque !== filterLocal) return false;
+      return true;
     });
 
     const totalItens = itens.length;
@@ -696,11 +714,36 @@ export default function InventarioView() {
           </DialogContent>
         </Dialog>
 
-        {/* Search */}
-        <div className="relative">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input placeholder="Buscar produto..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="pl-9 bg-secondary border-border" maxLength={200} />
+        {/* Search + filtros */}
+        <div className="flex flex-col sm:flex-row gap-2">
+          <div className="relative flex-1">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input placeholder="Buscar produto..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="pl-9 bg-secondary border-border" maxLength={200} />
+          </div>
+          <SearchableSelect
+            value={filterCategoria}
+            onValueChange={setFilterCategoria}
+            options={categoriaOptions.map(c => ({ value: c, label: c }))}
+            placeholder="Categoria"
+            searchPlaceholder="Buscar categoria..."
+            emptyMessage="Nenhuma categoria"
+            className="sm:w-48 bg-secondary border-border"
+          />
+          <SearchableSelect
+            value={filterLocal}
+            onValueChange={setFilterLocal}
+            options={localOptions.map(l => ({ value: l, label: l }))}
+            placeholder="Local"
+            searchPlaceholder="Buscar local..."
+            emptyMessage="Nenhum local"
+            className="sm:w-48 bg-secondary border-border"
+          />
         </div>
+        {(searchTerm || filterCategoria || filterLocal) && (
+          <p className="text-[11px] text-muted-foreground -mt-1">
+            Exibindo {filteredItems.length} de {itens.length} produtos
+          </p>
+        )}
 
         {/* Items table */}
         <div className="bg-card border border-border rounded-xl overflow-hidden">

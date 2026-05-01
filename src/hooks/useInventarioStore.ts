@@ -47,6 +47,7 @@ export interface InventarioItem {
   produtos?: {
     nome_produto: string;
     categoria: string;
+    local_estoque: string | null;
     unidade_medida: string | null;
     unidade_compra: string | null;
     fator_conversao_padrao: number | null;
