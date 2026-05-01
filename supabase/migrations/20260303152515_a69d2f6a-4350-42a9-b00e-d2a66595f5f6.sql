@@ -1,7 +1,7 @@
--- Migration de dados da Lovable — não aplicável em banco novo
+-- Migration de dados de template legado — não aplicável em banco novo
 -- DO $$
 -- DECLARE
 --   v_target uuid := '68fd6ab4-0088-4671-b77f-7991ac26c42a';
 -- BEGIN
---   -- skipped: data migration from Lovable, not needed on fresh database
+--   -- skipped: data migration from legacy template, not needed on fresh database
 -- END $$;

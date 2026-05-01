@@ -56,7 +56,7 @@
 | PWA | vite-plugin-pwa |
 | QR Code | qrcode |
 
-### 2.2 Backend (Lovable Cloud / Supabase)
+### 2.2 Backend (Supabase)
 | Camada | Tecnologia |
 |--------|-----------|
 | Banco de dados | PostgreSQL 15+ com RLS |
@@ -69,8 +69,8 @@
 ### 2.3 Infraestrutura
 - **Autenticação:** JWT via Supabase Auth, sem auto-confirm de email
 - **Isolamento de tenant:** `company_id` NOT NULL em todas as tabelas, `FORCE RLS` global
-- **Secrets:** Gerenciados via Lovable Cloud (nunca hardcoded)
-- **Deploy:** Automático via Lovable (frontend + edge functions)
+- **Secrets:** Gerenciados via Supabase (Edge Function secrets) e Vercel (env vars de build/runtime) — nunca hardcoded
+- **Deploy:** Frontend automatizado via Vercel (push em `main`); Edge Functions deployadas via `supabase functions deploy`
 
 ---
 
@@ -272,7 +272,7 @@ CREATE POLICY "select_own_company" ON tabela
 
 **Tabelas:** `ai_logs`, `ai_insights`, `ai_score_historico`
 
-**Edge Function:** `ai-chat/` — Processa prompts com contexto do tenant (17+ queries de contexto) usando modelos Lovable AI
+**Edge Function:** `ai-chat/` — Processa prompts com contexto do tenant (17+ queries de contexto) usando provedor LLM configurado por secret na Edge Function (chave da API nunca exposta ao cliente)
 
 **Segurança:** Todas as queries de contexto aplicam `.eq("company_id", companyId)` via adminClient com company_id resolvido do perfil do usuário
 

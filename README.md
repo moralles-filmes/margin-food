@@ -1,73 +1,50 @@
-# Welcome to your Lovable project
+# Margin Food (MarginPro)
 
-## Project info
+Sistema inteligente de gestão para restaurantes focado em controle de CMV, estoque, compras, ficha técnica, financeiro e aumento de margem operacional. Multi-tenant (multi-empresa) com isolamento por `company_id` em todas as tabelas e RLS global no PostgreSQL.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Stack
 
-## How can I edit this code?
+- **Frontend:** Vite 5 + React 18 + TypeScript 5
+- **UI:** shadcn/ui + Radix UI + Tailwind CSS 3
+- **Estado:** TanStack React Query 5
+- **Forms:** React Hook Form 7 + Zod 3
+- **Backend:** Supabase (PostgreSQL 15+, Auth, Edge Functions Deno, Realtime, Storage)
+- **PWA:** vite-plugin-pwa (auto-update)
+- **Build:** Bun
 
-There are several ways of editing your application.
+## Como rodar localmente
 
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+Pré-requisitos: [Bun](https://bun.sh) instalado.
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+bun install         # instala dependências
+bun run dev         # dev server em http://localhost:8080
+bun run build       # build de produção
+bun run test        # testes (Vitest)
+bun run lint        # ESLint
 ```
 
-**Edit a file directly in GitHub**
+## Variáveis de ambiente
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+Crie um `.env.local` na raiz com:
 
-**Use GitHub Codespaces**
+```
+VITE_SUPABASE_URL=...
+VITE_SUPABASE_ANON_KEY=...
+```
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+URL e chave anon do projeto Supabase estão no dashboard do projeto (Settings → API). Nunca commitar `service_role` no frontend.
 
-## What technologies are used for this project?
+## Deploy
 
-This project is built with:
+- **Frontend:** auto-deploy via Vercel ao push em `main`.
+- **Edge Functions:** `supabase functions deploy <nome>`.
+- **Migrations:** `supabase db push` (após validação local).
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## Documentação
 
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+- [`CLAUDE.md`](CLAUDE.md) — contexto completo do projeto, stack e últimas atualizações
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — guia completo de arquitetura
+- [`docs/DOMAIN_RULES.md`](docs/DOMAIN_RULES.md) — regras de negócio
+- [`docs/ENTERPRISE_SAFE_STANDARDS.md`](docs/ENTERPRISE_SAFE_STANDARDS.md) — padrões de segurança
+- [`TAREFAS.md`](TAREFAS.md) — tarefas em andamento
