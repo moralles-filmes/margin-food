@@ -745,8 +745,8 @@ export default function EstoqueGeralView() {
             onFilterChange={store.updateMovFilters}
             onLoadMore={store.loadMoreMovimentacoes}
             hasMore={store.movHasMore}
-            totalCount={store.movTotalCount}
-            serverTotals={store.movServerTotals}
+            movKpis={store.movKpis}
+            movKpisLoading={store.movKpisLoading}
           />
           <NovaMovimentacaoModal
             open={movModalOpen}

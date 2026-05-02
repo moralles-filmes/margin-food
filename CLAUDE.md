@@ -174,6 +174,7 @@ margin-food/
 - **Financeiro: RPCs `_guarded_`** — Todas as operações financeiras (CP, CR, lançamentos, conciliação) usam RPCs prefixadas `_guarded_` com `assert_tenant()`, `has_permission()`, optimistic locking via `updated_at` e log em `fin_audit_logs`.
 - **Conciliação Bancária** — 3 destinos: `lancamento`, `conta_pagar`, `conta_receber`. Categoria filtrada por `tipo` lowercase (`'receita'`/`'despesa'`). Linhas persistidas em `sessionStorage`. "Ignorar" via tabela `fin_conciliacao_ignoradas`.
 - **Bundle: xlsx em chunk separado** — `vite.config.ts` tem `manualChunks: { 'vendor-xlsx': ['xlsx'] }`. Seções raras do FinanceiroView são `React.lazy`. Não desfazer isso.
+- **KPIs agregados são SUM no Postgres, nunca `reduce` no client** — Cards/dashboards com `Total R$`, `Qtd Total`, `Registros` devem consumir RPC dedicada (`get_*_kpis`) que retorna o agregado calculado no banco. Padrão idêntico ao `produtos.saldo_atual`. **Nunca** fazer `.select(...)` sem `.limit()` seguido de `.reduce()` para somar — isso baixa a tabela inteira pela rede e cresce O(n). Referência: `get_movimentacoes_kpis` (migration `20260502180000`). Retornar ambos os lados (entrada+saída, receita+despesa, etc.) em uma única chamada para que o toggle/aba vire filtro client-side instantâneo.
 
 ---
 
@@ -201,6 +202,7 @@ margin-food/
 - [ ] Testar fluxo completo: criar empresa → criar admin → login admin → criar usuários
 - [ ] Validar isolamento: logar como user do tenant A e tentar `GET /rest/v1/faturamento_periodos_legacy` — deve retornar só registros do mesmo tenant
 - [ ] Dropar tabelas `*_bkp_reset_20260301` (18 tabelas, snapshot tem ~14 meses) e `z_canary_test`
+- [ ] Auditar outras telas (Compras, CMV, Financeiro, Relatórios) por padrão `select sem limit + reduce client` — substituir por RPC com SUM (mesmo padrão de `get_movimentacoes_kpis`)
 
 ---
 

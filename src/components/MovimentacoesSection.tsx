@@ -57,15 +57,18 @@ interface Props {
   }) => void;
   onLoadMore?: () => void;
   hasMore?: boolean;
-  totalCount?: number | null;
-  serverTotals?: { totalValor: number; totalQtd: number } | null;
+  movKpis?: {
+    entradas: { total_valor: number; total_qtd: number; registros: number };
+    saidas: { total_valor: number; total_qtd: number; registros: number };
+  } | null;
+  movKpisLoading?: boolean;
 }
 
 export default function MovimentacoesSection({
   movimentacoes, produtos, categorias, getProdNome,
   canCreateMov, onOpenMovModal,
   canEditPricing, recalculating, recalcularPrecos,
-  onRefresh, onFilterChange, onLoadMore, hasMore, totalCount, serverTotals,
+  onRefresh, onFilterChange, onLoadMore, hasMore, movKpis, movKpisLoading,
 }: Props) {
   const { hasPermission } = useAuth();
   const canEdit = hasPermission('stock:movements:edit') || useCan('estoque:movimentacoes:edit');
@@ -109,11 +112,13 @@ export default function MovimentacoesSection({
     pushFilters(dir, filterProduto, filterCategoria, filterSetor, filterDateFrom, filterDateTo, showCancelled);
   }, [pushFilters, filterProduto, filterCategoria, filterSetor, filterDateFrom, filterDateTo, showCancelled]);
 
-  // Single effect for filter changes AND initial mount (no duplicate mount effect)
+  // Re-sincroniza filtros de servidor quando qualquer filtro muda.
+  // direction é excluída das deps: handleDirectionChange já chama pushFilters,
+  // evitando o duplo disparo que causava 2x round-trips por toggle.
   useEffect(() => {
     pushFilters(direction, filterProduto, filterCategoria, filterSetor, filterDateFrom, filterDateTo, showCancelled);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterProduto, filterCategoria, filterSetor, filterDateFrom, filterDateTo, showCancelled, direction]);
+  }, [filterProduto, filterCategoria, filterSetor, filterDateFrom, filterDateTo, showCancelled]);
 
   // All movimentacoes are now already server-filtered
   const filtered = movimentacoes;
@@ -372,40 +377,55 @@ export default function MovimentacoesSection({
       )}
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-3 gap-2">
-        <div className="bg-card border border-border rounded-xl p-3 text-center">
-          <div className="flex items-center justify-center gap-1.5 mb-1">
-            <DollarSign className="w-3.5 h-3.5 text-muted-foreground" />
-            <p className="text-[10px] text-muted-foreground">
-              {direction === 'entradas' ? 'Total Entradas' : 'Total Saídas'}
-            </p>
+      {(() => {
+        const side = movKpis?.[direction === 'entradas' ? 'entradas' : 'saidas'];
+        const kpiValor = side?.total_valor ?? totalValor;
+        const kpiQtd   = side?.total_qtd   ?? totalQtd;
+        const kpiRegs  = side?.registros    ?? operationalFiltered.length;
+        const skelClass = movKpisLoading ? 'animate-pulse bg-muted rounded' : '';
+        return (
+          <div className="grid grid-cols-3 gap-2">
+            <div className="bg-card border border-border rounded-xl p-3 text-center">
+              <div className="flex items-center justify-center gap-1.5 mb-1">
+                <DollarSign className="w-3.5 h-3.5 text-muted-foreground" />
+                <p className="text-[10px] text-muted-foreground">
+                  {direction === 'entradas' ? 'Total Entradas' : 'Total Saídas'}
+                </p>
+              </div>
+              <p className={`text-lg font-bold ${direction === 'entradas' ? 'text-success' : 'text-destructive'} ${skelClass}`}>
+                {movKpisLoading ? '     ' : fmtBRL(kpiValor)}
+              </p>
+            </div>
+            <div className="bg-card border border-border rounded-xl p-3 text-center">
+              <div className="flex items-center justify-center gap-1.5 mb-1">
+                <Package className="w-3.5 h-3.5 text-muted-foreground" />
+                <p className="text-[10px] text-muted-foreground">Qtd Total</p>
+              </div>
+              <p className={`text-lg font-bold text-foreground ${skelClass}`}>
+                {movKpisLoading ? '   ' : formatFixedBR(kpiQtd, 1)}
+              </p>
+            </div>
+            <div className="bg-card border border-border rounded-xl p-3 text-center">
+              <div className="flex items-center justify-center gap-1.5 mb-1">
+                {direction === 'entradas'
+                  ? <TrendingUp className="w-3.5 h-3.5 text-muted-foreground" />
+                  : <TrendingDown className="w-3.5 h-3.5 text-muted-foreground" />
+                }
+                <p className="text-[10px] text-muted-foreground">
+                  {direction === 'entradas' ? 'Registros' : 'Perdas (R$)'}
+                </p>
+              </div>
+              <p className={`text-lg font-bold ${direction === 'saidas' && perdasTotal > 0 ? 'text-destructive' : 'text-foreground'} ${skelClass}`}>
+                {movKpisLoading
+                  ? '   '
+                  : direction === 'entradas'
+                    ? kpiRegs
+                    : fmtBRL(perdasTotal)}
+              </p>
+            </div>
           </div>
-          <p className={`text-lg font-bold ${direction === 'entradas' ? 'text-success' : 'text-destructive'}`}>
-            {fmtBRL(serverTotals ? serverTotals.totalValor : totalValor)}
-          </p>
-        </div>
-        <div className="bg-card border border-border rounded-xl p-3 text-center">
-          <div className="flex items-center justify-center gap-1.5 mb-1">
-            <Package className="w-3.5 h-3.5 text-muted-foreground" />
-            <p className="text-[10px] text-muted-foreground">Qtd Total</p>
-          </div>
-          <p className="text-lg font-bold text-foreground">{formatFixedBR(serverTotals ? serverTotals.totalQtd : totalQtd, 1)}</p>
-        </div>
-        <div className="bg-card border border-border rounded-xl p-3 text-center">
-          <div className="flex items-center justify-center gap-1.5 mb-1">
-            {direction === 'entradas'
-              ? <TrendingUp className="w-3.5 h-3.5 text-muted-foreground" />
-              : <TrendingDown className="w-3.5 h-3.5 text-muted-foreground" />
-            }
-            <p className="text-[10px] text-muted-foreground">
-              {direction === 'entradas' ? 'Registros' : 'Perdas (R$)'}
-            </p>
-          </div>
-          <p className={`text-lg font-bold ${direction === 'saidas' && perdasTotal > 0 ? 'text-destructive' : 'text-foreground'}`}>
-            {direction === 'entradas' ? (totalCount != null ? totalCount : operationalFiltered.length) : fmtBRL(perdasTotal)}
-          </p>
-        </div>
-      </div>
+        );
+      })()}
 
       {/* Top 5 */}
       {top5.length > 0 && (
