@@ -242,8 +242,11 @@ export function useEstoqueGeralStore() {
   const [movCursor, setMovCursor] = useState<{ created_at: string; id: string } | null>(null);
   const [movHasMore, setMovHasMore] = useState(true);
   const [movFilters, setMovFilters] = useState<MovFilters>({});
-  const [movTotalCount, setMovTotalCount] = useState<number | null>(null);
-  const [movServerTotals, setMovServerTotals] = useState<{ totalValor: number; totalQtd: number } | null>(null);
+  const [movKpis, setMovKpis] = useState<{
+    entradas: { total_valor: number; total_qtd: number; registros: number };
+    saidas: { total_valor: number; total_qtd: number; registros: number };
+  } | null>(null);
+  const [movKpisLoading, setMovKpisLoading] = useState(false);
 
   const ESTOQUE_PAGE = 50;
   const MAX_FETCH = 1000; // Supabase default limit
@@ -433,7 +436,7 @@ export function useEstoqueGeralStore() {
   }, [fetchSaldos, fetchProdutoGlobalCounts, prodFilters]);
 
   // === Fetch movimentacoes via cursor-based RPC ===
-  const fetchMovimentacoes = useCallback(async (filters?: MovFilters, cursor?: { created_at: string; id: string } | null, append = false) => {
+  const fetchMovimentacoes = useCallback(async (filters?: MovFilters, cursor?: { created_at: string; id: string } | null, append = false, opts: { skipKpis?: boolean } = {}) => {
     const f = filters ?? movFilters;
     const rpcParams: Record<string, unknown> = {
       p_limit: ESTOQUE_PAGE,
@@ -446,44 +449,20 @@ export function useEstoqueGeralStore() {
       p_show_cancelled: f.showCancelled || false,
     };
 
-    // Fetch total count + aggregates on first load (not on append/load-more)
-    if (!append) {
-      let countQuery = supabase
-        .from('movimentacoes_estoque')
-        .select('id', { count: 'exact', head: true });
-      if (f.direction) countQuery = countQuery.eq('direction', f.direction);
-      if (f.produtoId) countQuery = countQuery.eq('produto_id', f.produtoId);
-      if (f.setor) countQuery = countQuery.eq('setor', f.setor);
-      if (f.dateFrom) countQuery = countQuery.gte('data', f.dateFrom);
-      if (f.dateTo) countQuery = countQuery.lte('data', f.dateTo);
-      if (!f.showCancelled) countQuery = countQuery.eq('status', 'ATIVO');
-
-      // Also fetch server-side totals for KPIs
-      let totalsQuery = supabase
-        .from('movimentacoes_estoque')
-        .select('custo_total, custo_unitario, quantidade');
-      if (f.direction) totalsQuery = totalsQuery.eq('direction', f.direction);
-      if (f.produtoId) totalsQuery = totalsQuery.eq('produto_id', f.produtoId);
-      if (f.setor) totalsQuery = totalsQuery.eq('setor', f.setor);
-      if (f.dateFrom) totalsQuery = totalsQuery.gte('data', f.dateFrom);
-      if (f.dateTo) totalsQuery = totalsQuery.lte('data', f.dateTo);
-      if (!f.showCancelled) totalsQuery = totalsQuery.eq('status', 'ATIVO');
-      // Exclude estornos from totals
-      totalsQuery = totalsQuery.not('tipo', 'in', '("ENTRADA_ESTORNO","SAIDA_ESTORNO")');
-
-      const [{ count }, { data: totalsRows }] = await Promise.all([countQuery, totalsQuery]);
-      setMovTotalCount(count ?? null);
-
-      if (totalsRows) {
-        const totalValor = totalsRows.reduce((sum: number, r: any) => {
-          const quantidade = Number(r.quantidade) || 0;
-          const custoUnitario = Number(r.custo_unitario) || 0;
-          const custoTotal = Number(r.custo_total) || 0;
-          return sum + (quantidade > 0 && custoUnitario >= 0 ? quantidade * custoUnitario : custoTotal);
-        }, 0);
-        const totalQtd = totalsRows.reduce((sum: number, r: any) => sum + (Number(r.quantidade) || 0), 0);
-        setMovServerTotals({ totalValor, totalQtd });
-      }
+    // Fetch KPIs (entradas + saidas) em uma unica round-trip no primeiro load.
+    // Quando só direction mudou, opts.skipKpis=true e o toggle vira filtro client-side instantâneo.
+    if (!append && !opts.skipKpis) {
+      setMovKpisLoading(true);
+      const { data: kpisData } = await supabase.rpc('get_movimentacoes_kpis', {
+        p_produto_id:     f.produtoId || null,
+        p_setor:          f.setor || null,
+        p_date_from:      f.dateFrom || null,
+        p_date_to:        f.dateTo || null,
+        p_show_cancelled: f.showCancelled || false,
+      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if (kpisData) setMovKpis(kpisData as any);
+      setMovKpisLoading(false);
     }
 
     const c = cursor !== undefined ? cursor : movCursor;
@@ -589,10 +568,21 @@ export function useEstoqueGeralStore() {
   }, [movHasMore, fetchMovimentacoes]);
 
   const updateMovFilters = useCallback((newFilters: MovFilters) => {
+    // Quando só direction muda, os KPIs já foram buscados para ambos os lados —
+    // basta trocar o lado exibido (skipKpis=true). O refetch da lista (50 linhas) é necessário.
+    const onlyDirectionChanged =
+      movFilters.produtoId === newFilters.produtoId &&
+      movFilters.categoria === newFilters.categoria &&
+      movFilters.setor === newFilters.setor &&
+      movFilters.dateFrom === newFilters.dateFrom &&
+      movFilters.dateTo === newFilters.dateTo &&
+      movFilters.showCancelled === newFilters.showCancelled &&
+      movFilters.direction !== newFilters.direction;
+
     setMovFilters(newFilters);
     setMovCursor(null);
-    fetchMovimentacoes(newFilters, null, false);
-  }, [fetchMovimentacoes]);
+    fetchMovimentacoes(newFilters, null, false, { skipKpis: onlyDirectionChanged });
+  }, [fetchMovimentacoes, movFilters]);
 
   const refetch = useCallback(async () => {
     setLoading(true);
@@ -753,7 +743,7 @@ export function useEstoqueGeralStore() {
 
   return {
     produtos, movimentacoes, saldos, saldosLoading, categorias, loading,
-    prodHasMore, prodTotalCount, prodPage, movHasMore, movTotalCount, movServerTotals, movFilters, prodFilters, prodGlobalCounts, prodCatalogLoading, prodCatalogError,
+    prodHasMore, prodTotalCount, prodPage, movHasMore, movKpis, movKpisLoading, movFilters, prodFilters, prodGlobalCounts, prodCatalogLoading, prodCatalogError,
     addProduto, updateProduto, deleteProduto,
     addMovimentacao,
     refetch, refreshSaldos, fetchAllProdutos, loadMoreProdutos, goToProdPage, loadMoreMovimentacoes, updateMovFilters, updateProdFilters,
