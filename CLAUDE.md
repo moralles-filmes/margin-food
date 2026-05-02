@@ -179,6 +179,24 @@ margin-food/
 
 > **Mantenha esta seção atualizada após cada sessão de trabalho.**
 
+### 2026-05-02 — Fix Custo Unitário em Saída para produtos clonados Moralles → Ren Sushi
+
+- **Bug**: Em **Controle de Estoque → Saída**, ao selecionar produtos antigos (clonados da Moralles), o campo "Custo unitário (R$)" ficava vazio e exibia *"⚠️ Item sem custo cadastrado. Registre uma entrada ou custo padrão."* — mesmo com `custo_padrao` preenchido. Produtos cadastrados na Ren Sushi pós-clone (10 itens) funcionavam.
+- **Causa raiz — clone incompleto**: A migration [20260409150000_clone_catalog_moralles_to_ren_sushi.sql:78-102](supabase/migrations/20260409150000_clone_catalog_moralles_to_ren_sushi.sql#L78-L102) copiou apenas um subconjunto de colunas e omitiu **`default_cost_purchase_unit`**, **`default_cost_base_unit`**, **`unidade_compra`** e **`fator_conversao_padrao`**. As 4 ficaram com o default da coluna (`0`/`'UN'`/`1`). Validado no banco: 231 de 242 produtos ativos da Ren Sushi tinham `default_cost_base_unit = 0` e `custo_padrao > 0`.
+- **Causa raiz — frontend mascarava o problema**: [CustoItemDisplay.tsx:32-41](src/components/estoque/CustoItemDisplay.tsx#L32-L41) tinha `case 'padrao': return p.defaultCostBaseUnit ?? (custoPadrao / fator)`. O `??` só aciona o fallback se o valor for `null`/`undefined`; como `dbToProduto` faz `Number(...) || 0`, chegava como `0` (`NOT NULL DEFAULT 0` na coluna). `0 ?? fallback` retorna `0` — fallback `custoPadrao / fator` **nunca era avaliado**. `costBase = 0` → `hasCost = false` → o `useEffect` de auto-fill em [NovaMovimentacaoModal.tsx:184-193](src/components/estoque/NovaMovimentacaoModal.tsx#L184-L193) deixava `custoUnitario` em branco.
+- **Bonus descoberto**: Salmão Fresco da Ren Sushi tinha `unidade_compra = 'UN'` (default), enquanto na Moralles era `'KG'` — o backfill também corrigiu isso.
+
+#### Fix em 2 camadas
+
+**Camada 1 — Backfill (banco)** [`20260502120000_backfill_ren_sushi_cloned_product_costs.sql`](supabase/migrations/20260502120000_backfill_ren_sushi_cloned_product_costs.sql): UPDATE com JOIN por SKU (validado: 0 duplicatas em ambas empresas) que copia `unidade_compra`, `fator_conversao_padrao`, `default_cost_purchase_unit`, `default_cost_base_unit` da Moralles para a Ren Sushi. Idempotente via `WHERE r.default_cost_base_unit = 0` (preserva os 10 produtos pós-clone). Triggers analisados (`produtos_force_company_id` em UPDATE só faz `NEW.company_id := OLD.company_id`, `trg_block_placeholder_company` não toca Ren Sushi, `audit_trigger_fn` aceita `auth.uid()=NULL`) — sem `DISABLE TRIGGER USER`. Pós-fix: 241/242 com `default_cost_base_unit > 0`, 0 na categoria do bug, 1 produto sem nenhum custo (criado em branco para preencher depois).
+
+**Camada 2 — Defesa em profundidade (frontend)** [src/components/estoque/CustoItemDisplay.tsx:27-50](src/components/estoque/CustoItemDisplay.tsx#L27-L50): `getActiveCostBase` e `getActiveCostPurchase` agora checam `def > 0` em vez de `?? fallback`. Razão: backend devolve `0` (não null) por causa do `NOT NULL DEFAULT 0`. Esta correção é independente da migração — protege contra qualquer empresa futura clonada por código que reproduza o mesmo bug, e ativa o fallback existente (`custoPadrao / fator`).
+
+#### Verificação
+- `npx tsc --noEmit` — limpo
+- Query de validação pós-backfill: 241/242 com `default_cost_base_unit > 0`, 0 sem default mas com `custo_padrao`
+- Smoke test pendente (UI): Login Ren Sushi → Saída → "Bisnaga de Doce de Leite" deve auto-preencher R$21,02; Salmão Fresco deve mostrar `unidade_compra = KG`.
+
 ### 2026-05-01 — Hardening Dashboards Round 2 (3 achados da Fase 4 endereçados)
 
 Após o fix do "Abaixo do Mínimo", aplicada rodada de hardening nos 3 achados não-bloqueantes da auditoria Fase 4:

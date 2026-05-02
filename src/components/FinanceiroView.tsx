@@ -110,6 +110,24 @@ function FinSpinner() {
   );
 }
 
+// ── Tab grouping ─────────────────────────────────────────────────────────────
+const TAB_GROUPS = {
+  dashboard:  { label: null },
+  operacoes:  { label: 'Operações' },
+  config:     { label: 'Configurações' },
+  relatorios: { label: 'Relatórios & Análise' },
+} as const;
+
+type FinTabGroup = keyof typeof TAB_GROUPS;
+
+interface FinTab {
+  id: FinSubTab;
+  label: string;
+  icon: typeof LayoutDashboard;
+  badge?: number;
+  group: FinTabGroup;
+}
+
 // Map internal FinSubTab ids to registry subtab keys
 const TAB_REGISTRY_MAP: Record<FinSubTab, string> = {
   dashboard: 'dashboard',
@@ -173,26 +191,28 @@ export default function FinanceiroView() {
     }
   }, [activeTab]);
 
-  const allTabs: { id: FinSubTab; label: string; icon: typeof LayoutDashboard; badge?: number }[] = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'fechamento', label: 'Fechamento de Caixa', icon: DollarSign },
-    { id: 'cadastros', label: 'Cadastros Base', icon: FolderTree },
-    { id: 'contas', label: 'Contas Bancárias', icon: Landmark },
-    { id: 'lancamentos', label: 'Lançamentos', icon: Receipt },
-    { id: 'pagar', label: 'Contas a Pagar', icon: CreditCard, badge: pagarPendingCount || undefined },
-    { id: 'receber', label: 'Contas a Receber', icon: ArrowDownToLine },
-    { id: 'fluxo', label: 'Fluxo de Caixa', icon: Activity },
-    { id: 'dre', label: 'DRE / DFC', icon: BarChart3 },
-    { id: 'orcamento', label: 'Orçamento', icon: Target },
-    // conciliacao moved inside Lançamentos
-    { id: 'alertas', label: 'Alertas', icon: Bell },
-    { id: 'recorrencias', label: 'Recorrências', icon: RefreshCw },
-    { id: 'categorizacao', label: 'Categorização', icon: FolderTree },
-    { id: 'relatorio_socios', label: 'Relatório Sócios', icon: BarChart3 },
-    { id: 'projecao', label: 'Projeção', icon: TrendingUp },
-    { id: 'kpis', label: 'KPIs', icon: BarChart3 },
-    { id: 'auditoria', label: 'Auditoria', icon: Building2 },
-    { id: 'comparativo', label: 'Comparativo', icon: Activity },
+  const allTabs: FinTab[] = [
+    { id: 'dashboard',        label: 'Dashboard',           icon: LayoutDashboard, group: 'dashboard'  },
+    // Operações
+    { id: 'fechamento',       label: 'Fechamento de Caixa', icon: DollarSign,      group: 'operacoes'  },
+    { id: 'lancamentos',      label: 'Lançamentos',          icon: Receipt,         group: 'operacoes'  },
+    { id: 'pagar',            label: 'Contas a Pagar',       icon: CreditCard,      group: 'operacoes', badge: pagarPendingCount || undefined },
+    { id: 'receber',          label: 'Contas a Receber',     icon: ArrowDownToLine, group: 'operacoes'  },
+    { id: 'alertas',          label: 'Alertas',              icon: Bell,            group: 'operacoes'  },
+    { id: 'recorrencias',     label: 'Recorrências',         icon: RefreshCw,       group: 'operacoes'  },
+    // Configurações
+    { id: 'cadastros',        label: 'Cadastros Base',       icon: FolderTree,      group: 'config'     },
+    { id: 'contas',           label: 'Contas Bancárias',     icon: Landmark,        group: 'config'     },
+    { id: 'categorizacao',    label: 'Categorização',        icon: FolderTree,      group: 'config'     },
+    // Relatórios & Análise
+    { id: 'fluxo',            label: 'Fluxo de Caixa',       icon: Activity,        group: 'relatorios' },
+    { id: 'dre',              label: 'DRE / DFC',            icon: BarChart3,       group: 'relatorios' },
+    { id: 'orcamento',        label: 'Orçamento',            icon: Target,          group: 'relatorios' },
+    { id: 'projecao',         label: 'Projeção',             icon: TrendingUp,      group: 'relatorios' },
+    { id: 'kpis',             label: 'KPIs',                 icon: BarChart3,       group: 'relatorios' },
+    { id: 'relatorio_socios', label: 'Relatório Sócios',     icon: BarChart3,       group: 'relatorios' },
+    { id: 'comparativo',      label: 'Comparativo',          icon: Activity,        group: 'relatorios' },
+    { id: 'auditoria',        label: 'Auditoria',            icon: Building2,       group: 'relatorios' },
   ];
 
   // Filter tabs by permission
@@ -201,7 +221,21 @@ export default function FinanceiroView() {
       const registryKey = TAB_REGISTRY_MAP[tab.id];
       return visibleSubtabs.includes(registryKey);
     });
-  }, [visibleSubtabs]);
+  }, [visibleSubtabs, pagarPendingCount]);
+
+  // Group the RBAC-filtered tabs for rendering
+  const groupedTabs = useMemo(() => {
+    const order: FinTabGroup[] = [];
+    const map = new Map<FinTabGroup, typeof tabs>();
+    for (const tab of tabs) {
+      if (!map.has(tab.group)) {
+        order.push(tab.group);
+        map.set(tab.group, []);
+      }
+      map.get(tab.group)!.push(tab);
+    }
+    return order.map(g => ({ group: g, meta: TAB_GROUPS[g], tabs: map.get(g)! }));
+  }, [tabs]);
 
   // If active tab is not visible, switch to first visible
   const effectiveTab = useMemo(() => {
@@ -228,16 +262,29 @@ export default function FinanceiroView() {
 
       <Tabs value={effectiveTab} onValueChange={v => setActiveTab(v as FinSubTab)}>
         <TabsList className="flex flex-wrap h-auto gap-1 bg-muted/50 p-1">
-          {tabs.map(tab => {
-            const Icon = tab.icon;
-            return (
-              <TabsTrigger key={tab.id} value={tab.id} className="flex items-center gap-1.5 text-xs data-[state=active]:bg-background relative">
-                <Icon className="w-3.5 h-3.5" />
-                {tab.label}
-                <SubTabBadge count={tab.badge} />
-              </TabsTrigger>
-            );
-          })}
+          {groupedTabs.map(({ group, meta, tabs: groupTabs }) => (
+            <div key={group} className="contents">
+              {meta.label && (
+                <span
+                  role="none"
+                  aria-hidden="true"
+                  className="w-full mt-1 mb-0.5 px-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/60 pointer-events-none select-none"
+                >
+                  {meta.label}
+                </span>
+              )}
+              {groupTabs.map(tab => {
+                const Icon = tab.icon;
+                return (
+                  <TabsTrigger key={tab.id} value={tab.id} className="flex items-center gap-1.5 text-xs data-[state=active]:bg-background relative">
+                    <Icon className="w-3.5 h-3.5" />
+                    {tab.label}
+                    <SubTabBadge count={tab.badge} />
+                  </TabsTrigger>
+                );
+              })}
+            </div>
+          ))}
         </TabsList>
 
         <TabsContent value="dashboard"><DashboardFinanceiroSection onNavigate={setActiveTab} /></TabsContent>

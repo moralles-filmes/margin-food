@@ -304,8 +304,8 @@ export default function NovaMovimentacaoModal({
   return (
     <>
       <Dialog open={open} onOpenChange={(v) => { if (!v) guardedClose(); }}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader className="sticky top-0 z-10 bg-background pb-3 border-b border-border">
+        <DialogContent className="max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
+          <DialogHeader className="pb-3 border-b border-border flex-shrink-0">
             <DialogTitle className="flex items-center gap-2 text-sm">
               <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${
                 preset === 'entrada' ? 'bg-success/15' : preset === 'saida' ? 'bg-destructive/15' : 'bg-primary/15'
@@ -318,6 +318,7 @@ export default function NovaMovimentacaoModal({
             </DialogTitle>
           </DialogHeader>
 
+          <div className="overflow-y-auto flex-1">
           <form onSubmit={handleSubmit} className="space-y-3 pt-2">
             {/* Produto */}
             <div>
@@ -511,6 +512,7 @@ export default function NovaMovimentacaoModal({
               </Button>
             </DialogFooter>
           </form>
+          </div>
         </DialogContent>
       </Dialog>
 

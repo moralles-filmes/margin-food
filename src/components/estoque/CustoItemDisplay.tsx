@@ -29,7 +29,12 @@ export function getActiveCostBase(p: ProdutoExtended, mode?: CostOrigin): number
   switch (origin) {
     case 'media30': return p.avg30CostBaseUnit ?? 0;
     case 'ultima': return p.lastCostBaseUnit ?? 0;
-    default: return p.defaultCostBaseUnit ?? (p.custoPadrao > 0 && (p.fatorConversaoPadrao ?? 1) > 0 ? p.custoPadrao / (p.fatorConversaoPadrao ?? 1) : 0);
+    default: {
+      const def = p.defaultCostBaseUnit ?? 0;
+      if (def > 0) return def;
+      const fator = p.fatorConversaoPadrao ?? 1;
+      return p.custoPadrao > 0 && fator > 0 ? p.custoPadrao / fator : 0;
+    }
   }
 }
 
@@ -38,7 +43,11 @@ export function getActiveCostPurchase(p: ProdutoExtended, mode?: CostOrigin): nu
   switch (origin) {
     case 'media30': return p.avg30CostPurchaseUnit ?? 0;
     case 'ultima': return p.lastCostPurchaseUnit ?? 0;
-    default: return p.defaultCostPurchaseUnit ?? p.custoPadrao ?? 0;
+    default: {
+      const def = p.defaultCostPurchaseUnit ?? 0;
+      if (def > 0) return def;
+      return p.custoPadrao ?? 0;
+    }
   }
 }
 
