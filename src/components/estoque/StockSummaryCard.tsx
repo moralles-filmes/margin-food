@@ -78,7 +78,7 @@ export default function StockSummaryCard() {
                     </p>
                   </TooltipTrigger>
                   <TooltipContent side="bottom" className="max-w-xs text-xs">
-                    Calculado por: saldo atual × custo médio 30 dias (unidade base), com fallback para última compra e custo padrão.
+                    Σ (entradas − saídas) pelo custo registrado em cada movimentação. Mesmo valor base de "Total Entradas − Total Saídas".
                   </TooltipContent>
                 </Tooltip>
               )}
