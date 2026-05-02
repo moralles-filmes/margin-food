@@ -179,6 +179,14 @@ margin-food/
 
 > **Mantenha esta seção atualizada após cada sessão de trabalho.**
 
+### 2026-05-02 — Fix Divergência "SALDO TOTAL EM ESTOQUE" vs "VALOR EM ESTOQUE"
+
+- **Bug**: No Controle de Estoque, o card "SALDO TOTAL EM ESTOQUE" (topo da Estoque Geral, via `get_stock_summary`) e o card "VALOR EM ESTOQUE" (Dashboard, via `get_stock_dashboard`) mostravam valores diferentes — R$19.339,49 vs R$16.584,87 (Ren Sushi). Deveriam ser idênticos.
+- **Causa raiz**: A rodada de hardening de 2026-05-01 migrou `get_stock_dashboard` para usar `produtos.saldo_atual` (cache canônico), mas **deixou `get_stock_summary` com a lógica antiga** de Cumulative Ledger (`SUM(custo_total) FROM movimentacoes_estoque`). As duas fórmulas divergiam por: (1) ledger não filtra `p.ativo=true`; (2) ledger usa custo histórico por movimentação, não `avg30_cost_base_unit`; (3) nuances de ajustes de inventário que o cache absorve corretamente mas o ledger não.
+- **Fix** ([20260502130000_fix_stock_summary_use_saldo_cache.sql](supabase/migrations/20260502130000_fix_stock_summary_use_saldo_cache.sql)): `get_stock_summary` reescrita para usar `SUM(saldo_atual × custo_efetivo)` sobre produtos ativos — mesma fórmula e mesmo coalesce de custos (`avg30 → last → default → 0`) da `get_stock_dashboard`. Os demais campos (`items_count`, `missing_cost_items_count`) já usavam a fórmula correta e foram preservados.
+- **Princípio reforçado**: `produtos.saldo_atual` é a fonte única da verdade. Toda RPC de leitura de valor de estoque deve consumir o cache, nunca recalcular inline sobre movimentações.
+- **Validação**: `pg_proc` confirma que a função não contém mais `movimentacoes_estoque`/`ledger_value` e contém `saldo_atual`/`avg30_cost_base_unit`/`aggregates` (CTE novo). Smoke test pendente na UI: SALDO TOTAL e VALOR EM ESTOQUE devem exibir mesmo valor.
+
 ### 2026-05-02 — Fix Custo Unitário em Saída para produtos clonados Moralles → Ren Sushi
 
 - **Bug**: Em **Controle de Estoque → Saída**, ao selecionar produtos antigos (clonados da Moralles), o campo "Custo unitário (R$)" ficava vazio e exibia *"⚠️ Item sem custo cadastrado. Registre uma entrada ou custo padrão."* — mesmo com `custo_padrao` preenchido. Produtos cadastrados na Ren Sushi pós-clone (10 itens) funcionavam.
