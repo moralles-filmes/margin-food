@@ -179,6 +179,19 @@ margin-food/
 
 > **Mantenha esta seção atualizada após cada sessão de trabalho.**
 
+### 2026-05-02 — Fix Dashboard Controle de Estoque: `column m.user_id does not exist`
+
+- **Bug**: Aba Dashboard do Controle de Estoque exibia "Erro ao carregar dashboard — column m.user_id does not exist" para todos os tenants.
+- **Causa raiz — regressão**: `20260501195743_fix_stock_dashboard_use_saldo_cache.sql` copiou o bloco `recent_mov` de uma versão **pré-correção** de março/26 que tinha dois nomes de coluna errados: `m.user_id` (não existe — coluna real é `m.created_by`) e `pr.name` (não existe — coluna real é `pr.nome`). O mesmo bug havia sido corrigido explicitamente em `20260313001833_split_1.sql:145` (comentário literal: *"Fix 3: get_stock_dashboard — m.user_id does not exist, use m.created_by"*).
+- **Por que não foi detectado no `db push`**: PL/pgSQL valida referências a colunas apenas na **primeira execução da função**, não no `CREATE FUNCTION`. A migração foi aplicada sem erro; o crash só apareceu quando alguém abriu o Dashboard e a CTE `recent_mov` foi avaliada.
+- **Fix**: Nova migração `20260502151400_fix_get_stock_dashboard_columns.sql` com as 2 correções no bloco `recent_mov`:
+  - `pr.name` → `pr.nome`
+  - `LEFT JOIN ... ON pr.id = m.user_id` → `LEFT JOIN ... ON pr.id = m.created_by`
+  - Toda a lógica de saldo cache (cerne do fix de 01/05) permanece intacta.
+- **Blindagem**: DO-block ao final da migração executa `PERFORM 1 FROM movimentacoes_estoque m LEFT JOIN profiles pr ON pr.id = m.created_by WHERE pr.nome IS NOT NULL LIMIT 0` — força o parser do Postgres a resolver os nomes de coluna **durante o `db push`**, não em produção. Se qualquer coluna for renomeada no futuro, a migração rola back imediatamente.
+- **Padrão aplicável**: toda futura migração que junte `movimentacoes_estoque` com `profiles` deve incluir esse DO-block de blindagem ao final.
+- **Verificação**: `SELECT prosrc ILIKE '%m.created_by%' ...` confirmou `has_created_by=true, has_pr_nome=true, has_buggy_user_id=false, has_buggy_pr_name=false` no banco remoto.
+
 ### 2026-05-02 — Fix Custo Unitário em Saída para produtos clonados Moralles → Ren Sushi
 
 - **Bug**: Em **Controle de Estoque → Saída**, ao selecionar produtos antigos (clonados da Moralles), o campo "Custo unitário (R$)" ficava vazio e exibia *"⚠️ Item sem custo cadastrado. Registre uma entrada ou custo padrão."* — mesmo com `custo_padrao` preenchido. Produtos cadastrados na Ren Sushi pós-clone (10 itens) funcionavam.
