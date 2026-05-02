@@ -82,7 +82,15 @@
       "Bash(kill %1)",
       "Bash(grep -E \"\\\\.tsx$\")",
       "mcp__claude_ai_Supabase__execute_sql",
-      "mcp__claude_ai_Supabase__apply_migration"
-    ]
+      "mcp__claude_ai_Supabase__apply_migration",
+      "Bash(git fetch *)",
+      "Bash(git merge *)",
+      "Skill(update-config)",
+      "Skill(update-config:*)",
+      "Bash(git log *)",
+      "Bash(git pull *)",
+      "Bash(git add *)"
+    ],
+    "deny": []
   }
 }
