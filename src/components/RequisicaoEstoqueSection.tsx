@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
-import { Plus, X, Check, Inbox, AlertTriangle, ShoppingCart, RefreshCw, Ban, Search, ClipboardList, ChevronDown, ChevronUp, Edit3 } from 'lucide-react';
+import { Plus, X, Check, Inbox, AlertTriangle, ShoppingCart, RefreshCw, Ban, Search, ClipboardList, ChevronDown, ChevronUp, Edit3, History } from 'lucide-react';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { parseUTCToBR } from '@/lib/datetime';
 import { includesNormalized } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -106,6 +107,13 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
   const [expandedReq, setExpandedReq] = useState<string | null>(null);
   const [listaFixaOpen, setListaFixaOpen] = useState(false);
 
+  const [historicoOpen, setHistoricoOpen] = useState(false);
+  const [historicoItems, setHistoricoItems] = useState<Requisicao[]>([]);
+  const [historicoTotal, setHistoricoTotal] = useState(0);
+  const [historicoLoading, setHistoricoLoading] = useState(false);
+  const [historicoLoadingMore, setHistoricoLoadingMore] = useState(false);
+  const [expandedHistReq, setExpandedHistReq] = useState<string | null>(null);
+
   const [setor, setSetor] = useState(profile?.sector || 'Cozinha');
   const [observacao, setObservacao] = useState('');
   const [itens, setItens] = useState<ManualItem[]>([]);
@@ -172,7 +180,7 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
     try {
       if (append) setLoadingMore(true); else setLoading(true);
       const { data, error } = await supabase.functions.invoke('requisicao-estoque', {
-        body: { action: 'listar', limit: PAGE_SIZE, offset },
+        body: { action: 'listar', bucket: 'pendentes', limit: PAGE_SIZE, offset },
       });
       if (error) throw error;
       if (append) {
@@ -191,9 +199,34 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
     }
   }, [onBadgeRefresh]);
 
+  const loadHistorico = useCallback(async (offset = 0, append = false) => {
+    try {
+      if (append) setHistoricoLoadingMore(true); else setHistoricoLoading(true);
+      const { data, error } = await supabase.functions.invoke('requisicao-estoque', {
+        body: { action: 'listar', bucket: 'historico', limit: PAGE_SIZE, offset },
+      });
+      if (error) throw error;
+      if (append) setHistoricoItems(prev => [...prev, ...(data?.data || [])]);
+      else setHistoricoItems(data?.data || []);
+      setHistoricoTotal(data?.total ?? 0);
+    } catch (err) {
+      console.error('Error loading historico:', err);
+      toast.error('Erro ao carregar histórico');
+    } finally {
+      setHistoricoLoading(false);
+      setHistoricoLoadingMore(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadRequisicoes();
   }, [loadRequisicoes]);
+
+  useEffect(() => {
+    if (historicoOpen && historicoItems.length === 0 && !historicoLoading) {
+      loadHistorico();
+    }
+  }, [historicoOpen, historicoItems.length, historicoLoading, loadHistorico]);
 
   const getProdNome = (id: string) => produtos.find(p => p.id === id)?.nomeProduto || id.slice(0, 8);
   const getSaldo = (id: string) => saldos[id]?.saldo || 0;
@@ -332,6 +365,8 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
         toast.success(result.mensagem || 'Item atendido com baixa registrada.');
         setAttendDialog(null);
         loadRequisicoes();
+        setHistoricoItems([]); setHistoricoTotal(0);
+        if (historicoOpen) loadHistorico();
       } else {
         toast.error(result?.error || result?.message || 'A baixa do estoque não foi confirmada para este item');
       }
@@ -367,6 +402,8 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
       if (result?.success && result.movement_id) {
         toast.success(result.mensagem || 'Item atendido com baixa registrada.');
         loadRequisicoes();
+        setHistoricoItems([]); setHistoricoTotal(0);
+        if (historicoOpen) loadHistorico();
       } else {
         toast.error(result?.error || result?.message || 'A baixa do estoque não foi confirmada para este item');
       }
@@ -410,6 +447,8 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
         toast.success(data.mensagem);
         setRejectDialog(null);
         loadRequisicoes();
+        setHistoricoItems([]); setHistoricoTotal(0);
+        if (historicoOpen) loadHistorico();
       } else {
         toast.error(data?.error || data?.message || 'Erro ao recusar item');
       }
@@ -437,6 +476,8 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
       if (data?.success) {
         toast.success(data.mensagem, { duration: 5000 });
         loadRequisicoes();
+        setHistoricoItems([]); setHistoricoTotal(0);
+        if (historicoOpen) loadHistorico();
       } else {
         toast.error(data?.error || data?.message || 'Erro ao atender');
       }
@@ -463,6 +504,8 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
       if (data?.success) {
         toast.success(data.mensagem);
         loadRequisicoes();
+        setHistoricoItems([]); setHistoricoTotal(0);
+        if (historicoOpen) loadHistorico();
       } else {
         toast.error(data?.error || 'Erro ao negar');
       }
@@ -489,6 +532,8 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
       if (data?.success) {
         toast.success(data.mensagem || 'Requisição cancelada.');
         loadRequisicoes();
+        setHistoricoItems([]); setHistoricoTotal(0);
+        if (historicoOpen) loadHistorico();
       } else {
         toast.error(data?.message || data?.error || 'Erro ao cancelar');
       }
@@ -499,7 +544,7 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
     }
   };
 
-  const pendentes = requisicoes.filter(req => req.status === 'SOLICITADA' || req.status === 'PARCIALMENTE_ATENDIDA').length;
+  const pendentes = requisicoes.filter(req => hasPendingItems(req.requisicao_estoque_itens || [])).length;
 
   return (
     <>
@@ -513,6 +558,16 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
             <Button size="sm" variant="ghost" onClick={() => loadRequisicoes()} disabled={loading}>
               <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
             </Button>
+            {formMode === 'none' && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+                onClick={() => setHistoricoOpen(true)}
+              >
+                <History className="w-3.5 h-3.5" /> Histórico
+              </Button>
+            )}
             {canCreate && formMode === 'none' && (
               <>
                 <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={() => setFormMode('lista-fixa')}>
@@ -690,9 +745,9 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
           <div className="flex justify-center py-8">
             <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
           </div>
-        ) : requisicoes.length > 0 ? (
+        ) : requisicoes.filter(req => hasPendingItems(req.requisicao_estoque_itens || [])).length > 0 ? (
           <div className="space-y-2">
-            {requisicoes.map((req, index) => {
+            {requisicoes.filter(req => hasPendingItems(req.requisicao_estoque_itens || [])).map((req, index) => {
               const isOwn = req.solicitante_user_id === user?.id;
               const isPending = canActOnRequisicao(req.status);
               const isExpanded = expandedReq === req.id;
@@ -1011,6 +1066,128 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ── Histórico Sheet ────────────────────────────────────── */}
+      <Sheet open={historicoOpen} onOpenChange={setHistoricoOpen}>
+        <SheetContent side="right" className="w-full sm:max-w-md flex flex-col p-0">
+          <SheetHeader className="px-4 pt-5 pb-3 border-b border-border">
+            <SheetTitle className="text-sm">Histórico de Requisições</SheetTitle>
+            <SheetDescription className="text-[11px]">
+              Requisições encerradas (todos itens aceitos ou recusados) e canceladas.
+              {historicoTotal > 0 && ` ${historicoTotal} encerrada${historicoTotal !== 1 ? 's' : ''}.`}
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
+            {historicoLoading ? (
+              <div className="flex justify-center py-8">
+                <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : historicoItems.length === 0 ? (
+              <div className="bg-card border border-border rounded-xl p-8 text-center">
+                <Inbox className="w-12 h-12 mx-auto text-muted-foreground/30 mb-3" />
+                <p className="text-sm font-medium text-foreground mb-1">Sem histórico</p>
+                <p className="text-xs text-muted-foreground">Nenhuma requisição encerrada ainda.</p>
+              </div>
+            ) : (
+              <>
+                {historicoItems.map((req, index) => {
+                  const isExpanded = expandedHistReq === req.id;
+                  const itemCount = req.requisicao_estoque_itens?.length || 0;
+                  const atendidosCount = req.requisicao_estoque_itens?.filter(i => i.status === 'ATENDIDO').length || 0;
+                  const recusadosCount = req.requisicao_estoque_itens?.filter(i => i.status === 'RECUSADO').length || 0;
+
+                  return (
+                    <div key={req.id} className="bg-card border border-border rounded-xl animate-fade-up" style={{ animationDelay: `${index * 20}ms` }}>
+                      <button
+                        type="button"
+                        className="w-full flex items-center justify-between p-3 text-left"
+                        onClick={() => setExpandedHistReq(isExpanded ? null : req.id)}
+                      >
+                        <div>
+                          <p className="text-xs font-semibold text-foreground">{req.setor} • {parseUTCToBR(req.created_at)}</p>
+                          <p className="text-[10px] text-muted-foreground">
+                            {itemCount} itens
+                            {atendidosCount > 0 && <span className="text-success ml-1">• {atendidosCount} atendido{atendidosCount > 1 ? 's' : ''}</span>}
+                            {recusadosCount > 0 && <span className="text-destructive ml-1">• {recusadosCount} recusado{recusadosCount > 1 ? 's' : ''}</span>}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-[9px] px-2 py-0.5 rounded-full font-medium ${requisicaoStatusStyle(req.status)}`}>
+                            {requisicaoStatusLabel(req.status)}
+                          </span>
+                          {isExpanded ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />}
+                        </div>
+                      </button>
+
+                      {isExpanded && (
+                        <div className="px-3 pb-3 space-y-1 border-t border-border pt-2">
+                          {(req.requisicao_estoque_itens || []).map(item => {
+                            const listedItemDisplay = resolveListedRequisitionItemDisplay(item);
+                            const isPartiallyFulfilled = item.status === 'ATENDIDO' && item.quantidade_atendida > 0 && item.quantidade_atendida < item.quantidade_solicitada;
+
+                            return (
+                              <div
+                                key={item.id}
+                                className={`rounded-lg px-3 py-2 text-[11px] ${
+                                  item.status === 'RECUSADO'
+                                    ? 'bg-destructive/5 border border-destructive/15'
+                                    : item.status === 'ATENDIDO'
+                                      ? 'bg-success/5 border border-success/15'
+                                      : 'bg-secondary/30'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-foreground font-medium">{item.produtos?.nome_produto || getProdNome(item.produto_id)}</span>
+                                      <span className={`text-[8px] px-1.5 py-0.5 rounded-full font-medium ${itemStatusStyle(item.status)}`}>
+                                        {itemStatusLabel(item.status)}
+                                      </span>
+                                    </div>
+                                    {item.status === 'RECUSADO' && item.motivo_recusa && (
+                                      <p className="mt-0.5 text-[9px] text-destructive/80 italic">
+                                        Motivo: {item.motivo_recusa}
+                                      </p>
+                                    )}
+                                    {isPartiallyFulfilled && (
+                                      <p className="mt-0.5 text-[9px] text-warning italic">
+                                        Atendido parcialmente: {item.quantidade_atendida} de {item.quantidade_solicitada} {listedItemDisplay.unitLabel ?? ''}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <span className="text-muted-foreground shrink-0">
+                                    {item.quantidade_solicitada} {listedItemDisplay.unitLabel ?? ''}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {historicoItems.length < historicoTotal && (
+                  <div className="flex justify-center pt-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-xs gap-1.5"
+                      onClick={() => loadHistorico(historicoItems.length, true)}
+                      disabled={historicoLoadingMore}
+                    >
+                      {historicoLoadingMore ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : null}
+                      {historicoLoadingMore ? 'Carregando...' : `Ver mais (${historicoTotal - historicoItems.length} restantes)`}
+                    </Button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
 
       <ConfirmDialog />
     </>

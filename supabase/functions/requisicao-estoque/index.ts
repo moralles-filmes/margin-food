@@ -1042,17 +1042,52 @@ serve(async (req) => {
     if (action === "listar") {
       const pageSize = Number(body.limit) || 20;
       const offset = Number(body.offset) || 0;
+      const bucket = body.bucket === "historico" ? "historico" : "pendentes";
 
-      const { data, error, count } = await supabaseUser
-        .from("requisicoes_estoque")
-        .select("id, setor, solicitante_user_id, status, observacao, created_at, atendido_por, atendido_em, requisicao_estoque_itens(id, produto_id, quantidade_solicitada, quantidade_atendida, unidade, saldo_snapshot, status, motivo_recusa, recusado_por, recusado_em, atendido_por, atendido_em, produtos(nome_produto, unidade_medida, unidade_compra))", { count: "exact" })
-        .eq("ativo", true)
-        .order("created_at", { ascending: false })
-        .range(offset, offset + pageSize - 1);
+      const ITEM_SELECT = "id, produto_id, quantidade_solicitada, quantidade_atendida, unidade, saldo_snapshot, status, motivo_recusa, recusado_por, recusado_em, atendido_por, atendido_em, produtos(nome_produto, unidade_medida, unidade_compra)";
+      const REQ_SELECT = `id, setor, solicitante_user_id, status, observacao, created_at, atendido_por, atendido_em, ativo, requisicao_estoque_itens(${ITEM_SELECT})`;
 
-      if (error) throw error;
+      // Fase 1: IDs de requisições que ainda têm ao menos 1 item SOLICITADO (scoped by RLS/tenant).
+      const { data: pendingRows, error: pendErr } = await supabaseUser
+        .from("requisicao_estoque_itens")
+        .select("requisicao_id")
+        .eq("status", "SOLICITADO");
+      if (pendErr) throw pendErr;
 
-      return jsonRes({ success: true, data, total: count ?? (data?.length || 0), request_id: requestId });
+      const pendingIds = [...new Set((pendingRows ?? []).map((r: { requisicao_id: string }) => r.requisicao_id))];
+
+      // Fase 2: filtra conforme bucket.
+      if (bucket === "pendentes") {
+        if (pendingIds.length === 0) {
+          return jsonRes({ success: true, data: [], total: 0, request_id: requestId });
+        }
+        const { data, error, count } = await supabaseUser
+          .from("requisicoes_estoque")
+          .select(REQ_SELECT, { count: "exact" })
+          .eq("ativo", true)
+          .in("id", pendingIds)
+          .order("created_at", { ascending: false })
+          .range(offset, offset + pageSize - 1);
+        if (error) throw error;
+        return jsonRes({ success: true, data, total: count ?? (data?.length || 0), request_id: requestId });
+      } else {
+        // historico = (ativo=true AND id NOT IN pendingIds) OR (ativo=false AND status='CANCELADA')
+        let query = supabaseUser
+          .from("requisicoes_estoque")
+          .select(REQ_SELECT, { count: "exact" })
+          .order("created_at", { ascending: false });
+
+        if (pendingIds.length > 0) {
+          const idList = pendingIds.map((id: string) => `"${id}"`).join(",");
+          query = query.or(`and(ativo.eq.true,id.not.in.(${idList})),and(ativo.eq.false,status.eq.CANCELADA)`);
+        } else {
+          query = query.or(`ativo.eq.true,and(ativo.eq.false,status.eq.CANCELADA)`);
+        }
+
+        const { data, error, count } = await query.range(offset, offset + pageSize - 1);
+        if (error) throw error;
+        return jsonRes({ success: true, data, total: count ?? (data?.length || 0), request_id: requestId });
+      }
     }
 
     // ========================

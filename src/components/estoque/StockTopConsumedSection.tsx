@@ -15,7 +15,10 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Cell, PieChart, Pie, Toolti
 import { fmtBRL, fmtBRLCompact, formatFixedBR, formatPercentBR } from '@/lib/formatters';
 
 interface RankedItem {
-  produto_id: string; nome_produto: string; categoria: string; unidade_medida: string;
+  produto_id: string; nome_produto: string; categoria: string;
+  // unidade_medida contém a unidade de compra para itens dual-unit (unidade_compra ≠ base)
+  // e a unidade base como fallback. Todas as quantidades já vêm convertidas pela RPC.
+  unidade_medida: string;
   consumo_total: number; custo_total: number; media_diaria: number;
   saldo_atual: number; estoque_minimo: number; cobertura_dias: number | null;
   status_estoque: 'ok' | 'atencao' | 'critico' | 'sem_estoque';
@@ -25,7 +28,7 @@ interface RankedItem {
 interface AlertItem {
   produto_id: string; nome_produto: string; status_estoque: string;
   sem_custo: boolean; consumo_total: number; saldo_atual: number;
-  cobertura_dias: number | null; unidade_medida: string;
+  cobertura_dias: number | null; unidade_medida: string; // unidade de compra (ou base como fallback)
 }
 
 interface TopConsumedData {

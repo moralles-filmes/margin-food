@@ -5,7 +5,8 @@ import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useCan, useModuleAccess } from '@/permissions/hooks';
 import { startOfMonth, endOfMonth } from 'date-fns';
-import { formatDateBR, formatInBR, formatFixedBR, fmtBRL, parseLocalDate, formatPercentBR } from '@/lib/formatters';
+import { formatInBR, formatFixedBR, fmtBRL, parseLocalDate, formatPercentBR } from '@/lib/formatters';
+import { formatDateBR } from '@/lib/datetime';
 
 const COLORS = [
   'hsl(var(--primary))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))',
