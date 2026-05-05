@@ -18,7 +18,7 @@ import { ArrowDown, ArrowUp, Settings2, X } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Switch } from '@/components/ui/switch';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { CurrencyInput } from '@/components/ui/brl-input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -355,26 +355,37 @@ export default function NovaMovimentacaoModal({
 
             {/* Quantidade */}
             <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <Label className="text-[11px] text-muted-foreground mr-1">
-                  Quantidade *
-                </Label>
-                {hasPurchaseUnit && (
-                  <div className="flex items-center gap-1.5 bg-secondary/80 px-1.5 py-0.5 rounded-md border border-border">
-                    <span className={`text-[9px] font-medium transition-colors ${!form.usePurchaseUnit ? 'text-primary' : 'text-muted-foreground'}`}>
-                      {selectedProd?.unidadeMedida}
-                    </span>
-                    <Switch
-                      checked={form.usePurchaseUnit}
-                      onCheckedChange={(v) => setForm(f => ({ ...f, usePurchaseUnit: v }))}
-                      className="scale-[0.6] h-4 w-7"
-                    />
-                    <span className={`text-[9px] font-medium transition-colors ${form.usePurchaseUnit ? 'text-primary' : 'text-muted-foreground'}`}>
-                      {selectedUnCompra}
-                    </span>
-                  </div>
-                )}
-              </div>
+              <Label className="text-[11px] text-muted-foreground">Quantidade *</Label>
+
+              {hasPurchaseUnit && selectedProd && (
+                <ToggleGroup
+                  type="single"
+                  value={form.usePurchaseUnit ? 'purchase' : 'base'}
+                  onValueChange={(v) => {
+                    if (!v) return;
+                    setForm(f => ({ ...f, usePurchaseUnit: v === 'purchase' }));
+                  }}
+                  className="grid grid-cols-2 gap-1 bg-secondary/60 p-1 rounded-md border border-border w-full"
+                >
+                  <ToggleGroupItem
+                    value="base"
+                    aria-label={`Lançar em ${selectedProd.unidadeMedida}`}
+                    className="h-11 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:shadow-sm rounded-md flex flex-col items-center justify-center"
+                  >
+                    <span className="text-xs font-semibold leading-tight">{selectedProd.unidadeMedida}</span>
+                    <span className="text-[10px] opacity-80 leading-tight">Unidade base</span>
+                  </ToggleGroupItem>
+                  <ToggleGroupItem
+                    value="purchase"
+                    aria-label={`Lançar em ${selectedUnCompra}`}
+                    className="h-11 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:shadow-sm rounded-md flex flex-col items-center justify-center"
+                  >
+                    <span className="text-xs font-semibold leading-tight">{selectedUnCompra}</span>
+                    <span className="text-[10px] opacity-80 leading-tight">Un. de compra</span>
+                  </ToggleGroupItem>
+                </ToggleGroup>
+              )}
+
               <Input
                 type="text" inputMode="decimal"
                 value={form.quantidade}
