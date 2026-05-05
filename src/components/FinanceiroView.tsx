@@ -1,14 +1,14 @@
 import { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
-import SubTabBadge from '@/components/ui/SubTabBadge';
 import { usePersistedTab } from '@/hooks/usePersistedTab';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useCan, useModuleAccess } from '@/permissions';
+import { cn } from '@/lib/utils';
+import { SubmoduleSwitcher } from '@/components/ui/SubmoduleSwitcher';
 import { Shield } from 'lucide-react';
 import {
   LayoutDashboard, FolderTree, Landmark, Receipt,
-  DollarSign, TrendingUp,
+  DollarSign, TrendingUp, LayoutGrid, Settings,
   Building2, RefreshCw, CreditCard, ArrowDownToLine, Activity, BarChart3,
   Target, Bell
 } from 'lucide-react';
@@ -119,6 +119,12 @@ const TAB_GROUPS = {
 } as const;
 
 type FinTabGroup = keyof typeof TAB_GROUPS;
+
+const GROUP_ICONS: Partial<Record<FinTabGroup, typeof LayoutDashboard>> = {
+  operacoes:  LayoutGrid,
+  config:     Settings,
+  relatorios: BarChart3,
+};
 
 interface FinTab {
   id: FinSubTab;
@@ -260,53 +266,60 @@ export default function FinanceiroView() {
         <h1 className="text-lg font-bold text-foreground">Financeiro</h1>
       </div>
 
-      <Tabs value={effectiveTab} onValueChange={v => setActiveTab(v as FinSubTab)}>
-        <TabsList className="flex flex-wrap h-auto gap-1 bg-muted/50 p-1">
-          {groupedTabs.map(({ group, meta, tabs: groupTabs }) => (
-            <div key={group} className="contents">
-              {meta.label && (
-                <span
-                  role="none"
-                  aria-hidden="true"
-                  className="w-full mt-1 mb-0.5 px-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/60 pointer-events-none select-none"
-                >
-                  {meta.label}
-                </span>
-              )}
-              {groupTabs.map(tab => {
-                const Icon = tab.icon;
-                return (
-                  <TabsTrigger key={tab.id} value={tab.id} className="flex items-center gap-1.5 text-xs data-[state=active]:bg-background relative">
-                    <Icon className="w-3.5 h-3.5" />
-                    {tab.label}
-                    <SubTabBadge count={tab.badge} />
-                  </TabsTrigger>
-                );
-              })}
-            </div>
-          ))}
-        </TabsList>
+      {/* ── Navegação por grupo ── */}
+      <div className="rounded-2xl bg-card border border-border px-4 py-3 flex flex-wrap items-center justify-center gap-2">
+        {/* Dashboard */}
+        {groupedTabs.some(g => g.group === 'dashboard') && (
+          <button
+            type="button"
+            onClick={() => setActiveTab('dashboard')}
+            className={cn(
+              'flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium',
+              effectiveTab === 'dashboard'
+                ? 'gradient-salmon text-primary-foreground shadow-md'
+                : 'bg-secondary text-foreground hover:bg-secondary/80 transition-colors',
+            )}
+          >
+            <LayoutDashboard className="w-4 h-4" />
+            Dashboard
+          </button>
+        )}
 
-        <TabsContent value="dashboard"><DashboardFinanceiroSection onNavigate={setActiveTab} /></TabsContent>
-        <TabsContent value="fechamento"><FechamentoCaixaSection /></TabsContent>
-        <TabsContent value="cadastros"><CadastrosBase /></TabsContent>
-        <TabsContent value="contas"><ContasBancariasSection onNavigateExtrato={handleNavigateExtrato} /></TabsContent>
-        <TabsContent value="lancamentos"><LancamentosSection initialContaId={extratoContaId} initialDateFrom={fluxoDateFrom} initialDateTo={fluxoDateTo} /></TabsContent>
-        <TabsContent value="pagar"><ContasPagarSection /></TabsContent>
-        <TabsContent value="receber"><ContasReceberSection /></TabsContent>
-        <TabsContent value="fluxo"><FluxoCaixaSection onNavigate={handleFluxoNavigate} /></TabsContent>
-        <TabsContent value="dre"><DREDFCSection /></TabsContent>
-        <TabsContent value="orcamento"><Suspense fallback={<FinSpinner />}><OrcamentoSection /></Suspense></TabsContent>
-        {/* conciliacao now inside LancamentosSection */}
-        <TabsContent value="alertas"><AlertasSection onNavigate={(t) => setActiveTab(t as FinSubTab)} /></TabsContent>
-        <TabsContent value="recorrencias"><RecorrenciasSection onNavigate={(t) => setActiveTab(t as FinSubTab)} /></TabsContent>
-        <TabsContent value="categorizacao"><CategorizacaoSection /></TabsContent>
-        <TabsContent value="relatorio_socios"><Suspense fallback={<FinSpinner />}><RelatorioSociosSection /></Suspense></TabsContent>
-        <TabsContent value="projecao"><Suspense fallback={<FinSpinner />}><ProjecaoFluxoSection /></Suspense></TabsContent>
-        <TabsContent value="kpis"><Suspense fallback={<FinSpinner />}><KPIsSection /></Suspense></TabsContent>
-        <TabsContent value="auditoria"><Suspense fallback={<FinSpinner />}><AuditoriaFinSection /></Suspense></TabsContent>
-        <TabsContent value="comparativo"><Suspense fallback={<FinSpinner />}><ComparativoSection /></Suspense></TabsContent>
-      </Tabs>
+        {/* Operações, Configurações, Relatórios */}
+        {groupedTabs
+          .filter(g => g.group !== 'dashboard')
+          .map(({ group, meta, tabs: groupTabs }) => (
+            <SubmoduleSwitcher
+              key={group}
+              items={groupTabs}
+              value={effectiveTab}
+              onChange={v => setActiveTab(v as FinSubTab)}
+              groupLabel={meta.label ?? undefined}
+              groupIcon={GROUP_ICONS[group]}
+            />
+          ))}
+      </div>
+
+      {/* ── Conteúdo ── */}
+      {effectiveTab === 'dashboard' && <DashboardFinanceiroSection onNavigate={setActiveTab} />}
+      {effectiveTab === 'fechamento' && <FechamentoCaixaSection />}
+      {effectiveTab === 'cadastros' && <CadastrosBase />}
+      {effectiveTab === 'contas' && <ContasBancariasSection onNavigateExtrato={handleNavigateExtrato} />}
+      {effectiveTab === 'lancamentos' && <LancamentosSection initialContaId={extratoContaId} initialDateFrom={fluxoDateFrom} initialDateTo={fluxoDateTo} />}
+      {effectiveTab === 'pagar' && <ContasPagarSection />}
+      {effectiveTab === 'receber' && <ContasReceberSection />}
+      {effectiveTab === 'fluxo' && <FluxoCaixaSection onNavigate={handleFluxoNavigate} />}
+      {effectiveTab === 'dre' && <DREDFCSection />}
+      {effectiveTab === 'orcamento' && <Suspense fallback={<FinSpinner />}><OrcamentoSection /></Suspense>}
+      {/* conciliacao está dentro de LancamentosSection */}
+      {effectiveTab === 'alertas' && <AlertasSection onNavigate={(t) => setActiveTab(t as FinSubTab)} />}
+      {effectiveTab === 'recorrencias' && <RecorrenciasSection onNavigate={(t) => setActiveTab(t as FinSubTab)} />}
+      {effectiveTab === 'categorizacao' && <CategorizacaoSection />}
+      {effectiveTab === 'relatorio_socios' && <Suspense fallback={<FinSpinner />}><RelatorioSociosSection /></Suspense>}
+      {effectiveTab === 'projecao' && <Suspense fallback={<FinSpinner />}><ProjecaoFluxoSection /></Suspense>}
+      {effectiveTab === 'kpis' && <Suspense fallback={<FinSpinner />}><KPIsSection /></Suspense>}
+      {effectiveTab === 'auditoria' && <Suspense fallback={<FinSpinner />}><AuditoriaFinSection /></Suspense>}
+      {effectiveTab === 'comparativo' && <Suspense fallback={<FinSpinner />}><ComparativoSection /></Suspense>}
     </div>
   );
 }

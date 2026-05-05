@@ -28,6 +28,10 @@ interface SubmoduleSwitcherProps<T extends string> {
   value: T;
   onChange: (id: T) => void;
   className?: string;
+  /** Label to display on trigger when value is not in items (group-level fallback) */
+  groupLabel?: string;
+  /** Icon to display on trigger when value is not in items */
+  groupIcon?: LucideIcon;
 }
 
 export function SubmoduleSwitcher<T extends string>({
@@ -35,30 +39,39 @@ export function SubmoduleSwitcher<T extends string>({
   value,
   onChange,
   className,
+  groupLabel,
+  groupIcon,
 }: SubmoduleSwitcherProps<T>) {
   const isMobile = useIsMobile();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const active = items.find(i => i.id === value) ?? items[0];
-  const ActiveIcon = active?.icon;
+  const active = items.find(i => i.id === value);
+  // When value not found: if groupLabel provided, show ghost group button; else fall back to items[0]
+  const isGroupInactive = !active && !!groupLabel;
+  const displayItem = active ?? (!groupLabel ? items[0] : undefined);
+  const DisplayIcon = displayItem?.icon ?? groupIcon;
+  const displayLabel = displayItem?.label ?? groupLabel ?? '';
 
   function handleSelect(id: T) {
     onChange(id);
     setDrawerOpen(false);
   }
 
-  const triggerContent = active ? (
+  const triggerContent = (
     <>
-      {ActiveIcon && <ActiveIcon className="w-4 h-4 shrink-0" />}
-      <span className="flex-1 text-left">{active.label}</span>
-      {!!active.badge && (
+      {DisplayIcon && <DisplayIcon className="w-4 h-4 shrink-0" />}
+      <span className="flex-1 text-left">{displayLabel}</span>
+      {displayItem && !!displayItem.badge && (
         <span className="min-w-5 h-5 px-1 rounded-full bg-destructive/80 text-[10px] text-destructive-foreground flex items-center justify-center font-bold leading-none">
-          {active.badge > 99 ? '99+' : active.badge}
+          {displayItem.badge > 99 ? '99+' : displayItem.badge}
         </span>
       )}
       <ChevronDown className="w-4 h-4 shrink-0 opacity-70" />
     </>
-  ) : null;
+  );
+
+  const activeCls = 'gradient-salmon text-primary-foreground shadow-md';
+  const inactiveCls = 'bg-secondary text-foreground hover:bg-secondary/80 transition-colors';
 
   if (isMobile) {
     return (
@@ -67,7 +80,10 @@ export function SubmoduleSwitcher<T extends string>({
           <button
             type="button"
             onClick={() => setDrawerOpen(true)}
-            className="gradient-salmon text-primary-foreground shadow-md w-full flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium"
+            className={cn(
+              'w-full flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium',
+              isGroupInactive ? inactiveCls : activeCls,
+            )}
           >
             {triggerContent}
           </button>
@@ -120,7 +136,10 @@ export function SubmoduleSwitcher<T extends string>({
         <DropdownMenuTrigger asChild>
           <button
             type="button"
-            className="gradient-salmon text-primary-foreground shadow-md flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium min-w-[180px] max-w-xs"
+            className={cn(
+              'flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium min-w-[180px] max-w-xs',
+              isGroupInactive ? inactiveCls : activeCls,
+            )}
           >
             {triggerContent}
           </button>

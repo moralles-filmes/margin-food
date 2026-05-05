@@ -18,7 +18,7 @@ function fmt(v: number) {
   return fmtBRL(v);
 }
 
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { SubmoduleSwitcher } from '@/components/ui/SubmoduleSwitcher';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -501,6 +501,8 @@ function RhViewInner({ visibleSubtabs, user }: {
     { id: 'banco-horas', subtabKey: 'banco-horas', label: 'Banco de Horas', icon: Timer },
   ];
   const availableTabs = TAB_META.filter(t => visibleSubtabs.includes(t.subtabKey));
+  const availableItems = availableTabs.map(t => ({ id: t.id, label: t.label, icon: t.icon }));
+  const effectiveSubTab: RhSubTab = availableItems.some(i => i.id === subTab) ? subTab : (availableItems[0]?.id ?? 'prontuario');
 
   const renderColabForm = (form: typeof formColab, setForm: typeof setFormColab, isEdit: boolean) => (
     <div className="grid gap-3">
@@ -567,20 +569,10 @@ function RhViewInner({ visibleSubtabs, user }: {
 
   return (
     <><div className="space-y-4">
-      <Tabs value={subTab} onValueChange={v => setSubTab(v as RhSubTab)}>
-        <TabsList className="flex flex-wrap h-auto gap-1">
-          {availableTabs.map(t => {
-            const Icon = t.icon;
-            return (
-              <TabsTrigger key={t.id} value={t.id} className="text-xs gap-1 h-8">
-                <Icon className="w-3.5 h-3.5" /> {t.label}
-              </TabsTrigger>
-            );
-          })}
-        </TabsList>
+      <SubmoduleSwitcher items={availableItems} value={effectiveSubTab} onChange={id => setSubTab(id as RhSubTab)} />
 
         {/* ── PRONTUÁRIO ── */}
-        <TabsContent value="prontuario" className="space-y-4 mt-4">
+        {effectiveSubTab === 'prontuario' && <div className="space-y-4 mt-4">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">{colaboradores.length} colaboradores</span>
@@ -677,10 +669,10 @@ function RhViewInner({ visibleSubtabs, user }: {
               </Button>
             </DialogContent>
           </Dialog>
-        </TabsContent>
+        </div>}
 
         {/* ── PONTO ── */}
-        <TabsContent value="ponto" className="space-y-4 mt-4">
+        {effectiveSubTab === 'ponto' && <div className="space-y-4 mt-4">
           {/* My quick punch */}
           {myColaboradorId && isToday && canPonto && (
             <Card className="bg-primary/5 border-primary/20">
@@ -796,10 +788,10 @@ function RhViewInner({ visibleSubtabs, user }: {
               </div>
             </DialogContent>
           </Dialog>
-        </TabsContent>
+        </div>}
 
         {/* ── BANCO DE HORAS ── */}
-        <TabsContent value="banco-horas" className="space-y-4 mt-4">
+        {effectiveSubTab === 'banco-horas' && <div className="space-y-4 mt-4">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2">
               <Label className="text-xs">Período:</Label>
@@ -860,23 +852,22 @@ function RhViewInner({ visibleSubtabs, user }: {
               )}
             </CardContent>
           </Card>
-        </TabsContent>
+        </div>}
 
         {/* ── SUB-COMPONENTS ── */}
-        <TabsContent value="escalas"><EscalasSection colaboradores={colaboradores} canManage={canManage} /></TabsContent>
-        <TabsContent value="tarefas"><TarefasSection colaboradores={colaboradores} canManage={canManage} /></TabsContent>
-        <TabsContent value="onboarding"><OnboardingSection colaboradores={colaboradores} canManage={canManage} /></TabsContent>
-        <TabsContent value="treinamento"><TreinamentoSection colaboradores={colaboradores} canManage={canManage} /></TabsContent>
-        <TabsContent value="ferias"><FeriasAfastamentosSection colaboradores={colaboradores} canManage={canManage} /></TabsContent>
-        <TabsContent value="documentos"><DocumentosComplianceSection colaboradores={colaboradores} canManage={canManage} /></TabsContent>
-        <TabsContent value="folha"><FolhaPagamentoSection colaboradores={colaboradores} canManage={canManageFolha} /></TabsContent>
-        <TabsContent value="beneficios"><BeneficiosSection colaboradores={colaboradores} canManage={canManage} /></TabsContent>
-        <TabsContent value="dashboard"><DashboardRhSection colaboradores={colaboradores} /></TabsContent>
-        <TabsContent value="custos"><ControleCustosRhSection colaboradores={colaboradores} /></TabsContent>
-        <TabsContent value="sst"><SSTSection colaboradores={colaboradores} canManage={canManage} /></TabsContent>
-        <TabsContent value="disciplinar"><GestaoDisciplinarSection colaboradores={colaboradores} canManage={canManage} /></TabsContent>
-        <TabsContent value="comunicados"><ComunicacaoInternaSection canManage={canManage} /></TabsContent>
-      </Tabs>
+        {effectiveSubTab === 'escalas' && <EscalasSection colaboradores={colaboradores} canManage={canManage} />}
+        {effectiveSubTab === 'tarefas' && <TarefasSection colaboradores={colaboradores} canManage={canManage} />}
+        {effectiveSubTab === 'onboarding' && <OnboardingSection colaboradores={colaboradores} canManage={canManage} />}
+        {effectiveSubTab === 'treinamento' && <TreinamentoSection colaboradores={colaboradores} canManage={canManage} />}
+        {effectiveSubTab === 'ferias' && <FeriasAfastamentosSection colaboradores={colaboradores} canManage={canManage} />}
+        {effectiveSubTab === 'documentos' && <DocumentosComplianceSection colaboradores={colaboradores} canManage={canManage} />}
+        {effectiveSubTab === 'folha' && <FolhaPagamentoSection colaboradores={colaboradores} canManage={canManageFolha} />}
+        {effectiveSubTab === 'beneficios' && <BeneficiosSection colaboradores={colaboradores} canManage={canManage} />}
+        {effectiveSubTab === 'dashboard' && <DashboardRhSection colaboradores={colaboradores} />}
+        {effectiveSubTab === 'custos' && <ControleCustosRhSection colaboradores={colaboradores} />}
+        {effectiveSubTab === 'sst' && <SSTSection colaboradores={colaboradores} canManage={canManage} />}
+        {effectiveSubTab === 'disciplinar' && <GestaoDisciplinarSection colaboradores={colaboradores} canManage={canManage} />}
+        {effectiveSubTab === 'comunicados' && <ComunicacaoInternaSection canManage={canManage} />}
     </div>
       <ConfirmDialog />
     </>
