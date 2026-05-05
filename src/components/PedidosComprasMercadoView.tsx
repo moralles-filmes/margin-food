@@ -17,7 +17,7 @@ import { toast } from 'sonner';
 import { fmtBRL, formatDateBR, formatDateTimeBR } from '@/lib/formatters';
 import UserMentionSelect from '@/components/UserMentionSelect';
 import ProductSearchCombobox, { type ProductOption } from '@/components/ui/ProductSearchCombobox';
-import SubTabBadge from '@/components/ui/SubTabBadge';
+import { SubmoduleSwitcher } from '@/components/ui/SubmoduleSwitcher';
 import {
   Plus, ShoppingCart, X, Check, ChevronRight, AlertTriangle,
   Clock, CheckCircle2, XCircle, Inbox, Package, Search,
@@ -771,21 +771,11 @@ export default function PedidosComprasMercadoView() {
       </div>
 
       {/* Sub-tabs */}
-      <div className="flex items-center gap-1.5 flex-wrap pb-1 pt-1">
-        {subTabs.map(tab => {
-          const TabIcon = tab.icon;
-          const active = subTab === tab.id;
-          return (
-            <button key={tab.id} onClick={() => setSubTab(tab.id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all relative ${
-                active ? 'gradient-salmon text-primary-foreground shadow-md' : 'bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80'
-              }`}>
-              <TabIcon className="w-3.5 h-3.5" /> {tab.label}
-              <SubTabBadge count={tab.count} max={9} />
-            </button>
-          );
-        })}
-      </div>
+      <SubmoduleSwitcher
+        items={subTabs.map(t => ({ ...t, badge: t.count }))}
+        value={subTab}
+        onChange={setSubTab}
+      />
 
       {/* Filters */}
       <div className="flex items-center gap-2 flex-wrap">

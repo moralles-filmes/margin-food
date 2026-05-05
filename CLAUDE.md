@@ -182,6 +182,7 @@ margin-food/
 - **TableActions**: Localizado em `components/ui/TableActions.tsx`. Deve ser usado em todas as tabelas de gerenciamento para fornecer botões de Editar e Excluir consistentes, com suporte a permissões RBAC e diálogos de confirmação integrados.
 - **FormCloseConfirmDialog**: Usado em conjunto com `useFormDirtyGuard` para prevenir perda de dados em formulários.
 - **SearchableSelect**: Localizado em `components/ui/SearchableSelect.tsx`. Deve ser usado em todos os selects com 10+ opções (produtos, categorias, locais, usuários, fornecedores). Props: `value`, `onValueChange`, `options: {value, label}[]`, `placeholder`, `searchPlaceholder`, `modal` (true para uso dentro de Dialog).
+- **SubmoduleSwitcher**: Localizado em `components/ui/SubmoduleSwitcher.tsx`. **Obrigatório** para navegação de sub-módulos — substitui a fileira horizontal de botões (`overflow-x-auto`). Exibe um botão único com o sub-módulo ativo + chevron; abre Drawer (bottom sheet) no mobile e DropdownMenu no desktop. Props: `items: {id, label, icon, badge?}[]`, `value`, `onChange`. Módulos já migrados: Estoque, Compras, Configurações, Salmão, Ficha Técnica, PedidosComprasMercado. Módulos com `<Tabs>` do shadcn (Financeiro, RH, Admin, CMV, Relatórios) mantêm o padrão nativo.
 
 ### Padrões de Busca de Texto (OBRIGATÓRIO)
 

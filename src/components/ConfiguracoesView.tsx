@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { SubmoduleSwitcher } from '@/components/ui/SubmoduleSwitcher';
 import { Settings, Users, ShieldAlert, Database, Fish, Shield, ShieldCheck, Activity } from 'lucide-react';
 import AuditView from './AuditView';
 import SecurityAuditView from './SecurityAuditView';
@@ -91,17 +92,11 @@ export default function ConfiguracoesView({ store, initialSubTab }: Props) {
         <p className="text-xs text-muted-foreground">Sistema, usuários, segurança e auditoria</p>
       </div>
 
-      <div className="flex items-center gap-1 overflow-x-auto pb-1 -mx-1 px-1">
-        {visibleViews.map(view => {
-          const Icon = view.icon;
-          const active = effectiveActive === view.id;
-          return (
-            <button key={view.id} onClick={() => setActiveView(view.id)} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${active ? 'gradient-salmon text-primary-foreground shadow-md' : 'bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80'}`}>
-              <Icon className="w-3.5 h-3.5" />{view.label}
-            </button>
-          );
-        })}
-      </div>
+      <SubmoduleSwitcher
+        items={visibleViews}
+        value={effectiveActive}
+        onChange={setActiveView}
+      />
 
       {effectiveActive === 'geral' && (
         <div className="space-y-3">

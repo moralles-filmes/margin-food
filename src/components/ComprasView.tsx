@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { usePersistedTab } from '@/hooks/usePersistedTab';
 import { ShoppingCart, Calendar, BarChart3, ClipboardList, FileDown, Plus, Search, Inbox, X, Check, Trash2, Crown, Award, Medal, Zap, AlertTriangle, ShoppingBag, Building2, ShieldAlert, PackageX } from 'lucide-react';
-import SubTabBadge from '@/components/ui/SubTabBadge';
+import { SubmoduleSwitcher } from '@/components/ui/SubmoduleSwitcher';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -200,19 +200,11 @@ export default function ComprasView() {
         <p className="text-xs text-muted-foreground">Requisições, pedidos e inteligência de reposição</p>
       </div>
 
-      <div className="flex items-center gap-1.5 flex-wrap pb-1 pt-1">
-        {subViews.map(view => {
-          const Icon = view.icon;
-          const active = activeView === view.id;
-          return (
-            <button key={view.id} onClick={() => setActiveView(view.id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all relative ${active ? 'gradient-salmon text-primary-foreground shadow-md' : 'bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80'}`}>
-              <Icon className="w-3.5 h-3.5" /> {view.label}
-              <SubTabBadge count={view.badge} />
-            </button>
-          );
-        })}
-      </div>
+      <SubmoduleSwitcher
+        items={subViews}
+        value={activeView}
+        onChange={setActiveView}
+      />
 
       {/* ====== LISTA DO DIA ====== */}
       {activeView === 'lista-dia' && (

@@ -22,7 +22,7 @@ function showTenantErrorToast(msg: string) {
   });
 }
 import { Package, Search, Filter, Plus, ArrowUpDown, AlertTriangle, CheckCircle, TrendingDown, Inbox, ClipboardList, BarChart3, Edit2, Trash2, X, Check, Eye, ArrowDown, ArrowUp, Minus, Calculator, RefreshCw, ShoppingCart, Settings2, Shield, Copy, MoreVertical, Power, PowerOff, LayoutDashboard, ArrowLeftRight, Brain } from 'lucide-react';
-import SubTabBadge from '@/components/ui/SubTabBadge';
+import { SubmoduleSwitcher } from '@/components/ui/SubmoduleSwitcher';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { normalizeBRLMoneyToNumber, fmtBRL } from '@/lib/formatters';
 import { formatDecimalBR, formatIntegerBR, formatFixedBR } from '@/lib/formatters';
@@ -54,7 +54,6 @@ import StockLossesSection from './estoque/StockLossesSection';
 import StockTransfersSection from './estoque/StockTransfersSection';
 import StockPredictiveSection from './estoque/StockPredictiveSection';
 import { cacheInvalidate } from '@/components/cmv/cmvCache';
-import StockSummaryCard from './estoque/StockSummaryCard';
 import StockInactivityAlert from './estoque/StockInactivityAlert';
 import ProdutoFormPanel, { emptyProdForm } from './estoque/ProdutoFormPanel';
 import ProductSearchCombobox, { type ProductOption } from '@/components/ui/ProductSearchCombobox';
@@ -523,22 +522,11 @@ export default function EstoqueGeralView() {
         <p className="text-xs text-muted-foreground">{prodGlobalCounts.active} ativos de {prodGlobalCounts.total} produtos ({prodGlobalCounts.inactive} inativos) • {formatIntegerBR(Object.values(saldos).reduce((s, v) => s + v.saldo, 0))} itens em estoque</p>
       </div>
 
-      <StockSummaryCard />
-
-      <div className="flex items-center gap-1 overflow-x-auto pb-1 -mx-1 px-1">
-        {subViews.map(view => {
-          const Icon = view.icon;
-          const active = activeView === view.id;
-          return (
-            <button key={view.id} onClick={() => { setActiveView(view.id); if (view.id === 'produtos' || view.id === 'saldo') fetchCadastros(); }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all relative ${active ? 'gradient-salmon text-primary-foreground shadow-md' : 'bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80'}`}>
-              <Icon className="w-3.5 h-3.5" />
-              {view.label}
-              <SubTabBadge count={view.badge} />
-            </button>
-          );
-        })}
-      </div>
+      <SubmoduleSwitcher
+        items={subViews}
+        value={activeView}
+        onChange={(id) => { setActiveView(id); if (id === 'produtos' || id === 'saldo') fetchCadastros(); }}
+      />
 
       {/* ====== DASHBOARD ====== */}
       {activeView === 'dashboard' && (

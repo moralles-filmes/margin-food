@@ -24,7 +24,7 @@ import {
   Plus, Trash2, Save, RefreshCw, Search, ChefHat, Layers, Package, ShoppingBag,
   DollarSign, TrendingUp, Calculator, BarChart3, Settings2, ArrowRight, X, Fish
 } from 'lucide-react';
-import SubTabBadge from '@/components/ui/SubTabBadge';
+import { SubmoduleSwitcher } from '@/components/ui/SubmoduleSwitcher';
 
 import { fmtBRL, formatPercentBR, formatFixedBR } from '@/lib/formatters';
 const R$ = (v: number) => fmtBRL(v);
@@ -361,6 +361,15 @@ export default function FichaTecnicaView({ lotesLimpos = [] }: { lotesLimpos?: L
   // If current subtab isn't visible, switch to first visible
   const effectiveSubTab = visibleTabValues.includes(subTab) ? subTab : defaultTab;
 
+  const fichaSubViews = [
+    { id: 'pre_preparo', label: 'Pré-Preparos', icon: ChefHat, badge: countPP || undefined },
+    { id: 'item_pronto', label: 'Itens Prontos', icon: Layers, badge: countIP || undefined },
+    { id: 'produto_final', label: 'Produtos Finais', icon: ShoppingBag, badge: countPF || undefined },
+    { id: 'canais', label: 'Canais', icon: Settings2 },
+    { id: 'analise', label: 'Análise', icon: BarChart3 },
+    { id: 'markup', label: 'Markup', icon: Calculator },
+  ].filter(t => visibleTabValues.includes(t.id));
+
   if (!canView) {
     return <div className="text-center py-12 text-muted-foreground">Sem permissão para acessar Ficha Técnica.</div>;
   }
@@ -369,47 +378,11 @@ export default function FichaTecnicaView({ lotesLimpos = [] }: { lotesLimpos?: L
     <div className="space-y-4">
       <Tabs value={effectiveSubTab} onValueChange={setSubTab}>
         <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
-          <div className="flex items-center gap-1 overflow-x-auto pb-1 -mx-1 px-1">
-            {visibleSubtabs.includes('pre-preparos') && (
-              <button onClick={() => setSubTab('pre_preparo')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all relative ${effectiveSubTab === 'pre_preparo' ? 'gradient-salmon text-primary-foreground shadow-md' : 'bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80'}`}>
-                <ChefHat className="w-3.5 h-3.5" />Pré-Preparos
-                <SubTabBadge count={countPP} />
-              </button>
-            )}
-            {visibleSubtabs.includes('itens-prontos') && (
-              <button onClick={() => setSubTab('item_pronto')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all relative ${effectiveSubTab === 'item_pronto' ? 'gradient-salmon text-primary-foreground shadow-md' : 'bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80'}`}>
-                <Layers className="w-3.5 h-3.5" />Itens Prontos
-                <SubTabBadge count={countIP} />
-              </button>
-            )}
-            {visibleSubtabs.includes('produtos-finais') && (
-              <button onClick={() => setSubTab('produto_final')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all relative ${effectiveSubTab === 'produto_final' ? 'gradient-salmon text-primary-foreground shadow-md' : 'bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80'}`}>
-                <ShoppingBag className="w-3.5 h-3.5" />Produtos Finais
-                <SubTabBadge count={countPF} />
-              </button>
-            )}
-            {visibleSubtabs.includes('canais') && (
-              <button onClick={() => setSubTab('canais')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all relative ${effectiveSubTab === 'canais' ? 'gradient-salmon text-primary-foreground shadow-md' : 'bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80'}`}>
-                <Settings2 className="w-3.5 h-3.5" />Canais
-              </button>
-            )}
-            {visibleSubtabs.includes('analise') && (
-              <button onClick={() => setSubTab('analise')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all relative ${effectiveSubTab === 'analise' ? 'gradient-salmon text-primary-foreground shadow-md' : 'bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80'}`}>
-                <BarChart3 className="w-3.5 h-3.5" />Análise
-              </button>
-            )}
-            {visibleSubtabs.includes('markup') && (
-              <button onClick={() => setSubTab('markup')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all relative ${effectiveSubTab === 'markup' ? 'gradient-salmon text-primary-foreground shadow-md' : 'bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80'}`}>
-                <Calculator className="w-3.5 h-3.5" />Markup
-              </button>
-            )}
-          </div>
+          <SubmoduleSwitcher
+            items={fichaSubViews}
+            value={effectiveSubTab}
+            onChange={setSubTab}
+          />
           {canManageMarkup && (
             <Button size="sm" variant="outline" className="h-8 text-xs" disabled={recalculating} onClick={async () => {
               if (recalculating) return;

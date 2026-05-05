@@ -10,6 +10,7 @@ import StockView from './StockView';
 import GoalsView from './GoalsView';
 import PlanningView from './PlanningView';
 import { useModuleAccess } from '@/permissions/hooks';
+import { SubmoduleSwitcher } from '@/components/ui/SubmoduleSwitcher';
 
 interface Props {
   store: ReturnType<typeof useSalmonStore>;
@@ -74,27 +75,11 @@ export default function SalmonControlView({ store }: Props) {
 
   return (
     <div className="space-y-4">
-      {/* Sub-tabs */}
-      <div className="flex items-center gap-1 overflow-x-auto pb-1 -mx-1 px-1">
-        {visibleTabs.map(tab => {
-          const Icon = tab.icon;
-          const active = activeSubTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveSubTab(tab.id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
-                active
-                  ? 'gradient-salmon text-primary-foreground shadow-md'
-                  : 'bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80'
-              }`}
-            >
-              <Icon className="w-3.5 h-3.5" />
-              {tab.label}
-            </button>
-          );
-        })}
-      </div>
+      <SubmoduleSwitcher
+        items={visibleTabs}
+        value={activeSubTab}
+        onChange={setActiveSubTab}
+      />
 
       {/* Sub-tab content */}
       {activeSubTab === 'dashboard' && <DashboardView store={store} onNavigate={handleNavigate} />}
