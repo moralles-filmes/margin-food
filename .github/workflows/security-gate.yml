@@ -25,7 +25,7 @@ jobs:
       - name: Security Gate (SQL + code lint)
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          SB_SECRET_KEY: ${{ secrets.SB_SECRET_KEY }}
         run: npx tsx scripts/verify-security.ts
 
       - name: Build (only if gates pass)

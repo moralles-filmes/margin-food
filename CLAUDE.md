@@ -127,7 +127,7 @@ margin-food/
 2. **`saldo_atual` cacheado** — saldo de estoque salvo na tabela `produtos` (atualizado por trigger)
 3. **RLS otimizado** — funções de permissão simplificadas para evitar queries aninhadas caras
 4. **Índices** — adicionados em `movimentações_estoque` (company_id + produto_id + status)
-5. **React Query config** — `staleTime: 15s`, `gcTime: 5min`
+5. **React Query config** — `staleTime: 3min`, `gcTime: 10min`
 6. **Error handling no catálogo** — impede limpeza do catálogo em erro de fetch
 
 ---
@@ -142,7 +142,7 @@ margin-food/
 | `ficha-tecnica` | Fichas técnicas de receitas |
 | `inventario` | Operações de inventário |
 | `ai-chat` | Assistente IA central |
-| `requisicao-estoque` | Requisições de estoque (com lógica de estorno) |
+| `requisicao-estoque` | Requisições de estoque (estorno, notificação modal ao encerrar, ack do solicitante) |
 | `check-password` | Validação de senha |
 | `rbac-lint` | Auditoria de permissões RBAC |
 | `rh` | Recursos humanos |
@@ -180,6 +180,7 @@ margin-food/
 - **`formatDateBR` existe em dois módulos com semânticas diferentes — NUNCA importar de `formatters`** — `src/lib/datetime.ts:20` retorna `'yyyy-MM-dd'` (ISO, para `<Input type="date">` e queries ao banco). `src/lib/formatters.ts` re-exporta `formatDisplayBR as formatDateBR`, que retorna `'dd/MM/yyyy'` (exibição). Qualquer componente que use `formatDateBR` para inicializar estado de `<Input type="date">` **deve importar de `@/lib/datetime`**. Importar de `@/lib/formatters` gera valor no formato errado → `parseLocalDate` falha → `RangeError: Invalid time value` ao primeiro render. Causa do crash do módulo CMV corrigida em 2026-05-05.
 - **INSERT em tabela multi-tenant DEVE incluir `company_id` explícito no payload** — O trigger `force_company_id` NÃO é global; está aplicado apenas em `produtos` (`produtos_force_company_id`, migration `20260303004339`). Toda outra tabela com `company_id NOT NULL` (sem default) que receba INSERT direto via PostgREST do cliente exige o valor explícito vindo de `useCompanyId()`. Caso confirmado: `listas_fixas_setor` e `listas_fixas_setor_itens` em `ListaFixaSetorAdmin.tsx:115,142` (toast "Erro ao criar lista" mascarava `null value in column "company_id"`). UPDATE/DELETE não precisam — a RLS resolve via `USING (company_id = get_current_company_id())` no registro existente. **Sempre incluir `console.error('[componente.handler]', err)` no catch antes do toast** — toasts genéricos sem log mascaram a causa raiz e atrasam o diagnóstico em produção.
 - **Requisições de Estoque: critério de "pendente" é `hasPendingItems`, não `status`** — A lista principal (`RequisicaoEstoqueSection`) exibe apenas requisições com ao menos 1 item `SOLICITADO`. Requisições encerradas (todos itens aceitos/recusados) e canceladas (`ativo=false`) ficam no bucket `historico`, acessível via botão "Histórico" (Sheet lateral). A Edge Function `requisicao-estoque` action `listar` aceita `bucket: 'pendentes' | 'historico'` e usa 2-phase query (Fase 1: IDs com item `SOLICITADO` via `supabaseUser` + RLS; Fase 2: `.in()` para pendentes, `.or(not.in + cancelada)` para histórico). **Nunca** usar `req.status === 'PARCIALMENTE_ATENDIDA'` como proxy para "tem item aberto" — esse status coexiste com 0 itens SOLICITADO (ex: 2 atendidos + 1 recusado = Parcial mas encerrada). Fonte única: `hasPendingItems(req.requisicao_estoque_itens)` de `src/domain/estoque/requisitionStatus.ts`.
+- **Notificação modal bloqueante de Requisição encerrada** — Quando admin encerra requisição (ATENDIDA/PARCIALMENTE_ATENDIDA/NEGADA), a Edge Function `requisicao-estoque` chama `notifyIfRequisicaoEncerrada()` que insere 1 registro em `notifications` (type=`REQUISICAO_ENCERRADA`, idempotente via UNIQUE INDEX parcial em `notifications(entity_id) WHERE entity_type='requisicao_estoque' AND type='REQUISICAO_ENCERRADA'`). O solicitante vê um `AlertDialog` central bloqueante via `RequisicaoNotificationModal` montado globalmente em `App.tsx` (dentro do `NotificationsProvider`). Ao confirmar, action `marcar_requisicao_visto` grava `requisicoes_estoque.confirmado_pelo_solicitante_em/por` (visível ao admin como badge "✓ Visto"). **Compartilhamento de estado de notificações**: `NotificationsProvider` (`src/contexts/NotificationsContext.tsx`) instancia `useNotifications` uma única vez — `NotificationBell` e o modal consomem via `useNotificationsContext()`, evitando 2 subscriptions Realtime. **Admin lê confirmação via colunas na requisição** (não via `notifications` — RLS impediria). Migration: `20260508141432`. Texto do modal varia por status (ATENDIDA/PARCIALMENTE/NEGADA), gerado no servidor.
 
 ---
 
@@ -187,6 +188,8 @@ margin-food/
 - **TableActions**: Localizado em `components/ui/TableActions.tsx`. Deve ser usado em todas as tabelas de gerenciamento para fornecer botões de Editar e Excluir consistentes, com suporte a permissões RBAC e diálogos de confirmação integrados.
 - **FormCloseConfirmDialog**: Usado em conjunto com `useFormDirtyGuard` para prevenir perda de dados em formulários.
 - **SearchableSelect**: Localizado em `components/ui/SearchableSelect.tsx`. Deve ser usado em todos os selects com 10+ opções (produtos, categorias, locais, usuários, fornecedores). Props: `value`, `onValueChange`, `options: {value, label}[]`, `placeholder`, `searchPlaceholder`, `modal` (true para uso dentro de Dialog).
+- **NotificationsProvider**: Localizado em `src/contexts/NotificationsContext.tsx`. Instância única de `useNotifications` compartilhada entre `NotificationBell` e `RequisicaoNotificationModal` via `useNotificationsContext()`. Montado em `App.tsx` dentro do `BrowserRouter`. **Nunca** instanciar `useNotifications` diretamente em componentes que já estão dentro do Provider — duplicaria subscription Realtime e dessincronizaria estados.
+- **RequisicaoNotificationModal**: Localizado em `src/components/RequisicaoNotificationModal.tsx`. `AlertDialog` global bloqueante (sem ESC/clique fora). Montado em `App.tsx`. Processa fila de notificações `REQUISICAO_ENCERRADA` não lidas da mais antiga para a mais nova.
 - **SubmoduleSwitcher**: Localizado em `components/ui/SubmoduleSwitcher.tsx`. **Obrigatório** para navegação de sub-módulos — substitui a fileira horizontal de botões (`overflow-x-auto`). Exibe um botão único com o sub-módulo ativo + chevron; abre Drawer (bottom sheet) no mobile e DropdownMenu no desktop. Props: `items: {id, label, icon, badge?}[]`, `value`, `onChange`, `groupLabel?`, `groupIcon?` — quando `value` não pertence a `items`, o trigger exibe o fallback de grupo com estilo ghost (sem gradient-salmon). Útil para navegação multi-grupo (ex: Financeiro). Módulos já migrados: Estoque, Compras, Configurações, Salmão, Ficha Técnica, PedidosComprasMercado, **Financeiro**, **RH**. Financeiro usa layout especial: Dashboard isolado (botão direto) + 3 `SubmoduleSwitcher` por grupo (Operações, Configurações, Relatórios & Análise) dentro de um card. Módulos com `<Tabs>` do shadcn: Admin, CMV, Relatórios.
 
 ### Padrões de Busca de Texto (OBRIGATÓRIO)
@@ -217,6 +220,7 @@ margin-food/
 - [x] Dashboard: "Status do Estoque" mostrava OK=1 com saldo zero — corrigido em `20260505140000`
 - [x] Preditivo: "Compras sugeridas" mostrava R$173,55 fantasma após cancelar movs — corrigido em `20260505140100`
 - [x] Requisições encerradas saem da lista principal e vão para Sheet "Histórico" (`RequisicaoEstoqueSection` + Edge Function `requisicao-estoque` v4 — 2026-05-05)
+- [x] Notificação modal bloqueante ao encerrar requisição: AlertDialog global para solicitante + badge "Visto/Aguardando" para admin (Edge Function v7 + migration `20260508141432` — 2026-05-08)
 
 ---
 

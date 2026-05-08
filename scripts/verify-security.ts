@@ -8,13 +8,13 @@
  * Exit 0 = all clear, Exit 1 = block deploy.
  *
  * Usage:
- *   SUPABASE_URL=... SUPABASE_SECRET_KEY=... npx tsx scripts/verify-security.ts
+ *   SUPABASE_URL=... SB_SECRET_KEY=... npx tsx scripts/verify-security.ts
  */
 
 import { execSync } from 'child_process';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SUPABASE_SERVICE_KEY = process.env.SB_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 let exitCode = 0;
 
@@ -23,7 +23,7 @@ async function runSqlLint() {
   console.log('\n🔍 [1/2] Running rbac_sql_lint_report() ...');
 
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
-    console.warn('⚠️  SUPABASE_URL or SUPABASE_SECRET_KEY not set — skipping SQL lint (CI-only check).');
+    console.warn('⚠️  SUPABASE_URL or SB_SECRET_KEY not set — skipping SQL lint (CI-only check).');
     return;
   }
 
