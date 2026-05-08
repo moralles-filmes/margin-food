@@ -112,13 +112,14 @@ export default function ListaFixaSetorAdmin({ produtos }: Props) {
     try {
       const { data, error } = await supabase
         .from('listas_fixas_setor')
-        .insert({ setor: selectedSetor, nome: `Lista ${selectedSetor}`, created_by: user.id })
+        .insert({ company_id: companyId, setor: selectedSetor, nome: `Lista ${selectedSetor}`, created_by: user.id })
         .select('id, setor, nome, ativo, created_at')
         .single();
       if (error) throw error;
       setListas(prev => [...prev, data as ListaFixa]);
       toast.success(`Lista criada para ${selectedSetor}`);
     } catch (err: unknown) {
+      console.error('[lista-fixa.createLista]', err);
       const msg = err instanceof Error ? err.message : 'Erro desconhecido';
       if (msg.includes('duplicate')) {
         toast.error('Já existe uma lista para este setor');
@@ -138,6 +139,7 @@ export default function ListaFixaSetorAdmin({ produtos }: Props) {
       const { data, error } = await supabase
         .from('listas_fixas_setor_itens')
         .insert({
+          company_id: companyId,
           lista_fixa_id: currentLista.id,
           produto_id: produtoId,
           ordem: maxOrdem + 1,
