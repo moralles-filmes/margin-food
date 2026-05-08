@@ -5,6 +5,28 @@
 
 ---
 
+## SEGURANÇA — Obrigatório antes de qualquer commit/push
+
+**Todo agente (humano ou AI) DEVE verificar os itens abaixo antes de fazer `git add`, `git commit` ou `git push`:**
+
+1. **Nenhum JWT ou chave secreta nos arquivos staged** — procurar padrão `eyJ` (JWTs) e `sb_secret_` nos diffs.
+2. **`.claude/settings.local.json` nunca commitado** — pode conter tokens e comandos curl com chaves nas flags de shell history. Já está no `.gitignore`.
+3. **`.env`, `.env.*` nunca commitados** — já estão no `.gitignore` via `*.local`, mas verificar manualmente se existirem variantes como `.env.production`.
+4. **`supabase/.temp/`nunca commitado** — já está no `.gitignore`.
+5. **Edge Functions: nunca hardcodar chaves** — usar sempre `Deno.env.get("SB_SECRET_KEY")`. Chaves novas são adicionadas via painel Supabase → Edge Functions → Secrets.
+6. **GitHub Actions: usar `${{ secrets.NOME }}` para qualquer valor sensível** — nunca valor literal no YAML.
+
+**Checklist rápido antes do commit:**
+```bash
+# Ver o que vai ser commitado
+git diff --cached | grep -E 'eyJ|sb_secret_|password|api_key'
+# Se retornar algo, NÃO commitar — investigar o arquivo antes
+```
+
+> **Incidente de referência (2026-05-08):** Um JWT `service_role` (válido até 2036) foi commitado em `.claude/settings.local.json` via bash history de um curl de teste. A chave foi rotacionada e o legacy JWT desabilitado no Supabase. O arquivo foi removido do tracking e adicionado ao `.gitignore`.
+
+---
+
 ## 🔗 Repositórios e Serviços
 
 | Serviço | Identificador |
