@@ -10,51 +10,10 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.1"
+    PostgrestVersion: "14.4"
   }
   public: {
     Tables: {
-      admin_actions_log: {
-        Row: {
-          action: string
-          actor_user_id: string
-          company_id: string
-          created_at: string
-          details: Json | null
-          id: string
-          target_email: string | null
-          target_user_id: string | null
-        }
-        Insert: {
-          action: string
-          actor_user_id: string
-          company_id: string
-          created_at?: string
-          details?: Json | null
-          id?: string
-          target_email?: string | null
-          target_user_id?: string | null
-        }
-        Update: {
-          action?: string
-          actor_user_id?: string
-          company_id?: string
-          created_at?: string
-          details?: Json | null
-          id?: string
-          target_email?: string | null
-          target_user_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "admin_actions_log_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       ai_insights: {
         Row: {
           agente: string
@@ -266,6 +225,13 @@ export type Database = {
             foreignKeyName: "alertas_falta_estoque_produto_id_fkey"
             columns: ["produto_id"]
             isOneToOne: false
+            referencedRelation: "mv_giro_estoque"
+            referencedColumns: ["produto_id"]
+          },
+          {
+            foreignKeyName: "alertas_falta_estoque_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
             referencedRelation: "produtos"
             referencedColumns: ["id"]
           },
@@ -299,7 +265,7 @@ export type Database = {
       aprovacoes_solic_compra_mercado: {
         Row: {
           aprovado_em: string
-          aprovado_por_user_id: string
+          aprovado_por_user_id: string | null
           comentario: string | null
           company_id: string
           decisao: string
@@ -308,7 +274,7 @@ export type Database = {
         }
         Insert: {
           aprovado_em?: string
-          aprovado_por_user_id: string
+          aprovado_por_user_id?: string | null
           comentario?: string | null
           company_id?: string
           decisao: string
@@ -317,7 +283,7 @@ export type Database = {
         }
         Update: {
           aprovado_em?: string
-          aprovado_por_user_id?: string
+          aprovado_por_user_id?: string | null
           comentario?: string | null
           company_id?: string
           decisao?: string
@@ -345,7 +311,7 @@ export type Database = {
         Row: {
           acao: string
           antes: Json | null
-          company_id: string
+          company_id: string | null
           created_at: string
           depois: Json | null
           id: string
@@ -358,7 +324,7 @@ export type Database = {
         Insert: {
           acao: string
           antes?: Json | null
-          company_id?: string
+          company_id?: string | null
           created_at?: string
           depois?: Json | null
           id?: string
@@ -371,7 +337,7 @@ export type Database = {
         Update: {
           acao?: string
           antes?: Json | null
-          company_id?: string
+          company_id?: string | null
           created_at?: string
           depois?: Json | null
           id?: string
@@ -383,7 +349,7 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "audit_inventario_log_company_fk"
+            foreignKeyName: "audit_inventario_log_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
@@ -446,6 +412,7 @@ export type Database = {
           created_at: string
           entity: string
           entity_id: string | null
+          entity_unaccent: string | null
           id: string
           metadata: Json | null
           module: string
@@ -464,6 +431,7 @@ export type Database = {
           created_at?: string
           entity: string
           entity_id?: string | null
+          entity_unaccent?: string | null
           id?: string
           metadata?: Json | null
           module: string
@@ -482,6 +450,7 @@ export type Database = {
           created_at?: string
           entity?: string
           entity_id?: string | null
+          entity_unaccent?: string | null
           id?: string
           metadata?: Json | null
           module?: string
@@ -924,6 +893,13 @@ export type Database = {
             foreignKeyName: "ficha_componente_itens_produto_id_fkey"
             columns: ["produto_id"]
             isOneToOne: false
+            referencedRelation: "mv_giro_estoque"
+            referencedColumns: ["produto_id"]
+          },
+          {
+            foreignKeyName: "ficha_componente_itens_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
             referencedRelation: "produtos"
             referencedColumns: ["id"]
           },
@@ -945,6 +921,7 @@ export type Database = {
           id: string
           modo_preparo: string | null
           nome: string
+          nome_unaccent: string | null
           observacoes: string | null
           perda_estimada_percent: number
           peso_por_unidade: number | null
@@ -969,6 +946,7 @@ export type Database = {
           id?: string
           modo_preparo?: string | null
           nome: string
+          nome_unaccent?: string | null
           observacoes?: string | null
           perda_estimada_percent?: number
           peso_por_unidade?: number | null
@@ -993,6 +971,7 @@ export type Database = {
           id?: string
           modo_preparo?: string | null
           nome?: string
+          nome_unaccent?: string | null
           observacoes?: string | null
           perda_estimada_percent?: number
           peso_por_unidade?: number | null
@@ -1182,6 +1161,57 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fin_conciliacao_ignoradas: {
+        Row: {
+          company_id: string
+          conta_id: string | null
+          data: string
+          descricao: string | null
+          id: string
+          ignorado_em: string | null
+          ignorado_por: string | null
+          tipo: string
+          valor: number
+        }
+        Insert: {
+          company_id: string
+          conta_id?: string | null
+          data: string
+          descricao?: string | null
+          id?: string
+          ignorado_em?: string | null
+          ignorado_por?: string | null
+          tipo: string
+          valor: number
+        }
+        Update: {
+          company_id?: string
+          conta_id?: string | null
+          data?: string
+          descricao?: string | null
+          id?: string
+          ignorado_em?: string | null
+          ignorado_por?: string | null
+          tipo?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fin_conciliacao_ignoradas_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fin_conciliacao_ignoradas_conta_id_fkey"
+            columns: ["conta_id"]
+            isOneToOne: false
+            referencedRelation: "fin_contas"
             referencedColumns: ["id"]
           },
         ]
@@ -1877,13 +1907,6 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fin_lancamento_rateios_lancamento_id_fkey"
-            columns: ["lancamento_id"]
-            isOneToOne: false
-            referencedRelation: "fin_lancamentos"
             referencedColumns: ["id"]
           },
         ]
@@ -2621,6 +2644,13 @@ export type Database = {
             foreignKeyName: "inventario_itens_produto_id_fkey"
             columns: ["produto_id"]
             isOneToOne: false
+            referencedRelation: "mv_giro_estoque"
+            referencedColumns: ["produto_id"]
+          },
+          {
+            foreignKeyName: "inventario_itens_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
             referencedRelation: "produtos"
             referencedColumns: ["id"]
           },
@@ -3013,6 +3043,13 @@ export type Database = {
             foreignKeyName: "listas_fixas_setor_itens_produto_id_fkey"
             columns: ["produto_id"]
             isOneToOne: false
+            referencedRelation: "mv_giro_estoque"
+            referencedColumns: ["produto_id"]
+          },
+          {
+            foreignKeyName: "listas_fixas_setor_itens_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
             referencedRelation: "produtos"
             referencedColumns: ["id"]
           },
@@ -3078,7 +3115,7 @@ export type Database = {
           custo_total: number
           custo_unitario: number
           data: string
-          direction: string
+          direction: string | null
           editado_em: string | null
           editado_por: string | null
           estorno_de_id: string | null
@@ -3108,7 +3145,7 @@ export type Database = {
           custo_total?: number
           custo_unitario?: number
           data?: string
-          direction?: string
+          direction?: string | null
           editado_em?: string | null
           editado_por?: string | null
           estorno_de_id?: string | null
@@ -3138,7 +3175,7 @@ export type Database = {
           custo_total?: number
           custo_unitario?: number
           data?: string
-          direction?: string
+          direction?: string | null
           editado_em?: string | null
           editado_por?: string | null
           estorno_de_id?: string | null
@@ -3171,6 +3208,13 @@ export type Database = {
             foreignKeyName: "fk_mov_produto"
             columns: ["produto_id"]
             isOneToOne: false
+            referencedRelation: "mv_giro_estoque"
+            referencedColumns: ["produto_id"]
+          },
+          {
+            foreignKeyName: "fk_mov_produto"
+            columns: ["produto_id"]
+            isOneToOne: false
             referencedRelation: "produtos"
             referencedColumns: ["id"]
           },
@@ -3182,99 +3226,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      movimentacoes_estoque_bkp_20260301: {
-        Row: {
-          cancelado_em: string | null
-          cancelado_por: string | null
-          company_id: string | null
-          created_at: string | null
-          created_by: string | null
-          custo_total: number | null
-          custo_unitario: number | null
-          data: string | null
-          direction: string | null
-          editado_em: string | null
-          editado_por: string | null
-          estorno_de_id: string | null
-          id: string | null
-          internal_transfer: boolean | null
-          justificativa_cancelamento: string | null
-          justificativa_edicao: string | null
-          observacao: string | null
-          origem: string | null
-          produto_id: string | null
-          quantidade: number | null
-          reference_id: string | null
-          reference_type: string | null
-          referencia_id: string | null
-          salmon_lot_id: string | null
-          setor: string | null
-          source_module: string | null
-          status: string | null
-          tipo: string | null
-        }
-        Insert: {
-          cancelado_em?: string | null
-          cancelado_por?: string | null
-          company_id?: string | null
-          created_at?: string | null
-          created_by?: string | null
-          custo_total?: number | null
-          custo_unitario?: number | null
-          data?: string | null
-          direction?: string | null
-          editado_em?: string | null
-          editado_por?: string | null
-          estorno_de_id?: string | null
-          id?: string | null
-          internal_transfer?: boolean | null
-          justificativa_cancelamento?: string | null
-          justificativa_edicao?: string | null
-          observacao?: string | null
-          origem?: string | null
-          produto_id?: string | null
-          quantidade?: number | null
-          reference_id?: string | null
-          reference_type?: string | null
-          referencia_id?: string | null
-          salmon_lot_id?: string | null
-          setor?: string | null
-          source_module?: string | null
-          status?: string | null
-          tipo?: string | null
-        }
-        Update: {
-          cancelado_em?: string | null
-          cancelado_por?: string | null
-          company_id?: string | null
-          created_at?: string | null
-          created_by?: string | null
-          custo_total?: number | null
-          custo_unitario?: number | null
-          data?: string | null
-          direction?: string | null
-          editado_em?: string | null
-          editado_por?: string | null
-          estorno_de_id?: string | null
-          id?: string | null
-          internal_transfer?: boolean | null
-          justificativa_cancelamento?: string | null
-          justificativa_edicao?: string | null
-          observacao?: string | null
-          origem?: string | null
-          produto_id?: string | null
-          quantidade?: number | null
-          reference_id?: string | null
-          reference_type?: string | null
-          referencia_id?: string | null
-          salmon_lot_id?: string | null
-          setor?: string | null
-          source_module?: string | null
-          status?: string | null
-          tipo?: string | null
-        }
-        Relationships: []
       }
       movimentacoes_estoque_bkp_reset_20260301: {
         Row: {
@@ -3461,8 +3412,6 @@ export type Database = {
           company_id: string
           created_at: string
           created_by: string
-          deleted_at: string | null
-          deleted_by: string | null
           id: string
           month: number
           notes: string | null
@@ -3478,8 +3427,6 @@ export type Database = {
           company_id?: string
           created_at?: string
           created_by?: string
-          deleted_at?: string | null
-          deleted_by?: string | null
           id?: string
           month: number
           notes?: string | null
@@ -3495,8 +3442,6 @@ export type Database = {
           company_id?: string
           created_at?: string
           created_by?: string
-          deleted_at?: string | null
-          deleted_by?: string | null
           id?: string
           month?: number
           notes?: string | null
@@ -3599,10 +3544,13 @@ export type Database = {
           local_estoque: string | null
           needs_cost_review: boolean
           nome_produto: string
+          nome_produto_unaccent: string | null
           observacoes: string | null
           package_measure_unit: string | null
           package_quantity: number | null
+          saldo_atual: number | null
           sku: string | null
+          sku_unaccent: string | null
           unidade_compra: string
           unidade_medida: string
         }
@@ -3638,10 +3586,13 @@ export type Database = {
           local_estoque?: string | null
           needs_cost_review?: boolean
           nome_produto: string
+          nome_produto_unaccent?: string | null
           observacoes?: string | null
           package_measure_unit?: string | null
           package_quantity?: number | null
+          saldo_atual?: number | null
           sku?: string | null
+          sku_unaccent?: string | null
           unidade_compra?: string
           unidade_medida?: string
         }
@@ -3677,10 +3628,13 @@ export type Database = {
           local_estoque?: string | null
           needs_cost_review?: boolean
           nome_produto?: string
+          nome_produto_unaccent?: string | null
           observacoes?: string | null
           package_measure_unit?: string | null
           package_quantity?: number | null
+          saldo_atual?: number | null
           sku?: string | null
+          sku_unaccent?: string | null
           unidade_compra?: string
           unidade_medida?: string
         }
@@ -3693,117 +3647,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      produtos_bkp_20260301: {
-        Row: {
-          ativo: boolean | null
-          avg30_cost_base_unit: number | null
-          avg30_cost_purchase_unit: number | null
-          avg30_variation_percent: number | null
-          categoria: string | null
-          company_id: string | null
-          conta_no_cmv: boolean | null
-          conversoes: string | null
-          created_at: string | null
-          custo_medio_30d: number | null
-          custo_padrao: number | null
-          custo_ultima_compra: number | null
-          default_cost_base_unit: number | null
-          default_cost_purchase_unit: number | null
-          estoque_ideal: number | null
-          estoque_minimo: number | null
-          fator_conversao_padrao: number | null
-          fornecedores_preferenciais: string[] | null
-          id: string | null
-          inactivity_days_threshold: number | null
-          is_salmon_raw_linked: boolean | null
-          last_cost_base_unit: number | null
-          last_cost_purchase_unit: number | null
-          last_movement_at: string | null
-          last_purchase_date: string | null
-          last_supplier: string | null
-          lead_time_dias: number | null
-          local_estoque: string | null
-          needs_cost_review: boolean | null
-          nome_produto: string | null
-          observacoes: string | null
-          sku: string | null
-          unidade_compra: string | null
-          unidade_medida: string | null
-        }
-        Insert: {
-          ativo?: boolean | null
-          avg30_cost_base_unit?: number | null
-          avg30_cost_purchase_unit?: number | null
-          avg30_variation_percent?: number | null
-          categoria?: string | null
-          company_id?: string | null
-          conta_no_cmv?: boolean | null
-          conversoes?: string | null
-          created_at?: string | null
-          custo_medio_30d?: number | null
-          custo_padrao?: number | null
-          custo_ultima_compra?: number | null
-          default_cost_base_unit?: number | null
-          default_cost_purchase_unit?: number | null
-          estoque_ideal?: number | null
-          estoque_minimo?: number | null
-          fator_conversao_padrao?: number | null
-          fornecedores_preferenciais?: string[] | null
-          id?: string | null
-          inactivity_days_threshold?: number | null
-          is_salmon_raw_linked?: boolean | null
-          last_cost_base_unit?: number | null
-          last_cost_purchase_unit?: number | null
-          last_movement_at?: string | null
-          last_purchase_date?: string | null
-          last_supplier?: string | null
-          lead_time_dias?: number | null
-          local_estoque?: string | null
-          needs_cost_review?: boolean | null
-          nome_produto?: string | null
-          observacoes?: string | null
-          sku?: string | null
-          unidade_compra?: string | null
-          unidade_medida?: string | null
-        }
-        Update: {
-          ativo?: boolean | null
-          avg30_cost_base_unit?: number | null
-          avg30_cost_purchase_unit?: number | null
-          avg30_variation_percent?: number | null
-          categoria?: string | null
-          company_id?: string | null
-          conta_no_cmv?: boolean | null
-          conversoes?: string | null
-          created_at?: string | null
-          custo_medio_30d?: number | null
-          custo_padrao?: number | null
-          custo_ultima_compra?: number | null
-          default_cost_base_unit?: number | null
-          default_cost_purchase_unit?: number | null
-          estoque_ideal?: number | null
-          estoque_minimo?: number | null
-          fator_conversao_padrao?: number | null
-          fornecedores_preferenciais?: string[] | null
-          id?: string | null
-          inactivity_days_threshold?: number | null
-          is_salmon_raw_linked?: boolean | null
-          last_cost_base_unit?: number | null
-          last_cost_purchase_unit?: number | null
-          last_movement_at?: string | null
-          last_purchase_date?: string | null
-          last_supplier?: string | null
-          lead_time_dias?: number | null
-          local_estoque?: string | null
-          needs_cost_review?: boolean | null
-          nome_produto?: string | null
-          observacoes?: string | null
-          sku?: string | null
-          unidade_compra?: string | null
-          unidade_medida?: string | null
-        }
-        Relationships: []
       }
       produtos_bkp_reset_20260301: {
         Row: {
@@ -4007,6 +3850,13 @@ export type Database = {
             foreignKeyName: "purchase_ignored_rules_produto_id_fkey"
             columns: ["produto_id"]
             isOneToOne: false
+            referencedRelation: "mv_giro_estoque"
+            referencedColumns: ["produto_id"]
+          },
+          {
+            foreignKeyName: "purchase_ignored_rules_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
             referencedRelation: "produtos"
             referencedColumns: ["id"]
           },
@@ -4104,79 +3954,17 @@ export type Database = {
             foreignKeyName: "purchase_order_items_stock_item_id_fkey"
             columns: ["stock_item_id"]
             isOneToOne: false
+            referencedRelation: "mv_giro_estoque"
+            referencedColumns: ["produto_id"]
+          },
+          {
+            foreignKeyName: "purchase_order_items_stock_item_id_fkey"
+            columns: ["stock_item_id"]
+            isOneToOne: false
             referencedRelation: "produtos"
             referencedColumns: ["id"]
           },
         ]
-      }
-      purchase_order_items_bkp_20260301: {
-        Row: {
-          company_id: string | null
-          conversion_factor_snapshot: number | null
-          created_at: string | null
-          estimated_unit_value: number | null
-          id: string | null
-          name_snapshot: string | null
-          not_delivered_reason: string | null
-          order_id: string | null
-          purchase_unit_cost_snapshot: number | null
-          purchase_unit_snapshot: string | null
-          qty_received: number | null
-          qty_requested: number | null
-          received_at: string | null
-          received_by: string | null
-          received_status: string | null
-          shopping_note: string | null
-          shopping_status: string | null
-          stock_item_id: string | null
-          unit_snapshot: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          company_id?: string | null
-          conversion_factor_snapshot?: number | null
-          created_at?: string | null
-          estimated_unit_value?: number | null
-          id?: string | null
-          name_snapshot?: string | null
-          not_delivered_reason?: string | null
-          order_id?: string | null
-          purchase_unit_cost_snapshot?: number | null
-          purchase_unit_snapshot?: string | null
-          qty_received?: number | null
-          qty_requested?: number | null
-          received_at?: string | null
-          received_by?: string | null
-          received_status?: string | null
-          shopping_note?: string | null
-          shopping_status?: string | null
-          stock_item_id?: string | null
-          unit_snapshot?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          company_id?: string | null
-          conversion_factor_snapshot?: number | null
-          created_at?: string | null
-          estimated_unit_value?: number | null
-          id?: string | null
-          name_snapshot?: string | null
-          not_delivered_reason?: string | null
-          order_id?: string | null
-          purchase_unit_cost_snapshot?: number | null
-          purchase_unit_snapshot?: string | null
-          qty_received?: number | null
-          qty_requested?: number | null
-          received_at?: string | null
-          received_by?: string | null
-          received_status?: string | null
-          shopping_note?: string | null
-          shopping_status?: string | null
-          stock_item_id?: string | null
-          unit_snapshot?: string | null
-          updated_at?: string | null
-        }
-        Relationships: []
       }
       purchase_order_items_bkp_reset_20260301: {
         Row: {
@@ -4347,84 +4135,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      purchase_orders_bkp_20260301: {
-        Row: {
-          category: string | null
-          company_id: string | null
-          concluded_at: string | null
-          created_at: string | null
-          created_by: string | null
-          delivery_forecast_date: string | null
-          id: string | null
-          need_by_date: string | null
-          not_delivered_ack_at: string | null
-          not_delivered_ack_by: string | null
-          notes: string | null
-          payment_type: string | null
-          priority: string | null
-          responsible_user_id: string | null
-          shopping_done_at: string | null
-          shopping_done_by: string | null
-          status: string | null
-          supplier_name: string | null
-          title: string | null
-          total_confirmed: number | null
-          total_estimated: number | null
-          type: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          category?: string | null
-          company_id?: string | null
-          concluded_at?: string | null
-          created_at?: string | null
-          created_by?: string | null
-          delivery_forecast_date?: string | null
-          id?: string | null
-          need_by_date?: string | null
-          not_delivered_ack_at?: string | null
-          not_delivered_ack_by?: string | null
-          notes?: string | null
-          payment_type?: string | null
-          priority?: string | null
-          responsible_user_id?: string | null
-          shopping_done_at?: string | null
-          shopping_done_by?: string | null
-          status?: string | null
-          supplier_name?: string | null
-          title?: string | null
-          total_confirmed?: number | null
-          total_estimated?: number | null
-          type?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          category?: string | null
-          company_id?: string | null
-          concluded_at?: string | null
-          created_at?: string | null
-          created_by?: string | null
-          delivery_forecast_date?: string | null
-          id?: string | null
-          need_by_date?: string | null
-          not_delivered_ack_at?: string | null
-          not_delivered_ack_by?: string | null
-          notes?: string | null
-          payment_type?: string | null
-          priority?: string | null
-          responsible_user_id?: string | null
-          shopping_done_at?: string | null
-          shopping_done_by?: string | null
-          status?: string | null
-          supplier_name?: string | null
-          title?: string | null
-          total_confirmed?: number | null
-          total_estimated?: number | null
-          type?: string | null
-          updated_at?: string | null
-        }
-        Relationships: []
       }
       purchase_orders_bkp_reset_20260301: {
         Row: {
@@ -4699,6 +4409,13 @@ export type Database = {
             foreignKeyName: "purchase_requisition_items_produto_id_fkey"
             columns: ["produto_id"]
             isOneToOne: false
+            referencedRelation: "mv_giro_estoque"
+            referencedColumns: ["produto_id"]
+          },
+          {
+            foreignKeyName: "purchase_requisition_items_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
             referencedRelation: "produtos"
             referencedColumns: ["id"]
           },
@@ -4862,6 +4579,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "solic_compra_mercado_item"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recebimento_itens_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "mv_giro_estoque"
+            referencedColumns: ["produto_id"]
           },
           {
             foreignKeyName: "recebimento_itens_produto_id_fkey"
@@ -5096,6 +4820,13 @@ export type Database = {
             foreignKeyName: "requisicao_estoque_itens_produto_id_fkey"
             columns: ["produto_id"]
             isOneToOne: false
+            referencedRelation: "mv_giro_estoque"
+            referencedColumns: ["produto_id"]
+          },
+          {
+            foreignKeyName: "requisicao_estoque_itens_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
             referencedRelation: "produtos"
             referencedColumns: ["id"]
           },
@@ -5114,6 +4845,8 @@ export type Database = {
           atendido_por: string | null
           ativo: boolean
           company_id: string
+          confirmado_pelo_solicitante_em: string | null
+          confirmado_pelo_solicitante_por: string | null
           created_at: string
           deleted_at: string | null
           deleted_by: string | null
@@ -5129,6 +4862,8 @@ export type Database = {
           atendido_por?: string | null
           ativo?: boolean
           company_id?: string
+          confirmado_pelo_solicitante_em?: string | null
+          confirmado_pelo_solicitante_por?: string | null
           created_at?: string
           deleted_at?: string | null
           deleted_by?: string | null
@@ -5144,6 +4879,8 @@ export type Database = {
           atendido_por?: string | null
           ativo?: boolean
           company_id?: string
+          confirmado_pelo_solicitante_em?: string | null
+          confirmado_pelo_solicitante_por?: string | null
           created_at?: string
           deleted_at?: string | null
           deleted_by?: string | null
@@ -6570,10 +6307,6 @@ export type Database = {
           id: string
           justificativa: string | null
           metodo: string
-          motivo_rejeicao: string | null
-          rejeitado_em: string | null
-          rejeitado_por: string | null
-          status: string
           tipo: string
         }
         Insert: {
@@ -6592,10 +6325,6 @@ export type Database = {
           id?: string
           justificativa?: string | null
           metodo?: string
-          motivo_rejeicao?: string | null
-          rejeitado_em?: string | null
-          rejeitado_por?: string | null
-          status?: string
           tipo: string
         }
         Update: {
@@ -6614,10 +6343,6 @@ export type Database = {
           id?: string
           justificativa?: string | null
           metodo?: string
-          motivo_rejeicao?: string | null
-          rejeitado_em?: string | null
-          rejeitado_por?: string | null
-          status?: string
           tipo?: string
         }
         Relationships: [
@@ -7211,66 +6936,6 @@ export type Database = {
           },
         ]
       }
-      salmon_entries_bkp_20260301: {
-        Row: {
-          boxes: number | null
-          company_id: string | null
-          created_at: string | null
-          created_by: string | null
-          entry_date: string | null
-          gross_kg: number | null
-          id: string | null
-          lot: string | null
-          notes: string | null
-          sif: string | null
-          status: string | null
-          supplier_id: string | null
-          supplier_name: string | null
-          total_value: number | null
-          unit_cost: number | null
-          units: number | null
-          updated_at: string | null
-        }
-        Insert: {
-          boxes?: number | null
-          company_id?: string | null
-          created_at?: string | null
-          created_by?: string | null
-          entry_date?: string | null
-          gross_kg?: number | null
-          id?: string | null
-          lot?: string | null
-          notes?: string | null
-          sif?: string | null
-          status?: string | null
-          supplier_id?: string | null
-          supplier_name?: string | null
-          total_value?: number | null
-          unit_cost?: number | null
-          units?: number | null
-          updated_at?: string | null
-        }
-        Update: {
-          boxes?: number | null
-          company_id?: string | null
-          created_at?: string | null
-          created_by?: string | null
-          entry_date?: string | null
-          gross_kg?: number | null
-          id?: string | null
-          lot?: string | null
-          notes?: string | null
-          sif?: string | null
-          status?: string | null
-          supplier_id?: string | null
-          supplier_name?: string | null
-          total_value?: number | null
-          unit_cost?: number | null
-          units?: number | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
       salmon_entries_bkp_reset_20260301: {
         Row: {
           boxes: number | null
@@ -7617,7 +7282,7 @@ export type Database = {
           observacoes: string | null
           prioridade: string
           responsavel_user_id: string | null
-          solicitante_user_id: string
+          solicitante_user_id: string | null
           status: string
           tipo: string
           titulo: string
@@ -7633,7 +7298,7 @@ export type Database = {
           observacoes?: string | null
           prioridade?: string
           responsavel_user_id?: string | null
-          solicitante_user_id: string
+          solicitante_user_id?: string | null
           status?: string
           tipo: string
           titulo: string
@@ -7649,7 +7314,7 @@ export type Database = {
           observacoes?: string | null
           prioridade?: string
           responsavel_user_id?: string | null
-          solicitante_user_id?: string
+          solicitante_user_id?: string | null
           status?: string
           tipo?: string
           titulo?: string
@@ -7785,6 +7450,13 @@ export type Database = {
             foreignKeyName: "solic_compra_mercado_item_produto_id_fkey"
             columns: ["produto_id"]
             isOneToOne: false
+            referencedRelation: "mv_giro_estoque"
+            referencedColumns: ["produto_id"]
+          },
+          {
+            foreignKeyName: "solic_compra_mercado_item_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
             referencedRelation: "produtos"
             referencedColumns: ["id"]
           },
@@ -7850,6 +7522,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "companies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "solicitacoes_compra_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "mv_giro_estoque"
+            referencedColumns: ["produto_id"]
           },
           {
             foreignKeyName: "solicitacoes_compra_produto_id_fkey"
@@ -8029,14 +7708,14 @@ export type Database = {
             foreignKeyName: "supplier_item_prices_stock_item_id_fkey"
             columns: ["stock_item_id"]
             isOneToOne: false
-            referencedRelation: "produtos"
-            referencedColumns: ["id"]
+            referencedRelation: "mv_giro_estoque"
+            referencedColumns: ["produto_id"]
           },
           {
-            foreignKeyName: "supplier_item_prices_supplier_uuid_fkey"
-            columns: ["supplier_uuid"]
+            foreignKeyName: "supplier_item_prices_stock_item_id_fkey"
+            columns: ["stock_item_id"]
             isOneToOne: false
-            referencedRelation: "suppliers"
+            referencedRelation: "produtos"
             referencedColumns: ["id"]
           },
         ]
@@ -8078,36 +7757,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      suppliers_bkp_20260301: {
-        Row: {
-          company_id: string | null
-          contact_info: Json | null
-          created_at: string | null
-          id: string | null
-          is_active: boolean | null
-          name: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          company_id?: string | null
-          contact_info?: Json | null
-          created_at?: string | null
-          id?: string | null
-          is_active?: boolean | null
-          name?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          company_id?: string | null
-          contact_info?: Json | null
-          created_at?: string | null
-          id?: string | null
-          is_active?: boolean | null
-          name?: string | null
-          updated_at?: string | null
-        }
-        Relationships: []
       }
       suppliers_bkp_reset_20260301: {
         Row: {
@@ -8328,9 +7977,102 @@ export type Database = {
         }
         Relationships: []
       }
+      z_canary_test: {
+        Row: {
+          checked_at: string | null
+          id: number
+        }
+        Insert: {
+          checked_at?: string | null
+          id?: number
+        }
+        Update: {
+          checked_at?: string | null
+          id?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
-      [_ in never]: never
+      mv_consumo_itens_semana: {
+        Row: {
+          custo_total: number | null
+          produto_id: string | null
+          semana: string | null
+          total_saida: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_mov_produto"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "mv_giro_estoque"
+            referencedColumns: ["produto_id"]
+          },
+          {
+            foreignKeyName: "fk_mov_produto"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mv_fin_dre_mensal: {
+        Row: {
+          categoria_id: string | null
+          mes: string | null
+          qtd: number | null
+          tipo: string | null
+          total: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fin_lancamentos_categoria_id_fkey"
+            columns: ["categoria_id"]
+            isOneToOne: false
+            referencedRelation: "fin_categorias"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mv_fin_fluxo_caixa_diario: {
+        Row: {
+          conta_id: string | null
+          dia: string | null
+          tipo: string | null
+          total: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fin_lancamentos_conta_id_fkey"
+            columns: ["conta_id"]
+            isOneToOne: false
+            referencedRelation: "fin_contas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mv_giro_estoque: {
+        Row: {
+          categoria: string | null
+          entradas: number | null
+          nome_produto: string | null
+          produto_id: string | null
+          saidas: number | null
+          saldo_atual: number | null
+        }
+        Relationships: []
+      }
+      mv_pedidos_status_resumo: {
+        Row: {
+          mes: string | null
+          qtd: number | null
+          status: string | null
+          valor_total: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       _guarded_aprovar_conta_pagar: {
@@ -8373,9 +8115,24 @@ export type Database = {
         }
         Returns: Json
       }
+      _guarded_delete_categoria: { Args: { p_id: string }; Returns: Json }
+      _guarded_delete_centro_custo: { Args: { p_id: string }; Returns: Json }
+      _guarded_delete_conta: { Args: { p_id: string }; Returns: Json }
+      _guarded_delete_conta_pagar: { Args: { p_id: string }; Returns: Json }
+      _guarded_delete_conta_receber: { Args: { p_id: string }; Returns: Json }
+      _guarded_delete_lancamento: { Args: { p_id: string }; Returns: Json }
       _guarded_delete_orcamento: {
         Args: { p_expected_updated_at: string; p_id: string }
         Returns: undefined
+      }
+      _guarded_delete_plano_contas: { Args: { p_id: string }; Returns: Json }
+      _guarded_estornar_conta_pagar: {
+        Args: { p_id: string; p_justificativa?: string }
+        Returns: Json
+      }
+      _guarded_estornar_conta_receber: {
+        Args: { p_id: string; p_justificativa?: string }
+        Returns: Json
       }
       _guarded_list_fin_audit_logs: {
         Args: {
@@ -8395,6 +8152,92 @@ export type Database = {
           p_cursor_id?: string
           p_limit?: number
           p_mes?: string
+        }
+        Returns: Json
+      }
+      _guarded_update_categoria: {
+        Args: {
+          p_centro_custo_padrao_id?: string
+          p_expected_updated_at?: string
+          p_grupo?: string
+          p_id: string
+          p_linha_dre?: string
+          p_nome: string
+          p_tipo: string
+        }
+        Returns: Json
+      }
+      _guarded_update_centro_custo: {
+        Args: {
+          p_descricao?: string
+          p_expected_updated_at?: string
+          p_id: string
+          p_nome: string
+        }
+        Returns: Json
+      }
+      _guarded_update_conta: {
+        Args: {
+          p_agencia?: string
+          p_banco?: string
+          p_expected_updated_at?: string
+          p_id: string
+          p_nome: string
+          p_numero_conta?: string
+          p_saldo_inicial?: number
+          p_tipo: string
+        }
+        Returns: Json
+      }
+      _guarded_update_conta_pagar: {
+        Args: {
+          p_categoria_id?: string
+          p_centro_custo_id?: string
+          p_conta_id?: string
+          p_data_competencia?: string
+          p_data_vencimento?: string
+          p_descricao: string
+          p_expected_updated_at?: string
+          p_forma_pagamento?: string
+          p_fornecedor?: string
+          p_id: string
+          p_observacoes?: string
+          p_rateios?: Json
+          p_recorrencia?: Json
+          p_supplier_id?: string
+          p_valor: number
+        }
+        Returns: Json
+      }
+      _guarded_update_conta_receber: {
+        Args: {
+          p_categoria_id?: string
+          p_centro_custo_id?: string
+          p_cliente?: string
+          p_conta_id?: string
+          p_data_competencia?: string
+          p_data_vencimento?: string
+          p_descricao: string
+          p_expected_updated_at?: string
+          p_forma_pagamento?: string
+          p_id: string
+          p_observacoes?: string
+          p_rateios?: Json
+          p_recorrencia?: Json
+          p_supplier_id?: string
+          p_valor?: number
+        }
+        Returns: Json
+      }
+      _guarded_update_plano_contas: {
+        Args: {
+          p_codigo: string
+          p_expected_updated_at?: string
+          p_id: string
+          p_linha_dre?: string
+          p_natureza: string
+          p_nome: string
+          p_tipo: string
         }
         Returns: Json
       }
@@ -8585,31 +8428,18 @@ export type Database = {
         Returns: number
       }
       count_requisicoes_with_pending_items: { Args: never; Returns: number }
-      create_inventory_atomic:
-        | {
-            Args: {
-              p_categorias?: string[]
-              p_data: string
-              p_hora: string
-              p_idempotency_key?: string
-              p_observacao?: string
-              p_tipo: string
-              p_turno_id: string
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              p_categorias?: string[]
-              p_data: string
-              p_hora: string
-              p_idempotency_key?: string
-              p_observacao?: string
-              p_tipo: string
-              p_turno_id: string
-            }
-            Returns: Json
-          }
+      create_inventory_atomic: {
+        Args: {
+          p_categorias?: string[]
+          p_data: string
+          p_hora: string
+          p_idempotency_key?: string
+          p_observacao?: string
+          p_tipo: string
+          p_turno_id: string
+        }
+        Returns: string
+      }
       create_purchase_order_atomic: {
         Args: { p_idempotency_key: string; p_payload: Json }
         Returns: Json
@@ -8672,9 +8502,25 @@ export type Database = {
         Args: { _componente_pai_id: string; _itens: Json }
         Returns: Json
       }
+      fin_audit_integrity_check: {
+        Args: never
+        Returns: {
+          descricao: string
+          entidade_id: string
+          lancamento_id: string
+          problema: string
+          status: string
+          tipo: string
+          valor: number
+        }[]
+      }
       finalize_inventory_atomic: {
         Args: { p_id: string; p_justificativa: string }
         Returns: Json
+      }
+      fn_recompute_product_saldo: {
+        Args: { p_company: string; p_id: string }
+        Returns: undefined
       }
       generate_next_sku: { Args: { p_prefix?: string }; Returns: string }
       gerar_parcela_recorrente: {
@@ -8710,6 +8556,7 @@ export type Database = {
           valor_empresa: number
         }[]
       }
+      get_catalog_counts: { Args: never; Returns: Json }
       get_consumo_por_produto: {
         Args: {
           p_company_id: string
@@ -8761,26 +8608,32 @@ export type Database = {
         | { Args: { p_meses?: number }; Returns: Json }
         | { Args: { p_end: string; p_start: string }; Returns: Json }
       get_inactive_stock_items: { Args: never; Returns: Json }
+      get_movimentacoes_kpis: {
+        Args: {
+          p_date_from?: string
+          p_date_to?: string
+          p_produto_id?: string
+          p_setor?: string
+          p_show_cancelled?: boolean
+        }
+        Returns: Json
+      }
       get_or_set_cache: {
         Args: { p_key: string; p_ttl_seconds?: number }
         Returns: Json
       }
-      get_relatorios_compras: {
-        Args: { p_end: string; p_start: string }
-        Returns: Json
-      }
-      get_relatorios_kpis: {
-        Args: { p_end: string; p_start: string }
-        Returns: Json
-      }
-      get_relatorios_score: {
-        Args: { p_end: string; p_start: string }
-        Returns: Json
-      }
-      get_relatorios_tendencia: {
-        Args: { p_end: string; p_start: string }
-        Returns: Json
-      }
+      get_relatorios_compras:
+        | { Args: { p_end: string; p_start: string }; Returns: Json }
+        | { Args: { p_end: string; p_start: string }; Returns: Json }
+      get_relatorios_kpis:
+        | { Args: { p_end: string; p_start: string }; Returns: Json }
+        | { Args: { p_end: string; p_start: string }; Returns: Json }
+      get_relatorios_score:
+        | { Args: { p_end: string; p_start: string }; Returns: Json }
+        | { Args: { p_end: string; p_start: string }; Returns: Json }
+      get_relatorios_tendencia:
+        | { Args: { p_end: string; p_start: string }; Returns: Json }
+        | { Args: { p_end: string; p_start: string }; Returns: Json }
       get_report_item_detail: {
         Args: { p_end: string; p_produto_id: string; p_start: string }
         Returns: Json
@@ -8789,6 +8642,7 @@ export type Database = {
         Args: { p_end: string; p_start: string }
         Returns: Json
       }
+      get_rh_beneficios_total: { Args: never; Returns: Json }
       get_saldo_conta: { Args: { p_conta_id: string }; Returns: number }
       get_saldo_produto: { Args: { p_produto_id: string }; Returns: number }
       get_saldo_produtos: {
@@ -8802,6 +8656,8 @@ export type Database = {
         Args: { p_end: string; p_start: string }
         Returns: Json
       }
+      get_salmon_inventory_adjustment_kg: { Args: never; Returns: Json }
+      get_salmon_reconciliation_kpis: { Args: never; Returns: Json }
       get_spend_by_sector: {
         Args: {
           p_end_date: string
@@ -8899,7 +8755,10 @@ export type Database = {
         Returns: boolean
       }
       has_compras_view: { Args: { p_user_id: string }; Returns: boolean }
-      has_permission: {
+      has_permission:
+        | { Args: { _permission: string }; Returns: boolean }
+        | { Args: { _permission: string; _user_id: string }; Returns: boolean }
+      has_permission_quick: {
         Args: { _permission: string; _user_id: string }
         Returns: boolean
       }
@@ -8910,6 +8769,8 @@ export type Database = {
         }
         Returns: boolean
       }
+      immutable_unaccent: { Args: { "": string }; Returns: string }
+      list_companies: { Args: never; Returns: Json }
       list_fin_contas_pagar_cursor: {
         Args: {
           p_cursor_date?: string
@@ -9142,6 +9003,14 @@ export type Database = {
         Returns: undefined
       }
       mark_all_notifications_read: { Args: never; Returns: number }
+      onboard_new_company: {
+        Args: {
+          p_admin_user_id?: string
+          p_cnpj?: string
+          p_company_name: string
+        }
+        Returns: Json
+      }
       orcamento_execucao_mensal: { Args: { p_mes: string }; Returns: Json }
       pay_conta_pagar: {
         Args: { p_expected_updated_at: string; p_id: string }
@@ -9201,6 +9070,17 @@ export type Database = {
           p_conta_origem_id: string
           p_data: string
           p_descricao: string
+          p_user_id: string
+          p_valor: number
+        }
+        Returns: Json
+      }
+      reconcile_ignorar_lancamento: {
+        Args: {
+          p_conta_id: string
+          p_data: string
+          p_descricao: string
+          p_tipo: string
           p_user_id: string
           p_valor: number
         }
@@ -9299,10 +9179,17 @@ export type Database = {
         Args: { p_key: string; p_payload: Json; p_ttl_seconds?: number }
         Returns: undefined
       }
-      simulate_relatorios_score: {
-        Args: { p_end: string; p_params?: Json; p_start: string }
-        Returns: Json
-      }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
+      simulate_relatorios_score:
+        | {
+            Args: { p_end: string; p_params?: Json; p_start: string }
+            Returns: Json
+          }
+        | {
+            Args: { p_end: string; p_params?: Json; p_start: string }
+            Returns: Json
+          }
       soft_delete_inventory: {
         Args: { p_id: string; p_justificativa: string }
         Returns: Json
@@ -9342,29 +9229,26 @@ export type Database = {
         Returns: Json
       }
       unaccent: { Args: { "": string }; Returns: string }
-      update_transfer:
-        | {
-            Args: {
-              p_conta_destino: string
-              p_conta_origem: string
-              p_data: string
-              p_descricao: string
-              p_lancamento_id: string
-              p_valor: number
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              p_conta_destino_id: string
-              p_conta_origem_id: string
-              p_data_competencia: string
-              p_descricao: string
-              p_lancamento_id: string
-              p_valor: number
-            }
-            Returns: undefined
-          }
+      update_company: {
+        Args: {
+          p_ativo?: boolean
+          p_cnpj?: string
+          p_company_id: string
+          p_nome?: string
+        }
+        Returns: Json
+      }
+      update_transfer: {
+        Args: {
+          p_conta_destino_id: string
+          p_conta_origem_id: string
+          p_data_competencia: string
+          p_descricao: string
+          p_lancamento_id: string
+          p_valor: number
+        }
+        Returns: undefined
+      }
       upsert_salmon_leftover_atomic: {
         Args: { p_leftover_kg: number; p_note?: string; p_record_date: string }
         Returns: Json

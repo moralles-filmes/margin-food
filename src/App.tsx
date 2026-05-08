@@ -5,6 +5,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { NotificationsProvider } from "@/contexts/NotificationsContext";
+import RequisicaoNotificationModal from "@/components/RequisicaoNotificationModal";
 import { toast } from "sonner";
 import { PwaUpdatePrompt } from "@/components/PwaUpdatePrompt";
 import { emitDataEvent } from "@/lib/dataEvents";
@@ -153,7 +155,9 @@ const App = () => {
           <PwaUpdatePrompt />
           <ErrorBoundary>
             <BrowserRouter>
+              <NotificationsProvider>
               <Suspense fallback={<div className="h-screen bg-background" />}>
+                <RequisicaoNotificationModal />
                 <Routes>
                   <Route path="/" element={<Index />} />
                   <Route path="/login" element={<Login />} />
@@ -168,6 +172,7 @@ const App = () => {
                 </Routes>
                 <FloatingCalculator />
               </Suspense>
+              </NotificationsProvider>
             </BrowserRouter>
           </ErrorBoundary>
         </TooltipProvider>

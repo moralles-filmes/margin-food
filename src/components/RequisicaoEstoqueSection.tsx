@@ -5,6 +5,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '
 import { parseUTCToBR } from '@/lib/datetime';
 import { includesNormalized } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -62,6 +63,7 @@ interface Requisicao {
   created_at: string;
   atendido_por: string | null;
   atendido_em: string | null;
+  confirmado_pelo_solicitante_em: string | null;
   requisicao_estoque_itens: RequisicaoItem[];
 }
 
@@ -776,6 +778,11 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
                       <span className={`text-[9px] px-2 py-0.5 rounded-full font-medium ${requisicaoStatusStyle(req.status)}`}>
                         {requisicaoStatusLabel(req.status)}
                       </span>
+                      {['ATENDIDA', 'PARCIALMENTE_ATENDIDA', 'NEGADA'].includes(req.status) && (
+                        req.confirmado_pelo_solicitante_em
+                          ? <Badge variant="outline" className="text-[9px] h-4 px-1.5 text-emerald-700 border-emerald-300">✓ Visto</Badge>
+                          : <Badge variant="outline" className="text-[9px] h-4 px-1.5 text-amber-700 border-amber-300">⏱ Aguardando</Badge>
+                      )}
                       {isExpanded ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />}
                     </div>
                   </button>
@@ -1116,6 +1123,11 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
                           <span className={`text-[9px] px-2 py-0.5 rounded-full font-medium ${requisicaoStatusStyle(req.status)}`}>
                             {requisicaoStatusLabel(req.status)}
                           </span>
+                          {['ATENDIDA', 'PARCIALMENTE_ATENDIDA', 'NEGADA'].includes(req.status) && (
+                            req.confirmado_pelo_solicitante_em
+                              ? <Badge variant="outline" className="text-[9px] h-4 px-1.5 text-emerald-700 border-emerald-300">✓ Visto</Badge>
+                              : <Badge variant="outline" className="text-[9px] h-4 px-1.5 text-amber-700 border-amber-300">⏱ Aguardando</Badge>
+                          )}
                           {isExpanded ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />}
                         </div>
                       </button>

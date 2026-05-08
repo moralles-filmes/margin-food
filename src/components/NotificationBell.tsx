@@ -2,7 +2,8 @@ import { useState, useRef, useEffect } from 'react';
 import { Bell, CheckCheck, ExternalLink, Inbox } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { useNotifications, AppNotification } from '@/hooks/useNotifications';
+import { type AppNotification } from '@/hooks/useNotifications';
+import { useNotificationsContext } from '@/contexts/NotificationsContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -21,7 +22,7 @@ const MODULE_LABELS: Record<string, string> = {
 
 export default function NotificationBell({ onNavigate }: Props) {
   const { user } = useAuth();
-  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications(user?.id);
+  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotificationsContext();
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState<'unread' | 'all'>('unread');
   const ref = useRef<HTMLDivElement>(null);
