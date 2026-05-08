@@ -193,7 +193,7 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const serviceKey = (Deno.env.get("SUPABASE_SECRET_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"))!;
 
     // ── Tenant resolution (fail-closed) ──
     let userId: string;
@@ -657,6 +657,49 @@ serve(async (req) => {
     }
 
     // ========================
+    // HELPER: insere notificação para o solicitante quando a requisição encerra
+    // ========================
+    async function notifyIfRequisicaoEncerrada(reqId: string, cId: string, actorId: string) {
+      const { data: req } = await adminClient
+        .from("requisicoes_estoque")
+        .select("id, status, setor, solicitante_user_id")
+        .eq("id", reqId)
+        .eq("company_id", cId)
+        .single();
+
+      if (!req || !req.solicitante_user_id) return;
+      const FINAL = ["ATENDIDA", "PARCIALMENTE_ATENDIDA", "NEGADA"];
+      if (!FINAL.includes(req.status)) return;
+
+      const reqShort = reqId.slice(0, 8);
+      let title: string, message: string;
+      if (req.status === "ATENDIDA") {
+        title = "Requisição atendida";
+        message = `Sua requisição #${reqShort} (${req.setor ?? "—"}) foi atendida. A mercadoria está separada e pronta para retirada no almoxarifado.`;
+      } else if (req.status === "PARCIALMENTE_ATENDIDA") {
+        title = "Requisição parcialmente atendida";
+        message = `Sua requisição #${reqShort} (${req.setor ?? "—"}) foi parcialmente atendida. Verifique os itens — parte está pronta para retirada.`;
+      } else {
+        title = "Requisição negada";
+        message = `Sua requisição #${reqShort} (${req.setor ?? "—"}) foi negada. Veja o motivo na lista de requisições.`;
+      }
+
+      // ON CONFLICT DO NOTHING via UNIQUE parcial — garante idempotência em chamadas paralelas
+      await adminClient.from("notifications").upsert({
+        recipient_user_id: req.solicitante_user_id,
+        type: "REQUISICAO_ENCERRADA",
+        module: "estoque",
+        title,
+        message,
+        entity_type: "requisicao_estoque",
+        entity_id: reqId,
+        link_path: "/?module=estoque&sub=requisicoes",
+        created_by: actorId,
+        metadata: { status: req.status, setor: req.setor },
+      }, { onConflict: "entity_id", ignoreDuplicates: true });
+    }
+
+    // ========================
     // HELPER: official atomic pipeline for item attendance -> movement
     // ========================
     async function attendItemAtomic(reqId: string, itemId: string, approvedQty?: number) {
@@ -756,6 +799,8 @@ serve(async (req) => {
         p_after: { status: "RECUSADO", motivo_recusa: motivo_recusa.trim(), recusado_por: userId },
       });
 
+      await notifyIfRequisicaoEncerrada(requisicao_id, companyId, userId);
+
       return jsonRes({ success: true, mensagem: "Item recusado com sucesso.", request_id: requestId });
     }
 
@@ -784,6 +829,7 @@ serve(async (req) => {
 
       try {
         const result = await attendItemAtomic(requisicao_id, item_id, approvedQty);
+        await notifyIfRequisicaoEncerrada(requisicao_id, companyId, userId);
         return jsonRes({
           success: true,
           mensagem: result.message || "Item atendido com sucesso.",
@@ -911,6 +957,8 @@ serve(async (req) => {
         mensagem = `${atendidos} item(ns) atendido(s). ${semSaldo} item(ns) sem saldo: ${semSaldoProdutos.join(", ")}. Alertas gerados para Compras.`;
       }
 
+      await notifyIfRequisicaoEncerrada(requisicao_id, companyId, userId);
+
       return jsonRes({
         success: true,
         mensagem,
@@ -972,7 +1020,50 @@ serve(async (req) => {
         p_after: { status: "NEGADA", motivo: motivoText },
       });
 
+      await notifyIfRequisicaoEncerrada(requisicao_id, companyId, userId);
+
       return jsonRes({ success: true, mensagem: "Requisição negada.", request_id: requestId });
+    }
+
+    // ========================
+    // ACTION: marcar_requisicao_visto — solicitante confirma ciência do resultado
+    // ========================
+    if (action === "marcar_requisicao_visto") {
+      const { requisicao_id } = body;
+      if (!requisicao_id) return badRequest("requisicao_id obrigatório");
+
+      const { data: req } = await adminClient
+        .from("requisicoes_estoque")
+        .select("id, solicitante_user_id, confirmado_pelo_solicitante_em")
+        .eq("id", requisicao_id)
+        .eq("company_id", companyId)
+        .single();
+      if (!req) return notFound("Requisição");
+
+      const isOwner = req.solicitante_user_id === userId;
+      const isSuper = await hasAnyPermission(adminClient, userId, ["system:global:manage"]);
+      if (!isOwner && !isSuper) return forbidden("FORBIDDEN", "Apenas o solicitante pode confirmar");
+
+      const now = new Date().toISOString();
+
+      if (!req.confirmado_pelo_solicitante_em) {
+        await adminClient
+          .from("requisicoes_estoque")
+          .update({ confirmado_pelo_solicitante_em: now, confirmado_pelo_solicitante_por: userId })
+          .eq("id", requisicao_id)
+          .eq("company_id", companyId);
+      }
+
+      // Marca a notification como lida (RLS permite — owner é o próprio solicitante)
+      await supabaseUser
+        .from("notifications")
+        .update({ read_at: now })
+        .eq("entity_type", "requisicao_estoque")
+        .eq("entity_id", requisicao_id)
+        .eq("type", "REQUISICAO_ENCERRADA")
+        .is("read_at", null);
+
+      return jsonRes({ success: true, confirmado_em: now, request_id: requestId });
     }
 
     // ========================
@@ -1045,7 +1136,7 @@ serve(async (req) => {
       const bucket = body.bucket === "historico" ? "historico" : "pendentes";
 
       const ITEM_SELECT = "id, produto_id, quantidade_solicitada, quantidade_atendida, unidade, saldo_snapshot, status, motivo_recusa, recusado_por, recusado_em, atendido_por, atendido_em, produtos(nome_produto, unidade_medida, unidade_compra)";
-      const REQ_SELECT = `id, setor, solicitante_user_id, status, observacao, created_at, atendido_por, atendido_em, ativo, requisicao_estoque_itens(${ITEM_SELECT})`;
+      const REQ_SELECT = `id, setor, solicitante_user_id, status, observacao, created_at, atendido_por, atendido_em, ativo, confirmado_pelo_solicitante_em, requisicao_estoque_itens(${ITEM_SELECT})`;
 
       // Fase 1: IDs de requisições que ainda têm ao menos 1 item SOLICITADO (scoped by RLS/tenant).
       const { data: pendingRows, error: pendErr } = await supabaseUser
