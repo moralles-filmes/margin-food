@@ -23,6 +23,7 @@ import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
 import ContaDetailDialog, { type ContaDetailData, type ContaDetailRateio } from './ContaDetailDialog';
 import ContaFormDialog, { type ContaFormData, type RateioLine } from './ContaFormDialog';
 import * as XLSX from 'xlsx';
+import { mapFinanceiroDeleteError } from '@/lib/financeiroErrorMap';
 
 // ─── Types ───
 interface Lancamento {
@@ -333,15 +334,18 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
         if (error) throw error;
         toast.success('Transferencia excluida (ambos os lados)');
       } else {
-        const { error } = await supabase.from('fin_lancamentos').delete().eq('id', item.id);
+        const { error } = await (supabase.rpc as any)('_guarded_delete_lancamento', {
+          p_id: item.id,
+          p_expected_updated_at: item.updated_at,
+        });
         if (error) throw error;
         toast.success('Lancamento excluido');
       }
       load();
       emitDataEvent('financeiro:lancamentos');
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Erro ao excluir';
-      toast.error(msg);
+      console.error('[LivroRazaoSection.deleteLancamento]', err);
+      toast.error(mapFinanceiroDeleteError(err));
     } finally {
       setSaving(false);
     }

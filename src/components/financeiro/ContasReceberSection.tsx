@@ -18,6 +18,7 @@ import TableActions from '@/components/ui/TableActions';
 import ContaDetailDialog, { type ContaDetailData, type ContaDetailRateio } from './ContaDetailDialog';
 import ContaFormDialog, { type ContaFormData, type RateioLine } from './ContaFormDialog';
 import * as XLSX from 'xlsx';
+import { mapFinanceiroDeleteError } from '@/lib/financeiroErrorMap';
 
 /* ─── Types ─── */
 interface ContaReceber {
@@ -253,13 +254,17 @@ export default function ContasReceberSection() {
   const handleDelete = async (item: ContaReceber) => {
     setIsDeletingId(item.id);
     try {
-      const { error } = await (supabase.rpc as any)('_guarded_delete_conta_receber', { p_id: item.id });
+      const { error } = await (supabase.rpc as any)('_guarded_delete_conta_receber', {
+        p_id: item.id,
+        p_expected_updated_at: item.updated_at,
+      });
       if (error) throw error;
-      toast.success('Conta excluida');
+      toast.success('Conta excluída');
       load();
       emitDataEvent('financeiro:receber');
-    } catch (err: any) {
-      toast.error('Erro ao excluir: ' + err.message);
+    } catch (err: unknown) {
+      console.error('[ContasReceberSection.handleDelete]', err);
+      toast.error(mapFinanceiroDeleteError(err));
     } finally {
       setIsDeletingId(null);
     }

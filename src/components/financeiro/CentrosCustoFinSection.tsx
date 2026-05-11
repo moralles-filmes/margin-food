@@ -13,6 +13,7 @@ import { Plus, Edit, Trash2 } from 'lucide-react';
 import { useFormDirtyGuard } from '@/hooks/useFormDirtyGuard';
 import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
 import TableActions from '@/components/ui/TableActions';
+import { mapFinanceiroDeleteError } from '@/lib/financeiroErrorMap';
 
 interface CentroRow {
   id: string;
@@ -82,11 +83,16 @@ export default function CentrosCustoFinSection({ canCreate, canEdit, canDelete }
   };
 
   const remove = async (id: string) => {
-    const { error } = await (supabase.rpc as any)('_guarded_delete_centro_custo', { p_id: id });
-    if (error) { toast.error(error.message); return; }
-    toast.success('Centro de custo removido');
-    load();
-    emitDataEvent('financeiro:cadastros');
+    try {
+      const { error } = await (supabase.rpc as any)('_guarded_delete_centro_custo', { p_id: id });
+      if (error) throw error;
+      toast.success('Centro de custo removido');
+      load();
+      emitDataEvent('financeiro:cadastros');
+    } catch (err: unknown) {
+      console.error('[CentrosCustoFinSection.remove]', err);
+      toast.error(mapFinanceiroDeleteError(err));
+    }
   };
 
   return (

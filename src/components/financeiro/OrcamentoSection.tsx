@@ -19,6 +19,7 @@ import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import { mapFinanceiroDeleteError } from '@/lib/financeiroErrorMap';
 
 // ─── Types ───
 
@@ -178,19 +179,12 @@ export default function OrcamentoSection() {
         p_id: item.id,
         p_expected_updated_at: item.updated_at,
       });
-      if (error) {
-        if (error.message?.includes('OPTIMISTIC_LOCK_CONFLICT')) {
-          toast.error('O registro foi alterado por outro usuário. Atualize a lista.');
-        } else {
-          throw error;
-        }
-        return;
-      }
+      if (error) throw error;
       toast.success('Orçamento excluído');
       emitDataEvent('financeiro:orcamento');
-    } catch (err) {
-      console.error(err);
-      toast.error('Erro ao excluir');
+    } catch (err: unknown) {
+      console.error('[OrcamentoSection.handleDelete]', err);
+      toast.error(mapFinanceiroDeleteError(err));
     }
   };
 

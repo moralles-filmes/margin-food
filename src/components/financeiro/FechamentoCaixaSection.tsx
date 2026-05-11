@@ -24,6 +24,7 @@ import { APP_NAME } from '@/lib/brand';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import { mapFinanceiroDeleteError } from '@/lib/financeiroErrorMap';
 import {
   ResponsiveContainer,
   AreaChart,
@@ -212,15 +213,17 @@ export default function FechamentoCaixaSection() {
     });
     if (!ok) return;
 
-    const { error } = await supabase.rpc('rpc_delete_fechamento_caixa', { p_id: id });
-    if (error) {
-      toast.error(error.message);
-    } else {
+    try {
+      const { error } = await supabase.rpc('rpc_delete_fechamento_caixa', { p_id: id });
+      if (error) throw error;
       toast.success('Fechamento excluído');
       cacheInvalidate('calcular_cmv');
       cacheInvalidate('get_ranking');
       load();
       emitDataEvent('financeiro:fechamento');
+    } catch (err: unknown) {
+      console.error('[FechamentoCaixaSection.remove]', err);
+      toast.error(mapFinanceiroDeleteError(err));
     }
   };
 

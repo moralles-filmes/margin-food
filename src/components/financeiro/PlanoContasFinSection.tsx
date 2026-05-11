@@ -14,6 +14,7 @@ import { Plus, Edit, Trash2 } from 'lucide-react';
 import { useFormDirtyGuard } from '@/hooks/useFormDirtyGuard';
 import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
 import TableActions from '@/components/ui/TableActions';
+import { mapFinanceiroDeleteError } from '@/lib/financeiroErrorMap';
 
 interface PlanoContaRow {
   id: string;
@@ -91,11 +92,16 @@ export default function PlanoContasFinSection({ canCreate, canEdit, canDelete }:
   };
 
   const remove = async (id: string) => {
-    const { error } = await (supabase.rpc as any)('_guarded_delete_plano_contas', { p_id: id });
-    if (error) { toast.error(error.message); return; }
-    toast.success('Conta removida');
-    load();
-    emitDataEvent('financeiro:cadastros');
+    try {
+      const { error } = await (supabase.rpc as any)('_guarded_delete_plano_contas', { p_id: id });
+      if (error) throw error;
+      toast.success('Conta removida');
+      load();
+      emitDataEvent('financeiro:cadastros');
+    } catch (err: unknown) {
+      console.error('[PlanoContasFinSection.remove]', err);
+      toast.error(mapFinanceiroDeleteError(err));
+    }
   };
 
   return (

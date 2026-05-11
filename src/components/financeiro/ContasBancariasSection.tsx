@@ -23,6 +23,7 @@ import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
 import TableActions from '@/components/ui/TableActions';
 import * as XLSX from 'xlsx';
 import { includesNormalized } from '@/lib/utils';
+import { mapFinanceiroDeleteError } from '@/lib/financeiroErrorMap';
 
 // ─── Types ───
 interface ContaBancaria {
@@ -261,8 +262,9 @@ export default function ContasBancariasSection({ onNavigateExtrato }: ContasBanc
       toast.success('Conta desativada com sucesso');
       load();
       emitDataEvent('financeiro:contas');
-    } catch (error: any) {
-      toast.error(error.message || 'Erro ao desativar conta');
+    } catch (err: unknown) {
+      console.error('[ContasBancariasSection.deactivate]', err);
+      toast.error(mapFinanceiroDeleteError(err));
     }
   };
 
