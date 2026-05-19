@@ -148,14 +148,14 @@ export default function ProjecaoFluxoSection() {
     setExportingPdf(true);
     try {
       const { default: jsPDF } = await import('jspdf');
-      await import('jspdf-autotable');
+      const { default: autoTable } = await import('jspdf-autotable');
       const doc = new jsPDF();
       doc.setFontSize(14);
       doc.text('Projeção de Fluxo de Caixa', 14, 15);
       doc.setFontSize(9);
       doc.text(`Horizonte: ${dias} dias | Saldo Inicial: ${fmt(saldoInicial)}`, 14, 23);
 
-      (doc as any).autoTable({
+      autoTable(doc, {
         startY: 30,
         head: [['Data', 'Entradas', 'Saídas', 'Saldo']],
         body: timeline.map(d => [

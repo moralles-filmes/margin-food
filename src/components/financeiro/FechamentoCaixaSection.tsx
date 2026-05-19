@@ -22,7 +22,7 @@ import { useCan } from '@/permissions/hooks';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { APP_NAME } from '@/lib/brand';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { mapFinanceiroDeleteError } from '@/lib/financeiroErrorMap';
 import {
@@ -265,7 +265,7 @@ export default function FechamentoCaixaSection() {
       doc.setFontSize(8);
       doc.text(`Dias: ${items.length} | Bruto: ${fmtBRL(totalBruto)} | Líquido: ${fmtBRL(totalLiquido)}`, 14, 28);
 
-      (doc as any).autoTable({
+      autoTable(doc, {
         startY: 35,
         head: [['Data', 'Bruto', 'Taxas', 'Descontos', 'Líquido', 'Observação']],
         body: items.map(r => [

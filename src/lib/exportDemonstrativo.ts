@@ -95,7 +95,7 @@ const HEADER_COLOR: [number, number, number] = [30, 41, 59];
 
 export async function exportDemonstrativoPDF(opts: BuildOptions & { titulo: string; periodo: string }) {
   const { default: jsPDF } = await import('jspdf');
-  await import('jspdf-autotable');
+  const { default: autoTable } = await import('jspdf-autotable');
   const { rows, receitaTotal } = buildExportRows(opts);
   const doc = new jsPDF();
 
@@ -123,7 +123,7 @@ export async function exportDemonstrativoPDF(opts: BuildOptions & { titulo: stri
     return row;
   });
 
-  (doc as any).autoTable({
+  autoTable(doc, {
     startY: 36,
     head,
     body,

@@ -1,5 +1,5 @@
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import { APP_NAME } from '@/lib/brand';
 import { todayBR } from '@/lib/datetime';
 import { fmtBRL as fmtBRLMoney } from '@/lib/money';
@@ -30,7 +30,7 @@ export function gerarPDFDre(dados: { mes: string; linhas: { codigo: string; nome
   const doc = new jsPDF();
   addHeader(doc, 'DRE — Demonstrativo de Resultado', `Competência: ${dados.mes}`);
 
-  (doc as any).autoTable({
+  autoTable(doc, {
     startY: 36,
     head: [['Cód.', 'Linha', 'Valor', '% Receita']],
     body: dados.linhas.map(l => [l.codigo, l.nome, fmtBRL(l.valor), l.pctReceita]),
@@ -67,7 +67,7 @@ export function gerarPDFFluxoCaixa(dados: {
   doc.text(`Saídas Realizadas: ${fmtBRL(dados.totais.saidas)}`, 100, y);
   doc.text(`Saldo Real: ${fmtBRL(dados.totais.entradas - dados.totais.saidas)}`, 186, y);
 
-  (doc as any).autoTable({
+  autoTable(doc, {
     startY: y + 8,
     head: [['Data', 'Entradas', 'Saídas', 'Prev. Entradas', 'Prev. Saídas', 'Saldo Dia']],
     body: dados.linhas.map(l => [
@@ -93,7 +93,7 @@ export function gerarPDFContasPagar(dados: { items: { data_vencimento: string; d
 
   const total = dados.items.reduce((s, i) => s + i.valor, 0);
 
-  (doc as any).autoTable({
+  autoTable(doc, {
     startY: 36,
     head: [['Vencimento', 'Descrição', 'Fornecedor', 'Valor', 'Status']],
     body: dados.items.map(i => [i.data_vencimento, i.descricao, i.fornecedor || '—', fmtBRL(i.valor), i.status]),
@@ -113,7 +113,7 @@ export function gerarPDFContasReceber(dados: { items: { data_vencimento: string;
 
   const total = dados.items.reduce((s, i) => s + i.valor, 0);
 
-  (doc as any).autoTable({
+  autoTable(doc, {
     startY: 36,
     head: [['Vencimento', 'Descrição', 'Cliente', 'Valor', 'Status']],
     body: dados.items.map(i => [i.data_vencimento, i.descricao, i.cliente || '—', fmtBRL(i.valor), i.status]),

@@ -57,7 +57,7 @@ export function exportFileName(module: string, section: string, ext: string): st
 export async function exportTableToPdf(options: ExportOptions): Promise<boolean> {
   try {
     const { default: jsPDF } = await import('jspdf');
-    await import('jspdf-autotable');
+    const { default: autoTable } = await import('jspdf-autotable');
     const doc = new jsPDF();
     const { title, subtitle, columns, rows, summaryRows, module, section } = options;
 
@@ -86,7 +86,7 @@ export async function exportTableToPdf(options: ExportOptions): Promise<boolean>
       if (col.align) colStyles[i] = { halign: col.align };
     });
 
-    (doc as any).autoTable({
+    autoTable(doc, {
       startY,
       head,
       body,

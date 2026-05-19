@@ -1,5 +1,5 @@
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import { APP_NAME } from '@/lib/brand';
 import { fmtBRL } from '@/lib/money';
 import type { PurchaseOrder, PurchaseOrderItem } from '@/hooks/usePurchaseOrdersStore';
@@ -111,7 +111,7 @@ export function gerarPDFPedidoFornecedor({ order, items, includePrice, extraNote
     return row;
   });
 
-  (doc as any).autoTable({
+  autoTable(doc, {
     startY: y,
     head: [head],
     body,

@@ -321,14 +321,14 @@ export default function AuditoriaFinSection() {
     setExportingPdf(true);
     try {
       const { default: jsPDF } = await import('jspdf');
-      await import('jspdf-autotable');
+      const { default: autoTable } = await import('jspdf-autotable');
       const doc = new jsPDF({ orientation: 'landscape' });
       doc.setFontSize(14);
       doc.text('Auditoria Financeira', 14, 15);
       doc.setFontSize(9);
       doc.text(`Período: ${dias} dias | ${items.length} registros`, 14, 23);
 
-      (doc as any).autoTable({
+      autoTable(doc, {
         startY: 30,
         head: [['Data/Hora', 'Ação', 'Entidade', 'Registro', 'Usuário', 'Justificativa']],
         body: items.map(l => [

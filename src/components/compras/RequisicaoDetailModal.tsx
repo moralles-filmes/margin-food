@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { PurchaseRequisition, PurchaseRequisitionItem, AuditEntry, usePurchaseRequisitions } from '@/hooks/usePurchaseRequisitions';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import { APP_NAME } from '@/lib/brand';
 import { fmtBRL, formatFixedBR, formatDateTimeBR } from '@/lib/formatters';
 
@@ -115,15 +115,14 @@ export default function RequisicaoDetailModal({ requisitionId, open, onClose, ca
       i.prioridade,
     ]);
 
-    // @enterprise-exception: jsPDF autoTable plugin requires dynamic access
-    (doc as unknown as Record<string, Function>).autoTable({
+    autoTable(doc, {
       startY: req.observacao ? 52 : 46,
       head: [['Produto', 'Qtd', 'Un', 'Preço Ref', 'Subtotal', 'Prioridade']],
       body: tableData,
       styles: { fontSize: 8 },
     });
 
-    const finalY = (doc as unknown as Record<string, Record<string, unknown>>).lastAutoTable?.finalY as number || 80;
+    const finalY = (doc as any).lastAutoTable?.finalY as number || 80;
     const total = items.reduce((s, i) => s + (i.subtotal || 0), 0);
     doc.setFontSize(10);
     doc.text(`Total estimado: ${fmtBRL(total)}`, 14, finalY + 10);

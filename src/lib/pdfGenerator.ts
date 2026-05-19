@@ -1,5 +1,5 @@
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import { APP_NAME } from '@/lib/brand';
 import { fmtBRL } from '@/lib/money';
 
@@ -33,7 +33,7 @@ export function gerarPDFListaCompras(lista: PDFListaCompra) {
   doc.setFontSize(8);
   doc.text(lista.titulo, 14, 28);
 
-  (doc as any).autoTable({
+  autoTable(doc, {
     startY: 35,
     head: [['Produto', 'Qtd', 'Unidade', 'Categoria', 'Prioridade']],
     body: lista.itens.map(i => [i.produto, i.quantidade.toString(), i.unidade, i.categoria, i.prioridade]),
@@ -61,7 +61,7 @@ export function gerarPDFPedido(pedido: PDFPedido) {
 
   const total = pedido.itens.reduce((s, i) => s + i.total, 0);
 
-  (doc as any).autoTable({
+  autoTable(doc, {
     startY: 58,
     head: [['Produto', 'Qtd', 'Preço Unit.', 'Total']],
     body: pedido.itens.map(i => [i.produto, i.quantidade.toString(), fmtBRL(i.precoUnitario), fmtBRL(i.total)]),
@@ -121,7 +121,7 @@ export function gerarPDFCotacao(cotacao: PDFCotacao) {
   cotacao.fornecedores.forEach(f => prazoRow.push(f.prazo.toString()));
   body.push(prazoRow);
 
-  (doc as any).autoTable({
+  autoTable(doc, {
     startY: 38,
     head: [head],
     body,
