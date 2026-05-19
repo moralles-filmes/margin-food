@@ -21,37 +21,16 @@ export default function SalmonReconciliationReport() {
   const runCheck = async () => {
     setLoading(true);
     try {
-      // 1. Get entries totals from salmon_entries
-      const { data: entries } = await supabase
-        .from('salmon_entries')
-        .select('gross_kg')
-        .eq('status', 'ACTIVE');
+      const { data: kpis, error } = await supabase.rpc('get_salmon_reconciliation_kpis');
+      if (error) throw error;
 
-      const dbEntriesCount = entries?.length || 0;
-      const dbEntriesKg = entries?.reduce((s, e) => s + Number(e.gross_kg), 0) || 0;
+      const dbEntriesCount = Number(kpis.entries.count);
+      const dbEntriesKg    = Number(kpis.entries.total_kg);
+      const dbManipsCount  = Number(kpis.manips.count);
+      const dbManipsKg     = Number(kpis.manips.total_kg);
+      const ledgerSaldo    = Number(kpis.ledger_saldo);
 
-      // 2. Get manipulations totals
-      const { data: manips } = await supabase
-        .from('salmon_manipulations')
-        .select('gross_out_kg')
-        .eq('status', 'ACTIVE');
-
-      const dbManipsCount = manips?.length || 0;
-      const dbManipsKg = manips?.reduce((s, m) => s + Number(m.gross_out_kg), 0) || 0;
-
-      // 3. Get ledger saldo from movimentacoes_estoque directly
-      const { data: ledgerRows } = await supabase
-        .from('movimentacoes_estoque')
-        .select('direction, tipo, quantidade')
-        .eq('source_module', 'salmon')
-        .eq('status', 'ATIVO');
-
-      const ledgerSaldo = (ledgerRows ?? []).reduce((s, r) => {
-        if (['ENTRADA_ESTORNO', 'SAIDA_ESTORNO'].includes(r.tipo)) return s;
-        return s + (r.direction === 'IN' ? Number(r.quantidade) : -Number(r.quantidade));
-      }, 0);
-
-      // 4. Expected = entries - manips
+      // Expected = entries - manips
       const expectedSaldo = dbEntriesKg - dbManipsKg;
       const divergence = Math.abs(ledgerSaldo - expectedSaldo);
 

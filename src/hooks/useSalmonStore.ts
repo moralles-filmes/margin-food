@@ -205,27 +205,10 @@ export function useSalmonStore() {
   useEffect(() => {
     (async () => {
       try {
-        const { data: salmonProduct } = await supabase
-          .from('produtos')
-          .select('id')
-          .eq('is_salmon_raw_linked', true)
-          .maybeSingle();
-        if (!salmonProduct) return;
-
-        const { data: adjustments } = await supabase
-          .from('movimentacoes_estoque')
-          .select('tipo, quantidade')
-          .eq('produto_id', salmonProduct.id)
-          .eq('status', 'ATIVO')
-          .in('tipo', ['AJUSTE_INVENTARIO_POSITIVO', 'AJUSTE_INVENTARIO_NEGATIVO']);
-
-        if (adjustments && adjustments.length > 0) {
-          const total = adjustments.reduce((sum, adj) => {
-            if (adj.tipo === 'AJUSTE_INVENTARIO_POSITIVO') return sum + Number(adj.quantidade);
-            if (adj.tipo === 'AJUSTE_INVENTARIO_NEGATIVO') return sum - Number(adj.quantidade);
-            return sum;
-          }, 0);
-          setInventoryAdjustmentKg(total);
+        const { data: kpis, error } = await supabase.rpc('get_salmon_inventory_adjustment_kg');
+        if (error) throw error;
+        if (kpis?.produto_found) {
+          setInventoryAdjustmentKg(Number(kpis.adjustment_kg));
         }
       } catch (e) {
         console.error('Erro ao buscar ajustes de inventário para salmão:', e);

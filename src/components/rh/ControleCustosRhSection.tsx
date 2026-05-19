@@ -93,11 +93,9 @@ export default function ControleCustosRhSection({ colaboradores }: Props) {
       }, 0);
 
       // Benefícios do período
-      const { data: beneficios } = await supabase
-        .from('rh_beneficios')
-        .select('valor_empresa')
-        .eq('status', 'ATIVO');
-      const totalBeneficios = (beneficios || []).reduce((s, b) => s + (b.valor_empresa || 0), 0);
+      const { data: beneficiosKpi, error: beneficiosErr } = await supabase.rpc('get_rh_beneficios_total');
+      if (beneficiosErr) throw beneficiosErr;
+      const totalBeneficios = Number(beneficiosKpi?.total_beneficios ?? 0);
 
       // Horas extras do período (banco_horas)
       const { data: bancoHoras } = await supabase
