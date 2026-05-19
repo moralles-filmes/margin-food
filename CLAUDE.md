@@ -182,6 +182,7 @@ margin-food/
 - **Permissões novas**: sempre adicionar em `src/permissions/registry.ts` + rodar `rpc_sync_permissions_from_registry()`
 - **Sem mock de banco**: testes de integração sempre usam banco real
 - **Sem amend em commits públicos**: sempre criar novo commit
+- **jspdf-autotable v5: API funcional** — importar como `import autoTable from 'jspdf-autotable'` e chamar `autoTable(doc, {...})`. O import de side-effect `import 'jspdf-autotable'` e o padrão `(doc as any).autoTable({...})` **não funcionam** na v5 em Vite/ESM — o plugin só patchava o prototype se `window.jsPDF` existia globalmente (quebrou em 2026-05-19).
 
 ---
 
@@ -229,6 +230,8 @@ margin-food/
 
 ## ⏳ Pendente / Em Aberto
 
+- [x] Inventário: exportar lista de contagem em PDF (impressão para contagem manual) — RASCUNHO e EM_CONTAGEM, agrupado por local→categoria, lista cega por padrão — `src/lib/pdfInventarioContagem.ts` + `ExportListaContagemModal.tsx` (2026-05-19)
+- [ ] Conceder permissão `inventario:detalhe:export` aos roles Admin/Conferente/Gerente via Admin → Permissões (adicionado em `LEGACY_PERMISSION_MAP` como `inventory:export` mas roles precisam de grant explícito)
 - [ ] Monitorar integridade dos dados na empresa piloto após ativação multi-tenant
 - [ ] Testar fluxo completo: criar empresa → criar admin → login admin → criar usuários
 - [ ] Validar isolamento: logar como user do tenant A e tentar `GET /rest/v1/faturamento_periodos_legacy` — deve retornar só registros do mesmo tenant

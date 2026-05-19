@@ -558,6 +558,7 @@ export const LEGACY_PERMISSION_MAP: Record<string, string[]> = {
   'inventory:approve': ['inventario:auditoria:approve'],
   'inventory:count': ['inventario:detalhe:edit'],
   'inventory:reopen': ['inventario:auditoria:edit'],
+  'inventory:export': ['inventario:lista:export', 'inventario:detalhe:export', 'inventario:dashboard:export', 'inventario:auditoria:export'],
   'purchases:read': ['compras:lista:view', 'compras:pedidos:view', 'compras:checklist:view', 'compras:calendario:view', 'compras:ranking:view', 'compras:recebimentos:view', 'compras:confirmacoes:view', 'compras:alertas_falta:view'],
   'purchases:create': ['compras:lista:create', 'compras:pedidos:create'],
   'purchases:edit': ['compras:lista:edit', 'compras:pedidos:edit'],

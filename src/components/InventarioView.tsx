@@ -16,7 +16,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import {
   ClipboardCheck, Plus, ArrowLeft, Search, AlertTriangle, CheckCircle, TrendingDown, TrendingUp,
   BarChart3, Lock, Loader2, ShieldAlert, Users, Clock, FileText, Flame, Shield, Eye,
-  MoreVertical, Pencil, Trash2, RotateCcw, UserPlus, UserMinus, Settings, Zap
+  MoreVertical, Pencil, Trash2, RotateCcw, UserPlus, UserMinus, Settings, Zap, Printer
 } from 'lucide-react';
 import { todayBR, formatDisplayBR, formatInBR, parseUTCToBR } from '@/lib/datetime';
 import { parseLocalDate } from '@/lib/dateUtils';
@@ -26,6 +26,7 @@ import { supabase } from '@/integrations/supabase/client';
 import QuickInventorySection from './QuickInventorySection';
 import InventarioDashboardView from './inventario/InventarioDashboardView';
 import InventarioAuditView from './inventario/InventarioAuditView';
+import ExportListaContagemModal from './inventario/ExportListaContagemModal';
 import { narrowRows } from '@/lib/guards';
 import { includesNormalized } from '@/lib/utils';
 
@@ -58,6 +59,7 @@ export default function InventarioView() {
   const canEditAudit = useCan('inventario:auditoria:edit');
   const canManageConferentes = useCan('inventario:conferentes:manage');
   const canViewConferentes = useCan('inventario:conferentes:view');
+  const canExportDetail = useCan('inventario:detalhe:export');
 
   const [subView, setSubView] = useState<SubView>('list');
   const [searchTerm, setSearchTerm] = useState('');
@@ -79,6 +81,9 @@ export default function InventarioView() {
 
   // Partial finalization confirmation dialog
   const [showPartialConfirm, setShowPartialConfirm] = useState(false);
+
+  // Export lista de contagem PDF
+  const [exportOpen, setExportOpen] = useState(false);
 
   // Create form
   const [formTipo, setFormTipo] = useState('completo');
@@ -558,6 +563,11 @@ export default function InventarioView() {
                 <Trash2 className="w-3.5 h-3.5" /> Excluir
               </Button>
             )}
+            {canExportDetail && (inv.status === 'RASCUNHO' || inv.status === 'EM_CONTAGEM') && (
+              <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => setExportOpen(true)}>
+                <Printer className="w-3.5 h-3.5" /> Exportar Lista (PDF)
+              </Button>
+            )}
             {canViewAudit && (
               <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => setSubView('audit')}>
                 <FileText className="w-3.5 h-3.5" /> Auditoria
@@ -714,6 +724,23 @@ export default function InventarioView() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Export Lista de Contagem PDF */}
+        {(() => {
+          const confId = (inv as any).conferente_user_id ?? null;
+          const nomeConferente = confId
+            ? (store.conferentes.find(c => c.user_id === confId)?.nome ?? null)
+            : null;
+          return (
+            <ExportListaContagemModal
+              open={exportOpen}
+              onOpenChange={setExportOpen}
+              inventario={inv}
+              itens={itens}
+              nomeConferente={nomeConferente}
+            />
+          );
+        })()}
 
         {/* Search + filtros */}
         <div className="flex flex-col sm:flex-row gap-2">
