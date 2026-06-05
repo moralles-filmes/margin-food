@@ -710,6 +710,7 @@ export default function ConciliacaoBancariaSection() {
   const withSuggestions = linhas.filter(l => !l.matchId && !l.jaConciliada && !l.ignorada && l.suggestions && l.suggestions.length > 0).length;
 
   const rateioValorTotal = linhas[rateioDialog.linhaIndex]?.valor || 0;
+  const rateioLinhaTipo = linhas[rateioDialog.linhaIndex]?.tipo;
   const rateioTotalAtual = rateioLinhas.reduce((s, l) => s + Number(l.valor || 0), 0);
   const rateioDiff = rateioValorTotal - rateioTotalAtual;
   const rateioValido = Math.abs(rateioDiff) < 0.01;
@@ -1208,10 +1209,13 @@ export default function ConciliacaoBancariaSection() {
                   <div key={idx} className="grid grid-cols-12 gap-2 items-end border border-border rounded-lg p-2">
                     <div className="col-span-4">
                       <Label className="text-[10px] text-muted-foreground">Categoria</Label>
-                      <Select value={rl.categoria_id} onValueChange={v => updateRateioLinha(idx, 'categoria_id', v)}>
-                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecione" /></SelectTrigger>
-                        <SelectContent>{categorias.map(c => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}</SelectContent>
-                      </Select>
+                      <CategoryCombobox
+                        value={rl.categoria_id}
+                        onValueChange={v => updateRateioLinha(idx, 'categoria_id', v)}
+                        options={rateioLinhaTipo ? categoriasForTipo(rateioLinhaTipo) : categorias}
+                        placeholder="Selecione"
+                        className="h-8 text-xs"
+                      />
                     </div>
                     <div className="col-span-3">
                       <Label className="text-[10px] text-muted-foreground">Centro de Custo</Label>
