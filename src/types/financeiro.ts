@@ -53,6 +53,7 @@ export interface ContaBancariaRef {
 export interface CategoriaFinRef {
   id: string;
   nome: string;
+  tipo?: string | null;
   centro_custo_padrao_id: string | null;
 }
 

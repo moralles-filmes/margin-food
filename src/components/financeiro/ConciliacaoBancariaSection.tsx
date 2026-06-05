@@ -16,6 +16,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Upload, CheckCircle, Save, RefreshCw, ArrowRight, Receipt, Eye, Plus, Trash2, PieChart, ArrowRightLeft, Search, CreditCard, FileText, EyeOff, X } from 'lucide-react';
 import CriarLancamentoExtratoDialog from '@/components/financeiro/CriarLancamentoExtratoDialog';
+import CategoryCombobox from '@/components/financeiro/CategoryCombobox';
 import type { ContaBancariaRef, CategoriaFinRef, CentroCustoRef, LancamentoConciliacao, LancamentoCandidate, ContaPagarCandidate, ContaReceberCandidate } from '@/types/financeiro';
 
 /* ───────── Types ───────── */
@@ -43,6 +44,7 @@ interface LinhaExtrato {
   matchRaw?: MatchSuggestion['raw'];
   suggestions?: MatchSuggestion[];
   rateioLinhas?: RateioLinha[];
+  categoriaId?: string;
   jaConciliada?: boolean;
   ignorada?: boolean;
 }
@@ -154,7 +156,7 @@ export default function ConciliacaoBancariaSection() {
         if (data && data.length > 0 && !contaSel) setContaSel(data[0].id);
       });
     Promise.all([
-      supabase.from('fin_categorias').select('id, nome, centro_custo_padrao_id').eq('ativo', true).order('nome'),
+      supabase.from('fin_categorias').select('id, nome, tipo, centro_custo_padrao_id').eq('ativo', true).order('nome'),
       supabase.from('fin_centros_custo').select('id, nome').eq('ativo', true).order('nome'),
     ]).then(([catRes, ccRes]) => {
       setCategorias(catRes.data || []);
@@ -625,7 +627,7 @@ export default function ConciliacaoBancariaSection() {
     try {
       if (toImport.length > 0) {
         for (const l of toImport) {
-          const rateioPayload = l.rateioLinhas && l.rateioLinhas.length > 0
+          let rateioPayload = l.rateioLinhas && l.rateioLinhas.length > 0
             ? l.rateioLinhas.map(r => ({
                 categoria_id: r.categoria_id || null,
                 centro_custo_id: r.centro_custo_id || null,
@@ -634,6 +636,18 @@ export default function ConciliacaoBancariaSection() {
                 observacao: r.observacao || null,
               }))
             : null;
+
+          // Categoria escolhida inline (sem rateio) → rateio de 1 linha, para a RPC gravar categoria no INSERT
+          if (!rateioPayload && l.categoriaId) {
+            const cat = categorias.find(c => c.id === l.categoriaId);
+            rateioPayload = [{
+              categoria_id: l.categoriaId,
+              centro_custo_id: cat?.centro_custo_padrao_id || null,
+              valor: l.valor,
+              percentual: 100,
+              observacao: null,
+            }];
+          }
 
           const { error } = await supabase.rpc('reconcile_import_lancamento', {
             p_data: l.data, p_descricao: l.descricao, p_valor: l.valor, p_tipo: l.tipo,
@@ -703,6 +717,12 @@ export default function ConciliacaoBancariaSection() {
   const getNomeCategoria = (id: string) => categorias.find(c => c.id === id)?.nome || '';
   const getNomeCentro = (id: string) => centrosCusto.find(c => c.id === id)?.nome || '';
   const getContaNome = (id: string) => contas.find(c => c.id === id)?.nome || '—';
+
+  // Categorias filtradas pelo tipo da linha (tipo lowercase no banco; categorias sem tipo valem para ambos)
+  const categoriasForTipo = (tipo: 'RECEITA' | 'DESPESA') =>
+    categorias.filter(c => tipo === 'RECEITA' ? (c.tipo === 'receita' || !c.tipo) : (c.tipo === 'despesa' || !c.tipo));
+  const setLinhaCategoria = (i: number, categoriaId: string) =>
+    setLinhas(prev => prev.map((l, j) => j === i ? { ...l, categoriaId } : l));
 
   const getOriginBadge = (origin?: MatchSuggestion['origin']) => {
     if (origin === 'lancamento') return <Badge className="bg-success/10 text-success border-success/20 text-[10px]">Lançamento</Badge>;
@@ -812,9 +832,9 @@ export default function ConciliacaoBancariaSection() {
             <>
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="text-sm text-muted-foreground flex flex-wrap gap-1">
-                  <Badge variant="outline" className="bg-success/10 text-success border-success/20">{matchedTotal} match</Badge>
+                  <Badge variant="outline" className="bg-success/10 text-success border-success/20">{matchedTotal} p/ conciliar</Badge>
                   {withSuggestions > 0 && <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/20">{withSuggestions} com sugestões</Badge>}
-                  <Badge variant="outline">{selecionadas.length} nova(s)</Badge>
+                  <Badge variant="outline">{selecionadas.length} p/ criar</Badge>
                   {linhas.filter(l => l.jaConciliada).length > 0 && (
                     <Badge variant="outline" className="bg-muted text-muted-foreground">{linhas.filter(l => l.jaConciliada).length} já conciliada(s)</Badge>
                   )}
@@ -842,7 +862,7 @@ export default function ConciliacaoBancariaSection() {
                     <TableHead>Tipo</TableHead>
                     <TableHead className="text-right">Valor</TableHead>
                     <TableHead>Ações</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead className="w-[150px]">Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -900,6 +920,18 @@ export default function ConciliacaoBancariaSection() {
                             <span className="text-[10px] text-amber-600 flex items-center gap-1 mt-0.5">
                               <Search className="w-3 h-3" /> {linha.suggestions!.length} sugestão(ões) disponível(is)
                             </span>
+                          )}
+                          {!hasMatch && !isDone && !isInactive && !(linha.rateioLinhas && linha.rateioLinhas.length > 1) && (
+                            <div className="mt-1 max-w-[220px]">
+                              <CategoryCombobox
+                                value={linha.categoriaId || ''}
+                                onValueChange={(v) => setLinhaCategoria(i, v)}
+                                options={categoriasForTipo(linha.tipo)}
+                                placeholder="Categoria (opcional)..."
+                                className="h-7 text-xs"
+                                modal={false}
+                              />
+                            </div>
                           )}
                         </TableCell>
                         <TableCell>
@@ -963,11 +995,11 @@ export default function ConciliacaoBancariaSection() {
                           ) : isIgnorada ? (
                             <Badge variant="outline" className="text-[10px] text-muted-foreground">Ignorado</Badge>
                           ) : hasMatch ? (
-                            <Badge className="bg-success/10 text-success border-success/20 text-[10px]">Match</Badge>
+                            <Badge className="bg-success/10 text-success border-success/20 text-[10px]">Conciliar c/ existente</Badge>
                           ) : hasSuggestions ? (
-                            <Badge className="bg-amber-500/10 text-amber-600 border-amber-500/20 text-[10px]">Sugestões</Badge>
+                            <Badge className="bg-amber-500/10 text-amber-600 border-amber-500/20 text-[10px]">Sugestão p/ conciliar</Badge>
                           ) : (
-                            <Badge variant="outline" className="text-[10px]">Nova</Badge>
+                            <Badge variant="outline" className="text-[10px]">Criar novo</Badge>
                           )}
                         </TableCell>
                       </TableRow>

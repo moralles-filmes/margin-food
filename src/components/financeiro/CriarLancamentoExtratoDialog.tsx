@@ -165,8 +165,22 @@ export default function CriarLancamentoExtratoDialog({ open, onOpenChange, linha
           }))
         : null;
 
+      // Categoria única → rateio de 1 linha, para a RPC gravar categoria_id no INSERT.
+      // Evita um segundo UPDATE em lançamento REALIZADO (que dispararia o trigger de justificativa).
+      const singleCat = !useRateio && categoriaId ? categorias.find(c => c.id === categoriaId) : null;
+      const singleRateioPayload = singleCat
+        ? [{
+            categoria_id: categoriaId,
+            centro_custo_id: singleCat.centro_custo_padrao_id || null,
+            valor,
+            percentual: 100,
+            observacao: null,
+          }]
+        : null;
+      const effectivePayload = rateioPayload ?? singleRateioPayload;
+
       if (destino === 'lancamento') {
-        // Create via existing RPC + add extra fields
+        // Create via existing RPC (categoria já vai no payload → sem UPDATE de campo vigiado)
         const { error } = await supabase.rpc('reconcile_import_lancamento', {
           p_data: dataCompetencia,
           p_descricao: descricao,
@@ -174,12 +188,13 @@ export default function CriarLancamentoExtratoDialog({ open, onOpenChange, linha
           p_tipo: tipo,
           p_conta_id: contaBancariaId,
           p_user_id: user?.id,
-          p_rateio_linhas: rateioPayload || null,
+          p_rateio_linhas: effectivePayload,
         });
         if (error) throw error;
 
-        // Update the just-created lancamento with extra fields if needed
-        if (dataVencimento || dataPagamento || (categoriaId && !useRateio) || observacoes) {
+        // Update the just-created lancamento with extra fields if needed.
+        // NÃO incluir categoria_id aqui: é campo vigiado pelo trigger de lançamento REALIZADO.
+        if (dataVencimento || dataPagamento || observacoes) {
           // Find the lancamento we just created (most recent for this account)
           const { data: recent } = await supabase.from('fin_lancamentos')
             .select('id')
@@ -194,7 +209,6 @@ export default function CriarLancamentoExtratoDialog({ open, onOpenChange, linha
             if (dataVencimento) updatePayload.data_vencimento = dataVencimento;
             if (dataPagamento) updatePayload.data_pagamento = dataPagamento;
             if (observacoes) updatePayload.observacoes = observacoes;
-            if (categoriaId && !useRateio) updatePayload.categoria_id = categoriaId;
             if (Object.keys(updatePayload).length > 0) {
               await supabase.from('fin_lancamentos').update(updatePayload).eq('id', recent[0].id);
             }
@@ -231,7 +245,7 @@ export default function CriarLancamentoExtratoDialog({ open, onOpenChange, linha
           p_tipo: 'DESPESA',
           p_conta_id: contaBancariaId,
           p_user_id: user?.id,
-          p_rateio_linhas: rateioPayload || null,
+          p_rateio_linhas: effectivePayload,
         });
         if (lancError) console.warn('Lancamento mirror for CP:', lancError.message);
 
@@ -288,7 +302,7 @@ export default function CriarLancamentoExtratoDialog({ open, onOpenChange, linha
           p_tipo: 'RECEITA',
           p_conta_id: contaBancariaId,
           p_user_id: user?.id,
-          p_rateio_linhas: rateioPayload || null,
+          p_rateio_linhas: effectivePayload,
         });
         if (lancError) console.warn('Lancamento mirror for CR:', lancError.message);
 
