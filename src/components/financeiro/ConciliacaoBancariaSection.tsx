@@ -11,10 +11,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
+import { parseExtrato, verifyContaExtrato, type ExtratoConta } from '@/lib/extratoParser';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import { Upload, CheckCircle, Save, RefreshCw, ArrowRight, Receipt, Eye, Plus, Trash2, PieChart, ArrowRightLeft, Search, CreditCard, FileText, EyeOff, X } from 'lucide-react';
+import { Upload, CheckCircle, Save, RefreshCw, ArrowRight, Receipt, Eye, Plus, Trash2, PieChart, ArrowRightLeft, Search, CreditCard, FileText, EyeOff, X, AlertTriangle } from 'lucide-react';
 import CriarLancamentoExtratoDialog from '@/components/financeiro/CriarLancamentoExtratoDialog';
 import CategoryCombobox from '@/components/financeiro/CategoryCombobox';
 import type { ContaBancariaRef, CategoriaFinRef, CentroCustoRef, LancamentoConciliacao, LancamentoCandidate, ContaPagarCandidate, ContaReceberCandidate } from '@/types/financeiro';
@@ -140,6 +142,13 @@ export default function ConciliacaoBancariaSection() {
 
   const [criarDialog, setCriarDialog] = useState<{ open: boolean; linhaIndex: number }>({ open: false, linhaIndex: -1 });
 
+  // Dialogo de alerta quando o extrato não pertence à conta selecionada
+  const [contaMismatch, setContaMismatch] = useState<{
+    open: boolean;
+    parsed: LinhaExtrato[];
+    extratoInfo: ExtratoConta;
+  } | null>(null);
+
   // Wrapper: atualiza state e persiste no sessionStorage
   const setLinhas = (updater: LinhaExtrato[] | ((prev: LinhaExtrato[]) => LinhaExtrato[])) => {
     setLinhasState(prev => {
@@ -150,7 +159,7 @@ export default function ConciliacaoBancariaSection() {
   };
 
   useEffect(() => {
-    supabase.from('fin_contas').select('id, nome').eq('ativo', true).order('nome')
+    supabase.from('fin_contas').select('id, nome, numero_conta, agencia, banco').eq('ativo', true).order('nome')
       .then(({ data }) => {
         setContas(data || []);
         if (data && data.length > 0 && !contaSel) setContaSel(data[0].id);
@@ -224,71 +233,10 @@ export default function ConciliacaoBancariaSection() {
   };
 
   // ========== File Parsing ==========
-  const parseCSV = (text: string) => {
-    const lines = text.split('\n').filter(l => l.trim());
-    const parsed: LinhaExtrato[] = [];
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const sep = line.includes(';') ? ';' : ',';
-      const parts = line.split(sep).map(p => p.trim().replace(/^"|"$/g, ''));
-      if (parts.length < 3) continue;
-      let data = '', descricao = '', valor = 0;
-      const dateCandidate = parts[0];
-      if (/\d{2}[\/\-]\d{2}[\/\-]\d{2,4}/.test(dateCandidate)) {
-        const dateParts = dateCandidate.split(/[\/\-]/);
-        if (dateParts.length === 3) {
-          const year = dateParts[2].length === 2 ? `20${dateParts[2]}` : dateParts[2];
-          data = `${year}-${dateParts[1].padStart(2, '0')}-${dateParts[0].padStart(2, '0')}`;
-        }
-      } else if (/\d{4}-\d{2}-\d{2}/.test(dateCandidate)) {
-        data = dateCandidate;
-      }
-      if (!data) continue;
-      descricao = parts[1] || '';
-      for (let j = parts.length - 1; j >= 2; j--) {
-        const numStr = parts[j].replace(/\./g, '').replace(',', '.').replace(/[^\d\-\.]/g, '');
-        const num = parseFloat(numStr);
-        if (!isNaN(num) && num !== 0) { valor = num; break; }
-      }
-      if (!descricao || valor === 0) continue;
-      parsed.push({ data, descricao, valor: Math.abs(valor), tipo: valor > 0 ? 'RECEITA' : 'DESPESA', selecionada: true });
-    }
-    return parsed;
-  };
 
-  const parseOFX = (text: string) => {
-    const parsed: LinhaExtrato[] = [];
-    const transactions = text.split('<STMTTRN>').slice(1);
-    for (const tx of transactions) {
-      const getTag = (tag: string) => { const m = tx.match(new RegExp(`<${tag}>([^<\\n]+)`)); return m ? m[1].trim() : ''; };
-      const dtposted = getTag('DTPOSTED');
-      const trnamt = getTag('TRNAMT');
-      const memo = getTag('MEMO') || getTag('NAME') || getTag('FITID');
-      if (!dtposted || !trnamt) continue;
-      const valor = parseFloat(trnamt.replace(',', '.'));
-      const data = dtposted.length >= 8 ? `${dtposted.slice(0, 4)}-${dtposted.slice(4, 6)}-${dtposted.slice(6, 8)}` : '';
-      if (!data || isNaN(valor)) continue;
-      parsed.push({ data, descricao: memo || 'Sem descrição', valor: Math.abs(valor), tipo: valor >= 0 ? 'RECEITA' : 'DESPESA', selecionada: true });
-    }
-    return parsed;
-  };
-
-  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setNomeArquivo(file.name);
-    setLoading(true);
+  /** Busca matches e popula sugestões de conciliação para linhas já parseadas. */
+  const processarLinhas = async (parsed: LinhaExtrato[]) => {
     try {
-      const text = await file.text();
-      const ext = file.name.toLowerCase().split('.').pop();
-      let parsed: LinhaExtrato[] = ext === 'ofx' || ext === 'qfx' ? parseOFX(text) : parseCSV(text);
-
-      if (parsed.length === 0) {
-        toast.error('Nenhuma transação encontrada no arquivo.');
-        setLoading(false);
-        return;
-      }
-
       // Busca dados para match + entradas já conciliadas + entradas ignoradas
       const [lancRes, lancAllRes, cpRes, crRes, conciliadosRes, ignoradasRes] = await Promise.all([
         contaSel ? supabase.from('fin_lancamentos').select('id, data_competencia, valor, tipo, descricao, conciliado, conta_id')
@@ -330,7 +278,7 @@ export default function ConciliacaoBancariaSection() {
 
       const usedIds = new Set<string>();
 
-      parsed = parsed.map(linha => {
+      const final = parsed.map(linha => {
         const key = `${linha.data}|${linha.valor}|${linha.tipo}`;
 
         // Já conciliada — exibir informativo, sem ação
@@ -404,33 +352,71 @@ export default function ConciliacaoBancariaSection() {
         return { ...linha, suggestions: suggestions.length > 0 ? suggestions : undefined };
       });
 
-      const matchedLanc = parsed.filter(l => l.matchOrigin === 'lancamento').length;
-      const matchedCP = parsed.filter(l => l.matchOrigin === 'conta_pagar').length;
-      const matchedCR = parsed.filter(l => l.matchOrigin === 'conta_receber').length;
-      const jaConciliadas = parsed.filter(l => l.jaConciliada).length;
-      const ignoradas = parsed.filter(l => l.ignorada).length;
-      const withSuggestions = parsed.filter(l => !l.matchId && !l.jaConciliada && !l.ignorada && l.suggestions && l.suggestions.length > 0).length;
-      const unmatched = parsed.length - matchedLanc - matchedCP - matchedCR - jaConciliadas - ignoradas;
+      const matchedLanc = final.filter(l => l.matchOrigin === 'lancamento').length;
+      const matchedCP = final.filter(l => l.matchOrigin === 'conta_pagar').length;
+      const matchedCR = final.filter(l => l.matchOrigin === 'conta_receber').length;
+      const jaConciliadas = final.filter(l => l.jaConciliada).length;
+      const ignoradas = final.filter(l => l.ignorada).length;
+      const withSuggestions = final.filter(l => !l.matchId && !l.jaConciliada && !l.ignorada && l.suggestions && l.suggestions.length > 0).length;
+      const unmatched = final.length - matchedLanc - matchedCP - matchedCR - jaConciliadas - ignoradas;
 
-      let msg = `${parsed.length} transações: `;
-      const parts: string[] = [];
-      if (matchedLanc > 0) parts.push(`${matchedLanc} match lançamento`);
-      if (matchedCP > 0) parts.push(`${matchedCP} match contas a pagar`);
-      if (matchedCR > 0) parts.push(`${matchedCR} match contas a receber`);
-      if (jaConciliadas > 0) parts.push(`${jaConciliadas} já conciliada(s)`);
-      if (ignoradas > 0) parts.push(`${ignoradas} ignorada(s)`);
-      if (withSuggestions > 0) parts.push(`${withSuggestions} com sugestões`);
-      parts.push(`${unmatched - withSuggestions} nova(s)`);
-      toast.success(msg + parts.join(', '));
+      const msg = `${final.length} transações: `;
+      const msgParts: string[] = [];
+      if (matchedLanc > 0) msgParts.push(`${matchedLanc} match lançamento`);
+      if (matchedCP > 0) msgParts.push(`${matchedCP} match contas a pagar`);
+      if (matchedCR > 0) msgParts.push(`${matchedCR} match contas a receber`);
+      if (jaConciliadas > 0) msgParts.push(`${jaConciliadas} já conciliada(s)`);
+      if (ignoradas > 0) msgParts.push(`${ignoradas} ignorada(s)`);
+      if (withSuggestions > 0) msgParts.push(`${withSuggestions} com sugestões`);
+      msgParts.push(`${unmatched - withSuggestions} nova(s)`);
+      toast.success(msg + msgParts.join(', '));
 
-      setLinhas(parsed);
+      setLinhas(final);
     } catch (err) {
-      console.error(err);
+      console.error('[ConciliacaoBancariaSection.processarLinhas]', err);
       toast.error('Erro ao processar arquivo');
     }
-    setLoading(false);
-    if (fileRef.current) fileRef.current.value = '';
-    setNomeArquivo('');
+  };
+
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setNomeArquivo(file.name);
+    setLoading(true);
+    try {
+      const text = await file.text();
+      const result = parseExtrato(file.name, text);
+      const parsed: LinhaExtrato[] = result.linhas.map(l => ({ ...l, selecionada: true }));
+
+      if (parsed.length === 0) {
+        toast.error('Nenhuma transação encontrada no arquivo.');
+        return;
+      }
+
+      // Verifica se o extrato pertence à conta selecionada
+      const contaCadastro = contas.find(c => c.id === contaSel);
+      const verdict = verifyContaExtrato(result.conta, contaCadastro);
+
+      if (verdict.status === 'mismatch') {
+        // Bloqueia — abre dialog com opção de override
+        setContaMismatch({ open: true, parsed, extratoInfo: result.conta });
+        return;
+      }
+
+      if (verdict.status === 'unverified' && (result.conta.numeroConta || result.conta.agencia)) {
+        // O extrato tem info de conta mas não foi possível comparar (ex: cadastro sem nº/agência)
+        toast.warning('Não foi possível confirmar a conta do extrato — verifique se a conta selecionada está correta.');
+      }
+
+      await processarLinhas(parsed);
+    } catch (err) {
+      console.error('[ConciliacaoBancariaSection.handleFile]', err);
+      toast.error('Erro ao processar arquivo');
+    } finally {
+      setLoading(false);
+      if (fileRef.current) fileRef.current.value = '';
+      setNomeArquivo('');
+    }
   };
 
   const limparExtrato = () => {
@@ -1412,6 +1398,88 @@ export default function ConciliacaoBancariaSection() {
           loadLancamentos();
         }}
       />
+
+      {/* ========== CONTA MISMATCH ALERT ========== */}
+      {contaMismatch && (
+        <AlertDialog open={contaMismatch.open}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+                <AlertTriangle className="w-5 h-5 shrink-0" />
+                Conta do extrato diverge da selecionada
+              </AlertDialogTitle>
+            </AlertDialogHeader>
+
+            <div className="space-y-3 text-sm">
+              <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 space-y-1">
+                <p className="font-semibold text-foreground">Identificação no arquivo:</p>
+                {contaMismatch.extratoInfo.numeroConta && (
+                  <p className="text-muted-foreground">
+                    Conta: <span className="font-mono font-medium text-foreground">{contaMismatch.extratoInfo.numeroConta}</span>
+                  </p>
+                )}
+                {contaMismatch.extratoInfo.agencia && (
+                  <p className="text-muted-foreground">
+                    Agência: <span className="font-mono font-medium text-foreground">{contaMismatch.extratoInfo.agencia}</span>
+                  </p>
+                )}
+                {contaMismatch.extratoInfo.banco && (
+                  <p className="text-muted-foreground">
+                    Banco: <span className="font-medium text-foreground">{contaMismatch.extratoInfo.banco}</span>
+                  </p>
+                )}
+              </div>
+
+              {(() => {
+                const cad = contas.find(c => c.id === contaSel);
+                return cad ? (
+                  <div className="rounded-lg border bg-muted/40 p-3 space-y-1">
+                    <p className="font-semibold text-foreground">Conta selecionada: {cad.nome}</p>
+                    {(cad.numero_conta || cad.agencia) ? (
+                      <>
+                        {cad.numero_conta && (
+                          <p className="text-muted-foreground">
+                            Conta: <span className="font-mono font-medium text-foreground">{cad.numero_conta}</span>
+                          </p>
+                        )}
+                        {cad.agencia && (
+                          <p className="text-muted-foreground">
+                            Agência: <span className="font-mono font-medium text-foreground">{cad.agencia}</span>
+                          </p>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-xs text-muted-foreground italic">Número/agência não cadastrados</p>
+                    )}
+                  </div>
+                ) : null;
+              })()}
+
+              <p className="text-muted-foreground text-xs">
+                Selecione a conta correta no dropdown ou confirme para importar mesmo assim.
+              </p>
+            </div>
+
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setContaMismatch(null)}>
+                Cancelar
+              </AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+                onClick={async () => {
+                  const pending = contaMismatch.parsed;
+                  setContaMismatch(null);
+                  setLoading(true);
+                  await processarLinhas(pending);
+                  setLoading(false);
+                }}
+              >
+                Importar mesmo assim
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </div>
   );
 }

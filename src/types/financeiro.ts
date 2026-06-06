@@ -43,10 +43,13 @@ export interface JobRole {
   created_at: string;
 }
 
-/** Conta bancária (projection: id, nome) */
+/** Conta bancária (projection: id, nome + campos opcionais para verificação de extrato) */
 export interface ContaBancariaRef {
   id: string;
   nome: string;
+  numero_conta?: string | null;
+  agencia?: string | null;
+  banco?: string | null;
 }
 
 /** Categoria financeira (projection used in conciliação) */

@@ -1,0 +1,270 @@
+/**
+ * extratoParser.ts — Parser unificado de extratos bancários (OFX/QFX/CSV).
+ *
+ * Além das transações, extrai a identidade da conta do arquivo (quando disponível)
+ * para possibilitar a verificação entre o extrato importado e a conta selecionada.
+ *
+ * OFX: lê o bloco <BANKACCTFROM> / <CCACCTFROM> → ACCTID (nº da conta), BRANCHID (agência), BANKID (código).
+ * CSV: varredura best-effort das primeiras linhas por padrões de agência/conta.
+ */
+
+export interface ExtratoLinha {
+  data: string;       // ISO yyyy-MM-dd
+  descricao: string;
+  valor: number;      // absoluto
+  tipo: 'RECEITA' | 'DESPESA';
+}
+
+/** Identidade da conta extraída do arquivo (todos os campos opcionais) */
+export interface ExtratoConta {
+  numeroConta?: string;  // ex: "12345-6" ou "12345"
+  agencia?: string;      // ex: "1234" ou "1234-5"
+  banco?: string;        // nome livre (CSV) ou código BANKID (OFX)
+  bankId?: string;       // código numérico do banco (OFX BANKID)
+}
+
+export interface ExtratoParseResult {
+  linhas: ExtratoLinha[];
+  conta: ExtratoConta;
+}
+
+/* ───────── OFX parser ───────── */
+
+function parseOFX(text: string): ExtratoParseResult {
+  const linhas: ExtratoLinha[] = [];
+
+  // Extrai identidade da conta do cabeçalho (<BANKACCTFROM> ou <CCACCTFROM> para cartões)
+  const conta: ExtratoConta = {};
+  const acctBlock =
+    text.match(/<BANKACCTFROM>([\s\S]*?)<\/BANKACCTFROM>/i)?.[1] ||
+    text.match(/<CCACCTFROM>([\s\S]*?)<\/CCACCTFROM>/i)?.[1] ||
+    // Fallback: alguns OFX não fecham com </BANKACCTFROM>, apenas abrem e usam próxima tag de mesmo nível
+    text.match(/<BANKACCTFROM>([\s\S]*?)(?=<STMTTRNRS|<STMTRS|<CCSTMTRS|$)/i)?.[1] ||
+    text.match(/<CCACCTFROM>([\s\S]*?)(?=<STMTTRNRS|<STMTRS|<CCSTMTRS|$)/i)?.[1];
+
+  if (acctBlock) {
+    const getHeaderTag = (tag: string) => {
+      const m = acctBlock.match(new RegExp(`<${tag}>([^<\\n\\r]+)`, 'i'));
+      return m ? m[1].trim() : '';
+    };
+    const acctId = getHeaderTag('ACCTID');
+    const branchId = getHeaderTag('BRANCHID');
+    const bankId = getHeaderTag('BANKID');
+    if (acctId) conta.numeroConta = acctId;
+    if (branchId) conta.agencia = branchId;
+    if (bankId) { conta.bankId = bankId; conta.banco = bankId; }
+  } else {
+    // Tentativa flat (OFX sem bloco fechado): procurar as tags soltas no início do arquivo
+    const getFlat = (tag: string) => {
+      const m = text.match(new RegExp(`<${tag}>([^<\\n\\r]+)`, 'i'));
+      return m ? m[1].trim() : '';
+    };
+    const acctId = getFlat('ACCTID');
+    const branchId = getFlat('BRANCHID');
+    const bankId = getFlat('BANKID');
+    if (acctId) conta.numeroConta = acctId;
+    if (branchId) conta.agencia = branchId;
+    if (bankId) { conta.bankId = bankId; conta.banco = bankId; }
+  }
+
+  // Transações
+  const transactions = text.split('<STMTTRN>').slice(1);
+  for (const tx of transactions) {
+    const getTag = (tag: string) => {
+      const m = tx.match(new RegExp(`<${tag}>([^<\\n]+)`));
+      return m ? m[1].trim() : '';
+    };
+    const dtposted = getTag('DTPOSTED');
+    const trnamt = getTag('TRNAMT');
+    const memo = getTag('MEMO') || getTag('NAME') || getTag('FITID');
+    if (!dtposted || !trnamt) continue;
+    const valor = parseFloat(trnamt.replace(',', '.'));
+    const data =
+      dtposted.length >= 8
+        ? `${dtposted.slice(0, 4)}-${dtposted.slice(4, 6)}-${dtposted.slice(6, 8)}`
+        : '';
+    if (!data || isNaN(valor)) continue;
+    linhas.push({
+      data,
+      descricao: memo || 'Sem descrição',
+      valor: Math.abs(valor),
+      tipo: valor >= 0 ? 'RECEITA' : 'DESPESA',
+    });
+  }
+
+  return { linhas, conta };
+}
+
+/* ───────── CSV parser ───────── */
+
+// Padrões usados em cabeçalhos de CSV de bancos brasileiros para achar nº da conta / agência
+const CSV_AGENCIA_RE = /ag[eê]ncia[:\s#]+([0-9x-]+)/i;
+const CSV_CONTA_RE = /(?:conta|c[/]c|c[.]c[.])[:\s#]+([0-9x.-]+)/i;
+const CSV_BANCO_RE = /banco[:\s]+([^;\n,]+)/i;
+
+function parseCSV(text: string): ExtratoParseResult {
+  const rawLines = text.split('\n');
+  const linhas: ExtratoLinha[] = [];
+  const conta: ExtratoConta = {};
+
+  // Varre as primeiras 15 linhas em busca de metadados de conta
+  const headerZone = rawLines.slice(0, 15);
+  for (const hl of headerZone) {
+    if (!conta.agencia) {
+      const m = CSV_AGENCIA_RE.exec(hl);
+      if (m) conta.agencia = m[1].trim();
+    }
+    if (!conta.numeroConta) {
+      const m = CSV_CONTA_RE.exec(hl);
+      if (m) conta.numeroConta = m[1].trim();
+    }
+    if (!conta.banco) {
+      const m = CSV_BANCO_RE.exec(hl);
+      if (m) conta.banco = m[1].trim();
+    }
+  }
+
+  // Transações
+  for (const line of rawLines) {
+    if (!line.trim()) continue;
+    const sep = line.includes(';') ? ';' : ',';
+    const parts = line.split(sep).map(p => p.trim().replace(/^"|"$/g, ''));
+    if (parts.length < 3) continue;
+
+    let data = '';
+    let descricao = '';
+    let valor = 0;
+
+    const dateCandidate = parts[0];
+    if (/\d{2}[/-]\d{2}[/-]\d{2,4}/.test(dateCandidate)) {
+      const dateParts = dateCandidate.split(/[/-]/);
+      if (dateParts.length === 3) {
+        const year = dateParts[2].length === 2 ? `20${dateParts[2]}` : dateParts[2];
+        data = `${year}-${dateParts[1].padStart(2, '0')}-${dateParts[0].padStart(2, '0')}`;
+      }
+    } else if (/\d{4}-\d{2}-\d{2}/.test(dateCandidate)) {
+      data = dateCandidate;
+    }
+
+    if (!data) continue;
+    descricao = parts[1] || '';
+
+    for (let j = parts.length - 1; j >= 2; j--) {
+      const numStr = parts[j]
+        .replace(/\./g, '')
+        .replace(',', '.')
+        .replace(/[^\d.-]/g, '');
+      const num = parseFloat(numStr);
+      if (!isNaN(num) && num !== 0) { valor = num; break; }
+    }
+
+    if (!descricao || valor === 0) continue;
+    linhas.push({
+      data,
+      descricao,
+      valor: Math.abs(valor),
+      tipo: valor > 0 ? 'RECEITA' : 'DESPESA',
+    });
+  }
+
+  return { linhas, conta };
+}
+
+/* ───────── Entry point ───────── */
+
+/** Escolhe o parser pela extensão do arquivo e retorna linhas + identidade da conta. */
+export function parseExtrato(filename: string, text: string): ExtratoParseResult {
+  const ext = filename.toLowerCase().split('.').pop();
+  return ext === 'ofx' || ext === 'qfx' ? parseOFX(text) : parseCSV(text);
+}
+
+/* ───────── Verificação de conta ───────── */
+
+export type ContaVerdictStatus = 'match' | 'mismatch' | 'unverified';
+
+export interface ContaVerdict {
+  status: ContaVerdictStatus;
+  /** Mensagem legível explicando o motivo (usada no AlertDialog). */
+  motivo: string;
+}
+
+/** Normaliza para só dígitos, sem zeros à esquerda. */
+function normDigits(v: string | null | undefined): string {
+  if (!v) return '';
+  return v.replace(/\D/g, '').replace(/^0+/, '') || '';
+}
+
+/**
+ * Tolera dígito verificador: ex "12345" bate com "123456" porque um é prefixo do outro
+ * e as strings diferem em no máximo 2 chars (dígito + eventual hífen removido).
+ */
+function digitosCompativeis(a: string, b: string): boolean {
+  if (a === b) return true;
+  if (a.length === 0 || b.length === 0) return false;
+  // Prefixo: o menor está contido no início do maior e diferem em ≤ 2 chars
+  const shorter = a.length <= b.length ? a : b;
+  const longer = a.length <= b.length ? b : a;
+  return longer.startsWith(shorter) && longer.length - shorter.length <= 2;
+}
+
+/**
+ * Compara a identidade lida do extrato com o cadastro em `fin_contas`.
+ *
+ * Retorna:
+ * - `match`     — pelo menos um campo chave bate (confiável o suficiente para liberar sem aviso).
+ * - `mismatch`  — pelo menos um campo chave foi comparável e NÃO bateu → bloquear com override.
+ * - `unverified`— não há dados suficientes em nenhum dos lados para comparar → permitir com aviso.
+ */
+export function verifyContaExtrato(
+  extrato: ExtratoConta,
+  cadastro: { numero_conta?: string | null; agencia?: string | null; banco?: string | null } | undefined,
+): ContaVerdict {
+  if (!cadastro) {
+    return { status: 'unverified', motivo: 'Conta não encontrada no cadastro.' };
+  }
+
+  const extNumero = normDigits(extrato.numeroConta);
+  const cadNumero = normDigits(cadastro.numero_conta);
+  const extAgencia = normDigits(extrato.agencia);
+  const cadAgencia = normDigits(cadastro.agencia);
+
+  const temExtratoId = extNumero.length > 0 || extAgencia.length > 0;
+  const temCadastroId = cadNumero.length > 0 || cadAgencia.length > 0;
+
+  if (!temExtratoId || !temCadastroId) {
+    return {
+      status: 'unverified',
+      motivo: temExtratoId
+        ? 'A conta selecionada não tem número/agência cadastrado — não é possível confirmar automaticamente.'
+        : 'O arquivo não contém identificação de conta — não é possível confirmar automaticamente.',
+    };
+  }
+
+  // Compara número de conta (campo mais confiável)
+  if (extNumero && cadNumero) {
+    if (digitosCompativeis(extNumero, cadNumero)) {
+      return { status: 'match', motivo: 'Número de conta confere.' };
+    }
+    return {
+      status: 'mismatch',
+      motivo: `Número da conta diverge: extrato "${extrato.numeroConta}" vs cadastro "${cadastro.numero_conta}".`,
+    };
+  }
+
+  // Fallback: só agência disponível dos dois lados
+  if (extAgencia && cadAgencia) {
+    if (digitosCompativeis(extAgencia, cadAgencia)) {
+      return { status: 'match', motivo: 'Agência confere.' };
+    }
+    return {
+      status: 'mismatch',
+      motivo: `Agência diverge: extrato "${extrato.agencia}" vs cadastro "${cadastro.agencia}".`,
+    };
+  }
+
+  // Um lado tem nº/agência mas o outro não tem o campo comparável → não podemos decidir
+  return {
+    status: 'unverified',
+    motivo: 'Não foi possível comparar os campos disponíveis no extrato com o cadastro.',
+  };
+}

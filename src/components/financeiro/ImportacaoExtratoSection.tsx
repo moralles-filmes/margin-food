@@ -7,12 +7,13 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
-import { Upload, FileText, CheckCircle, XCircle, Save } from 'lucide-react';
+import { Upload, Save, AlertTriangle } from 'lucide-react';
 import { fmtBRL, formatDateBR, parseLocalDate } from '@/lib/formatters';
+import { parseExtrato, verifyContaExtrato, type ExtratoConta } from '@/lib/extratoParser';
 
 interface LinhaExtrato {
   data: string;
@@ -22,111 +23,34 @@ interface LinhaExtrato {
   selecionada: boolean;
 }
 
+interface ContaRef {
+  id: string;
+  nome: string;
+  numero_conta: string | null;
+  agencia: string | null;
+  banco: string | null;
+}
+
 export default function ImportacaoExtratoSection() {
   const { user } = useAuth();
   const [linhas, setLinhas] = useState<LinhaExtrato[]>([]);
-  const [contas, setContas] = useState<any[]>([]);
+  const [contas, setContas] = useState<ContaRef[]>([]);
   const [contaSel, setContaSel] = useState('');
   const [loading, setLoading] = useState(false);
   const [importando, setImportando] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // Dialogo de alerta quando o extrato não pertence à conta selecionada
+  const [contaMismatch, setContaMismatch] = useState<{
+    open: boolean;
+    parsed: LinhaExtrato[];
+    extratoInfo: ExtratoConta;
+  } | null>(null);
+
   useState(() => {
-    supabase.from('fin_contas').select('id, nome').eq('ativo', true).order('nome')
-      .then(({ data }) => setContas(data || []));
+    supabase.from('fin_contas').select('id, nome, numero_conta, agencia, banco').eq('ativo', true).order('nome')
+      .then(({ data }) => setContas((data as ContaRef[]) || []));
   });
-
-  const parseCSV = (text: string) => {
-    const lines = text.split('\n').filter(l => l.trim());
-    const parsed: LinhaExtrato[] = [];
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      // Try common CSV formats: date;desc;value or date,desc,value
-      const sep = line.includes(';') ? ';' : ',';
-      const parts = line.split(sep).map(p => p.trim().replace(/^"|"$/g, ''));
-
-      if (parts.length < 3) continue;
-
-      // Try to find date, description, value
-      let data = '', descricao = '', valor = 0;
-
-      // Attempt format: date, desc, value
-      const dateCandidate = parts[0];
-      if (/\d{2}[\/\-]\d{2}[\/\-]\d{2,4}/.test(dateCandidate)) {
-        // Parse dd/mm/yyyy or dd-mm-yyyy
-        const dateParts = dateCandidate.split(/[\/\-]/);
-        if (dateParts.length === 3) {
-          const year = dateParts[2].length === 2 ? `20${dateParts[2]}` : dateParts[2];
-          data = `${year}-${dateParts[1].padStart(2, '0')}-${dateParts[0].padStart(2, '0')}`;
-        }
-      } else if (/\d{4}-\d{2}-\d{2}/.test(dateCandidate)) {
-        data = dateCandidate;
-      }
-
-      if (!data) continue; // Skip header or invalid lines
-
-      descricao = parts[1] || '';
-
-      // Value: last numeric column
-      for (let j = parts.length - 1; j >= 2; j--) {
-        const numStr = parts[j].replace(/\./g, '').replace(',', '.').replace(/[^\d\-\.]/g, '');
-        const num = parseFloat(numStr);
-        if (!isNaN(num) && num !== 0) {
-          valor = num;
-          break;
-        }
-      }
-
-      if (!descricao || valor === 0) continue;
-
-      parsed.push({
-        data,
-        descricao,
-        valor: Math.abs(valor),
-        tipo: valor > 0 ? 'RECEITA' : 'DESPESA',
-        selecionada: true,
-      });
-    }
-
-    return parsed;
-  };
-
-  const parseOFX = (text: string) => {
-    const parsed: LinhaExtrato[] = [];
-    const transactions = text.split('<STMTTRN>').slice(1);
-
-    for (const tx of transactions) {
-      const getTag = (tag: string) => {
-        const match = tx.match(new RegExp(`<${tag}>([^<\\n]+)`));
-        return match ? match[1].trim() : '';
-      };
-
-      const trntype = getTag('TRNTYPE');
-      const dtposted = getTag('DTPOSTED');
-      const trnamt = getTag('TRNAMT');
-      const memo = getTag('MEMO') || getTag('NAME') || getTag('FITID');
-
-      if (!dtposted || !trnamt) continue;
-
-      const valor = parseFloat(trnamt.replace(',', '.'));
-      const data = dtposted.length >= 8
-        ? `${dtposted.slice(0, 4)}-${dtposted.slice(4, 6)}-${dtposted.slice(6, 8)}`
-        : '';
-
-      if (!data || isNaN(valor)) continue;
-
-      parsed.push({
-        data,
-        descricao: memo || trntype || 'Sem descrição',
-        valor: Math.abs(valor),
-        tipo: valor >= 0 ? 'RECEITA' : 'DESPESA',
-        selecionada: true,
-      });
-    }
-
-    return parsed;
-  };
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -135,28 +59,38 @@ export default function ImportacaoExtratoSection() {
     setLoading(true);
     try {
       const text = await file.text();
-      const ext = file.name.toLowerCase().split('.').pop();
-
-      let parsed: LinhaExtrato[] = [];
-      if (ext === 'ofx' || ext === 'qfx') {
-        parsed = parseOFX(text);
-      } else {
-        parsed = parseCSV(text);
-      }
+      const result = parseExtrato(file.name, text);
+      const parsed: LinhaExtrato[] = result.linhas.map(l => ({ ...l, selecionada: true }));
 
       if (parsed.length === 0) {
         toast.error('Nenhuma transação encontrada no arquivo. Verifique o formato.');
-      } else {
-        toast.success(`${parsed.length} transação(ões) encontrada(s)`);
+        return;
+      }
+
+      // Verifica se o extrato pertence à conta selecionada (só quando uma conta está selecionada)
+      if (contaSel) {
+        const contaCadastro = contas.find(c => c.id === contaSel);
+        const verdict = verifyContaExtrato(result.conta, contaCadastro);
+
+        if (verdict.status === 'mismatch') {
+          setContaMismatch({ open: true, parsed, extratoInfo: result.conta });
+          return;
+        }
+
+        if (verdict.status === 'unverified' && (result.conta.numeroConta || result.conta.agencia)) {
+          toast.warning('Não foi possível confirmar a conta do extrato — verifique se a conta selecionada está correta.');
+        }
       }
 
       setLinhas(parsed);
+      toast.success(`${parsed.length} transação(ões) encontrada(s)`);
     } catch (err) {
-      console.error(err);
+      console.error('[ImportacaoExtratoSection.handleFile]', err);
       toast.error('Erro ao processar arquivo');
+    } finally {
+      setLoading(false);
+      if (fileRef.current) fileRef.current.value = '';
     }
-    setLoading(false);
-    if (fileRef.current) fileRef.current.value = '';
   };
 
   const toggleAll = (checked: boolean) => {
@@ -292,6 +226,87 @@ export default function ImportacaoExtratoSection() {
             <strong>OFX/QFX:</strong> formato padrão bancário
           </p>
         </CardContent></Card>
+      )}
+
+      {/* ========== CONTA MISMATCH ALERT ========== */}
+      {contaMismatch && (
+        <AlertDialog open={contaMismatch.open}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+                <AlertTriangle className="w-5 h-5 shrink-0" />
+                Conta do extrato diverge da selecionada
+              </AlertDialogTitle>
+            </AlertDialogHeader>
+
+            <div className="space-y-3 text-sm">
+              <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 space-y-1">
+                <p className="font-semibold text-foreground">Identificação no arquivo:</p>
+                {contaMismatch.extratoInfo.numeroConta && (
+                  <p className="text-muted-foreground">
+                    Conta: <span className="font-mono font-medium text-foreground">{contaMismatch.extratoInfo.numeroConta}</span>
+                  </p>
+                )}
+                {contaMismatch.extratoInfo.agencia && (
+                  <p className="text-muted-foreground">
+                    Agência: <span className="font-mono font-medium text-foreground">{contaMismatch.extratoInfo.agencia}</span>
+                  </p>
+                )}
+                {contaMismatch.extratoInfo.banco && (
+                  <p className="text-muted-foreground">
+                    Banco: <span className="font-medium text-foreground">{contaMismatch.extratoInfo.banco}</span>
+                  </p>
+                )}
+              </div>
+
+              {(() => {
+                const cad = contas.find(c => c.id === contaSel);
+                return cad ? (
+                  <div className="rounded-lg border bg-muted/40 p-3 space-y-1">
+                    <p className="font-semibold text-foreground">Conta selecionada: {cad.nome}</p>
+                    {(cad.numero_conta || cad.agencia) ? (
+                      <>
+                        {cad.numero_conta && (
+                          <p className="text-muted-foreground">
+                            Conta: <span className="font-mono font-medium text-foreground">{cad.numero_conta}</span>
+                          </p>
+                        )}
+                        {cad.agencia && (
+                          <p className="text-muted-foreground">
+                            Agência: <span className="font-mono font-medium text-foreground">{cad.agencia}</span>
+                          </p>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-xs text-muted-foreground italic">Número/agência não cadastrados</p>
+                    )}
+                  </div>
+                ) : null;
+              })()}
+
+              <p className="text-muted-foreground text-xs">
+                Selecione a conta correta no dropdown ou confirme para importar mesmo assim.
+              </p>
+            </div>
+
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setContaMismatch(null)}>
+                Cancelar
+              </AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+                onClick={() => {
+                  const pending = contaMismatch.parsed;
+                  setContaMismatch(null);
+                  setLinhas(pending);
+                  toast.success(`${pending.length} transação(ões) carregada(s)`);
+                }}
+              >
+                Importar mesmo assim
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       )}
     </div>
   );
