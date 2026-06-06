@@ -25,6 +25,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { mapFinanceiroDeleteError } from '@/lib/financeiroErrorMap';
+import DateRangePresets from './DateRangePresets';
 import {
   ResponsiveContainer,
   AreaChart,
@@ -97,12 +98,13 @@ export default function FechamentoCaixaSection() {
   const load = useCallback(async () => {
     if (loading && items.length > 0) return; // prevent double-load
     setLoading(true);
-    const { data, error } = await supabase
+    let query = supabase
       .from('financeiro_fechamento_caixa')
-      .select('id, data, faturamento_bruto, taxas, descontos, faturamento_liquido, observacao, created_at, updated_at')
-      .gte('data', startDate)
-      .lte('data', endDate)
-      .order('data', { ascending: false });
+      .select('id, data, faturamento_bruto, taxas, descontos, faturamento_liquido, observacao, created_at, updated_at');
+    if (startDate) query = query.gte('data', startDate);
+    if (endDate) query = query.lte('data', endDate);
+    query = query.order('data', { ascending: false });
+    const { data, error } = await query;
 
     if (error) {
       toast.error('Erro ao carregar fechamentos');
@@ -417,6 +419,12 @@ export default function FechamentoCaixaSection() {
           )}
         </div>
       </div>
+
+      <DateRangePresets
+        from={startDate}
+        to={endDate}
+        onChange={(s, e) => { setStartDate(s); setEndDate(e); }}
+      />
 
       {/* Summary cards */}
       {loading ? (

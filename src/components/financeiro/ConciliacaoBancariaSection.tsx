@@ -617,6 +617,8 @@ export default function ConciliacaoBancariaSection() {
     const toReconcileLanc = linhas.filter(l => l.matchId && l.matchOrigin === 'lancamento' && !l.jaConciliada);
     const pendingCP = linhas.filter(l => l.matchId && l.matchOrigin === 'conta_pagar');
     const pendingCR = linhas.filter(l => l.matchId && l.matchOrigin === 'conta_receber');
+    // Conjunto das linhas que serão efetivamente processadas — usado para remover apenas elas da lista no sucesso
+    const processadas = new Set<LinhaExtrato>([...toImport, ...toReconcileLanc, ...pendingCP, ...pendingCR]);
 
     if (toImport.length === 0 && toReconcileLanc.length === 0 && pendingCP.length === 0 && pendingCR.length === 0) {
       toast.error('Nenhuma ação a realizar');
@@ -684,8 +686,9 @@ export default function ConciliacaoBancariaSection() {
 
       const total = toImport.length + toReconcileLanc.length + pendingCP.length + pendingCR.length;
       toast.success(`${total} operação(ões) processada(s) com sucesso`);
-      setLinhasState([]);
-      clearLinhas(contaSel);
+      // Remove apenas as linhas processadas; as demais (não selecionadas, sem match, ignoradas, já conciliadas)
+      // permanecem na lista. setLinhas já persiste o resultado no sessionStorage via saveLinhas.
+      setLinhas(prev => prev.filter(l => !processadas.has(l)));
       loadLancamentos();
       emitDataEvent('financeiro:lancamentos');
       emitDataEvent('financeiro:conciliacao');

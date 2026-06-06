@@ -24,6 +24,7 @@ import ContaDetailDialog, { type ContaDetailData, type ContaDetailRateio } from 
 import ContaFormDialog, { type ContaFormData, type RateioLine } from './ContaFormDialog';
 import * as XLSX from 'xlsx';
 import { mapFinanceiroDeleteError } from '@/lib/financeiroErrorMap';
+import DateRangePresets from './DateRangePresets';
 
 // ─── Types ───
 interface Lancamento {
@@ -567,6 +568,12 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
             )}
           </div>
         </div>
+
+        <DateRangePresets
+          from={filtroDataDe}
+          to={filtroDataAte}
+          onChange={(de, ate) => { setFiltroDataDe(de); setFiltroDataAte(ate); }}
+        />
 
         <Table>
           <TableHeader>
