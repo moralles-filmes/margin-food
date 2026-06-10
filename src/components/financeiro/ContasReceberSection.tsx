@@ -4,6 +4,8 @@ import { emitDataEvent, useDataEvent } from '@/lib/dataEvents';
 import { fmtBRL, formatDateBR, parseLocalDate } from '@/lib/formatters';
 import { useCan } from '@/permissions/hooks';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -96,6 +98,11 @@ export default function ContasReceberSection() {
   const [showDetail, setShowDetail] = useState(false);
   const [detailData, setDetailData] = useState<ContaDetailData | null>(null);
   const [detailRawItem, setDetailRawItem] = useState<ContaReceber | null>(null);
+
+  // Seletor de data de recebimento
+  const [recOpen, setRecOpen] = useState(false);
+  const [recTarget, setRecTarget] = useState<ContaReceber | null>(null);
+  const [recDate, setRecDate] = useState<string>(todayBR());
 
   useEffect(() => { if (canView) load(); }, [canView]);
   useEffect(() => { if (!canView) return; setCursorDate(null); setCursorId(null); setItems([]); loadPage(null, null); loadTotals(); }, [filtroStatus, canView]);
@@ -299,7 +306,7 @@ export default function ContasReceberSection() {
         p_cliente: form.cliente || null,
         p_valor: form.valor,
         p_data_vencimento: form.data_vencimento,
-        p_data_competencia: form.data_competencia || null,
+        p_data_competencia: form.data_competencia || form.data_vencimento || null,
         p_categoria_id: catId,
         p_centro_custo_id: ccId,
         p_conta_id: form.conta_id || null,
@@ -321,15 +328,28 @@ export default function ContasReceberSection() {
     }
   };
 
-  /* ─── Receive ─── */
-  const receber = async (item?: ContaReceber) => {
+  /* ─── Receive (abre seletor de data antes de confirmar) ─── */
+  const abrirRecebimento = (item?: ContaReceber) => {
     const target = item || detailRawItem;
     if (saving || !target) return;
+    setRecTarget(target);
+    setRecDate(todayBR());
+    setRecOpen(true);
+  };
+
+  const confirmarRecebimento = async () => {
+    if (saving || !recTarget) return;
+    if (!recDate) { toast.error('Informe a data do recebimento'); return; }
     setSaving(true);
     try {
-      const { error } = await supabase.rpc('receive_conta_receber', { p_id: target.id, p_expected_updated_at: target.updated_at });
+      const { error } = await supabase.rpc('receive_conta_receber', {
+        p_id: recTarget.id,
+        p_expected_updated_at: recTarget.updated_at,
+        p_data_recebimento: recDate,
+      });
       if (error) { toast.error(error.message); load(); return; }
       toast.success('Recebimento registrado + lancamento gerado');
+      setRecOpen(false);
       setShowDetail(false);
       load();
       emitDataEvent('financeiro:receber');
@@ -447,7 +467,7 @@ export default function ContasReceberSection() {
                 <TableCell>
                   <div className="flex gap-1 items-center justify-end" onClick={e => e.stopPropagation()}>
                     {item.status === 'A_RECEBER' && canEdit && (
-                      <Button size="sm" variant="default" onClick={() => receber(item)} disabled={saving} className="text-xs h-7">Receber</Button>
+                      <Button size="sm" variant="default" onClick={() => abrirRecebimento(item)} disabled={saving} className="text-xs h-7">Receber</Button>
                     )}
                     {item.status === 'RECEBIDO' && (
                       <Button size="sm" variant="outline" onClick={() => estornar(item)} disabled={saving} className="text-xs h-7 text-warning border-warning/30 hover:bg-warning/10">
@@ -489,9 +509,35 @@ export default function ContasReceberSection() {
         canEdit={canEdit}
         saving={saving}
         onEdit={() => detailRawItem && handleEdit(detailRawItem)}
-        onPay={() => receber()}
+        onPay={() => abrirRecebimento()}
         onEstornar={() => estornar()}
       />
+
+      {/* Receive Date Dialog */}
+      <Dialog open={recOpen} onOpenChange={o => { if (!o) setRecOpen(false); }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Registrar recebimento</DialogTitle>
+            <DialogDescription>
+              {recTarget ? `${recTarget.descricao} — ${fmt(recTarget.valor)}` : ''}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Data do recebimento</label>
+            <Input type="date" value={recDate} max={todayBR()} onChange={e => setRecDate(e.target.value)} />
+            <p className="text-xs text-muted-foreground">
+              A competência da conta é preservada no DRE; o fluxo de caixa (DFC) usa esta data.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRecOpen(false)} disabled={saving}>Cancelar</Button>
+            <Button onClick={confirmarRecebimento} disabled={saving || !recDate}>
+              {saving ? <RefreshCw className="w-4 h-4 mr-1 animate-spin" /> : null}
+              Confirmar recebimento
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Form Dialog */}
       <ContaFormDialog

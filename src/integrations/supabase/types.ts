@@ -8118,9 +8118,18 @@ export type Database = {
       _guarded_delete_categoria: { Args: { p_id: string }; Returns: Json }
       _guarded_delete_centro_custo: { Args: { p_id: string }; Returns: Json }
       _guarded_delete_conta: { Args: { p_id: string }; Returns: Json }
-      _guarded_delete_conta_pagar: { Args: { p_id: string }; Returns: Json }
-      _guarded_delete_conta_receber: { Args: { p_id: string }; Returns: Json }
-      _guarded_delete_lancamento: { Args: { p_id: string }; Returns: Json }
+      _guarded_delete_conta_pagar: {
+        Args: { p_expected_updated_at?: string; p_id: string }
+        Returns: Json
+      }
+      _guarded_delete_conta_receber: {
+        Args: { p_expected_updated_at?: string; p_id: string }
+        Returns: Json
+      }
+      _guarded_delete_lancamento: {
+        Args: { p_expected_updated_at?: string; p_id: string }
+        Returns: Json
+      }
       _guarded_delete_orcamento: {
         Args: { p_expected_updated_at: string; p_id: string }
         Returns: undefined
@@ -9013,7 +9022,11 @@ export type Database = {
       }
       orcamento_execucao_mensal: { Args: { p_mes: string }; Returns: Json }
       pay_conta_pagar: {
-        Args: { p_expected_updated_at: string; p_id: string }
+        Args: {
+          p_data_pagamento?: string
+          p_expected_updated_at: string
+          p_id: string
+        }
         Returns: Json
       }
       preview_regra_categorizacao: {
@@ -9045,7 +9058,11 @@ export type Database = {
         Returns: undefined
       }
       receive_conta_receber: {
-        Args: { p_expected_updated_at: string; p_id: string }
+        Args: {
+          p_data_recebimento?: string
+          p_expected_updated_at: string
+          p_id: string
+        }
         Returns: Json
       }
       receive_market_order_atomic: {

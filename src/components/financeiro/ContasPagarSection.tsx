@@ -5,6 +5,7 @@ import { fmtBRL, formatDateBR, parseLocalDate } from '@/lib/formatters';
 import { useCan } from '@/permissions/hooks';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -101,6 +102,11 @@ export default function ContasPagarSection() {
   const [showDetail, setShowDetail] = useState(false);
   const [detailData, setDetailData] = useState<ContaDetailData | null>(null);
   const [detailRawItem, setDetailRawItem] = useState<ContaPagar | null>(null);
+
+  // Seletor de data de pagamento
+  const [payOpen, setPayOpen] = useState(false);
+  const [payTarget, setPayTarget] = useState<ContaPagar | null>(null);
+  const [payDate, setPayDate] = useState<string>(todayBR());
 
   useEffect(() => { if (canView) load(); }, [canView]);
   useEffect(() => { if (!canView) return; setCursorDate(null); setCursorId(null); setItems([]); loadPage(null, null); loadTotals(); }, [filtroStatus, canView]);
@@ -318,7 +324,7 @@ export default function ContasPagarSection() {
         p_fornecedor: fornecedor,
         p_supplier_id: form.supplier_id || null,
         p_data_vencimento: form.data_vencimento,
-        p_data_competencia: form.data_competencia || null,
+        p_data_competencia: form.data_competencia || form.data_vencimento || null,
         p_categoria_id: catId,
         p_centro_custo_id: ccId,
         p_conta_id: form.conta_id || null,
@@ -365,15 +371,28 @@ export default function ContasPagarSection() {
     }
   };
 
-  /* ─── Pay ─── */
-  const pagar = async (item?: ContaPagar) => {
+  /* ─── Pay (abre seletor de data antes de confirmar) ─── */
+  const abrirPagamento = (item?: ContaPagar) => {
     const target = item || detailRawItem;
     if (saving || !target) return;
+    setPayTarget(target);
+    setPayDate(todayBR());
+    setPayOpen(true);
+  };
+
+  const confirmarPagamento = async () => {
+    if (saving || !payTarget) return;
+    if (!payDate) { toast.error('Informe a data do pagamento'); return; }
     setSaving(true);
     try {
-      const { error } = await supabase.rpc('pay_conta_pagar', { p_id: target.id, p_expected_updated_at: target.updated_at });
+      const { error } = await supabase.rpc('pay_conta_pagar', {
+        p_id: payTarget.id,
+        p_expected_updated_at: payTarget.updated_at,
+        p_data_pagamento: payDate,
+      });
       if (error) { toast.error(error.message); load(); return; }
       toast.success('Pagamento registrado + lancamento gerado');
+      setPayOpen(false);
       setShowDetail(false);
       load();
       emitDataEvent('financeiro:pagar');
@@ -496,7 +515,7 @@ export default function ContasPagarSection() {
                       <Button size="sm" variant="outline" onClick={() => aprovar(item)} disabled={saving} className="text-xs h-7">Aprovar</Button>
                     )}
                     {item.status === 'APROVADO' && (
-                      <Button size="sm" variant="default" onClick={() => pagar(item)} disabled={saving} className="text-xs h-7">Pagar</Button>
+                      <Button size="sm" variant="default" onClick={() => abrirPagamento(item)} disabled={saving} className="text-xs h-7">Pagar</Button>
                     )}
                     {item.status === 'PAGO' && (
                       <Button size="sm" variant="outline" onClick={() => estornar(item)} disabled={saving} className="text-xs h-7 text-warning border-warning/30 hover:bg-warning/10">
@@ -539,10 +558,36 @@ export default function ContasPagarSection() {
         canApprove={canApprove}
         saving={saving}
         onEdit={() => detailRawItem && handleEdit(detailRawItem)}
-        onPay={() => pagar()}
+        onPay={() => abrirPagamento()}
         onEstornar={() => estornar()}
         onAprovar={() => aprovar()}
       />
+
+      {/* Payment Date Dialog */}
+      <Dialog open={payOpen} onOpenChange={o => { if (!o) setPayOpen(false); }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Registrar pagamento</DialogTitle>
+            <DialogDescription>
+              {payTarget ? `${payTarget.descricao} — ${fmt(payTarget.valor)}` : ''}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Data do pagamento</label>
+            <Input type="date" value={payDate} max={todayBR()} onChange={e => setPayDate(e.target.value)} />
+            <p className="text-xs text-muted-foreground">
+              A competência da conta é preservada no DRE; o fluxo de caixa (DFC) usa esta data.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPayOpen(false)} disabled={saving}>Cancelar</Button>
+            <Button onClick={confirmarPagamento} disabled={saving || !payDate}>
+              {saving ? <RefreshCw className="w-4 h-4 mr-1 animate-spin" /> : null}
+              Confirmar pagamento
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Form Dialog */}
       <ContaFormDialog
