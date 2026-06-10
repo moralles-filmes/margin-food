@@ -45,7 +45,9 @@ interface Categoria {
 // ─── Helpers ───
 
 function formatMonthBR(value: string): string {
-  const d = new Date(value + '-01');
+  // Parse "yyyy-MM" como data LOCAL (não UTC) — evita recuo de um mês no rótulo em BRT.
+  const [y, m] = value.split('-').map(Number);
+  const d = new Date(y, m - 1, 1);
   const label = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(d);
   return label.charAt(0).toUpperCase() + label.slice(1);
 }

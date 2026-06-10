@@ -78,7 +78,10 @@ export default function DRESection() {
   const meses = Array.from({ length: 12 }, (_, i) => formatInBR(subMonths(new Date(), i), 'yyyy-MM'));
 
   const formatMonthLabel = (value: string) => {
-    const d = new Date(value + '-01');
+    // Parse "yyyy-MM" como data LOCAL (não UTC) — `new Date("2026-06-01")` é UTC e
+    // o Intl formata em BRT (UTC-3), recuando o rótulo um mês (junho vira "maio").
+    const [y, m] = value.split('-').map(Number);
+    const d = new Date(y, m - 1, 1);
     const label = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(d);
     return label.charAt(0).toUpperCase() + label.slice(1);
   };
