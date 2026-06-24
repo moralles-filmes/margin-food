@@ -228,6 +228,23 @@ export function useCotacoesStore() {
     return data as { success: boolean; id: string };
   }, [fetchCotacoes]);
 
+  /**
+   * Converte a sugestão salva em pedido(s) de compra (1 por fornecedor vencedor).
+   * RPC atômica: só INSERT em purchase_orders/_items, encerra a cotação (CONVERTIDA).
+   */
+  const convertToPurchaseOrders = useCallback(async (
+    cotacaoId: string,
+    expectedUpdatedAt?: string | null,
+  ) => {
+    const { data, error: err } = await db.rpc('create_purchase_orders_from_cotacao_atomic', {
+      p_cotacao_id: cotacaoId,
+      p_expected_updated_at: expectedUpdatedAt ?? null,
+    });
+    if (err) throw err;
+    await fetchCotacoes();
+    return data as { success: boolean; orders: number; items: number; order_ids: string[] };
+  }, [fetchCotacoes]);
+
   /** Salva a matriz de preços + meta dos fornecedores. */
   const saveRespostas = useCallback(async (
     cotacaoId: string,
@@ -257,5 +274,6 @@ export function useCotacoesStore() {
     fetchCotacaoDetail,
     saveRespostas,
     saveSugestao,
+    convertToPurchaseOrders,
   };
 }

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Pencil, Trash2, Package, Building2, Info, Table2, BarChart3, Wand2 } from 'lucide-react';
+import { Pencil, Trash2, Package, Building2, Info, Table2, BarChart3, Wand2, ShoppingCart, PackageCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCan } from '@/permissions/hooks';
 import { formatMoneyBR } from '@/lib/formatters';
@@ -33,9 +33,11 @@ interface CotacaoDetailDrawerProps {
 export default function CotacaoDetailDrawer({ cotacao, store, onClose, onEdit, onDeleted }: CotacaoDetailDrawerProps) {
   const canEdit = useCan('compras:cotacao:edit');
   const canDelete = useCan('compras:cotacao:delete');
+  const canConvert = useCan('compras:cotacao:close'); // "converter em pedido" mapeia para close
   const [detail, setDetail] = useState<CotacaoDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [converting, setConverting] = useState(false);
 
   const load = useCallback(async (id: string) => {
     setLoading(true);
@@ -54,6 +56,9 @@ export default function CotacaoDetailDrawer({ cotacao, store, onClose, onEdit, o
   }, [cotacao, load]);
 
   const editable = !!cotacao && ['RASCUNHO', 'EM_COTACAO'].includes(cotacao.status);
+  // Conversão só após salvar a sugestão (status EM_ANALISE) e enquanto não convertida/encerrada.
+  const convertible = !!cotacao && cotacao.status === 'EM_ANALISE';
+  const isConverted = !!cotacao && cotacao.status === 'CONVERTIDA';
 
   const handleDelete = async () => {
     if (!cotacao) return;
@@ -68,6 +73,26 @@ export default function CotacaoDetailDrawer({ cotacao, store, onClose, onEdit, o
       toast.error(mapCotacaoError(err));
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const handleConvert = async () => {
+    if (!cotacao) return;
+    if (!confirm(
+      `Converter a cotação ${cotacao.codigo} em pedido(s) de compra?\n\n` +
+      `Será criado 1 pedido por fornecedor vencedor com os itens selecionados na sugestão. ` +
+      `A cotação será encerrada (CONVERTIDA).`
+    )) return;
+    setConverting(true);
+    try {
+      const res = await store.convertToPurchaseOrders(cotacao.id, cotacao.updated_at);
+      toast.success(`${res.orders} pedido(s) de compra criado(s) com ${res.items} item(ns). Cotação convertida.`);
+      onClose(); // a lista atualiza via refetch/realtime do store
+    } catch (err) {
+      console.error('[CotacaoDetailDrawer.handleConvert]', err);
+      toast.error(mapCotacaoError(err));
+    } finally {
+      setConverting(false);
     }
   };
 
@@ -93,6 +118,17 @@ export default function CotacaoDetailDrawer({ cotacao, store, onClose, onEdit, o
                   onClick={() => detail && onEdit(cotacao, detail)} disabled={!detail || loading}>
                   <Pencil className="w-3.5 h-3.5" /> Editar
                 </Button>
+              )}
+              {canConvert && convertible && (
+                <Button size="sm" className="h-8 text-xs gap-1.5 flex-1 gradient-salmon text-primary-foreground border-0"
+                  onClick={handleConvert} disabled={converting}>
+                  <ShoppingCart className="w-3.5 h-3.5" /> {converting ? 'Convertendo…' : 'Converter em pedido(s)'}
+                </Button>
+              )}
+              {isConverted && (
+                <span className="h-8 px-2.5 inline-flex items-center gap-1.5 rounded-md text-xs bg-success/15 text-success flex-1 justify-center">
+                  <PackageCheck className="w-3.5 h-3.5" /> Convertida em pedido(s)
+                </span>
               )}
               {canDelete && (
                 <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5 text-destructive hover:text-destructive"
@@ -173,7 +209,13 @@ export default function CotacaoDetailDrawer({ cotacao, store, onClose, onEdit, o
 
             <div className="mt-4 flex items-start gap-2 text-[11px] text-muted-foreground bg-secondary/30 rounded-lg p-2.5">
               <Info className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-              <span>Respostas, comparativo, sugestão inteligente, WhatsApp e IA chegam nas próximas fases.</span>
+              <span>
+                {convertible
+                  ? 'Sugestão salva — clique em "Converter em pedido(s)" para gerar 1 pedido por fornecedor vencedor com os itens selecionados.'
+                  : isConverted
+                    ? 'Cotação convertida. Os pedidos gerados aparecem em Compras → Pedidos & Mercado.'
+                    : 'Salve uma sugestão na aba Sugestão para habilitar a conversão em pedido(s). Envio por WhatsApp e IA chegam nas próximas fases.'}
+              </span>
             </div>
           </>
         )}
