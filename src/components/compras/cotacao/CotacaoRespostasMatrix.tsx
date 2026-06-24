@@ -144,7 +144,7 @@ export default function CotacaoRespostasMatrix({ cotacaoId, itens, fornecedores,
                           onChange={e => setPreco(f.id, it.id, e.target.value)}
                           disabled={!canEdit || !c.disp}
                           type="number" min={0} step="0.01"
-                          placeholder={c.disp ? 'R$' : '—'}
+                          placeholder={c.disp ? `R$/${it.purchase_unit_snapshot || it.unidade_snapshot || 'un'}` : '—'}
                           className={`h-7 text-xs bg-secondary border-border text-right ${!c.disp ? 'opacity-50' : ''}`}
                         />
                         <button type="button" onClick={() => canEdit && toggleDisp(f.id, it.id)} disabled={!canEdit}
