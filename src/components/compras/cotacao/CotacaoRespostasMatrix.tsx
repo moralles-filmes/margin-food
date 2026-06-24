@@ -66,14 +66,14 @@ export default function CotacaoRespostasMatrix({ cotacaoId, itens, fornecedores,
         respostasPayload.push({
           cotacao_fornecedor_id: f.id,
           cotacao_item_id: it.id,
-          preco_unitario: c.preco === '' ? null : c.preco,
+          preco_unitario: c.preco === '' ? null : c.preco.replace(',', '.'),
           disponivel: c.disp,
         });
       }
     }));
     const metaPayload: CotacaoFornecedorMetaInput[] = fornecedores.map(f => ({
       cotacao_fornecedor_id: f.id,
-      frete: meta[f.id]?.frete ?? '',
+      frete: (meta[f.id]?.frete ?? '').replace(',', '.'),
       prazo_entrega_dias: meta[f.id]?.prazo ?? '',
       condicao_pagamento: meta[f.id]?.condicao || null,
     }));
