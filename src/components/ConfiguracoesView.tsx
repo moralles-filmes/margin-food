@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { SubmoduleSwitcher } from '@/components/ui/SubmoduleSwitcher';
-import { Settings, Users, ShieldAlert, Database, Fish, Shield, ShieldCheck, Activity } from 'lucide-react';
+import { Settings, Users, ShieldAlert, Database, Fish, Shield, ShieldCheck, Activity, Plug } from 'lucide-react';
 import AuditView from './AuditView';
 import SecurityAuditView from './SecurityAuditView';
 import GlobalAuditView from './GlobalAuditView';
 import PerformanceMonitorView from './PerformanceMonitorView';
 import AdminUsersView from './AdminUsersView';
+import IntegracoesView from './configuracoes/IntegracoesView';
 import { useSalmonStore } from '@/hooks/useSalmonStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCan, useModuleAccess } from '@/permissions';
@@ -16,6 +17,7 @@ import { toast } from 'sonner';
 // Map internal subtab keys to module registry keys
 const SUBTAB_MAP: Record<string, string> = {
   'geral': 'geral',
+  'integracoes': 'integracoes',
   'salmao': 'salmon',
   'usuarios': 'usuarios',
   'audit-global': 'auditoria-sistema',
@@ -24,10 +26,11 @@ const SUBTAB_MAP: Record<string, string> = {
   'auditoria': 'auditoria-compras',
 };
 
-type SubView = 'geral' | 'salmao' | 'usuarios' | 'auditoria' | 'seguranca' | 'audit-global' | 'performance';
+type SubView = 'geral' | 'integracoes' | 'salmao' | 'usuarios' | 'auditoria' | 'seguranca' | 'audit-global' | 'performance';
 
 const allSubViews: { id: SubView; label: string; icon: typeof Settings; registryKey: string }[] = [
   { id: 'geral', label: 'Geral', icon: Settings, registryKey: 'geral' },
+  { id: 'integracoes', label: 'Integrações', icon: Plug, registryKey: 'integracoes' },
   { id: 'salmao', label: 'Salmão', icon: Fish, registryKey: 'salmon' },
   { id: 'usuarios', label: 'Usuários', icon: Users, registryKey: 'usuarios' },
   { id: 'audit-global', label: 'Auditoria Sistema', icon: ShieldCheck, registryKey: 'auditoria-sistema' },
@@ -163,6 +166,8 @@ export default function ConfiguracoesView({ store, initialSubTab }: Props) {
           )}
         </div>
       )}
+
+      {effectiveActive === 'integracoes' && <IntegracoesView />}
 
       {effectiveActive === 'usuarios' && (
         canManageUsuarios ? <AdminUsersView /> : (
