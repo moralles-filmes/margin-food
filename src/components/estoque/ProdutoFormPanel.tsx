@@ -75,6 +75,20 @@ export default function ProdutoFormPanel({
   const { isDirty, showConfirm, guardedClose, confirmClose, cancelClose, markClean } =
     useFormDirtyGuard({ current: prodForm, onClose });
 
+  // Raw string state para o input de fator — preserva estados intermediários como "14," ou "14."
+  const [rawFator, setRawFator] = useState(() =>
+    prodForm.fatorConversaoPadrao > 0 ? String(prodForm.fatorConversaoPadrao) : ''
+  );
+  // Sincroniza rawFator quando o fator muda de fora (auto-cálculo, carregamento de produto)
+  useEffect(() => {
+    if (rawFator === '') return;
+    const current = parseFloat(rawFator.replace(',', '.'));
+    if (prodForm.fatorConversaoPadrao !== current) {
+      setRawFator(prodForm.fatorConversaoPadrao > 0 ? String(prodForm.fatorConversaoPadrao) : '');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prodForm.fatorConversaoPadrao]);
+
   // Focus on mount only
   useEffect(() => {
     if (!didFocusRef.current && prodNameInputRef.current) {
@@ -313,7 +327,32 @@ export default function ProdutoFormPanel({
             <div className="space-y-1.5">
               <div>
                 <Label className="text-[10px] text-muted-foreground">Fator de conversão manual (qtd base/embalagem)</Label>
-                <Input type="number" step="0.01" min="0.01" value={prodForm.fatorConversaoPadrao || ''} onChange={e => setProdForm(f => ({ ...f, fatorConversaoPadrao: parseFloat(e.target.value) || 0 }))} className="bg-secondary border-border text-foreground" placeholder="Ex: 12 (1 caixa = 12 un)" />
+                <Input
+                  type="text"
+                  inputMode="decimal"
+                  value={rawFator}
+                  onChange={e => {
+                    const raw = e.target.value;
+                    setRawFator(raw);
+                    if (raw === '') return;
+                    const parsed = parseFloat(raw.replace(',', '.'));
+                    if (!isNaN(parsed)) {
+                      setProdForm(f => ({ ...f, fatorConversaoPadrao: parsed }));
+                    }
+                  }}
+                  onBlur={() => {
+                    const parsed = parseFloat(rawFator.replace(',', '.'));
+                    if (!isNaN(parsed) && parsed > 0) {
+                      setRawFator(String(parsed));
+                      setProdForm(f => ({ ...f, fatorConversaoPadrao: parsed }));
+                    } else {
+                      setRawFator('');
+                      setProdForm(f => ({ ...f, fatorConversaoPadrao: 0 }));
+                    }
+                  }}
+                  className="bg-secondary border-border text-foreground"
+                  placeholder="Ex: 12 (1 caixa = 12 un)"
+                />
               </div>
               {prodForm.fatorConversaoPadrao > 0 && (
                 <p className="text-[10px] text-muted-foreground">
