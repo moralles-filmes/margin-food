@@ -1,8 +1,37 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import type { Cotacao, CotacaoCounts } from '@/types/cotacao';
+import type { Cotacao, CotacaoCounts, CotacaoItem, CotacaoFornecedor } from '@/types/cotacao';
 import { COTACAO_STATUS_ABERTOS } from '@/types/cotacao';
+
+/** Payload de item enviado às RPCs create/update (snapshots montados no cliente). */
+export interface CotacaoItemInput {
+  produto_id?: string | null;
+  produto_nome_snapshot: string;
+  unidade_snapshot?: string | null;
+  purchase_unit_snapshot?: string | null;
+  conversion_factor_snapshot?: number;
+  quantidade: number;
+  observacao?: string | null;
+}
+
+/** Payload de fornecedor participante enviado às RPCs create/update. */
+export interface CotacaoFornecedorInput {
+  supplier_id?: string | null;
+  supplier_nome_snapshot: string;
+  whatsapp_snapshot?: string | null;
+  pedido_minimo_snapshot?: number;
+}
+
+export interface CotacaoCreateInput {
+  titulo: string;
+  observacao?: string | null;
+  data_validade?: string | null;
+  origin_type?: 'MANUAL' | 'ALERTA' | 'REQUISICAO';
+  origin_ref?: string | null;
+  itens: CotacaoItemInput[];
+  fornecedores: CotacaoFornecedorInput[];
+}
 
 // NOTA: as tabelas de cotação ainda não estão nos tipos gerados do Supabase
 // (`src/integrations/supabase/types`). Após `supabase db push` + regeneração
@@ -85,6 +114,68 @@ export function useCotacoesStore() {
 
   const openCount = counts.emAberto;
 
+  // ── Mutations (via RPCs atômicas) — lançam em erro; componente faz os toasts ──
+  const createCotacao = useCallback(async (input: CotacaoCreateInput) => {
+    const { data, error: err } = await db.rpc('create_cotacao_atomic', {
+      p_titulo: input.titulo,
+      p_observacao: input.observacao ?? null,
+      p_data_validade: input.data_validade ?? null,
+      p_origin_type: input.origin_type ?? 'MANUAL',
+      p_origin_ref: input.origin_ref ?? null,
+      p_itens: input.itens,
+      p_fornecedores: input.fornecedores,
+    });
+    if (err) throw err;
+    await fetchCotacoes();
+    return data as { success: boolean; id: string; codigo: string };
+  }, [fetchCotacoes]);
+
+  const updateCotacao = useCallback(async (
+    id: string,
+    input: Omit<CotacaoCreateInput, 'origin_type' | 'origin_ref'>,
+    expectedUpdatedAt?: string | null,
+  ) => {
+    const { data, error: err } = await db.rpc('update_cotacao_atomic', {
+      p_id: id,
+      p_titulo: input.titulo,
+      p_observacao: input.observacao ?? null,
+      p_data_validade: input.data_validade ?? null,
+      p_itens: input.itens,
+      p_fornecedores: input.fornecedores,
+      p_expected_updated_at: expectedUpdatedAt ?? null,
+    });
+    if (err) throw err;
+    await fetchCotacoes();
+    return data as { success: boolean; id: string };
+  }, [fetchCotacoes]);
+
+  const deleteCotacao = useCallback(async (id: string, expectedUpdatedAt?: string | null) => {
+    const { data, error: err } = await db.rpc('soft_delete_cotacao', {
+      p_id: id,
+      p_expected_updated_at: expectedUpdatedAt ?? null,
+    });
+    if (err) throw err;
+    await fetchCotacoes();
+    return data as { success: boolean; id: string };
+  }, [fetchCotacoes]);
+
+  /** Carrega itens + fornecedores de uma cotação (para o drawer de detalhe). */
+  const fetchCotacaoDetail = useCallback(async (cotacaoId: string): Promise<{
+    itens: CotacaoItem[];
+    fornecedores: CotacaoFornecedor[];
+  }> => {
+    const [itensRes, fornRes] = await Promise.all([
+      db.from('cotacao_itens').select('*').eq('cotacao_id', cotacaoId).order('created_at', { ascending: true }),
+      db.from('cotacao_fornecedores').select('*').eq('cotacao_id', cotacaoId).order('created_at', { ascending: true }),
+    ]);
+    if (itensRes.error) throw itensRes.error;
+    if (fornRes.error) throw fornRes.error;
+    return {
+      itens: (itensRes.data ?? []) as CotacaoItem[],
+      fornecedores: (fornRes.data ?? []) as CotacaoFornecedor[],
+    };
+  }, []);
+
   return {
     cotacoes,
     loading,
@@ -92,5 +183,9 @@ export function useCotacoesStore() {
     counts,
     openCount,
     refetch: fetchCotacoes,
+    createCotacao,
+    updateCotacao,
+    deleteCotacao,
+    fetchCotacaoDetail,
   };
 }

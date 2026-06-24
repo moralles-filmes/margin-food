@@ -5,12 +5,13 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { toast } from 'sonner';
 import { useCan } from '@/permissions/hooks';
 import { useCotacoesStore } from '@/hooks/useCotacoesStore';
 import { includesNormalized } from '@/lib/utils';
 import { formatMoneyBR } from '@/lib/formatters';
-import type { Cotacao, CotacaoStatus } from '@/types/cotacao';
+import type { Cotacao, CotacaoStatus, CotacaoItem, CotacaoFornecedor } from '@/types/cotacao';
+import CotacaoFormDialog from './CotacaoFormDialog';
+import CotacaoDetailDrawer from './CotacaoDetailDrawer';
 
 const STATUS_META: Record<CotacaoStatus, { label: string; className: string }> = {
   RASCUNHO:    { label: 'Rascunho',     className: 'bg-secondary text-muted-foreground' },
@@ -57,6 +58,18 @@ export default function CotacaoView({ store }: CotacaoViewProps) {
   const { cotacoes, loading, counts } = store;
   const [query, setQuery] = useState('');
 
+  // Dialog/drawer state
+  const [formOpen, setFormOpen] = useState(false);
+  const [editing, setEditing] = useState<Cotacao | null>(null);
+  const [editingDetail, setEditingDetail] = useState<{ itens: CotacaoItem[]; fornecedores: CotacaoFornecedor[] } | null>(null);
+  const [detailCotacao, setDetailCotacao] = useState<Cotacao | null>(null);
+
+  const openCreate = () => { setEditing(null); setEditingDetail(null); setFormOpen(true); };
+  const openEditFromDrawer = (c: Cotacao, detail: { itens: CotacaoItem[]; fornecedores: CotacaoFornecedor[] }) => {
+    setDetailCotacao(null);
+    setEditing(c); setEditingDetail(detail); setFormOpen(true);
+  };
+
   const filtered = useMemo(() => {
     if (!query.trim()) return cotacoes;
     return cotacoes.filter(c =>
@@ -84,7 +97,7 @@ export default function CotacaoView({ store }: CotacaoViewProps) {
           <Button
             size="sm"
             className="gradient-salmon text-primary-foreground border-0 gap-1.5"
-            onClick={() => toast.info('Criação de cotação chega na próxima fase (CRUD).')}
+            onClick={openCreate}
           >
             <Plus className="w-4 h-4" /> Nova Cotação
           </Button>
@@ -135,7 +148,7 @@ export default function CotacaoView({ store }: CotacaoViewProps) {
             return (
               <button
                 key={c.id}
-                onClick={() => toast.info('Detalhe da cotação chega na próxima fase.')}
+                onClick={() => setDetailCotacao(c)}
                 className="w-full text-left bg-card border border-border rounded-xl p-3 hover:border-primary/40 transition-colors animate-fade-up"
                 style={{ animationDelay: `${i * 40}ms` }}
               >
@@ -168,6 +181,24 @@ export default function CotacaoView({ store }: CotacaoViewProps) {
           })}
         </div>
       )}
+
+      {formOpen && (
+        <CotacaoFormDialog
+          open
+          onOpenChange={(o) => { if (!o) setFormOpen(false); }}
+          store={store}
+          editing={editing}
+          editingDetail={editingDetail}
+        />
+      )}
+
+      <CotacaoDetailDrawer
+        cotacao={detailCotacao}
+        store={store}
+        onClose={() => setDetailCotacao(null)}
+        onEdit={openEditFromDrawer}
+        onDeleted={() => setDetailCotacao(null)}
+      />
     </div>
   );
 }
