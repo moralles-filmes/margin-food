@@ -1,8 +1,26 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import type { Cotacao, CotacaoCounts, CotacaoItem, CotacaoFornecedor } from '@/types/cotacao';
+import type { Cotacao, CotacaoCounts, CotacaoItem, CotacaoFornecedor, CotacaoResposta } from '@/types/cotacao';
 import { COTACAO_STATUS_ABERTOS } from '@/types/cotacao';
+
+/** Linha da matriz de respostas enviada à RPC save_cotacao_respostas_atomic. */
+export interface CotacaoRespostaInput {
+  cotacao_fornecedor_id: string;
+  cotacao_item_id: string;
+  preco_unitario?: number | string | null;
+  quantidade_disponivel?: number | string | null;
+  disponivel?: boolean;
+  observacao?: string | null;
+}
+
+/** Meta por fornecedor (prazo/frete/condição) salva junto das respostas. */
+export interface CotacaoFornecedorMetaInput {
+  cotacao_fornecedor_id: string;
+  prazo_entrega_dias?: number | string | null;
+  frete?: number | string | null;
+  condicao_pagamento?: string | null;
+}
 
 /** Payload de item enviado às RPCs create/update (snapshots montados no cliente). */
 export interface CotacaoItemInput {
@@ -159,10 +177,11 @@ export function useCotacoesStore() {
     return data as { success: boolean; id: string };
   }, [fetchCotacoes]);
 
-  /** Carrega itens + fornecedores de uma cotação (para o drawer de detalhe). */
+  /** Carrega itens + fornecedores + respostas de uma cotação (para o drawer de detalhe). */
   const fetchCotacaoDetail = useCallback(async (cotacaoId: string): Promise<{
     itens: CotacaoItem[];
     fornecedores: CotacaoFornecedor[];
+    respostas: CotacaoResposta[];
   }> => {
     const [itensRes, fornRes] = await Promise.all([
       db.from('cotacao_itens').select('*').eq('cotacao_id', cotacaoId).order('created_at', { ascending: true }),
@@ -170,11 +189,36 @@ export function useCotacoesStore() {
     ]);
     if (itensRes.error) throw itensRes.error;
     if (fornRes.error) throw fornRes.error;
+    const fornIds = (fornRes.data ?? []).map((f: any) => f.id);
+    // cotacao_respostas não tem coluna cotacao_id → filtra pelos fornecedores da cotação
+    let respostas: CotacaoResposta[] = [];
+    if (fornIds.length > 0) {
+      const respRes = await db.from('cotacao_respostas').select('*').in('cotacao_fornecedor_id', fornIds);
+      if (respRes.error) throw respRes.error;
+      respostas = (respRes.data ?? []) as CotacaoResposta[];
+    }
     return {
       itens: (itensRes.data ?? []) as CotacaoItem[],
       fornecedores: (fornRes.data ?? []) as CotacaoFornecedor[],
+      respostas,
     };
   }, []);
+
+  /** Salva a matriz de preços + meta dos fornecedores. */
+  const saveRespostas = useCallback(async (
+    cotacaoId: string,
+    respostas: CotacaoRespostaInput[],
+    fornecedoresMeta: CotacaoFornecedorMetaInput[] = [],
+  ) => {
+    const { data, error: err } = await db.rpc('save_cotacao_respostas_atomic', {
+      p_cotacao_id: cotacaoId,
+      p_respostas: respostas,
+      p_fornecedores_meta: fornecedoresMeta,
+    });
+    if (err) throw err;
+    await fetchCotacoes();
+    return data as { success: boolean; upserts: number };
+  }, [fetchCotacoes]);
 
   return {
     cotacoes,
@@ -187,5 +231,6 @@ export function useCotacoesStore() {
     updateCotacao,
     deleteCotacao,
     fetchCotacaoDetail,
+    saveRespostas,
   };
 }
