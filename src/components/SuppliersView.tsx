@@ -13,7 +13,7 @@ interface SuppliersViewProps {
   store: ReturnType<typeof useSalmonStore>;
 }
 
-const emptyForm = { name: '', cnpj: '', contact: '', notes: '', active: true, categoriasAtendidas: [] as string[], prazoEntregaPadrao: 0, formaPagamentoPadrao: '' };
+const emptyForm = { name: '', cnpj: '', contact: '', notes: '', active: true, categoriasAtendidas: [] as string[], prazoEntregaPadrao: 0, formaPagamentoPadrao: '', pedidoMinimoValor: 0, pedidoMinimoQtd: 0, whatsappNumber: '' };
 
 export default function SuppliersView({ store }: SuppliersViewProps) {
   const { suppliers, addSupplier, updateSupplier, deleteSupplier } = store;
@@ -29,7 +29,7 @@ export default function SuppliersView({ store }: SuppliersViewProps) {
   const startEdit = (s: Supplier) => {
     if (!canEdit) { toast.error('Sem permissão para editar fornecedores'); return; }
     setEditId(s.id);
-    setForm({ name: s.name, cnpj: s.cnpj, contact: s.contact, notes: s.notes, active: s.active, categoriasAtendidas: s.categoriasAtendidas || [], prazoEntregaPadrao: s.prazoEntregaPadrao || 0, formaPagamentoPadrao: s.formaPagamentoPadrao || '' });
+    setForm({ name: s.name, cnpj: s.cnpj, contact: s.contact, notes: s.notes, active: s.active, categoriasAtendidas: s.categoriasAtendidas || [], prazoEntregaPadrao: s.prazoEntregaPadrao || 0, formaPagamentoPadrao: s.formaPagamentoPadrao || '', pedidoMinimoValor: s.pedidoMinimoValor || 0, pedidoMinimoQtd: s.pedidoMinimoQtd || 0, whatsappNumber: s.whatsappNumber || '' });
     setShowForm(true);
   };
 
@@ -102,6 +102,17 @@ export default function SuppliersView({ store }: SuppliersViewProps) {
             <div className="col-span-2">
               <Label className="text-[11px] text-muted-foreground">Observações</Label>
               <Input value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Notas..." className="bg-secondary border-border text-foreground" />
+            </div>
+            <div className="col-span-2 pt-1 border-t border-border/60">
+              <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Cotação</p>
+            </div>
+            <div>
+              <Label className="text-[11px] text-muted-foreground">Pedido mínimo (R$)</Label>
+              <Input type="number" min={0} step="0.01" value={form.pedidoMinimoValor || ''} onChange={e => setForm(f => ({ ...f, pedidoMinimoValor: parseFloat(e.target.value) || 0 }))} placeholder="0,00" className="bg-secondary border-border text-foreground" />
+            </div>
+            <div>
+              <Label className="text-[11px] text-muted-foreground">WhatsApp (Z-API)</Label>
+              <Input value={form.whatsappNumber} onChange={e => setForm(f => ({ ...f, whatsappNumber: e.target.value }))} placeholder="55 11 99999-9999" className="bg-secondary border-border text-foreground" />
             </div>
           </div>
           <div className="flex items-center justify-between pt-1">

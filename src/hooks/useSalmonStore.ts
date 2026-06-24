@@ -148,6 +148,9 @@ export function useSalmonStore() {
             prazoEntregaPadrao: (s.contact_info as any)?.prazoEntregaPadrao || 0,
             formaPagamentoPadrao: (s.contact_info as any)?.formaPagamentoPadrao || '',
             createdAt: s.created_at,
+            pedidoMinimoValor: Number(s.minimum_order_value) || 0,
+            pedidoMinimoQtd: Number(s.minimum_order_quantity) || 0,
+            whatsappNumber: s.whatsapp_number || '',
           })));
         }
 
@@ -228,7 +231,14 @@ export function useSalmonStore() {
     };
     const { data, error } = await supabase
       .from('suppliers')
-      .insert({ name: s.name, is_active: s.active, contact_info: contactInfo as any })
+      .insert({
+        name: s.name,
+        is_active: s.active,
+        contact_info: contactInfo as any,
+        minimum_order_value: s.pedidoMinimoValor ?? 0,
+        minimum_order_quantity: s.pedidoMinimoQtd ?? 0,
+        whatsapp_number: s.whatsappNumber || null,
+      } as any)
       .select()
       .single();
 
@@ -248,6 +258,9 @@ export function useSalmonStore() {
       prazoEntregaPadrao: contactInfo.prazoEntregaPadrao,
       formaPagamentoPadrao: contactInfo.formaPagamentoPadrao,
       createdAt: data.created_at,
+      pedidoMinimoValor: s.pedidoMinimoValor ?? 0,
+      pedidoMinimoQtd: s.pedidoMinimoQtd ?? 0,
+      whatsappNumber: s.whatsappNumber || '',
     };
     setSuppliers(prev => [newS, ...prev]);
     return newS;
@@ -269,6 +282,9 @@ export function useSalmonStore() {
     const updatePayload: any = { contact_info: contactInfo as any };
     if (data.name !== undefined) updatePayload.name = data.name;
     if (data.active !== undefined) updatePayload.is_active = data.active;
+    if (data.pedidoMinimoValor !== undefined) updatePayload.minimum_order_value = data.pedidoMinimoValor ?? 0;
+    if (data.pedidoMinimoQtd !== undefined) updatePayload.minimum_order_quantity = data.pedidoMinimoQtd ?? 0;
+    if (data.whatsappNumber !== undefined) updatePayload.whatsapp_number = data.whatsappNumber || null;
 
     const { error } = await supabase.from('suppliers').update(updatePayload).eq('id', id);
     if (error) {
