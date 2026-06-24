@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { Check, AlertTriangle, Save, Wand2, RotateCcw, ArrowRight, Truck, Coins, TrendingDown, Users } from 'lucide-react';
+import { Check, AlertTriangle, Save, Wand2, RotateCcw, ArrowRight, Truck, Coins, TrendingDown, Users, Sparkles } from 'lucide-react';
 import { formatMoneyBR } from '@/lib/formatters';
 import { mapCotacaoError } from '@/lib/cotacaoErrors';
 import {
@@ -30,6 +30,8 @@ export default function CotacaoSugestaoInteligente({ cotacaoId, itens, fornecedo
   const [overrides, setOverrides] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [showAdjust, setShowAdjust] = useState(false);
+  const [iaText, setIaText] = useState<string | null>(null);
+  const [iaLoading, setIaLoading] = useState(false);
 
   const base = set.scenarios[selectedType];
   const overridden = Object.keys(overrides).length > 0;
@@ -69,6 +71,20 @@ export default function CotacaoSugestaoInteligente({ cotacaoId, itens, fornecedo
       toast.error(mapCotacaoError(err));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleAnalisarIA = async () => {
+    setIaLoading(true);
+    try {
+      const res = await store.runIA({ cotacao_id: cotacaoId, task: 'analise_precos', allow_competitor_context: true });
+      if (res?.success && res.text) setIaText(res.text);
+      else toast.error(res?.message ?? 'Não foi possível analisar');
+    } catch (err: any) {
+      console.error('[CotacaoSugestaoInteligente.handleAnalisarIA]', err);
+      toast.error(err?.message?.includes('PERMISSION') ? 'Sem permissão para usar a IA' : 'Erro ao analisar com IA');
+    } finally {
+      setIaLoading(false);
     }
   };
 
@@ -224,6 +240,24 @@ export default function CotacaoSugestaoInteligente({ cotacaoId, itens, fornecedo
           )}
         </>
       )}
+
+      {/* Análise com IA (anota — não altera os números do otimizador) */}
+      <div className="border-t border-border/60 pt-3 space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] font-semibold text-foreground flex items-center gap-1">
+            <Sparkles className="w-3 h-3 text-primary" /> Análise com IA
+          </span>
+          <button onClick={handleAnalisarIA} disabled={iaLoading}
+            className="text-[10px] text-primary hover:underline flex items-center gap-1 disabled:opacity-50">
+            <Sparkles className={`w-3 h-3 ${iaLoading ? 'animate-pulse' : ''}`} /> {iaLoading ? 'Analisando…' : iaText ? 'Refazer análise' : 'Analisar preços'}
+          </button>
+        </div>
+        {iaText ? (
+          <div className="bg-secondary/40 rounded-lg p-2.5 text-[11px] text-foreground whitespace-pre-wrap leading-relaxed">{iaText}</div>
+        ) : (
+          <p className="text-[10px] text-muted-foreground">A IA comenta a matriz de preços (não altera os números do otimizador). Requer chave de IA em Configurações → Integrações.</p>
+        )}
+      </div>
     </div>
   );
 }
