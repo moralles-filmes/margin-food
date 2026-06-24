@@ -242,6 +242,18 @@ export const MODULE_MANIFESTS: ModuleManifest[] = [
         ...CRUD,
         { action: 'export', label: 'Exportar' },
       ]},
+      // Cotação (RFQ). NOTA: send_whatsapp/use_ai/convert NÃO são ações RBAC válidas
+      // (ver src/permissions/actions.ts) → mapeadas: WhatsApp+IA = 'manage', converter = 'close'.
+      { key: 'cotacao', label: 'Cotação', actions: [
+        { action: 'view', label: 'Ver' },
+        { action: 'create', label: 'Criar' },
+        { action: 'edit', label: 'Editar' },
+        { action: 'delete', label: 'Excluir' },
+        { action: 'approve', label: 'Aprovar Sugestão' },
+        { action: 'close', label: 'Converter em Pedido' },
+        { action: 'manage', label: 'WhatsApp / IA' },
+        { action: 'export', label: 'Exportar' },
+      ]},
       { key: 'recebimentos', label: 'Recebimentos', actions: [
         { action: 'view', label: 'Ver' },
         { action: 'create', label: 'Criar' },
@@ -559,7 +571,7 @@ export const LEGACY_PERMISSION_MAP: Record<string, string[]> = {
   'inventory:count': ['inventario:detalhe:edit'],
   'inventory:reopen': ['inventario:auditoria:edit'],
   'inventory:export': ['inventario:lista:export', 'inventario:detalhe:export', 'inventario:dashboard:export', 'inventario:auditoria:export'],
-  'purchases:read': ['compras:lista:view', 'compras:pedidos:view', 'compras:checklist:view', 'compras:calendario:view', 'compras:ranking:view', 'compras:recebimentos:view', 'compras:confirmacoes:view', 'compras:alertas_falta:view'],
+  'purchases:read': ['compras:lista:view', 'compras:pedidos:view', 'compras:checklist:view', 'compras:calendario:view', 'compras:ranking:view', 'compras:recebimentos:view', 'compras:confirmacoes:view', 'compras:alertas_falta:view', 'compras:cotacao:view'],
   'purchases:create': ['compras:lista:create', 'compras:pedidos:create'],
   'purchases:edit': ['compras:lista:edit', 'compras:pedidos:edit'],
   'purchases:approve': ['compras:lista:approve', 'compras:checklist:approve', 'compras:confirmacoes:approve'],
@@ -573,8 +585,8 @@ export const LEGACY_PERMISSION_MAP: Record<string, string[]> = {
   'purchases:confirmations:read': ['compras:confirmacoes:view'],
   'suppliers:read': ['compras:fornecedores:view'],
   'suppliers:edit': ['compras:fornecedores:edit', 'compras:fornecedores:create', 'compras:fornecedores:delete'],
-  'compras:read': ['compras:lista:view', 'compras:pedidos:view', 'compras:checklist:view', 'compras:calendario:view', 'compras:ranking:view', 'compras:recebimentos:view', 'compras:confirmacoes:view', 'compras:fornecedores:view', 'compras:alertas_falta:view'],
-  'compras:write': ['compras:lista:create', 'compras:lista:edit', 'compras:pedidos:create', 'compras:pedidos:edit', 'compras:recebimentos:create', 'compras:recebimentos:edit', 'compras:recebimentos:close', 'compras:lista:cancel'],
+  'compras:read': ['compras:lista:view', 'compras:pedidos:view', 'compras:checklist:view', 'compras:calendario:view', 'compras:ranking:view', 'compras:recebimentos:view', 'compras:confirmacoes:view', 'compras:fornecedores:view', 'compras:alertas_falta:view', 'compras:cotacao:view'],
+  'compras:write': ['compras:lista:create', 'compras:lista:edit', 'compras:pedidos:create', 'compras:pedidos:edit', 'compras:recebimentos:create', 'compras:recebimentos:edit', 'compras:recebimentos:close', 'compras:lista:cancel', 'compras:cotacao:create', 'compras:cotacao:edit'],
   'cmv:read': ['cmv:categoria:view', 'cmv:setor:view', 'cmv:top-itens:view', 'cmv:semanal:view'],
   'cmv:export': ['cmv:categoria:export', 'cmv:setor:export', 'cmv:top-itens:export', 'cmv:semanal:export'],
   'cmv:write': ['cmv:semanal:edit'],

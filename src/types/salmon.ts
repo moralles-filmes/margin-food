@@ -108,6 +108,10 @@ export interface Supplier {
   prazoEntregaPadrao: number;
   formaPagamentoPadrao: string;
   createdAt: string;
+  // Campos de Cotação (colunas dedicadas em suppliers — usados pela otimização e WhatsApp)
+  pedidoMinimoValor?: number;
+  pedidoMinimoQtd?: number;
+  whatsappNumber?: string;
 }
 
 export interface MetaCompraMensal {

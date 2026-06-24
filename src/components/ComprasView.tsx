@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { usePersistedTab } from '@/hooks/usePersistedTab';
-import { ShoppingCart, Calendar, BarChart3, ClipboardList, Plus, Search, Inbox, X, Check, Trash2, Crown, Award, Medal, Zap, AlertTriangle, ShoppingBag, Building2, ShieldAlert, PackageX } from 'lucide-react';
+import { ShoppingCart, Calendar, BarChart3, ClipboardList, Plus, Search, Inbox, X, Check, Trash2, Crown, Award, Medal, Zap, AlertTriangle, ShoppingBag, Building2, ShieldAlert, PackageX, FileText } from 'lucide-react';
 import { SubmoduleSwitcher } from '@/components/ui/SubmoduleSwitcher';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,8 @@ import { usePurchaseOrdersStore } from '@/hooks/usePurchaseOrdersStore';
 import ShoppingChecklistView from '@/components/compras/ShoppingChecklistView';
 import CalendarioLembretesView from '@/components/compras/CalendarioLembretesView';
 import RankingFornecedoresView from '@/components/compras/RankingFornecedoresView';
+import CotacaoView from '@/components/compras/cotacao/CotacaoView';
+import { useCotacoesStore } from '@/hooks/useCotacoesStore';
 import { supabase } from '@/integrations/supabase/client';
 import { useModuleAccess, useCan } from '@/permissions/hooks';
 
@@ -29,9 +31,10 @@ const SUBTAB_REGISTRY_MAP: Record<string, string> = {
   'ranking': 'ranking',
   'fornecedores': 'fornecedores',
   'alertas-falta': 'alertas_falta',
+  'cotacao': 'cotacao',
 };
 
-type SubView = 'requisicoes' | 'pedidos-compras' | 'calendario' | 'ranking' | 'fornecedores' | 'alertas-falta';
+type SubView = 'requisicoes' | 'pedidos-compras' | 'calendario' | 'ranking' | 'fornecedores' | 'alertas-falta' | 'cotacao';
 
 const DIAS = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
 const CATEGORIAS = ['Peixe', 'Oriental', 'Bebidas', 'Limpeza', 'Embalagens', 'Cozinha', 'Descartáveis', 'Proteínas', 'Hortifruti', 'Outros'];
@@ -53,6 +56,7 @@ export default function ComprasView() {
   const [activeView, setActiveView] = usePersistedTab<SubView>('app:tab:compras', 'pedidos-compras');
   const salmonStore = useSalmonStoreContext();
   const purchaseOrdersStore = usePurchaseOrdersStore();
+  const cotacoesStore = useCotacoesStore();
   const shoppingCount = purchaseOrdersStore.shoppingCount;
 
   // Calendário form
@@ -76,6 +80,7 @@ export default function ComprasView() {
       'ranking': 'ranking',
       'fornecedores': 'fornecedores',
       'alertas_falta': 'alertas-falta',
+      'cotacao': 'cotacao',
     };
     return visibleSubtabs
       .map(k => reverseMap[k])
@@ -119,6 +124,7 @@ export default function ComprasView() {
     { id: 'pedidos-compras', label: 'Pedidos & Compras Mercado', icon: ShoppingBag, badge: (purchaseOrdersStore.openCount + purchaseOrdersStore.receivingCount + purchaseOrdersStore.unackedPartialCount) || undefined },
     { id: 'requisicoes', label: 'Checklist Compra', icon: ClipboardList, badge: shoppingCount || undefined },
     { id: 'alertas-falta', label: 'Itens em Falta', icon: PackageX, badge: alertasFaltaCount || undefined },
+    { id: 'cotacao', label: 'Cotação', icon: FileText, badge: cotacoesStore.openCount || undefined },
     { id: 'calendario', label: 'Calendário', icon: Calendar },
     { id: 'ranking', label: 'Ranking', icon: BarChart3 },
     { id: 'fornecedores', label: 'Fornecedores', icon: Building2 },
@@ -178,6 +184,9 @@ export default function ComprasView() {
 
       {/* ====== FORNECEDORES ====== */}
       {activeView === 'fornecedores' && <SuppliersView store={salmonStore} />}
+
+      {/* ====== COTAÇÃO (RFQ) ====== */}
+      {activeView === 'cotacao' && <CotacaoView store={cotacoesStore} />}
     </div>
   );
 }
