@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import type { Cotacao, CotacaoCounts, CotacaoItem, CotacaoFornecedor, CotacaoResposta } from '@/types/cotacao';
+import type { Cotacao, CotacaoCounts, CotacaoItem, CotacaoFornecedor, CotacaoResposta, CotacaoWhatsappLog, CotacaoWhatsappTipo } from '@/types/cotacao';
 import { COTACAO_STATUS_ABERTOS } from '@/types/cotacao';
 
 /** Linha da matriz de respostas enviada à RPC save_cotacao_respostas_atomic. */
@@ -245,6 +245,34 @@ export function useCotacoesStore() {
     return data as { success: boolean; orders: number; items: number; order_ids: string[] };
   }, [fetchCotacoes]);
 
+  /**
+   * Envia uma mensagem de WhatsApp via Edge Function `send-whatsapp-zapi`
+   * (credenciais Z-API ficam no servidor). Retorna {success, message, ...}.
+   */
+  const sendWhatsapp = useCallback(async (payload: {
+    cotacao_id: string;
+    cotacao_fornecedor_id?: string | null;
+    tipo: CotacaoWhatsappTipo;
+    phone: string;
+    message: string;
+  }) => {
+    const { data, error: err } = await supabase.functions.invoke('send-whatsapp-zapi', { body: payload });
+    if (err) throw err;
+    await fetchCotacoes();
+    return data as { success: boolean; status?: string; log_id?: string | null; message?: string };
+  }, [fetchCotacoes]);
+
+  /** Logs de WhatsApp de uma cotação (mais recentes primeiro). */
+  const fetchWhatsappLogs = useCallback(async (cotacaoId: string): Promise<CotacaoWhatsappLog[]> => {
+    const { data, error: err } = await db
+      .from('cotacao_whatsapp_logs')
+      .select('*')
+      .eq('cotacao_id', cotacaoId)
+      .order('created_at', { ascending: false });
+    if (err) throw err;
+    return (data ?? []) as CotacaoWhatsappLog[];
+  }, []);
+
   /** Salva a matriz de preços + meta dos fornecedores. */
   const saveRespostas = useCallback(async (
     cotacaoId: string,
@@ -275,5 +303,7 @@ export function useCotacoesStore() {
     saveRespostas,
     saveSugestao,
     convertToPurchaseOrders,
+    sendWhatsapp,
+    fetchWhatsappLogs,
   };
 }

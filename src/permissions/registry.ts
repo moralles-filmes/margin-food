@@ -463,6 +463,7 @@ export const MODULE_MANIFESTS: ModuleManifest[] = [
     label: 'Configurações',
     subtabs: [
       { key: 'geral', label: 'Geral', actions: VIEW_MANAGE },
+      { key: 'integracoes', label: 'Integrações', actions: VIEW_MANAGE },
       { key: 'salmon', label: 'Salmão', actions: VIEW_MANAGE },
       { key: 'usuarios', label: 'Usuários', actions: [
         { action: 'view', label: 'Ver' },
@@ -617,6 +618,6 @@ export const LEGACY_PERMISSION_MAP: Record<string, string[]> = {
   'finance:delete': ['financeiro:cadastros:delete', 'financeiro:contas:delete', 'financeiro:lancamentos:delete', 'financeiro:pagar:delete', 'financeiro:receber:delete', 'financeiro:orcamento:delete'],
   'finance:export': ['financeiro:lancamentos:export', 'financeiro:fluxo:export', 'financeiro:dre:export', 'financeiro:relatorio-socios:export', 'financeiro:pagar:export', 'financeiro:receber:export', 'financeiro:contas:export', 'financeiro:cadastros:export', 'financeiro:projecao:export', 'financeiro:kpis:export', 'financeiro:auditoria:export', 'financeiro:comparativo:export', 'financeiro:orcamento:export'],
   'users:manage': ['configuracoes:usuarios:view', 'configuracoes:usuarios:create', 'configuracoes:usuarios:edit', 'configuracoes:usuarios:delete', 'configuracoes:usuarios:manage'],
-  'settings:manage': ['configuracoes:geral:view', 'configuracoes:geral:manage', 'configuracoes:salmon:view', 'configuracoes:salmon:manage'],
+  'settings:manage': ['configuracoes:geral:view', 'configuracoes:geral:manage', 'configuracoes:integracoes:view', 'configuracoes:integracoes:manage', 'configuracoes:salmon:view', 'configuracoes:salmon:manage'],
   'system:admin': ['system:global:manage', 'configuracoes:auditoria-sistema:view', 'configuracoes:performance:view', 'configuracoes:auditoria-seguranca:view', 'configuracoes:auditoria-compras:view'],
 };

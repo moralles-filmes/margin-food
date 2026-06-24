@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Pencil, Trash2, Package, Building2, Info, Table2, BarChart3, Wand2, ShoppingCart, PackageCheck } from 'lucide-react';
+import { Pencil, Trash2, Package, Building2, Info, Table2, BarChart3, Wand2, ShoppingCart, PackageCheck, MessageCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCan } from '@/permissions/hooks';
 import { formatMoneyBR } from '@/lib/formatters';
@@ -12,6 +12,7 @@ import type { Cotacao, CotacaoItem, CotacaoFornecedor, CotacaoResposta } from '@
 import CotacaoRespostasMatrix from './CotacaoRespostasMatrix';
 import CotacaoComparativoTable from './CotacaoComparativoTable';
 import CotacaoSugestaoInteligente from './CotacaoSugestaoInteligente';
+import CotacaoWhatsappPanel from './CotacaoWhatsappPanel';
 
 type CotacaoDetail = { itens: CotacaoItem[]; fornecedores: CotacaoFornecedor[]; respostas: CotacaoResposta[] };
 
@@ -139,12 +140,13 @@ export default function CotacaoDetailDrawer({ cotacao, store, onClose, onEdit, o
             </div>
 
             <Tabs defaultValue="itens" className="w-full mt-4">
-              <TabsList className="w-full grid grid-cols-5 h-8 bg-secondary/50">
+              <TabsList className="w-full grid grid-cols-6 h-8 bg-secondary/50">
                 <TabsTrigger value="itens" className="text-[10px] gap-1"><Package className="w-3 h-3" /> Itens</TabsTrigger>
                 <TabsTrigger value="fornecedores" className="text-[10px] gap-1"><Building2 className="w-3 h-3" /> Forn.</TabsTrigger>
                 <TabsTrigger value="respostas" className="text-[10px] gap-1"><Table2 className="w-3 h-3" /> Respostas</TabsTrigger>
                 <TabsTrigger value="comparativo" className="text-[10px] gap-1"><BarChart3 className="w-3 h-3" /> Comparar</TabsTrigger>
                 <TabsTrigger value="sugestao" className="text-[10px] gap-1"><Wand2 className="w-3 h-3" /> Sugestão</TabsTrigger>
+                <TabsTrigger value="whatsapp" className="text-[10px] gap-1"><MessageCircle className="w-3 h-3" /> Zap</TabsTrigger>
               </TabsList>
 
               <TabsContent value="itens" className="space-y-1.5 mt-3">
@@ -205,6 +207,17 @@ export default function CotacaoDetailDrawer({ cotacao, store, onClose, onEdit, o
                       onSaved={() => load(cotacao.id)}
                     />}
               </TabsContent>
+
+              <TabsContent value="whatsapp" className="mt-3">
+                {loading || !detail ? <div className="h-24 bg-secondary/40 rounded-lg animate-pulse" />
+                  : <CotacaoWhatsappPanel
+                      cotacao={cotacao}
+                      itens={detail.itens}
+                      fornecedores={detail.fornecedores}
+                      store={store}
+                      onChanged={() => load(cotacao.id)}
+                    />}
+              </TabsContent>
             </Tabs>
 
             <div className="mt-4 flex items-start gap-2 text-[11px] text-muted-foreground bg-secondary/30 rounded-lg p-2.5">
@@ -214,7 +227,7 @@ export default function CotacaoDetailDrawer({ cotacao, store, onClose, onEdit, o
                   ? 'Sugestão salva — clique em "Converter em pedido(s)" para gerar 1 pedido por fornecedor vencedor com os itens selecionados.'
                   : isConverted
                     ? 'Cotação convertida. Os pedidos gerados aparecem em Compras → Pedidos & Mercado.'
-                    : 'Salve uma sugestão na aba Sugestão para habilitar a conversão em pedido(s). Envio por WhatsApp e IA chegam nas próximas fases.'}
+                    : 'Salve uma sugestão na aba Sugestão para habilitar a conversão em pedido(s). Envie mensagens aos fornecedores na aba Zap. A IA chega na próxima fase.'}
               </span>
             </div>
           </>
