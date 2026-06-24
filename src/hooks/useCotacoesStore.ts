@@ -262,6 +262,22 @@ export function useCotacoesStore() {
     return data as { success: boolean; status?: string; log_id?: string | null; message?: string };
   }, [fetchCotacoes]);
 
+  /**
+   * Assistente de IA da Cotação (Edge Function `cotacao-ia`, chave por empresa).
+   * task='gerar_mensagem' (com tipo) ou 'analise_precos'. Read-only — só retorna texto.
+   */
+  const runIA = useCallback(async (payload: {
+    cotacao_id: string;
+    task: 'gerar_mensagem' | 'analise_precos';
+    fornecedor_id?: string | null;
+    tipo?: CotacaoWhatsappTipo;
+    allow_competitor_context?: boolean;
+  }) => {
+    const { data, error: err } = await supabase.functions.invoke('cotacao-ia', { body: payload });
+    if (err) throw err;
+    return data as { success: boolean; text?: string; message?: string; provider?: string; model?: string };
+  }, []);
+
   /** Logs de WhatsApp de uma cotação (mais recentes primeiro). */
   const fetchWhatsappLogs = useCallback(async (cotacaoId: string): Promise<CotacaoWhatsappLog[]> => {
     const { data, error: err } = await db
@@ -305,5 +321,6 @@ export function useCotacoesStore() {
     convertToPurchaseOrders,
     sendWhatsapp,
     fetchWhatsappLogs,
+    runIA,
   };
 }

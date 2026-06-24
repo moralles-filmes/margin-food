@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
-import { Send, RefreshCw, Check, AlertTriangle, Clock, MessageCircle } from 'lucide-react';
+import { Send, RefreshCw, Check, AlertTriangle, Clock, MessageCircle, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCan } from '@/permissions';
 import { buildTemplateContext, renderTemplate, WHATSAPP_TIPO_LABEL } from '@/lib/cotacaoTemplates';
@@ -33,6 +33,7 @@ export default function CotacaoWhatsappPanel({ cotacao, itens, fornecedores, sto
   const [phone, setPhone] = useState('');
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
+  const [generatingIA, setGeneratingIA] = useState(false);
   const [logs, setLogs] = useState<CotacaoWhatsappLog[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
 
@@ -86,6 +87,25 @@ export default function CotacaoWhatsappPanel({ cotacao, itens, fornecedores, sto
     }
   };
 
+  const handleGenerateIA = async () => {
+    if (!forn) { toast.error('Selecione um fornecedor'); return; }
+    setGeneratingIA(true);
+    try {
+      const res = await store.runIA({ cotacao_id: cotacao.id, task: 'gerar_mensagem', fornecedor_id: forn.id, tipo });
+      if (res?.success && res.text) {
+        setMessage(res.text);
+        toast.success('Mensagem gerada pela IA');
+      } else {
+        toast.error(res?.message ?? 'Não foi possível gerar a mensagem');
+      }
+    } catch (err: any) {
+      console.error('[CotacaoWhatsappPanel.handleGenerateIA]', err);
+      toast.error(err?.message?.includes('PERMISSION') ? 'Sem permissão para usar a IA' : 'Erro ao gerar mensagem');
+    } finally {
+      setGeneratingIA(false);
+    }
+  };
+
   if (fornecedores.length === 0) {
     return <p className="text-xs text-muted-foreground text-center py-6">Adicione fornecedores para enviar mensagens.</p>;
   }
@@ -122,7 +142,15 @@ export default function CotacaoWhatsappPanel({ cotacao, itens, fornecedores, sto
         </div>
 
         <div className="space-y-1">
-          <label className="text-[10px] uppercase text-muted-foreground">Mensagem</label>
+          <div className="flex items-center justify-between">
+            <label className="text-[10px] uppercase text-muted-foreground">Mensagem</label>
+            {canSend && (
+              <button onClick={handleGenerateIA} disabled={generatingIA}
+                className="text-[10px] text-primary hover:underline flex items-center gap-1 disabled:opacity-50">
+                <Sparkles className={`w-3 h-3 ${generatingIA ? 'animate-pulse' : ''}`} /> {generatingIA ? 'Gerando…' : 'Gerar com IA'}
+              </button>
+            )}
+          </div>
           <Textarea value={message} onChange={e => setMessage(e.target.value)} rows={7} disabled={!canSend}
             className="text-xs bg-secondary border-border resize-y" />
         </div>

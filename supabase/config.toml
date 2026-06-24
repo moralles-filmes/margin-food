@@ -15,6 +15,9 @@ verify_jwt = false
 [functions.send-whatsapp-zapi]
 verify_jwt = false
 
+[functions.cotacao-ia]
+verify_jwt = false
+
 [functions.admin-users]
 verify_jwt = false
 
