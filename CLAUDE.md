@@ -181,6 +181,7 @@ margin-food/
 - **Commits**: `tipo(escopo): descrição` — ex: `fix(estoque): corrige timeout no catálogo`
 - **Idioma do código**: inglês para variáveis/funções, português para UI e comentários de negócio
 - **Migrações**: sempre criar novo arquivo em `supabase/migrations/` com timestamp `YYYYMMDDHHMMSS_nome.sql`
+- **GRANTs obrigatórios em toda nova tabela**: toda migration que cria tabela DEVE incluir `GRANT ALL ON TABLE public.<tabela> TO authenticated, service_role;` — sem isso, PostgREST retorna "permission denied" nos SELECTs diretos do cliente, mesmo com RLS policy permissiva. RPCs `SECURITY DEFINER` mascaram o problema (escrita funciona), mas leituras diretas falham silenciosamente (lista vazia, sem toast de erro). Incidente confirmado: tabelas de cotação criadas em 2026-06-24 sem GRANTs → cotação criada mas lista sempre vazia. Corrigido em migration `20260624200000`.
 - **Permissões novas**: sempre adicionar em `src/permissions/registry.ts` + rodar `rpc_sync_permissions_from_registry()`
 - **Sem mock de banco**: testes de integração sempre usam banco real
 - **Sem amend em commits públicos**: sempre criar novo commit
