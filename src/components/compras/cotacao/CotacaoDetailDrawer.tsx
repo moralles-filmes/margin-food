@@ -2,13 +2,17 @@ import { useState, useEffect, useCallback } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Pencil, Trash2, Package, Building2, Info } from 'lucide-react';
+import { Pencil, Trash2, Package, Building2, Info, Table2, BarChart3 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCan } from '@/permissions/hooks';
 import { formatMoneyBR } from '@/lib/formatters';
 import { mapCotacaoError } from '@/lib/cotacaoErrors';
 import type { useCotacoesStore } from '@/hooks/useCotacoesStore';
-import type { Cotacao, CotacaoItem, CotacaoFornecedor } from '@/types/cotacao';
+import type { Cotacao, CotacaoItem, CotacaoFornecedor, CotacaoResposta } from '@/types/cotacao';
+import CotacaoRespostasMatrix from './CotacaoRespostasMatrix';
+import CotacaoComparativoTable from './CotacaoComparativoTable';
+
+type CotacaoDetail = { itens: CotacaoItem[]; fornecedores: CotacaoFornecedor[]; respostas: CotacaoResposta[] };
 
 const FORN_STATUS_LABEL: Record<string, string> = {
   AGUARDANDO: 'Aguardando', ENVIADO: 'Enviado', RESPONDIDO: 'Respondido',
@@ -23,10 +27,12 @@ interface CotacaoDetailDrawerProps {
   onDeleted: () => void;
 }
 
+
+
 export default function CotacaoDetailDrawer({ cotacao, store, onClose, onEdit, onDeleted }: CotacaoDetailDrawerProps) {
   const canEdit = useCan('compras:cotacao:edit');
   const canDelete = useCan('compras:cotacao:delete');
-  const [detail, setDetail] = useState<{ itens: CotacaoItem[]; fornecedores: CotacaoFornecedor[] } | null>(null);
+  const [detail, setDetail] = useState<CotacaoDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -66,7 +72,7 @@ export default function CotacaoDetailDrawer({ cotacao, store, onClose, onEdit, o
 
   return (
     <Sheet open={!!cotacao} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
+      <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
         {cotacao && (
           <>
             <SheetHeader>
@@ -96,9 +102,11 @@ export default function CotacaoDetailDrawer({ cotacao, store, onClose, onEdit, o
             </div>
 
             <Tabs defaultValue="itens" className="w-full mt-4">
-              <TabsList className="w-full grid grid-cols-2 h-8 bg-secondary/50">
+              <TabsList className="w-full grid grid-cols-4 h-8 bg-secondary/50">
                 <TabsTrigger value="itens" className="text-[11px] gap-1"><Package className="w-3 h-3" /> Itens</TabsTrigger>
-                <TabsTrigger value="fornecedores" className="text-[11px] gap-1"><Building2 className="w-3 h-3" /> Fornecedores</TabsTrigger>
+                <TabsTrigger value="fornecedores" className="text-[11px] gap-1"><Building2 className="w-3 h-3" /> Forn.</TabsTrigger>
+                <TabsTrigger value="respostas" className="text-[11px] gap-1"><Table2 className="w-3 h-3" /> Respostas</TabsTrigger>
+                <TabsTrigger value="comparativo" className="text-[11px] gap-1"><BarChart3 className="w-3 h-3" /> Comparativo</TabsTrigger>
               </TabsList>
 
               <TabsContent value="itens" className="space-y-1.5 mt-3">
@@ -127,6 +135,24 @@ export default function CotacaoDetailDrawer({ cotacao, store, onClose, onEdit, o
                       </span>
                     </div>
                   ))}
+              </TabsContent>
+
+              <TabsContent value="respostas" className="mt-3">
+                {loading || !detail ? <div className="h-24 bg-secondary/40 rounded-lg animate-pulse" />
+                  : <CotacaoRespostasMatrix
+                      cotacaoId={cotacao.id}
+                      itens={detail.itens}
+                      fornecedores={detail.fornecedores}
+                      respostas={detail.respostas}
+                      store={store}
+                      canEdit={canEdit && cotacao.status !== 'CONVERTIDA' && cotacao.status !== 'CANCELADA'}
+                      onSaved={() => load(cotacao.id)}
+                    />}
+              </TabsContent>
+
+              <TabsContent value="comparativo" className="mt-3">
+                {loading || !detail ? <div className="h-24 bg-secondary/40 rounded-lg animate-pulse" />
+                  : <CotacaoComparativoTable itens={detail.itens} fornecedores={detail.fornecedores} respostas={detail.respostas} />}
               </TabsContent>
             </Tabs>
 
