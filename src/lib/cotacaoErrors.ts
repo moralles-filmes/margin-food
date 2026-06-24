@@ -7,7 +7,8 @@ export function mapCotacaoError(err: unknown): string {
     return 'A cotação foi alterada por outra pessoa. Recarregue e tente novamente.';
   }
   if (msg.includes('STATUS_INVALIDO')) {
-    return 'Esta cotação não pode mais ser editada no status atual.';
+    const m = msg.match(/\(([^)]+)\)/); // motivo entre parênteses do servidor
+    return m ? `Ação indisponível: ${m[1]}.` : 'Esta cotação não pode mais ser editada no status atual.';
   }
   if (msg.includes('PERMISSION_DENIED')) {
     return 'Você não tem permissão para esta ação.';
