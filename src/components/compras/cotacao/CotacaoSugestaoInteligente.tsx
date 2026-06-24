@@ -129,7 +129,7 @@ export default function CotacaoSugestaoInteligente({ cotacaoId, itens, fornecedo
             </div>
             <div className="bg-card border border-border rounded-lg p-2">
               <div className="flex items-center gap-1 text-[9px] uppercase text-muted-foreground"><TrendingDown className="w-3 h-3" /> Economia</div>
-              <div className="text-sm font-bold text-emerald-600 dark:text-emerald-400">{formatMoneyBR(scenario.economia)}</div>
+              <div className="text-sm font-bold text-success">{formatMoneyBR(scenario.economia)}</div>
             </div>
             <div className="bg-card border border-border rounded-lg p-2">
               <div className="flex items-center gap-1 text-[9px] uppercase text-muted-foreground"><Users className="w-3 h-3" /> Fornecedores</div>
@@ -138,7 +138,7 @@ export default function CotacaoSugestaoInteligente({ cotacaoId, itens, fornecedo
           </div>
 
           {overridden && (
-            <div className="flex items-center justify-between text-[11px] text-amber-600 dark:text-amber-400 bg-amber-500/10 rounded-lg px-2.5 py-1.5">
+            <div className="flex items-center justify-between text-[11px] text-warning bg-warning/10 rounded-lg px-2.5 py-1.5">
               <span className="flex items-center gap-1"><Wand2 className="w-3 h-3" /> Ajuste manual aplicado</span>
               <button onClick={() => setOverrides({})} className="flex items-center gap-1 hover:underline"><RotateCcw className="w-3 h-3" /> Restaurar cenário</button>
             </div>
@@ -150,7 +150,7 @@ export default function CotacaoSugestaoInteligente({ cotacaoId, itens, fornecedo
               <div key={s.supplierId} className="bg-card border border-border rounded-lg p-2.5">
                 <div className="flex items-center justify-between gap-2 mb-1.5">
                   <span className="text-sm font-semibold text-foreground truncate">{s.nome}</span>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full inline-flex items-center gap-1 ${s.minOrder <= 0 || s.meetsMin ? 'bg-success/15 text-success' : 'bg-amber-500/15 text-amber-600 dark:text-amber-400'}`}>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full inline-flex items-center gap-1 ${s.minOrder <= 0 || s.meetsMin ? 'bg-success/15 text-success' : 'bg-warning/15 text-warning'}`}>
                     {s.minOrder <= 0 ? 'sem mínimo' : s.meetsMin ? <><Check className="w-3 h-3" /> bate mínimo</> : <><AlertTriangle className="w-3 h-3" /> abaixo do mínimo</>}
                   </span>
                 </div>
@@ -181,7 +181,7 @@ export default function CotacaoSugestaoInteligente({ cotacaoId, itens, fornecedo
                 {scenario.reallocations.map(r => (
                   <div key={r.itemId} className="flex items-center gap-1 text-[11px] text-foreground">
                     <span className="truncate flex-1">{r.nome}: {r.fromNome} <ArrowRight className="w-3 h-3 inline" /> {r.toNome}</span>
-                    <span className={`shrink-0 ${r.delta > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                    <span className={`shrink-0 ${r.delta > 0 ? 'text-warning' : 'text-success'}`}>
                       {r.delta > 0 ? '+' : ''}{formatMoneyBR(r.delta)}
                     </span>
                   </div>
@@ -191,7 +191,7 @@ export default function CotacaoSugestaoInteligente({ cotacaoId, itens, fornecedo
           )}
 
           {scenario.warnings.map((w, i) => (
-            <div key={i} className="flex items-start gap-1.5 text-[11px] text-amber-600 dark:text-amber-400">
+            <div key={i} className="flex items-start gap-1.5 text-[11px] text-warning">
               <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" /><span>{w}</span>
             </div>
           ))}

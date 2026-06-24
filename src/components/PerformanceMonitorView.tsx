@@ -102,7 +102,7 @@ export default function PerformanceMonitorView() {
               {lastRefresh.map((mv, i) => (
                 <div key={i} className="bg-muted/50 rounded-lg p-3 text-center">
                   <p className="text-[10px] font-mono text-muted-foreground truncate">{mv.view?.replace('mv_', '')}</p>
-                  <p className={`text-sm font-bold ${mv.ms > 800 ? 'text-destructive' : mv.ms > 300 ? 'text-amber-500' : 'text-emerald-500'}`}>
+                  <p className={`text-sm font-bold ${mv.ms > 800 ? 'text-destructive' : mv.ms > 300 ? 'text-warning' : 'text-success'}`}>
                     {mv.ms?.toFixed(0)}ms
                   </p>
                 </div>
@@ -116,7 +116,7 @@ export default function PerformanceMonitorView() {
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-sm flex items-center gap-2">
-            <Zap className="w-4 h-4 text-amber-500" /> Slow Queries ({slowEvents.length})
+            <Zap className="w-4 h-4 text-warning" /> Slow Queries ({slowEvents.length})
             <Badge variant="outline" className="text-[9px] ml-auto">Threshold: 800ms</Badge>
           </CardTitle>
         </CardHeader>
@@ -147,7 +147,7 @@ export default function PerformanceMonitorView() {
                       <Badge variant="outline" className="text-[9px]">{ev.metadata?.type || '—'}</Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <span className={`text-xs font-bold ${(ev.metadata?.duration_ms || 0) > 2000 ? 'text-destructive' : 'text-amber-500'}`}>
+                      <span className={`text-xs font-bold ${(ev.metadata?.duration_ms || 0) > 2000 ? 'text-destructive' : 'text-warning'}`}>
                         {ev.metadata?.duration_ms?.toFixed(0) || '—'}ms
                       </span>
                     </TableCell>

@@ -106,7 +106,7 @@ export default function ExportListaContagemModal({
                   Lista cega evita viés na contagem (recomendado).
                 </p>
               ) : (
-                <p className="text-[11px] text-amber-600">
+                <p className="text-[11px] text-warning">
                   O conferente verá o saldo esperado — pode influenciar a contagem.
                 </p>
               )}
@@ -120,7 +120,7 @@ export default function ExportListaContagemModal({
 
           {/* Alerta quando saldo habilitado */}
           {mostrarSaldo && (
-            <div className="flex gap-2 rounded-lg border border-amber-300/50 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-700/30 p-3 text-xs text-amber-700 dark:text-amber-400">
+            <div className="flex gap-2 rounded-lg border border-warning/30 bg-warning/10 p-3 text-xs text-warning">
               <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
               <span>
                 A lista cega é a melhor prática para auditorias — sem ver o saldo, o conferente

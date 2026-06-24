@@ -36,15 +36,15 @@ type SystemBug = {
 
 const SEVERITY_COLORS: Record<string, string> = {
   critical: 'bg-destructive/15 text-destructive border-destructive/30',
-  high: 'bg-orange-500/15 text-orange-600 border-orange-500/30',
-  medium: 'bg-yellow-500/15 text-yellow-600 border-yellow-500/30',
+  high: 'bg-warning/15 text-warning border-warning/30',
+  medium: 'bg-warning/15 text-warning border-warning/30',
   low: 'bg-muted text-muted-foreground border-border',
 };
 
 const STATUS_COLORS: Record<string, string> = {
   open: 'bg-destructive/10 text-destructive',
-  in_progress: 'bg-blue-500/10 text-blue-600',
-  fixed: 'bg-emerald-500/10 text-emerald-600',
+  in_progress: 'bg-info/10 text-info',
+  fixed: 'bg-success/10 text-success',
   validated: 'bg-primary/10 text-primary',
 };
 

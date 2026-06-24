@@ -212,7 +212,7 @@ export default function AccessManagementCard() {
                       <td className="py-2 px-2 text-foreground">{u.name || '—'}</td>
                       <td className="py-2 px-2 text-center">
                         {u.is_super_admin ? (
-                          <span className="text-emerald-500 font-semibold">SIM</span>
+                          <span className="text-success font-semibold">SIM</span>
                         ) : (
                           <span className="text-muted-foreground">NÃO</span>
                         )}
@@ -251,7 +251,7 @@ export default function AccessManagementCard() {
                     <span className="text-muted-foreground whitespace-nowrap">
                       {new Date(log.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                     </span>
-                    <span className={`font-semibold ${log.action === 'SET_SUPER_ADMIN' ? 'text-emerald-500' : log.action.includes('CREATED') || log.action.includes('INVITED') ? 'text-blue-500' : 'text-destructive'}`}>
+                    <span className={`font-semibold ${log.action === 'SET_SUPER_ADMIN' ? 'text-success' : log.action.includes('CREATED') || log.action.includes('INVITED') ? 'text-info' : 'text-destructive'}`}>
                       {log.action}
                     </span>
                     <span className="text-foreground truncate">{log.target_email}</span>

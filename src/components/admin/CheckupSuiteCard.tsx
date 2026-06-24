@@ -26,7 +26,7 @@ const SECTION_LABELS: Record<string, string> = {
 };
 
 const STATUS_ICON: Record<string, React.ReactNode> = {
-  PASS: <CheckCircle2 className="w-4 h-4 text-emerald-500" />,
+  PASS: <CheckCircle2 className="w-4 h-4 text-success" />,
   FAIL: <XCircle className="w-4 h-4 text-destructive" />,
   SKIPPED: <MinusCircle className="w-4 h-4 text-muted-foreground" />,
 };
@@ -315,7 +315,7 @@ export default function CheckupSuiteCard() {
           <Stethoscope className="w-4 h-4" /> Checkup Suite
           {overallStatus && (
             <span className={`ml-2 text-xs px-2 py-0.5 rounded-full font-medium ${
-              overallStatus === 'ALL PASS' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-destructive/10 text-destructive'
+              overallStatus === 'ALL PASS' ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'
             }`}>
               {overallStatus}
             </span>

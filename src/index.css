@@ -14,115 +14,137 @@
 
 @layer base {
   :root {
-    --background: 230 40% 98%;
-    --foreground: 222 47% 11%;
+    /* Premium Black / White / Gold — LIGHT */
+    --background: 44 41% 95%;        /* #F7F4EC off-white quente */
+    --foreground: 0 0% 9%;          /* #171717 */
 
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card-foreground: 0 0% 9%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
+    --popover-foreground: 0 0% 9%;
 
-    --primary: 221 83% 53%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 43 89% 38%;          /* #B8860B dourado (light) */
+    --primary-foreground: 0 0% 9%;  /* quase-preto: texto sobre dourado */
 
-    --secondary: 226 40% 94%;
-    --secondary-foreground: 222 47% 11%;
+    --secondary: 44 30% 92%;
+    --secondary-foreground: 0 0% 9%;
 
-    --muted: 226 40% 94%;
-    --muted-foreground: 215 25% 40%;
+    --muted: 44 30% 92%;
+    --muted-foreground: 0 0% 32%;   /* #525252 */
 
-    --accent: 226 40% 94%;
-    --accent-foreground: 222 47% 11%;
+    --accent: 44 60% 90%;
+    --accent-foreground: 0 0% 9%;
 
-    --destructive: 0 84% 60%;
+    --destructive: 0 74% 42%;       /* #B91C1C */
     --destructive-foreground: 0 0% 100%;
 
-    --success: 160 84% 39%;
+    --success: 142 72% 29%;         /* #15803D */
     --success-foreground: 0 0% 100%;
 
-    --warning: 38 92% 50%;
-    --warning-foreground: 222 47% 11%;
+    --warning: 26 90% 37%;          /* #B45309 */
+    --warning-foreground: 0 0% 100%;
 
-    --info: 221 83% 53%;
+    --info: 215 19% 35%;            /* #475569 slate — desacoplado do primary */
     --info-foreground: 0 0% 100%;
 
-    --border: 220 30% 91%;
-    --input: 220 30% 91%;
-    --ring: 221 83% 53%;
+    --border: 44 20% 86%;
+    --input: 44 20% 84%;
+    --ring: 43 89% 38%;             /* foco dourado */
 
     --radius: 1rem;
 
-    --sidebar-background: 230 40% 98%;
-    --sidebar-foreground: 222 47% 11%;
-    --sidebar-primary: 221 83% 53%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 226 40% 94%;
-    --sidebar-accent-foreground: 222 47% 11%;
+    --sidebar-background: 44 52% 96%;   /* #FAF7EF */
+    --sidebar-foreground: 0 0% 9%;
+    --sidebar-primary: 43 89% 38%;
+    --sidebar-primary-foreground: 0 0% 9%;
+    --sidebar-accent: 44 60% 90%;
+    --sidebar-accent-foreground: 0 0% 9%;
     --sidebar-border: transparent;
-    --sidebar-ring: 221 83% 53%;
+    --sidebar-ring: 43 89% 38%;
 
-    --gradient-salmon: linear-gradient(135deg, hsl(221, 83%, 53%), hsl(221, 83%, 43%));
-    --gradient-gold: linear-gradient(135deg, hsl(38, 92%, 50%), hsl(30, 85%, 45%));
-    --gradient-card: linear-gradient(145deg, hsl(0, 0%, 100%), hsl(230, 40%, 99%));
-    --gradient-surface: linear-gradient(180deg, hsl(230, 40%, 98%), hsl(230, 40% ,96%));
-    --shadow-glow: 0 0 30px -5px hsl(221 83% 53% / 0.1);
+    /* Premium tokens */
+    --surface-elevated: 43 100% 99%;        /* #FFFDF8 */
+    --sidebar-hover: 40 60% 38%;            /* gold-dark — usado via /[0.08] */
+    --sidebar-active: 46 65% 52%;           /* gold — usado via /[0.14] */
+    --sidebar-active-foreground: 0 0% 9%;   /* quase-preto: dourado como texto reprova AA no claro */
+    --gold: 43 89% 38%;
+    --gold-light: 44 81% 71%;               /* #F1D27A */
+    --gold-dark: 40 60% 38%;                /* #9A7426 */
+    --gold-foreground: 0 0% 9%;
+
+    --gradient-salmon: linear-gradient(135deg, hsl(43 89% 38%), hsl(40 60% 38%));
+    --gradient-gold: linear-gradient(135deg, hsl(44 81% 71%), hsl(43 89% 38%));
+    --gradient-card: linear-gradient(145deg, hsl(0 0% 100%), hsl(43 100% 99%));
+    --gradient-surface: linear-gradient(180deg, hsl(44 41% 95%), hsl(44 41% 93%));
+    --shadow-glow: 0 0 30px -5px hsl(43 89% 38% / 0.12);
     --shadow-card: 0 10px 15px -3px rgb(0 0 0 / 0.04), 0 4px 6px -4px rgb(0 0 0 / 0.04);
   }
 
   .dark {
-    --background: 222 47% 5%;
-    --foreground: 210 40% 98%;
+    /* Premium Black / White / Gold — DARK */
+    --background: 240 10% 4%;        /* #09090B */
+    --foreground: 60 18% 97%;        /* #F8F8F5 branco quente */
 
-    --card: 222 47% 10%;
-    --card-foreground: 210 40% 98%;
+    --card: 240 6% 7%;               /* #111113 */
+    --card-foreground: 60 18% 97%;
 
-    --popover: 222 47% 10%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 240 6% 7%;
+    --popover-foreground: 60 18% 97%;
 
-    --primary: 217 91% 60%;
-    --primary-foreground: 222 47% 11%;
+    --primary: 46 65% 52%;           /* #D4AF37 dourado (dark) */
+    --primary-foreground: 240 10% 4%;/* quase-preto: texto sobre dourado */
 
-    --secondary: 222 47% 15%;
-    --secondary-foreground: 210 40% 90%;
+    --secondary: 0 0% 9%;            /* #171717 elevado */
+    --secondary-foreground: 60 18% 97%;
 
-    --muted: 222 47% 15%;
-    --muted-foreground: 215 20% 65%;
+    --muted: 0 0% 9%;
+    --muted-foreground: 60 8% 69%;   /* #B6B6AA */
 
-    --accent: 222 47% 15%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 0 0% 11%;
+    --accent-foreground: 60 18% 97%;
 
-    --destructive: 0 72% 51%;
+    --destructive: 0 84% 60%;        /* #EF4444 */
     --destructive-foreground: 0 0% 100%;
 
-    --success: 158 64% 52%;
-    --success-foreground: 222 47% 11%;
+    --success: 142 71% 45%;          /* #22C55E */
+    --success-foreground: 240 10% 4%;
 
-    --warning: 38 92% 50%;
-    --warning-foreground: 222 47% 11%;
+    --warning: 38 92% 50%;           /* #F59E0B */
+    --warning-foreground: 240 10% 4%;
 
-    --info: 217 91% 60%;
-    --info-foreground: 222 47% 11%;
+    --info: 215 16% 47%;             /* #64748B slate — desacoplado */
+    --info-foreground: 0 0% 100%;
 
-    --border: 222 47% 18%;
-    --input: 222 47% 18%;
-    --ring: 217 91% 60%;
+    --border: 240 5% 14%;            /* hairline escuro sutil — nunca branco puro */
+    --input: 240 5% 17%;
+    --ring: 46 65% 52%;              /* foco dourado */
 
-    --sidebar-background: 222 47% 3%;
-    --sidebar-foreground: 210 40% 92%;
-    --sidebar-primary: 217 91% 60%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 222 47% 8%;
-    --sidebar-accent-foreground: 210 40% 92%;
+    --sidebar-background: 240 9% 2%; /* #050506 */
+    --sidebar-foreground: 60 18% 97%;
+    --sidebar-primary: 46 65% 52%;
+    --sidebar-primary-foreground: 240 10% 4%;
+    --sidebar-accent: 0 0% 9%;
+    --sidebar-accent-foreground: 60 18% 97%;
     --sidebar-border: transparent;
-    --sidebar-ring: 217 91% 60%;
+    --sidebar-ring: 46 65% 52%;
 
-    --gradient-salmon: linear-gradient(135deg, hsl(217, 91%, 60%), hsl(217, 91%, 50%));
-    --gradient-gold: linear-gradient(135deg, hsl(38, 92%, 50%), hsl(30, 85%, 45%));
-    --gradient-card: linear-gradient(145deg, hsl(222, 47% , 12%), hsl(222, 47%, 9%));
-    --gradient-surface: linear-gradient(180deg, hsl(222, 47%, 5%), hsl(222, 47%, 3%));
-    --shadow-glow: 0 0 30px -5px hsl(217 91% 60% / 0.15);
-    --shadow-card: 0 10px 25px -5px rgb(0 0 0 / 0.3), 0 8px 10px -6px rgb(0 0 0 / 0.3);
+    /* Premium tokens */
+    --surface-elevated: 0 0% 9%;     /* #171717 */
+    --sidebar-hover: 46 65% 52%;     /* gold — usado via /[0.08] */
+    --sidebar-active: 46 65% 52%;    /* gold — usado via /[0.14] */
+    --sidebar-active-foreground: 44 81% 71%; /* gold-light: contraste no escuro */
+    --gold: 46 65% 52%;
+    --gold-light: 44 81% 71%;
+    --gold-dark: 40 60% 38%;
+    --gold-foreground: 240 10% 4%;
+
+    --gradient-salmon: linear-gradient(135deg, hsl(46 65% 52%), hsl(40 60% 38%));
+    --gradient-gold: linear-gradient(135deg, hsl(44 81% 71%), hsl(46 65% 52%));
+    --gradient-card: linear-gradient(145deg, hsl(0 0% 9%), hsl(240 6% 7%));
+    --gradient-surface: linear-gradient(180deg, hsl(240 10% 4%), hsl(240 9% 2%));
+    --shadow-glow: 0 0 30px -5px hsl(46 65% 52% / 0.18);
+    --shadow-card: 0 10px 25px -5px rgb(0 0 0 / 0.4), 0 8px 10px -6px rgb(0 0 0 / 0.35);
   }
 }
 
@@ -160,10 +182,10 @@
     @apply font-medium text-foreground;
   }
   tr:hover td {
-    background-color: hsl(214 95% 93% / 0.3);
+    background-color: hsl(var(--primary) / 0.06);
   }
   .dark tr:hover td {
-    background-color: hsl(217 33% 20% / 0.3);
+    background-color: hsl(var(--primary) / 0.08);
   }
 
   ::-webkit-scrollbar {

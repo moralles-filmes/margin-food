@@ -64,19 +64,19 @@ const ACTIONS = [
 ];
 
 const ACTION_COLORS: Record<string, string> = {
-  CREATE: 'bg-emerald-500/15 text-emerald-400',
-  UPDATE: 'bg-blue-500/15 text-blue-400',
+  CREATE: 'bg-success/15 text-success',
+  UPDATE: 'bg-info/15 text-info',
   DELETE: 'bg-destructive/15 text-destructive',
-  PAY: 'bg-amber-500/15 text-amber-400',
-  RECEIVE: 'bg-emerald-500/15 text-emerald-400',
-  TRANSFER_CREATE: 'bg-violet-500/15 text-violet-400',
+  PAY: 'bg-warning/15 text-warning',
+  RECEIVE: 'bg-success/15 text-success',
+  TRANSFER_CREATE: 'bg-info/15 text-info',
   TRANSFER_DELETE: 'bg-destructive/15 text-destructive',
-  FERIAS_APPROVE: 'bg-emerald-500/15 text-emerald-400',
-  MIRROR: 'bg-blue-500/15 text-blue-400',
-  CANCEL_MIRROR: 'bg-amber-500/15 text-amber-400',
+  FERIAS_APPROVE: 'bg-success/15 text-success',
+  MIRROR: 'bg-info/15 text-info',
+  CANCEL_MIRROR: 'bg-warning/15 text-warning',
   STORNO: 'bg-destructive/15 text-destructive',
-  JOB_RUN: 'bg-violet-500/15 text-violet-400',
-  SLOW_QUERY: 'bg-amber-500/15 text-amber-400',
+  JOB_RUN: 'bg-info/15 text-info',
+  SLOW_QUERY: 'bg-warning/15 text-warning',
 };
 
 export default function GlobalAuditView() {

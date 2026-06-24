@@ -43,7 +43,7 @@ const VARIANT_STYLES: Record<string, string> = {
   success: 'bg-success/15 text-success border-success/25',
   warning: 'bg-warning/15 text-warning border-warning/25',
   danger: 'bg-destructive/15 text-destructive border-destructive/25',
-  info: 'bg-primary/15 text-primary border-primary/25',
+  info: 'bg-info/15 text-info border-info/25',
   neutral: 'bg-muted text-muted-foreground border-border',
 };
 
@@ -75,7 +75,7 @@ export default function StatusBadge({
     success: 'bg-success',
     warning: 'bg-warning',
     danger: 'bg-destructive',
-    info: 'bg-primary',
+    info: 'bg-info',
     neutral: 'bg-muted-foreground',
   }[mapped];
 

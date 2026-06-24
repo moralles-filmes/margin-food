@@ -69,7 +69,7 @@ export default function CotacaoComparativoTable({ itens, fornecedores, respostas
         </div>
         <div className="bg-card border border-border rounded-lg p-2.5">
           <div className="flex items-center gap-1 text-[10px] uppercase text-muted-foreground"><TrendingDown className="w-3 h-3" /> Economia est.</div>
-          <div className="text-sm font-bold text-emerald-600 dark:text-emerald-400">{formatMoneyBR(data.economia)}</div>
+          <div className="text-sm font-bold text-success">{formatMoneyBR(data.economia)}</div>
         </div>
         <div className="bg-card border border-border rounded-lg p-2.5">
           <div className="flex items-center gap-1 text-[10px] uppercase text-muted-foreground"><Users className="w-3 h-3" /> Fornecedores</div>
@@ -103,7 +103,7 @@ export default function CotacaoComparativoTable({ itens, fornecedores, respostas
                 {row.prices.map(p => {
                   const isBest = row.bestFornId === p.fornId && p.price != null;
                   return (
-                    <td key={p.fornId} className={`text-right px-2 py-1 ${isBest ? 'bg-emerald-500/10 font-semibold text-emerald-700 dark:text-emerald-300' : 'text-foreground'}`}>
+                    <td key={p.fornId} className={`text-right px-2 py-1 ${isBest ? 'bg-success/10 font-semibold text-success' : 'text-foreground'}`}>
                       {p.unavailable ? <span className="text-destructive text-[10px]">indisp.</span>
                         : p.price == null ? <span className="text-muted-foreground/50">—</span>
                         : formatMoneyBR(p.price)}
@@ -134,7 +134,7 @@ export default function CotacaoComparativoTable({ itens, fornecedores, respostas
                 return (
                   <td key={f.id} className="text-right px-2 py-1 text-[10px]">
                     {min > 0 ? (
-                      <span className={`inline-flex items-center gap-0.5 ${!used ? 'text-muted-foreground/50' : meets ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                      <span className={`inline-flex items-center gap-0.5 ${!used ? 'text-muted-foreground/50' : meets ? 'text-success' : 'text-warning'}`}>
                         {used && (meets ? <Check className="w-3 h-3" /> : <AlertTriangle className="w-3 h-3" />)}
                         {formatMoneyBR(min)}
                       </span>
@@ -149,7 +149,7 @@ export default function CotacaoComparativoTable({ itens, fornecedores, respostas
       </div>
 
       {data.itemsSemResposta.length > 0 && (
-        <div className="flex items-start gap-2 text-[11px] text-amber-600 dark:text-amber-400 bg-amber-500/10 rounded-lg p-2.5">
+        <div className="flex items-start gap-2 text-[11px] text-warning bg-warning/10 rounded-lg p-2.5">
           <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
           <span>Sem preço: {data.itemsSemResposta.slice(0, 6).join(', ')}{data.itemsSemResposta.length > 6 ? `… (+${data.itemsSemResposta.length - 6})` : ''}</span>
         </div>

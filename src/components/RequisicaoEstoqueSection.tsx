@@ -780,8 +780,8 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
                       </span>
                       {['ATENDIDA', 'PARCIALMENTE_ATENDIDA', 'NEGADA'].includes(req.status) && (
                         req.confirmado_pelo_solicitante_em
-                          ? <Badge variant="outline" className="text-[9px] h-4 px-1.5 text-emerald-700 border-emerald-300">✓ Visto</Badge>
-                          : <Badge variant="outline" className="text-[9px] h-4 px-1.5 text-amber-700 border-amber-300">⏱ Aguardando</Badge>
+                          ? <Badge variant="outline" className="text-[9px] h-4 px-1.5 text-success border-success/30">✓ Visto</Badge>
+                          : <Badge variant="outline" className="text-[9px] h-4 px-1.5 text-warning border-warning/30">⏱ Aguardando</Badge>
                       )}
                       {isExpanded ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />}
                     </div>
@@ -1125,8 +1125,8 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
                           </span>
                           {['ATENDIDA', 'PARCIALMENTE_ATENDIDA', 'NEGADA'].includes(req.status) && (
                             req.confirmado_pelo_solicitante_em
-                              ? <Badge variant="outline" className="text-[9px] h-4 px-1.5 text-emerald-700 border-emerald-300">✓ Visto</Badge>
-                              : <Badge variant="outline" className="text-[9px] h-4 px-1.5 text-amber-700 border-amber-300">⏱ Aguardando</Badge>
+                              ? <Badge variant="outline" className="text-[9px] h-4 px-1.5 text-success border-success/30">✓ Visto</Badge>
+                              : <Badge variant="outline" className="text-[9px] h-4 px-1.5 text-warning border-warning/30">⏱ Aguardando</Badge>
                           )}
                           {isExpanded ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />}
                         </div>

@@ -50,7 +50,7 @@ const agentes: Agente[] = [
   {
     id: 'salmao', label: 'Salmão Intelligence', icon: Fish,
     description: 'Perda, custo, manipulação e porcionamento',
-    color: 'bg-orange-500/10 text-orange-600',
+    color: 'bg-warning/10 text-warning',
     questions: [
       'Por que meu CMV salmão subiu essa semana?',
       'Estou manipulando salmão demais?',
@@ -60,7 +60,7 @@ const agentes: Agente[] = [
   {
     id: 'estoque', label: 'Estoque Geral', icon: Package,
     description: 'Giro, ruptura, cobertura e itens críticos',
-    color: 'bg-blue-500/10 text-blue-600',
+    color: 'bg-info/10 text-info',
     questions: [
       'O que preciso comprar essa semana?',
       'Tenho estoque parado?',
@@ -70,7 +70,7 @@ const agentes: Agente[] = [
   {
     id: 'cmv', label: 'Analista de CMV', icon: TrendingDown,
     description: 'Margem, meta vs realizado, ranking de impacto',
-    color: 'bg-red-500/10 text-red-600',
+    color: 'bg-destructive/10 text-destructive',
     questions: [
       'Por que meu CMV aumentou?',
       'Quais 3 itens estão destruindo minha margem?',
@@ -90,7 +90,7 @@ const agentes: Agente[] = [
   {
     id: 'ficha-tecnica', label: 'Ficha Técnica', icon: BookOpen,
     description: 'Custo por produto, markup e margem por canal',
-    color: 'bg-purple-500/10 text-purple-600',
+    color: 'bg-info/10 text-info',
     questions: [
       'Qual produto devo aumentar preço?',
       'Qual canal está com margem negativa?',
@@ -110,7 +110,7 @@ const agentes: Agente[] = [
   {
     id: 'rh', label: 'Consultor de RH', icon: UserCheck,
     description: 'Custos de pessoal, absenteísmo, escalas e compliance',
-    color: 'bg-amber-500/10 text-amber-600',
+    color: 'bg-warning/10 text-warning',
     questions: [
       'Qual o custo total de pessoal este mês?',
       'Tem funcionário com banco de horas alto?',

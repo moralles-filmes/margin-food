@@ -327,7 +327,7 @@ export default function ContaDetailDialog({
               </Button>
             )}
             {canPayOrReceive && onPay && (
-              <Button onClick={onPay} disabled={saving} className="bg-green-600 hover:bg-green-700 text-white">
+              <Button onClick={onPay} disabled={saving} className="bg-success hover:bg-success/90 text-success-foreground">
                 <DollarSign className="w-4 h-4 mr-1" />
                 {variant === 'pagar' ? 'Informar pagamento' : 'Informar recebimento'}
               </Button>

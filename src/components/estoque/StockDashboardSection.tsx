@@ -207,7 +207,7 @@ export default function StockDashboardSection({ categorias, onNavigate }: Props)
 
   const getMovIcon = (tipo: string, direction?: string | null) => {
     if (direction === 'IN' || tipo === 'ENTRADA' || tipo.includes('POSITIVO')) {
-      return <ArrowDown className="w-3.5 h-3.5 text-emerald-500" />;
+      return <ArrowDown className="w-3.5 h-3.5 text-success" />;
     }
     if (direction === 'OUT' || tipo === 'SAIDA' || tipo.includes('NEGATIVO')) {
       return <ArrowUp className="w-3.5 h-3.5 text-destructive" />;

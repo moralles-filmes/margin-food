@@ -469,8 +469,8 @@ export default function MovimentacoesSection({
                       {isCancelled && <Badge variant="outline" className="text-[8px] px-1 py-0 h-3.5 border-destructive/30 text-destructive">Cancelado</Badge>}
                       {isEstorno && <Badge variant="outline" className="text-[8px] px-1 py-0 h-3.5 border-warning/30 text-warning">Estorno</Badge>}
                       {m.justificativa_edicao && <Badge variant="outline" className="text-[8px] px-1 py-0 h-3.5 border-primary/30 text-primary">Editado</Badge>}
-                      {m.source_module === 'salmon' && <Badge variant="outline" className="text-[8px] px-1 py-0 h-3.5 border-cyan-500/30 text-cyan-600">🐟 Salmão</Badge>}
-                      {m.internal_transfer && <Badge variant="outline" className="text-[8px] px-1 py-0 h-3.5 border-indigo-500/30 text-indigo-600">Transf. Interna</Badge>}
+                      {m.source_module === 'salmon' && <Badge variant="outline" className="text-[8px] px-1 py-0 h-3.5 border-info/30 text-info">🐟 Salmão</Badge>}
+                      {m.internal_transfer && <Badge variant="outline" className="text-[8px] px-1 py-0 h-3.5 border-info/30 text-info">Transf. Interna</Badge>}
                     </div>
                     <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
                       <span>{m.data}</span>
@@ -484,7 +484,7 @@ export default function MovimentacoesSection({
                       {isEstorno && m.estorno_de_id && <span className="text-warning">(Ref: #{m.estorno_de_id.slice(0, 8)})</span>}
                       {!isEstorno && m.origem && !m.source_module && <><span>•</span><span>{m.origem}</span></>}
                       {(m as any).setor && <><span>•</span><span className="font-medium text-foreground">🏷️ {(m as any).setor}</span></>}
-                      {m.salmon_lot_id && <><span>•</span><span className="text-cyan-600">Lote: {m.salmon_lot_id}</span></>}
+                      {m.salmon_lot_id && <><span>•</span><span className="text-info">Lote: {m.salmon_lot_id}</span></>}
                       {prod?.categoria && <><span>•</span><span>{prod.categoria}</span></>}
                     </div>
                     {m.observacao && (

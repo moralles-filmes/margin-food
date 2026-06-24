@@ -224,28 +224,28 @@ export default function AppLayout({ children, activeTab, onTabChange, isOffline,
   const sidebarContent = (
     <div className="flex flex-col h-full">
       {/* Logo */}
-      <div className={`flex items-center gap-3 px-4 py-6 border-b border-sidebar-border/10 ${sidebarCollapsed ? 'justify-center px-2' : ''}`}>
+      <div className={`flex items-center gap-3 px-4 py-6 border-b border-border/60 ${sidebarCollapsed ? 'justify-center px-2' : ''}`}>
         {!sidebarCollapsed ? (
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shadow-lg shadow-primary/20 shrink-0">
-              <span className="text-white font-black text-xl tracking-tighter">M</span>
+              <span className="text-primary-foreground font-black text-xl tracking-tighter">M</span>
             </div>
             <div className="flex flex-col min-w-0">
-              <span className="text-[17px] font-black text-foreground leading-tight tracking-tight truncate">Margin <span className="text-primary font-bold">Food</span></span>
+              <span className="text-[17px] font-black text-foreground leading-tight tracking-tight truncate">Margin <span className="text-gold-dark dark:text-gold font-bold">Food</span></span>
               <span className="text-[9px] text-muted-foreground font-bold uppercase tracking-[0.2em] opacity-40 leading-none mt-0.5">{profile?.company_name || 'Margin Food'}</span>
             </div>
           </div>
         ) : (
           <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shadow-lg shadow-primary/20 shrink-0 scale-90">
-            <span className="text-white font-black text-xl tracking-tighter">M</span>
+            <span className="text-primary-foreground font-black text-xl tracking-tighter">M</span>
           </div>
         )}
 
         {!isMobile && (
           <button 
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)} 
-            className={`ml-auto text-muted-foreground hover:text-foreground transition-all duration-300 p-1.5 rounded-lg hover:bg-white/40
-              ${sidebarCollapsed ? 'rotate-180 ml-0 fixed left-12 bg-background shadow-md border border-border/50 z-[60]' : ''}`}
+            className={`ml-auto text-muted-foreground hover:text-foreground transition-all duration-300 p-1.5 rounded-lg hover:bg-sidebar-hover/[0.08]
+              ${sidebarCollapsed ? 'rotate-180 ml-0 fixed left-12 bg-card shadow-card border border-gold/25 z-[60]' : ''}`}
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
@@ -292,17 +292,17 @@ export default function AppLayout({ children, activeTab, onTabChange, isOffline,
                         className={`w-full flex items-center gap-3 rounded-xl transition-all duration-300 group relative
                           ${sidebarCollapsed ? 'justify-center px-2 py-3' : 'px-4 py-2.5'}
                           ${active
-                            ? 'bg-card text-primary font-bold shadow-card border-border/50 border scale-[1.02]'
-                            : 'text-muted-foreground hover:bg-white/40 hover:text-foreground'
+                            ? 'bg-sidebar-active/[0.14] text-sidebar-active-foreground font-semibold border border-gold/25'
+                            : 'text-muted-foreground hover:bg-sidebar-hover/[0.08] hover:text-foreground'
                           }`}
                         title={sidebarCollapsed ? item.label : undefined}
                       >
-                        <Icon className={`w-4 h-4 flex-shrink-0 transition-transform duration-300 ${active ? 'scale-110' : 'group-hover:scale-110'}`} />
+                        {active && !sidebarCollapsed && (
+                          <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-full bg-gold" />
+                        )}
+                        <Icon className={`w-4 h-4 flex-shrink-0 transition-transform duration-300 ${active ? 'scale-110 text-gold' : 'group-hover:scale-110'}`} />
                         {!sidebarCollapsed && (
                           <span className="text-[13px] truncate tracking-tight">{item.label}</span>
-                        )}
-                        {active && !sidebarCollapsed && (
-                          <div className="absolute right-3 w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
                         )}
                       </button>
                     );
@@ -423,7 +423,7 @@ export default function AppLayout({ children, activeTab, onTabChange, isOffline,
             }} />
             <div className="relative">
               <button onClick={() => setShowUserMenu(!showUserMenu)} className="w-8 h-8 rounded-full bg-primary/10 border border-border flex items-center justify-center hover:bg-primary/20 transition-colors">
-                <User className="w-4 h-4 text-primary" />
+                <User className="w-4 h-4 text-gold-dark dark:text-gold" />
               </button>
               {showUserMenu && (
                 <div className="absolute right-0 top-10 bg-card border border-border rounded-xl shadow-lg p-3 w-52 z-50 animate-scale-in">
@@ -433,7 +433,7 @@ export default function AppLayout({ children, activeTab, onTabChange, isOffline,
                     {roles.length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-1">
                         {roles.map(r => (
-                          <span key={r} className="text-[9px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
+                          <span key={r} className="text-[9px] px-1.5 py-0.5 rounded-full bg-primary/10 text-gold-dark dark:text-gold font-medium">
                             {ROLE_DISPLAY[r] || r}
                           </span>
                         ))}

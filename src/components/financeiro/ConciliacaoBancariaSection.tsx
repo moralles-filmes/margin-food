@@ -717,7 +717,7 @@ export default function ConciliacaoBancariaSection() {
   const getOriginBadge = (origin?: MatchSuggestion['origin']) => {
     if (origin === 'lancamento') return <Badge className="bg-success/10 text-success border-success/20 text-[10px]">Lançamento</Badge>;
     if (origin === 'conta_pagar') return <Badge className="bg-primary/10 text-primary border-primary/20 text-[10px]">Conta a Pagar</Badge>;
-    if (origin === 'conta_receber') return <Badge className="bg-amber-500/10 text-amber-600 border-amber-500/20 text-[10px]">Conta a Receber</Badge>;
+    if (origin === 'conta_receber') return <Badge className="bg-warning/10 text-warning border-warning/20 text-[10px]">Conta a Receber</Badge>;
     return null;
   };
 
@@ -823,7 +823,7 @@ export default function ConciliacaoBancariaSection() {
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="text-sm text-muted-foreground flex flex-wrap gap-1">
                   <Badge variant="outline" className="bg-success/10 text-success border-success/20">{matchedTotal} p/ conciliar</Badge>
-                  {withSuggestions > 0 && <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/20">{withSuggestions} com sugestões</Badge>}
+                  {withSuggestions > 0 && <Badge variant="outline" className="bg-warning/10 text-warning border-warning/20">{withSuggestions} com sugestões</Badge>}
                   <Badge variant="outline">{selecionadas.length} p/ criar</Badge>
                   {linhas.filter(l => l.jaConciliada).length > 0 && (
                     <Badge variant="outline" className="bg-muted text-muted-foreground">{linhas.filter(l => l.jaConciliada).length} já conciliada(s)</Badge>
@@ -870,7 +870,7 @@ export default function ConciliacaoBancariaSection() {
                         isJaConciliada ? 'bg-muted/30 opacity-60' :
                         isIgnorada ? 'bg-muted/30 opacity-50' :
                         hasMatch ? 'bg-success/5' :
-                        hasSuggestions ? 'bg-amber-500/5' :
+                        hasSuggestions ? 'bg-warning/5' :
                         !linha.selecionada ? 'opacity-70' : ''
                       }>
                         <TableCell>
@@ -907,7 +907,7 @@ export default function ConciliacaoBancariaSection() {
                             </span>
                           )}
                           {hasSuggestions && !isInactive && (
-                            <span className="text-[10px] text-amber-600 flex items-center gap-1 mt-0.5">
+                            <span className="text-[10px] text-warning flex items-center gap-1 mt-0.5">
                               <Search className="w-3 h-3" /> {linha.suggestions!.length} sugestão(ões) disponível(is)
                             </span>
                           )}
@@ -987,7 +987,7 @@ export default function ConciliacaoBancariaSection() {
                           ) : hasMatch ? (
                             <Badge className="bg-success/10 text-success border-success/20 text-[10px]">Conciliar c/ existente</Badge>
                           ) : hasSuggestions ? (
-                            <Badge className="bg-amber-500/10 text-amber-600 border-amber-500/20 text-[10px]">Sugestão p/ conciliar</Badge>
+                            <Badge className="bg-warning/10 text-warning border-warning/20 text-[10px]">Sugestão p/ conciliar</Badge>
                           ) : (
                             <Badge variant="outline" className="text-[10px]">Criar novo</Badge>
                           )}

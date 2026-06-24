@@ -15,10 +15,10 @@ import CotacaoDetailDrawer from './CotacaoDetailDrawer';
 
 const STATUS_META: Record<CotacaoStatus, { label: string; className: string }> = {
   RASCUNHO:    { label: 'Rascunho',     className: 'bg-secondary text-muted-foreground' },
-  EM_COTACAO:  { label: 'Em cotação',   className: 'bg-amber-500/15 text-amber-600 dark:text-amber-400' },
-  RESPONDIDA:  { label: 'Respondida',   className: 'bg-blue-500/15 text-blue-600 dark:text-blue-400' },
-  EM_ANALISE:  { label: 'Em análise',   className: 'bg-blue-500/15 text-blue-600 dark:text-blue-400' },
-  NEGOCIANDO:  { label: 'Negociando',   className: 'bg-purple-500/15 text-purple-600 dark:text-purple-400' },
+  EM_COTACAO:  { label: 'Em cotação',   className: 'bg-warning/15 text-warning' },
+  RESPONDIDA:  { label: 'Respondida',   className: 'bg-info/15 text-info' },
+  EM_ANALISE:  { label: 'Em análise',   className: 'bg-info/15 text-info' },
+  NEGOCIANDO:  { label: 'Negociando',   className: 'bg-info/15 text-info' },
   ENCERRADA:   { label: 'Encerrada',    className: 'bg-secondary text-muted-foreground' },
   CONVERTIDA:  { label: 'Convertida',   className: 'bg-success/15 text-success' },
   CANCELADA:   { label: 'Cancelada',    className: 'bg-destructive/15 text-destructive' },
@@ -107,10 +107,10 @@ export default function CotacaoView({ store }: CotacaoViewProps) {
       {/* Cards de resumo */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-2.5">
         <SummaryCard icon={FileText}      label="Em aberto"      value={String(counts.emAberto)}          tint="bg-primary/15 text-primary" />
-        <SummaryCard icon={Send}          label="Aguardando"     value={String(counts.aguardandoResposta)} tint="bg-amber-500/15 text-amber-600 dark:text-amber-400" />
-        <SummaryCard icon={ClipboardCheck} label="Em análise"    value={String(counts.emAnalise)}          tint="bg-blue-500/15 text-blue-600 dark:text-blue-400" />
+        <SummaryCard icon={Send}          label="Aguardando"     value={String(counts.aguardandoResposta)} tint="bg-warning/15 text-warning" />
+        <SummaryCard icon={ClipboardCheck} label="Em análise"    value={String(counts.emAnalise)}          tint="bg-info/15 text-info" />
         <SummaryCard icon={CheckCircle2}  label="Convertidas"    value={String(counts.convertidas)}        tint="bg-success/15 text-success" />
-        <SummaryCard icon={TrendingDown}  label="Economia (mês)" value={formatMoneyBR(counts.economiaMes)} tint="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" />
+        <SummaryCard icon={TrendingDown}  label="Economia (mês)" value={formatMoneyBR(counts.economiaMes)} tint="bg-success/15 text-success" />
       </div>
 
       {/* Busca */}

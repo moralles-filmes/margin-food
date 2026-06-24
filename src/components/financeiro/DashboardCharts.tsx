@@ -41,8 +41,15 @@ const CHART_COLORS = [
   'hsl(var(--muted-foreground))',
 ];
 
-// Fallback hex colors for Recharts (doesn't support CSS vars in all cases)
-const PIE_COLORS = ['#22c55e', '#ef4444', '#3b82f6', '#eab308', '#8b5cf6', '#14b8a6'];
+// Theme-aware categorical palette (gold-centric, no dominant blue)
+const PIE_COLORS = [
+  'hsl(var(--primary))',
+  'hsl(var(--info))',
+  'hsl(var(--warning))',
+  'hsl(var(--gold-light))',
+  'hsl(var(--success))',
+  'hsl(var(--destructive))',
+];
 
 export default function DashboardCharts() {
   const [chartData, setChartData] = useState<ChartsData | null>(null);
@@ -162,8 +169,8 @@ export default function DashboardCharts() {
                 <YAxis fontSize={11} tickFormatter={v => `${formatDecimalBR(v / 1000, 0)}k`} />
                 <Tooltip formatter={(v: number) => fmt(v)} />
                 <Legend />
-                <Bar dataKey="receitas" name="Receitas" fill="#22c55e" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="despesas" name="Despesas" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="receitas" name="Receitas" fill="hsl(var(--success))" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="despesas" name="Despesas" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -178,7 +185,7 @@ export default function DashboardCharts() {
                 <XAxis dataKey="mesLabel" fontSize={11} />
                 <YAxis fontSize={11} tickFormatter={v => `${formatDecimalBR(v / 1000, 0)}k`} />
                 <Tooltip formatter={(v: number) => fmt(v)} />
-                <Line type="monotone" dataKey="resultado" name="Resultado" stroke="#3b82f6" strokeWidth={2} dot={{ r: 4 }} />
+                <Line type="monotone" dataKey="resultado" name="Resultado" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 4 }} />
               </LineChart>
             </ResponsiveContainer>
           </CardContent>
