@@ -204,6 +204,30 @@ export function useCotacoesStore() {
     };
   }, []);
 
+  /** Persiste a sugestão escolhida (marca respostas selecionadas, status → EM_ANALISE). */
+  const saveSugestao = useCallback(async (
+    cotacaoId: string,
+    input: {
+      tipo: string;
+      total_estimado: number;
+      economia_estimada: number;
+      dados_json: unknown;
+      selecoes: { cotacao_fornecedor_id: string; cotacao_item_id: string }[];
+    },
+  ) => {
+    const { data, error: err } = await db.rpc('save_cotacao_sugestao', {
+      p_cotacao_id: cotacaoId,
+      p_tipo: input.tipo,
+      p_total_estimado: input.total_estimado,
+      p_economia_estimada: input.economia_estimada,
+      p_dados_json: input.dados_json,
+      p_selecoes: input.selecoes,
+    });
+    if (err) throw err;
+    await fetchCotacoes();
+    return data as { success: boolean; id: string };
+  }, [fetchCotacoes]);
+
   /** Salva a matriz de preços + meta dos fornecedores. */
   const saveRespostas = useCallback(async (
     cotacaoId: string,
@@ -232,5 +256,6 @@ export function useCotacoesStore() {
     deleteCotacao,
     fetchCotacaoDetail,
     saveRespostas,
+    saveSugestao,
   };
 }
