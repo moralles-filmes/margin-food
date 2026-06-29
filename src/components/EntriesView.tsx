@@ -214,12 +214,16 @@ export default function EntriesView({ store }: EntriesViewProps) {
     toast.info('Dados duplicados — edite e salve');
   };
 
-  const confirmDelete = () => {
-    if (deleteId) {
-      deleteEntry(deleteId);
+  const confirmDelete = async () => {
+    if (!deleteId) return;
+    const id = deleteId;
+    setDeleteId(null);
+    try {
+      await deleteEntry(id);
       toast.success('Entrada excluída!');
-      setDeleteId(null);
-      if (expandedId === deleteId) setExpandedId(null);
+      if (expandedId === id) setExpandedId(null);
+    } catch {
+      // deleteEntry já exibiu o toast de erro específico
     }
   };
 

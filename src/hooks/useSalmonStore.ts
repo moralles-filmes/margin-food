@@ -16,6 +16,17 @@ async function getCurrentUserId(): Promise<string | null> {
   return data?.user?.id ?? null;
 }
 
+// Detecta a mensagem "Entrada/Manipulação já cancelada." lançada pelos RPCs
+// cancel_salmon_*_atomic. Isso acontece quando o registro já foi cancelado
+// FORA do módulo de Salmão — tipicamente porque o movimento de estoque
+// vinculado foi cancelado em Movimentações, que cascateia o cancelamento para
+// o salmon_entry/manipulation (ver supabase/functions/requisicao-estoque/index.ts).
+// Nesse caso a exclusão no Salmão é um no-op idempotente: o registro já não é
+// mais válido, então removemos da lista em vez de tratar como erro.
+function isAlreadyCancelledError(message?: string | null): boolean {
+  return !!message && /j[áa]\s+cancelad[ao]/i.test(message);
+}
+
 // Map DB row → frontend SalmonEntry
 function mapDbEntry(row: any): SalmonEntry {
   return {
@@ -469,6 +480,13 @@ export function useSalmonStore() {
       p_reason: 'Entrada de salmão excluída',
     });
     if (error) {
+      // Já cancelada fora do módulo (ex.: cancelamento do movimento em Estoque):
+      // exclusão idempotente — remove da lista sem erro.
+      if (isAlreadyCancelledError(error.message)) {
+        setEntries(prev => prev.filter(e => e.id !== id));
+        emitDataEvent('salmao:entradas');
+        return;
+      }
       toast.error('Falha ao excluir entrada: ' + error.message, { duration: 6000 });
       throw new Error(error.message);
     }
@@ -569,6 +587,13 @@ export function useSalmonStore() {
       p_reason: 'Manipulação de salmão excluída',
     });
     if (error) {
+      // Já cancelada fora do módulo (ex.: cancelamento do movimento em Estoque):
+      // exclusão idempotente — remove da lista sem erro.
+      if (isAlreadyCancelledError(error.message)) {
+        setManipulations(prev => prev.filter(m => m.id !== id));
+        emitDataEvent('salmao:manipulacoes');
+        return;
+      }
       toast.error('Falha ao excluir manipulação: ' + error.message, { duration: 6000 });
       throw new Error(error.message);
     }

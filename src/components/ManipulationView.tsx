@@ -552,7 +552,7 @@ export default function ManipulationView({ store, preSelectedEntryId, onClearPre
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                      <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => { deleteManipulation(m.id); toast.success('Manipulação excluída!'); }}>Excluir</AlertDialogAction>
+                      <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={async () => { try { await deleteManipulation(m.id); toast.success('Manipulação excluída!'); } catch { /* erro já tratado no store */ } }}>Excluir</AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
