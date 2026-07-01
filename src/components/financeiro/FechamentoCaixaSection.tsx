@@ -23,7 +23,7 @@ import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { APP_NAME } from '@/lib/brand';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import * as XLSX from 'xlsx';
+import * as XLSX from '@/lib/safeXlsx';
 import { mapFinanceiroDeleteError } from '@/lib/financeiroErrorMap';
 import DateRangePresets from './DateRangePresets';
 import {

@@ -79,7 +79,7 @@ export function useCotacoesStore() {
     try {
       const { data, error: err } = await db
         .from('cotacoes')
-        .select('*')
+        .select('id, company_id, codigo, titulo, status, data_envio, data_validade, observacao, origin_type, origin_ref, total_estimado, economia_estimada, created_by, created_at, updated_at, deleted_at, deleted_by')
         .is('deleted_at', null)
         .order('created_at', { ascending: false });
       if (err) throw err;
@@ -184,8 +184,8 @@ export function useCotacoesStore() {
     respostas: CotacaoResposta[];
   }> => {
     const [itensRes, fornRes] = await Promise.all([
-      db.from('cotacao_itens').select('*').eq('cotacao_id', cotacaoId).order('created_at', { ascending: true }),
-      db.from('cotacao_fornecedores').select('*').eq('cotacao_id', cotacaoId).order('created_at', { ascending: true }),
+      db.from('cotacao_itens').select('id, cotacao_id, company_id, produto_id, produto_nome_snapshot, unidade_snapshot, purchase_unit_snapshot, quantidade, observacao, created_at, updated_at').eq('cotacao_id', cotacaoId).order('created_at', { ascending: true }),
+      db.from('cotacao_fornecedores').select('id, cotacao_id, company_id, supplier_id, supplier_nome_snapshot, whatsapp_snapshot, pedido_minimo_snapshot, status, prazo_entrega_dias, condicao_pagamento, frete, observacao, mensagem_enviada_em, respondido_em, created_at, updated_at').eq('cotacao_id', cotacaoId).order('created_at', { ascending: true }),
     ]);
     if (itensRes.error) throw itensRes.error;
     if (fornRes.error) throw fornRes.error;
@@ -193,7 +193,7 @@ export function useCotacoesStore() {
     // cotacao_respostas não tem coluna cotacao_id → filtra pelos fornecedores da cotação
     let respostas: CotacaoResposta[] = [];
     if (fornIds.length > 0) {
-      const respRes = await db.from('cotacao_respostas').select('*').in('cotacao_fornecedor_id', fornIds);
+      const respRes = await db.from('cotacao_respostas').select('id, cotacao_fornecedor_id, cotacao_item_id, company_id, preco_unitario, quantidade_disponivel, disponivel, observacao, selecionado, created_at, updated_at').in('cotacao_fornecedor_id', fornIds);
       if (respRes.error) throw respRes.error;
       respostas = (respRes.data ?? []) as CotacaoResposta[];
     }
@@ -282,7 +282,7 @@ export function useCotacoesStore() {
   const fetchWhatsappLogs = useCallback(async (cotacaoId: string): Promise<CotacaoWhatsappLog[]> => {
     const { data, error: err } = await db
       .from('cotacao_whatsapp_logs')
-      .select('*')
+      .select('id, cotacao_id, cotacao_fornecedor_id, company_id, tipo, phone, message, zapi_response, status, sent_at, created_by, created_at')
       .eq('cotacao_id', cotacaoId)
       .order('created_at', { ascending: false });
     if (err) throw err;

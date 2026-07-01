@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils';
 import { todayBR } from '@/lib/datetime';
 import { formatFixedBR, fmtBRL } from '@/lib/formatters';
 
+import { useCan } from '@/permissions/hooks';
 interface Colaborador {
   id: string;
   nome: string;
@@ -72,7 +73,9 @@ const STATUS_CONFIG: Record<string, { label: string; variant: 'default' | 'secon
 
 const R = (v: number) => formatFixedBR(v, 2);
 
-export default function BeneficiosSection({ colaboradores, canManage }: Props) {
+export default function BeneficiosSection({
+ colaboradores, canManage }: Props) {
+  const canViewRbac = useCan('rh:beneficios:view');
   const { user } = useAuth();
   const [beneficios, setBeneficios] = useState<Beneficio[]>([]);
   const [loading, setLoading] = useState(true);
@@ -241,6 +244,8 @@ export default function BeneficiosSection({ colaboradores, canManage }: Props) {
     if (filterColab !== 'todos' && b.colaborador_id !== filterColab) return false;
     return true;
   });
+
+  if (!canViewRbac) return null;
 
   return (
     <div className="space-y-4">

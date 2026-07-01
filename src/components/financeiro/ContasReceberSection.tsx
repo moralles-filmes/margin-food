@@ -19,7 +19,7 @@ import { todayBR } from '@/lib/datetime';
 import TableActions from '@/components/ui/TableActions';
 import ContaDetailDialog, { type ContaDetailData, type ContaDetailRateio } from './ContaDetailDialog';
 import ContaFormDialog, { type ContaFormData, type RateioLine } from './ContaFormDialog';
-import * as XLSX from 'xlsx';
+import * as XLSX from '@/lib/safeXlsx';
 import { mapFinanceiroDeleteError } from '@/lib/financeiroErrorMap';
 
 /* ─── Types ─── */
@@ -109,8 +109,6 @@ export default function ContasReceberSection() {
   useDataEvent('financeiro:cadastros', useCallback(() => { if (canView) loadAux(); }, [canView]));
   useDataEvent('financeiro:receber', useCallback(() => { if (canView) { loadPage(null, null); loadTotals(); } }, [canView]));
 
-  if (!canView) return <NoAccess />;
-
   const loadPage = async (cDate: string | null, cId: string | null) => {
     setLoading(true);
     const { data, error } = await supabase.rpc('list_fin_contas_receber_cursor', {
@@ -153,7 +151,7 @@ export default function ContasReceberSection() {
     try {
       const { data: detail, error: detailErr } = await supabase
         .from('fin_contas_receber')
-        .select('*')
+        .select('id, descricao, cliente, valor, status, data_competencia, data_vencimento, data_recebimento, forma_pagamento, categoria_id, centro_custo_id, conta_id, observacoes, recorrente, recorrencia_config, updated_at')
         .eq('id', item.id)
         .single();
       if (detailErr) throw detailErr;
@@ -210,19 +208,21 @@ export default function ContasReceberSection() {
   };
   const { showConfirm, guardedClose, confirmClose, cancelClose } = useFormDirtyGuard({ current: form, onClose: handleCloseForm });
 
+  if (!canView) return <NoAccess />;
+
   const handleEdit = async (item: ContaReceber) => {
     setLoading(true);
     try {
       const { data: detail, error: detailErr } = await supabase
         .from('fin_contas_receber')
-        .select('*')
+        .select('id, descricao, cliente, valor, status, data_competencia, data_vencimento, data_recebimento, forma_pagamento, categoria_id, centro_custo_id, conta_id, observacoes, recorrente, recorrencia_config, updated_at')
         .eq('id', item.id)
         .single();
       if (detailErr) throw detailErr;
 
       const { data: rates, error: rateErr } = await supabase
         .from('fin_lancamento_rateios')
-        .select('*')
+        .select('id, categoria_id, centro_custo_id, valor, percentual')
         .eq('lancamento_id', item.id);
       if (rateErr) throw rateErr;
 

@@ -5,6 +5,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { X, AtSign } from 'lucide-react';
 import { includesNormalized } from '@/lib/utils';
 
+import { useCan } from '@/permissions/hooks';
 interface UserOption {
   id: string;
   nome: string;
@@ -17,7 +18,9 @@ interface UserMentionSelectProps {
   placeholder?: string;
 }
 
-export default function UserMentionSelect({ value, onChange, placeholder = 'Buscar usuário (@nome)...' }: UserMentionSelectProps) {
+export default function UserMentionSelect({
+ value, onChange, placeholder = 'Buscar usuário (@nome)...' }: UserMentionSelectProps) {
+  const canViewRbac = useCan('configuracoes:usuarios:view');
   const [users, setUsers] = useState<UserOption[]>([]);
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
@@ -72,6 +75,8 @@ export default function UserMentionSelect({ value, onChange, placeholder = 'Busc
       </div>
     );
   }
+
+  if (!canViewRbac) return null;
 
   return (
     <div className="relative">

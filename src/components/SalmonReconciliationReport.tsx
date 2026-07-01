@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { CheckCircle2, AlertTriangle, RefreshCw, Loader2 } from 'lucide-react';
 
+import { useCan } from '@/permissions/hooks';
 interface ReconciliationData {
   dbEntriesCount: number;
   dbEntriesKg: number;
@@ -15,6 +16,7 @@ interface ReconciliationData {
 }
 
 export default function SalmonReconciliationReport() {
+  const canViewRbac = useCan('salmon:estoque:view');
   const [data, setData] = useState<ReconciliationData | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -49,6 +51,9 @@ export default function SalmonReconciliationReport() {
     }
     setLoading(false);
   };
+
+
+  if (!canViewRbac) return null;
 
   return (
     <div className="bg-card border border-border rounded-xl p-4 space-y-3">

@@ -1,12 +1,8 @@
+import { getCorsHeaders } from "../_shared/cors.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
-}
-
-const PLACEHOLDER_COMPANY = '00000000-0000-0000-0000-000000000001'
+let corsHeaders = getCorsHeaders();const PLACEHOLDER_COMPANY = '00000000-0000-0000-0000-000000000001'
 
 // ═══ SINGLE SOURCE OF TRUTH: CMV outflow & inflow types ═══
 const CMV_OUTFLOW_TYPES = ['SAIDA', 'BAIXA_PERDA', 'SAIDA_CONSUMO', 'SAIDA_REQUISICAO', 'SAIDA_PERDA', 'AJUSTE_INVENTARIO_NEGATIVO'] as const
@@ -24,6 +20,7 @@ function localDateStr(daysAgo = 0): string {
 }
 
 serve(async (req) => {
+  corsHeaders = getCorsHeaders(req);
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
@@ -223,7 +220,7 @@ async function calcularCmv(client: any, companyId: string, payload: any) {
   let cmvSalmaoPct = 0
   let cmvTotalPct = 0
   let custoTotal = 0
-  let metodoUsado = metodo || 'ledger'
+  const metodoUsado = metodo || 'ledger'
   let eiValor = 0, efValor = 0
 
   if (metodoUsado === 'inventario' && inventario_inicial_id && inventario_final_id) {

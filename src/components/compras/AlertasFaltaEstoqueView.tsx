@@ -62,8 +62,13 @@ function NoAccess() {
 }
 
 export default function AlertasFaltaEstoqueView() {
-  const canView = useCan('compras:alertas_falta:view') || useCan('compras:pedidos:view') || useCan('system:global:manage');
-  const canConfirm = useCan('compras:alertas_falta:approve') || useCan('compras:pedidos:edit') || useCan('system:global:manage');
+  const canViewAlertas = useCan('compras:alertas_falta:view');
+  const canViewPedidos = useCan('compras:pedidos:view');
+  const canApproveAlertas = useCan('compras:alertas_falta:approve');
+  const canEditPedidos = useCan('compras:pedidos:edit');
+  const canManageGlobal = useCan('system:global:manage');
+  const canView = canViewAlertas || canViewPedidos || canManageGlobal;
+  const canConfirm = canApproveAlertas || canEditPedidos || canManageGlobal;
   const { confirm, ConfirmDialog } = useConfirmDialog();
 
   const [alertas, setAlertas] = useState<AlertaFalta[]>([]);

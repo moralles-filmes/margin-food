@@ -47,7 +47,7 @@ export default function EtiquetaModal({ manipulation, dataValidade, onClose }: P
         </head>
         <body>
           ${printRef.current.innerHTML}
-          <script>window.onload = function() { window.print(); window.close(); }<\/script>
+          <script>window.onload = function() { window.print(); window.close(); }</script>
         </body>
       </html>
     `);

@@ -22,6 +22,7 @@ import { format, parseISO, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 
+import { useCan } from '@/permissions/hooks';
 interface Colaborador {
   id: string;
   nome: string;
@@ -72,7 +73,9 @@ const STATUS_CONFIG: Record<string, { label: string; variant: 'default' | 'secon
   ARQUIVADO: { label: 'Arquivado', variant: 'secondary', icon: FileText },
 };
 
-export default function DocumentosComplianceSection({ colaboradores, canManage }: Props) {
+export default function DocumentosComplianceSection({
+ colaboradores, canManage }: Props) {
+  const canViewRbac = useCan('rh:documentos:view');
   const { user } = useAuth();
   const [documentos, setDocumentos] = useState<Documento[]>([]);
   const [loading, setLoading] = useState(true);
@@ -164,7 +167,7 @@ export default function DocumentosComplianceSection({ colaboradores, canManage }
         obrigatorio: form.obrigatorio,
         alertar_vencimento: form.alertar_vencimento,
         dias_alerta_antes: form.dias_alerta_antes,
-        uploaded_by: user?.id!,
+        uploaded_by: user?.id ?? null,
       });
       if (error) { toast.error('Erro: ' + error.message); setUploading(false); return; }
       toast.success('Documento registrado!');
@@ -277,6 +280,8 @@ export default function DocumentosComplianceSection({ colaboradores, canManage }
   const complianceRate = colaboradores.length > 0
     ? Math.round((complianceData.filter(c => c.compliant).length / colaboradores.length) * 100)
     : 100;
+
+  if (!canViewRbac) return null;
 
   return (
     <div className="space-y-4">

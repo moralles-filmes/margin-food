@@ -1,3 +1,4 @@
+import { getCorsHeaders } from "../_shared/cors.ts";
 // ════════════════════════════════════════════════════════════════════════════
 // send-whatsapp-zapi — proxy de envio de mensagens WhatsApp via Z-API (Cotação)
 // ════════════════════════════════════════════════════════════════════════════
@@ -10,11 +11,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+let corsHeaders = getCorsHeaders();
 
 const PLACEHOLDER_TENANT = "00000000-0000-0000-0000-000000000001";
 
@@ -89,6 +86,7 @@ function normalizePhone(raw: string | null | undefined): string {
 }
 
 serve(async (req) => {
+  corsHeaders = getCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   const requestId = crypto.randomUUID();

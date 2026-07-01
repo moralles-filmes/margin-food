@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 
+import { useCan } from '@/permissions/hooks';
 interface MentionNotification {
   id: string;
   title: string;
@@ -48,7 +49,9 @@ interface Props {
   onNavigateToOrder?: (orderId: string) => void;
 }
 
-export default function RequisicoesList({ onNavigateToOrder }: Props) {
+export default function RequisicoesList({
+ onNavigateToOrder }: Props) {
+  const canViewRbac = useCan('compras:lista:view');
   const { user } = useAuth();
   const [mentions, setMentions] = useState<(MentionNotification & { order?: OrderSnapshot })[]>([]);
   const [loading, setLoading] = useState(true);
@@ -129,6 +132,8 @@ export default function RequisicoesList({ onNavigateToOrder }: Props) {
       onNavigateToOrder(mention.entity_id);
     }
   };
+
+  if (!canViewRbac) return null;
 
   return (
     <div className="space-y-3">

@@ -11,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { formatFixedBR, formatDateBR, formatInBR, fmtBRL } from '@/lib/formatters';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, LineChart, Line, ResponsiveContainer, Cell } from 'recharts';
 
+import { useCan } from '@/permissions/hooks';
 interface ConsumptionData {
   consumo_total: number;
   custo_total: number;
@@ -41,7 +42,9 @@ const chartConfigTop: ChartConfig = { consumo_total: { label: 'Consumo', color: 
 type GroupBy = 'daily' | 'weekly' | 'monthly';
 type PeriodPreset = '7' | '30' | '90' | 'custom';
 
-export default function StockConsumptionHistorySection({ categorias }: { categorias: string[] }) {
+export default function StockConsumptionHistorySection({
+ categorias }: { categorias: string[] }) {
+  const canViewRbac = useCan('estoque:ranking:view');
   const [data, setData] = useState<ConsumptionData | null>(null);
   const [loading, setLoading] = useState(true);
   const [periodPreset, setPeriodPreset] = useState<PeriodPreset>('30');
@@ -96,6 +99,8 @@ export default function StockConsumptionHistorySection({ categorias }: { categor
     if (!data?.produtos) return [];
     return data.produtos.map(p => ({ id: p.produto_id, name: p.nome_produto }));
   }, [data]);
+
+  if (!canViewRbac) return null;
 
   return (
     <div className="space-y-4">

@@ -16,6 +16,7 @@ import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
 import TableActions from '@/components/ui/TableActions';
 import { mapFinanceiroDeleteError } from '@/lib/financeiroErrorMap';
 
+import { useCan } from '@/permissions/hooks';
 interface PlanoContaRow {
   id: string;
   codigo: string;
@@ -32,7 +33,9 @@ interface Props {
   canDelete: boolean;
 }
 
-export default function PlanoContasFinSection({ canCreate, canEdit, canDelete }: Props) {
+export default function PlanoContasFinSection({
+ canCreate, canEdit, canDelete }: Props) {
+  const canViewRbac = useCan('financeiro:cadastros:view');
   const { user } = useAuth();
   const [items, setItems] = useState<PlanoContaRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -103,6 +106,8 @@ export default function PlanoContasFinSection({ canCreate, canEdit, canDelete }:
       toast.error(mapFinanceiroDeleteError(err));
     }
   };
+
+  if (!canViewRbac) return null;
 
   return (
     <div className="space-y-4">

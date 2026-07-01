@@ -15,6 +15,7 @@ import { format, subDays } from 'date-fns';
 import { cn, normalizeSearchText } from '@/lib/utils';
 import { CursorState } from '@/hooks/useCursorPagination';
 
+import { useCan } from '@/permissions/hooks';
 interface AuditLog {
   id: string;
   created_at: string;
@@ -80,6 +81,7 @@ const ACTION_COLORS: Record<string, string> = {
 };
 
 export default function GlobalAuditView() {
+  const canViewRbac = useCan('configuracoes:auditoria-sistema:view');
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
@@ -183,6 +185,9 @@ export default function GlobalAuditView() {
     a.href = url; a.download = `audit_trail_${format(new Date(), 'yyyy-MM-dd')}.csv`;
     a.click(); URL.revokeObjectURL(url);
   };
+
+
+  if (!canViewRbac) return null;
 
   return (
     <div className="space-y-4">

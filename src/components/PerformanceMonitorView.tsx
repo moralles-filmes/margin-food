@@ -8,6 +8,7 @@ import { Activity, RefreshCw, Zap, Database, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 
+import { useCan } from '@/permissions/hooks';
 interface SlowEvent {
   id: string;
   created_at: string;
@@ -21,6 +22,7 @@ interface MvStatus {
 }
 
 export default function PerformanceMonitorView() {
+  const canViewRbac = useCan('configuracoes:performance:view');
   const [slowEvents, setSlowEvents] = useState<SlowEvent[]>([]);
   const [lastRefresh, setLastRefresh] = useState<MvStatus[]>([]);
   const [loading, setLoading] = useState(true);
@@ -72,6 +74,9 @@ export default function PerformanceMonitorView() {
   if (loading) {
     return <div className="flex items-center justify-center py-12"><div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>;
   }
+
+
+  if (!canViewRbac) return null;
 
   return (
     <div className="space-y-4">

@@ -12,7 +12,7 @@ import { gerarPDFFluxoCaixa } from '@/lib/pdfFinanceiro';
 import { fmtBRL, formatDateBR, parseLocalDate } from '@/lib/formatters';
 import { formatDateBR as formatDateISO } from '@/lib/datetime';
 import { toast } from 'sonner';
-import * as XLSX from 'xlsx';
+import * as XLSX from '@/lib/safeXlsx';
 
 /* ─── Types ─── */
 export type EntidadeTipo = 'lancamento' | 'conta_pagar' | 'conta_receber';

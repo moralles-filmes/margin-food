@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { fmtBRL, formatDateBR, normalizeBRLMoneyToNumber } from '@/lib/formatters';
 import { Crown, Award, Medal, Search, Plus, Inbox, ArrowUp, BarChart3, Loader2, ChevronDown } from 'lucide-react';
 
+import { useCan } from '@/permissions/hooks';
 const CATEGORIAS = ['Peixe', 'Oriental', 'Bebidas', 'Limpeza', 'Embalagens', 'Cozinha', 'Descartáveis', 'Proteínas', 'Hortifruti', 'Outros'];
 const PAGE_SIZE = 20;
 
@@ -35,6 +36,7 @@ interface RankingRow {
 type RankingTab = 'cheapest' | 'expensive' | 'by-item' | 'by-category';
 
 export default function RankingFornecedoresView() {
+  const canViewRbac = useCan('compras:ranking:view');
   const { user } = useAuth();
   const { produtos } = useEstoqueGeralStoreContext();
   const [rows, setRows] = useState<RankingRow[]>([]);
@@ -134,6 +136,9 @@ export default function RankingFornecedoresView() {
   };
 
   const needsFilter = (tab === 'by-item' && !selectedItem) || (tab === 'by-category' && !selectedCategory);
+
+
+  if (!canViewRbac) return null;
 
   return (
     <div className="space-y-4">

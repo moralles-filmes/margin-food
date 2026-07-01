@@ -18,6 +18,7 @@ import {
 import { format, parseISO, isPast } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
+import { useCan } from '@/permissions/hooks';
 interface Colaborador {
   id: string;
   nome: string;
@@ -69,7 +70,9 @@ const STATUS_LABELS: Record<string, { label: string; icon: typeof Clock }> = {
   CANCELADA: { label: 'Cancelada', icon: XCircle },
 };
 
-export default function TarefasSection({ colaboradores, canManage }: Props) {
+export default function TarefasSection({
+ colaboradores, canManage }: Props) {
+  const canViewRbac = useCan('rh:tarefas:view');
   const { user } = useAuth();
   const [tarefas, setTarefas] = useState<Tarefa[]>([]);
   const [loading, setLoading] = useState(true);
@@ -128,7 +131,7 @@ export default function TarefasSection({ colaboradores, canManage }: Props) {
         prioridade: form.prioridade,
         recorrencia: form.recorrencia,
         responsavel_id: form.responsavel_id || null,
-        criado_por: user?.id!,
+        criado_por: user?.id ?? null,
         prazo: form.prazo ? new Date(form.prazo).toISOString() : null,
         checklist: checklist as unknown as import('@/integrations/supabase/types').Json[],
         observacoes: form.observacoes,
@@ -194,6 +197,8 @@ export default function TarefasSection({ colaboradores, canManage }: Props) {
       </div>
     );
   }
+
+  if (!canViewRbac) return null;
 
   return (
     <div className="space-y-4">

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { includesNormalized } from '@/lib/utils';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
+
 import { useCan, useModuleAccess } from '@/permissions/hooks';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -221,7 +221,6 @@ function NivelTable({ tipo, tipoLabel, tipoIcon, componentes, canCreate, canEdit
 // MAIN VIEW
 // ============================================================
 export default function FichaTecnicaView({ lotesLimpos = [] }: { lotesLimpos?: LoteSalmaoLimpo[] }) {
-  const { } = useAuth();
   const { confirm, ConfirmDialog } = useConfirmDialog();
   const { visibleSubtabs, canView } = useModuleAccess('ficha');
 

@@ -96,7 +96,8 @@ export default function EstoqueGeralView() {
   const canDeleteCatalogo = useCan('estoque:catalogo:delete');
   const canCreateMov = useCan('estoque:movimentacoes:create');
   const canEditPricing = canEditCatalogo;
-  const canViewSelector = canEditCatalogo || useCan('financeiro:dashboard:view');
+  const canViewFinanceiroDashboard = useCan('financeiro:dashboard:view');
+  const canViewSelector = canEditCatalogo || canViewFinanceiroDashboard;
   const { produtos, saldos, movimentacoes, categorias, prodTotalCount, prodHasMore, prodPage, prodGlobalCounts, prodCatalogLoading, prodCatalogError } = store;
 
   // Requisition pending count for badge — counts only requisitions with ≥1 SOLICITADO item

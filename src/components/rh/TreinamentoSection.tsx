@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
+import { useCan } from '@/permissions/hooks';
 interface Colaborador {
   id: string;
   nome: string;
@@ -80,7 +81,9 @@ const SETOR_LABELS: Record<string, string> = {
 };
 const TIPO_ICONS = { leitura: FileText, video: Video, quiz: HelpCircle };
 
-export default function TreinamentoSection({ colaboradores, canManage }: Props) {
+export default function TreinamentoSection({
+ colaboradores, canManage }: Props) {
+  const canViewRbac = useCan('rh:treinamento:view');
   const { user } = useAuth();
   const [trilhas, setTrilhas] = useState<Trilha[]>([]);
   const [progressos, setProgressos] = useState<Progresso[]>([]);
@@ -130,7 +133,7 @@ export default function TreinamentoSection({ colaboradores, canManage }: Props) 
         obrigatoria: form.obrigatoria,
         modulos: formModulos as unknown as import('@/integrations/supabase/types').Json[],
         carga_horaria_min: form.carga_horaria_min,
-        criado_por: user?.id!,
+        criado_por: user?.id ?? null,
       });
       if (error) { toast.error('Erro: ' + error.message); return; }
       toast.success('Trilha criada!');
@@ -364,6 +367,8 @@ export default function TreinamentoSection({ colaboradores, canManage }: Props) 
     inscritos: progressos.length,
     concluidos: progressos.filter(p => p.status === 'CONCLUIDO').length,
   };
+
+  if (!canViewRbac) return null;
 
   return (
     <div className="space-y-4">

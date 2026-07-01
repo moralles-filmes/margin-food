@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils';
 import { formatInBR } from '@/lib/datetime';
 import { formatFixedBR } from '@/lib/formatters';
 
+import { useCan } from '@/permissions/hooks';
 interface Colaborador {
   id: string;
   nome: string;
@@ -92,7 +93,9 @@ function calcIRRF(baseIR: number): number {
 
 const R = (v: number) => formatFixedBR(v, 2);
 
-export default function FolhaPagamentoSection({ colaboradores, canManage }: Props) {
+export default function FolhaPagamentoSection({
+ colaboradores, canManage }: Props) {
+  const canViewRbac = useCan('rh:folha:view');
   const { user } = useAuth();
   const [folhas, setFolhas] = useState<FolhaPagamento[]>([]);
   const [loading, setLoading] = useState(true);
@@ -327,6 +330,8 @@ export default function FolhaPagamentoSection({ colaboradores, canManage }: Prop
   }
 
   // List view
+  if (!canViewRbac) return null;
+
   return (
     <div className="space-y-4">
       {/* Stats */}

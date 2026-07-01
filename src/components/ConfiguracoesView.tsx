@@ -8,7 +8,7 @@ import PerformanceMonitorView from './PerformanceMonitorView';
 import AdminUsersView from './AdminUsersView';
 import IntegracoesView from './configuracoes/IntegracoesView';
 import { useSalmonStore } from '@/hooks/useSalmonStore';
-import { useAuth } from '@/contexts/AuthContext';
+
 import { useCan, useModuleAccess } from '@/permissions';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -47,7 +47,6 @@ interface Props {
 export default function ConfiguracoesView({ store, initialSubTab }: Props) {
   const [activeView, setActiveView] = useState<SubView>(initialSubTab ?? 'geral');
   const { stockConfig, setStockConfig } = store;
-  const { } = useAuth();
   const { visibleSubtabs } = useModuleAccess('configuracoes');
 
   // Granular permission checks for actions

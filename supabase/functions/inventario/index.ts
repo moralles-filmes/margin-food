@@ -1,14 +1,11 @@
+import { getCorsHeaders } from "../_shared/cors.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
-}
-
-const PAGE_SIZE = 50
+let corsHeaders = getCorsHeaders();const PAGE_SIZE = 50
 
 serve(async (req) => {
+  corsHeaders = getCorsHeaders(req);
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
@@ -484,9 +481,9 @@ serve(async (req) => {
       const sobAnalise = (invs || []).filter(i => i.status === 'SOB_ANALISE')
 
       let topCriticos: any[] = []
-      let categoriasDrift: Record<string, number> = {}
-      let turnoDrift: Record<string, number> = {}
-      let userDrift: Record<string, { total: number; count: number; nome: string }> = {}
+      const categoriasDrift: Record<string, number> = {}
+      const turnoDrift: Record<string, number> = {}
+      const userDrift: Record<string, { total: number; count: number; nome: string }> = {}
 
       if (finalizados.length > 0) {
         const lastId = finalizados[0].id
@@ -609,7 +606,7 @@ serve(async (req) => {
         .order('created_at')
 
       const userIds = (data || []).map((c: any) => c.user_id)
-      let profileMap: Record<string, string> = {}
+      const profileMap: Record<string, string> = {}
       if (userIds.length > 0) {
         const { data: profiles } = await adminClient.from('profiles').select('id, nome, email').in('id', userIds)
         ;(profiles || []).forEach((p: any) => { profileMap[p.id] = p.nome || p.email })
@@ -719,11 +716,7 @@ serve(async (req) => {
 
 function json(data: any, status = 200) {
   return new Response(JSON.stringify(data), {
-    status, headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
-      'Content-Type': 'application/json',
-    },
+    status, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   })
 }
 
@@ -733,10 +726,6 @@ function forbidden(msg = 'Sem permissão') {
 
 function unauthorized() {
   return new Response(JSON.stringify({ error: 'Não autorizado' }), {
-    status: 401, headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
-      'Content-Type': 'application/json',
-    },
+    status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   })
 }

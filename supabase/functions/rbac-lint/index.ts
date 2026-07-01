@@ -1,15 +1,14 @@
+import { getCorsHeaders } from "../_shared/cors.ts";
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const DEPLOY_VERSION = 'rbac-lint-compat-v1';
 const PERMISSION_KEY = 'system:global:manage';
 const EXECUTED_SQL = 'select public.rbac_sql_lint_report_quick($1) as report';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
-};
+let corsHeaders = getCorsHeaders();
 
 Deno.serve(async (req) => {
+  corsHeaders = getCorsHeaders(req);
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -31,7 +30,6 @@ Deno.serve(async (req) => {
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const serviceRoleKey = (Deno.env.get('SB_SECRET_KEY') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'))!;
     const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
 
     const userClient = createClient(supabaseUrl, anonKey, {
@@ -59,11 +57,7 @@ Deno.serve(async (req) => {
       }, 403);
     }
 
-    const adminClient = createClient(supabaseUrl, serviceRoleKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
-
-    const { data: reportData, error: rpcErr } = await adminClient.rpc('rbac_sql_lint_report_quick', {
+    const { data: reportData, error: rpcErr } = await userClient.rpc('rbac_sql_lint_report_quick', {
       p_actor_user_id: actorUserId,
     });
 

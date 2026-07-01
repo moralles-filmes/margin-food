@@ -1,9 +1,7 @@
+import { getCorsHeaders } from "../_shared/cors.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
-};
+let corsHeaders = getCorsHeaders();
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -17,8 +15,10 @@ const PERM_USERS_MANAGE = 'configuracoes:usuarios:manage';
 // Legacy permission aliases that also grant access
 const LEGACY_VIEW = ['users:manage', 'system:admin'];
 const LEGACY_MANAGE = ['users:manage', 'system:admin'];
+const PLACEHOLDER_TENANT = '00000000-0000-0000-0000-000000000001';
 
 Deno.serve(async (req) => {
+  corsHeaders = getCorsHeaders(req);
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
@@ -73,17 +73,45 @@ Deno.serve(async (req) => {
       .eq('id', callerUserId)
       .single();
 
-    if (!callerProfile?.company_id) {
+    if (!callerProfile?.company_id || callerProfile.company_id === PLACEHOLDER_TENANT) {
       return json({ error: 'Tenant do usuário não encontrado' }, 400);
     }
 
     const callerCompanyId = callerProfile.company_id;
+    const { data: callerIsGlobalManager } = await adminClient.rpc('has_permission', {
+      _user_id: callerUserId,
+      _permission: 'system:global:manage',
+    });
+    const isGlobalManager = callerIsGlobalManager === true;
+
+    const getTargetProfileInScope = async (userId: string) => {
+      const { data: targetProfile, error: targetError } = await adminClient
+        .from('profiles')
+        .select('id, nome, email, sector, job_role_id, company_id')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (targetError) throw targetError;
+      if (!targetProfile) return null;
+      if (!isGlobalManager && targetProfile.company_id !== callerCompanyId) return null;
+      return targetProfile;
+    };
+
+    const validateJobRoleInCompany = async (jobRoleId: string | null | undefined, companyId: string) => {
+      if (!jobRoleId) return true;
+      const { data } = await adminClient
+        .from('job_roles')
+        .select('id')
+        .eq('id', jobRoleId)
+        .eq('company_id', companyId)
+        .maybeSingle();
+      return !!data;
+    };
 
     // ─── Permission check helper ───
     const checkPermission = async (requiredPerm: string, legacyAliases: string[]): Promise<boolean> => {
       // Super-admin bypass: system:global:manage grants everything
-      const { data: isSuperAdmin } = await adminClient.rpc('has_permission', { _user_id: callerUserId, _permission: 'system:global:manage' });
-      if (isSuperAdmin === true) return true;
+      if (isGlobalManager) return true;
 
       // Check new granular permission
       const { data: hasPerm } = await adminClient.rpc('has_permission', { _user_id: callerUserId, _permission: requiredPerm });
@@ -157,7 +185,7 @@ Deno.serve(async (req) => {
         if (delError) debug.deleteError = delError.message;
 
         // Fetch all permissions with pagination (bypass 1000 limit)
-        let allKeys: string[] = [];
+        const allKeys: string[] = [];
         let from = 0;
         const step = 1000;
         while (true) {
@@ -170,7 +198,7 @@ Deno.serve(async (req) => {
         debug.dbPermsCount = allKeys.length;
 
         // Fetch role permissions with pagination
-        let roleGranted = new Set<string>();
+        const roleGranted = new Set<string>();
         from = 0;
         while (true) {
           const { data: chunk, error: chunkErr } = await adminClient
@@ -185,6 +213,7 @@ Deno.serve(async (req) => {
         }
         debug.roleCount = roleGranted.size;
 
+        const allKeySet = new Set(allKeys);
         const selectedSet = new Set(selectedPermissions);
         const rows: { user_id: string; permission_key: string; effect: string; granted_by: string }[] = [];
 
@@ -196,16 +225,29 @@ Deno.serve(async (req) => {
             rows.push({ user_id: userId, permission_key: key, effect: 'DENY', granted_by: callerUserId });
           }
         }
-        
+
+        // Chaves solicitadas que não existem no catálogo `permissions` nem no
+        // role: seriam descartadas em silêncio (causa histórica do bug da
+        // Cotação). Reportar ao cliente em vez de fingir sucesso.
+        const unknownKeys = selectedPermissions.filter(k => !allKeySet.has(k) && !roleGranted.has(k));
+        if (unknownKeys.length > 0) {
+          debug.unknownKeys = unknownKeys;
+          console.error('[admin-users.saveUserPermissions] chaves ignoradas (fora do catálogo):', unknownKeys.join(', '));
+        }
+
         debug.rowsToInsert = rows.length;
 
         if (rows.length > 0) {
           const { error: insError } = await adminClient.from('user_permissions').insert(rows);
-          if (insError) debug.insertError = insError.message;
+          if (insError) {
+            debug.insertError = insError.message;
+            console.error('[admin-users.saveUserPermissions] erro no INSERT:', insError.message);
+          }
         }
         return debug;
       } catch (e: any) {
         debug.exception = e.message;
+        console.error('[admin-users.saveUserPermissions] exceção:', e.message);
         return debug;
       }
     };
@@ -264,6 +306,9 @@ Deno.serve(async (req) => {
       const { email, password, nome, role, sector, job_role_id, permissions } = body;
       if (!email || !password || !nome || !role) return json({ error: 'Campos obrigatórios: email, password, nome, role' }, 400);
       if (!VALID_ROLES.includes(role)) return json({ error: 'Role inválido. Use admin ou operador.' }, 400);
+      if (!(await validateJobRoleInCompany(job_role_id, callerCompanyId))) {
+        return json({ error: 'Cargo inválido para esta empresa' }, 400);
+      }
 
       const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
         email, password, email_confirm: true, user_metadata: { nome }
@@ -280,12 +325,18 @@ Deno.serve(async (req) => {
       if (job_role_id) profileUpdate.job_role_id = job_role_id;
       await adminClient.from('profiles').update(profileUpdate).eq('id', newUser.user.id);
 
+      let createPermResult: any = null;
       if (Array.isArray(permissions) && permissions.length > 0) {
-        await saveUserPermissions(newUser.user.id, permissions, role);
+        createPermResult = await saveUserPermissions(newUser.user.id, permissions, role);
       }
 
       await audit('user.created', newUser.user.id, { valor_novo: JSON.stringify({ email, nome, role, sector: sector || null, job_role_id: job_role_id || null, permissions_count: permissions?.length || 0 }) });
-      return json({ success: true, user: { id: newUser.user.id, email, nome, role, sector: sector || null } });
+      // Usuário já foi criado; se as permissões falharam, retorna sucesso com aviso
+      // (não 500) para o cliente não interpretar como falha total de criação.
+      const createWarning = createPermResult && (createPermResult.insertError || createPermResult.exception || createPermResult.unknownKeys?.length)
+        ? `Usuário criado, mas houve problema ao salvar permissões: ${createPermResult.insertError || createPermResult.exception || 'chaves ignoradas: ' + createPermResult.unknownKeys.join(', ')}`
+        : undefined;
+      return json({ success: true, user: { id: newUser.user.id, email, nome, role, sector: sector || null }, ...(createWarning ? { warning: createWarning } : {}) });
     }
 
     // ─── EDIT USER ───
@@ -293,7 +344,11 @@ Deno.serve(async (req) => {
       const { userId, nome, email, role, sector, job_role_id, permissions } = body;
       if (!userId) return json({ error: 'userId obrigatório' }, 400);
 
-      const { data: oldProfile } = await adminClient.from('profiles').select('nome, email, sector, job_role_id').eq('id', userId).single();
+      const oldProfile = await getTargetProfileInScope(userId);
+      if (!oldProfile) return json({ error: 'Usuário não encontrado nesta empresa' }, 404);
+      if (!(await validateJobRoleInCompany(job_role_id, oldProfile.company_id))) {
+        return json({ error: 'Cargo inválido para a empresa do usuário' }, 400);
+      }
       const { data: oldRoleRow } = await adminClient.from('user_roles').select('role').eq('user_id', userId).single();
       const before = { nome: oldProfile?.nome, email: oldProfile?.email, role: oldRoleRow?.role, sector: oldProfile?.sector };
 
@@ -322,14 +377,21 @@ Deno.serve(async (req) => {
         await adminClient.auth.admin.updateUserById(userId, { user_metadata: { nome } });
       }
 
+      let permResult: any = null;
       if (permissions && Array.isArray(permissions)) {
-        await saveUserPermissions(userId, permissions, role || before.role);
+        permResult = await saveUserPermissions(userId, permissions, role || before.role);
+        if (permResult?.insertError || permResult?.exception) {
+          return json({ error: `Falha ao salvar permissões: ${permResult.insertError || permResult.exception}` }, 500);
+        }
       }
 
       const after = { nome: nome || before.nome, email: email || before.email, role: role || before.role, sector: profileUpdate.sector !== undefined ? profileUpdate.sector : before.sector };
       await audit('user.edited', userId, { valor_anterior: JSON.stringify(before), valor_novo: JSON.stringify(after) });
 
-      return json({ success: true });
+      const editWarning = permResult?.unknownKeys?.length
+        ? `Algumas permissões foram ignoradas (não existem no catálogo): ${permResult.unknownKeys.join(', ')}`
+        : undefined;
+      return json(editWarning ? { success: true, warning: editWarning } : { success: true });
     }
 
     // ─── UPDATE ROLE (legacy) ───
@@ -337,6 +399,7 @@ Deno.serve(async (req) => {
       const { userId, role, sector } = body;
       if (!userId || !role) return json({ error: 'userId e role são obrigatórios' }, 400);
       if (!VALID_ROLES.includes(role)) return json({ error: 'Role inválido. Use admin ou operador.' }, 400);
+      if (!(await getTargetProfileInScope(userId))) return json({ error: 'Usuário não encontrado nesta empresa' }, 404);
 
       const { data: oldRole } = await adminClient.from('user_roles').select('role').eq('user_id', userId).single();
       await adminClient.from('user_roles').delete().eq('user_id', userId);
@@ -350,6 +413,7 @@ Deno.serve(async (req) => {
       const { userId, newPassword } = body;
       if (!userId || !newPassword) return json({ error: 'userId e newPassword obrigatórios' }, 400);
       if (newPassword.length < 12) return json({ error: 'Senha deve ter no mínimo 12 caracteres' }, 400);
+      if (!(await getTargetProfileInScope(userId))) return json({ error: 'Usuário não encontrado nesta empresa' }, 404);
       const { error } = await adminClient.auth.admin.updateUserById(userId, { password: newPassword });
       if (error) return json({ error: error.message }, 500);
       await audit('password.reset', userId);
@@ -360,6 +424,7 @@ Deno.serve(async (req) => {
     if (action === 'disable') {
       const { userId } = body;
       if (!userId) return json({ error: 'userId obrigatório' }, 400);
+      if (!(await getTargetProfileInScope(userId))) return json({ error: 'Usuário não encontrado nesta empresa' }, 404);
       const { error } = await adminClient.auth.admin.updateUserById(userId, { ban_duration: '876600h' });
       if (error) return json({ error: error.message }, 500);
       await audit('user.disabled', userId);
@@ -370,6 +435,7 @@ Deno.serve(async (req) => {
     if (action === 'enable') {
       const { userId } = body;
       if (!userId) return json({ error: 'userId obrigatório' }, 400);
+      if (!(await getTargetProfileInScope(userId))) return json({ error: 'Usuário não encontrado nesta empresa' }, 404);
       const { error } = await adminClient.auth.admin.updateUserById(userId, { ban_duration: 'none' });
       if (error) return json({ error: error.message }, 500);
       await audit('user.enabled', userId);
@@ -384,7 +450,8 @@ Deno.serve(async (req) => {
       if (userId === callerUserId) return json({ error: 'Não é possível excluir a si mesmo' }, 400);
 
       // Busca dados antes de deletar (para o log de auditoria)
-      const { data: profile } = await adminClient.from('profiles').select('nome, email').eq('id', userId).single();
+      const profile = await getTargetProfileInScope(userId);
+      if (!profile) return json({ error: 'Usuário não encontrado nesta empresa' }, 404);
       const { data: roleRow } = await adminClient.from('user_roles').select('role').eq('user_id', userId).single();
 
       // Grava auditoria ANTES de deletar para garantir captura dos dados

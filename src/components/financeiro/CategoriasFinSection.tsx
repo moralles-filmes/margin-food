@@ -16,6 +16,7 @@ import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
 import TableActions from '@/components/ui/TableActions';
 import { mapFinanceiroDeleteError } from '@/lib/financeiroErrorMap';
 
+import { useCan } from '@/permissions/hooks';
 interface CategoriaRow {
   id: string;
   nome: string;
@@ -37,7 +38,9 @@ interface Props {
   canDelete: boolean;
 }
 
-export default function CategoriasFinSection({ canCreate, canEdit, canDelete }: Props) {
+export default function CategoriasFinSection({
+ canCreate, canEdit, canDelete }: Props) {
+  const canViewRbac = useCan('financeiro:cadastros:view');
   const { user, profile } = useAuth();
   const [items, setItems] = useState<CategoriaRow[]>([]);
   const [centros, setCentros] = useState<CentroRef[]>([]);
@@ -114,6 +117,8 @@ export default function CategoriasFinSection({ canCreate, canEdit, canDelete }: 
   };
 
   const centroNome = (id: string) => centros.find(c => c.id === id)?.nome || '—';
+
+  if (!canViewRbac) return null;
 
   return (
     <div className="space-y-4">

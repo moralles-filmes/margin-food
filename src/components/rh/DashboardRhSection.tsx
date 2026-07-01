@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 import { formatFixedBR, fmtBRL, formatPercentBR } from '@/lib/formatters';
 import GlobalKpiCard from '@/components/ui/KpiCard';
 
+import { useCan } from '@/permissions/hooks';
 const COLORS = [
   'hsl(var(--primary))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))',
   'hsl(var(--chart-4))', 'hsl(var(--chart-5))', 'hsl(var(--accent))',
@@ -50,7 +51,9 @@ const SETOR_LABELS: Record<string, string> = {
   cozinha: 'Cozinha', sushi: 'Sushi', limpeza: 'Limpeza', salao: 'Salão', copa: 'Copa'
 };
 
-export default function DashboardRhSection({ colaboradores }: Props) {
+export default function DashboardRhSection({
+ colaboradores }: Props) {
+  const canViewRbac = useCan('rh:dashboard:view');
   const [periodo, setPeriodo] = useState(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -169,6 +172,8 @@ export default function DashboardRhSection({ colaboradores }: Props) {
       </div>
     );
   }
+
+  if (!canViewRbac) return null;
 
   return (
     <div className="space-y-4">

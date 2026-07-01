@@ -18,6 +18,7 @@ import { Plus, Calendar, Pencil, Trash2, Zap, Inbox } from 'lucide-react';
 import UserMentionSelect from '@/components/UserMentionSelect';
 import { todayBR } from '@/lib/datetime';
 
+import { useCan } from '@/permissions/hooks';
 const DIAS = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
 const CATEGORIAS = ['Peixe', 'Oriental', 'Bebidas', 'Limpeza', 'Embalagens', 'Cozinha', 'Descartáveis', 'Proteínas', 'Hortifruti', 'Outros'];
 
@@ -54,6 +55,7 @@ const emptyForm = {
 };
 
 export default function CalendarioLembretesView() {
+  const canViewRbac = useCan('compras:calendario:view');
   const { user } = useAuth();
   const { produtos } = useEstoqueGeralStoreContext();
   const salmonStore = useSalmonStoreContext();
@@ -228,6 +230,9 @@ export default function CalendarioLembretesView() {
   const todayIdx = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1;
 
   if (loading) return <div className="text-center py-8 text-muted-foreground text-sm">Carregando...</div>;
+
+
+  if (!canViewRbac) return null;
 
   return (
     <div className="space-y-4">

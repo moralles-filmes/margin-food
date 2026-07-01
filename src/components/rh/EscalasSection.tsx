@@ -19,7 +19,9 @@ import { format, addDays, startOfWeek, parseISO, addWeeks, subWeeks } from 'date
 import { ptBR } from 'date-fns/locale';
 import { fmtBRL } from '@/lib/formatters';
 import { formatDateBR } from '@/lib/datetime';
+import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 
+import { useCan } from '@/permissions/hooks';
 const SETORES = ['cozinha', 'sushi', 'limpeza', 'salao', 'copa'];
 const SETOR_LABELS: Record<string, string> = {
   cozinha: 'Cozinha', sushi: 'Sushi', limpeza: 'Limpeza', salao: 'Salão', copa: 'Copa'
@@ -70,8 +72,11 @@ interface Props {
   canManage: boolean;
 }
 
-export default function EscalasSection({ colaboradores, canManage }: Props) {
+export default function EscalasSection({
+ colaboradores, canManage }: Props) {
+  const canViewRbac = useCan('rh:escalas:view');
   const { user, profile } = useAuth();
+  const { confirm, ConfirmDialog } = useConfirmDialog();
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [setor, setSetor] = useState('salao');
   const [escala, setEscala] = useState<Escala | null>(null);
@@ -208,6 +213,14 @@ export default function EscalasSection({ colaboradores, canManage }: Props) {
   };
 
   const handleDeleteSlot = async (slotId: string) => {
+    const ok = await confirm({
+      title: 'Remover turno',
+      description: 'Tem certeza que deseja remover este turno da escala?',
+      confirmLabel: 'Remover',
+      variant: 'destructive',
+    });
+    if (!ok) return;
+
     const { error } = await supabase.from('rh_escala_slots').delete().eq('id', slotId);
     if (error) { toast.error('Erro: ' + error.message); return; }
     toast.success('Turno removido');
@@ -241,6 +254,8 @@ export default function EscalasSection({ colaboradores, canManage }: Props) {
   if (loading) {
     return <div className="flex items-center justify-center py-12"><div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>;
   }
+
+  if (!canViewRbac) return null;
 
   return (
     <div className="space-y-4">
@@ -442,6 +457,7 @@ export default function EscalasSection({ colaboradores, canManage }: Props) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <ConfirmDialog />
     </div>
   );
 }

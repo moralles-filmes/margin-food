@@ -1,3 +1,4 @@
+import { getCorsHeaders } from "../_shared/cors.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -26,11 +27,7 @@ export function getReversalTipo(tipo: string): "SAIDA_ESTORNO" | "ENTRADA_ESTORN
   return isOriginalEntradaForReversal(tipo) ? "SAIDA_ESTORNO" : "ENTRADA_ESTORNO";
 }
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+let corsHeaders = getCorsHeaders();
 
 interface ReqItem {
   produto_id: string;
@@ -184,6 +181,7 @@ async function writeAudit(
 // ─── Main Handler ───────────────────────────────────────────────────────────
 
 serve(async (req) => {
+  corsHeaders = getCorsHeaders(req);
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -634,7 +632,7 @@ serve(async (req) => {
     // HELPER: sync aggregated parent status from item-level statuses
     // ========================
     async function syncRequisicaoStatus(reqId: string, cId: string, uId: string, userClient: ReturnType<typeof createClient>) {
-      const { data: statusResult } = await adminClient.rpc("compute_requisicao_status_agregado", {
+      const { data: statusResult } = await userClient.rpc("compute_requisicao_status_agregado", {
         p_requisicao_id: reqId,
       });
       const newStatus = statusResult || "SOLICITADA";

@@ -21,6 +21,7 @@ import { format, parseISO, differenceInBusinessDays, addDays, isWithinInterval, 
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 
+import { useCan } from '@/permissions/hooks';
 interface Colaborador {
   id: string;
   nome: string;
@@ -79,7 +80,9 @@ const STATUS_CONFIG: Record<string, { label: string; variant: 'default' | 'secon
   CANCELADO: { label: 'Cancelado', variant: 'destructive' },
 };
 
-export default function FeriasAfastamentosSection({ colaboradores, canManage }: Props) {
+export default function FeriasAfastamentosSection({
+ colaboradores, canManage }: Props) {
+  const canViewRbac = useCan('rh:ferias:view');
   const { user } = useAuth();
   const [registros, setRegistros] = useState<FeriaAfastamento[]>([]);
   const [saldos, setSaldos] = useState<FeriasSaldo[]>([]);
@@ -147,7 +150,7 @@ export default function FeriasAfastamentosSection({ colaboradores, canManage }: 
         dias_uteis: dias,
         motivo: form.motivo,
         observacoes: form.observacoes,
-        solicitado_por: user?.id!,
+        solicitado_por: user?.id ?? null,
       });
       if (error) { toast.error('Erro: ' + error.message); return; }
       toast.success('Solicitação registrada!');
@@ -250,6 +253,8 @@ export default function FeriasAfastamentosSection({ colaboradores, canManage }: 
       } catch { return false; }
     });
   };
+
+  if (!canViewRbac) return null;
 
   return (
     <div className="space-y-4">

@@ -13,6 +13,7 @@ import { AlertTriangle, TrendingUp, TrendingDown, Minus, ShieldAlert, ShoppingCa
 import { fmtBRL as fmtBRLMoney, formatDecimalBR } from '@/lib/formatters';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
+import { useCan } from '@/permissions/hooks';
 interface ForecastDay {
   day: number;
   dow: number;
@@ -82,7 +83,9 @@ const TENDENCIA_CONFIG: Record<string, { label: string; icon: typeof TrendingUp;
 
 const DOW_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
-export default function StockPredictiveSection({ categorias }: Props) {
+export default function StockPredictiveSection({
+ categorias }: Props) {
+  const canViewRbac = useCan('estoque:preditivo:view');
   const [items, setItems] = useState<PredictiveItem[]>([]);
   const [kpis, setKpis] = useState<PredictiveKpis | null>(null);
   const [loading, setLoading] = useState(true);
@@ -155,6 +158,8 @@ export default function StockPredictiveSection({ categorias }: Props) {
     estoque: { label: 'Estoque projetado', color: 'hsl(var(--primary))' },
     consumo: { label: 'Consumo previsto', color: 'hsl(var(--destructive))' },
   };
+
+  if (!canViewRbac) return null;
 
   return (
     <TooltipProvider>

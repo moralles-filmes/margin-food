@@ -20,7 +20,7 @@ import {
 import { useFormDirtyGuard } from '@/hooks/useFormDirtyGuard';
 import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
 import { cn, includesNormalized } from '@/lib/utils';
-import * as XLSX from 'xlsx';
+import * as XLSX from '@/lib/safeXlsx';
 
 // ─── Types ───
 export interface CatNode {
@@ -368,9 +368,6 @@ export default function CadastroBaseTree() {
   useEffect(() => { load(); }, [load]);
   useDataEvent('financeiro:cadastros', load);
 
-  // ─── Early return if no permission ───
-  if (!canView) return <NoAccess />;
-
   const tree = buildTree(items);
   const filteredTree = filterTree(tree, search);
 
@@ -433,6 +430,9 @@ export default function CadastroBaseTree() {
     setShowForm(false);
   };
   const { showConfirm, guardedClose, confirmClose, cancelClose } = useFormDirtyGuard({ current: form, onClose: resetForm });
+
+  // ─── Early return if no permission ───
+  if (!canView) return <NoAccess />;
 
   const save = async () => {
     if (saving) return;
