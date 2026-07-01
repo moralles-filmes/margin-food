@@ -252,7 +252,8 @@ export default function AdminUsersView() {
         permissions: Array.from(newPermissions),
       });
 
-      toast.success(`Usuário ${newEmail} criado!`);
+      if (data?.warning) toast.warning(data.warning);
+      else toast.success(`Usuário ${newEmail} criado!`);
       setShowCreate(false);
       setNewEmail(''); setNewNome(''); setNewRole('operador'); setNewSector(''); setNewJobRoleId('');
       setNewPermissions(new Set());
@@ -284,22 +285,23 @@ export default function AdminUsersView() {
     if (!editingUser) return;
     setSaving(true);
     try {
-      const { data, error: invokeError } = await (supabase.functions.invoke as any)('admin-users', {
-        body: {
-          action: 'edit-user',
-          userId: editingUser.id,
-          nome: editNome,
-          email: editEmail,
-          role: editRole,
-          permissions: Array.from(editPermissions),
-        }
+      // Usa o helper invoke() (checa data.error, faz refresh de auth e lança em
+      // falha) — o chamador antigo ignorava invokeError e mostrava sucesso sempre.
+      const data = await invoke({
+        action: 'edit-user',
+        userId: editingUser.id,
+        nome: editNome,
+        email: editEmail,
+        role: editRole,
+        permissions: Array.from(editPermissions),
       });
 
-      toast.success('Usuário atualizado!');
+      if (data?.warning) toast.warning(data.warning);
+      else toast.success('Usuário atualizado!');
       setEditingUser(null);
       fetchAll();
     } catch (err: any) {
-      console.error('Error in handleEditUser:', err);
+      console.error('[handleEditUser]', err);
       toast.error('Erro ao salvar usuário: ' + (err.message || 'Erro desconhecido'));
     } finally {
       setSaving(false);

@@ -14,7 +14,7 @@ import { gerarPDFPedido } from '@/lib/pdfGenerator';
 import PedidosComprasMercadoView from '@/components/PedidosComprasMercadoView';
 import AlertasFaltaEstoqueView from '@/components/compras/AlertasFaltaEstoqueView';
 import SuppliersView from '@/components/SuppliersView';
-import { usePurchaseOrdersStore } from '@/hooks/usePurchaseOrdersStore';
+import { usePurchaseOrdersStoreContext } from '@/contexts/PurchaseOrdersStoreContext';
 import ShoppingChecklistView from '@/components/compras/ShoppingChecklistView';
 import CalendarioLembretesView from '@/components/compras/CalendarioLembretesView';
 import RankingFornecedoresView from '@/components/compras/RankingFornecedoresView';
@@ -55,7 +55,7 @@ export default function ComprasView() {
 
   const [activeView, setActiveView] = usePersistedTab<SubView>('app:tab:compras', 'pedidos-compras');
   const salmonStore = useSalmonStoreContext();
-  const purchaseOrdersStore = usePurchaseOrdersStore();
+  const purchaseOrdersStore = usePurchaseOrdersStoreContext();
   const cotacoesStore = useCotacoesStore();
   const shoppingCount = purchaseOrdersStore.shoppingCount;
 

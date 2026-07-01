@@ -4,6 +4,7 @@ import { usePersistedTab } from '@/hooks/usePersistedTab';
 import { TabId } from '@/types/salmon';
 import { SalmonStoreProvider, useSalmonStoreContext } from '@/contexts/SalmonStoreContext';
 import { EstoqueGeralStoreProvider, useEstoqueGeralStoreContext } from '@/contexts/EstoqueGeralStoreContext';
+import { PurchaseOrdersStoreProvider } from '@/contexts/PurchaseOrdersStoreContext';
 import { useAuth } from '@/contexts/AuthContext';
 import type { AppPermission } from '@/contexts/AuthContext';
 import AppLayout from '@/components/AppLayout';
@@ -272,7 +273,9 @@ const Index = () => {
         {activeTab === 'salmon' && canAccessTab('salmon') && <SalmonControlView store={store} />}
         {activeTab === 'estoque-geral' && canAccessTab('estoque-geral') && <EstoqueGeralView />}
         {activeTab === 'inventario' && canAccessTab('inventario') && <InventarioView />}
-        {activeTab === 'compras' && canAccessTab('compras') && <ComprasView />}
+        {activeTab === 'compras' && canAccessTab('compras') && (
+          <PurchaseOrdersStoreProvider><ComprasView /></PurchaseOrdersStoreProvider>
+        )}
         {activeTab === 'planning' && canAccessTab('planning') && <PlanningView store={store} estoqueStore={estoqueStore} />}
         {activeTab === 'suppliers' && canAccessTab('suppliers') && <SuppliersView store={store} />}
         {activeTab === 'relatorios' && canAccessTab('relatorios') && <RelatoriosView />}

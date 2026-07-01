@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEstoqueGeralStoreContext } from '@/contexts/EstoqueGeralStoreContext';
 import { useSalmonStoreContext } from '@/contexts/SalmonStoreContext';
-import { usePurchaseOrdersStore } from '@/hooks/usePurchaseOrdersStore';
+import { usePurchaseOrdersStoreContext } from '@/contexts/PurchaseOrdersStoreContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -57,7 +57,7 @@ export default function CalendarioLembretesView() {
   const { user } = useAuth();
   const { produtos } = useEstoqueGeralStoreContext();
   const salmonStore = useSalmonStoreContext();
-  const purchaseStore = usePurchaseOrdersStore();
+  const purchaseStore = usePurchaseOrdersStoreContext();
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
