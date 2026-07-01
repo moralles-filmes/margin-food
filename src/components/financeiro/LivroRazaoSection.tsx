@@ -22,7 +22,7 @@ import { useFormDirtyGuard } from '@/hooks/useFormDirtyGuard';
 import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
 import ContaDetailDialog, { type ContaDetailData, type ContaDetailRateio } from './ContaDetailDialog';
 import ContaFormDialog, { type ContaFormData, type RateioLine } from './ContaFormDialog';
-import * as XLSX from 'xlsx';
+import * as XLSX from '@/lib/safeXlsx';
 import { mapFinanceiroDeleteError } from '@/lib/financeiroErrorMap';
 import DateRangePresets from './DateRangePresets';
 
@@ -195,8 +195,6 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
   useEffect(() => { setCursorDate(null); setCursorId(null); setItems([]); loadPage(null, null); }, [filtroTipo, filtroOrigem, filtroConta, filtroDataDe, filtroDataAte, loadPage]);
   useDataEvent('financeiro:lancamentos', load);
 
-  if (!canView) return <NoAccess />;
-
   const fmt = fmtBRL;
   const catNome = (id: string) => categorias.find(c => c.id === id)?.nome || '';
   const contaNome = (id: string) => contas.find(c => c.id === id)?.nome || '-';
@@ -264,6 +262,8 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
   };
   const { showConfirm, guardedClose, confirmClose, cancelClose } = useFormDirtyGuard({ current: form, onClose: resetForm });
 
+  if (!canView) return <NoAccess />;
+
   const openEdit = async (item: Lancamento) => {
     if (item.conciliado) {
       toast.error('Lancamentos conciliados devem ser desconciliados antes da edicao.');
@@ -286,7 +286,7 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
     // Load rateios from database
     const { data: rates, error: rateErr } = await supabase
       .from('fin_lancamento_rateios')
-      .select('*')
+      .select('id, categoria_id, centro_custo_id, valor, percentual')
       .eq('lancamento_id', item.id);
     if (rateErr) {
       toast.error('Erro ao carregar rateios: ' + rateErr.message);

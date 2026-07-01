@@ -17,6 +17,7 @@ import { formatInBR } from '@/lib/datetime';
 import { fmtBRL } from '@/lib/money';
 import type { Database } from '@/integrations/supabase/types';
 
+import { useCan } from '@/permissions/hooks';
 type RhCustoMensal = Database['public']['Tables']['rh_custos_mensais']['Row'];
 
 interface RhColaborador {
@@ -51,7 +52,9 @@ interface CustoMensalView {
 
 const fmt = fmtBRL;
 
-export default function ControleCustosRhSection({ colaboradores }: Props) {
+export default function ControleCustosRhSection({
+ colaboradores }: Props) {
+  const canViewRbac = useCan('rh:custos:view');
   const { user } = useAuth();
   const [custos, setCustos] = useState<CustoMensalView[]>([]);
   const [loading, setLoading] = useState(true);
@@ -166,6 +169,8 @@ export default function ControleCustosRhSection({ colaboradores }: Props) {
   const variacao = atual && anterior && anterior.total_geral > 0
     ? ((atual.total_geral - anterior.total_geral) / anterior.total_geral) * 100
     : null;
+
+  if (!canViewRbac) return null;
 
   return (
     <div className="space-y-4">

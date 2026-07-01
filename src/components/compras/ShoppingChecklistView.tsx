@@ -7,7 +7,8 @@ import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCan } from '@/permissions/hooks';
-import { usePurchaseOrdersStore, PurchaseOrder, PurchaseOrderItem } from '@/hooks/usePurchaseOrdersStore';
+import { PurchaseOrder, PurchaseOrderItem } from '@/hooks/usePurchaseOrdersStore';
+import { usePurchaseOrdersStoreContext } from '@/contexts/PurchaseOrdersStoreContext';
 import { supabase } from '@/integrations/supabase/client';
 
 interface Props {
@@ -16,7 +17,7 @@ interface Props {
 
 export default function ShoppingChecklistView({ onNavigateToOrder }: Props) {
   const { user } = useAuth();
-  const store = usePurchaseOrdersStore();
+  const store = usePurchaseOrdersStoreContext();
   const isAdmin = useCan('system:global:manage');
 
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);

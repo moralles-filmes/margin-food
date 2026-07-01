@@ -18,7 +18,7 @@ import { ptBR } from 'date-fns/locale';
 import { APP_NAME } from '@/lib/brand';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import * as XLSX from 'xlsx';
+import * as XLSX from '@/lib/safeXlsx';
 import DashboardCharts from '@/components/financeiro/DashboardCharts';
 import {
   DollarSign, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight,

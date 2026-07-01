@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import { useCan } from '@/permissions/hooks';
 import { AlertTriangle, Bell, Clock, RefreshCw, ExternalLink, ShieldX, Download } from 'lucide-react';
 import { fmtBRL } from '@/lib/money';
-import * as XLSX from 'xlsx';
+import * as XLSX from '@/lib/safeXlsx';
 
 // ─── Types ───
 interface AlertaFinanceiro {

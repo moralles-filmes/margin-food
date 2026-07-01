@@ -1,12 +1,8 @@
+import { getCorsHeaders } from "../_shared/cors.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
-}
-
-// ─── TENANT RESOLUTION (FAIL-CLOSED) ───
+let corsHeaders = getCorsHeaders();// ─── TENANT RESOLUTION (FAIL-CLOSED) ───
 async function resolveTenantOrThrow(adminClient: any, userId: string): Promise<string> {
   const { data, error } = await adminClient
     .from('profiles')
@@ -51,6 +47,7 @@ async function writeAudit(
 }
 
 serve(async (req) => {
+  corsHeaders = getCorsHeaders(req);
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }

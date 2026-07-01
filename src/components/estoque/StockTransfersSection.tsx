@@ -12,6 +12,7 @@ import { ArrowRight, ArrowLeftRight, Loader2, Package, MapPin, RefreshCw, Search
 import { format, subDays } from 'date-fns';
 import { fmtBRL, formatFixedBR } from '@/lib/formatters';
 
+import { useCan } from '@/permissions/hooks';
 interface Transfer {
   transfer_group_id: string;
   produto_id: string;
@@ -35,7 +36,9 @@ interface Props {
   locais: string[];
 }
 
-export default function StockTransfersSection({ categorias, locais }: Props) {
+export default function StockTransfersSection({
+ categorias, locais }: Props) {
+  const canViewRbac = useCan('estoque:transferencias:view');
   const store = useEstoqueGeralStoreContext();
   const { produtos, saldos } = store;
   const activeProdutos = useMemo(() => produtos.filter(p => p.ativo), [produtos]);
@@ -139,6 +142,8 @@ export default function StockTransfersSection({ categorias, locais }: Props) {
   };
 
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+
+  if (!canViewRbac) return null;
 
   return (
     <div className="space-y-4">

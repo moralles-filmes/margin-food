@@ -14,7 +14,7 @@ import { RefreshCw, Repeat, Play, ExternalLink, ShieldX, Download, FileText } fr
 import { fmtBRL, todayBR, formatInBR } from '@/lib/formatters';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import * as XLSX from 'xlsx';
+import * as XLSX from '@/lib/safeXlsx';
 
 // ─── Types ───
 type OrigemType = 'lancamento' | 'conta_pagar' | 'conta_receber';

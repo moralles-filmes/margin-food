@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils';
 import GlobalKpiCard from '@/components/ui/KpiCard';
 import { formatIntegerBR } from '@/lib/formatters';
 
+import { useCan } from '@/permissions/hooks';
 interface Colaborador {
   id: string;
   nome: string;
@@ -51,7 +52,9 @@ const GRAVIDADES = [
 
 const R = (v: number) => formatIntegerBR(v);
 
-export default function SSTSection({ colaboradores, canManage }: Props) {
+export default function SSTSection({
+ colaboradores, canManage }: Props) {
+  const canViewRbac = useCan('rh:sst:view');
   const { user } = useAuth();
   const [tab, setTab] = useState<SstTab>('epis');
   const [epis, setEpis] = useState<any[]>([]);
@@ -115,6 +118,8 @@ export default function SSTSection({ colaboradores, canManage }: Props) {
       </div>
     );
   }
+
+  if (!canViewRbac) return null;
 
   return (
     <div className="space-y-4">

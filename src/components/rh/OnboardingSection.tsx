@@ -19,6 +19,7 @@ import {
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
+import { useCan } from '@/permissions/hooks';
 interface Colaborador {
   id: string;
   nome: string;
@@ -97,7 +98,9 @@ const FASE_LABELS: Record<string, string> = {
   '30dias': '30 Dias', '60dias': '60 Dias', '90dias': '90 Dias'
 };
 
-export default function OnboardingSection({ colaboradores, canManage }: Props) {
+export default function OnboardingSection({
+ colaboradores, canManage }: Props) {
+  const canViewRbac = useCan('rh:onboarding:view');
   const { user } = useAuth();
   const [onboardings, setOnboardings] = useState<Onboarding[]>([]);
   const [loading, setLoading] = useState(true);
@@ -138,7 +141,7 @@ export default function OnboardingSection({ colaboradores, canManage }: Props) {
     const { error } = await supabase.from('rh_onboarding').insert([{
       colaborador_id: formColabId,
       mentor_id: formMentorId || null,
-      criado_por: user?.id!,
+      criado_por: user?.id ?? null,
       checklist_admissao: JSON.parse(JSON.stringify(DEFAULT_ADMISSAO)),
       checklist_30dias: JSON.parse(JSON.stringify(DEFAULT_30)),
       checklist_60dias: JSON.parse(JSON.stringify(DEFAULT_60)),
@@ -327,6 +330,8 @@ export default function OnboardingSection({ colaboradores, canManage }: Props) {
   }
 
   // List view
+  if (!canViewRbac) return null;
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">

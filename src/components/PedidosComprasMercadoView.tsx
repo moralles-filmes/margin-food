@@ -2,7 +2,8 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { includesNormalized, normalizeSearchText } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCan } from '@/permissions/hooks';
-import { usePurchaseOrdersStore, PurchaseOrder, PurchaseOrderItem } from '@/hooks/usePurchaseOrdersStore';
+import { PurchaseOrder, PurchaseOrderItem } from '@/hooks/usePurchaseOrdersStore';
+import { usePurchaseOrdersStoreContext } from '@/contexts/PurchaseOrdersStoreContext';
 import { useEstoqueGeralStoreContext } from '@/contexts/EstoqueGeralStoreContext';
 import { useSalmonStoreContext } from '@/contexts/SalmonStoreContext';
 import { Button } from '@/components/ui/button';
@@ -59,7 +60,7 @@ function serializeCategories(cats: string[]): string {
 
 export default function PedidosComprasMercadoView() {
   const { user } = useAuth();
-  const store = usePurchaseOrdersStore();
+  const store = usePurchaseOrdersStoreContext();
   const estoqueStore = useEstoqueGeralStoreContext();
   const salmonStore = useSalmonStoreContext();
   const { produtos } = estoqueStore;

@@ -71,8 +71,10 @@ export default function MovimentacoesSection({
   onRefresh, onFilterChange, onLoadMore, hasMore, movKpis, movKpisLoading,
 }: Props) {
   const { hasPermission } = useAuth();
-  const canEdit = hasPermission('stock:movements:edit') || useCan('estoque:movimentacoes:edit');
-  const canCancel = hasPermission('stock:movements:cancel') || useCan('estoque:movimentacoes:cancel');
+  const canEditMovimentacoes = useCan('estoque:movimentacoes:edit');
+  const canCancelMovimentacoes = useCan('estoque:movimentacoes:cancel');
+  const canEdit = hasPermission('stock:movements:edit') || canEditMovimentacoes;
+  const canCancel = hasPermission('stock:movements:cancel') || canCancelMovimentacoes;
 
   const [direction, setDirection] = useState<DirectionTab>('entradas');
   const [filterProduto, setFilterProduto] = useState('all');

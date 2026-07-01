@@ -19,6 +19,7 @@ import { format, parseISO, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 
+import { useCan } from '@/permissions/hooks';
 interface Props {
   canManage: boolean;
 }
@@ -43,7 +44,9 @@ const SETOR_LABELS: Record<string, string> = {
   cozinha: 'Cozinha', sushi: 'Sushi', limpeza: 'Limpeza', salao: 'Salão', copa: 'Copa'
 };
 
-export default function ComunicacaoInternaSection({ canManage }: Props) {
+export default function ComunicacaoInternaSection({
+ canManage }: Props) {
+  const canViewRbac = useCan('rh:mural:view');
   const { user } = useAuth();
   const [comunicados, setComunicados] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -161,6 +164,8 @@ export default function ComunicacaoInternaSection({ canManage }: Props) {
 
   const fixados = filtered.filter(c => c.fixado);
   const naoFixados = filtered.filter(c => !c.fixado);
+
+  if (!canViewRbac) return null;
 
   return (
     <div className="space-y-4">

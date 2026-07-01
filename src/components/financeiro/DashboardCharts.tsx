@@ -11,6 +11,7 @@ import { fmtBRL, formatDecimalBR } from '@/lib/formatters';
 import { toast } from 'sonner';
 import { AlertTriangle } from 'lucide-react';
 
+import { useCan } from '@/permissions/hooks';
 // ── Types ──
 
 interface MonthlyItem {
@@ -52,6 +53,7 @@ const PIE_COLORS = [
 ];
 
 export default function DashboardCharts() {
+  const canViewRbac = useCan('financeiro:dashboard:view');
   const [chartData, setChartData] = useState<ChartsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -144,6 +146,9 @@ export default function DashboardCharts() {
   }
 
   const { evolucao_mensal, despesas_por_categoria } = chartData;
+
+
+  if (!canViewRbac) return null;
 
   return (
     <div className="space-y-4">

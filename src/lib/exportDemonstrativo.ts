@@ -155,7 +155,7 @@ export async function exportDemonstrativoPDF(opts: BuildOptions & { titulo: stri
 // ── Excel Export ──
 
 export async function exportDemonstrativoExcel(opts: BuildOptions & { titulo: string; periodo: string }) {
-  const XLSX = await import('xlsx');
+  const XLSX = await import('@/lib/safeXlsx');
   const { rows, receitaTotal } = buildExportRows(opts);
   const showPct = opts.showPctReceita && receitaTotal > 0;
 

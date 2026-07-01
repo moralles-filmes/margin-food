@@ -7,6 +7,7 @@ import { Loader2, PieChart as PieIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { fmtBRL } from '@/lib/money';
 
+import { useCan } from '@/permissions/hooks';
 interface SectorBreakdown {
   sector: string;
   value: number;
@@ -41,7 +42,9 @@ const chartTooltipStyle = {
   color: 'hsl(var(--foreground))',
 };
 
-export default function GastosPorSetorChart({ period }: { period: PeriodRange }) {
+export default function GastosPorSetorChart({
+ period }: { period: PeriodRange }) {
+  const canViewRbac = useCan('relatorios:cmv:view');
   const [data, setData] = useState<SpendBySectorData | null>(null);
   const [loading, setLoading] = useState(false);
   const [includeLosses, setIncludeLosses] = useState(true);
@@ -69,6 +72,8 @@ export default function GastosPorSetorChart({ period }: { period: PeriodRange })
   }, [period, includeLosses]);
 
   const breakdown = data?.breakdown || [];
+
+  if (!canViewRbac) return null;
 
   return (
     <div className="bg-card border border-border rounded-xl p-4 space-y-3 animate-fade-up">

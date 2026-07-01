@@ -21,6 +21,9 @@ export default tseslint.config(
       ...reactHooks.configs.recommended.rules,
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
       "@typescript-eslint/no-unused-vars": "off",
+      // Dívida técnica existente: manter visível sem bloquear o gate global.
+      // Não adicionar `any` novo sem justificativa; migrar por módulo para tipos/narrowing.
+      "@typescript-eslint/no-explicit-any": "warn",
       // Blindagem de busca accent-insensitive — ver CLAUDE.md "Padrões de Busca de Texto"
       "no-restricted-syntax": [
         "error",

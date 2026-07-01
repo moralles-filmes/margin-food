@@ -209,16 +209,23 @@ export function usePurchaseOrdersStore() {
     if (user) fetchOrders();
   }, [user, fetchOrders]);
 
+  // Mantém a referência mais recente de fetchOrders sem re-executar o efeito do
+  // canal Realtime. O efeito abaixo depende só de [user], então o canal é criado
+  // e subscrito UMA vez por sessão — nunca re-bindado quando os filtros mudam
+  // (evita o erro "cannot add postgres_changes callbacks after subscribe()").
+  const fetchOrdersRef = useRef(fetchOrders);
+  useEffect(() => { fetchOrdersRef.current = fetchOrders; }, [fetchOrders]);
+
   useEffect(() => {
     if (!user) return;
     const channel = supabase
       .channel('purchase-orders-rt')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'purchase_orders' }, () => {
-        fetchOrders();
+        fetchOrdersRef.current();
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [user, fetchOrders]);
+  }, [user]);
 
   const fetchItems = useCallback(async (orderId: string): Promise<PurchaseOrderItem[]> => {
     const { data } = await supabase

@@ -19,7 +19,7 @@ import { todayBR } from '@/lib/datetime';
 import TableActions from '@/components/ui/TableActions';
 import ContaDetailDialog, { type ContaDetailData, type ContaDetailRateio } from './ContaDetailDialog';
 import ContaFormDialog, { type ContaFormData, type RateioLine } from './ContaFormDialog';
-import * as XLSX from 'xlsx';
+import * as XLSX from '@/lib/safeXlsx';
 import { mapFinanceiroDeleteError } from '@/lib/financeiroErrorMap';
 
 /* ─── Types ─── */
@@ -71,6 +71,7 @@ function NoAccess() {
 export default function ContasPagarSection() {
   const canView = useCan('financeiro:pagar:view');
   const canCreate = useCan('financeiro:pagar:create');
+  const canEdit = useCan('financeiro:pagar:edit');
   const canApprove = useCan('financeiro:pagar:approve');
   const canExport = useCan('financeiro:pagar:export');
 
@@ -112,8 +113,6 @@ export default function ContasPagarSection() {
   useEffect(() => { if (!canView) return; setCursorDate(null); setCursorId(null); setItems([]); loadPage(null, null); loadTotals(); }, [filtroStatus, canView]);
   useDataEvent('financeiro:cadastros', useCallback(() => { if (canView) loadAux(); }, [canView]));
   useDataEvent('financeiro:pagar', useCallback(() => { if (canView) { loadPage(null, null); loadTotals(); } }, [canView]));
-
-  if (!canView) return <NoAccess />;
 
   const loadPage = async (cDate: string | null, cId: string | null) => {
     setLoading(true);
@@ -159,7 +158,7 @@ export default function ContasPagarSection() {
     try {
       const { data: detail, error: detailErr } = await supabase
         .from('fin_contas_pagar')
-        .select('*')
+        .select('id, descricao, fornecedor, supplier_id, valor, status, data_competencia, data_vencimento, data_pagamento, forma_pagamento, categoria_id, centro_custo_id, conta_id, observacoes, recorrente, recorrencia_config, updated_at')
         .eq('id', item.id)
         .single();
       if (detailErr) throw detailErr;
@@ -217,20 +216,22 @@ export default function ContasPagarSection() {
   };
   const { showConfirm, guardedClose, confirmClose, cancelClose } = useFormDirtyGuard({ current: form, onClose: handleCloseForm });
 
+  if (!canView) return <NoAccess />;
+
   /* ─── Open edit from detail or table ─── */
   const handleEdit = async (item: ContaPagar) => {
     setLoading(true);
     try {
       const { data: detail, error: detailErr } = await supabase
         .from('fin_contas_pagar')
-        .select('*')
+        .select('id, descricao, fornecedor, supplier_id, valor, status, data_competencia, data_vencimento, data_pagamento, forma_pagamento, categoria_id, centro_custo_id, conta_id, observacoes, recorrente, recorrencia_config, updated_at')
         .eq('id', item.id)
         .single();
       if (detailErr) throw detailErr;
 
       const { data: rates, error: rateErr } = await supabase
         .from('fin_lancamento_rateios')
-        .select('*')
+        .select('id, categoria_id, centro_custo_id, valor, percentual')
         .eq('lancamento_id', item.id);
       if (rateErr) throw rateErr;
 
@@ -554,7 +555,7 @@ export default function ContasPagarSection() {
         onOpenChange={setShowDetail}
         data={detailData}
         variant="pagar"
-        canEdit={useCan('financeiro:pagar:edit')}
+        canEdit={canEdit}
         canApprove={canApprove}
         saving={saving}
         onEdit={() => detailRawItem && handleEdit(detailRawItem)}

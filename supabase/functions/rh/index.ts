@@ -1,12 +1,11 @@
+import { getCorsHeaders } from "../_shared/cors.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+let corsHeaders = getCorsHeaders();
 
 serve(async (req) => {
+  corsHeaders = getCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
@@ -101,7 +100,7 @@ serve(async (req) => {
 
         let totalMinTrabalhados = 0;
         let diasTrabalhados = 0;
-        let atrasosTotalMin = 0;
+        const atrasosTotalMin = 0;
 
         for (const [date, dayPontos] of Object.entries(byDate)) {
           const entradas = dayPontos.filter((p: any) => p.tipo === "ENTRADA");

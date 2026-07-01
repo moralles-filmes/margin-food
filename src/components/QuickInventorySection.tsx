@@ -10,6 +10,7 @@ import { Search, Loader2, ClipboardCheck, Package, CheckCircle, AlertTriangle, Z
 import { fmtBRL, formatFixedBR } from '@/lib/formatters';
 import { normalizeSearchText } from '@/lib/utils';
 
+import { useCan } from '@/permissions/hooks';
 interface CountedItem {
   productId: string;
   nomeProduto: string;
@@ -28,6 +29,7 @@ interface ProductRow {
 }
 
 export default function QuickInventorySection() {
+  const canViewRbac = useCan('inventario:rapido:view');
   // Product search
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
@@ -217,6 +219,9 @@ export default function QuickInventorySection() {
       </div>
     );
   }
+
+
+  if (!canViewRbac) return null;
 
   return (
     <div className="space-y-4">

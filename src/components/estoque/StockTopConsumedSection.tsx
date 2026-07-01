@@ -14,6 +14,7 @@ import EmptyState from '@/components/ui/EmptyState';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Cell, PieChart, Pie, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { fmtBRL, fmtBRLCompact, formatFixedBR, formatPercentBR } from '@/lib/formatters';
 
+import { useCan } from '@/permissions/hooks';
 interface RankedItem {
   produto_id: string; nome_produto: string; categoria: string;
   // unidade_medida contém a unidade de compra para itens dual-unit (unidade_compra ≠ base)
@@ -59,7 +60,9 @@ const chartConfig: ChartConfig = { consumo_total: { label: 'Consumo', color: 'hs
 type PeriodPreset = '7' | '30' | '90' | 'custom';
 type RankBy = 'quantity' | 'cost';
 
-export default function StockTopConsumedSection({ categorias }: { categorias: string[] }) {
+export default function StockTopConsumedSection({
+ categorias }: { categorias: string[] }) {
+  const canViewRbac = useCan('estoque:ranking:view');
   const [data, setData] = useState<TopConsumedData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -106,6 +109,8 @@ export default function StockTopConsumedSection({ categorias }: { categorias: st
   }, [startDate, endDate, rankBy, filterCategory]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  if (!canViewRbac) return null;
 
   return (
     <div className="space-y-4">

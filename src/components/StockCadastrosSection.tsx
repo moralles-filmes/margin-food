@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
+import { useCan } from '@/permissions/hooks';
 interface StockCategory {
   id: string;
   name: string;
@@ -40,6 +41,7 @@ const LOCATION_TYPES = [
 ];
 
 export default function StockCadastrosSection() {
+  const canViewRbac = useCan('estoque:cadastros:view');
   const { user, profile } = useAuth();
   const [tab, setTab] = useState('categorias');
   const { confirm, ConfirmDialog } = useConfirmDialog();
@@ -260,6 +262,9 @@ export default function StockCadastrosSection() {
     toast.success('Local excluído');
     fetchLocations();
   };
+
+
+  if (!canViewRbac) return null;
 
   return (
     <div className="space-y-4">

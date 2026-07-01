@@ -12,7 +12,7 @@ import { fmtBRL, fmtBRLCompact, formatPercentBR, formatIntegerBR } from '@/lib/f
 import KpiCard from '@/components/ui/KpiCard';
 import { useCan } from '@/permissions/hooks';
 import { useDataEvent } from '@/lib/dataEvents';
-import * as XLSX from 'xlsx';
+import * as XLSX from '@/lib/safeXlsx';
 
 /* ─── Types ─── */
 type KPIFornecedor = { nome: string; total: number };

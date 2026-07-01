@@ -14,6 +14,7 @@ import KpiCard from '@/components/ui/KpiCard';
 import StatusBadge from '@/components/ui/StatusBadge';
 import type { StockHealthStatus } from '@/domain/estoque/rules';
 
+import { useCan } from '@/permissions/hooks';
 interface DashboardCategory {
   categoria: string;
   valor: number;
@@ -159,7 +160,9 @@ function normalizeDashboardData(raw: unknown): DashboardData | null {
   };
 }
 
-export default function StockDashboardSection({ categorias, onNavigate }: Props) {
+export default function StockDashboardSection({
+ categorias, onNavigate }: Props) {
+  const canViewRbac = useCan('estoque:dashboard:view');
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -245,6 +248,8 @@ export default function StockDashboardSection({ categorias, onNavigate }: Props)
       </div>
     );
   }
+
+  if (!canViewRbac) return null;
 
   return (
     <div className="space-y-4">

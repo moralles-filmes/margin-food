@@ -21,7 +21,7 @@ import {
 import { useFormDirtyGuard } from '@/hooks/useFormDirtyGuard';
 import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
 import TableActions from '@/components/ui/TableActions';
-import * as XLSX from 'xlsx';
+import * as XLSX from '@/lib/safeXlsx';
 import { includesNormalized } from '@/lib/utils';
 import { mapFinanceiroDeleteError } from '@/lib/financeiroErrorMap';
 
@@ -151,9 +151,6 @@ export default function ContasBancariasSection({ onNavigateExtrato }: ContasBanc
   useDataEvent('financeiro:contas_receber', loadSaldos);
   useDataEvent('financeiro:conciliacao', loadSaldos);
 
-  // ─── Early return ───
-  if (!canView) return <NoAccess />;
-
   // ─── Filtering ───
   const filtered = items.filter(c => {
     const matchSearch = !search || includesNormalized(c.nome, search) || includesNormalized(c.banco || '', search);
@@ -183,6 +180,9 @@ export default function ContasBancariasSection({ onNavigateExtrato }: ContasBanc
     setShowForm(false);
   };
   const { showConfirm, guardedClose, confirmClose, cancelClose } = useFormDirtyGuard({ current: form, onClose: resetForm });
+
+  // ─── Early return ───
+  if (!canView) return <NoAccess />;
 
   const save = async () => {
     if (saving) return;

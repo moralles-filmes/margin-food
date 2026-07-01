@@ -5,6 +5,7 @@ import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 import { Upload, CheckCircle2, AlertTriangle, Loader2 } from 'lucide-react';
 
+import { useCan } from '@/permissions/hooks';
 interface LocalEntry {
   id: string;
   date: string;
@@ -47,7 +48,9 @@ interface MigrationResult {
   errors: string[];
 }
 
-export default function SalmonMigrationWizard({ onComplete }: { onComplete?: () => void }) {
+export default function SalmonMigrationWizard({
+ onComplete }: { onComplete?: () => void }) {
+  const canViewRbac = useCan('salmon:estoque:view');
   const [status, setStatus] = useState<MigrationStatus>('idle');
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<MigrationResult | null>(null);
@@ -265,6 +268,8 @@ export default function SalmonMigrationWizard({ onComplete }: { onComplete?: () 
       </div>
     );
   }
+
+  if (!canViewRbac) return null;
 
   return (
     <div className="bg-card border border-border rounded-xl p-4 space-y-3">

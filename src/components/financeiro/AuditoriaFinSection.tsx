@@ -13,7 +13,7 @@ import { parseUTCToBR, formatDateBR, parseLocalDate } from '@/lib/formatters';
 import { RefreshCw, Shield, Search, FileDown, Ban, ChevronDown, ChevronRight, Plus, Pencil, Trash2, Users } from 'lucide-react';
 import { useCan } from '@/permissions/hooks';
 import { useDataEvent } from '@/lib/dataEvents';
-import * as XLSX from 'xlsx';
+import * as XLSX from '@/lib/safeXlsx';
 
 /* ─── Types ─── */
 interface AuditoriaFinItem {

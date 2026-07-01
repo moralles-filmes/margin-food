@@ -21,6 +21,7 @@ import CriarLancamentoExtratoDialog from '@/components/financeiro/CriarLancament
 import CategoryCombobox from '@/components/financeiro/CategoryCombobox';
 import type { ContaBancariaRef, CategoriaFinRef, CentroCustoRef, LancamentoConciliacao, LancamentoCandidate, ContaPagarCandidate, ContaReceberCandidate } from '@/types/financeiro';
 
+import { useCan } from '@/permissions/hooks';
 /* ───────── Types ───────── */
 
 interface MatchSuggestion {
@@ -113,6 +114,7 @@ function clearLinhas(contaId: string) {
 }
 
 export default function ConciliacaoBancariaSection() {
+  const canViewRbac = useCan('financeiro:conciliacao:view');
   const { user } = useAuth();
   const [contas, setContas] = useState<ContaBancariaRef[]>([]);
   const [contaSel, setContaSel] = useState('');
@@ -756,6 +758,9 @@ export default function ConciliacaoBancariaSection() {
     setTransferDialog({ open: false, linhaIndex: -1 });
     setTransferContaDestino('');
   };
+
+
+  if (!canViewRbac) return null;
 
   return (
     <div className="space-y-4">

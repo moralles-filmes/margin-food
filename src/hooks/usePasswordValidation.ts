@@ -32,7 +32,7 @@ export function usePasswordValidation(): PasswordValidation {
     if (!/[A-Z]/.test(password)) errs.push('1 letra maiúscula');
     if (!/[a-z]/.test(password)) errs.push('1 letra minúscula');
     if (!/[0-9]/.test(password)) errs.push('1 número');
-    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) errs.push('1 símbolo especial');
+    if (!/[^A-Za-z0-9]/.test(password)) errs.push('1 símbolo especial');
     if (COMMON_PASSWORDS.includes(password.toLowerCase())) errs.push('Senha muito comum');
     return errs;
   }, [password]);
@@ -44,7 +44,7 @@ export function usePasswordValidation(): PasswordValidation {
     if (/[A-Z]/.test(password)) score++;
     if (/[a-z]/.test(password)) score++;
     if (/[0-9]/.test(password)) score++;
-    if (/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) score++;
+    if (/[^A-Za-z0-9]/.test(password)) score++;
     return score;
   }, [password]);
 

@@ -1,10 +1,24 @@
+import { getCorsHeaders } from "../_shared/cors.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
-};
+let corsHeaders = getCorsHeaders();
+
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const RATE_LIMIT_MAX_ATTEMPTS = 10;
+const rateLimit = new Map<string, { count: number; resetAt: number }>();
+
+function checkRateLimit(key: string): boolean {
+  const now = Date.now();
+  const current = rateLimit.get(key);
+  if (!current || current.resetAt <= now) {
+    rateLimit.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return true;
+  }
+  if (current.count >= RATE_LIMIT_MAX_ATTEMPTS) return false;
+  current.count += 1;
+  return true;
+}
 
 const COMMON_PASSWORDS = [
   'password', '123456', '12345678', 'qwerty', 'abc123', 'monkey', 'master',
@@ -20,7 +34,7 @@ function validatePasswordStrength(password: string): { valid: boolean; errors: s
   if (!/[A-Z]/.test(password)) errors.push('Pelo menos 1 letra maiúscula');
   if (!/[a-z]/.test(password)) errors.push('Pelo menos 1 letra minúscula');
   if (!/[0-9]/.test(password)) errors.push('Pelo menos 1 número');
-  if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) errors.push('Pelo menos 1 símbolo especial');
+  if (!/[^A-Za-z0-9]/.test(password)) errors.push('Pelo menos 1 símbolo especial');
   if (COMMON_PASSWORDS.includes(password.toLowerCase())) errors.push('Senha muito comum');
   return { valid: errors.length === 0, errors };
 }
@@ -57,11 +71,48 @@ async function checkPwnedPassword(password: string): Promise<{ breached: boolean
 }
 
 serve(async (req) => {
+  corsHeaders = getCorsHeaders(req);
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
+  if (req.method !== 'POST') {
+    return new Response(JSON.stringify({ error: 'Método não permitido' }), {
+      status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+
   try {
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Não autorizado' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
+    if (!supabaseUrl || !anonKey) {
+      return new Response(JSON.stringify({ error: 'Configuração do servidor inválida' }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const authClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authHeader } } });
+    const token = authHeader.replace('Bearer ', '');
+    const { data: userData, error: authError } = await authClient.auth.getUser(token);
+    if (authError || !userData?.user) {
+      return new Response(JSON.stringify({ error: 'Não autorizado' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    if (!checkRateLimit(userData.user.id)) {
+      return new Response(JSON.stringify({ error: 'Muitas tentativas. Tente novamente em instantes.' }), {
+        status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
     const { password } = await req.json();
     if (!password || typeof password !== 'string') {
       return new Response(JSON.stringify({ error: 'Senha é obrigatória' }), {

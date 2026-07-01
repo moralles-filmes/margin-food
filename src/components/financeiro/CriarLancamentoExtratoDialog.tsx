@@ -17,6 +17,7 @@ import CategoryCombobox from '@/components/financeiro/CategoryCombobox';
 import SupplierCombobox from '@/components/financeiro/SupplierCombobox';
 import { Plus, Trash2, PieChart, CheckCircle, RefreshCw, FileText } from 'lucide-react';
 
+import { useCan } from '@/permissions/hooks';
 interface ExtratoLinha {
   data: string;
   descricao: string;
@@ -42,7 +43,9 @@ interface Props {
 
 type Destino = 'lancamento' | 'conta_pagar' | 'conta_receber';
 
-export default function CriarLancamentoExtratoDialog({ open, onOpenChange, linha, contaBancariaId, onCreated }: Props) {
+export default function CriarLancamentoExtratoDialog({
+ open, onOpenChange, linha, contaBancariaId, onCreated }: Props) {
+  const canViewRbac = useCan('financeiro:conciliacao:reconcile');
   const { user } = useAuth();
 
   // Form state
@@ -349,6 +352,8 @@ export default function CriarLancamentoExtratoDialog({ open, onOpenChange, linha
     if (tipo === 'DESPESA') return c.tipo === 'despesa' || !c.tipo;
     return true;
   });
+
+  if (!canViewRbac) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

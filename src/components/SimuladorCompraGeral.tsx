@@ -52,7 +52,8 @@ const fmt = (v: number) => formatFixedBR(v, 2);
 
 export default function SimuladorCompraGeral() {
   const { hasPermission } = useAuth();
-  const canEdit = hasPermission('purchases:create') || useCan('compras:pedidos:create');
+  const canCreatePedidos = useCan('compras:pedidos:create');
+  const canEdit = hasPermission('purchases:create') || canCreatePedidos;
 
   // Filters
   const [semanasMeta, setSemanasMeta] = useState('2');

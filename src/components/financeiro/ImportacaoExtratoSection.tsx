@@ -15,6 +15,7 @@ import { Upload, Save, AlertTriangle } from 'lucide-react';
 import { fmtBRL, formatDateBR, parseLocalDate } from '@/lib/formatters';
 import { parseExtrato, verifyContaExtrato, type ExtratoConta } from '@/lib/extratoParser';
 
+import { useCan } from '@/permissions/hooks';
 interface LinhaExtrato {
   data: string;
   descricao: string;
@@ -32,6 +33,7 @@ interface ContaRef {
 }
 
 export default function ImportacaoExtratoSection() {
+  const canViewRbac = useCan('financeiro:conciliacao:view');
   const { user } = useAuth();
   const [linhas, setLinhas] = useState<LinhaExtrato[]>([]);
   const [contas, setContas] = useState<ContaRef[]>([]);
@@ -130,6 +132,9 @@ export default function ImportacaoExtratoSection() {
   const selecionadas = linhas.filter(l => l.selecionada);
   const totalEntradas = selecionadas.filter(l => l.tipo === 'RECEITA').reduce((s, l) => s + l.valor, 0);
   const totalSaidas = selecionadas.filter(l => l.tipo === 'DESPESA').reduce((s, l) => s + l.valor, 0);
+
+
+  if (!canViewRbac) return null;
 
   return (
     <div className="space-y-4">

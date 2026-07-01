@@ -78,7 +78,7 @@ class ErrorBoundary extends Component<
         <button
           className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm"
           onClick={() => {
-            try { sessionStorage.removeItem(CHUNK_RELOAD_KEY); } catch {}
+            try { sessionStorage.removeItem(CHUNK_RELOAD_KEY); } catch { /* ignore unavailable sessionStorage */ }
             void clearSwAndReload();
           }}
         >

@@ -11,7 +11,7 @@ import { useDataEvent } from '@/lib/dataEvents';
 import { useCan } from '@/permissions/hooks';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import * as XLSX from 'xlsx';
+import * as XLSX from '@/lib/safeXlsx';
 
 // ─── Types ───
 type RankingItem = { nome: string; valor: number };

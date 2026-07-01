@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useInventarioStore, Inventario, InventarioItem, AuditLog } from '@/hooks/useInventarioStore';
-import { useAuth } from '@/contexts/AuthContext';
+
 import { useCan, useModuleAccess } from '@/permissions/hooks';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -44,7 +44,6 @@ const tipoDisplayLabel = (tipo: string) => {
 
 export default function InventarioView() {
   const store = useInventarioStore();
-  const { } = useAuth();
   const { visibleSubtabs } = useModuleAccess('inventario');
 
   // Granular permission gates

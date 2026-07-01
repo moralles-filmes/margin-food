@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { isAllowedAction, validatePermissionKey, ALLOWED_ACTIONS } from '../permissions/actions';
-import { buildPermissionEntries, isValidPermission, ALL_PERMISSION_KEYS } from '../permissions/registry';
+import { buildPermissionEntries, isValidPermission, ALL_PERMISSION_KEYS, LEGACY_PERMISSION_MAP } from '../permissions/registry';
 
 describe('RBAC Action Set', () => {
   it('has exactly 11 allowed actions', () => {
@@ -66,7 +66,6 @@ describe('Permission Registry Validation', () => {
   });
 
   it('all legacy map values reference valid registry keys', () => {
-    const { LEGACY_PERMISSION_MAP } = require('../permissions/registry');
     for (const [legacyKey, mappedKeys] of Object.entries(LEGACY_PERMISSION_MAP)) {
       for (const key of mappedKeys as string[]) {
         const result = validatePermissionKey(key);

@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { parseUTCToBR } from '@/lib/datetime';
 
+import { useCan } from '@/permissions/hooks';
 interface InactiveItem {
   item_id: string;
   item_name: string;
@@ -22,7 +23,9 @@ interface InactiveItem {
   stock_qty: number;
 }
 
-export default function StockInactivityAlert({ categorias }: { categorias: string[] }) {
+export default function StockInactivityAlert({
+ categorias }: { categorias: string[] }) {
+  const canViewRbac = useCan('estoque:preditivo:view');
   const [items, setItems] = useState<InactiveItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(false);
@@ -74,6 +77,8 @@ export default function StockInactivityAlert({ categorias }: { categorias: strin
       </Card>
     );
   }
+
+  if (!canViewRbac) return null;
 
   return (
     <Card className={`border-border transition-all ${count > 0 ? 'border-warning/30' : ''}`}>

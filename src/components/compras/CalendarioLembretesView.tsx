@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEstoqueGeralStoreContext } from '@/contexts/EstoqueGeralStoreContext';
 import { useSalmonStoreContext } from '@/contexts/SalmonStoreContext';
-import { usePurchaseOrdersStore } from '@/hooks/usePurchaseOrdersStore';
+import { usePurchaseOrdersStoreContext } from '@/contexts/PurchaseOrdersStoreContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,6 +18,7 @@ import { Plus, Calendar, Pencil, Trash2, Zap, Inbox } from 'lucide-react';
 import UserMentionSelect from '@/components/UserMentionSelect';
 import { todayBR } from '@/lib/datetime';
 
+import { useCan } from '@/permissions/hooks';
 const DIAS = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
 const CATEGORIAS = ['Peixe', 'Oriental', 'Bebidas', 'Limpeza', 'Embalagens', 'Cozinha', 'Descartáveis', 'Proteínas', 'Hortifruti', 'Outros'];
 
@@ -54,10 +55,11 @@ const emptyForm = {
 };
 
 export default function CalendarioLembretesView() {
+  const canViewRbac = useCan('compras:calendario:view');
   const { user } = useAuth();
   const { produtos } = useEstoqueGeralStoreContext();
   const salmonStore = useSalmonStoreContext();
-  const purchaseStore = usePurchaseOrdersStore();
+  const purchaseStore = usePurchaseOrdersStoreContext();
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -228,6 +230,9 @@ export default function CalendarioLembretesView() {
   const todayIdx = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1;
 
   if (loading) return <div className="text-center py-8 text-muted-foreground text-sm">Carregando...</div>;
+
+
+  if (!canViewRbac) return null;
 
   return (
     <div className="space-y-4">

@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 
 import { fmtBRL, formatPercentBR, formatFixedBR } from '@/lib/formatters';
+import { useCan } from '@/permissions/hooks';
 function fmtR$(n: number) { return fmtBRL(n); }
 function fmtPct(n: number) { return formatPercentBR(n); }
 function fmtQty(n: number, d = 1) { return formatFixedBR(n, d); }
@@ -72,7 +73,9 @@ interface Props {
 
 const PAGE_SIZE = 20;
 
-export default function AnaliseItemView({ period }: Props) {
+export default function AnaliseItemView({
+ period }: Props) {
+  const canViewRbac = useCan('ficha:analise:view');
   const [items, setItems] = useState<ReportItem[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
@@ -236,6 +239,8 @@ export default function AnaliseItemView({ period }: Props) {
       </div>
     );
   }
+
+  if (!canViewRbac) return null;
 
   return (
     <div className="space-y-4">

@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, LineChart, Line, Cell, PieChart, Pie } from 'recharts';
 import { fmtBRL, fmtBRLCompact, formatFixedBR, formatDateBR, formatInBR } from '@/lib/formatters';
 
+import { useCan } from '@/permissions/hooks';
 interface LossData {
   quantidade_total: number;
   valor_total: number;
@@ -56,7 +57,9 @@ const LOSS_TYPE_OPTIONS = [
   { value: 'quebra', label: 'Quebra' },
 ];
 
-export default function StockLossesSection({ categorias }: { categorias: string[] }) {
+export default function StockLossesSection({
+ categorias }: { categorias: string[] }) {
+  const canViewRbac = useCan('estoque:perdas:view');
   const [data, setData] = useState<LossData | null>(null);
   const [loading, setLoading] = useState(true);
   const [periodPreset, setPeriodPreset] = useState<PeriodPreset>('30');
@@ -106,6 +109,8 @@ export default function StockLossesSection({ categorias }: { categorias: string[
     if (groupBy === 'weekly') return `Sem ${formatInBR(d, 'dd/MM')}`;
     return formatInBR(d, 'dd/MM');
   };
+
+  if (!canViewRbac) return null;
 
   return (
     <div className="space-y-4">
