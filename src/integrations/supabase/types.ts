@@ -733,6 +733,503 @@ export type Database = {
           },
         ]
       }
+      cotacao_fornecedores: {
+        Row: {
+          company_id: string
+          condicao_pagamento: string | null
+          cotacao_id: string
+          created_at: string
+          frete: number
+          id: string
+          mensagem_enviada_em: string | null
+          observacao: string | null
+          pedido_minimo_snapshot: number
+          prazo_entrega_dias: number | null
+          respondido_em: string | null
+          status: string
+          supplier_id: string | null
+          supplier_nome_snapshot: string
+          updated_at: string
+          whatsapp_snapshot: string | null
+        }
+        Insert: {
+          company_id: string
+          condicao_pagamento?: string | null
+          cotacao_id: string
+          created_at?: string
+          frete?: number
+          id?: string
+          mensagem_enviada_em?: string | null
+          observacao?: string | null
+          pedido_minimo_snapshot?: number
+          prazo_entrega_dias?: number | null
+          respondido_em?: string | null
+          status?: string
+          supplier_id?: string | null
+          supplier_nome_snapshot: string
+          updated_at?: string
+          whatsapp_snapshot?: string | null
+        }
+        Update: {
+          company_id?: string
+          condicao_pagamento?: string | null
+          cotacao_id?: string
+          created_at?: string
+          frete?: number
+          id?: string
+          mensagem_enviada_em?: string | null
+          observacao?: string | null
+          pedido_minimo_snapshot?: number
+          prazo_entrega_dias?: number | null
+          respondido_em?: string | null
+          status?: string
+          supplier_id?: string | null
+          supplier_nome_snapshot?: string
+          updated_at?: string
+          whatsapp_snapshot?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cotacao_fornecedores_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cotacao_fornecedores_cotacao_id_fkey"
+            columns: ["cotacao_id"]
+            isOneToOne: false
+            referencedRelation: "cotacoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cotacao_fornecedores_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cotacao_ia_config: {
+        Row: {
+          api_key: string | null
+          ativo: boolean
+          company_id: string
+          created_at: string
+          id: string
+          model: string | null
+          provider: string
+          updated_at: string
+        }
+        Insert: {
+          api_key?: string | null
+          ativo?: boolean
+          company_id: string
+          created_at?: string
+          id?: string
+          model?: string | null
+          provider?: string
+          updated_at?: string
+        }
+        Update: {
+          api_key?: string | null
+          ativo?: boolean
+          company_id?: string
+          created_at?: string
+          id?: string
+          model?: string | null
+          provider?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cotacao_ia_config_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cotacao_itens: {
+        Row: {
+          company_id: string
+          conversion_factor_snapshot: number
+          cotacao_id: string
+          created_at: string
+          id: string
+          observacao: string | null
+          produto_id: string | null
+          produto_nome_snapshot: string
+          purchase_unit_snapshot: string | null
+          quantidade: number
+          unidade_snapshot: string | null
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          conversion_factor_snapshot?: number
+          cotacao_id: string
+          created_at?: string
+          id?: string
+          observacao?: string | null
+          produto_id?: string | null
+          produto_nome_snapshot: string
+          purchase_unit_snapshot?: string | null
+          quantidade?: number
+          unidade_snapshot?: string | null
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          conversion_factor_snapshot?: number
+          cotacao_id?: string
+          created_at?: string
+          id?: string
+          observacao?: string | null
+          produto_id?: string | null
+          produto_nome_snapshot?: string
+          purchase_unit_snapshot?: string | null
+          quantidade?: number
+          unidade_snapshot?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cotacao_itens_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cotacao_itens_cotacao_id_fkey"
+            columns: ["cotacao_id"]
+            isOneToOne: false
+            referencedRelation: "cotacoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cotacao_itens_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "mv_giro_estoque"
+            referencedColumns: ["produto_id"]
+          },
+          {
+            foreignKeyName: "cotacao_itens_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cotacao_respostas: {
+        Row: {
+          company_id: string
+          cotacao_fornecedor_id: string
+          cotacao_item_id: string
+          created_at: string
+          disponivel: boolean
+          id: string
+          observacao: string | null
+          preco_unitario: number | null
+          quantidade_disponivel: number | null
+          selecionado: boolean
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          cotacao_fornecedor_id: string
+          cotacao_item_id: string
+          created_at?: string
+          disponivel?: boolean
+          id?: string
+          observacao?: string | null
+          preco_unitario?: number | null
+          quantidade_disponivel?: number | null
+          selecionado?: boolean
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          cotacao_fornecedor_id?: string
+          cotacao_item_id?: string
+          created_at?: string
+          disponivel?: boolean
+          id?: string
+          observacao?: string | null
+          preco_unitario?: number | null
+          quantidade_disponivel?: number | null
+          selecionado?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cotacao_respostas_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cotacao_respostas_cotacao_fornecedor_id_fkey"
+            columns: ["cotacao_fornecedor_id"]
+            isOneToOne: false
+            referencedRelation: "cotacao_fornecedores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cotacao_respostas_cotacao_item_id_fkey"
+            columns: ["cotacao_item_id"]
+            isOneToOne: false
+            referencedRelation: "cotacao_itens"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cotacao_sugestoes: {
+        Row: {
+          company_id: string
+          cotacao_id: string
+          created_at: string
+          created_by: string
+          dados_json: Json
+          economia_estimada: number
+          id: string
+          tipo: string
+          total_estimado: number
+        }
+        Insert: {
+          company_id: string
+          cotacao_id: string
+          created_at?: string
+          created_by?: string
+          dados_json?: Json
+          economia_estimada?: number
+          id?: string
+          tipo: string
+          total_estimado?: number
+        }
+        Update: {
+          company_id?: string
+          cotacao_id?: string
+          created_at?: string
+          created_by?: string
+          dados_json?: Json
+          economia_estimada?: number
+          id?: string
+          tipo?: string
+          total_estimado?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cotacao_sugestoes_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cotacao_sugestoes_cotacao_id_fkey"
+            columns: ["cotacao_id"]
+            isOneToOne: false
+            referencedRelation: "cotacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cotacao_whatsapp_logs: {
+        Row: {
+          company_id: string
+          cotacao_fornecedor_id: string | null
+          cotacao_id: string
+          created_at: string
+          created_by: string
+          id: string
+          message: string | null
+          phone: string | null
+          sent_at: string | null
+          status: string
+          tipo: string
+          zapi_response: Json | null
+        }
+        Insert: {
+          company_id: string
+          cotacao_fornecedor_id?: string | null
+          cotacao_id: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          message?: string | null
+          phone?: string | null
+          sent_at?: string | null
+          status?: string
+          tipo: string
+          zapi_response?: Json | null
+        }
+        Update: {
+          company_id?: string
+          cotacao_fornecedor_id?: string | null
+          cotacao_id?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          message?: string | null
+          phone?: string | null
+          sent_at?: string | null
+          status?: string
+          tipo?: string
+          zapi_response?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cotacao_whatsapp_logs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cotacao_whatsapp_logs_cotacao_fornecedor_id_fkey"
+            columns: ["cotacao_fornecedor_id"]
+            isOneToOne: false
+            referencedRelation: "cotacao_fornecedores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cotacao_whatsapp_logs_cotacao_id_fkey"
+            columns: ["cotacao_id"]
+            isOneToOne: false
+            referencedRelation: "cotacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cotacao_zapi_config: {
+        Row: {
+          ativo: boolean
+          base_url: string
+          client_token: string | null
+          company_id: string
+          created_at: string
+          default_phone: string | null
+          id: string
+          instance_id: string | null
+          token: string | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          base_url?: string
+          client_token?: string | null
+          company_id: string
+          created_at?: string
+          default_phone?: string | null
+          id?: string
+          instance_id?: string | null
+          token?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          base_url?: string
+          client_token?: string | null
+          company_id?: string
+          created_at?: string
+          default_phone?: string | null
+          id?: string
+          instance_id?: string | null
+          token?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cotacao_zapi_config_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cotacoes: {
+        Row: {
+          codigo: string
+          codigo_unaccent: string | null
+          company_id: string
+          created_at: string
+          created_by: string
+          data_envio: string | null
+          data_validade: string | null
+          deleted_at: string | null
+          deleted_by: string | null
+          economia_estimada: number
+          id: string
+          observacao: string | null
+          origin_ref: string | null
+          origin_type: string | null
+          status: string
+          titulo: string
+          titulo_unaccent: string | null
+          total_estimado: number
+          updated_at: string
+        }
+        Insert: {
+          codigo: string
+          codigo_unaccent?: string | null
+          company_id: string
+          created_at?: string
+          created_by?: string
+          data_envio?: string | null
+          data_validade?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
+          economia_estimada?: number
+          id?: string
+          observacao?: string | null
+          origin_ref?: string | null
+          origin_type?: string | null
+          status?: string
+          titulo: string
+          titulo_unaccent?: string | null
+          total_estimado?: number
+          updated_at?: string
+        }
+        Update: {
+          codigo?: string
+          codigo_unaccent?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string
+          data_envio?: string | null
+          data_validade?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
+          economia_estimada?: number
+          id?: string
+          observacao?: string | null
+          origin_ref?: string | null
+          origin_type?: string | null
+          status?: string
+          titulo?: string
+          titulo_unaccent?: string | null
+          total_estimado?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cotacoes_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dashboard_cache: {
         Row: {
           created_at: string
@@ -7722,31 +8219,52 @@ export type Database = {
       }
       suppliers: {
         Row: {
+          categories_served: string[]
           company_id: string
           contact_info: Json | null
+          cotacao_notes: string | null
           created_at: string
+          delivery_days: number | null
           id: string
           is_active: boolean
+          minimum_order_quantity: number
+          minimum_order_value: number
           name: string
+          payment_terms: string | null
           updated_at: string
+          whatsapp_number: string | null
         }
         Insert: {
+          categories_served?: string[]
           company_id?: string
           contact_info?: Json | null
+          cotacao_notes?: string | null
           created_at?: string
+          delivery_days?: number | null
           id?: string
           is_active?: boolean
+          minimum_order_quantity?: number
+          minimum_order_value?: number
           name: string
+          payment_terms?: string | null
           updated_at?: string
+          whatsapp_number?: string | null
         }
         Update: {
+          categories_served?: string[]
           company_id?: string
           contact_info?: Json | null
+          cotacao_notes?: string | null
           created_at?: string
+          delivery_days?: number | null
           id?: string
           is_active?: boolean
+          minimum_order_quantity?: number
+          minimum_order_value?: number
           name?: string
+          payment_terms?: string | null
           updated_at?: string
+          whatsapp_number?: string | null
         }
         Relationships: [
           {
@@ -8437,6 +8955,18 @@ export type Database = {
         Returns: number
       }
       count_requisicoes_with_pending_items: { Args: never; Returns: number }
+      create_cotacao_atomic: {
+        Args: {
+          p_data_validade?: string
+          p_fornecedores?: Json
+          p_itens?: Json
+          p_observacao?: string
+          p_origin_ref?: string
+          p_origin_type?: string
+          p_titulo: string
+        }
+        Returns: Json
+      }
       create_inventory_atomic: {
         Args: {
           p_categorias?: string[]
@@ -8451,6 +8981,10 @@ export type Database = {
       }
       create_purchase_order_atomic: {
         Args: { p_idempotency_key: string; p_payload: Json }
+        Returns: Json
+      }
+      create_purchase_orders_from_cotacao_atomic: {
+        Args: { p_cotacao_id: string; p_expected_updated_at?: string }
         Returns: Json
       }
       create_quick_inventory_atomic: {
@@ -8581,6 +9115,8 @@ export type Database = {
           ultima_mov: string
         }[]
       }
+      get_cotacao_ia_config: { Args: never; Returns: Json }
+      get_cotacao_zapi_config: { Args: never; Returns: Json }
       get_current_company_id: { Args: never; Returns: string }
       get_current_company_id_strict: { Args: never; Returns: string }
       get_effective_permissions: {
@@ -8616,6 +9152,16 @@ export type Database = {
       get_fin_kpis:
         | { Args: { p_meses?: number }; Returns: Json }
         | { Args: { p_end: string; p_start: string }; Returns: Json }
+      get_fin_lancamentos_totais: {
+        Args: {
+          p_conta_id?: string
+          p_end?: string
+          p_origem?: string
+          p_start?: string
+          p_tipo?: string
+        }
+        Returns: Json
+      }
       get_inactive_stock_items: { Args: never; Returns: Json }
       get_movimentacoes_kpis: {
         Args: {
@@ -9191,6 +9737,45 @@ export type Database = {
             }
             Returns: Json
           }
+      save_cotacao_ia_config: {
+        Args: {
+          p_api_key?: string
+          p_ativo?: boolean
+          p_model?: string
+          p_provider?: string
+        }
+        Returns: Json
+      }
+      save_cotacao_respostas_atomic: {
+        Args: {
+          p_cotacao_id: string
+          p_fornecedores_meta?: Json
+          p_respostas?: Json
+        }
+        Returns: Json
+      }
+      save_cotacao_sugestao: {
+        Args: {
+          p_cotacao_id: string
+          p_dados_json?: Json
+          p_economia_estimada?: number
+          p_selecoes?: Json
+          p_tipo: string
+          p_total_estimado?: number
+        }
+        Returns: Json
+      }
+      save_cotacao_zapi_config: {
+        Args: {
+          p_ativo?: boolean
+          p_base_url?: string
+          p_client_token?: string
+          p_default_phone?: string
+          p_instance_id?: string
+          p_token?: string
+        }
+        Returns: Json
+      }
       seed_default_categories: { Args: never; Returns: Json }
       set_cache: {
         Args: { p_key: string; p_payload: Json; p_ttl_seconds?: number }
@@ -9207,6 +9792,10 @@ export type Database = {
             Args: { p_end: string; p_params?: Json; p_start: string }
             Returns: Json
           }
+      soft_delete_cotacao: {
+        Args: { p_expected_updated_at?: string; p_id: string }
+        Returns: Json
+      }
       soft_delete_inventory: {
         Args: { p_id: string; p_justificativa: string }
         Returns: Json
@@ -9252,6 +9841,18 @@ export type Database = {
           p_cnpj?: string
           p_company_id: string
           p_nome?: string
+        }
+        Returns: Json
+      }
+      update_cotacao_atomic: {
+        Args: {
+          p_data_validade?: string
+          p_expected_updated_at?: string
+          p_fornecedores?: Json
+          p_id: string
+          p_itens?: Json
+          p_observacao?: string
+          p_titulo: string
         }
         Returns: Json
       }

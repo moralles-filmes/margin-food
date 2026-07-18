@@ -133,6 +133,8 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
   const [cursorDate, setCursorDate] = useState<string | null>(null);
   const [cursorId, setCursorId] = useState<string | null>(null);
 
+  const [totais, setTotais] = useState({ total_receita: 0, total_despesa: 0, total_transferencia: 0, resultado: 0 });
+
   const [form, setForm] = useState<ContaFormData>({
     tipo: 'DESPESA', valor: 0, data_competencia: todayBR(),
     data_vencimento: '', data_pagamento: '',
@@ -177,6 +179,24 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
     setLoading(false);
   }, [filtroDataDe, filtroDataAte, filtroTipo, filtroConta, filtroOrigem]);
 
+  const loadTotais = useCallback(async () => {
+    const { data, error } = await supabase.rpc('get_fin_lancamentos_totais', {
+      p_start: filtroDataDe || null,
+      p_end: filtroDataAte || null,
+      p_tipo: filtroTipo !== 'todos' ? filtroTipo : null,
+      p_conta_id: filtroConta !== 'todos' ? filtroConta : null,
+      p_origem: filtroOrigem !== 'todos' ? filtroOrigem : null,
+    });
+    if (error) { console.error('[LivroRazaoSection.loadTotais]', error); return; }
+    const result = data as unknown as { total_receita: number; total_despesa: number; total_transferencia: number; resultado: number } | null;
+    setTotais({
+      total_receita: Number(result?.total_receita) || 0,
+      total_despesa: Number(result?.total_despesa) || 0,
+      total_transferencia: Number(result?.total_transferencia) || 0,
+      resultado: Number(result?.resultado) || 0,
+    });
+  }, [filtroDataDe, filtroDataAte, filtroTipo, filtroConta, filtroOrigem]);
+
   const load = useCallback(async () => {
     setCursorDate(null);
     setCursorId(null);
@@ -185,14 +205,15 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
       supabase.from('fin_categorias').select('id, nome, tipo, centro_custo_padrao_id').eq('ativo', true).order('nome'),
       supabase.from('fin_centros_custo').select('id, nome').eq('ativo', true).order('nome'),
       supabase.from('fin_contas').select('id, nome').eq('ativo', true).order('nome'),
+      loadTotais(),
     ]);
     setCategorias((catRes.data as CategoriaRef[]) || []);
     setCentros((ccRes.data as CentroCustoRef[]) || []);
     setContas((contRes.data as ContaRef[]) || []);
-  }, [loadPage]);
+  }, [loadPage, loadTotais]);
 
   useEffect(() => { if (canView) load(); }, [load, canView]);
-  useEffect(() => { setCursorDate(null); setCursorId(null); setItems([]); loadPage(null, null); }, [filtroTipo, filtroOrigem, filtroConta, filtroDataDe, filtroDataAte, loadPage]);
+  useEffect(() => { setCursorDate(null); setCursorId(null); setItems([]); loadPage(null, null); loadTotais(); }, [filtroTipo, filtroOrigem, filtroConta, filtroDataDe, filtroDataAte, loadPage, loadTotais]);
   useDataEvent('financeiro:lancamentos', load);
 
   const fmt = fmtBRL;
@@ -574,6 +595,22 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
           to={filtroDataAte}
           onChange={(de, ate) => { setFiltroDataDe(de); setFiltroDataAte(ate); }}
         />
+
+        <div className="flex items-center gap-4 flex-wrap text-sm bg-card border border-border rounded-lg px-4 py-2.5">
+          {filtroTipo === 'todos' ? (
+            <>
+              <span className="text-muted-foreground">Entradas: <strong className="text-success">{fmt(totais.total_receita)}</strong></span>
+              <span className="text-muted-foreground">Saidas: <strong className="text-destructive">{fmt(totais.total_despesa)}</strong></span>
+              <span className="text-muted-foreground">Resultado: <strong className={totais.resultado >= 0 ? 'text-success' : 'text-destructive'}>{fmt(totais.resultado)}</strong></span>
+            </>
+          ) : filtroTipo === 'RECEITA' ? (
+            <span className="text-muted-foreground">Total de entradas: <strong className="text-success">{fmt(totais.total_receita)}</strong></span>
+          ) : filtroTipo === 'DESPESA' ? (
+            <span className="text-muted-foreground">Total de saidas: <strong className="text-destructive">{fmt(totais.total_despesa)}</strong></span>
+          ) : (
+            <span className="text-muted-foreground">Total de transferencias: <strong className="text-foreground">{fmt(totais.total_transferencia)}</strong></span>
+          )}
+        </div>
 
         <Table>
           <TableHeader>
