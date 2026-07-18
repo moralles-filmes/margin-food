@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DateInput } from '@/components/ui/DateInput';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
@@ -235,10 +236,9 @@ export default function ContaFormDialog({
               )}
               <div>
                 <Label className="text-xs text-muted-foreground">Data de competencia *</Label>
-                <Input
-                  type="date"
+                <DateInput
                   value={form.data_competencia}
-                  onChange={e => set({ data_competencia: e.target.value })}
+                  onValueChange={v => set({ data_competencia: v })}
                   className="mt-1"
                 />
               </div>
@@ -416,10 +416,9 @@ export default function ContaFormDialog({
               )}
               <div>
                 <Label className="text-xs text-muted-foreground">Vencimento *</Label>
-                <Input
-                  type="date"
+                <DateInput
                   value={form.data_vencimento}
-                  onChange={e => set({ data_vencimento: e.target.value })}
+                  onValueChange={v => set({ data_vencimento: v })}
                   className="mt-1"
                 />
               </div>
@@ -448,10 +447,9 @@ export default function ContaFormDialog({
               {variant === 'lancamento' && !isTransfer && (
                 <div>
                   <Label className="text-xs text-muted-foreground">Data Pagamento</Label>
-                  <Input
-                    type="date"
+                  <DateInput
                     value={form.data_pagamento || ''}
-                    onChange={e => set({ data_pagamento: e.target.value })}
+                    onValueChange={v => set({ data_pagamento: v })}
                     className="mt-1"
                   />
                 </div>
