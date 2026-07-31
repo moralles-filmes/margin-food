@@ -89,6 +89,19 @@ export default function ProdutoFormPanel({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prodForm.fatorConversaoPadrao]);
 
+  // Raw string state para "Qtd por embalagem" — preserva estados intermediários como "3," ou "4,5"
+  const [rawPackageQty, setRawPackageQty] = useState(() =>
+    prodForm.packageQuantity != null ? String(prodForm.packageQuantity) : ''
+  );
+  // Sincroniza rawPackageQty quando a quantidade muda de fora (carregamento de produto)
+  useEffect(() => {
+    const current = rawPackageQty === '' ? null : parseFloat(rawPackageQty.replace(',', '.'));
+    if (prodForm.packageQuantity !== current) {
+      setRawPackageQty(prodForm.packageQuantity != null ? String(prodForm.packageQuantity) : '');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prodForm.packageQuantity]);
+
   // Focus on mount only
   useEffect(() => {
     if (!didFocusRef.current && prodNameInputRef.current) {
@@ -276,8 +289,11 @@ export default function ProdutoFormPanel({
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <Label className="text-[10px] text-muted-foreground">Qtd por embalagem</Label>
-                  <Input type="number" step="0.01" min="0" value={prodForm.packageQuantity ?? ''} onChange={e => {
-                    const qty = parseFloat(e.target.value) || null;
+                  <Input type="text" inputMode="decimal" value={rawPackageQty} onChange={e => {
+                    const raw = e.target.value;
+                    setRawPackageQty(raw);
+                    const parsed = raw === '' ? NaN : parseFloat(raw.replace(',', '.'));
+                    const qty = !isNaN(parsed) && parsed > 0 ? parsed : null;
                     const auto = calcAutoFactor(qty, prodForm.packageMeasureUnit, prodForm.unidadeMedida);
                     setProdForm(f => ({
                       ...f,
