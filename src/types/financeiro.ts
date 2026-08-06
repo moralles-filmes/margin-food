@@ -70,17 +70,24 @@ export interface CentroCustoRef {
 export interface LancamentoConciliacao {
   id: string;
   data_competencia: string;
+  data_vencimento: string | null;
+  data_pagamento: string | null;
   valor: number;
   tipo: string;
   descricao: string;
+  observacoes: string | null;
   conta_id: string;
   categoria_id: string | null;
   centro_custo_id: string | null;
+  forma_pagamento: string | null;
   status: string;
+  origem: string;
+  recorrente: boolean | null;
   conciliado: boolean | null;
   conciliado_em: string | null;
   conciliado_por: string | null;
   created_at: string;
+  updated_at: string;
 }
 
 /** Lançamento candidate for matching (broader projection) */

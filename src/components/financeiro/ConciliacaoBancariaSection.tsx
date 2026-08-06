@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { CurrencyInput } from '@/components/ui/brl-input';
-import { fmtBRL, formatDateBR, parseLocalDate } from '@/lib/formatters';
+import { fmtBRL, formatDateBR, parseLocalDate, todayBR } from '@/lib/formatters';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -16,9 +16,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { parseExtrato, verifyContaExtrato, type ExtratoConta } from '@/lib/extratoParser';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import { Upload, CheckCircle, Save, RefreshCw, ArrowRight, Receipt, Eye, Plus, Trash2, PieChart, ArrowRightLeft, Search, CreditCard, FileText, EyeOff, X, AlertTriangle } from 'lucide-react';
+import { Upload, CheckCircle, Save, RefreshCw, ArrowRight, Receipt, Eye, Plus, Trash2, PieChart, ArrowRightLeft, Search, CreditCard, FileText, EyeOff, X, AlertTriangle, Edit } from 'lucide-react';
 import CriarLancamentoExtratoDialog from '@/components/financeiro/CriarLancamentoExtratoDialog';
 import CategoryCombobox from '@/components/financeiro/CategoryCombobox';
+import ContaFormDialog, { type ContaFormData, type RateioLine } from '@/components/financeiro/ContaFormDialog';
+import { useConfirmDialog } from '@/hooks/useConfirmDialog';
+import { mapFinanceiroDeleteError } from '@/lib/financeiroErrorMap';
 import type { ContaBancariaRef, CategoriaFinRef, CentroCustoRef, LancamentoConciliacao, LancamentoCandidate, ContaPagarCandidate, ContaReceberCandidate } from '@/types/financeiro';
 
 import { useCan } from '@/permissions/hooks';
@@ -144,6 +147,24 @@ export default function ConciliacaoBancariaSection() {
 
   const [criarDialog, setCriarDialog] = useState<{ open: boolean; linhaIndex: number }>({ open: false, linhaIndex: -1 });
 
+  // Edição de lançamento já existente (aba "Lançamentos")
+  const { confirm: confirmDelete, ConfirmDialog: DeleteConfirmDialog } = useConfirmDialog();
+  const [showEditForm, setShowEditForm] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editUpdatedAt, setEditUpdatedAt] = useState<string | null>(null);
+  const [editPrevStatus, setEditPrevStatus] = useState<string | null>(null);
+  const [editJustificativa, setEditJustificativa] = useState('');
+  const [editForm, setEditForm] = useState<ContaFormData>({
+    tipo: 'DESPESA', valor: 0, data_competencia: todayBR(),
+    data_vencimento: '', data_pagamento: '',
+    descricao: '', conta_id: '', conta_destino_id: '',
+    forma_pagamento: 'pix', status: 'REALIZADO',
+    recorrente: false, frequencia: 'mensal', parcelas: 0,
+    observacoes: '', categoria_id: '', centro_custo_id: '',
+  });
+  const [editRateioLines, setEditRateioLines] = useState<RateioLine[]>([]);
+
   // Dialogo de alerta quando o extrato não pertence à conta selecionada
   const [contaMismatch, setContaMismatch] = useState<{
     open: boolean;
@@ -191,7 +212,7 @@ export default function ConciliacaoBancariaSection() {
     setLoading(true);
     const { data, error } = await supabase
       .from('fin_lancamentos')
-      .select('id, data_competencia, valor, tipo, descricao, conta_id, categoria_id, centro_custo_id, status, conciliado, conciliado_em, conciliado_por, created_at')
+      .select('id, data_competencia, data_vencimento, data_pagamento, valor, tipo, descricao, observacoes, conta_id, categoria_id, centro_custo_id, forma_pagamento, status, origem, recorrente, conciliado, conciliado_em, conciliado_por, created_at, updated_at')
       .eq('conta_id', contaSel)
       .eq('status', 'REALIZADO')
       .order('data_competencia', { ascending: false })
@@ -212,23 +233,167 @@ export default function ConciliacaoBancariaSection() {
         p_lancamento_ids: [id],
       });
       if (error) { toast.error(error.message); return; }
-      setLancamentos(prev => prev.map(l => l.id === id ? { ...l, conciliado: value } : l));
       toast.success('Lançamento conciliado');
     } else {
-      const { data, error } = await supabase.rpc('unreconcile_lancamento', { p_id: id });
+      // unreconcile_lancamento só desmarca (conciliado/conciliado_em/conciliado_por) —
+      // o lançamento continua existindo para permitir corrigir categoria e conciliar de novo.
+      const { error } = await supabase.rpc('unreconcile_lancamento', { p_id: id });
       if (error) { toast.error(error.message); return; }
-      const deleted = (data as unknown as { deleted?: boolean } | null)?.deleted;
-      if (deleted) {
-        // Lançamento nasceu da própria conciliação (origem='conciliacao') — não tem
-        // vida fora dela, então desconciliar exclui o registro (não só desmarca).
-        setLancamentos(prev => prev.filter(l => l.id !== id));
-        toast.success('Conciliação removida — lançamento excluído (havia sido criado pela conciliação)');
-      } else {
-        setLancamentos(prev => prev.map(l => l.id === id ? { ...l, conciliado: value } : l));
-        toast.success('Conciliação removida');
-      }
+      toast.success('Conciliação removida');
     }
+    setLancamentos(prev => prev.map(l => l.id === id ? { ...l, conciliado: value } : l));
     emitDataEvent('financeiro:conciliacao');
+  };
+
+  const openEditLancamento = async (item: LancamentoConciliacao) => {
+    if (item.conciliado) {
+      toast.error('Desconcilie o lançamento antes de editar.');
+      return;
+    }
+    if (item.origem === 'espelho_cp') {
+      toast.error('Este lançamento foi gerado por uma Conta a Pagar. Edite diretamente em Contas a Pagar.');
+      return;
+    }
+    if (item.origem === 'espelho_cr') {
+      toast.error('Este lançamento foi gerado por uma Conta a Receber. Edite diretamente em Contas a Receber.');
+      return;
+    }
+
+    const { data: rates, error: rateErr } = await supabase
+      .from('fin_lancamento_rateios')
+      .select('id, categoria_id, centro_custo_id, valor, percentual')
+      .eq('lancamento_id', item.id);
+    if (rateErr) {
+      toast.error('Erro ao carregar rateios: ' + rateErr.message);
+      return;
+    }
+    setEditRateioLines((rates || []).map(r => ({
+      key: r.id,
+      categoria_id: r.categoria_id,
+      centro_custo_id: r.centro_custo_id || '',
+      valor: r.valor,
+      percentual: r.percentual,
+    })));
+
+    setEditId(item.id);
+    setEditUpdatedAt(item.updated_at);
+    setEditPrevStatus(item.status);
+    setEditJustificativa('');
+    setEditForm({
+      tipo: item.tipo, valor: item.valor, data_competencia: item.data_competencia,
+      data_vencimento: item.data_vencimento || '', data_pagamento: item.data_pagamento || '',
+      descricao: item.descricao || '', conta_id: item.conta_id || '', conta_destino_id: '',
+      forma_pagamento: item.forma_pagamento || 'pix', status: item.status,
+      recorrente: item.recorrente || false, frequencia: 'mensal', parcelas: 0,
+      observacoes: item.observacoes || '',
+      categoria_id: item.categoria_id || '',
+      centro_custo_id: item.centro_custo_id || '',
+    });
+    setShowEditForm(true);
+  };
+
+  const closeEditLancamento = () => {
+    setShowEditForm(false);
+    setEditId(null);
+    setEditRateioLines([]);
+  };
+
+  const saveEditLancamento = async () => {
+    if (editSaving) return;
+    if (!editForm.descricao.trim()) { toast.error('Descrição obrigatória'); return; }
+
+    const totalRateio = editRateioLines.reduce((s, l) => s + Number(l.valor || 0), 0);
+    const diffRateio = (editForm.valor || 0) - totalRateio;
+    const rateioValido = editRateioLines.length === 0 || Math.abs(diffRateio) < 0.01;
+    const valorFinal = editRateioLines.length > 0 ? totalRateio : editForm.valor;
+    if (!valorFinal || valorFinal <= 0) { toast.error('Valor obrigatório'); return; }
+    if (editRateioLines.length > 0 && !rateioValido) { toast.error(`Rateio incompleto. Ajuste os valores para totalizar ${fmt(editForm.valor)}.`); return; }
+    if (editRateioLines.length > 0 && editRateioLines.some(l => !l.categoria_id)) { toast.error('Todas as linhas de rateio precisam de categoria'); return; }
+    if (editPrevStatus === 'REALIZADO' && !editJustificativa.trim()) {
+      toast.error('Justificativa obrigatória para edição de lançamento REALIZADO.');
+      return;
+    }
+
+    setEditSaving(true);
+    try {
+      const rateiosPayload = editRateioLines.length > 0
+        ? editRateioLines.map(l => ({
+            categoria_id: l.categoria_id,
+            centro_custo_id: l.centro_custo_id || null,
+            valor: l.valor,
+            percentual: l.percentual || null,
+            observacao: null,
+          }))
+        : [];
+
+      const { error } = await supabase.rpc('_guarded_upsert_lancamento' as any, {
+        p_id: editId,
+        p_tipo: editForm.tipo,
+        p_status: editForm.status,
+        p_valor: valorFinal,
+        p_conta_id: editForm.conta_id || null,
+        p_categoria_id: editRateioLines.length === 1 ? editRateioLines[0].categoria_id : (editForm.categoria_id || null),
+        p_centro_custo_id: editRateioLines.length === 1 ? (editRateioLines[0].centro_custo_id || null) : (editForm.centro_custo_id || null),
+        p_data_competencia: editForm.data_competencia,
+        p_data_vencimento: editForm.data_vencimento || null,
+        p_data_pagamento: editForm.data_pagamento || (editForm.status === 'REALIZADO' ? editForm.data_competencia : null),
+        p_descricao: editForm.descricao,
+        p_observacoes: editForm.observacoes || null,
+        p_forma_pagamento: editForm.forma_pagamento,
+        p_recorrente: editForm.recorrente,
+        p_recorrencia_config: null,
+        p_rateios: rateiosPayload,
+        p_updated_at: editUpdatedAt || null,
+        p_justificativa_edicao: editJustificativa.trim() || null,
+      } as any);
+
+      if (error) {
+        if (error.message?.includes('CONFLICT')) {
+          toast.error('Este registro foi alterado por outro usuário. Recarregue a página.');
+        } else {
+          toast.error(error.message);
+        }
+        return;
+      }
+
+      toast.success('Lançamento atualizado');
+      closeEditLancamento();
+      loadLancamentos();
+      emitDataEvent('financeiro:conciliacao');
+      emitDataEvent('financeiro:lancamentos');
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const deleteLancamentoConciliacao = async (item: LancamentoConciliacao) => {
+    if (item.conciliado) {
+      toast.error('Desconcilie o lançamento antes de excluir.');
+      return;
+    }
+    if (item.origem === 'espelho_cp' || item.origem === 'espelho_cr') {
+      toast.error('Este lançamento é um espelho de Conta a Pagar/Receber. Use o estorno na conta correspondente.');
+      return;
+    }
+    const ok = await confirmDelete({ title: 'Excluir lançamento', description: 'Tem certeza que deseja excluir este lançamento? Esta ação não pode ser desfeita.', confirmLabel: 'Excluir', variant: 'destructive' });
+    if (!ok) return;
+    setEditSaving(true);
+    try {
+      const { error } = await supabase.rpc('_guarded_delete_lancamento' as any, {
+        p_id: item.id,
+        p_expected_updated_at: item.updated_at,
+      } as any);
+      if (error) throw error;
+      toast.success('Lançamento excluído');
+      setLancamentos(prev => prev.filter(l => l.id !== item.id));
+      emitDataEvent('financeiro:conciliacao');
+      emitDataEvent('financeiro:lancamentos');
+    } catch (err: unknown) {
+      console.error('[ConciliacaoBancariaSection.deleteLancamentoConciliacao]', err);
+      toast.error(mapFinanceiroDeleteError(err));
+    } finally {
+      setEditSaving(false);
+    }
   };
 
   const conciliarTodos = async () => {
@@ -1062,16 +1227,18 @@ export default function ConciliacaoBancariaSection() {
                 <TableHead className="w-10">✓</TableHead>
                 <TableHead>Data</TableHead>
                 <TableHead>Descrição</TableHead>
+                <TableHead>Categoria</TableHead>
                 <TableHead>Tipo</TableHead>
                 <TableHead className="text-right">Valor</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="w-20">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
-                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Carregando...</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">Carregando...</TableCell></TableRow>
               ) : lancamentos.length === 0 ? (
-                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                   {contaSel ? 'Nenhum lançamento encontrado' : 'Selecione uma conta bancária'}
                 </TableCell></TableRow>
               ) : lancamentos
@@ -1080,13 +1247,22 @@ export default function ConciliacaoBancariaSection() {
                     if (filtro === 'conciliados') return !!l.conciliado;
                     return true;
                   })
-                  .map(item => (
+                  .map(item => {
+                const categoriaNome = categorias.find(c => c.id === item.categoria_id)?.nome;
+                return (
                 <TableRow key={item.id} className={item.conciliado ? 'opacity-80' : ''}>
                   <TableCell>
                     <Checkbox checked={!!item.conciliado} onCheckedChange={(v) => conciliar(item.id, !!v)} />
                   </TableCell>
                   <TableCell className="font-mono text-sm">{formatDateBR(parseLocalDate(item.data_competencia))}</TableCell>
                   <TableCell className="font-medium max-w-[200px] truncate">{item.descricao}</TableCell>
+                  <TableCell>
+                    {categoriaNome ? (
+                      <span className="text-xs">{categoriaNome}</span>
+                    ) : (
+                      <span className="text-xs text-warning-foreground flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Sem categoria</span>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <Badge variant={item.tipo === 'RECEITA' ? 'default' : 'destructive'}>{item.tipo}</Badge>
                   </TableCell>
@@ -1100,8 +1276,19 @@ export default function ConciliacaoBancariaSection() {
                       <span className="text-xs text-muted-foreground">Pendente</span>
                     )}
                   </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1">
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEditLancamento(item)} disabled={editSaving} title="Editar">
+                        <Edit className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => deleteLancamentoConciliacao(item)} disabled={editSaving} title="Excluir">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  </TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
         </>
@@ -1496,6 +1683,30 @@ export default function ConciliacaoBancariaSection() {
           </AlertDialogContent>
         </AlertDialog>
       )}
+
+      {/* ========== EDITAR LANÇAMENTO (aba Lançamentos) ========== */}
+      {showEditForm && (
+        <ContaFormDialog
+          open={showEditForm}
+          onOpenChange={o => { if (!o) closeEditLancamento(); }}
+          variant="lancamento"
+          form={editForm}
+          onFormChange={setEditForm}
+          rateioLines={editRateioLines}
+          onRateioLinesChange={setEditRateioLines}
+          categorias={categorias.map(c => ({ ...c, tipo: c.tipo || '' }))}
+          centros={centrosCusto}
+          contas={contas}
+          isEditing
+          saving={editSaving}
+          onSave={saveEditLancamento}
+          onClose={closeEditLancamento}
+          editPrevStatus={editPrevStatus}
+          justificativa={editJustificativa}
+          onJustificativaChange={setEditJustificativa}
+        />
+      )}
+      <DeleteConfirmDialog />
     </div>
   );
 }
