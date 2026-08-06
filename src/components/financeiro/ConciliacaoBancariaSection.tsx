@@ -203,6 +203,9 @@ export default function ConciliacaoBancariaSection() {
     if (saved && saved.length > 0) {
       setLinhasState(saved);
       if (view !== 'importar') setView('importar');
+      // O cache pode estar desatualizado se o lançamento foi desconciliado/excluído
+      // em outra aba/sessão — revalida as linhas travadas contra o banco.
+      refreshLockedLinhas(saved);
     }
   }, [contaSel]);
 
@@ -243,6 +246,7 @@ export default function ConciliacaoBancariaSection() {
     }
     setLancamentos(prev => prev.map(l => l.id === id ? { ...l, conciliado: value } : l));
     emitDataEvent('financeiro:conciliacao');
+    refreshLockedLinhas();
   };
 
   const openEditLancamento = async (item: LancamentoConciliacao) => {
@@ -388,6 +392,7 @@ export default function ConciliacaoBancariaSection() {
       setLancamentos(prev => prev.filter(l => l.id !== item.id));
       emitDataEvent('financeiro:conciliacao');
       emitDataEvent('financeiro:lancamentos');
+      refreshLockedLinhas();
     } catch (err: unknown) {
       console.error('[ConciliacaoBancariaSection.deleteLancamentoConciliacao]', err);
       toast.error(mapFinanceiroDeleteError(err));
@@ -408,127 +413,147 @@ export default function ConciliacaoBancariaSection() {
     setLancamentos(prev => prev.map(l => ids.includes(l.id) ? { ...l, conciliado: true } : l));
     toast.success(`${count} lançamentos conciliados`);
     emitDataEvent('financeiro:conciliacao');
+    refreshLockedLinhas();
   };
 
   // ========== File Parsing ==========
 
-  /** Busca matches e popula sugestões de conciliação para linhas já parseadas. */
+  interface MatchContext {
+    allLancamentos: LancamentoCandidate[];
+    contasPagar: ContaPagarCandidate[];
+    contasReceber: ContaReceberCandidate[];
+    conciliadosSet: Set<string>;
+    ignoradasSet: Set<string>;
+  }
+
+  /** Busca lançamentos/CP/CR candidatos + sets de já-conciliadas/ignoradas para a conta selecionada. */
+  const fetchMatchContext = async (): Promise<MatchContext> => {
+    // Busca dados para match + entradas já conciliadas + entradas ignoradas
+    const [lancRes, lancAllRes, cpRes, crRes, conciliadosRes, ignoradasRes] = await Promise.all([
+      contaSel ? supabase.from('fin_lancamentos').select('id, data_competencia, valor, tipo, descricao, conciliado, conta_id')
+        .eq('conta_id', contaSel).eq('status', 'REALIZADO').or('conciliado.is.null,conciliado.eq.false') : Promise.resolve({ data: [] }),
+      supabase.from('fin_lancamentos').select('id, data_competencia, valor, tipo, descricao, conciliado, conta_id')
+        .eq('status', 'REALIZADO').or('conciliado.is.null,conciliado.eq.false').limit(500),
+      supabase.from('fin_contas_pagar').select('id, descricao, valor, data_vencimento, status, fornecedor, recorrente, recorrencia_config')
+        .in('status', ['AGUARDANDO_APROVACAO', 'APROVADO']).order('data_vencimento'),
+      supabase.from('fin_contas_receber').select('id, descricao, valor, data_vencimento, status, cliente, recorrente, recorrencia_config')
+        .eq('status', 'A_RECEBER').order('data_vencimento'),
+      contaSel ? supabase.from('fin_lancamentos').select('data_competencia, valor, tipo')
+        .eq('conta_id', contaSel).eq('conciliado', true).eq('status', 'REALIZADO') : Promise.resolve({ data: [] }),
+      // Entradas ignoradas para esta conta
+      contaSel ? supabase.from('fin_conciliacao_ignoradas').select('data, valor, tipo, descricao')
+        .eq('conta_id', contaSel) : Promise.resolve({ data: [] }),
+    ]);
+
+    const lancSameConta = ((lancRes as { data: LancamentoCandidate[] | null }).data || []) as LancamentoCandidate[];
+    const lancAll = (lancAllRes.data || []) as LancamentoCandidate[];
+    const contasPagar = (cpRes.data || []) as ContaPagarCandidate[];
+    const contasReceber = (crRes.data || []) as ContaReceberCandidate[];
+
+    // Já conciliadas — mostrar com badge em vez de filtrar silenciosamente
+    const conciliadosSet = new Set(
+      ((conciliadosRes.data || []) as { data_competencia: string; valor: number; tipo: string }[])
+        .map(l => `${l.data_competencia}|${Number(l.valor)}|${l.tipo}`)
+    );
+
+    // Ignoradas — mostrar com badge "Ignorado"
+    const ignoradasSet = new Set(
+      ((ignoradasRes.data || []) as { data: string; valor: number; tipo: string; descricao: string | null }[])
+        .map(l => `${l.data}|${Number(l.valor)}|${l.tipo}`)
+    );
+
+    const lancMap = new Map<string, LancamentoCandidate>();
+    for (const l of lancSameConta) lancMap.set(l.id, { ...l, _sameAccount: true });
+    for (const l of lancAll) { if (!lancMap.has(l.id)) lancMap.set(l.id, { ...l, _sameAccount: false }); }
+    const allLancamentos = Array.from(lancMap.values());
+
+    return { allLancamentos, contasPagar, contasReceber, conciliadosSet, ignoradasSet };
+  };
+
+  /** Recalcula o estado de match de UMA linha (já conciliada/ignorada/sugestão) contra o contexto atual do banco. */
+  const matchLinha = (linha: LinhaExtrato, ctx: MatchContext, usedIds: Set<string>): LinhaExtrato => {
+    const key = `${linha.data}|${linha.valor}|${linha.tipo}`;
+    const base = { ...linha, matchId: undefined, matchOrigin: undefined, matchDescricao: undefined, matchRaw: undefined, suggestions: undefined };
+
+    // Já conciliada — exibir informativo, sem ação
+    if (ctx.conciliadosSet.has(key)) {
+      return { ...base, selecionada: false, jaConciliada: true, ignorada: false };
+    }
+
+    // Ignorada — exibir informativo, sem ação
+    if (ctx.ignoradasSet.has(key)) {
+      return { ...base, selecionada: false, ignorada: true, jaConciliada: false };
+    }
+
+    const suggestions: MatchSuggestion[] = [];
+
+    for (const ex of ctx.allLancamentos) {
+      if (usedIds.has(`lanc-${ex.id}`)) continue;
+      if (ex.tipo !== linha.tipo) continue;
+      let score = computeScore(linha.valor, linha.data, linha.descricao, Number(ex.valor), ex.data_competencia, ex.descricao || '');
+      if (score === 0) continue;
+      if (ex._sameAccount) score += 10;
+      suggestions.push({
+        id: ex.id, origin: 'lancamento', descricao: ex.descricao || '(sem desc.)',
+        valor: Number(ex.valor), data: ex.data_competencia,
+        extra: ex._sameAccount ? 'Mesma conta' : `Conta: ${getContaNome(ex.conta_id)}`,
+        score, raw: ex,
+      });
+    }
+
+    if (linha.tipo === 'DESPESA') {
+      for (const cp of ctx.contasPagar) {
+        if (usedIds.has(`cp-${cp.id}`)) continue;
+        const score = computeScore(linha.valor, linha.data, linha.descricao, Number(cp.valor), cp.data_vencimento, cp.descricao || '');
+        if (score === 0) continue;
+        suggestions.push({
+          id: cp.id, origin: 'conta_pagar', descricao: cp.descricao || '(sem desc.)',
+          valor: Number(cp.valor), data: cp.data_vencimento,
+          extra: cp.fornecedor || undefined, score, raw: cp,
+        });
+      }
+    }
+
+    if (linha.tipo === 'RECEITA') {
+      for (const cr of ctx.contasReceber) {
+        if (usedIds.has(`cr-${cr.id}`)) continue;
+        const score = computeScore(linha.valor, linha.data, linha.descricao, Number(cr.valor), cr.data_vencimento, cr.descricao || '');
+        if (score === 0) continue;
+        suggestions.push({
+          id: cr.id, origin: 'conta_receber', descricao: cr.descricao || '(sem desc.)',
+          valor: Number(cr.valor), data: cr.data_vencimento,
+          extra: cr.cliente || undefined, score, raw: cr,
+        });
+      }
+    }
+
+    suggestions.sort((a, b) => b.score - a.score);
+
+    const best = suggestions[0];
+    if (best && best.score >= 60) {
+      usedIds.add(`${best.origin === 'lancamento' ? 'lanc' : best.origin === 'conta_pagar' ? 'cp' : 'cr'}-${best.id}`);
+      return {
+        ...base,
+        matchId: best.id,
+        matchOrigin: best.origin,
+        matchDescricao: best.descricao,
+        matchRaw: best.raw,
+        suggestions,
+        selecionada: false,
+        jaConciliada: false,
+        ignorada: false,
+      };
+    }
+
+    return { ...base, jaConciliada: false, ignorada: false, suggestions: suggestions.length > 0 ? suggestions : undefined };
+  };
+
+  /** Busca matches e popula sugestões de conciliação para linhas já parseadas (usado ao importar um arquivo novo). */
   const processarLinhas = async (parsed: LinhaExtrato[]) => {
     try {
-      // Busca dados para match + entradas já conciliadas + entradas ignoradas
-      const [lancRes, lancAllRes, cpRes, crRes, conciliadosRes, ignoradasRes] = await Promise.all([
-        contaSel ? supabase.from('fin_lancamentos').select('id, data_competencia, valor, tipo, descricao, conciliado, conta_id')
-          .eq('conta_id', contaSel).eq('status', 'REALIZADO').or('conciliado.is.null,conciliado.eq.false') : Promise.resolve({ data: [] }),
-        supabase.from('fin_lancamentos').select('id, data_competencia, valor, tipo, descricao, conciliado, conta_id')
-          .eq('status', 'REALIZADO').or('conciliado.is.null,conciliado.eq.false').limit(500),
-        supabase.from('fin_contas_pagar').select('id, descricao, valor, data_vencimento, status, fornecedor, recorrente, recorrencia_config')
-          .in('status', ['AGUARDANDO_APROVACAO', 'APROVADO']).order('data_vencimento'),
-        supabase.from('fin_contas_receber').select('id, descricao, valor, data_vencimento, status, cliente, recorrente, recorrencia_config')
-          .eq('status', 'A_RECEBER').order('data_vencimento'),
-        contaSel ? supabase.from('fin_lancamentos').select('data_competencia, valor, tipo')
-          .eq('conta_id', contaSel).eq('conciliado', true).eq('status', 'REALIZADO') : Promise.resolve({ data: [] }),
-        // Entradas ignoradas para esta conta
-        contaSel ? supabase.from('fin_conciliacao_ignoradas').select('data, valor, tipo, descricao')
-          .eq('conta_id', contaSel) : Promise.resolve({ data: [] }),
-      ]);
-
-      const lancSameConta = ((lancRes as { data: LancamentoCandidate[] | null }).data || []) as LancamentoCandidate[];
-      const lancAll = (lancAllRes.data || []) as LancamentoCandidate[];
-      const contasPagar = (cpRes.data || []) as ContaPagarCandidate[];
-      const contasReceber = (crRes.data || []) as ContaReceberCandidate[];
-
-      // Já conciliadas — mostrar com badge em vez de filtrar silenciosamente
-      const conciliadosSet = new Set(
-        ((conciliadosRes.data || []) as { data_competencia: string; valor: number; tipo: string }[])
-          .map(l => `${l.data_competencia}|${Number(l.valor)}|${l.tipo}`)
-      );
-
-      // Ignoradas — mostrar com badge "Ignorado"
-      const ignoradasSet = new Set(
-        ((ignoradasRes.data || []) as { data: string; valor: number; tipo: string; descricao: string | null }[])
-          .map(l => `${l.data}|${Number(l.valor)}|${l.tipo}`)
-      );
-
-      const lancMap = new Map<string, LancamentoCandidate>();
-      for (const l of lancSameConta) lancMap.set(l.id, { ...l, _sameAccount: true });
-      for (const l of lancAll) { if (!lancMap.has(l.id)) lancMap.set(l.id, { ...l, _sameAccount: false }); }
-      const allLancamentos = Array.from(lancMap.values());
-
+      const ctx = await fetchMatchContext();
       const usedIds = new Set<string>();
-
-      const final = parsed.map(linha => {
-        const key = `${linha.data}|${linha.valor}|${linha.tipo}`;
-
-        // Já conciliada — exibir informativo, sem ação
-        if (conciliadosSet.has(key)) {
-          return { ...linha, selecionada: false, jaConciliada: true };
-        }
-
-        // Ignorada — exibir informativo, sem ação
-        if (ignoradasSet.has(key)) {
-          return { ...linha, selecionada: false, ignorada: true };
-        }
-
-        const suggestions: MatchSuggestion[] = [];
-
-        for (const ex of allLancamentos) {
-          if (usedIds.has(`lanc-${ex.id}`)) continue;
-          if (ex.tipo !== linha.tipo) continue;
-          let score = computeScore(linha.valor, linha.data, linha.descricao, Number(ex.valor), ex.data_competencia, ex.descricao || '');
-          if (score === 0) continue;
-          if (ex._sameAccount) score += 10;
-          suggestions.push({
-            id: ex.id, origin: 'lancamento', descricao: ex.descricao || '(sem desc.)',
-            valor: Number(ex.valor), data: ex.data_competencia,
-            extra: ex._sameAccount ? 'Mesma conta' : `Conta: ${getContaNome(ex.conta_id)}`,
-            score, raw: ex,
-          });
-        }
-
-        if (linha.tipo === 'DESPESA') {
-          for (const cp of contasPagar) {
-            if (usedIds.has(`cp-${cp.id}`)) continue;
-            const score = computeScore(linha.valor, linha.data, linha.descricao, Number(cp.valor), cp.data_vencimento, cp.descricao || '');
-            if (score === 0) continue;
-            suggestions.push({
-              id: cp.id, origin: 'conta_pagar', descricao: cp.descricao || '(sem desc.)',
-              valor: Number(cp.valor), data: cp.data_vencimento,
-              extra: cp.fornecedor || undefined, score, raw: cp,
-            });
-          }
-        }
-
-        if (linha.tipo === 'RECEITA') {
-          for (const cr of contasReceber) {
-            if (usedIds.has(`cr-${cr.id}`)) continue;
-            const score = computeScore(linha.valor, linha.data, linha.descricao, Number(cr.valor), cr.data_vencimento, cr.descricao || '');
-            if (score === 0) continue;
-            suggestions.push({
-              id: cr.id, origin: 'conta_receber', descricao: cr.descricao || '(sem desc.)',
-              valor: Number(cr.valor), data: cr.data_vencimento,
-              extra: cr.cliente || undefined, score, raw: cr,
-            });
-          }
-        }
-
-        suggestions.sort((a, b) => b.score - a.score);
-
-        const best = suggestions[0];
-        if (best && best.score >= 60) {
-          usedIds.add(`${best.origin === 'lancamento' ? 'lanc' : best.origin === 'conta_pagar' ? 'cp' : 'cr'}-${best.id}`);
-          return {
-            ...linha,
-            matchId: best.id,
-            matchOrigin: best.origin,
-            matchDescricao: best.descricao,
-            matchRaw: best.raw,
-            suggestions,
-            selecionada: false,
-          };
-        }
-
-        return { ...linha, suggestions: suggestions.length > 0 ? suggestions : undefined };
-      });
+      const final = parsed.map(linha => matchLinha(linha, ctx, usedIds));
 
       const matchedLanc = final.filter(l => l.matchOrigin === 'lancamento').length;
       const matchedCP = final.filter(l => l.matchOrigin === 'conta_pagar').length;
@@ -553,6 +578,32 @@ export default function ConciliacaoBancariaSection() {
     } catch (err) {
       console.error('[ConciliacaoBancariaSection.processarLinhas]', err);
       toast.error('Erro ao processar arquivo');
+    }
+  };
+
+  /**
+   * Revalida silenciosamente as linhas marcadas como "já conciliada"/"ignorada" contra o banco.
+   * Essas linhas não têm estado manual do usuário (seleção/sugestão escolhida), então podem ser
+   * recalculadas com segurança — ao contrário das demais linhas (com matchId/rateio/categoria
+   * escolhidos manualmente), que nunca são tocadas aqui.
+   * Corrige o caso de uma linha continuar exibindo "Já conciliada anteriormente" no Importar
+   * Extrato depois que o lançamento correspondente foi desconciliado/excluído na aba Lançamentos.
+   */
+  const refreshLockedLinhas = async (source?: LinhaExtrato[]) => {
+    if (!contaSel) return;
+    const base = source || linhas;
+    if (!base.some(l => l.jaConciliada || l.ignorada)) return;
+    try {
+      const ctx = await fetchMatchContext();
+      const usedIds = new Set<string>();
+      for (const l of base) {
+        if (!l.jaConciliada && !l.ignorada && l.matchId && l.matchOrigin) {
+          usedIds.add(`${l.matchOrigin === 'lancamento' ? 'lanc' : l.matchOrigin === 'conta_pagar' ? 'cp' : 'cr'}-${l.matchId}`);
+        }
+      }
+      setLinhas(prev => prev.map(l => (l.jaConciliada || l.ignorada) ? matchLinha(l, ctx, usedIds) : l));
+    } catch (err) {
+      console.error('[ConciliacaoBancariaSection.refreshLockedLinhas]', err);
     }
   };
 
@@ -1260,7 +1311,7 @@ export default function ConciliacaoBancariaSection() {
                     {categoriaNome ? (
                       <span className="text-xs">{categoriaNome}</span>
                     ) : (
-                      <span className="text-xs text-warning-foreground flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Sem categoria</span>
+                      <span className="text-xs text-warning flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Sem categoria</span>
                     )}
                   </TableCell>
                   <TableCell>
