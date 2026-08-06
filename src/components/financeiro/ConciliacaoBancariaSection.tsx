@@ -131,6 +131,9 @@ export default function ConciliacaoBancariaSection() {
   const [lancamentos, setLancamentos] = useState<LancamentoConciliacao[]>([]);
   const [filtro, setFiltro] = useState<'pendentes' | 'conciliados' | 'todos'>('pendentes');
   const [view, setView] = useState<'importar' | 'conciliar'>('conciliar');
+  // Totais da conta inteira (independentes do filtro/paginação da lista) — usados só no resumo do cabeçalho.
+  const [totalPendentesConta, setTotalPendentesConta] = useState(0);
+  const [totalConciliadosConta, setTotalConciliadosConta] = useState(0);
 
   const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; linhaIndex: number; match: MatchSuggestion | null }>({ open: false, linhaIndex: -1, match: null });
   const [processando, setProcessando] = useState(false);
@@ -210,14 +213,36 @@ export default function ConciliacaoBancariaSection() {
   }, [contaSel]);
 
   useEffect(() => { if (contaSel && view === 'conciliar') loadLancamentos(); }, [contaSel, filtro, view]);
+  useEffect(() => { if (contaSel && view === 'conciliar') loadLancamentosCounts(); }, [contaSel, view]);
+
+  /** Totais reais da conta (pendente/conciliado), independentes do filtro e do limit(200) da lista. */
+  const loadLancamentosCounts = async () => {
+    const [pendRes, concRes] = await Promise.all([
+      supabase.from('fin_lancamentos').select('id', { count: 'exact', head: true })
+        .eq('conta_id', contaSel).eq('status', 'REALIZADO').or('conciliado.is.null,conciliado.eq.false'),
+      supabase.from('fin_lancamentos').select('id', { count: 'exact', head: true })
+        .eq('conta_id', contaSel).eq('status', 'REALIZADO').eq('conciliado', true),
+    ]);
+    setTotalPendentesConta(pendRes.count || 0);
+    setTotalConciliadosConta(concRes.count || 0);
+  };
 
   const loadLancamentos = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    let query = supabase
       .from('fin_lancamentos')
       .select('id, data_competencia, data_vencimento, data_pagamento, valor, tipo, descricao, observacoes, conta_id, categoria_id, centro_custo_id, forma_pagamento, status, origem, recorrente, conciliado, conciliado_em, conciliado_por, created_at, updated_at')
       .eq('conta_id', contaSel)
-      .eq('status', 'REALIZADO')
+      .eq('status', 'REALIZADO');
+
+    // O filtro precisa entrar na query — sem isso, o .limit(200) abaixo pega só os
+    // lançamentos mais recentes por competência (normalmente pendentes), empurrando
+    // conciliados mais antigos para fora da página e fazendo a aba "Conciliados"
+    // aparecer vazia mesmo havendo registros (bug confirmado: PagBank Gm, 2026-08-06).
+    if (filtro === 'pendentes') query = query.or('conciliado.is.null,conciliado.eq.false');
+    else if (filtro === 'conciliados') query = query.eq('conciliado', true);
+
+    const { data, error } = await query
       .order('data_competencia', { ascending: false })
       .limit(200);
 
@@ -247,6 +272,7 @@ export default function ConciliacaoBancariaSection() {
     setLancamentos(prev => prev.map(l => l.id === id ? { ...l, conciliado: value } : l));
     emitDataEvent('financeiro:conciliacao');
     refreshLockedLinhas();
+    loadLancamentosCounts();
   };
 
   const openEditLancamento = async (item: LancamentoConciliacao) => {
@@ -393,6 +419,7 @@ export default function ConciliacaoBancariaSection() {
       emitDataEvent('financeiro:conciliacao');
       emitDataEvent('financeiro:lancamentos');
       refreshLockedLinhas();
+      loadLancamentosCounts();
     } catch (err: unknown) {
       console.error('[ConciliacaoBancariaSection.deleteLancamentoConciliacao]', err);
       toast.error(mapFinanceiroDeleteError(err));
@@ -414,6 +441,7 @@ export default function ConciliacaoBancariaSection() {
     toast.success(`${count} lançamentos conciliados`);
     emitDataEvent('financeiro:conciliacao');
     refreshLockedLinhas();
+    loadLancamentosCounts();
   };
 
   // ========== File Parsing ==========
@@ -1250,7 +1278,7 @@ export default function ConciliacaoBancariaSection() {
         <>
           <div className="flex items-center justify-between flex-wrap gap-2">
             <p className="text-sm text-muted-foreground">
-              {pendentes} pendente(s) • {conciliados} conciliado(s)
+              {totalPendentesConta} pendente(s) • {totalConciliadosConta} conciliado(s)
             </p>
             <div className="flex items-center gap-2">
               <Select value={filtro} onValueChange={v => setFiltro(v as 'pendentes' | 'conciliados' | 'todos')}>
