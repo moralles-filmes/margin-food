@@ -212,11 +212,22 @@ export default function ConciliacaoBancariaSection() {
         p_lancamento_ids: [id],
       });
       if (error) { toast.error(error.message); return; }
+      setLancamentos(prev => prev.map(l => l.id === id ? { ...l, conciliado: value } : l));
+      toast.success('Lançamento conciliado');
     } else {
-      await (supabase.from('fin_lancamentos').update({ conciliado: false, conciliado_em: null, conciliado_por: null } as Record<string, unknown>) as unknown as { eq: (col: string, val: string) => Promise<unknown> }).eq('id', id);
+      const { data, error } = await supabase.rpc('unreconcile_lancamento', { p_id: id });
+      if (error) { toast.error(error.message); return; }
+      const deleted = (data as unknown as { deleted?: boolean } | null)?.deleted;
+      if (deleted) {
+        // Lançamento nasceu da própria conciliação (origem='conciliacao') — não tem
+        // vida fora dela, então desconciliar exclui o registro (não só desmarca).
+        setLancamentos(prev => prev.filter(l => l.id !== id));
+        toast.success('Conciliação removida — lançamento excluído (havia sido criado pela conciliação)');
+      } else {
+        setLancamentos(prev => prev.map(l => l.id === id ? { ...l, conciliado: value } : l));
+        toast.success('Conciliação removida');
+      }
     }
-    setLancamentos(prev => prev.map(l => l.id === id ? { ...l, conciliado: value } : l));
-    toast.success(value ? 'Lançamento conciliado' : 'Conciliação removida');
     emitDataEvent('financeiro:conciliacao');
   };
 
