@@ -10,6 +10,7 @@ interface CategoryOption {
   nome: string;
   tipo?: string;
   codigo?: string;
+  groupLabel?: string;
 }
 
 interface CategoryComboboxProps {
@@ -36,6 +37,16 @@ export default function CategoryCombobox({
 
   const selected = useMemo(() => options.find(o => o.id === value), [options, value]);
 
+  const groupedOptions = useMemo(() => {
+    const groups = new Map<string, CategoryOption[]>();
+    for (const opt of options) {
+      const key = opt.groupLabel || '';
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(opt);
+    }
+    return Array.from(groups.entries()).sort(([a], [b]) => a.localeCompare(b));
+  }, [options]);
+
   return (
     <Popover open={open} onOpenChange={setOpen} modal={modal}>
       <PopoverTrigger asChild>
@@ -55,23 +66,25 @@ export default function CategoryCombobox({
           <CommandInput placeholder="Buscar categoria..." />
           <CommandList className="max-h-[300px] overflow-y-auto">
             <CommandEmpty>Nenhuma categoria encontrada.</CommandEmpty>
-            <CommandGroup>
-              {options.map(opt => (
-                <CommandItem
-                  key={opt.id}
-                  value={opt.codigo ? `${opt.codigo} ${opt.nome}` : opt.nome}
-                  onSelect={() => {
-                    onValueChange(opt.id === value ? '' : opt.id);
-                    setOpen(false);
-                  }}
-                >
-                  <Check className={cn('mr-2 h-3 w-3', value === opt.id ? 'opacity-100' : 'opacity-0')} />
-                  <span className="truncate text-xs">
-                    {opt.codigo ? `${opt.codigo} — ${opt.nome}` : opt.nome}
-                  </span>
-                </CommandItem>
-              ))}
-            </CommandGroup>
+            {groupedOptions.map(([groupLabel, opts]) => (
+              <CommandGroup key={groupLabel || '__root__'} heading={groupLabel || undefined}>
+                {opts.map(opt => (
+                  <CommandItem
+                    key={opt.id}
+                    value={opt.codigo ? `${opt.codigo} ${opt.nome}` : opt.nome}
+                    onSelect={() => {
+                      onValueChange(opt.id === value ? '' : opt.id);
+                      setOpen(false);
+                    }}
+                  >
+                    <Check className={cn('mr-2 h-3 w-3', value === opt.id ? 'opacity-100' : 'opacity-0')} />
+                    <span className="truncate text-xs">
+                      {opt.codigo ? `${opt.codigo} — ${opt.nome}` : opt.nome}
+                    </span>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            ))}
           </CommandList>
         </Command>
       </PopoverContent>

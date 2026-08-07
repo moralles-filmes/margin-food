@@ -14,6 +14,7 @@ import { emitDataEvent } from '@/lib/dataEvents';
 import { fmtBRL } from '@/lib/money';
 import { toast } from 'sonner';
 import CategoryCombobox from '@/components/financeiro/CategoryCombobox';
+import { buildCategoryOptions } from '@/lib/categoriaOptions';
 import SupplierCombobox from '@/components/financeiro/SupplierCombobox';
 import { Plus, Trash2, PieChart, CheckCircle, RefreshCw, FileText } from 'lucide-react';
 
@@ -75,11 +76,11 @@ export default function CriarLancamentoExtratoDialog({
   useEffect(() => {
     if (!open) return;
     Promise.all([
-      supabase.from('fin_categorias').select('id, nome, tipo, codigo, centro_custo_padrao_id').eq('ativo', true).order('nome'),
+      supabase.from('fin_categorias').select('id, nome, tipo, codigo, parent_id, centro_custo_padrao_id').eq('ativo', true).order('nome'),
       supabase.from('fin_centros_custo').select('id, nome').eq('ativo', true).order('nome'),
       supabase.from('suppliers').select('id, name').order('name'),
     ]).then(([catRes, ccRes, supRes]) => {
-      setCategorias(catRes.data || []);
+      setCategorias(buildCategoryOptions(catRes.data || []));
       setCentrosCusto(ccRes.data || []);
       setSuppliers((supRes.data || []).map((s: any) => ({ id: s.id, name: s.name })));
     });
