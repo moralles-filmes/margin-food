@@ -135,6 +135,7 @@ export default function ConciliacaoBancariaSection() {
   // Totais da conta inteira (independentes do filtro/paginação da lista) — usados só no resumo do cabeçalho.
   const [totalPendentesConta, setTotalPendentesConta] = useState(0);
   const [totalConciliadosConta, setTotalConciliadosConta] = useState(0);
+  const [selectedLancamentoIds, setSelectedLancamentoIds] = useState<Set<string>>(new Set());
 
   const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; linhaIndex: number; match: MatchSuggestion | null }>({ open: false, linhaIndex: -1, match: null });
   const [processando, setProcessando] = useState(false);
@@ -429,6 +430,66 @@ export default function ConciliacaoBancariaSection() {
     }
   };
 
+  const bulkDeleteLancamentos = async () => {
+    if (selectedLancamentoIds.size === 0) return;
+    const selecionados = lancamentos.filter(l => selectedLancamentoIds.has(l.id));
+
+    const ok = await confirmDelete({
+      title: 'Excluir lançamentos selecionados',
+      description: `Tem certeza que deseja excluir ${selecionados.length} lançamento(s)? Esta ação não pode ser desfeita.`,
+      confirmLabel: 'Excluir',
+      variant: 'destructive',
+    });
+    if (!ok) return;
+
+    setEditSaving(true);
+    try {
+      const excluidosIds: string[] = [];
+      const bloqueados: string[] = [];
+
+      for (const item of selecionados) {
+        if (item.conciliado) {
+          bloqueados.push(`${item.descricao} (desconcilie antes de excluir)`);
+          continue;
+        }
+        if (item.origem === 'espelho_cp' || item.origem === 'espelho_cr') {
+          bloqueados.push(`${item.descricao} (é espelho de Conta a Pagar/Receber)`);
+          continue;
+        }
+        const { error } = await supabase.rpc('_guarded_delete_lancamento' as any, {
+          p_id: item.id,
+          p_expected_updated_at: item.updated_at,
+        } as any);
+        if (error) {
+          console.error('[ConciliacaoBancariaSection.bulkDeleteLancamentos]', error);
+          bloqueados.push(`${item.descricao} (${mapFinanceiroDeleteError(error)})`);
+          continue;
+        }
+        excluidosIds.push(item.id);
+      }
+
+      if (excluidosIds.length > 0) {
+        setLancamentos(prev => prev.filter(l => !excluidosIds.includes(l.id)));
+      }
+      setSelectedLancamentoIds(new Set());
+
+      if (bloqueados.length === 0) {
+        toast.success(`${excluidosIds.length} lançamento(s) excluído(s)`);
+      } else if (excluidosIds.length === 0) {
+        toast.error(`Nenhum lançamento excluído. Bloqueados: ${bloqueados.join('; ')}`);
+      } else {
+        toast.warning(`${excluidosIds.length} excluído(s), ${bloqueados.length} bloqueado(s): ${bloqueados.join('; ')}`);
+      }
+
+      emitDataEvent('financeiro:conciliacao');
+      emitDataEvent('financeiro:lancamentos');
+      refreshLockedLinhas();
+      loadLancamentosCounts();
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
   const conciliarTodos = async () => {
     const pendentes = lancamentos.filter(l => !l.conciliado);
     if (pendentes.length === 0) return;
@@ -443,6 +504,14 @@ export default function ConciliacaoBancariaSection() {
     emitDataEvent('financeiro:conciliacao');
     refreshLockedLinhas();
     loadLancamentosCounts();
+  };
+
+  const toggleAllLancamentos = (checked: boolean) => {
+    if (!checked) { setSelectedLancamentoIds(new Set()); return; }
+    const selectableIds = lancamentosFiltrados
+      .filter(l => !l.conciliado && l.origem !== 'espelho_cp' && l.origem !== 'espelho_cr')
+      .map(l => l.id);
+    setSelectedLancamentoIds(new Set(selectableIds));
   };
 
   // ========== File Parsing ==========
@@ -951,6 +1020,11 @@ export default function ConciliacaoBancariaSection() {
 
   const fmt = fmtBRL;
   const pendentes = lancamentos.filter(l => !l.conciliado).length;
+  const lancamentosFiltrados = lancamentos.filter(l => {
+    if (filtro === 'pendentes') return !l.conciliado;
+    if (filtro === 'conciliados') return !!l.conciliado;
+    return true;
+  });
   const conciliados = lancamentos.filter(l => l.conciliado).length;
   const selecionadas = linhas.filter(l => l.selecionada && !l.matchId && !l.jaConciliada && !l.ignorada);
   const matchedTotal = linhas.filter(l => l.matchId && !l.jaConciliada).length;
@@ -1281,7 +1355,7 @@ export default function ConciliacaoBancariaSection() {
             <p className="text-sm text-muted-foreground">
               {totalPendentesConta} pendente(s) • {totalConciliadosConta} conciliado(s)
             </p>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Select value={filtro} onValueChange={v => setFiltro(v as 'pendentes' | 'conciliados' | 'todos')}>
                 <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -1298,12 +1372,24 @@ export default function ConciliacaoBancariaSection() {
                   <CheckCircle className="w-4 h-4 mr-1" /> Conciliar Todos
                 </Button>
               )}
+              {lancamentosFiltrados.length > 0 && (
+                <>
+                  <Button variant="outline" size="sm" onClick={() => toggleAllLancamentos(true)}>Selecionar Todos</Button>
+                  <Button variant="outline" size="sm" onClick={() => toggleAllLancamentos(false)}>Desmarcar</Button>
+                </>
+              )}
+              {selectedLancamentoIds.size > 0 && (
+                <Button variant="destructive" size="sm" onClick={bulkDeleteLancamentos} disabled={editSaving}>
+                  <Trash2 className="w-4 h-4 mr-1" /> Excluir Selecionados ({selectedLancamentoIds.size})
+                </Button>
+              )}
             </div>
           </div>
 
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-10"></TableHead>
                 <TableHead className="w-10">✓</TableHead>
                 <TableHead>Data</TableHead>
                 <TableHead>Descrição</TableHead>
@@ -1316,21 +1402,26 @@ export default function ConciliacaoBancariaSection() {
             </TableHeader>
             <TableBody>
               {loading ? (
-                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">Carregando...</TableCell></TableRow>
+                <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">Carregando...</TableCell></TableRow>
               ) : lancamentos.length === 0 ? (
-                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                   {contaSel ? 'Nenhum lançamento encontrado' : 'Selecione uma conta bancária'}
                 </TableCell></TableRow>
-              ) : lancamentos
-                  .filter(l => {
-                    if (filtro === 'pendentes') return !l.conciliado;
-                    if (filtro === 'conciliados') return !!l.conciliado;
-                    return true;
-                  })
-                  .map(item => {
+              ) : lancamentosFiltrados.map(item => {
                 const categoriaNome = categorias.find(c => c.id === item.categoria_id)?.nome;
                 return (
                 <TableRow key={item.id} className={item.conciliado ? 'opacity-80' : ''}>
+                  <TableCell>
+                    <Checkbox
+                      checked={selectedLancamentoIds.has(item.id)}
+                      onCheckedChange={(v) => setSelectedLancamentoIds(prev => {
+                        const next = new Set(prev);
+                        if (v) next.add(item.id); else next.delete(item.id);
+                        return next;
+                      })}
+                      aria-label={`Selecionar ${item.descricao}`}
+                    />
+                  </TableCell>
                   <TableCell>
                     <Checkbox checked={!!item.conciliado} onCheckedChange={(v) => conciliar(item.id, !!v)} />
                   </TableCell>
