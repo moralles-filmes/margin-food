@@ -21,6 +21,7 @@ import ContaDetailDialog, { type ContaDetailData, type ContaDetailRateio } from 
 import ContaFormDialog, { type ContaFormData, type RateioLine } from './ContaFormDialog';
 import * as XLSX from '@/lib/safeXlsx';
 import { mapFinanceiroDeleteError } from '@/lib/financeiroErrorMap';
+import { buildCategoryOptions } from '@/lib/categoriaOptions';
 
 /* ─── Types ─── */
 interface ContaReceber {
@@ -34,7 +35,7 @@ interface ContaReceber {
   updated_at: string;
 }
 
-interface Categoria { id: string; nome: string; tipo: string; codigo: string | null; centro_custo_padrao_id: string | null; }
+interface Categoria { id: string; nome: string; tipo: string; codigo: string | null; parent_id: string | null; centro_custo_padrao_id: string | null; }
 interface Centro { id: string; nome: string; }
 interface Conta { id: string; nome: string; }
 
@@ -131,11 +132,11 @@ export default function ContasReceberSection() {
 
   const loadAux = async () => {
     const [catRes, ccRes, contRes] = await Promise.all([
-      supabase.from('fin_categorias').select('id, nome, tipo, codigo, centro_custo_padrao_id').eq('ativo', true).order('nome'),
+      supabase.from('fin_categorias').select('id, nome, tipo, codigo, parent_id, centro_custo_padrao_id').eq('ativo', true).order('nome'),
       supabase.from('fin_centros_custo').select('id, nome').eq('ativo', true).order('nome'),
       supabase.from('fin_contas').select('id, nome').eq('ativo', true).order('nome'),
     ]);
-    setCategorias((catRes.data as Categoria[]) || []);
+    setCategorias(buildCategoryOptions((catRes.data as Categoria[]) || []));
     setCentros((ccRes.data as Centro[]) || []);
     setContas((contRes.data as Conta[]) || []);
   };
