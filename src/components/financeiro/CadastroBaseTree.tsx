@@ -13,6 +13,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   ChevronRight, ChevronDown, Plus, Edit, Trash2, FolderTree,
   FileText, Wand2, Search, Download, ShieldAlert, ArrowUp, ArrowDown, GripVertical
@@ -98,6 +99,15 @@ function filterTree(nodes: CatNode[], search: string): CatNode[] {
   return filter(nodes);
 }
 
+function collectLeafIds(nodes: CatNode[], depth = 0): string[] {
+  const ids: string[] = [];
+  for (const node of nodes) {
+    if (node.children.length === 0 && depth > 0) ids.push(node.id);
+    ids.push(...collectLeafIds(node.children, depth + 1));
+  }
+  return ids;
+}
+
 // ─── Skeleton loading ───
 function SkeletonTree() {
   return (
@@ -158,12 +168,15 @@ interface TreeRowProps {
   onDragOver: (e: React.DragEvent, targetId: string, targetTipo: string, targetParentId: string | null) => void;
   onDragEnd: () => void;
   onDrop: (e: React.DragEvent, targetId: string) => void;
+  selectedIds: Set<string>;
+  onToggleSelect: (id: string) => void;
 }
 
 function TreeRow({
   node, depth, expanded, toggleExpand, onEdit, onAdd, onDelete, onMove,
   canEdit, canCreate, canDelete, saving, isFirst, isLast,
   dragCtx, onDragStart, onDragOver, onDragEnd, onDrop,
+  selectedIds, onToggleSelect,
 }: TreeRowProps) {
   const isExpanded = expanded.has(node.id);
   const hasChildren = node.children.length > 0;
@@ -228,6 +241,16 @@ function TreeRow({
           )}
         </button>
 
+        {canDelete && isLeaf && (
+          <Checkbox
+            checked={selectedIds.has(node.id)}
+            onCheckedChange={() => onToggleSelect(node.id)}
+            disabled={saving}
+            className="shrink-0"
+            aria-label={`Selecionar ${node.nome}`}
+          />
+        )}
+
         <span className="font-mono text-xs text-muted-foreground w-12 shrink-0">{node.codigo}</span>
 
         <span className={cn('flex-1 text-sm truncate', isTopLevel ? 'font-bold text-foreground uppercase tracking-wide text-xs' : 'font-medium text-foreground')}>
@@ -289,6 +312,8 @@ function TreeRow({
           onDragOver={onDragOver}
           onDragEnd={onDragEnd}
           onDrop={onDrop}
+          selectedIds={selectedIds}
+          onToggleSelect={onToggleSelect}
         />
       ))}
     </>
@@ -349,6 +374,7 @@ export default function CadastroBaseTree() {
   const [dragCtx, setDragCtx] = useState<DragContext>({
     dragId: null, dragTipo: null, dragParentId: null, dropTargetId: null,
   });
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const { confirm, ConfirmDialog } = useConfirmDialog();
 
@@ -381,6 +407,16 @@ export default function CadastroBaseTree() {
 
   const expandAll = () => setExpanded(new Set(items.map(i => i.id)));
   const collapseAll = () => setExpanded(new Set());
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+  const selectAllLeaves = () => setSelectedIds(new Set(collectLeafIds(filteredTree)));
+  const deselectAll = () => setSelectedIds(new Set());
 
   // ─── Form handlers ───
   const openAdd = (parentId: string, parentCodigo: string, parentTipo: string) => {
@@ -524,6 +560,61 @@ export default function CadastroBaseTree() {
     }
   };
 
+  // ─── Bulk delete (multi-select) ───
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+
+    const ok = await confirm({
+      title: 'Excluir categorias selecionadas',
+      description: `Deseja desativar ${ids.length} categoria(s) selecionada(s)? Esta ação pode ser revertida.`,
+      variant: 'destructive',
+      confirmLabel: 'Excluir',
+    });
+    if (!ok) return;
+
+    setSaving(true);
+    try {
+      const excluidas: string[] = [];
+      const bloqueadas: string[] = [];
+
+      for (const id of ids) {
+        const nome = items.find(i => i.id === id)?.nome || id;
+
+        const [lancRes, rateioRes] = await Promise.all([
+          supabase.from('fin_lancamentos').select('id').eq('categoria_id', id).limit(1),
+          supabase.from('fin_lancamento_rateios').select('id').eq('categoria_id', id).limit(1),
+        ]);
+        if ((lancRes.data && lancRes.data.length > 0) || (rateioRes.data && rateioRes.data.length > 0)) {
+          bloqueadas.push(`${nome} (vinculada a lançamentos)`);
+          continue;
+        }
+
+        const { error } = await supabase.from('fin_categorias').update({ ativo: false }).eq('id', id);
+        if (error) {
+          bloqueadas.push(`${nome} (${error.message})`);
+          continue;
+        }
+        excluidas.push(id);
+      }
+
+      setSelectedIds(new Set());
+
+      if (bloqueadas.length === 0) {
+        toast.success(`${excluidas.length} categoria(s) excluída(s)`);
+      } else if (excluidas.length === 0) {
+        toast.error(`Nenhuma categoria excluída. Bloqueadas: ${bloqueadas.join('; ')}`);
+      } else {
+        toast.warning(`${excluidas.length} excluída(s), ${bloqueadas.length} bloqueada(s): ${bloqueadas.join('; ')}`);
+      }
+
+      load();
+      emitDataEvent('financeiro:cadastros');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   // ─── Reorder category ───
   const handleMove = async (categoryId: string, direction: 'up' | 'down') => {
     if (saving) return;
@@ -660,9 +751,20 @@ export default function CadastroBaseTree() {
             Árvore hierárquica de receitas e despesas — base para DRE e DFC
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Button variant="outline" size="sm" onClick={expandAll}>Expandir Tudo</Button>
           <Button variant="outline" size="sm" onClick={collapseAll}>Recolher</Button>
+          {canDelete && collectLeafIds(filteredTree).length > 0 && (
+            <>
+              <Button variant="outline" size="sm" onClick={selectAllLeaves}>Selecionar Todas</Button>
+              <Button variant="outline" size="sm" onClick={deselectAll}>Desmarcar</Button>
+            </>
+          )}
+          {selectedIds.size > 0 && (
+            <Button variant="destructive" size="sm" onClick={handleBulkDelete} disabled={saving}>
+              <Trash2 className="w-4 h-4 mr-1" /> Excluir Selecionadas ({selectedIds.size})
+            </Button>
+          )}
           {canExport && (
             <Button variant="outline" size="sm" onClick={exportExcel}>
               <Download className="w-4 h-4 mr-1" /> Excel
@@ -731,6 +833,8 @@ export default function CadastroBaseTree() {
                 onDragOver={handleDragOver}
                 onDragEnd={handleDragEnd}
                 onDrop={handleDrop}
+                selectedIds={selectedIds}
+                onToggleSelect={toggleSelect}
               />
             ))}
           </CardContent>
