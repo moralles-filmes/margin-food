@@ -23,6 +23,7 @@ import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
 import ContaDetailDialog, { type ContaDetailData, type ContaDetailRateio } from './ContaDetailDialog';
 import ContaFormDialog, { type ContaFormData, type RateioLine } from './ContaFormDialog';
 import * as XLSX from '@/lib/safeXlsx';
+import { buildCategoryOptions } from '@/lib/categoriaOptions';
 import { mapFinanceiroDeleteError } from '@/lib/financeiroErrorMap';
 import DateRangePresets from './DateRangePresets';
 
@@ -50,7 +51,7 @@ interface Lancamento {
   updated_at: string;
 }
 
-interface CategoriaRef { id: string; nome: string; tipo: string; centro_custo_padrao_id: string | null }
+interface CategoriaRef { id: string; nome: string; tipo: string; parent_id: string | null; centro_custo_padrao_id: string | null }
 interface CentroCustoRef { id: string; nome: string }
 interface ContaRef { id: string; nome: string }
 
@@ -202,12 +203,12 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
     setCursorId(null);
     const [_, catRes, ccRes, contRes] = await Promise.all([
       loadPage(null, null),
-      supabase.from('fin_categorias').select('id, nome, tipo, centro_custo_padrao_id').eq('ativo', true).order('nome'),
+      supabase.from('fin_categorias').select('id, nome, tipo, parent_id, centro_custo_padrao_id').eq('ativo', true).order('nome'),
       supabase.from('fin_centros_custo').select('id, nome').eq('ativo', true).order('nome'),
       supabase.from('fin_contas').select('id, nome').eq('ativo', true).order('nome'),
       loadTotais(),
     ]);
-    setCategorias((catRes.data as CategoriaRef[]) || []);
+    setCategorias(buildCategoryOptions((catRes.data as CategoriaRef[]) || []));
     setCentros((ccRes.data as CentroCustoRef[]) || []);
     setContas((contRes.data as ContaRef[]) || []);
   }, [loadPage, loadTotais]);

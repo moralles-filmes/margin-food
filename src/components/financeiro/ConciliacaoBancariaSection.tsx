@@ -22,6 +22,7 @@ import CategoryCombobox from '@/components/financeiro/CategoryCombobox';
 import ContaFormDialog, { type ContaFormData, type RateioLine } from '@/components/financeiro/ContaFormDialog';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { mapFinanceiroDeleteError } from '@/lib/financeiroErrorMap';
+import { buildCategoryOptions } from '@/lib/categoriaOptions';
 import type { ContaBancariaRef, CategoriaFinRef, CentroCustoRef, LancamentoConciliacao, LancamentoCandidate, ContaPagarCandidate, ContaReceberCandidate } from '@/types/financeiro';
 
 import { useCan } from '@/permissions/hooks';
@@ -191,10 +192,10 @@ export default function ConciliacaoBancariaSection() {
         if (data && data.length > 0 && !contaSel) setContaSel(data[0].id);
       });
     Promise.all([
-      supabase.from('fin_categorias').select('id, nome, tipo, centro_custo_padrao_id').eq('ativo', true).order('nome'),
+      supabase.from('fin_categorias').select('id, nome, tipo, parent_id, centro_custo_padrao_id').eq('ativo', true).order('nome'),
       supabase.from('fin_centros_custo').select('id, nome').eq('ativo', true).order('nome'),
     ]).then(([catRes, ccRes]) => {
-      setCategorias(catRes.data || []);
+      setCategorias(buildCategoryOptions(catRes.data || []));
       setCentrosCusto(ccRes.data || []);
     });
   }, []);
