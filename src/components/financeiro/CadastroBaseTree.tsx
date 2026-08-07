@@ -396,6 +396,9 @@ export default function CadastroBaseTree() {
 
   const tree = buildTree(items);
   const filteredTree = filterTree(tree, search);
+  // Leaves currently visible/selectable — used to prune stale selection (search filter, background reload).
+  const visibleLeafIds = new Set(collectLeafIds(filteredTree));
+  const visibleSelectedCount = Array.from(selectedIds).filter(id => visibleLeafIds.has(id)).length;
 
   const toggleExpand = (id: string) => {
     setExpanded(prev => {
@@ -562,7 +565,10 @@ export default function CadastroBaseTree() {
 
   // ─── Bulk delete (multi-select) ───
   const handleBulkDelete = async () => {
-    const ids = Array.from(selectedIds);
+    // Intersect with currently visible leaves: selectedIds isn't pruned when the tree is
+    // filtered by search or silently reloaded (useDataEvent) elsewhere, so a stale id could
+    // point at a category the user can no longer see and no longer intends to delete.
+    const ids = Array.from(selectedIds).filter(id => visibleLeafIds.has(id));
     if (ids.length === 0) return;
 
     const ok = await confirm({
@@ -760,9 +766,9 @@ export default function CadastroBaseTree() {
               <Button variant="outline" size="sm" onClick={deselectAll}>Desmarcar</Button>
             </>
           )}
-          {selectedIds.size > 0 && (
+          {visibleSelectedCount > 0 && (
             <Button variant="destructive" size="sm" onClick={handleBulkDelete} disabled={saving}>
-              <Trash2 className="w-4 h-4 mr-1" /> Excluir Selecionadas ({selectedIds.size})
+              <Trash2 className="w-4 h-4 mr-1" /> Excluir Selecionadas ({visibleSelectedCount})
             </Button>
           )}
           {canExport && (

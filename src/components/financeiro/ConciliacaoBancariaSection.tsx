@@ -214,7 +214,12 @@ export default function ConciliacaoBancariaSection() {
     }
   }, [contaSel]);
 
-  useEffect(() => { if (contaSel && view === 'conciliar') loadLancamentos(); }, [contaSel, filtro, view]);
+  useEffect(() => {
+    if (contaSel && view === 'conciliar') loadLancamentos();
+    // Selection refers to rows from the previous account/filter/view — drop it so the
+    // "Excluir Selecionados (N)" button doesn't show a stale count after switching.
+    setSelectedLancamentoIds(new Set());
+  }, [contaSel, filtro, view]);
   useEffect(() => { if (contaSel && view === 'conciliar') loadLancamentosCounts(); }, [contaSel, view]);
 
   /** Totais reais da conta (pendente/conciliado), independentes do filtro e do limit(200) da lista. */
