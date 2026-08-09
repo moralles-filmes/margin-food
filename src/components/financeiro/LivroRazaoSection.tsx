@@ -678,9 +678,22 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
                       </Tooltip>
                     </TooltipProvider>
                   </TableCell>
-                  <TableCell className={`font-bold ${item.tipo === 'RECEITA' ? 'text-success' : item.tipo === 'TRANSFERENCIA' ? 'text-foreground' : 'text-destructive'}`}>
-                    {item.tipo === 'RECEITA' ? '+' : item.tipo === 'TRANSFERENCIA' ? '' : '-'} {fmt(item.valor)}
-                  </TableCell>
+                  {(() => {
+                    // Transferencia numa conta filtrada tem direcao definida: entrada (credito) na conta destino,
+                    // saida (debito) na conta origem. Sem filtro de conta, a transferencia zera no consolidado
+                    // da empresa, entao nao ha sinal correto unico — mantem neutro.
+                    const isTransferInto = item.tipo === 'TRANSFERENCIA' && filtroConta !== 'todos' && item.conta_destino_id === filtroConta;
+                    const isTransferOutOf = item.tipo === 'TRANSFERENCIA' && filtroConta !== 'todos' && item.conta_id === filtroConta;
+                    const isCredit = item.tipo === 'RECEITA' || isTransferInto;
+                    const isDebit = item.tipo === 'DESPESA' || isTransferOutOf;
+                    const cls = isCredit ? 'text-success' : isDebit ? 'text-destructive' : 'text-foreground';
+                    const sign = isCredit ? '+' : isDebit ? '-' : '';
+                    return (
+                      <TableCell className={`font-bold ${cls}`}>
+                        {sign} {fmt(item.valor)}
+                      </TableCell>
+                    );
+                  })()}
                   <TableCell className={item.saldo_apos != null && item.saldo_apos < 0 ? 'text-destructive font-medium' : 'text-foreground font-medium'}>
                     {item.saldo_apos != null ? fmt(item.saldo_apos) : '—'}
                   </TableCell>
