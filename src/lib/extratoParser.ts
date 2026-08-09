@@ -26,6 +26,8 @@ export interface ExtratoConta {
 export interface ExtratoParseResult {
   linhas: ExtratoLinha[];
   conta: ExtratoConta;
+  /** Saldo final informado no próprio arquivo (só OFX, via <LEDGERBAL>). Ausente em CSV. */
+  saldoFinalArquivo?: { valor: number; data: string };
 }
 
 /* ───────── OFX parser ───────── */
@@ -67,6 +69,29 @@ function parseOFX(text: string): ExtratoParseResult {
     if (bankId) { conta.bankId = bankId; conta.banco = bankId; }
   }
 
+  // Saldo final do extrato (<LEDGERBAL><BALAMT>/<DTASOF>) — usado na conferência de saldo ao importar
+  let saldoFinalArquivo: { valor: number; data: string } | undefined;
+  const ledgerBlock =
+    text.match(/<LEDGERBAL>([\s\S]*?)<\/LEDGERBAL>/i)?.[1] ||
+    text.match(/<LEDGERBAL>([\s\S]*?)(?=<AVAILBAL|<\/STMTRS|<\/CCSTMTRS|$)/i)?.[1];
+  if (ledgerBlock) {
+    const getLedgerTag = (tag: string) => {
+      const m = ledgerBlock.match(new RegExp(`<${tag}>([^<\\n\\r]+)`, 'i'));
+      return m ? m[1].trim() : '';
+    };
+    const balAmt = getLedgerTag('BALAMT');
+    const dtAsOf = getLedgerTag('DTASOF');
+    if (balAmt) {
+      const valor = parseFloat(balAmt.replace(',', '.'));
+      if (!isNaN(valor)) {
+        const data = dtAsOf.length >= 8
+          ? `${dtAsOf.slice(0, 4)}-${dtAsOf.slice(4, 6)}-${dtAsOf.slice(6, 8)}`
+          : '';
+        if (data) saldoFinalArquivo = { valor, data };
+      }
+    }
+  }
+
   // Transações
   const transactions = text.split('<STMTTRN>').slice(1);
   for (const tx of transactions) {
@@ -92,7 +117,7 @@ function parseOFX(text: string): ExtratoParseResult {
     });
   }
 
-  return { linhas, conta };
+  return { linhas, conta, saldoFinalArquivo };
 }
 
 /* ───────── CSV parser ───────── */
@@ -267,4 +292,19 @@ export function verifyContaExtrato(
     status: 'unverified',
     motivo: 'Não foi possível comparar os campos disponíveis no extrato com o cadastro.',
   };
+}
+
+/**
+ * Retorna a data anterior (1 dia) em ISO 'yyyy-MM-dd', usando componentes
+ * locais — nunca `new Date(iso)`, que é interpretado como UTC meia-noite e
+ * desloca o dia no fuso BR (mesmo bug documentado para rótulos de mês).
+ */
+export function diaAnterior(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() - 1);
+  const yy = dt.getFullYear();
+  const mm = String(dt.getMonth() + 1).padStart(2, '0');
+  const dd = String(dt.getDate()).padStart(2, '0');
+  return `${yy}-${mm}-${dd}`;
 }
