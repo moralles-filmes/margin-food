@@ -49,6 +49,7 @@ interface Lancamento {
   conciliado: boolean | null;
   referencia_id: string | null;
   updated_at: string;
+  saldo_apos: number | null;
 }
 
 interface CategoriaRef { id: string; nome: string; tipo: string; parent_id: string | null; centro_custo_padrao_id: string | null }
@@ -71,7 +72,7 @@ function SkeletonTableRows() {
     <>
       {[...Array(5)].map((_, i) => (
         <TableRow key={i}>
-          {[...Array(7)].map((_, j) => (
+          {[...Array(8)].map((_, j) => (
             <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
           ))}
         </TableRow>
@@ -135,6 +136,7 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
   const [cursorId, setCursorId] = useState<string | null>(null);
 
   const [totais, setTotais] = useState({ total_receita: 0, total_despesa: 0, total_transferencia: 0, resultado: 0 });
+  const [saldoAtual, setSaldoAtual] = useState(0);
 
   const [form, setForm] = useState<ContaFormData>({
     tipo: 'DESPESA', valor: 0, data_competencia: todayBR(),
@@ -198,6 +200,14 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
     });
   }, [filtroDataDe, filtroDataAte, filtroTipo, filtroConta, filtroOrigem]);
 
+  const loadSaldoAtual = useCallback(async () => {
+    const { data, error } = await supabase.rpc('get_fin_saldo_atual', {
+      p_conta_id: filtroConta !== 'todos' ? filtroConta : null,
+    });
+    if (error) { console.error('[LivroRazaoSection.loadSaldoAtual]', error); return; }
+    setSaldoAtual(Number(data) || 0);
+  }, [filtroConta]);
+
   const load = useCallback(async () => {
     setCursorDate(null);
     setCursorId(null);
@@ -207,14 +217,15 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
       supabase.from('fin_centros_custo').select('id, nome').eq('ativo', true).order('nome'),
       supabase.from('fin_contas').select('id, nome').eq('ativo', true).order('nome'),
       loadTotais(),
+      loadSaldoAtual(),
     ]);
     setCategorias(buildCategoryOptions((catRes.data as CategoriaRef[]) || []));
     setCentros((ccRes.data as CentroCustoRef[]) || []);
     setContas((contRes.data as ContaRef[]) || []);
-  }, [loadPage, loadTotais]);
+  }, [loadPage, loadTotais, loadSaldoAtual]);
 
   useEffect(() => { if (canView) load(); }, [load, canView]);
-  useEffect(() => { setCursorDate(null); setCursorId(null); setItems([]); loadPage(null, null); loadTotais(); }, [filtroTipo, filtroOrigem, filtroConta, filtroDataDe, filtroDataAte, loadPage, loadTotais]);
+  useEffect(() => { setCursorDate(null); setCursorId(null); setItems([]); loadPage(null, null); loadTotais(); loadSaldoAtual(); }, [filtroTipo, filtroOrigem, filtroConta, filtroDataDe, filtroDataAte, loadPage, loadTotais, loadSaldoAtual]);
   useDataEvent('financeiro:lancamentos', load);
 
   const fmt = fmtBRL;
@@ -611,6 +622,7 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
           ) : (
             <span className="text-muted-foreground">Total de transferencias: <strong className="text-foreground">{fmt(totais.total_transferencia)}</strong></span>
           )}
+          <span className="text-muted-foreground ml-auto">Saldo atual: <strong className={saldoAtual >= 0 ? 'text-foreground' : 'text-destructive'}>{fmt(saldoAtual)}</strong></span>
         </div>
 
         <Table>
@@ -621,6 +633,7 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
               <TableHead>Tipo</TableHead>
               <TableHead>Origem</TableHead>
               <TableHead>Valor</TableHead>
+              <TableHead>Saldo</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="w-20">Acoes</TableHead>
             </TableRow>
@@ -629,7 +642,7 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
             {loading && items.length === 0 ? (
               <SkeletonTableRows />
             ) : items.length === 0 ? (
-              <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">Nenhum lancamento encontrado</TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">Nenhum lancamento encontrado</TableCell></TableRow>
             ) : items.map(item => {
               const orig = ORIGEM_LABEL[item.origem || (item.tipo === 'TRANSFERENCIA' ? 'transferencia' : 'manual')] || ORIGEM_LABEL.manual;
               return (
@@ -667,6 +680,9 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
                   </TableCell>
                   <TableCell className={`font-bold ${item.tipo === 'RECEITA' ? 'text-success' : item.tipo === 'TRANSFERENCIA' ? 'text-foreground' : 'text-destructive'}`}>
                     {item.tipo === 'RECEITA' ? '+' : item.tipo === 'TRANSFERENCIA' ? '' : '-'} {fmt(item.valor)}
+                  </TableCell>
+                  <TableCell className={item.saldo_apos != null && item.saldo_apos < 0 ? 'text-destructive font-medium' : 'text-foreground font-medium'}>
+                    {item.saldo_apos != null ? fmt(item.saldo_apos) : '—'}
                   </TableCell>
                   <TableCell><span className={`text-xs px-2 py-0.5 rounded-full border ${STATUS_COLOR[item.status] || ''}`}>{item.status}</span></TableCell>
                   <TableCell>
