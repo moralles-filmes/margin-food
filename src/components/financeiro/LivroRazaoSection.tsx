@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { Fragment, useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCan } from '@/permissions';
@@ -203,10 +203,11 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
   const loadSaldoAtual = useCallback(async () => {
     const { data, error } = await supabase.rpc('get_fin_saldo_atual', {
       p_conta_id: filtroConta !== 'todos' ? filtroConta : null,
+      p_data: filtroDataAte || null,
     });
     if (error) { console.error('[LivroRazaoSection.loadSaldoAtual]', error); return; }
     setSaldoAtual(Number(data) || 0);
-  }, [filtroConta]);
+  }, [filtroConta, filtroDataAte]);
 
   const load = useCallback(async () => {
     setCursorDate(null);
@@ -231,6 +232,33 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
   const fmt = fmtBRL;
   const catNome = (id: string) => categorias.find(c => c.id === id)?.nome || '';
   const contaNome = (id: string) => contas.find(c => c.id === id)?.nome || '-';
+
+  // Saldo de fechamento por dia: primeiro saldo_apos nao-nulo dentro do grupo do dia
+  // (items ja vem ordenado data_competencia DESC, id DESC — a 1a linha de cada dia
+  // e a transacao mais recente daquele dia). Dias 100% PREVISTO (saldo_apos null em
+  // todas as linhas) herdam o saldo do dia conhecido mais recente anterior (carry-forward).
+  const dayCloseSaldo = useMemo(() => {
+    const order: string[] = [];
+    const firstNonNull = new Map<string, number | null>();
+    for (const item of items) {
+      if (!firstNonNull.has(item.data_competencia)) {
+        order.push(item.data_competencia);
+        firstNonNull.set(item.data_competencia, null);
+      }
+      if (firstNonNull.get(item.data_competencia) == null && item.saldo_apos != null) {
+        firstNonNull.set(item.data_competencia, item.saldo_apos);
+      }
+    }
+    const result = new Map<string, number | null>();
+    let lastKnown: number | null = null;
+    for (let i = order.length - 1; i >= 0; i--) {
+      const date = order[i];
+      const v = firstNonNull.get(date);
+      if (v != null) lastKnown = v;
+      result.set(date, lastKnown);
+    }
+    return result;
+  }, [items]);
 
   /* ─── Detail view ─── */
   const openDetail = async (item: Lancamento) => {
@@ -643,14 +671,26 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
               <SkeletonTableRows />
             ) : items.length === 0 ? (
               <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">Nenhum lancamento encontrado</TableCell></TableRow>
-            ) : items.map(item => {
+            ) : items.map((item, idx) => {
               const orig = ORIGEM_LABEL[item.origem || (item.tipo === 'TRANSFERENCIA' ? 'transferencia' : 'manual')] || ORIGEM_LABEL.manual;
+              const isNewDay = idx === 0 || items[idx - 1].data_competencia !== item.data_competencia;
+              const diaSaldo = dayCloseSaldo.get(item.data_competencia);
               return (
-                <TableRow
-                  key={item.id}
-                  className="cursor-pointer hover:bg-muted/50"
-                  onClick={() => openDetail(item)}
-                >
+                <Fragment key={item.id}>
+                  {isNewDay && (
+                    <TableRow className="bg-muted/30 hover:bg-muted/30">
+                      <TableCell colSpan={8} className="py-1.5 text-xs font-medium text-muted-foreground">
+                        {formatDateBR(parseLocalDate(item.data_competencia))} — Saldo do dia:{' '}
+                        <span className={diaSaldo != null && diaSaldo < 0 ? 'text-destructive font-semibold' : 'text-foreground font-semibold'}>
+                          {diaSaldo != null ? fmt(diaSaldo) : '—'}
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  <TableRow
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => openDetail(item)}
+                  >
                   <TableCell className="font-mono text-sm">{formatDateBR(parseLocalDate(item.data_competencia))}</TableCell>
                   <TableCell className="font-medium max-w-[250px]">
                     {item.recorrente && <Repeat className="w-3 h-3 inline mr-1 text-muted-foreground" />}
@@ -713,6 +753,7 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
                     </div>
                   </TableCell>
                 </TableRow>
+                </Fragment>
               );
             })}
           </TableBody>
