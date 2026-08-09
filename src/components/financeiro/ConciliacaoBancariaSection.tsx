@@ -20,6 +20,7 @@ import { Upload, CheckCircle, Save, RefreshCw, ArrowRight, Receipt, Eye, Plus, T
 import CriarLancamentoExtratoDialog from '@/components/financeiro/CriarLancamentoExtratoDialog';
 import CategoryCombobox from '@/components/financeiro/CategoryCombobox';
 import ContaFormDialog, { type ContaFormData, type RateioLine } from '@/components/financeiro/ContaFormDialog';
+import ConfirmarSaldoExtratoDialog from '@/components/financeiro/ConfirmarSaldoExtratoDialog';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { mapFinanceiroDeleteError } from '@/lib/financeiroErrorMap';
 import { buildCategoryOptions } from '@/lib/categoriaOptions';
@@ -175,6 +176,19 @@ export default function ConciliacaoBancariaSection() {
     open: boolean;
     parsed: LinhaExtrato[];
     extratoInfo: ExtratoConta;
+    saldoFinalArquivo?: { valor: number; data: string };
+    fileName: string;
+  } | null>(null);
+
+  // Dialogo de conferência do saldo final do extrato (dispara após a checagem de conta)
+  const [confirmSaldoDialog, setConfirmSaldoDialog] = useState<{
+    open: boolean;
+    parsed: LinhaExtrato[];
+    nomeArquivo: string;
+    periodoInicio: string;
+    periodoFim: string;
+    deltaExtrato: number;
+    saldoSugerido?: { valor: number; data: string };
   } | null>(null);
 
   // Wrapper: atualiza state e persiste no sessionStorage
@@ -710,6 +724,23 @@ export default function ConciliacaoBancariaSection() {
     }
   };
 
+  const openConfirmSaldo = (
+    parsed: LinhaExtrato[],
+    saldoFinalArquivo: { valor: number; data: string } | undefined,
+    fileName: string,
+  ) => {
+    const datas = parsed.map(l => l.data).sort();
+    setConfirmSaldoDialog({
+      open: true,
+      parsed,
+      nomeArquivo: fileName,
+      periodoInicio: datas[0],
+      periodoFim: datas[datas.length - 1],
+      deltaExtrato: parsed.reduce((sum, l) => sum + (l.tipo === 'RECEITA' ? l.valor : -l.valor), 0),
+      saldoSugerido: saldoFinalArquivo,
+    });
+  };
+
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -731,7 +762,10 @@ export default function ConciliacaoBancariaSection() {
 
       if (verdict.status === 'mismatch') {
         // Bloqueia — abre dialog com opção de override
-        setContaMismatch({ open: true, parsed, extratoInfo: result.conta });
+        setContaMismatch({
+          open: true, parsed, extratoInfo: result.conta,
+          saldoFinalArquivo: result.saldoFinalArquivo, fileName: file.name,
+        });
         return;
       }
 
@@ -740,7 +774,7 @@ export default function ConciliacaoBancariaSection() {
         toast.warning('Não foi possível confirmar a conta do extrato — verifique se a conta selecionada está correta.');
       }
 
-      await processarLinhas(parsed);
+      openConfirmSaldo(parsed, result.saldoFinalArquivo, file.name);
     } catch (err) {
       console.error('[ConciliacaoBancariaSection.handleFile]', err);
       toast.error('Erro ao processar arquivo');
@@ -1845,12 +1879,12 @@ export default function ConciliacaoBancariaSection() {
               </AlertDialogCancel>
               <AlertDialogAction
                 className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
-                onClick={async () => {
+                onClick={() => {
                   const pending = contaMismatch.parsed;
+                  const saldoInfo = contaMismatch.saldoFinalArquivo;
+                  const fname = contaMismatch.fileName;
                   setContaMismatch(null);
-                  setLoading(true);
-                  await processarLinhas(pending);
-                  setLoading(false);
+                  openConfirmSaldo(pending, saldoInfo, fname);
                 }}
               >
                 Importar mesmo assim
@@ -1858,6 +1892,27 @@ export default function ConciliacaoBancariaSection() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+      )}
+
+      {/* ========== CONFERÊNCIA DE SALDO DO EXTRATO ========== */}
+      {confirmSaldoDialog && (
+        <ConfirmarSaldoExtratoDialog
+          open={confirmSaldoDialog.open}
+          nomeArquivo={confirmSaldoDialog.nomeArquivo}
+          periodoInicio={confirmSaldoDialog.periodoInicio}
+          periodoFim={confirmSaldoDialog.periodoFim}
+          deltaExtrato={confirmSaldoDialog.deltaExtrato}
+          saldoSugerido={confirmSaldoDialog.saldoSugerido}
+          contaId={contaSel}
+          onCancel={() => setConfirmSaldoDialog(null)}
+          onConfirmed={async () => {
+            const pending = confirmSaldoDialog.parsed;
+            setConfirmSaldoDialog(null);
+            setLoading(true);
+            await processarLinhas(pending);
+            setLoading(false);
+          }}
+        />
       )}
 
       {/* ========== EDITAR LANÇAMENTO (aba Lançamentos) ========== */}
