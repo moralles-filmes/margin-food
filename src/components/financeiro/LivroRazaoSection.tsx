@@ -101,6 +101,14 @@ interface LivroRazaoProps {
   initialDateTo?: string;
 }
 
+const dayHeaderFormatter = new Intl.DateTimeFormat('pt-BR', { weekday: 'short', day: 'numeric', month: 'long' });
+function formatDayHeaderLabel(date: Date): string {
+  return dayHeaderFormatter.format(date);
+}
+function capitalizeFirst(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 export default function LivroRazaoSection({ initialContaId, initialDateFrom, initialDateTo }: LivroRazaoProps = {}) {
   const { user } = useAuth();
   const canView = useCan('financeiro:lancamentos:view');
@@ -678,12 +686,19 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
               return (
                 <Fragment key={item.id}>
                   {isNewDay && (
-                    <TableRow className="bg-muted/30 hover:bg-muted/30">
-                      <TableCell colSpan={8} className="py-1.5 text-xs font-medium text-muted-foreground">
-                        {formatDateBR(parseLocalDate(item.data_competencia))} — Saldo do dia:{' '}
-                        <span className={diaSaldo != null && diaSaldo < 0 ? 'text-destructive font-semibold' : 'text-foreground font-semibold'}>
-                          {diaSaldo != null ? fmt(diaSaldo) : '—'}
-                        </span>
+                    <TableRow className="hover:bg-transparent border-0">
+                      <TableCell colSpan={8} className="p-0">
+                        <div className="flex items-center justify-between px-4 py-3 my-1.5 rounded-lg bg-muted/60">
+                          <span className="text-sm font-semibold text-foreground">
+                            {capitalizeFirst(formatDayHeaderLabel(parseLocalDate(item.data_competencia)))}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            saldo total{' '}
+                            <span className={`text-base font-bold ${diaSaldo != null && diaSaldo < 0 ? 'text-destructive' : 'text-foreground'}`}>
+                              {diaSaldo != null ? fmt(diaSaldo) : '—'}
+                            </span>
+                          </span>
+                        </div>
                       </TableCell>
                     </TableRow>
                   )}
