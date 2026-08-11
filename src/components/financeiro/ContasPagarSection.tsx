@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { CursorListResponse, FinStatusCounts } from '@/types/financeiro';
 import { emitDataEvent, useDataEvent } from '@/lib/dataEvents';
 import { fmtBRL, formatDateBR, parseLocalDate } from '@/lib/formatters';
@@ -15,13 +15,17 @@ import { Plus, AlertTriangle, CheckCircle, Clock, Ban, FileDown, RefreshCw, Undo
 import { useFormDirtyGuard } from '@/hooks/useFormDirtyGuard';
 import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
 import { gerarPDFContasPagar } from '@/lib/pdfFinanceiro';
-import { todayBR } from '@/lib/datetime';
+import { todayBR, formatInBR } from '@/lib/datetime';
 import TableActions from '@/components/ui/TableActions';
 import ContaDetailDialog, { type ContaDetailData, type ContaDetailRateio } from './ContaDetailDialog';
 import ContaFormDialog, { type ContaFormData, type RateioLine } from './ContaFormDialog';
 import * as XLSX from '@/lib/safeXlsx';
 import { mapFinanceiroDeleteError } from '@/lib/financeiroErrorMap';
 import { buildCategoryOptions } from '@/lib/categoriaOptions';
+import MonthNavigator from './MonthNavigator';
+import SearchableSelect from '@/components/ui/SearchableSelect';
+import { type FiltroPeriodo, computePeriodoRange } from './periodoFiltro';
+import { buildCategoriaFilterOptions, categoriaFiltroToParams, CATEGORIA_FILTRO_TODOS } from './categoriaFiltro';
 
 /* ─── Types ─── */
 interface ContaPagar {
@@ -35,7 +39,7 @@ interface ContaPagar {
   updated_at: string;
 }
 
-interface Categoria { id: string; nome: string; tipo: string; codigo: string | null; parent_id: string | null; centro_custo_padrao_id: string | null; }
+interface Categoria { id: string; nome: string; tipo: string; codigo: string | null; parent_id: string | null; centro_custo_padrao_id: string | null; groupLabel?: string; }
 interface Centro { id: string; nome: string; }
 interface Conta { id: string; nome: string; }
 interface Supplier { id: string; name: string; }
@@ -85,6 +89,10 @@ export default function ContasPagarSection() {
   const [saving, setSaving] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [filtroStatus, setFiltroStatus] = useState('todos');
+  const [filtroPeriodo, setFiltroPeriodo] = useState<FiltroPeriodo>('todos');
+  const [mesFiltro, setMesFiltro] = useState(() => formatInBR(new Date(), 'yyyy-MM'));
+  const [filtroConta, setFiltroConta] = useState('todos');
+  const [filtroCategoria, setFiltroCategoria] = useState(CATEGORIA_FILTRO_TODOS);
   const [hasMore, setHasMore] = useState(false);
   const [cursorDate, setCursorDate] = useState<string | null>(null);
   const [cursorId, setCursorId] = useState<string | null>(null);
@@ -111,16 +119,25 @@ export default function ContasPagarSection() {
   const [payDate, setPayDate] = useState<string>(todayBR());
 
   useEffect(() => { if (canView) load(); }, [canView]);
-  useEffect(() => { if (!canView) return; setCursorDate(null); setCursorId(null); setItems([]); loadPage(null, null); loadTotals(); }, [filtroStatus, canView]);
+  useEffect(() => { if (!canView) return; setCursorDate(null); setCursorId(null); setItems([]); loadPage(null, null); loadTotals(); }, [filtroStatus, filtroPeriodo, mesFiltro, filtroConta, filtroCategoria, canView]);
   useDataEvent('financeiro:cadastros', useCallback(() => { if (canView) loadAux(); }, [canView]));
   useDataEvent('financeiro:pagar', useCallback(() => { if (canView) { loadPage(null, null); loadTotals(); } }, [canView]));
 
+  const categoriaFilterOptions = useMemo(
+    () => buildCategoriaFilterOptions(categorias.filter(c => c.tipo === 'despesa')),
+    [categorias]
+  );
+
   const loadPage = async (cDate: string | null, cId: string | null) => {
     setLoading(true);
+    const { de, ate } = computePeriodoRange(filtroPeriodo, mesFiltro);
     const { data, error } = await supabase.rpc('list_fin_contas_pagar_cursor', {
       p_status: filtroStatus !== 'todos' ? filtroStatus : null,
       p_limit: PAGE_SIZE, p_cursor_date: cDate, p_cursor_id: cId,
-    });
+      p_data_de: de, p_data_ate: ate,
+      p_conta_id: filtroConta !== 'todos' ? filtroConta : null,
+      ...categoriaFiltroToParams(filtroCategoria),
+    } as any);
     if (error) { console.error(error); setLoading(false); return; }
     const result = (data as unknown) as CursorListResponse<ContaPagar> | null;
     const newItems: ContaPagar[] = result?.items || [];
@@ -462,23 +479,54 @@ export default function ContasPagarSection() {
               </Button>
             </>
           )}
-          <Select value={filtroStatus} onValueChange={setFiltroStatus}>
-            <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos</SelectItem>
-              <SelectItem value="RASCUNHO">Rascunho</SelectItem>
-              <SelectItem value="AGUARDANDO_APROVACAO">Aguard. Aprovacao</SelectItem>
-              <SelectItem value="APROVADO">Aprovado</SelectItem>
-              <SelectItem value="PAGO">Pago</SelectItem>
-              <SelectItem value="VENCIDO">Vencido</SelectItem>
-            </SelectContent>
-          </Select>
           {canCreate && (
             <Button size="sm" onClick={() => { handleCloseForm(); setShowForm(true); }}>
               <Plus className="w-4 h-4 mr-1" /> Nova Conta
             </Button>
           )}
         </div>
+      </div>
+
+      <div className="flex items-center gap-2 flex-wrap">
+        <Select value={filtroPeriodo} onValueChange={v => setFiltroPeriodo(v as FiltroPeriodo)}>
+          <SelectTrigger className="w-32 h-9"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todos</SelectItem>
+            <SelectItem value="dia">Dia</SelectItem>
+            <SelectItem value="semana">Semana</SelectItem>
+            <SelectItem value="mes">Mês</SelectItem>
+          </SelectContent>
+        </Select>
+        {filtroPeriodo === 'mes' && (
+          <MonthNavigator value={mesFiltro} onChange={setMesFiltro} />
+        )}
+        <Select value={filtroStatus} onValueChange={setFiltroStatus}>
+          <SelectTrigger className="w-44 h-9"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todos os status</SelectItem>
+            <SelectItem value="RASCUNHO">Rascunho</SelectItem>
+            <SelectItem value="AGUARDANDO_APROVACAO">Aguard. Aprovacao</SelectItem>
+            <SelectItem value="APROVADO">Aprovado</SelectItem>
+            <SelectItem value="PAGO">Pago</SelectItem>
+            <SelectItem value="VENCIDO">Vencido</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={filtroConta} onValueChange={setFiltroConta}>
+          <SelectTrigger className="w-48 h-9"><SelectValue placeholder="Conta de pagamento" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todas as contas</SelectItem>
+            {contas.map(c => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <SearchableSelect
+          value={filtroCategoria}
+          onValueChange={v => setFiltroCategoria(v || CATEGORIA_FILTRO_TODOS)}
+          options={categoriaFilterOptions}
+          placeholder="Categoria"
+          searchPlaceholder="Buscar categoria..."
+          className="w-52 h-9"
+          allowClear={false}
+        />
       </div>
 
       <Table>
