@@ -8,12 +8,15 @@ interface DateRangePresetsProps {
   to: string;     // yyyy-MM-dd ou ''
   onChange: (from: string, to: string) => void;
   className?: string;
+  /** Oculta os presets "Últimos 7d/30d/90d" — usar quando o filtro de mês navegavel os substitui. */
+  hideLastNDays?: boolean;
 }
 
 type Preset = {
   label: string;
   from: () => string;
   to: () => string;
+  lastNDays?: boolean;
 };
 
 function buildPresets(): Preset[] {
@@ -37,22 +40,25 @@ function buildPresets(): Preset[] {
       label: 'Últimos 7d',
       from: () => formatDateBR(subDays(parseLocalDate(todayBR()), 7)),
       to: () => todayBR(),
+      lastNDays: true,
     },
     {
       label: 'Últimos 30d',
       from: () => formatDateBR(subDays(parseLocalDate(todayBR()), 30)),
       to: () => todayBR(),
+      lastNDays: true,
     },
     {
       label: 'Últimos 90d',
       from: () => formatDateBR(subDays(parseLocalDate(todayBR()), 90)),
       to: () => todayBR(),
+      lastNDays: true,
     },
   ];
 }
 
-export default function DateRangePresets({ from, to, onChange, className }: DateRangePresetsProps) {
-  const presets = buildPresets();
+export default function DateRangePresets({ from, to, onChange, className, hideLastNDays }: DateRangePresetsProps) {
+  const presets = buildPresets().filter(p => !hideLastNDays || !p.lastNDays);
 
   const activeIndex = presets.findIndex(p => p.from() === from && p.to() === to);
   const isCleared = from === '' && to === '';

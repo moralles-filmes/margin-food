@@ -6,7 +6,7 @@ import { emitDataEvent, useDataEvent } from '@/lib/dataEvents';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { toast } from 'sonner';
 import { fmtBRL, todayBR, parseLocalDate } from '@/lib/formatters';
-import { formatDateBR } from '@/lib/datetime';
+import { formatDateBR, formatInBR } from '@/lib/datetime';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,6 +26,9 @@ import * as XLSX from '@/lib/safeXlsx';
 import { buildCategoryOptions } from '@/lib/categoriaOptions';
 import { mapFinanceiroDeleteError } from '@/lib/financeiroErrorMap';
 import DateRangePresets from './DateRangePresets';
+import MonthNavigator, { monthBounds } from './MonthNavigator';
+import SearchableSelect from '@/components/ui/SearchableSelect';
+import { buildCategoriaFilterOptions, categoriaFiltroToParams, CATEGORIA_FILTRO_TODOS } from './categoriaFiltro';
 
 // ─── Types ───
 interface Lancamento {
@@ -52,7 +55,7 @@ interface Lancamento {
   saldo_apos: number | null;
 }
 
-interface CategoriaRef { id: string; nome: string; tipo: string; parent_id: string | null; centro_custo_padrao_id: string | null }
+interface CategoriaRef { id: string; nome: string; tipo: string; parent_id: string | null; centro_custo_padrao_id: string | null; groupLabel?: string }
 interface CentroCustoRef { id: string; nome: string }
 interface ContaRef { id: string; nome: string }
 
@@ -131,12 +134,21 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
   const [filtroTipo, setFiltroTipo] = useState('todos');
   const [filtroOrigem, setFiltroOrigem] = useState('todos');
   const [filtroConta, setFiltroConta] = useState(initialContaId || 'todos');
+  const [filtroCategoria, setFiltroCategoria] = useState(CATEGORIA_FILTRO_TODOS);
   const [filtroDataDe, setFiltroDataDe] = useState(() => {
     if (initialDateFrom) return initialDateFrom;
     const d = new Date(); d.setDate(d.getDate() - 30);
     return formatDateBR(d);
   });
   const [filtroDataAte, setFiltroDataAte] = useState(() => initialDateTo || todayBR());
+  const [mesFiltro, setMesFiltro] = useState(() => formatInBR(new Date(), 'yyyy-MM'));
+
+  const handleMesChange = (mes: string) => {
+    setMesFiltro(mes);
+    const { start, end } = monthBounds(mes);
+    setFiltroDataDe(start);
+    setFiltroDataAte(end);
+  };
 
   const PAGE_SIZE = 50;
   const [hasMore, setHasMore] = useState(false);
@@ -175,7 +187,8 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
       p_limit: PAGE_SIZE,
       p_cursor_date: cDate,
       p_cursor_id: cId,
-    });
+      ...categoriaFiltroToParams(filtroCategoria),
+    } as any);
     if (error) { console.error(error); setLoading(false); return; }
     const result = data as unknown as { items: Lancamento[]; has_more: boolean } | null;
     const newItems = result?.items || [];
@@ -188,7 +201,7 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
       setCursorId(last.id);
     }
     setLoading(false);
-  }, [filtroDataDe, filtroDataAte, filtroTipo, filtroConta, filtroOrigem]);
+  }, [filtroDataDe, filtroDataAte, filtroTipo, filtroConta, filtroOrigem, filtroCategoria]);
 
   const loadTotais = useCallback(async () => {
     const { data, error } = await supabase.rpc('get_fin_lancamentos_totais', {
@@ -197,7 +210,8 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
       p_tipo: filtroTipo !== 'todos' ? filtroTipo : null,
       p_conta_id: filtroConta !== 'todos' ? filtroConta : null,
       p_origem: filtroOrigem !== 'todos' ? filtroOrigem : null,
-    });
+      ...categoriaFiltroToParams(filtroCategoria),
+    } as any);
     if (error) { console.error('[LivroRazaoSection.loadTotais]', error); return; }
     const result = data as unknown as { total_receita: number; total_despesa: number; total_transferencia: number; resultado: number } | null;
     setTotais({
@@ -206,7 +220,7 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
       total_transferencia: Number(result?.total_transferencia) || 0,
       resultado: Number(result?.resultado) || 0,
     });
-  }, [filtroDataDe, filtroDataAte, filtroTipo, filtroConta, filtroOrigem]);
+  }, [filtroDataDe, filtroDataAte, filtroTipo, filtroConta, filtroOrigem, filtroCategoria]);
 
   const loadSaldoAtual = useCallback(async () => {
     const { data, error } = await supabase.rpc('get_fin_saldo_atual', {
@@ -234,8 +248,10 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
   }, [loadPage, loadTotais, loadSaldoAtual]);
 
   useEffect(() => { if (canView) load(); }, [load, canView]);
-  useEffect(() => { setCursorDate(null); setCursorId(null); setItems([]); loadPage(null, null); loadTotais(); loadSaldoAtual(); }, [filtroTipo, filtroOrigem, filtroConta, filtroDataDe, filtroDataAte, loadPage, loadTotais, loadSaldoAtual]);
+  useEffect(() => { setCursorDate(null); setCursorId(null); setItems([]); loadPage(null, null); loadTotais(); loadSaldoAtual(); }, [filtroTipo, filtroOrigem, filtroConta, filtroCategoria, filtroDataDe, filtroDataAte, loadPage, loadTotais, loadSaldoAtual]);
   useDataEvent('financeiro:lancamentos', load);
+
+  const categoriaFilterOptions = useMemo(() => buildCategoriaFilterOptions(categorias), [categorias]);
 
   const fmt = fmtBRL;
   const catNome = (id: string) => categorias.find(c => c.id === id)?.nome || '';
@@ -617,6 +633,15 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
                 {contas.map(c => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
               </SelectContent>
             </Select>
+            <SearchableSelect
+              value={filtroCategoria}
+              onValueChange={v => setFiltroCategoria(v || CATEGORIA_FILTRO_TODOS)}
+              options={categoriaFilterOptions}
+              placeholder="Categoria"
+              searchPlaceholder="Buscar categoria..."
+              className="w-44 h-9"
+              allowClear={false}
+            />
             {canExport && (
               <Button size="sm" variant="outline" onClick={exportExcel}>
                 <Download className="w-4 h-4 mr-1" /> Excel
@@ -638,11 +663,15 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
           </div>
         </div>
 
-        <DateRangePresets
-          from={filtroDataDe}
-          to={filtroDataAte}
-          onChange={(de, ate) => { setFiltroDataDe(de); setFiltroDataAte(ate); }}
-        />
+        <div className="flex items-center gap-2 flex-wrap">
+          <MonthNavigator value={mesFiltro} onChange={handleMesChange} />
+          <DateRangePresets
+            from={filtroDataDe}
+            to={filtroDataAte}
+            onChange={(de, ate) => { setFiltroDataDe(de); setFiltroDataAte(ate); }}
+            hideLastNDays
+          />
+        </div>
 
         <div className="flex items-center gap-4 flex-wrap text-sm bg-card border border-border rounded-lg px-4 py-2.5">
           {filtroTipo === 'todos' ? (
