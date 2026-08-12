@@ -32,6 +32,10 @@ export interface DfcCategoria {
   ordem: number | null;
   grupo: string | null;
   linha_dre: string | null;
+  system_key: string | null;
+  excluir_dos_totais: boolean;
+  ativo: boolean;
+  updated_at: string;
 }
 
 /** Job role (admin panel) */
