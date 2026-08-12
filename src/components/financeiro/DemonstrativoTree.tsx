@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ChevronRight, ChevronDown } from 'lucide-react';
@@ -27,6 +27,8 @@ interface RowData {
   tipo: string;
   isSectionHeader?: boolean;
   isTotalRow?: boolean;
+  isInformational?: boolean;
+  hideValue?: boolean;
 }
 
 export default function DemonstrativoTree({
@@ -41,7 +43,7 @@ export default function DemonstrativoTree({
   const [expanded, setExpanded] = useState<Set<string>>(new Set(['_receitas', '_despesas']));
 
   // Auto-expand top-level categories when categorias change
-  useMemo(() => {
+  useEffect(() => {
     if (categorias.length > 0) {
       setExpanded(prev => {
         const next = new Set(prev);
@@ -79,15 +81,17 @@ export default function DemonstrativoTree({
       return own;
     };
 
-    const receitaNodes = tree.filter(n => n.tipo === 'receita');
-    const despesaNodes = tree.filter(n => n.tipo === 'despesa');
+    const receitaNodes = tree.filter(n => n.tipo === 'receita' && !n.excluir_dos_totais);
+    const despesaNodes = tree.filter(n => n.tipo === 'despesa' && !n.excluir_dos_totais);
+    const receitaNaoOperacional = tree.filter(n => n.tipo === 'receita' && n.excluir_dos_totais);
+    const despesaNaoOperacional = tree.filter(n => n.tipo === 'despesa' && n.excluir_dos_totais);
 
     const recTotal = receitaNodes.reduce((s, n) => s + calcNodeValue(n), 0);
     const despTotal = despesaNodes.reduce((s, n) => s + calcNodeValue(n), 0);
 
     const result: RowData[] = [];
 
-    const flatten = (nodes: CatNode[], depth: number, sign: 1 | -1) => {
+    const flatten = (nodes: CatNode[], depth: number, sign: 1 | -1, isInformational = false) => {
       for (const node of nodes) {
         const valor = calcNodeValue(node);
         result.push({
@@ -98,9 +102,10 @@ export default function DemonstrativoTree({
           depth,
           hasChildren: node.children.length > 0,
           tipo: node.tipo,
+          isInformational,
         });
         if (expanded.has(node.id) && node.children.length > 0) {
-          flatten(node.children, depth + 1, sign);
+          flatten(node.children, depth + 1, sign, isInformational);
         }
       }
     };
@@ -186,8 +191,25 @@ export default function DemonstrativoTree({
       });
     }
 
+    if (receitaNaoOperacional.length > 0 || despesaNaoOperacional.length > 0) {
+      result.push({
+        id: '_nao_operacionais',
+        codigo: '',
+        nome: 'VALORES NÃO OPERACIONAIS — NÃO COMPÕEM OS TOTAIS',
+        valor: 0,
+        depth: 0,
+        hasChildren: false,
+        tipo: 'informativo',
+        isSectionHeader: true,
+        isInformational: true,
+        hideValue: true,
+      });
+      flatten(receitaNaoOperacional, 1, 1, true);
+      flatten(despesaNaoOperacional, 1, -1, true);
+    }
+
     return { rows: result, receitaTotal: recTotal };
-  }, [categorias, lancamentos, rateios, expanded, showPctReceita, isDFC, saldoInicial]);
+  }, [categorias, lancamentos, rateios, expanded, isDFC, saldoInicial]);
 
   const toggleExpand = (id: string) => {
     setExpanded(prev => {
@@ -225,7 +247,7 @@ export default function DemonstrativoTree({
             {rows.map(row => {
               const isPositive = row.valor >= 0;
 
-              const pctReceita = showPctReceita && receitaTotal > 0
+              const pctReceita = showPctReceita && receitaTotal > 0 && !row.isInformational
                 ? formatPercentBR((Math.abs(row.valor) / receitaTotal) * 100)
                 : '—';
 
@@ -240,6 +262,7 @@ export default function DemonstrativoTree({
                   className={cn(
                     row.isTotalRow && 'bg-primary/5 font-bold border-t-2 border-primary/20',
                     row.isSectionHeader && 'bg-muted/50 border-t border-border',
+                    row.isInformational && 'bg-amber-50/50 dark:bg-amber-950/10',
                   )}
                 >
                   <TableCell
@@ -271,7 +294,7 @@ export default function DemonstrativoTree({
                     row.depth === 1 && !row.isSectionHeader && 'font-semibold',
                     isPositive ? 'text-success' : 'text-destructive',
                   )}>
-                    {fmtBRL(row.valor)}
+                    {row.hideValue ? '—' : fmtBRL(row.valor)}
                   </TableCell>
                   {showPctReceita && (
                     <TableCell className="text-right text-muted-foreground text-sm">

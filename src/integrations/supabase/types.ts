@@ -1543,6 +1543,7 @@ export type Database = {
           company_id: string
           created_at: string
           created_by: string | null
+          excluir_dos_totais: boolean
           grupo: string | null
           id: string
           linha_dre: string | null
@@ -1551,6 +1552,7 @@ export type Database = {
           parent_id: string | null
           plano_contas_id: string | null
           regra_sugestao: string | null
+          system_key: string | null
           tipo: string
           updated_at: string
         }
@@ -1561,6 +1563,7 @@ export type Database = {
           company_id?: string
           created_at?: string
           created_by?: string | null
+          excluir_dos_totais?: boolean
           grupo?: string | null
           id?: string
           linha_dre?: string | null
@@ -1569,6 +1572,7 @@ export type Database = {
           parent_id?: string | null
           plano_contas_id?: string | null
           regra_sugestao?: string | null
+          system_key?: string | null
           tipo?: string
           updated_at?: string
         }
@@ -1579,6 +1583,7 @@ export type Database = {
           company_id?: string
           created_at?: string
           created_by?: string | null
+          excluir_dos_totais?: boolean
           grupo?: string | null
           id?: string
           linha_dre?: string | null
@@ -1587,6 +1592,7 @@ export type Database = {
           parent_id?: string | null
           plano_contas_id?: string | null
           regra_sugestao?: string | null
+          system_key?: string | null
           tipo?: string
           updated_at?: string
         }
@@ -1786,6 +1792,7 @@ export type Database = {
           data_pagamento: string | null
           data_vencimento: string
           descricao: string
+          excluir_dos_relatorios: boolean
           forma_pagamento: string | null
           fornecedor: string | null
           id: string
@@ -1820,6 +1827,7 @@ export type Database = {
           data_pagamento?: string | null
           data_vencimento?: string
           descricao?: string
+          excluir_dos_relatorios?: boolean
           forma_pagamento?: string | null
           fornecedor?: string | null
           id?: string
@@ -1854,6 +1862,7 @@ export type Database = {
           data_pagamento?: string | null
           data_vencimento?: string
           descricao?: string
+          excluir_dos_relatorios?: boolean
           forma_pagamento?: string | null
           fornecedor?: string | null
           id?: string
@@ -2046,6 +2055,7 @@ export type Database = {
           data_recebimento: string | null
           data_vencimento: string
           descricao: string
+          excluir_dos_relatorios: boolean
           forma_pagamento: string | null
           id: string
           lancamento_id: string | null
@@ -2074,6 +2084,7 @@ export type Database = {
           data_recebimento?: string | null
           data_vencimento?: string
           descricao?: string
+          excluir_dos_relatorios?: boolean
           forma_pagamento?: string | null
           id?: string
           lancamento_id?: string | null
@@ -2102,6 +2113,7 @@ export type Database = {
           data_recebimento?: string | null
           data_vencimento?: string
           descricao?: string
+          excluir_dos_relatorios?: boolean
           forma_pagamento?: string | null
           id?: string
           lancamento_id?: string | null
@@ -2424,6 +2436,7 @@ export type Database = {
           data_pagamento: string | null
           data_vencimento: string | null
           descricao: string | null
+          excluir_dos_relatorios: boolean
           forma_pagamento: string | null
           id: string
           idempotency_key: string | null
@@ -2459,6 +2472,7 @@ export type Database = {
           data_pagamento?: string | null
           data_vencimento?: string | null
           descricao?: string | null
+          excluir_dos_relatorios?: boolean
           forma_pagamento?: string | null
           id?: string
           idempotency_key?: string | null
@@ -2494,6 +2508,7 @@ export type Database = {
           data_pagamento?: string | null
           data_vencimento?: string | null
           descricao?: string | null
+          excluir_dos_relatorios?: boolean
           forma_pagamento?: string | null
           id?: string
           idempotency_key?: string | null

@@ -14,7 +14,8 @@ interface ExportRow {
   nome: string;
   valor: number;
   depth: number;
-  style: 'header' | 'section' | 'normal' | 'total';
+  style: 'header' | 'section' | 'normal' | 'total' | 'informational';
+  hideValue?: boolean;
 }
 
 interface BuildOptions {
@@ -49,18 +50,20 @@ function buildExportRows(opts: BuildOptions): { rows: ExportRow[]; receitaTotal:
     return own;
   };
 
-  const receitaNodes = tree.filter(n => n.tipo === 'receita');
-  const despesaNodes = tree.filter(n => n.tipo === 'despesa');
+  const receitaNodes = tree.filter(n => n.tipo === 'receita' && !n.excluir_dos_totais);
+  const despesaNodes = tree.filter(n => n.tipo === 'despesa' && !n.excluir_dos_totais);
+  const receitaNaoOperacional = tree.filter(n => n.tipo === 'receita' && n.excluir_dos_totais);
+  const despesaNaoOperacional = tree.filter(n => n.tipo === 'despesa' && n.excluir_dos_totais);
   const recTotal = receitaNodes.reduce((s, n) => s + calcNodeValue(n), 0);
   const despTotal = despesaNodes.reduce((s, n) => s + calcNodeValue(n), 0);
 
   const rows: ExportRow[] = [];
 
-  const flatten = (nodes: CatNode[], depth: number, sign: 1 | -1) => {
+  const flatten = (nodes: CatNode[], depth: number, sign: 1 | -1, informational = false) => {
     for (const node of nodes) {
       const valor = calcNodeValue(node);
-      rows.push({ codigo: node.codigo, nome: node.nome, valor: sign * valor, depth, style: 'normal' });
-      if (node.children.length > 0) flatten(node.children, depth + 1, sign);
+      rows.push({ codigo: node.codigo, nome: node.nome, valor: sign * valor, depth, style: informational ? 'informational' : 'normal' });
+      if (node.children.length > 0) flatten(node.children, depth + 1, sign, informational);
     }
   };
 
@@ -84,6 +87,19 @@ function buildExportRows(opts: BuildOptions): { rows: ExportRow[]; receitaTotal:
     rows.push({ codigo: '', nome: 'SALDO ACUMULADO', valor: saldoInicial + resultadoLiquido, depth: 0, style: 'total' });
   } else {
     rows.push({ codigo: '', nome: 'RESULTADO DO PERÍODO', valor: resultadoLiquido, depth: 0, style: 'total' });
+  }
+
+  if (receitaNaoOperacional.length > 0 || despesaNaoOperacional.length > 0) {
+    rows.push({
+      codigo: '',
+      nome: 'VALORES NÃO OPERACIONAIS — NÃO COMPÕEM OS TOTAIS',
+      valor: 0,
+      depth: 0,
+      style: 'informational',
+      hideValue: true,
+    });
+    flatten(receitaNaoOperacional, 1, 1, true);
+    flatten(despesaNaoOperacional, 1, -1, true);
   }
 
   return { rows, receitaTotal: recTotal };
@@ -117,8 +133,8 @@ export async function exportDemonstrativoPDF(opts: BuildOptions & { titulo: stri
 
   const body = rows.map(r => {
     const indent = '  '.repeat(r.depth);
-    const pct = showPct ? `${((Math.abs(r.valor) / receitaTotal) * 100).toFixed(1)}%` : undefined;
-    const row = [r.codigo, `${indent}${r.nome}`, fmtBRL(r.valor)];
+    const pct = showPct && r.style !== 'informational' ? `${((Math.abs(r.valor) / receitaTotal) * 100).toFixed(1)}%` : '—';
+    const row = [r.codigo, `${indent}${r.nome}`, r.hideValue ? '—' : fmtBRL(r.valor)];
     if (showPct) row.push(pct!);
     return row;
   });
@@ -139,6 +155,8 @@ export async function exportDemonstrativoPDF(opts: BuildOptions & { titulo: stri
       } else if (row.style === 'section') {
         data.cell.styles.fontStyle = 'bold';
         data.cell.styles.fillColor = [230, 230, 240];
+      } else if (row.style === 'informational') {
+        data.cell.styles.fillColor = [255, 247, 220];
       }
     },
   });
@@ -168,8 +186,8 @@ export async function exportDemonstrativoExcel(opts: BuildOptions & { titulo: st
 
   for (const r of rows) {
     const indent = '  '.repeat(r.depth);
-    const row: (string | number)[] = [r.codigo, `${indent}${r.nome}`, r.valor];
-    if (showPct) row.push(`${((Math.abs(r.valor) / receitaTotal) * 100).toFixed(1)}%`);
+    const row: (string | number)[] = [r.codigo, `${indent}${r.nome}`, r.hideValue ? '—' : r.valor];
+    if (showPct) row.push(r.style === 'informational' ? '—' : `${((Math.abs(r.valor) / receitaTotal) * 100).toFixed(1)}%`);
     wsData.push(row);
   }
 
