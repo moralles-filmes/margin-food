@@ -15,6 +15,8 @@
 4. **`supabase/.temp/`nunca commitado** — já está no `.gitignore`.
 5. **Edge Functions: nunca hardcodar chaves** — usar sempre `Deno.env.get("SB_SECRET_KEY")`. Chaves novas são adicionadas via painel Supabase → Edge Functions → Secrets.
 6. **GitHub Actions: usar `${{ secrets.NOME }}` para qualquer valor sensível** — nunca valor literal no YAML.
+7. **Manter arquivos de contexto enxutos** — `AGENTS.md` e `CLAUDE.md` devem conter apenas informações realmente necessárias para orientar agentes; detalhes temporários, histórico longo e documentação extensa pertencem a `docs/` ou `TAREFAS.md`.
+8. **Ao final de toda sessão** — verificar se a mudança feita exige atualizar `AGENTS.md` ou `CLAUDE.md`. Se for necessário para orientar futuros agentes, atualizar automaticamente sem pedir confirmação.
 
 **Checklist rápido antes do commit:**
 ```bash

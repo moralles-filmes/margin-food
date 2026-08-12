@@ -5,6 +5,14 @@
 
 ---
 
+## 🔒 Regras Obrigatórias para Agentes
+
+- **Nunca commitar ou subir segredos para o Git**: nenhuma API key, senha, token, JWT, código secreto, credencial, `.env` ou qualquer valor que não possa ser público. Antes de `git add`, `git commit` ou `git push`, revisar diffs/staged e remover qualquer dado sensível.
+- **Manter `AGENTS.md` e `CLAUDE.md` enxutos**: adicionar apenas informações realmente necessárias para orientar outros agentes no projeto. Não registrar detalhes temporários, achismos, histórico longo ou documentação que pertença a `docs/` ou `TAREFAS.md`.
+- **Ao final de toda sessão**: verificar se a mudança feita exige atualizar `AGENTS.md` ou `CLAUDE.md`. Se for necessário para orientar futuros agentes, atualizar automaticamente sem pedir confirmação.
+
+---
+
 ## 🔗 Repositórios e Serviços
 
 | Serviço | Identificador |
