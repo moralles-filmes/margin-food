@@ -172,7 +172,8 @@ margin-food/
 - **`SECURITY DEFINER` exige `assert_tenant()` + `has_any_permission()` explícitos** — RPCs que retornam dados sensíveis (ex: `list_profiles_minimal`, `relatorio_socios_resumo`) nunca podem resolver tenant via JOIN manual.
 - **Hard delete de usuário preserva histórico** — FKs de `auth.users(id)` usam `ON DELETE SET NULL`. Edge function `admin-users` chama `auth.admin.deleteUser`; CASCADE limpa `profiles`/`user_roles`/`user_permissions`.
 - **Financeiro: RPCs `_guarded_`** — Todas as operações financeiras (CP, CR, lançamentos, conciliação) usam RPCs prefixadas `_guarded_` com `assert_tenant()`, `has_permission()`, optimistic locking via `updated_at` e log em `fin_audit_logs`.
-- **Conciliação Bancária** — 3 destinos: `lancamento`, `conta_pagar`, `conta_receber`. Categoria filtrada por `tipo` lowercase (`'receita'`/`'despesa'`). Linhas persistidas em `sessionStorage`. "Ignorar" via tabela `fin_conciliacao_ignoradas`.
+- **Conciliação Bancária** — 3 destinos: `lancamento`, `conta_pagar`, `conta_receber`. Categoria é obrigatória para conciliar Receita/Despesa (validação no cliente e em triggers/RPCs; Transferência é exceção). Linhas persistidas em `sessionStorage`. "Ignorar" via `fin_conciliacao_ignoradas`.
+- **Categorias não operacionais** — raízes fixas `RECEITAS NÃO OPERACIONAIS`/`DESPESAS NÃO OPERACIONAIS` (`fin_categorias.system_key`). Descendentes herdam `excluir_dos_totais`; aparecem como seção informativa no DRE/DFC, mas `excluir_dos_relatorios` os remove de todos os agregados. Saldo bancário/caixa continua real e os inclui.
 - **Bundle: Excel em chunk separado** — `vite.config.ts` tem `manualChunks: { 'vendor-excel': ['exceljs'] }`. O pacote `xlsx` foi removido por advisories HIGH; exports XLSX devem usar `src/lib/safeXlsx.ts`. Seções raras do FinanceiroView são `React.lazy`. Não desfazer isso.
 - **KPIs agregados são SUM no Postgres, nunca `reduce` no client** — Cards/dashboards com `Total R$`, `Qtd Total`, `Registros` devem consumir RPC dedicada (`get_*_kpis`) que retorna o agregado calculado no banco. Padrão idêntico ao `produtos.saldo_atual`. **Nunca** fazer `.select(...)` sem `.limit()` seguido de `.reduce()` para somar — isso baixa a tabela inteira pela rede e cresce O(n). Referência: `get_movimentacoes_kpis` (migration `20260502180000`). Retornar ambos os lados (entrada+saída, receita+despesa, etc.) em uma única chamada para que o toggle/aba vire filtro client-side instantâneo.
 
@@ -199,6 +200,7 @@ margin-food/
 ## ⏳ Pendente / Em Aberto
 
 - [x] Dashboard Financeiro: renomear "Despesa do Período" para "Despesa Realizada" e adicionar "Despesas Provisionadas" (realizada + contas a pagar) — concluído em 2026-08-12
+- [x] Conciliação Bancária: paginação completa, categoria obrigatória com auditoria e categorias não operacionais fora dos totais — concluído em 2026-08-12
 - [x] Security Gate do GitHub Actions: alinhar instalação e scripts ao Bun com lockfile congelado — concluído em 2026-08-12
 - [ ] Monitorar integridade dos dados na empresa piloto após ativação multi-tenant
 - [ ] Testar fluxo completo: criar empresa → criar admin → login admin → criar usuários

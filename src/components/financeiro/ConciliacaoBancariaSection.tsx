@@ -236,7 +236,7 @@ export default function ConciliacaoBancariaSection() {
   }, [contaSel, filtro, view]);
   useEffect(() => { if (contaSel && view === 'conciliar') loadLancamentosCounts(); }, [contaSel, view]);
 
-  /** Totais reais da conta (pendente/conciliado), independentes do filtro e do limit(200) da lista. */
+  /** Totais reais da conta (pendente/conciliado), independentes do filtro e da paginação da lista. */
   const loadLancamentosCounts = async () => {
     const [pendRes, concRes] = await Promise.all([
       supabase.from('fin_lancamentos').select('id', { count: 'exact', head: true })
@@ -250,34 +250,81 @@ export default function ConciliacaoBancariaSection() {
 
   const loadLancamentos = async () => {
     setLoading(true);
-    let query = supabase
-      .from('fin_lancamentos')
-      .select('id, data_competencia, data_vencimento, data_pagamento, valor, tipo, descricao, observacoes, conta_id, categoria_id, centro_custo_id, forma_pagamento, status, origem, recorrente, conciliado, conciliado_em, conciliado_por, created_at, updated_at')
-      .eq('conta_id', contaSel)
-      .eq('status', 'REALIZADO');
+    try {
+      const pageSize = 1000;
+      const allRows: LancamentoConciliacao[] = [];
+      let from = 0;
 
-    // O filtro precisa entrar na query — sem isso, o .limit(200) abaixo pega só os
-    // lançamentos mais recentes por competência (normalmente pendentes), empurrando
-    // conciliados mais antigos para fora da página e fazendo a aba "Conciliados"
-    // aparecer vazia mesmo havendo registros (bug confirmado: PagBank Gm, 2026-08-06).
-    if (filtro === 'pendentes') query = query.or('conciliado.is.null,conciliado.eq.false');
-    else if (filtro === 'conciliados') query = query.eq('conciliado', true);
+      // O PostgREST limita a quantidade de linhas por resposta. Busca em páginas
+      // sucessivas para que datas antigas nunca desapareçam silenciosamente.
+      while (true) {
+        let query = supabase
+          .from('fin_lancamentos')
+          .select('id, data_competencia, data_vencimento, data_pagamento, valor, tipo, descricao, observacoes, conta_id, categoria_id, centro_custo_id, forma_pagamento, status, origem, recorrente, conciliado, conciliado_em, conciliado_por, created_at, updated_at')
+          .eq('conta_id', contaSel)
+          .eq('status', 'REALIZADO');
 
-    const { data, error } = await query
-      .order('data_competencia', { ascending: false })
-      .limit(200);
+        if (filtro === 'pendentes') query = query.or('conciliado.is.null,conciliado.eq.false');
+        else if (filtro === 'conciliados') query = query.eq('conciliado', true);
 
-    if (error) {
+        const { data, error } = await query
+          .order('data_competencia', { ascending: false })
+          .order('id', { ascending: false })
+          .range(from, from + pageSize - 1);
+
+        if (error) throw error;
+        const page = (data || []) as LancamentoConciliacao[];
+        allRows.push(...page);
+        if (page.length < pageSize) break;
+        from += pageSize;
+      }
+
+      setLancamentos(allRows);
+    } catch (error) {
       console.error('Error loading lancamentos:', error);
       toast.error('Erro ao carregar lançamentos');
+      setLancamentos([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const findLancamentosSemCategoria = async (items: LancamentoConciliacao[]) => {
+    const verificaveis = items.filter(item => item.tipo !== 'TRANSFERENCIA' && !item.categoria_id);
+    if (verificaveis.length === 0) return [];
+
+    const idsComRateio = new Set<string>();
+    const pageSize = 500;
+    for (let from = 0; from < verificaveis.length; from += pageSize) {
+      const ids = verificaveis.slice(from, from + pageSize).map(item => item.id);
+      const { data, error } = await supabase
+        .from('fin_lancamento_rateios')
+        .select('lancamento_id, categoria_id')
+        .in('lancamento_id', ids)
+        .not('categoria_id', 'is', null);
+      if (error) throw error;
+      (data || []).forEach(rateio => idsComRateio.add(rateio.lancamento_id));
     }
 
-    setLancamentos(data || []);
-    setLoading(false);
+    return verificaveis.filter(item => !idsComRateio.has(item.id));
   };
 
   const conciliar = async (id: string, value: boolean) => {
     if (value) {
+      const item = lancamentos.find(l => l.id === id);
+      if (item) {
+        try {
+          const semCategoria = await findLancamentosSemCategoria([item]);
+          if (semCategoria.length > 0) {
+            toast.error('Selecione uma categoria antes de conciliar o lançamento.');
+            return;
+          }
+        } catch (error) {
+          console.error('Error validating reconciliation category:', error);
+          toast.error('Não foi possível validar a categoria do lançamento.');
+          return;
+        }
+      }
       const { error } = await supabase.rpc('reconcile_batch_lancamentos', {
         p_lancamento_ids: [id],
       });
@@ -512,6 +559,17 @@ export default function ConciliacaoBancariaSection() {
   const conciliarTodos = async () => {
     const pendentes = lancamentos.filter(l => !l.conciliado);
     if (pendentes.length === 0) return;
+    try {
+      const semCategoria = await findLancamentosSemCategoria(pendentes);
+      if (semCategoria.length > 0) {
+        toast.error(`${semCategoria.length} lançamento(s) estão sem categoria. Corrija-os antes de conciliar todos.`);
+        return;
+      }
+    } catch (error) {
+      console.error('Error validating reconciliation categories:', error);
+      toast.error('Não foi possível validar as categorias dos lançamentos.');
+      return;
+    }
     const ids = pendentes.map(l => l.id);
     const { data, error } = await supabase.rpc('reconcile_batch_lancamentos', {
       p_lancamento_ids: ids,
@@ -977,6 +1035,15 @@ export default function ConciliacaoBancariaSection() {
       return;
     }
 
+    const novasSemCategoria = toImport.filter(l => {
+      if (l.categoriaId) return false;
+      return !l.rateioLinhas?.length || l.rateioLinhas.some(r => !r.categoria_id);
+    });
+    if (novasSemCategoria.length > 0) {
+      toast.error(`${novasSemCategoria.length} linha(s) selecionada(s) estão sem categoria. Selecione a categoria antes de processar.`);
+      return;
+    }
+
     setImportando(true);
     try {
       if (toImport.length > 0) {
@@ -1291,7 +1358,7 @@ export default function ConciliacaoBancariaSection() {
                                 value={linha.categoriaId || ''}
                                 onValueChange={(v) => setLinhaCategoria(i, v)}
                                 options={categoriasForTipo(linha.tipo)}
-                                placeholder="Categoria (opcional)..."
+                                placeholder="Categoria obrigatória..."
                                 className="h-7 text-xs"
                                 modal={false}
                               />
@@ -1462,7 +1529,11 @@ export default function ConciliacaoBancariaSection() {
                     />
                   </TableCell>
                   <TableCell>
-                    <Checkbox checked={!!item.conciliado} onCheckedChange={(v) => conciliar(item.id, !!v)} />
+                    <Checkbox
+                      checked={!!item.conciliado}
+                      onCheckedChange={(v) => conciliar(item.id, !!v)}
+                      aria-label={item.conciliado ? `Desconciliar ${item.descricao}` : `Conciliar ${item.descricao}`}
+                    />
                   </TableCell>
                   <TableCell className="font-mono text-sm">{formatDateBR(parseLocalDate(item.data_competencia))}</TableCell>
                   <TableCell className="font-medium max-w-[200px] truncate">{item.descricao}</TableCell>

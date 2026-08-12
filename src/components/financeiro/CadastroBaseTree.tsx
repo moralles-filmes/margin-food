@@ -34,6 +34,8 @@ export interface CatNode {
   centro_custo_padrao_id: string | null;
   grupo: string | null;
   linha_dre: string | null;
+  system_key: string | null;
+  excluir_dos_totais: boolean;
   ativo: boolean;
   updated_at: string;
   children: CatNode[];
@@ -184,10 +186,12 @@ function TreeRow({
   const isLeaf = !hasChildren && depth > 0;
   const isDragging = dragCtx.dragId === node.id;
   const isDropTarget = dragCtx.dropTargetId === node.id && dragCtx.dragId !== node.id;
+  const isSystemCategory = node.system_key !== null;
   const canDrop = dragCtx.dragId !== null
     && dragCtx.dragId !== node.id
     && dragCtx.dragTipo === node.tipo
-    && dragCtx.dragParentId === (node.parent_id ?? null);
+    && dragCtx.dragParentId === (node.parent_id ?? null)
+    && !isSystemCategory;
 
   return (
     <>
@@ -213,7 +217,7 @@ function TreeRow({
         }}
       >
         {/* Drag handle */}
-        {canEdit && (
+        {canEdit && !isSystemCategory && (
           <span
             draggable
             onDragStart={(e) => {
@@ -241,7 +245,7 @@ function TreeRow({
           )}
         </button>
 
-        {canDelete && isLeaf && (
+        {canDelete && isLeaf && !isSystemCategory && (
           <Checkbox
             checked={selectedIds.has(node.id)}
             onCheckedChange={() => onToggleSelect(node.id)}
@@ -261,13 +265,19 @@ function TreeRow({
           {node.tipo}
         </Badge>
 
+        {node.excluir_dos_totais && (
+          <Badge variant="outline" className="text-[10px] h-5 whitespace-nowrap">
+            Fora dos totais
+          </Badge>
+        )}
+
         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-          {canEdit && !isFirst && (
+          {canEdit && !isSystemCategory && !isFirst && (
             <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => onMove(node.id, 'up')} title="Subir" disabled={saving}>
               <ArrowUp className="w-3 h-3" />
             </Button>
           )}
-          {canEdit && !isLast && (
+          {canEdit && !isSystemCategory && !isLast && (
             <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => onMove(node.id, 'down')} title="Descer" disabled={saving}>
               <ArrowDown className="w-3 h-3" />
             </Button>
@@ -277,12 +287,12 @@ function TreeRow({
               <Plus className="w-3 h-3" />
             </Button>
           )}
-          {canEdit && (
+          {canEdit && !isSystemCategory && (
             <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => onEdit(node)} title="Editar" disabled={saving}>
               <Edit className="w-3 h-3" />
             </Button>
           )}
-          {canDelete && isLeaf && (
+          {canDelete && isLeaf && !isSystemCategory && (
             <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => onDelete(node)} title="Desativar" disabled={saving}>
               <Trash2 className="w-3 h-3 text-destructive" />
             </Button>
@@ -343,6 +353,8 @@ const CATEGORY_FIELDS = `
   centro_custo_padrao_id,
   grupo,
   linha_dre,
+  system_key,
+  excluir_dos_totais,
   ativo,
   created_at,
   updated_at
@@ -395,6 +407,7 @@ export default function CadastroBaseTree() {
   useDataEvent('financeiro:cadastros', load);
 
   const tree = buildTree(items);
+  const hasRegularCategories = items.some(item => item.system_key === null);
   const filteredTree = filterTree(tree, search);
   // Leaves currently visible/selectable — used to prune stale selection (search filter, background reload).
   const visibleLeafIds = new Set(collectLeafIds(filteredTree));
@@ -699,7 +712,7 @@ export default function CadastroBaseTree() {
 
   // ─── Seed via RPC ───
   const seedDefaults = async () => {
-    if (items.length > 0) {
+    if (hasRegularCategories) {
       toast.error('Já existem categorias cadastradas.');
       return;
     }
@@ -776,7 +789,7 @@ export default function CadastroBaseTree() {
               <Download className="w-4 h-4 mr-1" /> Excel
             </Button>
           )}
-          {canCreate && items.length === 0 && (
+          {canCreate && !hasRegularCategories && (
             <Button variant="outline" size="sm" onClick={seedDefaults} disabled={seeding}>
               <Wand2 className={cn('w-4 h-4 mr-1', seeding && 'animate-spin')} /> Modelo Padrão
             </Button>
