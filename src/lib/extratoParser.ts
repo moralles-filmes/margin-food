@@ -13,6 +13,8 @@ export interface ExtratoLinha {
   descricao: string;
   valor: number;      // absoluto
   tipo: 'RECEITA' | 'DESPESA';
+  /** Identificador único fornecido pelo banco (OFX FITID), quando disponível. */
+  fitId?: string;
 }
 
 /** Identidade da conta extraída do arquivo (todos os campos opcionais) */
@@ -31,6 +33,34 @@ export interface ExtratoParseResult {
 }
 
 /* ───────── OFX parser ───────── */
+
+function parseOFXNumber(raw: string): number {
+  const normalized = raw.replace(/[^\d,.-]/g, '');
+  const lastComma = normalized.lastIndexOf(',');
+  const lastDot = normalized.lastIndexOf('.');
+
+  if (lastComma > lastDot) {
+    return Number(normalized.replace(/\./g, '').replace(',', '.'));
+  }
+  if (lastDot > lastComma && lastComma >= 0) {
+    return Number(normalized.replace(/,/g, ''));
+  }
+  if (lastComma >= 0) {
+    return Number(normalized.replace(',', '.'));
+  }
+  return Number(normalized);
+}
+
+function parseOFXDate(raw: string): string {
+  const value = raw.trim();
+  const isoLike = value.match(/^(\d{4})(\d{2})(\d{2})/);
+  if (isoLike) return `${isoLike[1]}-${isoLike[2]}-${isoLike[3]}`;
+
+  const br = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (br) return `${br[3]}-${br[2]}-${br[1]}`;
+
+  return '';
+}
 
 function parseOFX(text: string): ExtratoParseResult {
   const linhas: ExtratoLinha[] = [];
@@ -82,11 +112,9 @@ function parseOFX(text: string): ExtratoParseResult {
     const balAmt = getLedgerTag('BALAMT');
     const dtAsOf = getLedgerTag('DTASOF');
     if (balAmt) {
-      const valor = parseFloat(balAmt.replace(',', '.'));
+      const valor = parseOFXNumber(balAmt);
       if (!isNaN(valor)) {
-        const data = dtAsOf.length >= 8
-          ? `${dtAsOf.slice(0, 4)}-${dtAsOf.slice(4, 6)}-${dtAsOf.slice(6, 8)}`
-          : '';
+        const data = parseOFXDate(dtAsOf);
         if (data) saldoFinalArquivo = { valor, data };
       }
     }
@@ -101,19 +129,18 @@ function parseOFX(text: string): ExtratoParseResult {
     };
     const dtposted = getTag('DTPOSTED');
     const trnamt = getTag('TRNAMT');
-    const memo = getTag('MEMO') || getTag('NAME') || getTag('FITID');
+    const fitId = getTag('FITID');
+    const memo = getTag('MEMO') || getTag('NAME') || fitId;
     if (!dtposted || !trnamt) continue;
-    const valor = parseFloat(trnamt.replace(',', '.'));
-    const data =
-      dtposted.length >= 8
-        ? `${dtposted.slice(0, 4)}-${dtposted.slice(4, 6)}-${dtposted.slice(6, 8)}`
-        : '';
+    const valor = parseOFXNumber(trnamt);
+    const data = parseOFXDate(dtposted);
     if (!data || isNaN(valor)) continue;
     linhas.push({
       data,
       descricao: memo || 'Sem descrição',
       valor: Math.abs(valor),
       tipo: valor >= 0 ? 'RECEITA' : 'DESPESA',
+      fitId: fitId || undefined,
     });
   }
 

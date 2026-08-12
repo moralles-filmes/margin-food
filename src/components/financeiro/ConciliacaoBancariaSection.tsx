@@ -45,6 +45,7 @@ interface LinhaExtrato {
   descricao: string;
   valor: number;
   tipo: 'RECEITA' | 'DESPESA';
+  fitId?: string;
   selecionada: boolean;
   matchId?: string;
   matchOrigin?: MatchSuggestion['origin'];
@@ -116,6 +117,18 @@ function loadLinhas(contaId: string): LinhaExtrato[] | null {
 
 function clearLinhas(contaId: string) {
   try { sessionStorage.removeItem(SESSION_KEY(contaId)); } catch (_) { /* sessionStorage indisponível */ }
+}
+
+function bankLineKey(linha: { data: string; valor: number; tipo: string; descricao?: string | null }) {
+  return `${linha.data}|${Number(linha.valor)}|${linha.tipo}|${linha.descricao || ''}`;
+}
+
+function consumeCount(counts: Map<string, number>, key: string): boolean {
+  const remaining = counts.get(key) || 0;
+  if (remaining <= 0) return false;
+  if (remaining === 1) counts.delete(key);
+  else counts.set(key, remaining - 1);
+  return true;
 }
 
 export default function ConciliacaoBancariaSection() {
@@ -621,8 +634,8 @@ export default function ConciliacaoBancariaSection() {
     allLancamentos: LancamentoCandidate[];
     contasPagar: ContaPagarCandidate[];
     contasReceber: ContaReceberCandidate[];
-    conciliadosSet: Set<string>;
-    ignoradasSet: Set<string>;
+    conciliadosCounts: Map<string, number>;
+    ignoradasCounts: Map<string, number>;
   }
 
   /** Busca lançamentos/CP/CR candidatos + sets de já-conciliadas/ignoradas para a conta selecionada. */
@@ -637,7 +650,7 @@ export default function ConciliacaoBancariaSection() {
         .in('status', ['AGUARDANDO_APROVACAO', 'APROVADO']).order('data_vencimento'),
       supabase.from('fin_contas_receber').select('id, descricao, valor, data_vencimento, status, cliente, recorrente, recorrencia_config')
         .eq('status', 'A_RECEBER').order('data_vencimento'),
-      contaSel ? supabase.from('fin_lancamentos').select('data_competencia, valor, tipo')
+      contaSel ? supabase.from('fin_lancamentos').select('data_competencia, valor, tipo, descricao')
         .eq('conta_id', contaSel).eq('conciliado', true).eq('status', 'REALIZADO') : Promise.resolve({ data: [] }),
       // Entradas ignoradas para esta conta
       contaSel ? supabase.from('fin_conciliacao_ignoradas').select('data, valor, tipo, descricao')
@@ -650,37 +663,39 @@ export default function ConciliacaoBancariaSection() {
     const contasReceber = (crRes.data || []) as ContaReceberCandidate[];
 
     // Já conciliadas — mostrar com badge em vez de filtrar silenciosamente
-    const conciliadosSet = new Set(
-      ((conciliadosRes.data || []) as { data_competencia: string; valor: number; tipo: string }[])
-        .map(l => `${l.data_competencia}|${Number(l.valor)}|${l.tipo}`)
-    );
+    const conciliadosCounts = new Map<string, number>();
+    for (const l of (conciliadosRes.data || []) as { data_competencia: string; valor: number; tipo: string; descricao: string | null }[]) {
+      const key = bankLineKey({ data: l.data_competencia, valor: l.valor, tipo: l.tipo, descricao: l.descricao });
+      conciliadosCounts.set(key, (conciliadosCounts.get(key) || 0) + 1);
+    }
 
     // Ignoradas — mostrar com badge "Ignorado"
-    const ignoradasSet = new Set(
-      ((ignoradasRes.data || []) as { data: string; valor: number; tipo: string; descricao: string | null }[])
-        .map(l => `${l.data}|${Number(l.valor)}|${l.tipo}`)
-    );
+    const ignoradasCounts = new Map<string, number>();
+    for (const l of (ignoradasRes.data || []) as { data: string; valor: number; tipo: string; descricao: string | null }[]) {
+      const key = bankLineKey(l);
+      ignoradasCounts.set(key, (ignoradasCounts.get(key) || 0) + 1);
+    }
 
     const lancMap = new Map<string, LancamentoCandidate>();
     for (const l of lancSameConta) lancMap.set(l.id, { ...l, _sameAccount: true });
     for (const l of lancAll) { if (!lancMap.has(l.id)) lancMap.set(l.id, { ...l, _sameAccount: false }); }
     const allLancamentos = Array.from(lancMap.values());
 
-    return { allLancamentos, contasPagar, contasReceber, conciliadosSet, ignoradasSet };
+    return { allLancamentos, contasPagar, contasReceber, conciliadosCounts, ignoradasCounts };
   };
 
   /** Recalcula o estado de match de UMA linha (já conciliada/ignorada/sugestão) contra o contexto atual do banco. */
   const matchLinha = (linha: LinhaExtrato, ctx: MatchContext, usedIds: Set<string>): LinhaExtrato => {
-    const key = `${linha.data}|${linha.valor}|${linha.tipo}`;
+    const key = bankLineKey(linha);
     const base = { ...linha, matchId: undefined, matchOrigin: undefined, matchDescricao: undefined, matchRaw: undefined, suggestions: undefined };
 
     // Já conciliada — exibir informativo, sem ação
-    if (ctx.conciliadosSet.has(key)) {
+    if (consumeCount(ctx.conciliadosCounts, key)) {
       return { ...base, selecionada: false, jaConciliada: true, ignorada: false };
     }
 
     // Ignorada — exibir informativo, sem ação
-    if (ctx.ignoradasSet.has(key)) {
+    if (consumeCount(ctx.ignoradasCounts, key)) {
       return { ...base, selecionada: false, ignorada: true, jaConciliada: false };
     }
 
@@ -1098,6 +1113,7 @@ export default function ConciliacaoBancariaSection() {
             p_data: l.data, p_descricao: l.descricao, p_valor: l.valor, p_tipo: l.tipo,
             p_conta_id: contaSel, p_user_id: user?.id,
             p_rateio_linhas: rateioPayload || null,
+            p_external_id: l.fitId || null,
           });
           if (error) throw error;
         }

@@ -15,6 +15,7 @@ const OFX_COM_LEDGERBAL = `
 <TRNTYPE>DEBIT
 <DTPOSTED>20260805120000
 <TRNAMT>-150.00
+<FITID>txn-unique-123
 <MEMO>Compra cartao
 </STMTTRN>
 </BANKTRANLIST>
@@ -55,6 +56,38 @@ describe('parseExtrato — extração de LEDGERBAL (OFX)', () => {
   it('extrai valor e data do bloco <LEDGERBAL> quando presente', () => {
     const result = parseExtrato('extrato.ofx', OFX_COM_LEDGERBAL);
     expect(result.saldoFinalArquivo).toEqual({ valor: 21302.42, data: '2026-08-05' });
+  });
+
+  it('preserva o FITID único de cada transação', () => {
+    const result = parseExtrato('extrato.ofx', OFX_COM_LEDGERBAL);
+    expect(result.linhas[0].fitId).toBe('txn-unique-123');
+  });
+
+  it('interpreta saldo e data no formato brasileiro emitido pelo PagBank', () => {
+    const pagBank = OFX_COM_LEDGERBAL
+      .replace('<BALAMT>21302.42', '<BALAMT>R$\u00a098.589,12')
+      .replace('<DTASOF>20260805120000', '<DTASOF>01/08/2026');
+
+    const result = parseExtrato('pagbank.ofx', pagBank);
+    expect(result.saldoFinalArquivo).toEqual({ valor: 98589.12, data: '2026-08-01' });
+  });
+
+  it('mantém transações legítimas repetidas quando os FITIDs são diferentes', () => {
+    const repeated = OFX_COM_LEDGERBAL.replace(
+      '</BANKTRANLIST>',
+      `<STMTTRN>
+<TRNTYPE>DEBIT
+<DTPOSTED>20260805120000
+<TRNAMT>-150.00
+<FITID>txn-unique-456
+<MEMO>Compra cartao
+</STMTTRN>
+</BANKTRANLIST>`,
+    );
+
+    const result = parseExtrato('extrato.ofx', repeated);
+    expect(result.linhas).toHaveLength(2);
+    expect(result.linhas.map(l => l.fitId)).toEqual(['txn-unique-123', 'txn-unique-456']);
   });
 
   it('não popula saldoFinalArquivo quando o arquivo não tem <LEDGERBAL>', () => {
