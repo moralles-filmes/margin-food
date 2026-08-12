@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { CurrencyInput } from '@/components/ui/brl-input';
 import { fmtBRL, formatDateBR, parseLocalDate, todayBR } from '@/lib/formatters';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
+import { Badge, badgeVariants } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -24,6 +24,8 @@ import ConfirmarSaldoExtratoDialog from '@/components/financeiro/ConfirmarSaldoE
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { mapFinanceiroDeleteError } from '@/lib/financeiroErrorMap';
 import { buildCategoryOptions } from '@/lib/categoriaOptions';
+import { matchesImportFilter, type ImportFilter } from '@/lib/conciliacaoFilters';
+import { cn } from '@/lib/utils';
 import type { ContaBancariaRef, CategoriaFinRef, CentroCustoRef, LancamentoConciliacao, LancamentoCandidate, ContaPagarCandidate, ContaReceberCandidate } from '@/types/financeiro';
 
 import { useCan } from '@/permissions/hooks';
@@ -141,6 +143,7 @@ export default function ConciliacaoBancariaSection() {
   const [nomeArquivo, setNomeArquivo] = useState<string>('');
 
   const [linhas, setLinhasState] = useState<LinhaExtrato[]>([]);
+  const [importFilter, setImportFilter] = useState<ImportFilter>('todos');
   const [importando, setImportando] = useState(false);
 
   const [lancamentos, setLancamentos] = useState<LancamentoConciliacao[]>([]);
@@ -231,7 +234,11 @@ export default function ConciliacaoBancariaSection() {
 
   // Restaura linhas do sessionStorage quando a conta é selecionada
   useEffect(() => {
-    if (!contaSel) return;
+    setImportFilter('todos');
+    if (!contaSel) {
+      setLinhasState([]);
+      return;
+    }
     const saved = loadLinhas(contaSel);
     if (saved && saved.length > 0) {
       setLinhasState(saved);
@@ -239,6 +246,8 @@ export default function ConciliacaoBancariaSection() {
       // O cache pode estar desatualizado se o lançamento foi desconciliado/excluído
       // em outra aba/sessão — revalida as linhas travadas contra o banco.
       refreshLockedLinhas(saved);
+    } else {
+      setLinhasState([]);
     }
   }, [contaSel]);
 
@@ -789,6 +798,7 @@ export default function ConciliacaoBancariaSection() {
       toast.success(msg + msgParts.join(', '));
 
       setLinhas(final);
+      setImportFilter('todos');
     } catch (err) {
       console.error('[ConciliacaoBancariaSection.processarLinhas]', err);
       toast.error('Erro ao processar arquivo');
@@ -884,6 +894,7 @@ export default function ConciliacaoBancariaSection() {
 
   const limparExtrato = () => {
     setLinhasState([]);
+    setImportFilter('todos');
     setNomeArquivo('');
     if (contaSel) clearLinhas(contaSel);
   };
@@ -1175,6 +1186,28 @@ export default function ConciliacaoBancariaSection() {
   const selecionadas = linhas.filter(l => l.selecionada && !l.matchId && !l.jaConciliada && !l.ignorada);
   const matchedTotal = linhas.filter(l => l.matchId && !l.jaConciliada).length;
   const withSuggestions = linhas.filter(l => !l.matchId && !l.jaConciliada && !l.ignorada && l.suggestions && l.suggestions.length > 0).length;
+  const jaConciliadas = linhas.filter(l => l.jaConciliada).length;
+  const ignoradas = linhas.filter(l => l.ignorada).length;
+  const linhasFiltradas = linhas
+    .map((linha, index) => ({ linha, index }))
+    .filter(({ linha }) => matchesImportFilter(linha, importFilter));
+
+  const importFilterChip = (filter: ImportFilter, label: string, className = '') => (
+    <button
+      type="button"
+      onClick={() => setImportFilter(filter)}
+      aria-pressed={importFilter === filter}
+      className={cn(
+        badgeVariants({ variant: 'outline' }),
+        'cursor-pointer transition-colors hover:bg-accent',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+        importFilter === filter && 'ring-2 ring-primary ring-offset-1',
+        className,
+      )}
+    >
+      {label}
+    </button>
+  );
 
   const rateioValorTotal = linhas[rateioDialog.linhaIndex]?.valor || 0;
   const rateioLinhaTipo = linhas[rateioDialog.linhaIndex]?.tipo;
@@ -1303,16 +1336,12 @@ export default function ConciliacaoBancariaSection() {
             <>
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="text-sm text-muted-foreground flex flex-wrap gap-1">
-                  <Badge variant="outline" className="bg-success/10 text-success border-success/20">{matchedTotal} p/ conciliar</Badge>
-                  {withSuggestions > 0 && <Badge variant="outline" className="bg-warning/10 text-warning border-warning/20">{withSuggestions} com sugestões</Badge>}
-                  <Badge variant="outline">{selecionadas.length} p/ criar</Badge>
-                  {linhas.filter(l => l.jaConciliada).length > 0 && (
-                    <Badge variant="outline" className="bg-muted text-muted-foreground">{linhas.filter(l => l.jaConciliada).length} já conciliada(s)</Badge>
-                  )}
-                  {linhas.filter(l => l.ignorada).length > 0 && (
-                    <Badge variant="outline" className="bg-muted text-muted-foreground">{linhas.filter(l => l.ignorada).length} ignorada(s)</Badge>
-                  )}
-                  <Badge variant="outline">{linhas.length} total</Badge>
+                  {importFilterChip('conciliar', `${matchedTotal} p/ conciliar`, 'bg-success/10 text-success border-success/20')}
+                  {withSuggestions > 0 && importFilterChip('sugestoes', `${withSuggestions} com sugestões`, 'bg-warning/10 text-warning border-warning/20')}
+                  {importFilterChip('criar', `${selecionadas.length} p/ criar`)}
+                  {jaConciliadas > 0 && importFilterChip('conciliados', `${jaConciliadas} já conciliada(s)`, 'bg-muted text-muted-foreground')}
+                  {ignoradas > 0 && importFilterChip('ignorados', `${ignoradas} ignorada(s)`, 'bg-muted text-muted-foreground')}
+                  {importFilterChip('todos', `${linhas.length} total`)}
                 </div>
                 <div className="flex gap-2">
                   <Button variant="outline" size="sm" onClick={() => toggleAll(true)}>Selecionar Novas</Button>
@@ -1337,7 +1366,13 @@ export default function ConciliacaoBancariaSection() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {linhas.map((linha, i) => {
+                  {linhasFiltradas.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+                        Nenhuma linha neste filtro.
+                      </TableCell>
+                    </TableRow>
+                  ) : linhasFiltradas.map(({ linha, index: i }) => {
                     const isDone = linha.matchId?.endsWith('-done');
                     const hasMatch = !!linha.matchId && !isDone;
                     const hasSuggestions = !linha.matchId && linha.suggestions && linha.suggestions.length > 0;

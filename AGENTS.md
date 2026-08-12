@@ -199,6 +199,7 @@ margin-food/
 
 ## ⏳ Pendente / Em Aberto
 
+- [x] Conciliação Bancária: transferências importadas usam um único lançamento e contadores do extrato funcionam como filtros — concluído em 2026-08-12
 - [x] Conciliação OFX: preservar FITID, aceitar saldo/data do PagBank e não colapsar transações legítimas repetidas — concluído em 2026-08-12
 - [x] Categorias financeiras: selecionar homônimas por UUID e exibir rateios múltiplos corretamente na conciliação — concluído em 2026-08-12
 - [x] Dashboard Financeiro: renomear "Despesa do Período" para "Despesa Realizada" e adicionar "Despesas Provisionadas" (realizada + contas a pagar) — concluído em 2026-08-12
