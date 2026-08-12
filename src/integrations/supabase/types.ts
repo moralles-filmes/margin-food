@@ -1719,6 +1719,61 @@ export type Database = {
           },
         ]
       }
+      fin_conciliacao_vinculos: {
+        Row: {
+          company_id: string
+          conta_id: string
+          created_at: string
+          created_by: string | null
+          external_id: string
+          id: string
+          lancamento_id: string
+          tipo: string
+        }
+        Insert: {
+          company_id: string
+          conta_id: string
+          created_at?: string
+          created_by?: string | null
+          external_id: string
+          id?: string
+          lancamento_id: string
+          tipo: string
+        }
+        Update: {
+          company_id?: string
+          conta_id?: string
+          created_at?: string
+          created_by?: string | null
+          external_id?: string
+          id?: string
+          lancamento_id?: string
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fin_conciliacao_vinculos_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fin_conciliacao_vinculos_conta_id_fkey"
+            columns: ["conta_id"]
+            isOneToOne: false
+            referencedRelation: "fin_contas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fin_conciliacao_vinculos_lancamento_id_fkey"
+            columns: ["lancamento_id"]
+            isOneToOne: false
+            referencedRelation: "fin_lancamentos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fin_contas: {
         Row: {
           agencia: string | null
@@ -9640,6 +9695,15 @@ export type Database = {
       }
       reconcile_batch_lancamentos: {
         Args: { p_lancamento_ids: string[] }
+        Returns: Json
+      }
+      reconcile_bind_extrato: {
+        Args: {
+          p_conta_id: string
+          p_external_id: string
+          p_lancamento_id: string
+          p_tipo: string
+        }
         Returns: Json
       }
       reconcile_create_transfer: {
