@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { buildCategoryOptions } from './categoriaOptions';
+import { normalizeSearchText } from './utils';
+import { buildCategoryOptions, getCategoryCommandValue } from './categoriaOptions';
 
 describe('buildCategoryOptions', () => {
   it('gives an empty groupLabel to top-level categories (no parent)', () => {
@@ -45,5 +46,31 @@ describe('buildCategoryOptions', () => {
     const byId = Object.fromEntries(result.map(r => [r.id, r]));
     expect(byId.a.groupLabel).toBe('B');
     expect(byId.b.groupLabel).toBe('A');
+  });
+});
+
+describe('getCategoryCommandValue', () => {
+  it('keeps categories with the same name unique by id', () => {
+    const operational = getCategoryCommandValue({
+      id: 'categoria-operacional',
+      nome: 'SALARIOS',
+    });
+    const royalParma = getCategoryCommandValue({
+      id: 'categoria-royal-parma',
+      nome: 'SALARIOS',
+    });
+
+    expect(operational).not.toBe(royalParma);
+  });
+
+  it('keeps the visible name and code searchable', () => {
+    const value = getCategoryCommandValue({
+      id: 'categoria-1',
+      nome: 'SALÁRIOS',
+      codigo: '3.1',
+    });
+
+    expect(normalizeSearchText(value)).toContain('salarios');
+    expect(normalizeSearchText(value)).toContain('3.1');
   });
 });

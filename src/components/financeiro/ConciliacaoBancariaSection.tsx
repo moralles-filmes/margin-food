@@ -131,6 +131,7 @@ export default function ConciliacaoBancariaSection() {
   const [importando, setImportando] = useState(false);
 
   const [lancamentos, setLancamentos] = useState<LancamentoConciliacao[]>([]);
+  const [lancamentoRateioCategoryIds, setLancamentoRateioCategoryIds] = useState<Record<string, string[]>>({});
   const [filtro, setFiltro] = useState<'pendentes' | 'conciliados' | 'todos'>('pendentes');
   const [view, setView] = useState<'importar' | 'conciliar'>('conciliar');
   // Totais da conta inteira (independentes do filtro/paginação da lista) — usados só no resumo do cabeçalho.
@@ -279,10 +280,33 @@ export default function ConciliacaoBancariaSection() {
         from += pageSize;
       }
 
+      const rateioCategoryIds: Record<string, string[]> = {};
+      const semCategoriaDireta = allRows.filter(item => !item.categoria_id);
+      const rateioPageSize = 500;
+
+      for (let from = 0; from < semCategoriaDireta.length; from += rateioPageSize) {
+        const ids = semCategoriaDireta.slice(from, from + rateioPageSize).map(item => item.id);
+        const { data: rateios, error: rateioError } = await supabase
+          .from('fin_lancamento_rateios')
+          .select('lancamento_id, categoria_id')
+          .in('lancamento_id', ids)
+          .not('categoria_id', 'is', null);
+        if (rateioError) throw rateioError;
+
+        for (const rateio of rateios || []) {
+          const current = rateioCategoryIds[rateio.lancamento_id] || [];
+          if (rateio.categoria_id && !current.includes(rateio.categoria_id)) {
+            rateioCategoryIds[rateio.lancamento_id] = [...current, rateio.categoria_id];
+          }
+        }
+      }
+
+      setLancamentoRateioCategoryIds(rateioCategoryIds);
       setLancamentos(allRows);
     } catch (error) {
       console.error('Error loading lancamentos:', error);
       toast.error('Erro ao carregar lançamentos');
+      setLancamentoRateioCategoryIds({});
       setLancamentos([]);
     } finally {
       setLoading(false);
@@ -1515,6 +1539,14 @@ export default function ConciliacaoBancariaSection() {
                 </TableCell></TableRow>
               ) : lancamentosFiltrados.map(item => {
                 const categoriaNome = categorias.find(c => c.id === item.categoria_id)?.nome;
+                const rateioCategoryIds = lancamentoRateioCategoryIds[item.id] || [];
+                const rateioCategoryNames = rateioCategoryIds
+                  .map(categoryId => categorias.find(c => c.id === categoryId)?.nome)
+                  .filter((name): name is string => Boolean(name));
+                const categoryLabel = categoriaNome
+                  || (rateioCategoryIds.length > 1
+                    ? `${rateioCategoryIds.length} categorias`
+                    : rateioCategoryNames[0]);
                 return (
                 <TableRow key={item.id} className={item.conciliado ? 'opacity-80' : ''}>
                   <TableCell>
@@ -1538,8 +1570,10 @@ export default function ConciliacaoBancariaSection() {
                   <TableCell className="font-mono text-sm">{formatDateBR(parseLocalDate(item.data_competencia))}</TableCell>
                   <TableCell className="font-medium max-w-[200px] truncate">{item.descricao}</TableCell>
                   <TableCell>
-                    {categoriaNome ? (
-                      <span className="text-xs">{categoriaNome}</span>
+                    {categoryLabel ? (
+                      <span className="text-xs" title={rateioCategoryNames.join(' • ') || categoriaNome}>
+                        {categoryLabel}
+                      </span>
                     ) : (
                       <span className="text-xs text-warning flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Sem categoria</span>
                     )}
