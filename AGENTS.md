@@ -199,6 +199,7 @@ margin-food/
 ## ⏳ Pendente / Em Aberto
 
 - [x] Dashboard Financeiro: renomear "Despesa do Período" para "Despesa Realizada" e adicionar "Despesas Provisionadas" (realizada + contas a pagar) — concluído em 2026-08-12
+- [x] Security Gate do GitHub Actions: alinhar instalação e scripts ao Bun com lockfile congelado — concluído em 2026-08-12
 - [ ] Monitorar integridade dos dados na empresa piloto após ativação multi-tenant
 - [ ] Testar fluxo completo: criar empresa → criar admin → login admin → criar usuários
 - [ ] Validar isolamento: logar como user do tenant A e tentar `GET /rest/v1/faturamento_periodos_legacy` — deve retornar só registros do mesmo tenant
