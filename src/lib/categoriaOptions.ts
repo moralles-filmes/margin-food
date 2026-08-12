@@ -6,6 +6,13 @@ export interface CategoriaHierarchyRow {
   codigo?: string | null;
 }
 
+export function getCategoryCommandValue(
+  option: Pick<CategoriaHierarchyRow, 'id' | 'nome' | 'codigo'>,
+): string {
+  const searchableLabel = option.codigo ? `${option.codigo} ${option.nome}` : option.nome;
+  return `${searchableLabel} ${option.id}`;
+}
+
 /**
  * Anexa um `groupLabel` (breadcrumb "Categoria › Subcategoria", vazio para itens de topo)
  * a cada linha, calculado a partir da cadeia de `parent_id`. Usado para agrupar visualmente

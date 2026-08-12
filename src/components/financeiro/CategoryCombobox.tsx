@@ -4,6 +4,7 @@ import { cn, normalizeSearchText } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { getCategoryCommandValue } from '@/lib/categoriaOptions';
 
 interface CategoryOption {
   id: string;
@@ -71,7 +72,7 @@ export default function CategoryCombobox({
                 {opts.map(opt => (
                   <CommandItem
                     key={opt.id}
-                    value={opt.codigo ? `${opt.codigo} ${opt.nome}` : opt.nome}
+                    value={getCategoryCommandValue(opt)}
                     onSelect={() => {
                       onValueChange(opt.id === value ? '' : opt.id);
                       setOpen(false);
