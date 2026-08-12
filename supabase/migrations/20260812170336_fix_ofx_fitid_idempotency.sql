@@ -2,6 +2,8 @@
 -- A chave legada (data + descrição + valor + tipo + conta) colapsava vendas
 -- legítimas repetidas no mesmo dia. Ao reencontrar uma linha legada, a RPC a
 -- promove para a nova chave, evitando duplicar lançamentos já importados.
+-- O tipo faz parte da chave externa porque alguns bancos (PagBank inclusive)
+-- podem reutilizar o mesmo FITID no débito original e no respectivo estorno.
 
 DROP FUNCTION IF EXISTS public.reconcile_import_lancamento(date, text, numeric, text, uuid, uuid, jsonb);
 
@@ -61,7 +63,7 @@ BEGIN
   v_legacy_idem_key := md5(v_company::text || p_data::text || p_descricao || p_valor::text || p_tipo || p_conta_id::text);
   v_idem_key := CASE
     WHEN v_external_id IS NOT NULL
-      THEN md5(concat_ws('|', v_company::text, p_conta_id::text, 'external', v_external_id))
+      THEN md5(concat_ws('|', v_company::text, p_conta_id::text, 'external', v_external_id, p_tipo))
     ELSE v_legacy_idem_key
   END;
 

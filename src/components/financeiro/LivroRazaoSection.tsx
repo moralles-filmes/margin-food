@@ -418,7 +418,7 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
       if (item.tipo === 'TRANSFERENCIA') {
         const { error } = await supabase.rpc('delete_transfer', { p_lancamento_id: item.id });
         if (error) throw error;
-        toast.success('Transferencia excluida (ambos os lados)');
+        toast.success('Transferencia excluida');
       } else {
         const { error } = await (supabase.rpc as any)('_guarded_delete_lancamento', {
           p_id: item.id,
