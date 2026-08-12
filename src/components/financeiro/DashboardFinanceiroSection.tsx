@@ -87,6 +87,7 @@ export default function DashboardFinanceiroSection({ onNavigate }: { onNavigate?
     saldoCaixa: 0, aReceber: 0, aPagar: 0, receita: 0, despesa: 0, resultado: 0,
     receitaPrev: 0, despesaPrev: 0, resultadoPrev: 0,
   });
+  const despesasProvisionadas = resumo.despesa + resumo.aPagar;
   const [loading, setLoading] = useState(true);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingExcel, setExportingExcel] = useState(false);
@@ -192,7 +193,8 @@ export default function DashboardFinanceiroSection({ onNavigate }: { onNavigate?
           ['Contas a Receber', fmtBRL(resumo.aReceber)],
           ['Contas a Pagar', fmtBRL(resumo.aPagar)],
           ['Receita', fmtBRL(resumo.receita)],
-          ['Despesa', fmtBRL(resumo.despesa)],
+          ['Despesa Realizada', fmtBRL(resumo.despesa)],
+          ['Despesas Provisionadas', fmtBRL(despesasProvisionadas)],
           ['Resultado', fmtBRL(resumo.resultado)],
         ],
         styles: { fontSize: 9 },
@@ -219,7 +221,8 @@ export default function DashboardFinanceiroSection({ onNavigate }: { onNavigate?
         { Indicador: 'Contas a Receber', Valor: resumo.aReceber },
         { Indicador: 'Contas a Pagar', Valor: resumo.aPagar },
         { Indicador: 'Receita', Valor: resumo.receita },
-        { Indicador: 'Despesa', Valor: resumo.despesa },
+        { Indicador: 'Despesa Realizada', Valor: resumo.despesa },
+        { Indicador: 'Despesas Provisionadas', Valor: despesasProvisionadas },
         { Indicador: 'Resultado', Valor: resumo.resultado },
       ];
       const ws = XLSX.utils.json_to_sheet(rows);
@@ -240,7 +243,8 @@ export default function DashboardFinanceiroSection({ onNavigate }: { onNavigate?
     { label: 'Contas a Receber', value: resumo.aReceber, icon: ArrowUpRight, color: 'text-primary', target: 'receber' },
     { label: 'Contas a Pagar', value: resumo.aPagar, icon: ArrowDownRight, color: 'text-warning', target: 'pagar' },
     { label: 'Receita do Período', value: resumo.receita, icon: TrendingUp, color: 'text-success', target: 'lancamentos', prevValue: resumo.receitaPrev },
-    { label: 'Despesa do Período', value: resumo.despesa, icon: TrendingDown, color: 'text-destructive', target: 'lancamentos', prevValue: resumo.despesaPrev, invertDelta: true },
+    { label: 'Despesa Realizada', value: resumo.despesa, icon: TrendingDown, color: 'text-destructive', target: 'lancamentos', prevValue: resumo.despesaPrev, invertDelta: true },
+    { label: 'Despesas Provisionadas', value: despesasProvisionadas, icon: DollarSign, color: 'text-warning', target: 'pagar' },
     { label: 'Resultado', value: resumo.resultado, icon: DollarSign, color: resumo.resultado >= 0 ? 'text-success' : 'text-destructive', target: 'dre', prevValue: resumo.resultadoPrev },
   ];
 
@@ -318,8 +322,8 @@ export default function DashboardFinanceiroSection({ onNavigate }: { onNavigate?
 
       {/* KPI Cards */}
       {loading ? (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          {Array.from({ length: 6 }).map((_, i) => (
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-7 gap-3">
+          {Array.from({ length: 7 }).map((_, i) => (
             <Card key={i}><CardContent className="p-4 space-y-2">
               <Skeleton className="h-3 w-20" />
               <Skeleton className="h-6 w-28" />
@@ -327,7 +331,7 @@ export default function DashboardFinanceiroSection({ onNavigate }: { onNavigate?
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-7 gap-3">
           {cards.map(c => {
             const Icon = c.icon;
             const isClickable = !!c.target && !!onNavigate;
