@@ -24,6 +24,7 @@ interface ExtratoLinha {
   descricao: string;
   valor: number;
   tipo: 'RECEITA' | 'DESPESA';
+  fitId?: string;
 }
 
 interface RateioItem {
@@ -193,6 +194,7 @@ export default function CriarLancamentoExtratoDialog({
           p_conta_id: contaBancariaId,
           p_user_id: user?.id,
           p_rateio_linhas: effectivePayload,
+          p_external_id: linha?.fitId || null,
         });
         if (error) throw error;
 
@@ -250,6 +252,7 @@ export default function CriarLancamentoExtratoDialog({
           p_conta_id: contaBancariaId,
           p_user_id: user?.id,
           p_rateio_linhas: effectivePayload,
+          p_external_id: linha?.fitId || null,
         });
         if (lancError) console.warn('Lancamento mirror for CP:', lancError.message);
 
@@ -307,6 +310,7 @@ export default function CriarLancamentoExtratoDialog({
           p_conta_id: contaBancariaId,
           p_user_id: user?.id,
           p_rateio_linhas: effectivePayload,
+          p_external_id: linha?.fitId || null,
         });
         if (lancError) console.warn('Lancamento mirror for CR:', lancError.message);
 

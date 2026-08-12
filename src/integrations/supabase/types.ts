@@ -9669,6 +9669,7 @@ export type Database = {
           p_conta_id: string
           p_data: string
           p_descricao: string
+          p_external_id?: string | null
           p_rateio_linhas?: Json
           p_tipo: string
           p_user_id: string

@@ -199,6 +199,7 @@ margin-food/
 
 ## ⏳ Pendente / Em Aberto
 
+- [x] Conciliação OFX: preservar FITID, aceitar saldo/data do PagBank e não colapsar transações legítimas repetidas — concluído em 2026-08-12
 - [x] Categorias financeiras: selecionar homônimas por UUID e exibir rateios múltiplos corretamente na conciliação — concluído em 2026-08-12
 - [x] Dashboard Financeiro: renomear "Despesa do Período" para "Despesa Realizada" e adicionar "Despesas Provisionadas" (realizada + contas a pagar) — concluído em 2026-08-12
 - [x] Conciliação Bancária: paginação completa, categoria obrigatória com auditoria e categorias não operacionais fora dos totais — concluído em 2026-08-12
