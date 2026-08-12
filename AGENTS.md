@@ -199,6 +199,7 @@ margin-food/
 
 ## ⏳ Pendente / Em Aberto
 
+- [x] Conciliação OFX: persistir vínculos por FITID no banco para reconhecimento entre computadores e corrigir fechamento PagBank GM de 01/08 a 07/08 — concluído em 2026-08-12
 - [x] Conciliação Bancária: transferências importadas usam um único lançamento e contadores do extrato funcionam como filtros — concluído em 2026-08-12
 - [x] Conciliação OFX: preservar FITID, aceitar saldo/data do PagBank e não colapsar transações legítimas repetidas — concluído em 2026-08-12
 - [x] Categorias financeiras: selecionar homônimas por UUID e exibir rateios múltiplos corretamente na conciliação — concluído em 2026-08-12

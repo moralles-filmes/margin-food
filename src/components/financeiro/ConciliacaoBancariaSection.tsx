@@ -645,12 +645,29 @@ export default function ConciliacaoBancariaSection() {
     contasReceber: ContaReceberCandidate[];
     conciliadosCounts: Map<string, number>;
     ignoradasCounts: Map<string, number>;
+    externalIdsProcessados: Set<string>;
   }
+
+  const fetchVinculosExtrato = async () => {
+    if (!contaSel) return { data: [] as { external_id: string; tipo: string }[] };
+    const pageSize = 1000;
+    const data: { external_id: string; tipo: string }[] = [];
+    for (let from = 0; ; from += pageSize) {
+      const { data: page, error } = await supabase.from('fin_conciliacao_vinculos')
+        .select('external_id, tipo')
+        .eq('conta_id', contaSel)
+        .range(from, from + pageSize - 1);
+      if (error) throw error;
+      data.push(...(page || []));
+      if (!page || page.length < pageSize) break;
+    }
+    return { data };
+  };
 
   /** Busca lançamentos/CP/CR candidatos + sets de já-conciliadas/ignoradas para a conta selecionada. */
   const fetchMatchContext = async (): Promise<MatchContext> => {
     // Busca dados para match + entradas já conciliadas + entradas ignoradas
-    const [lancRes, lancAllRes, cpRes, crRes, conciliadosRes, ignoradasRes] = await Promise.all([
+    const [lancRes, lancAllRes, cpRes, crRes, conciliadosRes, ignoradasRes, vinculosRes] = await Promise.all([
       contaSel ? supabase.from('fin_lancamentos').select('id, data_competencia, valor, tipo, descricao, conciliado, conta_id')
         .eq('conta_id', contaSel).eq('status', 'REALIZADO').or('conciliado.is.null,conciliado.eq.false') : Promise.resolve({ data: [] }),
       supabase.from('fin_lancamentos').select('id, data_competencia, valor, tipo, descricao, conciliado, conta_id')
@@ -664,6 +681,7 @@ export default function ConciliacaoBancariaSection() {
       // Entradas ignoradas para esta conta
       contaSel ? supabase.from('fin_conciliacao_ignoradas').select('data, valor, tipo, descricao')
         .eq('conta_id', contaSel) : Promise.resolve({ data: [] }),
+      fetchVinculosExtrato(),
     ]);
 
     const lancSameConta = ((lancRes as { data: LancamentoCandidate[] | null }).data || []) as LancamentoCandidate[];
@@ -685,18 +703,29 @@ export default function ConciliacaoBancariaSection() {
       ignoradasCounts.set(key, (ignoradasCounts.get(key) || 0) + 1);
     }
 
+    const externalIdsProcessados = new Set(
+      ((vinculosRes.data || []) as { external_id: string; tipo: string }[])
+        .map(v => `${v.tipo}|${v.external_id}`),
+    );
+
     const lancMap = new Map<string, LancamentoCandidate>();
     for (const l of lancSameConta) lancMap.set(l.id, { ...l, _sameAccount: true });
     for (const l of lancAll) { if (!lancMap.has(l.id)) lancMap.set(l.id, { ...l, _sameAccount: false }); }
     const allLancamentos = Array.from(lancMap.values());
 
-    return { allLancamentos, contasPagar, contasReceber, conciliadosCounts, ignoradasCounts };
+    return { allLancamentos, contasPagar, contasReceber, conciliadosCounts, ignoradasCounts, externalIdsProcessados };
   };
 
   /** Recalcula o estado de match de UMA linha (já conciliada/ignorada/sugestão) contra o contexto atual do banco. */
   const matchLinha = (linha: LinhaExtrato, ctx: MatchContext, usedIds: Set<string>): LinhaExtrato => {
     const key = bankLineKey(linha);
     const base = { ...linha, matchId: undefined, matchOrigin: undefined, matchDescricao: undefined, matchRaw: undefined, suggestions: undefined };
+
+    // FITID é a identidade bancária estável e tem precedência sobre campos
+    // editáveis do lançamento (descrição/categoria/data de competência).
+    if (linha.fitId && ctx.externalIdsProcessados.has(`${linha.tipo}|${linha.fitId}`)) {
+      return { ...base, selecionada: false, jaConciliada: true, ignorada: false };
+    }
 
     // Já conciliada — exibir informativo, sem ação
     if (consumeCount(ctx.conciliadosCounts, key)) {
@@ -1014,13 +1043,25 @@ export default function ConciliacaoBancariaSection() {
     } : l));
   };
 
+  const bindExtratoLine = async (linha: LinhaExtrato | undefined, lancamentoId?: string | null) => {
+    if (!linha?.fitId || !lancamentoId || !contaSel) return;
+    const { error } = await supabase.rpc('reconcile_bind_extrato', {
+      p_conta_id: contaSel,
+      p_external_id: linha.fitId,
+      p_tipo: linha.tipo,
+      p_lancamento_id: lancamentoId,
+    });
+    if (error) throw error;
+  };
+
   // ========== Confirm baixa ==========
   const confirmarBaixa = async () => {
     const match = confirmDialog.match;
     if (!match) return;
     setProcessando(true);
     try {
-      const linhaData = linhas[confirmDialog.linhaIndex]?.data || formatDateBR();
+      const linha = linhas[confirmDialog.linhaIndex];
+      const linhaData = linha?.data || formatDateBR();
 
       if (match.origin === 'conta_pagar') {
         const { data, error } = await supabase.rpc('reconcile_pay_conta_pagar', {
@@ -1030,7 +1071,7 @@ export default function ConciliacaoBancariaSection() {
           p_user_id: user?.id,
         });
         if (error) throw error;
-        const result = data as { status?: string; recorrente?: boolean; next_cp_id?: string } | null;
+        const result = data as { status?: string; lancamento_id?: string; recorrente?: boolean; next_cp_id?: string } | null;
         if (result?.status === 'noop') {
           toast.info('Conta já estava paga');
         } else {
@@ -1038,6 +1079,7 @@ export default function ConciliacaoBancariaSection() {
           if (result?.recorrente && result?.next_cp_id) msg += ' Próxima parcela gerada.';
           toast.success(msg);
         }
+        await bindExtratoLine(linha, result?.lancamento_id);
       } else if (match.origin === 'conta_receber') {
         const { data, error } = await supabase.rpc('reconcile_receive_conta_receber', {
           p_conta_receber_id: match.id,
@@ -1046,7 +1088,7 @@ export default function ConciliacaoBancariaSection() {
           p_user_id: user?.id,
         });
         if (error) throw error;
-        const result = data as { status?: string; recorrente?: boolean; next_cr_id?: string } | null;
+        const result = data as { status?: string; lancamento_id?: string; recorrente?: boolean; next_cr_id?: string } | null;
         if (result?.status === 'noop') {
           toast.info('Conta já estava recebida');
         } else {
@@ -1054,6 +1096,7 @@ export default function ConciliacaoBancariaSection() {
           if (result?.recorrente && result?.next_cr_id) msg += ' Próxima parcela gerada.';
           toast.success(msg);
         }
+        await bindExtratoLine(linha, result?.lancamento_id);
       }
 
       setLinhas(prev => prev.filter((_, i) => i !== confirmDialog.linhaIndex));
@@ -1120,13 +1163,15 @@ export default function ConciliacaoBancariaSection() {
             }];
           }
 
-          const { error } = await supabase.rpc('reconcile_import_lancamento', {
+          const { data, error } = await supabase.rpc('reconcile_import_lancamento', {
             p_data: l.data, p_descricao: l.descricao, p_valor: l.valor, p_tipo: l.tipo,
             p_conta_id: contaSel, p_user_id: user?.id,
             p_rateio_linhas: rateioPayload || null,
             p_external_id: l.fitId || null,
           });
           if (error) throw error;
+          const result = data as { lancamento_id?: string } | null;
+          await bindExtratoLine(l, result?.lancamento_id);
         }
       }
 
@@ -1136,22 +1181,27 @@ export default function ConciliacaoBancariaSection() {
           p_lancamento_ids: matchIds,
         });
         if (error) throw error;
+        for (const l of toReconcileLanc) await bindExtratoLine(l, l.matchId);
       }
 
       for (const l of pendingCP) {
-        const { error } = await supabase.rpc('reconcile_pay_conta_pagar', {
+        const { data, error } = await supabase.rpc('reconcile_pay_conta_pagar', {
           p_conta_pagar_id: l.matchId!, p_conta_bancaria_id: contaSel,
           p_data_pagamento: l.data, p_user_id: user?.id,
         });
         if (error) throw error;
+        const result = data as { lancamento_id?: string } | null;
+        await bindExtratoLine(l, result?.lancamento_id);
       }
 
       for (const l of pendingCR) {
-        const { error } = await supabase.rpc('reconcile_receive_conta_receber', {
+        const { data, error } = await supabase.rpc('reconcile_receive_conta_receber', {
           p_conta_receber_id: l.matchId!, p_conta_bancaria_id: contaSel,
           p_data_recebimento: l.data, p_user_id: user?.id,
         });
         if (error) throw error;
+        const result = data as { lancamento_id?: string } | null;
+        await bindExtratoLine(l, result?.lancamento_id);
       }
 
       const total = toImport.length + toReconcileLanc.length + pendingCP.length + pendingCR.length;
@@ -1253,6 +1303,8 @@ export default function ConciliacaoBancariaSection() {
         p_conta_origem_id: contaOrigemId, p_conta_destino_id: contaDestinoId, p_user_id: user?.id,
       });
       if (error) throw error;
+      const result = data as { lancamento_id?: string } | null;
+      await bindExtratoLine(linha, result?.lancamento_id);
 
       setLinhas(prev => prev.filter((_, i) => i !== transferDialog.linhaIndex));
 

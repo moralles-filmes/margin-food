@@ -135,6 +135,17 @@ export default function CriarLancamentoExtratoDialog({
     });
   };
 
+  const bindExtratoLine = async (lancamentoId?: string | null) => {
+    if (!linha?.fitId || !lancamentoId) return;
+    const { error } = await supabase.rpc('reconcile_bind_extrato', {
+      p_conta_id: contaBancariaId,
+      p_external_id: linha.fitId,
+      p_tipo: linha.tipo,
+      p_lancamento_id: lancamentoId,
+    });
+    if (error) throw error;
+  };
+
   const ratearIgual = () => {
     const n = rateioLinhas.length;
     if (n === 0) return;
@@ -186,7 +197,7 @@ export default function CriarLancamentoExtratoDialog({
 
       if (destino === 'lancamento') {
         // Create via existing RPC (categoria já vai no payload → sem UPDATE de campo vigiado)
-        const { error } = await supabase.rpc('reconcile_import_lancamento', {
+        const { data, error } = await supabase.rpc('reconcile_import_lancamento', {
           p_data: dataCompetencia,
           p_descricao: descricao,
           p_valor: valor,
@@ -197,6 +208,8 @@ export default function CriarLancamentoExtratoDialog({
           p_external_id: linha?.fitId || null,
         });
         if (error) throw error;
+        const importResult = data as { lancamento_id?: string } | null;
+        await bindExtratoLine(importResult?.lancamento_id);
 
         // Update the just-created lancamento with extra fields if needed.
         // NÃO incluir categoria_id aqui: é campo vigiado pelo trigger de lançamento REALIZADO.
@@ -244,7 +257,7 @@ export default function CriarLancamentoExtratoDialog({
         if (cpError) throw cpError;
 
         // Create corresponding lancamento for the ledger with proper referencia linking
-        const { error: lancError } = await supabase.rpc('reconcile_import_lancamento', {
+        const { data: lancData, error: lancError } = await supabase.rpc('reconcile_import_lancamento', {
           p_data: dataCompetencia,
           p_descricao: descricao,
           p_valor: valor,
@@ -255,6 +268,7 @@ export default function CriarLancamentoExtratoDialog({
           p_external_id: linha?.fitId || null,
         });
         if (lancError) console.warn('Lancamento mirror for CP:', lancError.message);
+        else await bindExtratoLine((lancData as { lancamento_id?: string } | null)?.lancamento_id);
 
         // Link the lancamento back to CP via referencia fields
         if (cpData) {
@@ -302,7 +316,7 @@ export default function CriarLancamentoExtratoDialog({
         if (crError) throw crError;
 
         // Create corresponding lancamento for the ledger
-        const { error: lancError } = await supabase.rpc('reconcile_import_lancamento', {
+        const { data: lancData, error: lancError } = await supabase.rpc('reconcile_import_lancamento', {
           p_data: dataCompetencia,
           p_descricao: descricao,
           p_valor: valor,
@@ -313,6 +327,7 @@ export default function CriarLancamentoExtratoDialog({
           p_external_id: linha?.fitId || null,
         });
         if (lancError) console.warn('Lancamento mirror for CR:', lancError.message);
+        else await bindExtratoLine((lancData as { lancamento_id?: string } | null)?.lancamento_id);
 
         // Link the lancamento back to CR via referencia fields
         if (crData) {
