@@ -52,6 +52,33 @@ const OFX_SEM_LEDGERBAL = `
 </OFX>
 `;
 
+const OFC_LEGADO = `
+<OFC>
+<DTD>1.02
+<CPAGE>1252
+<ACCTSTMT>
+<ACCTFROM>
+<BANKID>001
+<BRANCHID>1234
+<ACCTID>98765-0
+</ACCTFROM>
+<STMTRS>
+<DTSTART>20260801
+<DTEND>20260814
+<LEDGER>1.234,56
+<STMTTRN>
+<TRNTYPE>1
+<DTPOSTED>20260813120000
+<TRNAMT>-89,90
+<FITID>ofc-legacy-123
+<NAME>Fornecedor OFC
+<MEMO>Compra importada
+</STMTTRN>
+</STMTRS>
+</ACCTSTMT>
+</OFC>
+`;
+
 describe('parseExtrato — extração de LEDGERBAL (OFX)', () => {
   it('extrai valor e data do bloco <LEDGERBAL> quando presente', () => {
     const result = parseExtrato('extrato.ofx', OFX_COM_LEDGERBAL);
@@ -99,6 +126,31 @@ describe('parseExtrato — extração de LEDGERBAL (OFX)', () => {
     const csv = '05/08/2026;Venda;150,00\n';
     const result = parseExtrato('extrato.csv', csv);
     expect(result.saldoFinalArquivo).toBeUndefined();
+  });
+});
+
+describe('parseExtrato — OFC legado', () => {
+  it('importa transação, conta, FITID e saldo do formato OFC', () => {
+    const result = parseExtrato('extrato.ofc', OFC_LEGADO);
+
+    expect(result.conta).toEqual({
+      numeroConta: '98765-0',
+      agencia: '1234',
+      banco: '001',
+      bankId: '001',
+    });
+    expect(result.saldoFinalArquivo).toEqual({ valor: 1234.56, data: '2026-08-14' });
+    expect(result.linhas).toEqual([{
+      data: '2026-08-13',
+      descricao: 'Compra importada',
+      valor: 89.9,
+      tipo: 'DESPESA',
+      fitId: 'ofc-legacy-123',
+    }]);
+  });
+
+  it('reconhece conteúdo OFC mesmo quando o banco entrega extensão .txt', () => {
+    expect(parseExtrato('extrato.txt', OFC_LEGADO).linhas).toHaveLength(1);
   });
 });
 

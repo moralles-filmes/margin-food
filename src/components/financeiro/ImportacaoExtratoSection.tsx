@@ -141,7 +141,7 @@ export default function ImportacaoExtratoSection() {
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <h2 className="text-xl font-bold text-foreground">Importação de Extratos</h2>
-          <p className="text-sm text-muted-foreground">Suporta CSV e OFX/QFX</p>
+          <p className="text-sm text-muted-foreground">Suporta CSV, OFX, QFX e OFC</p>
         </div>
       </div>
 
@@ -156,11 +156,11 @@ export default function ImportacaoExtratoSection() {
               </Select>
             </div>
             <div>
-              <Label>Arquivo (CSV/OFX)</Label>
+              <Label>Arquivo (CSV/OFX/QFX/OFC)</Label>
               <Input
                 ref={fileRef}
                 type="file"
-                accept=".csv,.ofx,.qfx,.txt"
+                accept=".csv,.ofx,.qfx,.ofc,.txt"
                 onChange={handleFile}
                 disabled={loading}
                 className="max-w-[280px]"
@@ -225,10 +225,10 @@ export default function ImportacaoExtratoSection() {
       {linhas.length === 0 && (
         <Card><CardContent className="p-8 text-center text-muted-foreground">
           <Upload className="w-10 h-10 mx-auto mb-3 opacity-30" />
-          <p className="font-medium">Selecione um arquivo CSV ou OFX para importar</p>
+          <p className="font-medium">Selecione um arquivo CSV, OFX, QFX ou OFC para importar</p>
           <p className="text-xs mt-2">
             <strong>CSV:</strong> data;descrição;valor (separado por ; ou ,)<br />
-            <strong>OFX/QFX:</strong> formato padrão bancário
+            <strong>OFX/QFX/OFC:</strong> formatos bancários suportados
           </p>
         </CardContent></Card>
       )}

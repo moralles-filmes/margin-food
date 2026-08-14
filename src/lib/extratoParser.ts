@@ -1,10 +1,10 @@
 /**
- * extratoParser.ts — Parser unificado de extratos bancários (OFX/QFX/CSV).
+ * extratoParser.ts — Parser unificado de extratos bancários (OFX/QFX/OFC/CSV).
  *
  * Além das transações, extrai a identidade da conta do arquivo (quando disponível)
  * para possibilitar a verificação entre o extrato importado e a conta selecionada.
  *
- * OFX: lê o bloco <BANKACCTFROM> / <CCACCTFROM> → ACCTID (nº da conta), BRANCHID (agência), BANKID (código).
+ * OFX/QFX: lê <BANKACCTFROM> / <CCACCTFROM>; OFC legado usa <ACCTFROM>.
  * CSV: varredura best-effort das primeiras linhas por padrões de agência/conta.
  */
 
@@ -13,7 +13,7 @@ export interface ExtratoLinha {
   descricao: string;
   valor: number;      // absoluto
   tipo: 'RECEITA' | 'DESPESA';
-  /** Identificador único fornecido pelo banco (OFX FITID), quando disponível. */
+  /** Identificador único fornecido pelo banco (OFX/OFC FITID), quando disponível. */
   fitId?: string;
 }
 
@@ -28,11 +28,11 @@ export interface ExtratoConta {
 export interface ExtratoParseResult {
   linhas: ExtratoLinha[];
   conta: ExtratoConta;
-  /** Saldo final informado no próprio arquivo (só OFX, via <LEDGERBAL>). Ausente em CSV. */
+  /** Saldo final informado no arquivo (OFX: LEDGERBAL; OFC: LEDGER). Ausente em CSV. */
   saldoFinalArquivo?: { valor: number; data: string };
 }
 
-/* ───────── OFX parser ───────── */
+/* ───────── OFX/QFX/OFC parser ───────── */
 
 function parseOFXNumber(raw: string): number {
   const normalized = raw.replace(/[^\d,.-]/g, '');
@@ -65,14 +65,16 @@ function parseOFXDate(raw: string): string {
 function parseOFX(text: string): ExtratoParseResult {
   const linhas: ExtratoLinha[] = [];
 
-  // Extrai identidade da conta do cabeçalho (<BANKACCTFROM> ou <CCACCTFROM> para cartões)
+  // Extrai identidade da conta do cabeçalho. OFC legado usa <ACCTFROM>.
   const conta: ExtratoConta = {};
   const acctBlock =
     text.match(/<BANKACCTFROM>([\s\S]*?)<\/BANKACCTFROM>/i)?.[1] ||
     text.match(/<CCACCTFROM>([\s\S]*?)<\/CCACCTFROM>/i)?.[1] ||
+    text.match(/<ACCTFROM>([\s\S]*?)<\/ACCTFROM>/i)?.[1] ||
     // Fallback: alguns OFX não fecham com </BANKACCTFROM>, apenas abrem e usam próxima tag de mesmo nível
     text.match(/<BANKACCTFROM>([\s\S]*?)(?=<STMTTRNRS|<STMTRS|<CCSTMTRS|$)/i)?.[1] ||
-    text.match(/<CCACCTFROM>([\s\S]*?)(?=<STMTTRNRS|<STMTRS|<CCSTMTRS|$)/i)?.[1];
+    text.match(/<CCACCTFROM>([\s\S]*?)(?=<STMTTRNRS|<STMTRS|<CCSTMTRS|$)/i)?.[1] ||
+    text.match(/<ACCTFROM>([\s\S]*?)(?=<STMTRS|<STMTTRN|$)/i)?.[1];
 
   if (acctBlock) {
     const getHeaderTag = (tag: string) => {
@@ -118,13 +120,23 @@ function parseOFX(text: string): ExtratoParseResult {
         if (data) saldoFinalArquivo = { valor, data };
       }
     }
+  } else {
+    // OFC legado informa o saldo como campo simples <LEDGER> e usa <DTEND>
+    // como data final do período do extrato.
+    const ledgerValue = text.match(/<LEDGER>([^<\n\r]+)/i)?.[1]?.trim();
+    const statementEnd = text.match(/<DTEND>([^<\n\r]+)/i)?.[1]?.trim();
+    if (ledgerValue && statementEnd) {
+      const valor = parseOFXNumber(ledgerValue);
+      const data = parseOFXDate(statementEnd);
+      if (!isNaN(valor) && data) saldoFinalArquivo = { valor, data };
+    }
   }
 
   // Transações
-  const transactions = text.split('<STMTTRN>').slice(1);
+  const transactions = text.split(/<STMTTRN>/i).slice(1);
   for (const tx of transactions) {
     const getTag = (tag: string) => {
-      const m = tx.match(new RegExp(`<${tag}>([^<\\n]+)`));
+      const m = tx.match(new RegExp(`<${tag}>([^<\\n]+)`, 'i'));
       return m ? m[1].trim() : '';
     };
     const dtposted = getTag('DTPOSTED');
@@ -227,7 +239,10 @@ function parseCSV(text: string): ExtratoParseResult {
 /** Escolhe o parser pela extensão do arquivo e retorna linhas + identidade da conta. */
 export function parseExtrato(filename: string, text: string): ExtratoParseResult {
   const ext = filename.toLowerCase().split('.').pop();
-  return ext === 'ofx' || ext === 'qfx' ? parseOFX(text) : parseCSV(text);
+  const hasFinancialTags = /<STMTTRN>/i.test(text) && /<DTPOSTED>/i.test(text) && /<TRNAMT>/i.test(text);
+  return ext === 'ofx' || ext === 'qfx' || ext === 'ofc' || hasFinancialTags
+    ? parseOFX(text)
+    : parseCSV(text);
 }
 
 /* ───────── Verificação de conta ───────── */
