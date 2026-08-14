@@ -199,6 +199,7 @@ margin-food/
 
 ## ⏳ Pendente / Em Aberto
 
+- [x] Importação de extrato: não abortar quando o auto-bind opcional de transferências falhar e recarregar schema cache da RPC — concluído em 2026-08-14
 - [x] Conciliação Bancária: aceitar extratos OFC legados (inclusive conta, FITID e saldo LEDGER) — concluído em 2026-08-14
 - [x] Conciliação OFX: persistir vínculos por FITID no banco para reconhecimento entre computadores e corrigir fechamento PagBank GM de 01/08 a 07/08 — concluído em 2026-08-12
 - [x] Conciliação OFX: reconhecer automaticamente no segundo extrato a contrapartida de transferência entre contas já criada pelo primeiro banco — concluído em 2026-08-14

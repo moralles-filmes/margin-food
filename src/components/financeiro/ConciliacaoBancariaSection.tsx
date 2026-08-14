@@ -26,6 +26,8 @@ import { mapFinanceiroDeleteError } from '@/lib/financeiroErrorMap';
 import { buildCategoryOptions } from '@/lib/categoriaOptions';
 import { matchesImportFilter, type ImportFilter } from '@/lib/conciliacaoFilters';
 import { cn } from '@/lib/utils';
+import { runOptionalAutoBind } from '@/lib/conciliacaoAutoBind';
+import { extractSupabaseErrorMessage } from '@/lib/supabaseErrors';
 import type { ContaBancariaRef, CategoriaFinRef, CentroCustoRef, LancamentoConciliacao, LancamentoCandidate, ContaPagarCandidate, ContaReceberCandidate } from '@/types/financeiro';
 
 import { useCan } from '@/permissions/hooks';
@@ -818,11 +820,22 @@ export default function ConciliacaoBancariaSection() {
       }));
     if (linesWithExternalId.length === 0) return;
 
-    const { error } = await supabase.rpc('reconcile_auto_bind_transfer_counterparts', {
-      p_conta_id: contaSel,
-      p_lines: linesWithExternalId,
-    });
-    if (error) throw error;
+    const result = await runOptionalAutoBind(() =>
+      supabase.rpc('reconcile_auto_bind_transfer_counterparts', {
+        p_conta_id: contaSel,
+        p_lines: linesWithExternalId,
+      }),
+    );
+
+    if (!result.ok) {
+      console.warn('[ConciliacaoBancariaSection.autoBindTransferCounterparts] optional step failed', {
+        diagnostic: result.diagnostic,
+        error: result.error,
+      });
+      toast.warning(
+        'Extrato carregado. O reconhecimento automático de transferências ficou indisponível; revise esses vínculos manualmente.',
+      );
+    }
   };
 
   /** Busca matches e popula sugestões de conciliação para linhas já parseadas (usado ao importar um arquivo novo). */
@@ -856,7 +869,7 @@ export default function ConciliacaoBancariaSection() {
       setImportFilter('todos');
     } catch (err) {
       console.error('[ConciliacaoBancariaSection.processarLinhas]', err);
-      toast.error('Erro ao processar arquivo');
+      toast.error(extractSupabaseErrorMessage(err, 'Erro ao processar arquivo'));
     }
   };
 
