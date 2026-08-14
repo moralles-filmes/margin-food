@@ -1379,12 +1379,12 @@ export default function ConciliacaoBancariaSection() {
             <CardContent className="p-4">
               <div className="flex items-end gap-3 flex-wrap">
                 <div>
-                  <Label>Arquivo (CSV / OFX / QFX)</Label>
+                  <Label>Arquivo (CSV / OFX / QFX / OFC)</Label>
                   <label className={`flex items-center gap-2 cursor-pointer${loading ? ' opacity-50 pointer-events-none' : ''}`}>
                     <input
                       ref={fileRef}
                       type="file"
-                      accept=".csv,.ofx,.qfx,.txt"
+                      accept=".csv,.ofx,.qfx,.ofc,.txt"
                       onChange={handleFile}
                       disabled={loading}
                       className="hidden"
@@ -1597,10 +1597,10 @@ export default function ConciliacaoBancariaSection() {
           {linhas.length === 0 && (
             <Card><CardContent className="p-8 text-center text-muted-foreground">
               <Upload className="w-10 h-10 mx-auto mb-3 opacity-30" />
-              <p className="font-medium">Selecione um arquivo CSV ou OFX para importar</p>
+              <p className="font-medium">Selecione um arquivo CSV, OFX, QFX ou OFC para importar</p>
               <p className="text-xs mt-2">
                 <strong>CSV:</strong> data;descrição;valor (separado por ; ou ,)<br />
-                <strong>OFX/QFX:</strong> formato padrão bancário
+                <strong>OFX/QFX/OFC:</strong> formatos bancários suportados
               </p>
             </CardContent></Card>
           )}
