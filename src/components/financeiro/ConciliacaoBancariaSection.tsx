@@ -135,6 +135,7 @@ function consumeCount(counts: Map<string, number>, key: string): boolean {
 
 export default function ConciliacaoBancariaSection() {
   const canViewRbac = useCan('financeiro:conciliacao:view');
+  const canReconcileRbac = useCan('financeiro:conciliacao:reconcile');
   const { user } = useAuth();
   const [contas, setContas] = useState<ContaBancariaRef[]>([]);
   const [contaSel, setContaSel] = useState('');
@@ -800,9 +801,34 @@ export default function ConciliacaoBancariaSection() {
     return { ...base, jaConciliada: false, ignorada: false, suggestions: suggestions.length > 0 ? suggestions : undefined };
   };
 
+  /**
+   * Vincula o segundo extrato de uma transferência já criada pelo primeiro banco.
+   * A RPC só aceita um candidato inequívoco e exige um vínculo bancário prévio na
+   * conta oposta; coincidências ambíguas continuam disponíveis para revisão manual.
+   */
+  const autoBindTransferCounterparts = async (parsed: LinhaExtrato[]) => {
+    if (!contaSel || !canReconcileRbac) return;
+    const linesWithExternalId = parsed
+      .filter(linha => !!linha.fitId)
+      .map(linha => ({
+        external_id: linha.fitId!,
+        tipo: linha.tipo,
+        data: linha.data,
+        valor: linha.valor,
+      }));
+    if (linesWithExternalId.length === 0) return;
+
+    const { error } = await supabase.rpc('reconcile_auto_bind_transfer_counterparts', {
+      p_conta_id: contaSel,
+      p_lines: linesWithExternalId,
+    });
+    if (error) throw error;
+  };
+
   /** Busca matches e popula sugestões de conciliação para linhas já parseadas (usado ao importar um arquivo novo). */
   const processarLinhas = async (parsed: LinhaExtrato[]) => {
     try {
+      await autoBindTransferCounterparts(parsed);
       const ctx = await fetchMatchContext();
       const usedIds = new Set<string>();
       const final = parsed.map(linha => matchLinha(linha, ctx, usedIds));
