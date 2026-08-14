@@ -9697,6 +9697,10 @@ export type Database = {
         Args: { p_lancamento_ids: string[] }
         Returns: Json
       }
+      reconcile_auto_bind_transfer_counterparts: {
+        Args: { p_conta_id: string; p_lines: Json }
+        Returns: Json
+      }
       reconcile_bind_extrato: {
         Args: {
           p_conta_id: string
