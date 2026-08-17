@@ -28,6 +28,8 @@ import { matchesImportFilter, type ImportFilter } from '@/lib/conciliacaoFilters
 import { cn } from '@/lib/utils';
 import { runOptionalAutoBind } from '@/lib/conciliacaoAutoBind';
 import { extractSupabaseErrorMessage } from '@/lib/supabaseErrors';
+import { computeScore } from '@/lib/conciliacaoScore';
+import { matchTransferCandidate, type TransferCandidate } from '@/lib/conciliacaoTransferMatch';
 import type { ContaBancariaRef, CategoriaFinRef, CentroCustoRef, LancamentoConciliacao, LancamentoCandidate, ContaPagarCandidate, ContaReceberCandidate } from '@/types/financeiro';
 import DateRangePresets from './DateRangePresets';
 import { subDays } from 'date-fns';
@@ -71,41 +73,6 @@ interface RateioLinha {
   valor: number;
   percentual: number;
   observacao: string;
-}
-
-/* ───────── Scoring helper ───────── */
-function computeScore(extratoValor: number, extratoData: string, extratoDesc: string, candidateValor: number, candidateData: string, candidateDesc: string): number {
-  let score = 0;
-  const diff = Math.abs(candidateValor - extratoValor);
-  const tolerance = Math.max(extratoValor * 0.01, 0.01);
-  if (diff < 0.01) score += 50;
-  else if (diff <= tolerance) score += 40;
-  else if (diff <= extratoValor * 0.05) score += 20;
-  else return 0;
-
-  const d1 = new Date(extratoData);
-  const d2 = new Date(candidateData);
-  const daysDiff = Math.abs((d1.getTime() - d2.getTime()) / 86400000);
-  if (daysDiff === 0) score += 30;
-  else if (daysDiff <= 1) score += 25;
-  else if (daysDiff <= 3) score += 15;
-  else if (daysDiff <= 7) score += 5;
-  else return 0;
-
-  if (extratoDesc && candidateDesc) {
-    const a = extratoDesc.toLowerCase().trim();
-    const b = candidateDesc.toLowerCase().trim();
-    if (a === b) score += 20;
-    else if (a.includes(b) || b.includes(a)) score += 15;
-    else {
-      const wordsA = a.split(/\s+/);
-      const wordsB = new Set(b.split(/\s+/));
-      const common = wordsA.filter(w => w.length > 2 && wordsB.has(w)).length;
-      score += Math.min(common * 3, 10);
-    }
-  }
-
-  return score;
 }
 
 /* ───────── sessionStorage helpers ───────── */
@@ -656,6 +623,7 @@ export default function ConciliacaoBancariaSection() {
     conciliadosCounts: Map<string, number>;
     ignoradasCounts: Map<string, number>;
     externalIdsProcessados: Set<string>;
+    transferCandidates: TransferCandidate[];
   }
 
   const fetchVinculosExtrato = async () => {
@@ -677,7 +645,7 @@ export default function ConciliacaoBancariaSection() {
   /** Busca lançamentos/CP/CR candidatos + sets de já-conciliadas/ignoradas para a conta selecionada. */
   const fetchMatchContext = async (): Promise<MatchContext> => {
     // Busca dados para match + entradas já conciliadas + entradas ignoradas
-    const [lancRes, lancAllRes, cpRes, crRes, conciliadosRes, ignoradasRes, vinculosRes] = await Promise.all([
+    const [lancRes, lancAllRes, cpRes, crRes, conciliadosRes, ignoradasRes, vinculosRes, transferRes] = await Promise.all([
       contaSel ? supabase.from('fin_lancamentos').select('id, data_competencia, valor, tipo, descricao, conciliado, conta_id')
         .eq('conta_id', contaSel).eq('status', 'REALIZADO').or('conciliado.is.null,conciliado.eq.false') : Promise.resolve({ data: [] }),
       supabase.from('fin_lancamentos').select('id, data_competencia, valor, tipo, descricao, conciliado, conta_id')
@@ -692,6 +660,15 @@ export default function ConciliacaoBancariaSection() {
       contaSel ? supabase.from('fin_conciliacao_ignoradas').select('data, valor, tipo, descricao')
         .eq('conta_id', contaSel) : Promise.resolve({ data: [] }),
       fetchVinculosExtrato(),
+      // Transferências que tocam esta conta (origem OU destino) — candidatas a
+      // contrapartida reconhecida por valor/data, sem depender de FITID/OFX.
+      // Não filtra por `conciliado`: a transferência já nasce conciliado=true
+      // no lado que a criou, então o filtro de "pendente" das demais queries
+      // sempre a excluiria.
+      contaSel ? supabase.from('fin_lancamentos').select('id, data_competencia, valor, conta_id, conta_destino_id, descricao')
+        .eq('tipo', 'TRANSFERENCIA').eq('status', 'REALIZADO')
+        .or(`conta_id.eq.${contaSel},conta_destino_id.eq.${contaSel}`)
+        .order('data_competencia', { ascending: false }).limit(500) : Promise.resolve({ data: [] }),
     ]);
 
     const lancSameConta = ((lancRes as { data: LancamentoCandidate[] | null }).data || []) as LancamentoCandidate[];
@@ -723,7 +700,9 @@ export default function ConciliacaoBancariaSection() {
     for (const l of lancAll) { if (!lancMap.has(l.id)) lancMap.set(l.id, { ...l, _sameAccount: false }); }
     const allLancamentos = Array.from(lancMap.values());
 
-    return { allLancamentos, contasPagar, contasReceber, conciliadosCounts, ignoradasCounts, externalIdsProcessados };
+    const transferCandidates = (transferRes.data || []) as TransferCandidate[];
+
+    return { allLancamentos, contasPagar, contasReceber, conciliadosCounts, ignoradasCounts, externalIdsProcessados, transferCandidates };
   };
 
   /** Recalcula o estado de match de UMA linha (já conciliada/ignorada/sugestão) contra o contexto atual do banco. */
@@ -745,6 +724,20 @@ export default function ConciliacaoBancariaSection() {
     // Ignorada — exibir informativo, sem ação
     if (consumeCount(ctx.ignoradasCounts, key)) {
       return { ...base, selecionada: false, ignorada: true, jaConciliada: false };
+    }
+
+    // Contrapartida de transferência já lançada pela outra conta — reconhece por
+    // valor/data (não depende de FITID, então funciona em OFX e CSV). Sem isso,
+    // essa linha nunca teria candidato no loop de sugestões abaixo: uma linha de
+    // extrato só é RECEITA/DESPESA, e o lançamento de transferência é sempre
+    // tipo='TRANSFERENCIA' — a comparação `ex.tipo !== linha.tipo` descartaria
+    // sempre, levando o usuário a recriar a transferência manualmente (duplicidade).
+    if (contaSel) {
+      const transferMatch = matchTransferCandidate(linha, contaSel, ctx.transferCandidates, usedIds);
+      if (transferMatch) {
+        usedIds.add(`transfer-${transferMatch.id}`);
+        return { ...base, selecionada: false, jaConciliada: true, ignorada: false };
+      }
     }
 
     const suggestions: MatchSuggestion[] = [];
@@ -1349,12 +1342,16 @@ export default function ConciliacaoBancariaSection() {
         p_conta_origem_id: contaOrigemId, p_conta_destino_id: contaDestinoId, p_user_id: user?.id,
       });
       if (error) throw error;
-      const result = data as { lancamento_id?: string } | null;
+      const result = data as { status?: string; lancamento_id?: string } | null;
       await bindExtratoLine(linha, result?.lancamento_id);
 
       setLinhas(prev => prev.filter((_, i) => i !== transferDialog.linhaIndex));
 
-      toast.success(`Transferência ${nOrigem} → ${nDestino} criada e conciliada!`);
+      toast.success(
+        result?.status === 'existing'
+          ? `Transferência ${nOrigem} → ${nDestino} já existia — vinculada em vez de duplicada.`
+          : `Transferência ${nOrigem} → ${nDestino} criada e conciliada!`,
+      );
       emitDataEvent('financeiro:lancamentos');
       loadLancamentos();
     } catch (err: any) {
