@@ -199,6 +199,7 @@ margin-food/
 
 ## ⏳ Pendente / Em Aberto
 
+- [x] Conciliação Bancária: filtrar lançamentos por período no banco (padrão últimos 90 dias, com opção de todo o histórico) — concluído em 2026-08-17
 - [x] Importação de extrato: não abortar quando o auto-bind opcional de transferências falhar e recarregar schema cache da RPC — concluído em 2026-08-14
 - [x] Conciliação Bancária: aceitar extratos OFC legados (inclusive conta, FITID e saldo LEDGER) — concluído em 2026-08-14
 - [x] Conciliação OFX: persistir vínculos por FITID no banco para reconhecimento entre computadores e corrigir fechamento PagBank GM de 01/08 a 07/08 — concluído em 2026-08-12
