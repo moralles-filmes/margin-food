@@ -29,6 +29,9 @@ import { cn } from '@/lib/utils';
 import { runOptionalAutoBind } from '@/lib/conciliacaoAutoBind';
 import { extractSupabaseErrorMessage } from '@/lib/supabaseErrors';
 import type { ContaBancariaRef, CategoriaFinRef, CentroCustoRef, LancamentoConciliacao, LancamentoCandidate, ContaPagarCandidate, ContaReceberCandidate } from '@/types/financeiro';
+import DateRangePresets from './DateRangePresets';
+import { subDays } from 'date-fns';
+import { formatInBR } from '@/lib/datetime';
 
 import { useCan } from '@/permissions/hooks';
 /* ───────── Types ───────── */
@@ -152,6 +155,8 @@ export default function ConciliacaoBancariaSection() {
   const [lancamentos, setLancamentos] = useState<LancamentoConciliacao[]>([]);
   const [lancamentoRateioCategoryIds, setLancamentoRateioCategoryIds] = useState<Record<string, string[]>>({});
   const [filtro, setFiltro] = useState<'pendentes' | 'conciliados' | 'todos'>('pendentes');
+  const [filtroDataDe, setFiltroDataDe] = useState(() => formatInBR(subDays(new Date(), 90), 'yyyy-MM-dd'));
+  const [filtroDataAte, setFiltroDataAte] = useState(todayBR());
   const [view, setView] = useState<'importar' | 'conciliar'>('conciliar');
   // Totais da conta inteira (independentes do filtro/paginação da lista) — usados só no resumo do cabeçalho.
   const [totalPendentesConta, setTotalPendentesConta] = useState(0);
@@ -259,7 +264,7 @@ export default function ConciliacaoBancariaSection() {
     // Selection refers to rows from the previous account/filter/view — drop it so the
     // "Excluir Selecionados (N)" button doesn't show a stale count after switching.
     setSelectedLancamentoIds(new Set());
-  }, [contaSel, filtro, view]);
+  }, [contaSel, filtro, filtroDataDe, filtroDataAte, view]);
   useEffect(() => { if (contaSel && view === 'conciliar') loadLancamentosCounts(); }, [contaSel, view]);
 
   /** Totais reais da conta (pendente/conciliado), independentes do filtro e da paginação da lista. */
@@ -292,6 +297,8 @@ export default function ConciliacaoBancariaSection() {
 
         if (filtro === 'pendentes') query = query.or('conciliado.is.null,conciliado.eq.false');
         else if (filtro === 'conciliados') query = query.eq('conciliado', true);
+        if (filtroDataDe) query = query.gte('data_competencia', filtroDataDe);
+        if (filtroDataAte) query = query.lte('data_competencia', filtroDataAte);
 
         const { data, error } = await query
           .order('data_competencia', { ascending: false })
@@ -1628,6 +1635,23 @@ export default function ConciliacaoBancariaSection() {
               {totalPendentesConta} pendente(s) • {totalConciliadosConta} conciliado(s)
             </p>
             <div className="flex items-center gap-2 flex-wrap">
+              <Input
+                type="date"
+                value={filtroDataDe}
+                max={filtroDataAte || undefined}
+                onChange={e => setFiltroDataDe(e.target.value)}
+                className="w-36 h-9 text-xs"
+                aria-label="Data inicial"
+              />
+              <span className="text-muted-foreground text-xs">até</span>
+              <Input
+                type="date"
+                value={filtroDataAte}
+                min={filtroDataDe || undefined}
+                onChange={e => setFiltroDataAte(e.target.value)}
+                className="w-36 h-9 text-xs"
+                aria-label="Data final"
+              />
               <Select value={filtro} onValueChange={v => setFiltro(v as 'pendentes' | 'conciliados' | 'todos')}>
                 <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -1657,6 +1681,12 @@ export default function ConciliacaoBancariaSection() {
               )}
             </div>
           </div>
+
+          <DateRangePresets
+            from={filtroDataDe}
+            to={filtroDataAte}
+            onChange={(de, ate) => { setFiltroDataDe(de); setFiltroDataAte(ate); }}
+          />
 
           <Table>
             <TableHeader>
