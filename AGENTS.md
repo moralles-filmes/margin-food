@@ -1,7 +1,37 @@
 # AGENTS.md — Contexto do Projeto Moralles Food
 
-> **Leia este arquivo primeiro.** Ele contém todo o contexto necessário para trabalhar neste projeto.
-> Após fazer qualquer alteração significativa, atualize a seção **Pendente / Em Aberto** deste arquivo.
+> **Leia este arquivo primeiro.** Ele contém o contexto necessário para trabalhar neste projeto.
+> `CLAUDE.md` e `AGENTS.md` são mantidos **idênticos** — ao editar um, replique a mudança no outro.
+
+---
+
+## 📏 Regras para manter este arquivo enxuto (leia antes de editar)
+
+- Este arquivo é contexto operacional, não um diário de bordo. Antes de adicionar qualquer coisa, pergunte: *"um agente futuro precisa disso para não repetir um erro caro, ou consegue descobrir isso lendo o código / `git log` / `TAREFAS.md`?"* Se consegue descobrir sozinho, **não escreva aqui**.
+- Só vale uma entrada nova se for: (a) uma regra de negócio ou invariante que o código sozinho não deixa óbvio, (b) uma armadilha que já causou bug em produção e pode se repetir, ou (c) uma decisão arquitetural que orienta código novo.
+- Escreva a regra e, se precisar, o motivo em **uma linha**. Não narre o processo de investigação ("testado com X, confirmado via Y, verificado ao vivo simulando Z") — isso é para a mensagem de commit, não para cá.
+- **Sem limite de tamanho fixo** — mas isso não é licença para inflar. O critério é sempre "é necessário para o sistema", nunca "documentar o que eu fiz agora".
+- Itens concluídos na seção **Pendente / Em Aberto** são removidos, não acumulados — o histórico já mora em `git log` e `TAREFAS.md`.
+- Ao corrigir/atualizar uma regra existente, **substitua** o texto antigo — não empilhe um novo parágrafo "REVISÃO" em cima do anterior.
+
+---
+
+## SEGURANÇA — Obrigatório antes de qualquer commit/push
+
+**Todo agente (humano ou AI) DEVE verificar antes de `git add`, `git commit` ou `git push`:**
+
+1. Nenhum JWT ou chave secreta nos arquivos staged — procurar `eyJ` (JWTs) e `sb_secret_` nos diffs.
+2. `.claude/settings.local.json` nunca commitado (pode conter tokens em shell history) — já no `.gitignore`.
+3. `.env`/`.env.*` nunca commitados (via `*.local`) — verificar variantes como `.env.production`.
+4. `supabase/.temp/` nunca commitado.
+5. Edge Functions: nunca hardcodar chaves — usar `Deno.env.get("SB_SECRET_KEY")`; segredos novos via Supabase → Edge Functions → Secrets.
+6. GitHub Actions: usar `${{ secrets.NOME }}` para qualquer valor sensível, nunca literal no YAML.
+
+```bash
+git diff --cached | grep -E 'eyJ|sb_secret_|password|api_key'
+```
+
+> **Incidente de referência (2026-05-08):** JWT `service_role` commitado via bash history em `.claude/settings.local.json`. Chave rotacionada, arquivo removido do tracking e adicionado ao `.gitignore`.
 
 ---
 
@@ -19,27 +49,9 @@
 
 ## 🧱 Stack Tecnológica
 
-### Frontend
-- **React 18 + TypeScript 5** — framework principal
-- **Vite 5 + SWC** — build tool
-- **shadcn/ui + Radix UI** — componentes de UI
-- **Tailwind CSS 3** — estilização
-- **React Router DOM 6** — roteamento
-- **TanStack React Query 5** — cache e fetching de dados
-- **React Hook Form 7 + Zod 3** — formulários e validação
-- **Recharts 2** — gráficos
-- **Sonner** — notificações toast
-- **jsPDF + xlsx** — exportação PDF e Excel
-- **vite-plugin-pwa** — suporte PWA com auto-update
-- **Bun** — gerenciador de pacotes (`bun install`, `bun run dev`)
+**Frontend:** React 18 + TypeScript 5, Vite 5 + SWC, shadcn/ui + Radix UI, Tailwind CSS 3, React Router DOM 6, TanStack React Query 5, React Hook Form 7 + Zod 3, Recharts 2, Sonner, jsPDF + ExcelJS (export PDF/Excel), vite-plugin-pwa, Bun (`bun install`, `bun run dev`).
 
-### Backend
-- **Supabase** — banco PostgreSQL 15+ com RLS global
-- **Supabase Auth** — autenticação email/senha
-- **PostgREST** — API automática + RPCs customizadas (30+)
-- **Edge Functions** — Deno/TypeScript (15 funções)
-- **Supabase Realtime** — subscriptions postgres_changes
-- **Supabase Storage** — arquivos
+**Backend:** Supabase — PostgreSQL 15+ com RLS global, Supabase Auth (email/senha), PostgREST + RPCs customizadas (30+), Edge Functions (Deno/TypeScript), Realtime (`postgres_changes`), Storage.
 
 ---
 
@@ -49,26 +61,26 @@
 margin-food/
 ├── src/
 │   ├── App.tsx                    # Roteamento raiz e providers
-│   ├── components/                # 50+ componentes por módulo
+│   ├── components/                # Componentes por módulo
 │   ├── pages/                     # Index, Login, Admin
 │   ├── contexts/                  # AuthContext, contextos de store
-│   ├── hooks/                     # 20+ hooks customizados
+│   ├── hooks/                     # Hooks customizados
 │   ├── lib/                       # Utilitários (formatters, PDFs, permissões)
 │   ├── types/                     # Tipos TypeScript (estoque, financeiro, salmon)
 │   ├── domain/                    # Regras de negócio e invariantes
 │   ├── integrations/supabase/     # Cliente Supabase e tipos gerados
-│   └── permissions/               # Registry RBAC, ações, validação
+│   └── permissions/                # Registry RBAC, ações, validação
 ├── supabase/
-│   ├── config.toml                # Config CLI (project_id, JWT)
-│   ├── migrations/                # 40+ migrações SQL
-│   └── functions/                 # 15 Edge Functions Deno
+│   ├── config.toml
+│   ├── migrations/                # Migrações SQL (timestamp YYYYMMDDHHMMSS)
+│   └── functions/                 # Edge Functions Deno
 ├── docs/
-│   ├── ARCHITECTURE.md            # Guia completo de arquitetura
-│   ├── DOMAIN_RULES.md            # Regras de negócio documentadas
-│   ├── ENTERPRISE_SAFE_STANDARDS.md # Padrões de segurança
-│   └── rbac/                      # Playbooks RBAC
-├── AGENTS.md                      # ← Este arquivo (contexto para AIs)
-└── TAREFAS.md                     # Tarefas em progresso e concluídas
+│   ├── ARCHITECTURE.md
+│   ├── DOMAIN_RULES.md
+│   ├── ENTERPRISE_SAFE_STANDARDS.md
+│   └── rbac/
+├── CLAUDE.md / AGENTS.md          # ← Este arquivo (contexto para AIs, mantidos idênticos)
+└── TAREFAS.md                     # Histórico detalhado de tarefas concluídas
 ```
 
 ---
@@ -76,29 +88,27 @@ margin-food/
 ## 🏗️ Arquitetura — Pontos Críticos
 
 ### Multi-tenancy
-- Toda tabela tem `company_id NOT NULL` — forçado por trigger (`trg_force_company_id`)
-- `get_current_company_id()` resolve: `auth.uid()` → `profiles.company_id`
-- UUID placeholder `00000000-0000-0000-0000-000000000001` é mantido para fins de sistema mas bloqueado para operações comuns
-- **Nunca** confiar em `company_id` vindo do cliente — sempre do backend
-- Onboarding via `onboard_new_company()` (cria empresa + cargos + turnos default)
+- Toda tabela tem `company_id NOT NULL`. Trigger `force_company_id` só existe em `produtos` — **qualquer outra tabela exige `company_id` explícito no payload do INSERT** vindo de `useCompanyId()` (UPDATE/DELETE não precisam, a RLS resolve pelo registro existente).
+- `get_current_company_id()` resolve `auth.uid()` → `profiles.company_id`. **Nunca** confiar em `company_id` vindo do cliente.
+- UUID placeholder `00000000-0000-0000-0000-000000000001` é reservado para o sistema, bloqueado para operações comuns.
+- Onboarding via `onboard_new_company()`.
 
 ### RLS (Row-Level Security)
-- `FORCE RLS` em todas as tabelas — sem exceção
-- `has_permission(user_id, permission_key)` — RPC usada no backend para checar permissões
-- `get_effective_permissions(user_id)` — retorna permissões efetivas do usuário
+- `FORCE RLS` em todas as tabelas, sem exceção.
+- `has_permission(user_id, key)` / `has_any_permission(user_id, keys[])` / `get_effective_permissions(user_id)` são as RPCs de checagem.
+- **Toda policy nova DEVE embrulhar `get_current_company_id()`/`has_permission()`/`has_any_permission()` em `(select ...)` na `USING`/`WITH CHECK`.** Mesmo `STABLE`, o Postgres reavalia essas chamadas linha a linha dentro de um `Filter`; `has_any_permission` chama `get_effective_permissions()` (4 CTEs, VOLATILE) — sem o `(select ...)` isso vira `InitPlan` avaliado 1x por execução em vez de 1x por linha. Sem isso, um `SELECT ... LIMIT N` pode multiplicar o tempo em ordens de grandeza e estourar `statement_timeout` (caso real: `fin_lancamentos.tenant_read`, 8,7s → 47ms, 185x — migration `20260806171500`). Audit completo do schema já corrigiu 388/426 policies em 111 tabelas (`20260806173000`).
+- Toda nova tabela com coluna pesquisável por usuário: adicionar coluna gerada `*_unaccent` + índice `gin (col_unaccent gin_trgm_ops)` na mesma migration (wrapper `public.immutable_unaccent(text)` já existe).
+- **`SECURITY DEFINER` que retorna dados sensíveis** (ex: `list_profiles_minimal`) exige `assert_tenant()` + `has_any_permission()` explícitos — nunca resolver tenant via JOIN manual.
 
 ### RBAC (Permissões)
-- Formato: `<módulo>:<submódulo>:<ação>`
-- Ações padrão (11): `view, create, edit, delete, export, manage, audit, approve, configure, execute, admin`
-- Registry em `src/permissions/registry.ts` — fonte única da verdade
-- Sync via `rpc_sync_permissions_from_registry()`
-- 200+ permissões granulares registradas (sincronizadas com banco via migração)
+- Formato: `<módulo>:<submódulo>:<ação>`.
+- **Fonte de verdade das ações é `src/permissions/actions.ts`** (`ALLOWED_ACTIONS`, 11 ações): `view, create, edit, delete, export, manage, approve, close, reconcile, cancel, simulate`. `validatePermissionKey()` rejeita qualquer outra — não existem ações como `send_whatsapp`/`use_ai`/`convert`/`audit`/`configure`/`execute`/`admin` (mapear para uma das 11: WhatsApp/IA → `manage`, converter → `close`).
+- Registry em `src/permissions/registry.ts` (fonte única de módulos/subtabs) → sync via `rpc_sync_permissions_from_registry()`.
 
 ### Autenticação
-- JWT Supabase Auth — validado via Bearer token nas Edge Functions
-- `verify_jwt = false` no config (validação manual dentro das funções)
-- Cache de roles/permissões no `sessionStorage` (TTL 5min) via AuthContext
-- Soft delete: registros críticos nunca deletados fisicamente (`deleted_at`)
+- JWT Supabase Auth, validado via Bearer token nas Edge Functions (`verify_jwt = false` no config, validação manual dentro de cada função).
+- Cache de roles/permissões no `sessionStorage` (TTL 5min) via AuthContext.
+- Soft delete em registros críticos (`deleted_at`) — hard delete de usuário preserva histórico via FKs `ON DELETE SET NULL`; `admin-users` chama `auth.admin.deleteUser`, CASCADE limpa `profiles`/`user_roles`/`user_permissions`.
 
 ---
 
@@ -107,28 +117,27 @@ margin-food/
 | Módulo | Descrição | Componente Principal |
 |--------|-----------|---------------------|
 | **Estoque** | Gestão de inventário (dual-unit) | `EstoqueGeralView` |
-| **Compras** | Pedidos, requisições, fornecedores | `ComprasView` |
+| **Compras** | Pedidos, requisições, fornecedores, Cotação (RFQ) | `ComprasView` |
 | **CMV** | Custo da Mercadoria Vendida + metas | `CmvView` |
-| **Ficha Técnica** | Fichas de receitas e precificação | `FichaTecnicaView` (74KB) |
+| **Ficha Técnica** | Fichas de receitas e precificação | `FichaTecnicaView` |
 | **Salmão** | Controle de rendimento de salmão | `SalmonControlView` |
-| **Financeiro** | Contas a pagar/receber, DRE | `FinanceiroView` |
+| **Financeiro** | Contas a pagar/receber, DRE, Conciliação | `FinanceiroView` |
 | **RH** | Folha de pagamento, escalas | `RhView` |
 | **Planejamento** | Projeções e radar de compras | `PlanningView` |
 | **Relatórios** | Analytics e KPIs | `RelatoriosView` |
 | **Inventário** | Auditorias físicas | `InventarioView` |
 | **IA Central** | Assistentes AI por módulo | `CentralIAView` |
-| **Admin** | Usuários, logs, segurança | `AdminUsersView` |
+| **Admin** | Usuários, empresas, logs, segurança | `AdminUsersView` |
 
 ---
 
 ## ⚡ Otimizações de Performance (Implementadas)
 
-1. **`get_catalog_counts()` RPC** — uma chamada para contagens do catálogo (evita 3 queries separadas com timeout)
-2. **`saldo_atual` cacheado** — saldo de estoque salvo na tabela `produtos` (atualizado por trigger)
-3. **RLS otimizado** — funções de permissão simplificadas para evitar queries aninhadas caras
-4. **Índices** — adicionados em `movimentações_estoque` (company_id + produto_id + status)
-5. **React Query config** — `staleTime: 15s`, `gcTime: 5min`
-6. **Error handling no catálogo** — impede limpeza do catálogo em erro de fetch
+- `get_catalog_counts()` — uma RPC para contagens do catálogo (evita queries separadas com timeout).
+- `produtos.saldo_atual` cacheado por trigger — ver princípio abaixo (fonte única da verdade).
+- Índices em `movimentacoes_estoque` (company_id + produto_id + status).
+- React Query: `staleTime: 3min`, `gcTime: 10min` (`App.tsx`).
+- KPIs agregados (`Total R$`, `Qtd Total`) sempre via RPC com `SUM` no Postgres — nunca `.select()` sem `.limit()` + `.reduce()` no client (baixa a tabela inteira, cresce O(n)). Referência: `get_movimentacoes_kpis`.
 
 ---
 
@@ -136,86 +145,100 @@ margin-food/
 
 | Função | Propósito |
 |--------|-----------|
-| `admin-users` | Gestão de usuários com RBAC |
-| `admin-create-user` | Criação de novos usuários |
+| `admin-users` / `admin-create-user` | Gestão de usuários com RBAC |
+| `admin-companies` | Gestão multi-tenant de empresas |
 | `cmv` | Cálculo de CMV |
 | `ficha-tecnica` | Fichas técnicas de receitas |
 | `inventario` | Operações de inventário |
 | `ai-chat` | Assistente IA central |
-| `requisicao-estoque` | Requisições de estoque (com lógica de estorno) |
-| `check-password` | Validação de senha |
-| `rbac-lint` | Auditoria de permissões RBAC |
+| `requisicao-estoque` | Requisições de estoque (estorno, notificação, ack) |
+| `check-password` | Validação de senha (exige Bearer + rate limit) |
+| `rbac-lint` (+ variantes `-full`/`-quick`) | Auditoria de permissões RBAC |
 | `rh` | Recursos humanos |
 | `purchase-requisitions` | Ordens de compra |
 | `scheduled-jobs` | Jobs em background (cron) |
-| `admin-companies` | Gestão multi-tenant de empresas |
+| `send-whatsapp-zapi` | WhatsApp da Cotação via Z-API (config por empresa em `cotacao_zapi_config`) |
+| `cotacao-ia` | Assistente de IA da Cotação (chave por empresa em `cotacao_ia_config`) |
+
+Todas as Edge Functions usam CORS compartilhado via `supabase/functions/_shared/cors.ts` (`getCorsHeaders()`, restringe a `ALLOWED_ORIGINS`) — nunca reintroduzir `Access-Control-Allow-Origin: '*'`.
 
 ---
 
 ## 📋 Convenções de Desenvolvimento
 
-- **Commits**: `tipo(escopo): descrição` — ex: `fix(estoque): corrige timeout no catálogo`
-- **Idioma do código**: inglês para variáveis/funções, português para UI e comentários de negócio
-- **Migrações**: sempre criar novo arquivo em `supabase/migrations/` com timestamp `YYYYMMDDHHMMSS_nome.sql`
-- **Permissões novas**: sempre adicionar em `src/permissions/registry.ts` + rodar `rpc_sync_permissions_from_registry()`
-- **Sem mock de banco**: testes de integração sempre usam banco real
-- **Sem amend em commits públicos**: sempre criar novo commit
+- **Commits**: `tipo(escopo): descrição` — ex: `fix(estoque): corrige timeout no catálogo`.
+- **Idioma do código**: inglês para variáveis/funções, português para UI e comentários de negócio.
+- **Migrações**: novo arquivo em `supabase/migrations/` com timestamp `YYYYMMDDHHMMSS_nome.sql`.
+- **GRANTs obrigatórios em toda nova tabela**: `GRANT ALL ON TABLE public.<tabela> TO authenticated, service_role;` — sem isso o PostgREST nega SELECT direto do cliente mesmo com RLS permissiva (RPCs `SECURITY DEFINER` mascaram o problema; leitura direta falha em silêncio).
+- **Aplicação de migrations**: preferir `supabase db push` (registra `version` = nome do arquivo). O CLI v2.75 quebra qualquer migration com `CREATE FUNCTION` seguido de outro statement (ex.: `GRANT`) — nesse caso usar MCP `apply_migration` + `supabase migration repair` para reconciliar o histórico.
+- **Alterar parâmetros de função `SECURITY DEFINER` já em produção**: `DROP FUNCTION IF EXISTS` da assinatura antiga antes do `CREATE OR REPLACE` — assinatura de parâmetros diferente cria overload, não substitui.
+- **Permissões novas**: adicionar em `src/permissions/registry.ts` + rodar `rpc_sync_permissions_from_registry()`.
+- **Sem mock de banco**: testes de integração sempre usam banco real.
+- **Sem amend em commits públicos**: sempre criar novo commit.
+- **jspdf-autotable v5**: importar como `import autoTable from 'jspdf-autotable'` e chamar `autoTable(doc, {...})` — o padrão `(doc as any).autoTable({...})` não funciona na v5 em Vite/ESM.
+- **CI**: GitHub Actions instala com Bun e lockfile congelado (`bun install --frozen-lockfile`).
 
 ---
 
 ## 🧭 Princípios e Decisões Arquiteturais
 
-> Decisões que orientam código novo. Histórico detalhado: `git log -- AGENTS.md` e `supabase/migrations/`.
+> Decisões que orientam código novo. Histórico detalhado: `git log` e `supabase/migrations/`.
 
-- **`produtos.saldo_atual` é fonte única da verdade** — Toda RPC de leitura de valor/saldo de estoque deve consumir o cache (mantido por trigger `fn_recompute_product_saldo`), **nunca** recalcular inline sobre `movimentacoes_estoque`. RPCs alinhadas: `get_stock_summary`, `get_stock_dashboard`, `get_relatorios_kpis`.
-- **PL/pgSQL valida colunas só na 1ª execução** — Toda migration que altere RPC com JOIN deve incluir `DO`-block que força resolução de colunas no `db push` (evita crash em produção ao invés de no deploy). Padrão: `20260502151400`.
-- **`SECURITY DEFINER` exige `assert_tenant()` + `has_any_permission()` explícitos** — RPCs que retornam dados sensíveis (ex: `list_profiles_minimal`, `relatorio_socios_resumo`) nunca podem resolver tenant via JOIN manual.
-- **Hard delete de usuário preserva histórico** — FKs de `auth.users(id)` usam `ON DELETE SET NULL`. Edge function `admin-users` chama `auth.admin.deleteUser`; CASCADE limpa `profiles`/`user_roles`/`user_permissions`.
-- **Financeiro: RPCs `_guarded_`** — Todas as operações financeiras (CP, CR, lançamentos, conciliação) usam RPCs prefixadas `_guarded_` com `assert_tenant()`, `has_permission()`, optimistic locking via `updated_at` e log em `fin_audit_logs`.
-- **Conciliação Bancária** — 3 destinos: `lancamento`, `conta_pagar`, `conta_receber`. Categoria é obrigatória para conciliar Receita/Despesa (validação no cliente e em triggers/RPCs; Transferência é exceção). Linhas persistidas em `sessionStorage`. "Ignorar" via `fin_conciliacao_ignoradas`.
-- **Categorias não operacionais** — raízes fixas `RECEITAS NÃO OPERACIONAIS`/`DESPESAS NÃO OPERACIONAIS` (`fin_categorias.system_key`). Descendentes herdam `excluir_dos_totais`; aparecem como seção informativa no DRE/DFC, mas `excluir_dos_relatorios` os remove de todos os agregados. Saldo bancário/caixa continua real e os inclui.
-- **Bundle: Excel em chunk separado** — `vite.config.ts` tem `manualChunks: { 'vendor-excel': ['exceljs'] }`. O pacote `xlsx` foi removido por advisories HIGH; exports XLSX devem usar `src/lib/safeXlsx.ts`. Seções raras do FinanceiroView são `React.lazy`. Não desfazer isso.
-- **KPIs agregados são SUM no Postgres, nunca `reduce` no client** — Cards/dashboards com `Total R$`, `Qtd Total`, `Registros` devem consumir RPC dedicada (`get_*_kpis`) que retorna o agregado calculado no banco. Padrão idêntico ao `produtos.saldo_atual`. **Nunca** fazer `.select(...)` sem `.limit()` seguido de `.reduce()` para somar — isso baixa a tabela inteira pela rede e cresce O(n). Referência: `get_movimentacoes_kpis` (migration `20260502180000`). Retornar ambos os lados (entrada+saída, receita+despesa, etc.) em uma única chamada para que o toggle/aba vire filtro client-side instantâneo.
+- **`produtos.saldo_atual` é fonte única da verdade** — Toda RPC de leitura de saldo/valor de estoque consome o cache (mantido por trigger `fn_recompute_product_saldo`), nunca recalcula sobre `movimentacoes_estoque` (estornos `*_ESTORNO` divergem do ledger cumulativo). RPCs alinhadas: `get_stock_summary`, `get_stock_dashboard`, `get_relatorios_kpis`, `get_stock_predictive_analysis_v2`. Já regrediu 2x por migrations que "consertavam" outra coisa — **confira com `pg_get_functiondef` antes de assumir que está alinhada**.
+- **PL/pgSQL só valida colunas na 1ª execução** — migration que altera RPC com JOIN deve incluir `DO`-block que força a resolução de colunas no `db push` (evita crash em produção em vez de no deploy).
+- **Financeiro: RPCs `_guarded_`** — toda operação financeira (CP, CR, lançamentos, conciliação) usa prefixo `_guarded_`, `assert_tenant()`, `has_permission()`, optimistic lock via `updated_at`, log em `fin_audit_logs`. Deletes exigem `p_expected_updated_at` e gravam `entidade_id` como `uuid` nativo — **nunca `::text`** (cast explícito sobre variável uuid bloqueia o assignment cast do Postgres, erro 42804, reverte a transação inteira). Erros padrão: `OPTIMISTIC_LOCK_CONFLICT`, `LANCAMENTO_VINCULADO`, `STATUS_INVALIDO: %`, `PERMISSION_DENIED: %`, `NOT_FOUND` (helper client: `mapFinanceiroDeleteError`).
+- **Conciliação Bancária (OFX/OFC)** — 3 destinos: `lancamento`, `conta_pagar`, `conta_receber`. Categoria obrigatória para Receita/Despesa (Transferência é exceção); vai no INSERT do lançamento (nasce `REALIZADO`+`conciliado=true`), **nunca via UPDATE pós-criação** (trigger de lançamento realizado exige justificativa nos campos vigiados). FITID é persistido no banco para reconhecer vínculos entre computadores diferentes; parser não pode colapsar transações legítimas repetidas. Transferências entre contas usam um único lançamento (não duplicam). Lista de Lançamentos usa paginação PostgREST completa (`range`), nunca `.limit(200)`; filtro padrão de período é resolvido no banco (90 dias, com opção de todo o histórico).
+- **Categorias não operacionais** — raízes fixas `RECEITAS/DESPESAS NÃO OPERACIONAIS` (`fin_categorias.system_key`); `excluir_dos_totais` é herdado pela árvore e materializado em `excluir_dos_relatorios` nos lançamentos/CP/CR. DRE/DFC exibem como seção informativa fora do resultado. **Saldo bancário/caixa permanece real e inclui tudo.**
+- **DRE (competência, inclui CP/CR em aberto) × DFC (caixa) × Dashboard (regime de caixa puro)** — três regras de data que não podem se misturar. Dashboard mostra só `fin_lancamentos` REALIZADO/CONCILIADO por competência (cards "Receita/Despesa Realizada", "Despesas Provisionadas" = realizada + CP em aberto, "Resultado"; decisão explícita do usuário em 2026-07-18 após boletos em aberto confundirem os cards). DRE/DFC/KPIs continuam accrual (competência + CP/CR em aberto). Espelho de pagamento (`pay_conta_pagar`/`receive_conta_receber`) grava `data_pagamento` = data escolhida pelo usuário, **nunca `CURRENT_DATE`** (UTC desloca o mês à noite no BR). Lançamentos `origem='conciliacao'` ainda não conciliados (`conciliado=false`) são excluídos de todos os agregados de relatório (Dashboard, DRE, DFC, Livro Razão, KPIs, Fluxo de Caixa, Orçamento, Sócios, Comparativo) — só o saldo acumulado/em caixa os inclui, pois reflete dinheiro real já movimentado.
+- **Bundle**: `exceljs` (não `xlsx`, removido por advisories HIGH) em chunk separado (`vendor-excel` no `vite.config.ts`); exports usam `src/lib/safeXlsx.ts`. Seções raras do FinanceiroView são `React.lazy`.
+- **Estoque: Ranking/Preditivo exibem em unidade de compra** (`get_stock_top_consumed`, `get_stock_predictive_analysis_v2` convertem via `fator_exibicao`). Ficha Técnica e Inventário permanecem em unidade contábil (base).
+- **`get_stock_dashboard`: bucket `ok` exige `saldo > 0`** — os 4 buckets (ok/atencao/critico/sem_estoque) são mutuamente exclusivos.
+- **`formatDateBR` existe em 2 módulos com semânticas diferentes** — `@/lib/datetime` retorna ISO (`yyyy-MM-dd`, para `<Input type="date">`); `@/lib/formatters` retorna `dd/MM/yyyy` (exibição). Importar do módulo errado quebra `<Input type="date">` (`RangeError: Invalid time value`).
+- **Rótulo de mês a partir de `"yyyy-MM"` deve parsear como data local** — `new Date("yyyy-MM-01")` é UTC e recua um mês no BR. Usar `new Date(y, m - 1, 1)` (construtor de componentes) ou anexar horário (`+'T12:00:00'`).
+- **INSERT em tabela multi-tenant exige `company_id` explícito no payload** (ver Multi-tenancy acima). Sempre `console.error` no catch antes do toast — toasts genéricos mascaram a causa raiz.
+- **Requisições de Estoque**: critério de "pendente" é `hasPendingItems(itens)` (`src/domain/estoque/requisitionStatus.ts`), nunca `status` isolado (um pedido `PARCIALMENTE_ATENDIDA` pode não ter nenhum item `SOLICITADO` aberto). Encerramento dispara notificação modal bloqueante via `NotificationsProvider`/`RequisicaoNotificationModal`.
+- **Cotação (RFQ)** — sub-módulo de Compras completo: CRUD, respostas/matriz comparativa, sugestão inteligente (função pura e determinística em `src/domain/compras/cotacaoOptimizer.ts` — a IA só anota, nunca decide números), WhatsApp via Z-API (config por empresa, token só no banco), IA multi-provider (reusa `ai-chat`/Gemini), conversão em pedido via RPC atômica `create_purchase_orders_from_cotacao_atomic` (1 `purchase_orders` por fornecedor vencedor, só INSERT — não toca recebimento/estoque).
+- **Salmão: exclusão é cancelamento idempotente** — `salmon_entries`/`salmon_manipulations` usam soft-cancel via RPCs atômicas, que também cancelam o movimento de estoque vinculado. Esse movimento pode ser cancelado *fora* do módulo (em Movimentações), o que cascateia de volta e dessincroniza a lista local do `useSalmonStore`. O delete no Salmão detecta "já cancelado" (`isAlreadyCancelledError`) e trata como no-op — não remover a cascata do lado de Movimentações, ela evita órfãos.
+- **Conciliação: contrapartida de transferência** — o matcher genérico (`matchLinha`) compara `tipo` (`RECEITA`/`DESPESA` vs `TRANSFERENCIA`) e por isso nunca casava a contrapartida sozinho; sem checagem de duplicidade em `reconcile_create_transfer`, reimportar o extrato da 2ª conta e clicar "Criar Transferência" de novo duplicava o lançamento (caso real em produção: transferências triplicada/duplicada). Corrigido com `matchTransferCandidate` (`src/lib/conciliacaoTransferMatch.ts` — casa por valor/data/direção, sem depender de FITID, cobre CSV) + guard de idempotência em `reconcile_create_transfer` (reaproveita transferência `REALIZADO` já existente entre as mesmas contas/valor numa janela de 3 dias, migration `20260817140000`).
+- **Design System (preto/branco/dourado)** — tokens HSL em `src/index.css`, consumidos via `hsl(var(--token))`. `--primary` é dourado com `--primary-foreground` quase-preto **nos dois modos** (branco sobre dourado reprova WCAG AA). `--info` é slate, desacoplado do `--primary`. Nunca `--border` branco puro no dark (recria "linhas brancas"). Não renomear as classes `gradient-salmon`/`glow-salmon`/`text-gradient-salmon` — o nome é legado, os valores já são dourados. Dourado como texto pequeno no light reprova AA (~3:1) — usar `text-gold-dark` ou `text-foreground`, nunca `text-primary` em texto pequeno no claro.
 
 ---
 
 ### Componentes Padronizados
-- **TableActions**: Localizado em `components/ui/TableActions.tsx`. Deve ser usado em todas as tabelas de gerenciamento para fornecer botões de Editar e Excluir consistentes, com suporte a permissões RBAC e diálogos de confirmação integrados.
-- **FormCloseConfirmDialog**: Usado em conjunto com `useFormDirtyGuard` para prevenir perda de dados em formulários.
-- **SearchableSelect**: Localizado em `components/ui/SearchableSelect.tsx`. Deve ser usado em todos os selects com 10+ opções (produtos, categorias, locais, usuários, fornecedores). Props: `value`, `onValueChange`, `options: {value, label}[]`, `placeholder`, `searchPlaceholder`, `modal` (true para uso dentro de Dialog).
+- **TableActions** (`components/ui/TableActions.tsx`) — botões Editar/Excluir com RBAC e diálogo de confirmação; usar em toda tabela de gerenciamento.
+- **FormCloseConfirmDialog** + `useFormDirtyGuard` — previne perda de dados em formulários.
+- **SearchableSelect** (`components/ui/SearchableSelect.tsx`) — usar em todo select com 10+ opções (produtos, categorias, locais, usuários, fornecedores).
+- **NotificationsProvider** (`src/contexts/NotificationsContext.tsx`) — instância única de `useNotifications`, montada em `App.tsx`. Nunca instanciar `useNotifications` de novo dentro do Provider (duplica subscription Realtime).
+- **RequisicaoNotificationModal** — `AlertDialog` global bloqueante para requisições encerradas.
+- **DateRangePresets** (`components/financeiro/DateRangePresets.tsx`) — atalhos de período em strings `yyyy-MM-dd`, importar de `@/lib/datetime`. Query consumidora deve tratar `from`/`to` vazio condicionalmente (`.gte()` com string vazia quebra no Postgres).
+- **MonthNavigator** (`components/financeiro/MonthNavigator.tsx`) — navegação de mês (setas + select), aritmética pura em `yyyy-MM` (sem passar por `new Date`).
+- **DateInput** (`components/ui/DateInput.tsx`) — usar em todo campo de data financeira (nunca `Input type="date"` cru) — limita ano a 4 dígitos, backstop de um CHECK constraint no banco.
+- **SubmoduleSwitcher** (`components/ui/SubmoduleSwitcher.tsx`) — obrigatório para navegação de sub-módulos (substitui fileira horizontal de botões).
 
 ### Padrões de Busca de Texto (OBRIGATÓRIO)
 
 > Bloqueado por ESLint (`no-restricted-syntax`). Toda nova busca de texto na UI **DEVE** seguir este padrão.
 
-- **Cliente:** SEMPRE usar `includesNormalized(haystack, needle)` ou `normalizeSearchText(text)` de `@/lib/utils`. **NUNCA** `.toLowerCase().includes()`.
-- **Servidor (PostgREST `.ilike()` / `.or('col.ilike.val')` / RPC):** SEMPRE buscar em coluna `*_unaccent` (gerada como `lower(immutable_unaccent(...))`) e normalizar o termo cliente-side com `normalizeSearchText()` antes de enviar. Razão: `ILIKE` no Postgres é case-insensitive mas **NÃO** remove acentos.
-- **Combobox / cmdk `<Command>`:** SEMPRE passar prop `filter={(val, search) => normalizeSearchText(val).includes(normalizeSearchText(search)) ? 1 : 0}`. O default do cmdk não normaliza acentos.
-- **Edge Function (Deno):** mesma regra — usar coluna `*_unaccent` e normalizar termo inline (não há import de `@/lib/utils` em Deno).
-- **Nova tabela com coluna pesquisável por usuário:** adicionar coluna gerada `*_unaccent` e índice `gin (col_unaccent gin_trgm_ops)` na **mesma migration** que cria a tabela. Wrapper `public.immutable_unaccent(text)` já existe.
-- **Casos legítimos não-busca** (path de arquivo, uuid::text, código sem acento): justificar com `// eslint-disable-next-line no-restricted-syntax -- <motivo>`.
+- **Cliente:** `includesNormalized(haystack, needle)` ou `normalizeSearchText(text)` de `@/lib/utils`. Nunca `.toLowerCase().includes()`.
+- **Servidor (`.ilike()` / RPC):** buscar em coluna `*_unaccent` e normalizar o termo cliente-side com `normalizeSearchText()` antes de enviar — `ILIKE` não remove acentos.
+- **Combobox / cmdk:** `filter={(val, search) => normalizeSearchText(val).includes(normalizeSearchText(search)) ? 1 : 0}` — o default do cmdk não normaliza acentos.
+- **Edge Function (Deno):** mesma regra, normalizar termo inline (sem import de `@/lib/utils`).
+- **Casos legítimos não-busca** (path de arquivo, uuid::text): justificar com `// eslint-disable-next-line no-restricted-syntax -- <motivo>`.
 
 ---
 
 ## ⏳ Pendente / Em Aberto
 
-- [x] Conciliação Bancária: filtrar lançamentos por período no banco (padrão últimos 90 dias, com opção de todo o histórico) — concluído em 2026-08-17
-- [x] Importação de extrato: não abortar quando o auto-bind opcional de transferências falhar e recarregar schema cache da RPC — concluído em 2026-08-14
-- [x] Conciliação Bancária: aceitar extratos OFC legados (inclusive conta, FITID e saldo LEDGER) — concluído em 2026-08-14
-- [x] Conciliação OFX: persistir vínculos por FITID no banco para reconhecimento entre computadores e corrigir fechamento PagBank GM de 01/08 a 07/08 — concluído em 2026-08-12
-- [x] Conciliação OFX: reconhecer automaticamente no segundo extrato a contrapartida de transferência entre contas já criada pelo primeiro banco — concluído em 2026-08-14
-- [x] Conciliação Bancária: transferências importadas usam um único lançamento e contadores do extrato funcionam como filtros — concluído em 2026-08-12
-- [x] Conciliação OFX: preservar FITID, aceitar saldo/data do PagBank e não colapsar transações legítimas repetidas — concluído em 2026-08-12
-- [x] Categorias financeiras: selecionar homônimas por UUID e exibir rateios múltiplos corretamente na conciliação — concluído em 2026-08-12
-- [x] Dashboard Financeiro: renomear "Despesa do Período" para "Despesa Realizada" e adicionar "Despesas Provisionadas" (realizada + contas a pagar) — concluído em 2026-08-12
-- [x] Conciliação Bancária: paginação completa, categoria obrigatória com auditoria e categorias não operacionais fora dos totais — concluído em 2026-08-12
-- [x] Security Gate do GitHub Actions: alinhar instalação e scripts ao Bun com lockfile congelado — concluído em 2026-08-12
+- [ ] Conceder permissão `inventario:detalhe:export` aos roles Admin/Conferente/Gerente via Admin → Permissões
 - [ ] Monitorar integridade dos dados na empresa piloto após ativação multi-tenant
 - [ ] Testar fluxo completo: criar empresa → criar admin → login admin → criar usuários
 - [ ] Validar isolamento: logar como user do tenant A e tentar `GET /rest/v1/faturamento_periodos_legacy` — deve retornar só registros do mesmo tenant
-- [ ] Dropar tabelas `*_bkp_reset_20260301` (18 tabelas, snapshot tem ~14 meses) e `z_canary_test`
-- [ ] Auditar outras telas (Compras, CMV, Financeiro, Relatórios) por padrão `select sem limit + reduce client` — substituir por RPC com SUM (mesmo padrão de `get_movimentacoes_kpis`)
-- [ ] Otimizar `rbac_sql_lint_report()` completo para não estourar statement timeout em produção; `bun run security:check` usa fallback `rbac_sql_lint_report_quick()` e está passando
+- [ ] Dropar tabelas `*_bkp_reset_20260301` (18 tabelas) e `z_canary_test`
+- [ ] Auditar outras telas (Compras, CMV, Financeiro, Relatórios) por padrão `select sem limit + reduce client`
+- [ ] Auditar bugs latentes de `formatDateBR` importado do módulo errado: `MetaCompraCard.tsx:107`, `RhView.tsx:473`
+- [ ] Auditar outros INSERTs diretos via PostgREST em tabelas multi-tenant sem `company_id` explícito
+- [ ] Conciliação: permitir override de competência no lançamento criado pela conciliação (`p_competencia` em `reconcile_import_lancamento`)
+- [ ] Otimizar `rbac_sql_lint_report()` completo para não estourar `statement_timeout` em produção (`bun run security:check` usa o fallback `rbac_sql_lint_report_quick()`)
 
 ---
 
@@ -225,4 +248,4 @@ margin-food/
 - **Regras de negócio**: `docs/DOMAIN_RULES.md`
 - **Padrões de segurança**: `docs/ENTERPRISE_SAFE_STANDARDS.md`
 - **RBAC playbook**: `docs/rbac/playbook-operacional.md`
-- **Tarefas ativas**: `TAREFAS.md`
+- **Histórico detalhado de tarefas**: `TAREFAS.md`
