@@ -29,7 +29,7 @@ import { cn } from '@/lib/utils';
 import { runOptionalAutoBind } from '@/lib/conciliacaoAutoBind';
 import { extractSupabaseErrorMessage } from '@/lib/supabaseErrors';
 import { computeScore } from '@/lib/conciliacaoScore';
-import { matchTransferCandidate, type TransferCandidate } from '@/lib/conciliacaoTransferMatch';
+import { matchTransferCandidate, findTransferWarnings, type TransferCandidate, type TransferWarning } from '@/lib/conciliacaoTransferMatch';
 import type { ContaBancariaRef, CategoriaFinRef, CentroCustoRef, LancamentoConciliacao, LancamentoCandidate, ContaPagarCandidate, ContaReceberCandidate } from '@/types/financeiro';
 import DateRangePresets from './DateRangePresets';
 import { subDays } from 'date-fns';
@@ -64,6 +64,12 @@ interface LinhaExtrato {
   rateioLinhas?: RateioLinha[];
   categoriaId?: string;
   jaConciliada?: boolean;
+  /** Preenchido quando a linha foi resolvida por ser a contrapartida de uma
+   *  transferência já lançada pelo extrato da outra conta. */
+  transferReconhecida?: { id: string; data: string; conta_id: string; conta_destino_id: string };
+  /** Transferências de mesmo valor e data próxima que não foram reconhecidas
+   *  automaticamente — exibidas como alerta para conferência manual. */
+  transferAlertas?: TransferWarning[];
   ignorada?: boolean;
 }
 
@@ -708,7 +714,11 @@ export default function ConciliacaoBancariaSection() {
   /** Recalcula o estado de match de UMA linha (já conciliada/ignorada/sugestão) contra o contexto atual do banco. */
   const matchLinha = (linha: LinhaExtrato, ctx: MatchContext, usedIds: Set<string>): LinhaExtrato => {
     const key = bankLineKey(linha);
-    const base = { ...linha, matchId: undefined, matchOrigin: undefined, matchDescricao: undefined, matchRaw: undefined, suggestions: undefined };
+    const base = {
+      ...linha,
+      matchId: undefined, matchOrigin: undefined, matchDescricao: undefined, matchRaw: undefined, suggestions: undefined,
+      transferReconhecida: undefined, transferAlertas: undefined,
+    };
 
     // FITID é a identidade bancária estável e tem precedência sobre campos
     // editáveis do lançamento (descrição/categoria/data de competência).
@@ -732,12 +742,30 @@ export default function ConciliacaoBancariaSection() {
     // extrato só é RECEITA/DESPESA, e o lançamento de transferência é sempre
     // tipo='TRANSFERENCIA' — a comparação `ex.tipo !== linha.tipo` descartaria
     // sempre, levando o usuário a recriar a transferência manualmente (duplicidade).
+    let transferAlertas: TransferWarning[] | undefined;
     if (contaSel) {
       const transferMatch = matchTransferCandidate(linha, contaSel, ctx.transferCandidates, usedIds);
       if (transferMatch) {
         usedIds.add(`transfer-${transferMatch.id}`);
-        return { ...base, selecionada: false, jaConciliada: true, ignorada: false };
+        const candidato = ctx.transferCandidates.find(c => c.id === transferMatch.id);
+        return {
+          ...base,
+          selecionada: false,
+          jaConciliada: true,
+          ignorada: false,
+          transferReconhecida: candidato ? {
+            id: candidato.id,
+            data: candidato.data_competencia,
+            conta_id: candidato.conta_id,
+            conta_destino_id: candidato.conta_destino_id,
+          } : undefined,
+        };
       }
+
+      // Não deu para reconhecer com segurança, mas existe transferência de mesmo
+      // valor por perto: avisa em vez de deixar a linha parecer 100% nova.
+      const warnings = findTransferWarnings(linha, contaSel, ctx.transferCandidates, usedIds);
+      if (warnings.length > 0) transferAlertas = warnings;
     }
 
     const suggestions: MatchSuggestion[] = [];
@@ -797,10 +825,11 @@ export default function ConciliacaoBancariaSection() {
         selecionada: false,
         jaConciliada: false,
         ignorada: false,
+        transferAlertas,
       };
     }
 
-    return { ...base, jaConciliada: false, ignorada: false, suggestions: suggestions.length > 0 ? suggestions : undefined };
+    return { ...base, jaConciliada: false, ignorada: false, suggestions: suggestions.length > 0 ? suggestions : undefined, transferAlertas };
   };
 
   /**
@@ -1508,8 +1537,34 @@ export default function ConciliacaoBancariaSection() {
                             </span>
                           )}
                           {isJaConciliada && (
-                            <span className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
-                              <CheckCircle className="w-3 h-3" /> Já conciliada anteriormente
+                            linha.transferReconhecida ? (
+                              <span className="text-[10px] text-muted-foreground flex items-start gap-1 mt-0.5">
+                                <ArrowRightLeft className="w-3 h-3 shrink-0 mt-px" />
+                                <span>
+                                  Transferência já lançada pelo extrato da outra conta em{' '}
+                                  {formatDateBR(parseLocalDate(linha.transferReconhecida.data))} (
+                                  {getContaNome(linha.transferReconhecida.conta_id)} → {getContaNome(linha.transferReconhecida.conta_destino_id)}
+                                  ). Não precisa lançar de novo.
+                                </span>
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
+                                <CheckCircle className="w-3 h-3" /> Já conciliada anteriormente
+                              </span>
+                            )
+                          )}
+                          {!isInactive && linha.transferAlertas && linha.transferAlertas.length > 0 && (
+                            <span className="text-[10px] text-warning flex items-start gap-1 mt-0.5">
+                              <AlertTriangle className="w-3 h-3 shrink-0 mt-px" />
+                              <span>
+                                Confira antes de conciliar: já existe transferência de mesmo valor
+                                {linha.transferAlertas.map(t => (
+                                  <span key={t.id} className="block">
+                                    • {formatDateBR(parseLocalDate(t.data))} — {getContaNome(t.conta_id)} → {getContaNome(t.conta_destino_id)}
+                                    {t.direcaoInvertida ? ' (direção invertida)' : ''}
+                                  </span>
+                                ))}
+                              </span>
                             </span>
                           )}
                           {isIgnorada && (
@@ -2015,6 +2070,7 @@ export default function ConciliacaoBancariaSection() {
           {transferDialog.linhaIndex >= 0 && linhas[transferDialog.linhaIndex] && (() => {
             const linha = linhas[transferDialog.linhaIndex];
             const isOutgoing = linha.tipo === 'DESPESA';
+            const nomeOutraConta = transferContaDestino ? getContaNome(transferContaDestino) : 'conta a selecionar';
             return (
               <div className="space-y-4">
                 <Card className="border-primary/20">
@@ -2050,12 +2106,33 @@ export default function ConciliacaoBancariaSection() {
                   </div>
                 </div>
 
+                {linha.transferAlertas && linha.transferAlertas.length > 0 && (
+                  <div className="rounded-lg border border-warning/30 bg-warning/10 p-3 text-xs">
+                    <p className="font-medium text-warning flex items-center gap-1.5 mb-1">
+                      <AlertTriangle className="w-3.5 h-3.5" /> Já existe transferência de mesmo valor
+                    </p>
+                    <ul className="text-muted-foreground space-y-0.5">
+                      {linha.transferAlertas.map(t => (
+                        <li key={t.id}>
+                          • {formatDateBR(parseLocalDate(t.data))} — {getContaNome(t.conta_id)} → {getContaNome(t.conta_destino_id)}
+                          {t.direcaoInvertida ? ' (direção invertida)' : ''}
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="text-muted-foreground mt-1">
+                      Confira no Livro Razão antes de confirmar — se for a mesma transferência, o sistema reaproveita o
+                      lançamento existente em vez de duplicar, desde que as contas e a direção coincidam.
+                    </p>
+                  </div>
+                )}
+
                 <div className="bg-muted/50 rounded-lg p-3 text-sm">
                   <p className="font-medium text-foreground mb-1">Ao confirmar:</p>
                   <ul className="text-muted-foreground space-y-1 text-xs">
-                    <li>✅ Dois lançamentos vinculados serão criados (saída + entrada)</li>
+                    <li>✅ Um lançamento de transferência: saída em <strong>{isOutgoing ? getContaNome(contaSel) : nomeOutraConta}</strong> e entrada em <strong>{isOutgoing ? nomeOutraConta : getContaNome(contaSel)}</strong></li>
                     <li>✅ Tipo = TRANSFERÊNCIA (não afeta receitas/despesas)</li>
                     <li>✅ Linha do extrato será conciliada automaticamente</li>
+                    <li>✅ Ao importar o extrato da outra conta, a linha correspondente é reconhecida sozinha — sem duplicar</li>
                   </ul>
                 </div>
 
