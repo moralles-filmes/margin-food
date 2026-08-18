@@ -43,6 +43,7 @@ interface Lancamento {
   categoria_id: string | null;
   centro_custo_id: string | null;
   data_competencia: string;
+  data_ledger: string;
   data_vencimento: string | null;
   data_pagamento: string | null;
   forma_pagamento: string | null;
@@ -197,7 +198,7 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
     else setItems(prev => [...prev, ...newItems]);
     if (newItems.length > 0) {
       const last = newItems[newItems.length - 1];
-      setCursorDate(last.data_competencia);
+      setCursorDate(last.data_ledger);
       setCursorId(last.id);
     }
     setLoading(false);
@@ -258,19 +259,19 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
   const contaNome = (id: string) => contas.find(c => c.id === id)?.nome || '-';
 
   // Saldo de fechamento por dia: primeiro saldo_apos nao-nulo dentro do grupo do dia
-  // (items ja vem ordenado data_competencia DESC, id DESC — a 1a linha de cada dia
+  // (items ja vem ordenado data_ledger DESC, id DESC — a 1a linha de cada dia
   // e a transacao mais recente daquele dia). Dias 100% PREVISTO (saldo_apos null em
   // todas as linhas) herdam o saldo do dia conhecido mais recente anterior (carry-forward).
   const dayCloseSaldo = useMemo(() => {
     const order: string[] = [];
     const firstNonNull = new Map<string, number | null>();
     for (const item of items) {
-      if (!firstNonNull.has(item.data_competencia)) {
-        order.push(item.data_competencia);
-        firstNonNull.set(item.data_competencia, null);
+      if (!firstNonNull.has(item.data_ledger)) {
+        order.push(item.data_ledger);
+        firstNonNull.set(item.data_ledger, null);
       }
-      if (firstNonNull.get(item.data_competencia) == null && item.saldo_apos != null) {
-        firstNonNull.set(item.data_competencia, item.saldo_apos);
+      if (firstNonNull.get(item.data_ledger) == null && item.saldo_apos != null) {
+        firstNonNull.set(item.data_ledger, item.saldo_apos);
       }
     }
     const result = new Map<string, number | null>();
@@ -577,7 +578,7 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
   // ─── Export ───
   const exportExcel = () => {
     const rows = items.map(item => ({
-      data_competencia: formatDateBR(parseLocalDate(item.data_competencia)),
+      data: formatDateBR(parseLocalDate(item.data_ledger)),
       descricao: item.descricao || '',
       tipo: item.tipo,
       status: item.status,
@@ -710,8 +711,8 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
               <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">Nenhum lancamento encontrado</TableCell></TableRow>
             ) : items.map((item, idx) => {
               const orig = ORIGEM_LABEL[item.origem || (item.tipo === 'TRANSFERENCIA' ? 'transferencia' : 'manual')] || ORIGEM_LABEL.manual;
-              const isNewDay = idx === 0 || items[idx - 1].data_competencia !== item.data_competencia;
-              const diaSaldo = dayCloseSaldo.get(item.data_competencia);
+              const isNewDay = idx === 0 || items[idx - 1].data_ledger !== item.data_ledger;
+              const diaSaldo = dayCloseSaldo.get(item.data_ledger);
               return (
                 <Fragment key={item.id}>
                   {isNewDay && (
@@ -719,7 +720,7 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
                       <TableCell colSpan={8} className="p-0">
                         <div className="flex items-center justify-between px-4 py-3 my-1.5 rounded-lg bg-muted/60">
                           <span className="text-sm font-semibold text-foreground">
-                            {capitalizeFirst(formatDayHeaderLabel(parseLocalDate(item.data_competencia)))}
+                            {capitalizeFirst(formatDayHeaderLabel(parseLocalDate(item.data_ledger)))}
                           </span>
                           <span className="text-xs text-muted-foreground">
                             saldo total{' '}
@@ -735,7 +736,7 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
                     className="cursor-pointer hover:bg-muted/50"
                     onClick={() => openDetail(item)}
                   >
-                  <TableCell className="font-mono text-sm">{formatDateBR(parseLocalDate(item.data_competencia))}</TableCell>
+                  <TableCell className="font-mono text-sm">{formatDateBR(parseLocalDate(item.data_ledger))}</TableCell>
                   <TableCell className="font-medium max-w-xs">
                     {item.recorrente && <Repeat className="w-3 h-3 inline mr-1 text-muted-foreground" />}
                     <span className="whitespace-normal break-words">{item.descricao}</span>
