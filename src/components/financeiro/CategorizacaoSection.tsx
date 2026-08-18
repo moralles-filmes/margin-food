@@ -414,8 +414,8 @@ export default function CategorizacaoSection() {
                     : `${previewItems.length} lançamento(s) seriam categorizados (máx. 20):`}
                 </p>
                 {previewItems.map(item => (
-                  <div key={item.id} className="text-xs flex justify-between border-b border-border/50 pb-1">
-                    <span className="truncate flex-1 mr-2">{item.descricao}</span>
+                  <div key={item.id} className="text-xs flex justify-between items-start gap-2 border-b border-border/50 pb-1">
+                    <span className="break-words">{item.descricao}</span>
                     <span className="text-muted-foreground shrink-0">{fmtBRL(item.valor)}</span>
                   </div>
                 ))}

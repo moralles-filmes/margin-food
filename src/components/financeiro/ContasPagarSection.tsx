@@ -555,7 +555,7 @@ export default function ContasPagarSection() {
                 onClick={() => openDetail(item)}
               >
                 <TableCell className={`font-mono text-sm ${isVencida ? 'text-destructive font-bold' : ''}`}>{formatDateBR(parseLocalDate(item.data_vencimento))}</TableCell>
-                <TableCell className="font-medium max-w-[200px] truncate">{item.descricao}</TableCell>
+                <TableCell className="font-medium max-w-xs whitespace-normal break-words">{item.descricao}</TableCell>
                 <TableCell className="text-muted-foreground">{item.fornecedor || '-'}</TableCell>
                 <TableCell className="font-bold text-destructive">{fmt(item.valor)}</TableCell>
                 <TableCell><span className={`text-xs px-2 py-0.5 rounded-full border ${sc.color}`}>{sc.label}</span></TableCell>

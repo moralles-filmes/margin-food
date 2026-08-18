@@ -736,9 +736,9 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
                     onClick={() => openDetail(item)}
                   >
                   <TableCell className="font-mono text-sm">{formatDateBR(parseLocalDate(item.data_competencia))}</TableCell>
-                  <TableCell className="font-medium max-w-[250px]">
+                  <TableCell className="font-medium max-w-xs">
                     {item.recorrente && <Repeat className="w-3 h-3 inline mr-1 text-muted-foreground" />}
-                    <span className="truncate block">{item.descricao}</span>
+                    <span className="whitespace-normal break-words">{item.descricao}</span>
                     {item.tipo === 'TRANSFERENCIA' && item.conta_id && item.conta_destino_id && (
                       <span className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
                         <ArrowUpRight className="w-3 h-3" />
