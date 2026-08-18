@@ -342,7 +342,7 @@ export default function RecorrenciasSection({ onNavigate }: Props) {
                   const maxReached = item.parcelas_max > 0 && item.parcelas_geradas >= item.parcelas_max;
                   return (
                     <TableRow key={item.chave_unica}>
-                      <TableCell className="font-medium max-w-[200px] truncate">{item.descricao}</TableCell>
+                      <TableCell className="font-medium max-w-xs whitespace-normal break-words">{item.descricao}</TableCell>
                       <TableCell>
                         <Badge variant={item.tipo === 'RECEITA' ? 'default' : 'destructive'}>{item.tipo}</Badge>
                       </TableCell>

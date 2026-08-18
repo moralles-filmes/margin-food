@@ -208,7 +208,7 @@ export default function ImportacaoExtratoSection() {
                     />
                   </TableCell>
                   <TableCell className="font-mono text-sm">{formatDateBR(parseLocalDate(linha.data))}</TableCell>
-                  <TableCell className="font-medium max-w-[250px] truncate">{linha.descricao}</TableCell>
+                  <TableCell className="font-medium max-w-xs whitespace-normal break-words">{linha.descricao}</TableCell>
                   <TableCell>
                     <Badge variant={linha.tipo === 'RECEITA' ? 'default' : 'destructive'}>{linha.tipo}</Badge>
                   </TableCell>

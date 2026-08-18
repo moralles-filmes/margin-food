@@ -1528,8 +1528,8 @@ export default function ConciliacaoBancariaSection() {
                           )}
                         </TableCell>
                         <TableCell className="font-mono text-sm">{formatDateBR(parseLocalDate(linha.data))}</TableCell>
-                        <TableCell className="max-w-[220px]">
-                          <span className="font-medium truncate block">{linha.descricao}</span>
+                        <TableCell className="max-w-xs">
+                          <span className="font-medium whitespace-normal break-words">{linha.descricao}</span>
                           {hasMatch && (
                             <span className="text-[10px] text-success flex items-center gap-1 mt-0.5">
                               <ArrowRight className="w-3 h-3" /> {linha.matchDescricao}
@@ -1792,7 +1792,7 @@ export default function ConciliacaoBancariaSection() {
                     />
                   </TableCell>
                   <TableCell className="font-mono text-sm">{formatDateBR(parseLocalDate(item.data_competencia))}</TableCell>
-                  <TableCell className="font-medium max-w-[200px] truncate">{item.descricao}</TableCell>
+                  <TableCell className="font-medium max-w-xs whitespace-normal break-words">{item.descricao}</TableCell>
                   <TableCell>
                     {categoryLabel ? (
                       <span className="text-xs" title={rateioCategoryNames.join(' • ') || categoriaNome}>
@@ -1877,7 +1877,7 @@ export default function ConciliacaoBancariaSection() {
                               <Badge variant="outline" className="text-[10px]">Score: {s.score}</Badge>
                               {idx === 0 && <Badge className="bg-primary/10 text-primary border-primary/20 text-[10px]">Melhor match</Badge>}
                             </div>
-                            <p className="text-sm font-medium truncate">{s.descricao}</p>
+                            <p className="text-sm font-medium break-words">{s.descricao}</p>
                             <div className="flex items-center gap-3 text-[11px] text-muted-foreground mt-0.5">
                               <span>Data: {formatDateBR(parseLocalDate(s.data))}</span>
                               {s.extra && <span>• {s.extra}</span>}

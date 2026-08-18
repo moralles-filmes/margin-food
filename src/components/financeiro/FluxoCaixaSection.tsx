@@ -303,7 +303,7 @@ export default function FluxoCaixaSection({ onNavigate }: FluxoCaixaProps) {
                       className={`bg-muted/20 ${onNavigate && det.entidade_tipo ? 'cursor-pointer hover:bg-muted/40' : ''}`}
                       onClick={() => onNavigate && det.entidade_tipo && navigateToDetail(det, d.data)}
                     >
-                      <TableCell className="pl-8 text-xs text-muted-foreground truncate max-w-[200px]">
+                      <TableCell className="pl-8 text-xs text-muted-foreground whitespace-normal break-words max-w-xs">
                         {onNavigate && det.entidade_tipo && <ExternalLink className="w-3 h-3 inline mr-1 opacity-40" />}
                         {det.descricao || '(sem descrição)'}
                       </TableCell>
