@@ -5,6 +5,7 @@ import { fmtBRL, formatDateBR, parseLocalDate } from '@/lib/formatters';
 import { useCan } from '@/permissions/hooks';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { BRLInput } from '@/components/ui/brl-input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -20,7 +21,7 @@ import TableActions from '@/components/ui/TableActions';
 import ContaDetailDialog, { type ContaDetailData, type ContaDetailRateio } from './ContaDetailDialog';
 import ContaFormDialog, { type ContaFormData, type RateioLine } from './ContaFormDialog';
 import * as XLSX from '@/lib/safeXlsx';
-import { mapFinanceiroDeleteError } from '@/lib/financeiroErrorMap';
+import { mapFinanceiroDeleteError, mapPagamentoError } from '@/lib/financeiroErrorMap';
 import { buildCategoryOptions } from '@/lib/categoriaOptions';
 import MonthNavigator from './MonthNavigator';
 import SearchableSelect from '@/components/ui/SearchableSelect';
@@ -113,10 +114,18 @@ export default function ContasPagarSection() {
   const [detailData, setDetailData] = useState<ContaDetailData | null>(null);
   const [detailRawItem, setDetailRawItem] = useState<ContaPagar | null>(null);
 
-  // Seletor de data de pagamento
+  // Seletor de data + conta bancária do pagamento
   const [payOpen, setPayOpen] = useState(false);
   const [payTarget, setPayTarget] = useState<ContaPagar | null>(null);
   const [payDate, setPayDate] = useState<string>(todayBR());
+  const [payContaId, setPayContaId] = useState<string>('');
+  const [payContaLoading, setPayContaLoading] = useState(false);
+
+  // Limite de aprovação (fin_config) — explica o status "Aguardando Aprovação"
+  const [limiteAprovacao, setLimiteAprovacao] = useState<number | null>(null);
+  const [limiteOpen, setLimiteOpen] = useState(false);
+  const [limiteInput, setLimiteInput] = useState(0);
+  const [limiteSaving, setLimiteSaving] = useState(false);
 
   useEffect(() => { if (canView) load(); }, [canView]);
   useEffect(() => { if (!canView) return; setCursorDate(null); setCursorId(null); setItems([]); loadPage(null, null); loadTotals(); }, [filtroStatus, filtroPeriodo, mesFiltro, filtroConta, filtroCategoria, canView]);
@@ -163,6 +172,31 @@ export default function ContasPagarSection() {
     setCentros((ccRes.data as Centro[]) || []);
     setContas((contRes.data as Conta[]) || []);
     setSuppliers((supRes.data as Supplier[]) || []);
+    loadLimiteAprovacao();
+  };
+
+  const loadLimiteAprovacao = async () => {
+    const { data, error } = await (supabase.rpc as any)('fin_get_limite_aprovacao_atual');
+    if (error) { console.error('[ContasPagarSection.loadLimiteAprovacao]', error); return; }
+    setLimiteAprovacao(Number(data) || 0);
+  };
+
+  const salvarLimiteAprovacao = async () => {
+    if (limiteSaving) return;
+    if (limiteInput < 0) { toast.error('O limite não pode ser negativo'); return; }
+    setLimiteSaving(true);
+    try {
+      const { error } = await (supabase.rpc as any)('fin_set_limite_aprovacao', { p_valor: limiteInput });
+      if (error) throw error;
+      setLimiteAprovacao(limiteInput);
+      setLimiteOpen(false);
+      toast.success(`Limite atualizado para ${fmtBRL(limiteInput)}. Vale para contas criadas a partir de agora.`);
+    } catch (err: unknown) {
+      console.error('[ContasPagarSection.salvarLimiteAprovacao]', err);
+      toast.error(err instanceof Error ? err.message : 'Erro ao salvar o limite');
+    } finally {
+      setLimiteSaving(false);
+    }
   };
 
   const load = async () => {
@@ -390,32 +424,59 @@ export default function ContasPagarSection() {
     }
   };
 
-  /* ─── Pay (abre seletor de data antes de confirmar) ─── */
-  const abrirPagamento = (item?: ContaPagar) => {
+  /* ─── Pay (abre seletor de data + conta antes de confirmar) ─── */
+  // A conta é opcional no cadastro do boleto, mas obrigatória na baixa: sem ela o
+  // lançamento espelho nasce fora de qualquer conta bancária, some da conciliação
+  // e o extrato traz a mesma despesa como nova.
+  const abrirPagamento = async (item?: ContaPagar) => {
     const target = item || detailRawItem;
     if (saving || !target) return;
     setPayTarget(target);
     setPayDate(todayBR());
+    setPayContaId('');
     setPayOpen(true);
+
+    setPayContaLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('fin_contas_pagar')
+        .select('conta_id')
+        .eq('id', target.id)
+        .single();
+      if (error) throw error;
+      if (data?.conta_id) setPayContaId(data.conta_id);
+    } catch (err) {
+      console.error('[ContasPagarSection.abrirPagamento]', err);
+    } finally {
+      setPayContaLoading(false);
+    }
   };
 
   const confirmarPagamento = async () => {
     if (saving || !payTarget) return;
     if (!payDate) { toast.error('Informe a data do pagamento'); return; }
+    if (!payContaId) { toast.error('Selecione a conta bancária de onde o pagamento saiu'); return; }
     setSaving(true);
     try {
       const { error } = await supabase.rpc('pay_conta_pagar', {
         p_id: payTarget.id,
         p_expected_updated_at: payTarget.updated_at,
         p_data_pagamento: payDate,
-      });
-      if (error) { toast.error(error.message); load(); return; }
+        p_conta_id: payContaId,
+      } as any);
+      if (error) {
+        console.error('[ContasPagarSection.confirmarPagamento]', error);
+        toast.error(mapPagamentoError(error));
+        load();
+        return;
+      }
       toast.success('Pagamento registrado + lancamento gerado');
       setPayOpen(false);
       setShowDetail(false);
       load();
       emitDataEvent('financeiro:pagar');
       emitDataEvent('financeiro:lancamentos');
+      emitDataEvent('financeiro:conciliacao');
     } finally {
       setSaving(false);
     }
@@ -467,6 +528,20 @@ export default function ContasPagarSection() {
             {serverTotals.vencidas > 0 && <span className="text-destructive font-medium">{serverTotals.vencidas} vencida(s) • </span>}
             Total pendente: {fmt(serverTotals.totalPendente)}
           </p>
+          {limiteAprovacao !== null && (
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Contas acima de <strong>{fmt(limiteAprovacao)}</strong> nascem como “Aguard. Aprovacao”
+              {canApprove && (
+                <button
+                  type="button"
+                  className="ml-1 underline underline-offset-2 hover:text-foreground"
+                  onClick={() => { setLimiteInput(limiteAprovacao); setLimiteOpen(true); }}
+                >
+                  alterar limite
+                </button>
+              )}
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {canExport && (
@@ -622,16 +697,37 @@ export default function ContasPagarSection() {
               {payTarget ? `${payTarget.descricao} — ${fmt(payTarget.valor)}` : ''}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Data do pagamento</label>
-            <Input type="date" value={payDate} max={todayBR()} onChange={e => setPayDate(e.target.value)} />
-            <p className="text-xs text-muted-foreground">
-              A competência da conta é preservada no DRE; o fluxo de caixa (DFC) usa esta data.
-            </p>
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Data do pagamento</label>
+              <Input type="date" value={payDate} max={todayBR()} onChange={e => setPayDate(e.target.value)} />
+              <p className="text-xs text-muted-foreground">
+                A competência da conta é preservada no DRE; o fluxo de caixa (DFC) usa esta data.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
+                Conta bancária <span className="text-destructive">*</span>
+              </label>
+              <SearchableSelect
+                value={payContaId}
+                onValueChange={v => setPayContaId(v || '')}
+                options={contas.map(c => ({ value: c.id, label: c.nome }))}
+                placeholder={payContaLoading ? 'Carregando...' : 'De onde saiu o pagamento'}
+                searchPlaceholder="Buscar conta..."
+                className="w-full"
+                allowClear={false}
+              />
+              <p className="text-xs text-muted-foreground">
+                Obrigatória na baixa: é ela que faz o pagamento aparecer na conciliação
+                do extrato e evita lançar a mesma despesa duas vezes.
+              </p>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setPayOpen(false)} disabled={saving}>Cancelar</Button>
-            <Button onClick={confirmarPagamento} disabled={saving || !payDate}>
+            <Button onClick={confirmarPagamento} disabled={saving || !payDate || !payContaId}>
               {saving ? <RefreshCw className="w-4 h-4 mr-1 animate-spin" /> : null}
               Confirmar pagamento
             </Button>
@@ -657,6 +753,33 @@ export default function ContasPagarSection() {
         onSave={save}
         onClose={guardedClose}
       />
+
+      {/* Limite de aprovação */}
+      <Dialog open={limiteOpen} onOpenChange={o => { if (!o) setLimiteOpen(false); }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Limite de aprovação</DialogTitle>
+            <DialogDescription>
+              Contas a pagar acima deste valor entram como “Aguard. Aprovacao” e precisam
+              ser aprovadas antes do pagamento. Abaixo dele, já nascem aprovadas.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Valor</label>
+            <BRLInput numericValue={limiteInput} onNumericChange={setLimiteInput} showPrefix />
+            <p className="text-xs text-muted-foreground">
+              Vale para contas criadas ou editadas a partir de agora — não altera o status das existentes.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLimiteOpen(false)} disabled={limiteSaving}>Cancelar</Button>
+            <Button onClick={salvarLimiteAprovacao} disabled={limiteSaving}>
+              {limiteSaving ? <RefreshCw className="w-4 h-4 mr-1 animate-spin" /> : null}
+              Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <FormCloseConfirmDialog open={showConfirm} onConfirmLeave={confirmClose} onCancelLeave={cancelClose} />
     </div>

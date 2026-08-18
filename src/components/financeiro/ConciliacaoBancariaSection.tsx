@@ -30,7 +30,9 @@ import { runOptionalAutoBind } from '@/lib/conciliacaoAutoBind';
 import { extractSupabaseErrorMessage } from '@/lib/supabaseErrors';
 import { computeScore } from '@/lib/conciliacaoScore';
 import { matchTransferCandidate, findTransferWarnings, type TransferCandidate, type TransferWarning } from '@/lib/conciliacaoTransferMatch';
-import type { ContaBancariaRef, CategoriaFinRef, CentroCustoRef, LancamentoConciliacao, LancamentoCandidate, ContaPagarCandidate, ContaReceberCandidate } from '@/types/financeiro';
+import type { ContaBancariaRef, CategoriaFinRef, CentroCustoRef, LancamentoConciliacao, LancamentoCandidate, ContaPagarCandidate, ContaReceberCandidate, ContaPagarAberta } from '@/types/financeiro';
+import { normalizeSearchText } from '@/lib/utils';
+import { mapPagamentoError } from '@/lib/financeiroErrorMap';
 import DateRangePresets from './DateRangePresets';
 import { subDays } from 'date-fns';
 import { formatInBR } from '@/lib/datetime';
@@ -47,6 +49,9 @@ interface MatchSuggestion {
   extra?: string;
   score: number;
   raw: LancamentoCandidate | ContaPagarCandidate | ContaReceberCandidate;
+  /** O lançamento já está no razão porque a baixa foi feita em Contas a
+   *  Pagar/Receber. Conciliar aqui é vincular; criar um novo duplicaria. */
+  jaNoRazao?: boolean;
 }
 
 interface LinhaExtrato {
@@ -60,6 +65,8 @@ interface LinhaExtrato {
   matchOrigin?: MatchSuggestion['origin'];
   matchDescricao?: string;
   matchRaw?: MatchSuggestion['raw'];
+  /** Espelho do match escolhido: já existe no razão (veio de CP/CR). */
+  matchJaNoRazao?: boolean;
   suggestions?: MatchSuggestion[];
   rateioLinhas?: RateioLinha[];
   categoriaId?: string;
@@ -150,6 +157,15 @@ export default function ConciliacaoBancariaSection() {
   const [transferContaDestino, setTransferContaDestino] = useState('');
 
   const [criarDialog, setCriarDialog] = useState<{ open: boolean; linhaIndex: number }>({ open: false, linhaIndex: -1 });
+
+  // Confirmação das linhas que casaram com uma baixa já registrada em CP/CR
+  const [jaNoRazaoDialog, setJaNoRazaoDialog] = useState<{ open: boolean; indices: number[] }>({ open: false, indices: [] });
+
+  // Seletor manual de boleto em aberto
+  const [boletoDialog, setBoletoDialog] = useState<{ open: boolean; linhaIndex: number }>({ open: false, linhaIndex: -1 });
+  const [boletoBusca, setBoletoBusca] = useState('');
+  const [boletoLoading, setBoletoLoading] = useState(false);
+  const [boletoOpcoes, setBoletoOpcoes] = useState<ContaPagarAberta[]>([]);
 
   // Edição de lançamento já existente (aba "Lançamentos")
   const { confirm: confirmDelete, ConfirmDialog: DeleteConfirmDialog } = useConfirmDialog();
@@ -629,16 +645,20 @@ export default function ConciliacaoBancariaSection() {
     conciliadosCounts: Map<string, number>;
     ignoradasCounts: Map<string, number>;
     externalIdsProcessados: Set<string>;
+    /** Lançamentos já amarrados a alguma linha bancária — não podem ser
+     *  oferecidos de novo, senão duas linhas do extrato apontariam para a mesma
+     *  baixa e uma despesa real sumiria da conciliação. */
+    lancamentosVinculados: Set<string>;
     transferCandidates: TransferCandidate[];
   }
 
   const fetchVinculosExtrato = async () => {
-    if (!contaSel) return { data: [] as { external_id: string; tipo: string }[] };
+    if (!contaSel) return { data: [] as { external_id: string; tipo: string; lancamento_id: string }[] };
     const pageSize = 1000;
-    const data: { external_id: string; tipo: string }[] = [];
+    const data: { external_id: string; tipo: string; lancamento_id: string }[] = [];
     for (let from = 0; ; from += pageSize) {
       const { data: page, error } = await supabase.from('fin_conciliacao_vinculos')
-        .select('external_id, tipo')
+        .select('external_id, tipo, lancamento_id')
         .eq('conta_id', contaSel)
         .range(from, from + pageSize - 1);
       if (error) throw error;
@@ -651,10 +671,10 @@ export default function ConciliacaoBancariaSection() {
   /** Busca lançamentos/CP/CR candidatos + sets de já-conciliadas/ignoradas para a conta selecionada. */
   const fetchMatchContext = async (): Promise<MatchContext> => {
     // Busca dados para match + entradas já conciliadas + entradas ignoradas
-    const [lancRes, lancAllRes, cpRes, crRes, conciliadosRes, ignoradasRes, vinculosRes, transferRes] = await Promise.all([
-      contaSel ? supabase.from('fin_lancamentos').select('id, data_competencia, valor, tipo, descricao, conciliado, conta_id')
+    const [lancRes, lancAllRes, cpRes, crRes, conciliadosRes, ignoradasRes, vinculosRes, transferRes, espelhosRes] = await Promise.all([
+      contaSel ? supabase.from('fin_lancamentos').select('id, data_competencia, data_pagamento, valor, tipo, descricao, conciliado, conta_id, origem')
         .eq('conta_id', contaSel).eq('status', 'REALIZADO').or('conciliado.is.null,conciliado.eq.false') : Promise.resolve({ data: [] }),
-      supabase.from('fin_lancamentos').select('id, data_competencia, valor, tipo, descricao, conciliado, conta_id')
+      supabase.from('fin_lancamentos').select('id, data_competencia, data_pagamento, valor, tipo, descricao, conciliado, conta_id, origem')
         .eq('status', 'REALIZADO').or('conciliado.is.null,conciliado.eq.false').limit(500),
       supabase.from('fin_contas_pagar').select('id, descricao, valor, data_vencimento, status, fornecedor, recorrente, recorrencia_config')
         .in('status', ['AGUARDANDO_APROVACAO', 'APROVADO']).order('data_vencimento'),
@@ -675,6 +695,13 @@ export default function ConciliacaoBancariaSection() {
         .eq('tipo', 'TRANSFERENCIA').eq('status', 'REALIZADO')
         .or(`conta_id.eq.${contaSel},conta_destino_id.eq.${contaSel}`)
         .order('data_competencia', { ascending: false }).limit(500) : Promise.resolve({ data: [] }),
+      // Baixas feitas em Contas a Pagar/Receber. Já estão conciliadas, então as
+      // demais queries (que filtram `conciliado = false`) nunca as trariam — e a
+      // linha correspondente do extrato virava um segundo lançamento.
+      contaSel ? supabase.from('fin_lancamentos').select('id, data_competencia, data_pagamento, valor, tipo, descricao, conciliado, conta_id, origem')
+        .eq('conta_id', contaSel).eq('status', 'REALIZADO')
+        .in('origem', ['espelho_cp', 'espelho_cr'])
+        .order('data_pagamento', { ascending: false, nullsFirst: false }).limit(500) : Promise.resolve({ data: [] }),
     ]);
 
     const lancSameConta = ((lancRes as { data: LancamentoCandidate[] | null }).data || []) as LancamentoCandidate[];
@@ -696,19 +723,23 @@ export default function ConciliacaoBancariaSection() {
       ignoradasCounts.set(key, (ignoradasCounts.get(key) || 0) + 1);
     }
 
-    const externalIdsProcessados = new Set(
-      ((vinculosRes.data || []) as { external_id: string; tipo: string }[])
-        .map(v => `${v.tipo}|${v.external_id}`),
-    );
+    const vinculos = (vinculosRes.data || []) as { external_id: string; tipo: string; lancamento_id: string }[];
+    const externalIdsProcessados = new Set(vinculos.map(v => `${v.tipo}|${v.external_id}`));
+    const lancamentosVinculados = new Set(vinculos.map(v => v.lancamento_id).filter(Boolean));
+
+    const espelhos = ((espelhosRes as { data: LancamentoCandidate[] | null }).data || []) as LancamentoCandidate[];
 
     const lancMap = new Map<string, LancamentoCandidate>();
     for (const l of lancSameConta) lancMap.set(l.id, { ...l, _sameAccount: true });
     for (const l of lancAll) { if (!lancMap.has(l.id)) lancMap.set(l.id, { ...l, _sameAccount: false }); }
+    // Espelhos entram por último e sobrescrevem: se o mesmo lançamento veio nas
+    // duas listas, o que importa é a marca de "já está no razão".
+    for (const l of espelhos) lancMap.set(l.id, { ...l, _sameAccount: true, _jaNoRazao: true });
     const allLancamentos = Array.from(lancMap.values());
 
     const transferCandidates = (transferRes.data || []) as TransferCandidate[];
 
-    return { allLancamentos, contasPagar, contasReceber, conciliadosCounts, ignoradasCounts, externalIdsProcessados, transferCandidates };
+    return { allLancamentos, contasPagar, contasReceber, conciliadosCounts, ignoradasCounts, externalIdsProcessados, lancamentosVinculados, transferCandidates };
   };
 
   /** Recalcula o estado de match de UMA linha (já conciliada/ignorada/sugestão) contra o contexto atual do banco. */
@@ -716,7 +747,8 @@ export default function ConciliacaoBancariaSection() {
     const key = bankLineKey(linha);
     const base = {
       ...linha,
-      matchId: undefined, matchOrigin: undefined, matchDescricao: undefined, matchRaw: undefined, suggestions: undefined,
+      matchId: undefined, matchOrigin: undefined, matchDescricao: undefined, matchRaw: undefined,
+      matchJaNoRazao: undefined, suggestions: undefined,
       transferReconhecida: undefined, transferAlertas: undefined,
     };
 
@@ -773,14 +805,24 @@ export default function ConciliacaoBancariaSection() {
     for (const ex of ctx.allLancamentos) {
       if (usedIds.has(`lanc-${ex.id}`)) continue;
       if (ex.tipo !== linha.tipo) continue;
-      let score = computeScore(linha.valor, linha.data, linha.descricao, Number(ex.valor), ex.data_competencia, ex.descricao || '');
+      // Já amarrado a outra linha bancária — oferecê-lo de novo esconderia uma
+      // despesa real atrás de uma baixa que já foi conciliada.
+      if (ctx.lancamentosVinculados.has(ex.id)) continue;
+      // A linha do extrato traz a data em que o dinheiro se moveu. Para uma baixa
+      // de CP/CR isso é `data_pagamento` — `data_competencia` guarda a competência
+      // do boleto e pode estar semanas atrás, o que zerava o score e fazia a linha
+      // parecer nova.
+      const dataCandidato = ex.data_pagamento || ex.data_competencia;
+      let score = computeScore(linha.valor, linha.data, linha.descricao, Number(ex.valor), dataCandidato, ex.descricao || '');
       if (score === 0) continue;
       if (ex._sameAccount) score += 10;
       suggestions.push({
         id: ex.id, origin: 'lancamento', descricao: ex.descricao || '(sem desc.)',
-        valor: Number(ex.valor), data: ex.data_competencia,
-        extra: ex._sameAccount ? 'Mesma conta' : `Conta: ${getContaNome(ex.conta_id)}`,
-        score, raw: ex,
+        valor: Number(ex.valor), data: dataCandidato,
+        extra: ex._jaNoRazao
+          ? (ex.origem === 'espelho_cr' ? 'Já baixado em Contas a Receber' : 'Já baixado em Contas a Pagar')
+          : (ex._sameAccount ? 'Mesma conta' : `Conta: ${getContaNome(ex.conta_id)}`),
+        score, raw: ex, jaNoRazao: ex._jaNoRazao,
       });
     }
 
@@ -821,6 +863,7 @@ export default function ConciliacaoBancariaSection() {
         matchOrigin: best.origin,
         matchDescricao: best.descricao,
         matchRaw: best.raw,
+        matchJaNoRazao: best.jaNoRazao,
         suggestions,
         selecionada: false,
         jaConciliada: false,
@@ -1095,6 +1138,7 @@ export default function ConciliacaoBancariaSection() {
       matchOrigin: suggestion.origin,
       matchDescricao: suggestion.descricao,
       matchRaw: suggestion.raw,
+      matchJaNoRazao: suggestion.jaNoRazao,
       selecionada: false,
     } : l));
     setSuggestionsDialog({ open: false, linhaIndex: -1 });
@@ -1107,8 +1151,68 @@ export default function ConciliacaoBancariaSection() {
       matchOrigin: undefined,
       matchDescricao: undefined,
       matchRaw: undefined,
+      matchJaNoRazao: undefined,
       selecionada: true,
     } : l));
+  };
+
+  // ========== Seletor manual de boleto em aberto ==========
+  // O match automático só sugere um boleto quando valor e data estão próximos.
+  // Boleto pago com atraso ficava invisível e a pessoa acabava criando um
+  // lançamento novo — e depois pagando o boleto de novo em Contas a Pagar.
+  const abrirBoletoDialog = (linhaIndex: number) => {
+    const linha = linhas[linhaIndex];
+    if (!linha) return;
+    setBoletoDialog({ open: true, linhaIndex });
+    setBoletoBusca('');
+    buscarBoletos('', linha);
+  };
+
+  const buscarBoletos = async (termo: string, linhaRef?: LinhaExtrato) => {
+    const linha = linhaRef || linhas[boletoDialog.linhaIndex];
+    setBoletoLoading(true);
+    try {
+      const { data, error } = await supabase.rpc('list_fin_contas_pagar_abertas' as any, {
+        // ILIKE não remove acentos: o termo vai normalizado para bater com as
+        // colunas *_unaccent do banco.
+        p_search: normalizeSearchText(termo) || null,
+        p_valor: linha?.valor ?? null,
+        p_data: linha?.data ?? null,
+        p_limit: 30,
+      } as any);
+      if (error) throw error;
+      setBoletoOpcoes((data as unknown as ContaPagarAberta[]) || []);
+    } catch (err) {
+      console.error('[ConciliacaoBancariaSection.buscarBoletos]', err);
+      toast.error(mapPagamentoError(err));
+      setBoletoOpcoes([]);
+    } finally {
+      setBoletoLoading(false);
+    }
+  };
+
+  const selecionarBoleto = (boleto: ContaPagarAberta) => {
+    const i = boletoDialog.linhaIndex;
+    if (i < 0) return;
+    if (!boleto.tem_categoria) {
+      toast.error('Este boleto está sem categoria. Informe a categoria em Contas a Pagar antes de conciliar.');
+      return;
+    }
+    setLinhas(prev => prev.map((l, j) => j === i ? {
+      ...l,
+      matchId: boleto.id,
+      matchOrigin: 'conta_pagar' as const,
+      matchDescricao: boleto.fornecedor ? `${boleto.descricao} — ${boleto.fornecedor}` : boleto.descricao,
+      matchRaw: {
+        id: boleto.id, descricao: boleto.descricao, valor: boleto.valor,
+        data_vencimento: boleto.data_vencimento, status: boleto.status,
+        fornecedor: boleto.fornecedor, recorrente: false, recorrencia_config: null,
+      } as ContaPagarCandidate,
+      matchJaNoRazao: false,
+      selecionada: false,
+    } : l));
+    setBoletoDialog({ open: false, linhaIndex: -1 });
+    toast.success('Boleto vinculado. Use "Baixar" ou "Processar" para dar baixa com a data do extrato.');
   };
 
   const bindExtratoLine = async (linha: LinhaExtrato | undefined, lancamentoId?: string | null) => {
@@ -1141,7 +1245,9 @@ export default function ConciliacaoBancariaSection() {
         if (error) throw error;
         const result = data as { status?: string; lancamento_id?: string; recorrente?: boolean; next_cp_id?: string } | null;
         if (result?.status === 'noop') {
-          toast.info('Conta já estava paga');
+          // A RPC devolve o lançamento da baixa anterior: vincular a linha aqui
+          // impede que ela reapareça como nova na próxima importação.
+          toast.info('Esta conta já estava paga — a linha do extrato foi vinculada ao lançamento existente.');
         } else {
           let msg = `Conta a pagar "${match.descricao}" baixada!`;
           if (result?.recorrente && result?.next_cp_id) msg += ' Próxima parcela gerada.';
@@ -1181,17 +1287,30 @@ export default function ConciliacaoBancariaSection() {
     setConfirmDialog({ open: false, linhaIndex: -1, match: null });
   };
 
-  const importarEConciliar = async () => {
+  const importarEConciliar = async (jaConfirmouVinculos = false) => {
     if (!contaSel) { toast.error('Selecione uma conta bancária'); return; }
 
+    // Linhas cujo match é uma baixa já registrada em Contas a Pagar/Receber:
+    // antes de processar, a pessoa decide entre vincular ou lançar como novo.
+    const indicesJaNoRazao = linhas
+      .map((l, i) => ({ l, i }))
+      .filter(({ l }) => l.matchId && l.matchJaNoRazao && !l.jaConciliada && !l.ignorada)
+      .map(({ i }) => i);
+
+    if (indicesJaNoRazao.length > 0 && !jaConfirmouVinculos) {
+      setJaNoRazaoDialog({ open: true, indices: indicesJaNoRazao });
+      return;
+    }
+
     const toImport = linhas.filter(l => l.selecionada && !l.matchId && !l.jaConciliada && !l.ignorada);
-    const toReconcileLanc = linhas.filter(l => l.matchId && l.matchOrigin === 'lancamento' && !l.jaConciliada);
+    const toLinkExisting = linhas.filter(l => l.matchId && l.matchOrigin === 'lancamento' && l.matchJaNoRazao && !l.jaConciliada);
+    const toReconcileLanc = linhas.filter(l => l.matchId && l.matchOrigin === 'lancamento' && !l.matchJaNoRazao && !l.jaConciliada);
     const pendingCP = linhas.filter(l => l.matchId && l.matchOrigin === 'conta_pagar');
     const pendingCR = linhas.filter(l => l.matchId && l.matchOrigin === 'conta_receber');
     // Conjunto das linhas que serão efetivamente processadas — usado para remover apenas elas da lista no sucesso
-    const processadas = new Set<LinhaExtrato>([...toImport, ...toReconcileLanc, ...pendingCP, ...pendingCR]);
+    const processadas = new Set<LinhaExtrato>([...toImport, ...toLinkExisting, ...toReconcileLanc, ...pendingCP, ...pendingCR]);
 
-    if (toImport.length === 0 && toReconcileLanc.length === 0 && pendingCP.length === 0 && pendingCR.length === 0) {
+    if (toImport.length === 0 && toLinkExisting.length === 0 && toReconcileLanc.length === 0 && pendingCP.length === 0 && pendingCR.length === 0) {
       toast.error('Nenhuma ação a realizar');
       return;
     }
@@ -1243,6 +1362,19 @@ export default function ConciliacaoBancariaSection() {
         }
       }
 
+      // Baixa que já está no razão: só amarra a linha bancária ao lançamento
+      // existente. Nada de lançamento novo — é o que duplicava a despesa.
+      for (const l of toLinkExisting) {
+        const { error } = await supabase.rpc('reconcile_link_existing_lancamento' as any, {
+          p_conta_id: contaSel,
+          p_lancamento_id: l.matchId!,
+          p_external_id: l.fitId || null,
+          p_tipo: l.tipo,
+          p_data_extrato: l.data,
+        } as any);
+        if (error) throw error;
+      }
+
       if (toReconcileLanc.length > 0) {
         const matchIds = toReconcileLanc.map(l => l.matchId!);
         const { error } = await supabase.rpc('reconcile_batch_lancamentos', {
@@ -1272,8 +1404,11 @@ export default function ConciliacaoBancariaSection() {
         await bindExtratoLine(l, result?.lancamento_id);
       }
 
-      const total = toImport.length + toReconcileLanc.length + pendingCP.length + pendingCR.length;
-      toast.success(`${total} operação(ões) processada(s) com sucesso`);
+      const total = toImport.length + toLinkExisting.length + toReconcileLanc.length + pendingCP.length + pendingCR.length;
+      const vinculadas = toLinkExisting.length > 0
+        ? ` (${toLinkExisting.length} vinculada(s) a baixas já lançadas, sem duplicar)`
+        : '';
+      toast.success(`${total} operação(ões) processada(s) com sucesso${vinculadas}`);
       // Remove apenas as linhas processadas; as demais (não selecionadas, sem match, ignoradas, já conciliadas)
       // permanecem na lista. setLinhas já persiste o resultado no sessionStorage via saveLinhas.
       setLinhas(prev => prev.filter(l => !processadas.has(l)));
@@ -1282,9 +1417,9 @@ export default function ConciliacaoBancariaSection() {
       emitDataEvent('financeiro:conciliacao');
       emitDataEvent('financeiro:contas_pagar');
       emitDataEvent('financeiro:contas_receber');
-    } catch (err: any) {
-      console.error(err);
-      toast.error(err.message || 'Erro ao processar');
+    } catch (err: unknown) {
+      console.error('[ConciliacaoBancariaSection.importarEConciliar]', err);
+      toast.error(mapPagamentoError(err));
     }
     setImportando(false);
   };
@@ -1470,7 +1605,9 @@ export default function ConciliacaoBancariaSection() {
                 <div className="flex gap-2">
                   <Button variant="outline" size="sm" onClick={() => toggleAll(true)}>Selecionar Novas</Button>
                   <Button variant="outline" size="sm" onClick={() => toggleAll(false)}>Desmarcar</Button>
-                  <Button size="sm" onClick={importarEConciliar} disabled={importando}>
+                  {/* Arrow function obrigatória: onClick={importarEConciliar} passaria o
+                      evento como `jaConfirmouVinculos` e pularia a confirmação. */}
+                  <Button size="sm" onClick={() => importarEConciliar()} disabled={importando}>
                     <Save className={`w-4 h-4 mr-1 ${importando ? 'animate-spin' : ''}`} />
                     Processar
                   </Button>
@@ -1534,6 +1671,16 @@ export default function ConciliacaoBancariaSection() {
                             <span className="text-[10px] text-success flex items-center gap-1 mt-0.5">
                               <ArrowRight className="w-3 h-3" /> {linha.matchDescricao}
                               {linha.matchOrigin && <span className="ml-1">{getOriginBadge(linha.matchOrigin)}</span>}
+                            </span>
+                          )}
+                          {hasMatch && linha.matchJaNoRazao && (
+                            <span className="text-[10px] text-warning flex items-start gap-1 mt-0.5">
+                              <AlertTriangle className="w-3 h-3 shrink-0 mt-px" />
+                              <span>
+                                Já está no Livro Razão — veio da baixa em Contas a Pagar/Receber.
+                                Ao processar, esta linha será <strong>vinculada</strong> a esse lançamento,
+                                sem criar outro.
+                              </span>
                             </span>
                           )}
                           {isJaConciliada && (
@@ -1618,6 +1765,13 @@ export default function ConciliacaoBancariaSection() {
                                   setConfirmDialog({ open: true, linhaIndex: i, match: suggestion });
                                 }}>
                                   <CreditCard className="w-3 h-3 mr-1" /> Baixar
+                                </Button>
+                              )}
+                              {!hasMatch && !isDone && linha.tipo === 'DESPESA' && (
+                                <Button size="sm" variant="outline" className="h-7 text-xs"
+                                  title="Vincular esta saída a um boleto em aberto e dar baixa nele"
+                                  onClick={() => abrirBoletoDialog(i)}>
+                                  <Receipt className="w-3 h-3 mr-1" /> Boleto
                                 </Button>
                               )}
                               {!hasMatch && !isDone && (
@@ -1906,6 +2060,156 @@ export default function ConciliacaoBancariaSection() {
           })()}
         </DialogContent>
       </Dialog>
+
+      {/* ========== BOLETO EM ABERTO (vínculo manual) ========== */}
+      <Dialog open={boletoDialog.open} onOpenChange={(open) => !open && setBoletoDialog({ open: false, linhaIndex: -1 })}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Receipt className="w-5 h-5 text-primary" /> Vincular a um boleto em aberto
+            </DialogTitle>
+          </DialogHeader>
+
+          {boletoDialog.linhaIndex >= 0 && linhas[boletoDialog.linhaIndex] && (
+            <div className="space-y-4">
+              <Card className="border-primary/20">
+                <CardContent className="p-3 flex justify-between items-center">
+                  <div>
+                    <p className="text-[10px] text-muted-foreground font-medium uppercase">Linha do Extrato</p>
+                    <p className="text-sm font-medium">{linhas[boletoDialog.linhaIndex].descricao}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatDateBR(parseLocalDate(linhas[boletoDialog.linhaIndex].data))}
+                    </p>
+                  </div>
+                  <p className="text-lg font-bold text-destructive">{fmt(linhas[boletoDialog.linhaIndex].valor)}</p>
+                </CardContent>
+              </Card>
+
+              <div className="flex gap-2">
+                <Input
+                  value={boletoBusca}
+                  onChange={e => setBoletoBusca(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') buscarBoletos(boletoBusca); }}
+                  placeholder="Buscar por descrição ou fornecedor..."
+                  className="h-9"
+                />
+                <Button size="sm" variant="outline" className="h-9" onClick={() => buscarBoletos(boletoBusca)} disabled={boletoLoading}>
+                  <Search className={`w-4 h-4 ${boletoLoading ? 'animate-spin' : ''}`} />
+                </Button>
+              </div>
+
+              <div className="space-y-2">
+                {boletoLoading ? (
+                  <p className="text-center text-muted-foreground py-4">Buscando...</p>
+                ) : boletoOpcoes.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-4">Nenhum boleto em aberto encontrado</p>
+                ) : boletoOpcoes.map(b => {
+                  const mesmoValor = Math.abs(Number(b.valor) - linhas[boletoDialog.linhaIndex].valor) < 0.01;
+                  return (
+                    <Card key={b.id}
+                      className={`cursor-pointer transition-colors hover:border-primary/40 ${mesmoValor ? 'border-success/40' : ''}`}
+                      onClick={() => selecionarBoleto(b)}>
+                      <CardContent className="p-3 flex items-center justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                            <Badge variant="outline" className="text-[10px]">
+                              {b.status === 'AGUARDANDO_APROVACAO' ? 'Aguard. Aprovacao' : b.status}
+                            </Badge>
+                            {mesmoValor && <Badge className="bg-success/10 text-success border-success/20 text-[10px]">Mesmo valor</Badge>}
+                            {!b.tem_categoria && (
+                              <Badge className="bg-warning/10 text-warning border-warning/20 text-[10px]">Sem categoria</Badge>
+                            )}
+                          </div>
+                          <p className="text-sm font-medium break-words">{b.descricao}</p>
+                          <div className="flex items-center gap-3 text-[11px] text-muted-foreground mt-0.5 flex-wrap">
+                            <span>Vence: {formatDateBR(parseLocalDate(b.data_vencimento))}</span>
+                            {b.fornecedor && <span>• {b.fornecedor}</span>}
+                          </div>
+                        </div>
+                        <p className="text-sm font-bold text-destructive shrink-0">{fmt(Number(b.valor))}</p>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setBoletoDialog({ open: false, linhaIndex: -1 })}>Fechar</Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ========== CONFIRMAÇÃO: BAIXA JÁ NO LIVRO RAZÃO ========== */}
+      <AlertDialog open={jaNoRazaoDialog.open} onOpenChange={(open) => !open && setJaNoRazaoDialog({ open: false, indices: [] })}>
+        <AlertDialogContent className="max-w-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-warning" />
+              {jaNoRazaoDialog.indices.length === 1
+                ? 'Este pagamento já está no Livro Razão'
+                : `${jaNoRazaoDialog.indices.length} pagamentos já estão no Livro Razão`}
+            </AlertDialogTitle>
+          </AlertDialogHeader>
+
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              A baixa foi feita em <strong>Contas a Pagar/Receber</strong> e o lançamento já existe.
+              Confirmando, a linha do extrato é <strong>vinculada</strong> a ele — o valor não entra duas vezes
+              no DRE, no fluxo de caixa nem no saldo. Se você prefere tratar esta linha como uma despesa
+              diferente, escolha “Lançar como novo”.
+            </p>
+
+            <div className="space-y-2 max-h-[40vh] overflow-y-auto">
+              {jaNoRazaoDialog.indices.map(i => {
+                const linha = linhas[i];
+                if (!linha) return null;
+                return (
+                  <Card key={i} className="border-warning/30">
+                    <CardContent className="p-3 flex items-center justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium break-words">{linha.descricao}</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {formatDateBR(parseLocalDate(linha.data))} • no razão como “{linha.matchDescricao}”
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-sm font-bold text-destructive">{fmt(linha.valor)}</span>
+                        <Button size="sm" variant="ghost" className="h-7 text-xs text-destructive"
+                          onClick={() => {
+                            clearMatch(i);
+                            setJaNoRazaoDialog(prev => ({
+                              ...prev,
+                              indices: prev.indices.filter(idx => idx !== i),
+                            }));
+                          }}>
+                          Lançar como novo
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+              {jaNoRazaoDialog.indices.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-3">
+                  Todas as linhas foram marcadas para lançar como novas. Elas vão pedir categoria antes de processar.
+                </p>
+              )}
+            </div>
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setJaNoRazaoDialog({ open: false, indices: [] })}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => {
+              setJaNoRazaoDialog({ open: false, indices: [] });
+              importarEConciliar(true);
+            }}>
+              Confirmar e processar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* ========== RATEIO DIALOG ========== */}
       <Dialog open={rateioDialog.open} onOpenChange={(open) => !open && setRateioDialog({ open: false, linhaIndex: -1 })}>
