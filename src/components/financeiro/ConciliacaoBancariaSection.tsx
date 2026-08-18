@@ -106,6 +106,15 @@ function clearLinhas(contaId: string) {
   try { sessionStorage.removeItem(SESSION_KEY(contaId)); } catch (_) { /* sessionStorage indisponível */ }
 }
 
+/** Lançamento já conciliado da conta, usado para reconhecer linha de extrato repetida. */
+interface ConciliadoRow {
+  id: string;
+  data_competencia: string;
+  valor: number;
+  tipo: string;
+  descricao: string | null;
+}
+
 function bankLineKey(linha: { data: string; valor: number; tipo: string; descricao?: string | null }) {
   return `${linha.data}|${Number(linha.valor)}|${linha.tipo}|${linha.descricao || ''}`;
 }
@@ -668,6 +677,27 @@ export default function ConciliacaoBancariaSection() {
     return { data };
   };
 
+  /**
+   * Lançamentos já conciliados da conta. Pagina de verdade: uma conta com meses de
+   * extrato passa de 1.000 registros e o corte padrão do PostgREST descartava o
+   * excedente em silêncio, fazendo linha antiga reaparecer como nova.
+   */
+  const fetchConciliadosExtrato = async () => {
+    if (!contaSel) return { data: [] as ConciliadoRow[] };
+    const pageSize = 1000;
+    const data: ConciliadoRow[] = [];
+    for (let from = 0; ; from += pageSize) {
+      const { data: page, error } = await supabase.from('fin_lancamentos')
+        .select('id, data_competencia, valor, tipo, descricao')
+        .eq('conta_id', contaSel).eq('conciliado', true).eq('status', 'REALIZADO')
+        .range(from, from + pageSize - 1);
+      if (error) throw error;
+      data.push(...((page || []) as ConciliadoRow[]));
+      if (!page || page.length < pageSize) break;
+    }
+    return { data };
+  };
+
   /** Busca lançamentos/CP/CR candidatos + sets de já-conciliadas/ignoradas para a conta selecionada. */
   const fetchMatchContext = async (): Promise<MatchContext> => {
     // Busca dados para match + entradas já conciliadas + entradas ignoradas
@@ -680,8 +710,7 @@ export default function ConciliacaoBancariaSection() {
         .in('status', ['AGUARDANDO_APROVACAO', 'APROVADO']).order('data_vencimento'),
       supabase.from('fin_contas_receber').select('id, descricao, valor, data_vencimento, status, cliente, recorrente, recorrencia_config')
         .eq('status', 'A_RECEBER').order('data_vencimento'),
-      contaSel ? supabase.from('fin_lancamentos').select('data_competencia, valor, tipo, descricao')
-        .eq('conta_id', contaSel).eq('conciliado', true).eq('status', 'REALIZADO') : Promise.resolve({ data: [] }),
+      fetchConciliadosExtrato(),
       // Entradas ignoradas para esta conta
       contaSel ? supabase.from('fin_conciliacao_ignoradas').select('data, valor, tipo, descricao')
         .eq('conta_id', contaSel) : Promise.resolve({ data: [] }),
@@ -709,9 +738,20 @@ export default function ConciliacaoBancariaSection() {
     const contasPagar = (cpRes.data || []) as ContaPagarCandidate[];
     const contasReceber = (crRes.data || []) as ContaReceberCandidate[];
 
-    // Já conciliadas — mostrar com badge em vez de filtrar silenciosamente
+    const vinculos = (vinculosRes.data || []) as { external_id: string; tipo: string; lancamento_id: string }[];
+    const externalIdsProcessados = new Set(vinculos.map(v => `${v.tipo}|${v.external_id}`));
+    const lancamentosVinculados = new Set(vinculos.map(v => v.lancamento_id).filter(Boolean));
+
+    // Já conciliadas — mostrar com badge em vez de filtrar silenciosamente.
+    // Lançamento que já tem vínculo de FITID fica FORA deste contador: ele é
+    // reconhecido pela identidade bancária, e contá-lo aqui também faria a MESMA
+    // baixa ser reivindicada duas vezes — uma pelo FITID e outra por
+    // valor/data/descrição. Em vendas legítimas repetidas no mesmo dia (mesmo valor,
+    // mesma bandeira) isso marcava as duas linhas como "já conciliada" e a venda que
+    // de fato faltava no razão sumia da lista de pendentes.
     const conciliadosCounts = new Map<string, number>();
-    for (const l of (conciliadosRes.data || []) as { data_competencia: string; valor: number; tipo: string; descricao: string | null }[]) {
+    for (const l of (conciliadosRes.data || []) as ConciliadoRow[]) {
+      if (lancamentosVinculados.has(l.id)) continue;
       const key = bankLineKey({ data: l.data_competencia, valor: l.valor, tipo: l.tipo, descricao: l.descricao });
       conciliadosCounts.set(key, (conciliadosCounts.get(key) || 0) + 1);
     }
@@ -722,10 +762,6 @@ export default function ConciliacaoBancariaSection() {
       const key = bankLineKey(l);
       ignoradasCounts.set(key, (ignoradasCounts.get(key) || 0) + 1);
     }
-
-    const vinculos = (vinculosRes.data || []) as { external_id: string; tipo: string; lancamento_id: string }[];
-    const externalIdsProcessados = new Set(vinculos.map(v => `${v.tipo}|${v.external_id}`));
-    const lancamentosVinculados = new Set(vinculos.map(v => v.lancamento_id).filter(Boolean));
 
     const espelhos = ((espelhosRes as { data: LancamentoCandidate[] | null }).data || []) as LancamentoCandidate[];
 
