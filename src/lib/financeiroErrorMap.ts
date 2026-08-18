@@ -1,3 +1,25 @@
+/** Erros das RPCs de baixa/conciliação (pay_conta_pagar, reconcile_*). */
+export function mapPagamentoError(err: unknown): string {
+  const msg = String((err as { message?: string })?.message ?? '');
+  if (msg.includes('CONTA_OBRIGATORIA'))
+    return 'Selecione a conta bancária de onde o pagamento saiu.';
+  if (msg.includes('CONTA_DIVERGENTE'))
+    return 'Este lançamento pertence a outra conta bancária. Concilie pelo extrato da conta correta.';
+  if (msg.includes('CATEGORY_REQUIRED'))
+    return 'O lançamento está sem categoria. Informe a categoria antes de conciliar.';
+  if (msg.includes('EXTERNAL_ID_CONFLICT'))
+    return 'Esta linha do extrato já está vinculada a outro lançamento.';
+  if (msg.includes('OPTIMISTIC_LOCK_CONFLICT') || msg.includes('alterado por outro'))
+    return 'Este registro foi alterado por outro usuário. Recarregue a página e tente novamente.';
+  if (msg.includes('STATUS_INVALIDO'))
+    return 'A conta não está em um status que permita esta operação.';
+  if (msg.includes('PERMISSION_DENIED') || msg.includes('Permission denied') || msg.includes('Sem permissão'))
+    return 'Você não tem permissão para esta operação.';
+  if (msg.includes('NOT_FOUND'))
+    return 'Registro não encontrado.';
+  return msg || 'Erro ao registrar o pagamento';
+}
+
 export function mapFinanceiroDeleteError(err: unknown): string {
   const msg = String((err as { message?: string })?.message ?? '');
   if (msg.includes('OPTIMISTIC_LOCK_CONFLICT'))

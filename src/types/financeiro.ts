@@ -98,13 +98,34 @@ export interface LancamentoConciliacao {
 export interface LancamentoCandidate {
   id: string;
   data_competencia: string;
+  /** Data em que o dinheiro saiu/entrou. É esta — não a competência — que bate
+   *  com a linha do extrato quando o lançamento veio de uma baixa em CP/CR. */
+  data_pagamento?: string | null;
   valor: number;
   tipo: string;
   descricao: string;
   conciliado: boolean | null;
   conta_id: string;
+  origem?: string | null;
   /** Runtime flag: true if from same bank account */
   _sameAccount?: boolean;
+  /** Runtime flag: lançamento já realizado e conciliado que veio de Contas a
+   *  Pagar/Receber — casar com ele significa vincular, nunca criar outro. */
+  _jaNoRazao?: boolean;
+}
+
+/** Boleto em aberto no seletor manual da conciliação (list_fin_contas_pagar_abertas) */
+export interface ContaPagarAberta {
+  id: string;
+  descricao: string;
+  fornecedor: string | null;
+  valor: number;
+  status: string;
+  data_vencimento: string;
+  data_competencia: string | null;
+  conta_id: string | null;
+  categoria_id: string | null;
+  tem_categoria: boolean;
 }
 
 /** Conta a pagar candidate for matching */
