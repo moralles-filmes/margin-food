@@ -99,7 +99,7 @@ function InfoField({ label, value, editable }: { label: string; value: string | 
     <div className="min-w-0">
       <p className="text-xs text-muted-foreground font-medium mb-0.5">{label}</p>
       <div className="flex items-center gap-1">
-        <p className="text-sm font-medium text-foreground truncate">{value || '-'}</p>
+        <p className="text-sm font-medium text-foreground break-words">{value || '-'}</p>
         {editable && <Pencil className="w-3 h-3 text-muted-foreground flex-shrink-0" />}
       </div>
     </div>
