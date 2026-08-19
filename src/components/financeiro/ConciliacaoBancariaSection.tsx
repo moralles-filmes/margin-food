@@ -80,6 +80,14 @@ interface LinhaExtrato {
   ignorada?: boolean;
 }
 
+/** Classificação da diferença entre o valor do boleto e o que saiu do banco. */
+type AjusteTipo = '' | 'JUROS' | 'TARIFA' | 'DESCONTO';
+
+interface AjusteBaixa {
+  tipo: AjusteTipo;
+  categoriaId: string;
+}
+
 interface RateioLinha {
   categoria_id: string;
   centro_custo_id: string;
@@ -152,7 +160,6 @@ export default function ConciliacaoBancariaSection() {
   const [totalConciliadosConta, setTotalConciliadosConta] = useState(0);
   const [selectedLancamentoIds, setSelectedLancamentoIds] = useState<Set<string>>(new Set());
 
-  const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; linhaIndex: number; match: MatchSuggestion | null }>({ open: false, linhaIndex: -1, match: null });
   const [processando, setProcessando] = useState(false);
 
   const [suggestionsDialog, setSuggestionsDialog] = useState<{ open: boolean; linhaIndex: number }>({ open: false, linhaIndex: -1 });
@@ -169,6 +176,13 @@ export default function ConciliacaoBancariaSection() {
 
   // Confirmação das linhas que casaram com uma baixa já registrada em CP/CR
   const [jaNoRazaoDialog, setJaNoRazaoDialog] = useState<{ open: boolean; indices: number[] }>({ open: false, indices: [] });
+
+  // Revisão obrigatória antes de dar baixa em boleto. Sem ela, o "Processar"
+  // baixou 21 contas em 3 segundos sem ninguém confirmar nada.
+  const [baixaDialog, setBaixaDialog] = useState<{ open: boolean; indices: number[]; escopo: 'lote' | 'individual' }>(
+    { open: false, indices: [], escopo: 'lote' },
+  );
+  const [ajustesBaixa, setAjustesBaixa] = useState<Record<number, AjusteBaixa>>({});
 
   // Seletor manual de boleto em aberto
   const [boletoDialog, setBoletoDialog] = useState<{ open: boolean; linhaIndex: number }>({ open: false, linhaIndex: -1 });
@@ -891,7 +905,15 @@ export default function ConciliacaoBancariaSection() {
     suggestions.sort((a, b) => b.score - a.score);
 
     const best = suggestions[0];
-    if (best && best.score >= 60) {
+    // Boleto só vira match automático com o valor batendo no centavo. A tolerância
+    // de 5% do score já casou boleto de um fornecedor com linha de outro (KIDELICIA
+    // 1.185,14 × 1.138,60, exatamente 60 pontos) e baixou 21 contas de uma vez.
+    // Valor aproximado continua aparecendo como sugestão, para escolha manual.
+    const valorExatoSeNecessario = !best
+      || (best.origin === 'lancamento')
+      || Math.abs(Number(best.valor) - linha.valor) < 0.01;
+
+    if (best && best.score >= 60 && valorExatoSeNecessario) {
       usedIds.add(`${best.origin === 'lancamento' ? 'lanc' : best.origin === 'conta_pagar' ? 'cp' : 'cr'}-${best.id}`);
       return {
         ...base,
@@ -1262,68 +1284,112 @@ export default function ConciliacaoBancariaSection() {
     if (error) throw error;
   };
 
-  // ========== Confirm baixa ==========
-  const confirmarBaixa = async () => {
-    const match = confirmDialog.match;
-    if (!match) return;
+
+  /** Valor do boleto/título escolhido para a linha (o do extrato é `linha.valor`). */
+  const valorDoTitulo = (linha: LinhaExtrato): number => {
+    const raw = linha.matchRaw as ContaPagarCandidate | ContaReceberCandidate | undefined;
+    return Number(raw?.valor ?? linha.valor);
+  };
+
+  /** Extrato menos boleto: positivo = pagou a mais (juros/tarifa); negativo = desconto. */
+  const diferencaBaixa = (linha: LinhaExtrato): number =>
+    Math.round((linha.valor - valorDoTitulo(linha)) * 100) / 100;
+
+  const abrirRevisaoBaixa = (indices: number[], escopo: 'lote' | 'individual' = 'lote') => {
+    setAjustesBaixa(prev => {
+      const next = { ...prev };
+      for (const i of indices) {
+        if (next[i]) continue;
+        const linha = linhas[i];
+        const diff = linha ? diferencaBaixa(linha) : 0;
+        // Sugere a classificação pelo sinal; a categoria continua escolha da pessoa.
+        next[i] = { tipo: diff > 0 ? 'JUROS' : diff < 0 ? 'DESCONTO' : '', categoriaId: '' };
+      }
+      return next;
+    });
+    setBaixaDialog({ open: true, indices, escopo });
+  };
+
+  const confirmarRevisaoBaixa = () => {
+    for (const i of baixaDialog.indices) {
+      const linha = linhas[i];
+      if (!linha) continue;
+      const diff = diferencaBaixa(linha);
+      if (Math.abs(diff) < 0.01) continue;
+
+      if (linha.matchOrigin !== 'conta_pagar') {
+        toast.error(`"${linha.matchDescricao}": o valor recebido difere do título. Ajuste o título antes de baixar.`);
+        return;
+      }
+      const ajuste = ajustesBaixa[i];
+      if (!ajuste?.tipo) {
+        toast.error(`Classifique a diferença de ${fmt(Math.abs(diff))} em "${linha.matchDescricao}".`);
+        return;
+      }
+      if (!ajuste.categoriaId) {
+        toast.error(`Selecione a categoria da diferença em "${linha.matchDescricao}".`);
+        return;
+      }
+    }
+    const { indices, escopo } = baixaDialog;
+    setBaixaDialog({ open: false, indices: [], escopo: 'lote' });
+    if (escopo === 'individual') processarBaixas(indices);
+    else importarEConciliar(true, true);
+  };
+
+  /** Baixa apenas as linhas indicadas (botão "Baixar" de uma linha só). */
+  const processarBaixas = async (indices: number[]) => {
+    if (!contaSel) return;
+    const alvos = indices.map(i => linhas[i]).filter(Boolean);
+    if (alvos.length === 0) return;
+
     setProcessando(true);
     try {
-      const linha = linhas[confirmDialog.linhaIndex];
-      const linhaData = linha?.data || formatDateBR();
+      for (const l of alvos) {
+        const idx = linhas.indexOf(l);
+        const ajuste = ajustesBaixa[idx];
+        const temDiferenca = Math.abs(diferencaBaixa(l)) >= 0.01;
 
-      if (match.origin === 'conta_pagar') {
-        const { data, error } = await supabase.rpc('reconcile_pay_conta_pagar', {
-          p_conta_pagar_id: match.id,
-          p_conta_bancaria_id: contaSel,
-          p_data_pagamento: linhaData,
-          p_user_id: user?.id,
-        });
-        if (error) throw error;
-        const result = data as { status?: string; lancamento_id?: string; recorrente?: boolean; next_cp_id?: string } | null;
-        if (result?.status === 'noop') {
-          // A RPC devolve o lançamento da baixa anterior: vincular a linha aqui
-          // impede que ela reapareça como nova na próxima importação.
-          toast.info('Esta conta já estava paga — a linha do extrato foi vinculada ao lançamento existente.');
-        } else {
-          let msg = `Conta a pagar "${match.descricao}" baixada!`;
-          if (result?.recorrente && result?.next_cp_id) msg += ' Próxima parcela gerada.';
-          toast.success(msg);
+        if (l.matchOrigin === 'conta_pagar') {
+          const { data, error } = await supabase.rpc('reconcile_pay_conta_pagar', {
+            p_conta_pagar_id: l.matchId!, p_conta_bancaria_id: contaSel,
+            p_data_pagamento: l.data, p_user_id: user?.id,
+            p_valor_extrato: l.valor,
+            p_ajuste_tipo: temDiferenca ? (ajuste?.tipo || null) : null,
+            p_ajuste_categoria_id: temDiferenca ? (ajuste?.categoriaId || null) : null,
+          } as any);
+          if (error) throw error;
+          const result = data as { status?: string; lancamento_id?: string } | null;
+          await bindExtratoLine(l, result?.lancamento_id);
+          if (result?.status === 'noop') toast.info(`"${l.matchDescricao}" já estava paga — linha vinculada ao lançamento existente.`);
+        } else if (l.matchOrigin === 'conta_receber') {
+          const { data, error } = await supabase.rpc('reconcile_receive_conta_receber', {
+            p_conta_receber_id: l.matchId!, p_conta_bancaria_id: contaSel,
+            p_data_recebimento: l.data, p_user_id: user?.id,
+          });
+          if (error) throw error;
+          const result = data as { lancamento_id?: string } | null;
+          await bindExtratoLine(l, result?.lancamento_id);
         }
-        await bindExtratoLine(linha, result?.lancamento_id);
-      } else if (match.origin === 'conta_receber') {
-        const { data, error } = await supabase.rpc('reconcile_receive_conta_receber', {
-          p_conta_receber_id: match.id,
-          p_conta_bancaria_id: contaSel,
-          p_data_recebimento: linhaData,
-          p_user_id: user?.id,
-        });
-        if (error) throw error;
-        const result = data as { status?: string; lancamento_id?: string; recorrente?: boolean; next_cr_id?: string } | null;
-        if (result?.status === 'noop') {
-          toast.info('Conta já estava recebida');
-        } else {
-          let msg = `Conta a receber "${match.descricao}" baixada!`;
-          if (result?.recorrente && result?.next_cr_id) msg += ' Próxima parcela gerada.';
-          toast.success(msg);
-        }
-        await bindExtratoLine(linha, result?.lancamento_id);
       }
 
-      setLinhas(prev => prev.filter((_, i) => i !== confirmDialog.linhaIndex));
-
+      toast.success(`${alvos.length} baixa(s) registrada(s)`);
+      const processadas = new Set(alvos);
+      setLinhas(prev => prev.filter(l => !processadas.has(l)));
       emitDataEvent('financeiro:lancamentos');
+      emitDataEvent('financeiro:conciliacao');
       emitDataEvent('financeiro:contas_pagar');
       emitDataEvent('financeiro:contas_receber');
       loadLancamentos();
-    } catch (err: any) {
-      console.error(err);
-      toast.error(err.message || 'Erro ao dar baixa');
+    } catch (err: unknown) {
+      console.error('[ConciliacaoBancariaSection.processarBaixas]', err);
+      toast.error(mapPagamentoError(err));
+    } finally {
+      setProcessando(false);
     }
-    setProcessando(false);
-    setConfirmDialog({ open: false, linhaIndex: -1, match: null });
   };
 
-  const importarEConciliar = async (jaConfirmouVinculos = false) => {
+  const importarEConciliar = async (jaConfirmouVinculos = false, jaConfirmouBaixas = false) => {
     if (!contaSel) { toast.error('Selecione uma conta bancária'); return; }
 
     // Linhas cujo match é uma baixa já registrada em Contas a Pagar/Receber:
@@ -1335,6 +1401,18 @@ export default function ConciliacaoBancariaSection() {
 
     if (indicesJaNoRazao.length > 0 && !jaConfirmouVinculos) {
       setJaNoRazaoDialog({ open: true, indices: indicesJaNoRazao });
+      return;
+    }
+
+    // Dar baixa em boleto é irreversível pela tela (exige estorno para desfazer):
+    // passa sempre por revisão, com o valor do extrato ao lado do valor do boleto.
+    const indicesBaixa = linhas
+      .map((l, i) => ({ l, i }))
+      .filter(({ l }) => l.matchId && (l.matchOrigin === 'conta_pagar' || l.matchOrigin === 'conta_receber') && !l.jaConciliada)
+      .map(({ i }) => i);
+
+    if (indicesBaixa.length > 0 && !jaConfirmouBaixas) {
+      abrirRevisaoBaixa(indicesBaixa);
       return;
     }
 
@@ -1421,10 +1499,18 @@ export default function ConciliacaoBancariaSection() {
       }
 
       for (const l of pendingCP) {
+        // O valor do extrato vai junto: a RPC recusa a baixa se houver diferença
+        // sem classificação, e lança juros/tarifa/desconto em categoria separada.
+        const idx = linhas.indexOf(l);
+        const ajuste = ajustesBaixa[idx];
+        const temDiferenca = Math.abs(diferencaBaixa(l)) >= 0.01;
         const { data, error } = await supabase.rpc('reconcile_pay_conta_pagar', {
           p_conta_pagar_id: l.matchId!, p_conta_bancaria_id: contaSel,
           p_data_pagamento: l.data, p_user_id: user?.id,
-        });
+          p_valor_extrato: l.valor,
+          p_ajuste_tipo: temDiferenca ? (ajuste?.tipo || null) : null,
+          p_ajuste_categoria_id: temDiferenca ? (ajuste?.categoriaId || null) : null,
+        } as any);
         if (error) throw error;
         const result = data as { lancamento_id?: string } | null;
         await bindExtratoLine(l, result?.lancamento_id);
@@ -1793,13 +1879,8 @@ export default function ConciliacaoBancariaSection() {
                                 <Button size="sm" variant="ghost" className="h-7 text-xs text-destructive" onClick={() => clearMatch(i)}>✕</Button>
                               )}
                               {hasMatch && (linha.matchOrigin === 'conta_pagar' || linha.matchOrigin === 'conta_receber') && (
-                                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => {
-                                  const suggestion = linha.suggestions?.find(s => s.id === linha.matchId) || {
-                                    id: linha.matchId!, origin: linha.matchOrigin!, descricao: linha.matchDescricao || '',
-                                    valor: linha.valor, data: linha.data, score: 0, raw: linha.matchRaw,
-                                  };
-                                  setConfirmDialog({ open: true, linhaIndex: i, match: suggestion });
-                                }}>
+                                <Button size="sm" variant="outline" className="h-7 text-xs"
+                                  onClick={() => abrirRevisaoBaixa([i], 'individual')}>
                                   <CreditCard className="w-3 h-3 mr-1" /> Baixar
                                 </Button>
                               )}
@@ -2097,6 +2178,152 @@ export default function ConciliacaoBancariaSection() {
         </DialogContent>
       </Dialog>
 
+      {/* ========== REVISÃO ANTES DA BAIXA ========== */}
+      <Dialog open={baixaDialog.open} onOpenChange={(open) => !open && setBaixaDialog({ open: false, indices: [], escopo: 'lote' })}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CreditCard className="w-5 h-5 text-primary" />
+              {baixaDialog.indices.length === 1
+                ? 'Confirmar baixa'
+                : `Confirmar ${baixaDialog.indices.length} baixas`}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Dar baixa marca o título como pago e lança a despesa no razão. Para desfazer só pelo
+              estorno — por isso confira o que o banco pagou contra o que o título cobrava.
+            </p>
+
+            <div className="space-y-2">
+              {baixaDialog.indices.map(i => {
+                const linha = linhas[i];
+                if (!linha) return null;
+                const valorTitulo = valorDoTitulo(linha);
+                const diff = diferencaBaixa(linha);
+                const diverge = Math.abs(diff) >= 0.01;
+                const ajuste = ajustesBaixa[i] || { tipo: '' as AjusteTipo, categoriaId: '' };
+                // Extrato maior = despesa a mais (juros/tarifa). Menor = receita (desconto).
+                const categoriasAjuste = categoriasForTipo(diff > 0 ? 'DESPESA' : 'RECEITA');
+
+                return (
+                  <Card key={i} className={diverge ? 'border-warning/40' : ''}>
+                    <CardContent className="p-3 space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <p className="text-[10px] text-muted-foreground font-medium uppercase">Linha do extrato</p>
+                          <p className="text-sm font-medium break-words">{linha.descricao}</p>
+                          <p className="text-xs text-muted-foreground">{formatDateBR(parseLocalDate(linha.data))}</p>
+                          <p className="text-base font-bold mt-1">{fmt(linha.valor)}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-muted-foreground font-medium uppercase">
+                            {linha.matchOrigin === 'conta_pagar' ? 'Boleto' : 'Título a receber'}
+                          </p>
+                          <p className="text-sm font-medium break-words">{linha.matchDescricao}</p>
+                          <p className="text-base font-bold mt-1">{fmt(valorTitulo)}</p>
+                        </div>
+                      </div>
+
+                      {diverge ? (
+                        <div className="rounded-md border border-warning/40 bg-warning/5 p-2.5 space-y-2">
+                          <p className="text-xs text-warning flex items-center gap-1.5">
+                            <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                            <span>
+                              O banco {diff > 0 ? 'debitou' : 'debitou'} <strong>{fmt(Math.abs(diff))}</strong>
+                              {diff > 0 ? ' a mais' : ' a menos'} que o título.
+                            </span>
+                          </p>
+
+                          {linha.matchOrigin === 'conta_pagar' ? (
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <Label className="text-[10px] text-muted-foreground">Lançar a diferença como</Label>
+                                <Select
+                                  value={ajuste.tipo}
+                                  onValueChange={v => setAjustesBaixa(prev => ({
+                                    ...prev, [i]: { tipo: v as AjusteTipo, categoriaId: prev[i]?.categoriaId || '' },
+                                  }))}
+                                >
+                                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecione" /></SelectTrigger>
+                                  <SelectContent>
+                                    {diff > 0 ? (
+                                      <>
+                                        <SelectItem value="JUROS">Juros / multa</SelectItem>
+                                        <SelectItem value="TARIFA">Tarifa bancária</SelectItem>
+                                      </>
+                                    ) : (
+                                      <SelectItem value="DESCONTO">Desconto obtido</SelectItem>
+                                    )}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div>
+                                <Label className="text-[10px] text-muted-foreground">Categoria da diferença</Label>
+                                <CategoryCombobox
+                                  value={ajuste.categoriaId}
+                                  onValueChange={v => setAjustesBaixa(prev => ({
+                                    ...prev, [i]: { tipo: prev[i]?.tipo || '', categoriaId: v },
+                                  }))}
+                                  options={categoriasAjuste}
+                                  placeholder="Selecione"
+                                  className="h-8 text-xs"
+                                  modal={false}
+                                />
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-[11px] text-muted-foreground">
+                              Diferença em conta a receber ainda não é lançada automaticamente. Ajuste o
+                              valor do título antes de baixar.
+                            </p>
+                          )}
+
+                          <p className="text-[11px] text-muted-foreground">
+                            O título entra no razão por {fmt(valorTitulo)} na categoria dele, e a diferença
+                            vira um lançamento separado. A soma bate com o extrato.
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-success flex items-center gap-1.5">
+                          <CheckCircle className="w-3.5 h-3.5" /> Valores conferem.
+                        </p>
+                      )}
+
+                      <div className="flex justify-end">
+                        <Button size="sm" variant="ghost" className="h-7 text-xs text-destructive"
+                          onClick={() => {
+                            clearMatch(i);
+                            setBaixaDialog(prev => ({ ...prev, indices: prev.indices.filter(idx => idx !== i) }));
+                          }}>
+                          Não dar baixa nesta
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+
+              {baixaDialog.indices.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-3">
+                  Nenhuma baixa selecionada. As linhas voltaram para a lista.
+                </p>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBaixaDialog({ open: false, indices: [], escopo: 'lote' })}>
+              Cancelar
+            </Button>
+            <Button onClick={confirmarRevisaoBaixa} disabled={processando || importando}>
+              {baixaDialog.indices.length === 0 ? 'Continuar' : 'Confirmar baixa'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* ========== BOLETO EM ABERTO (vínculo manual) ========== */}
       <Dialog open={boletoDialog.open} onOpenChange={(open) => !open && setBoletoDialog({ open: false, linhaIndex: -1 })}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
@@ -2335,69 +2562,6 @@ export default function ConciliacaoBancariaSection() {
         </DialogContent>
       </Dialog>
 
-      {/* ========== CONFIRMATION DIALOG (Baixa CP/CR) ========== */}
-      <Dialog open={confirmDialog.open} onOpenChange={(open) => !open && setConfirmDialog({ open: false, linhaIndex: -1, match: null })}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              {confirmDialog.match?.origin === 'conta_receber'
-                ? <><CreditCard className="w-5 h-5 text-primary" /> Confirmar Recebimento — Conta a Receber</>
-                : <><Receipt className="w-5 h-5 text-primary" /> Confirmar Baixa — Conta a Pagar</>
-              }
-            </DialogTitle>
-          </DialogHeader>
-          {confirmDialog.match && (() => {
-            const match = confirmDialog.match!;
-            const linha = linhas[confirmDialog.linhaIndex];
-            const isCP = match.origin === 'conta_pagar';
-            return (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <Card className="border-primary/20">
-                    <CardContent className="p-3">
-                      <p className="text-[10px] text-muted-foreground mb-1 font-medium uppercase">
-                        {isCP ? 'Conta a Pagar' : 'Conta a Receber'}
-                      </p>
-                      <p className="font-semibold">{match.descricao}</p>
-                      {match.extra && <p className="text-muted-foreground text-xs">{match.extra}</p>}
-                      <p className={`text-lg font-bold mt-1 ${isCP ? 'text-destructive' : 'text-success'}`}>{fmt(match.valor)}</p>
-                      <p className="text-xs text-muted-foreground">Vencimento: {formatDateBR(parseLocalDate(match.data))}</p>
-                      {'recorrente' in match.raw && match.raw.recorrente && (
-                        <Badge variant="outline" className="mt-2 text-[10px]">🔄 Recorrente</Badge>
-                      )}
-                    </CardContent>
-                  </Card>
-                  <Card className="border-border/50">
-                    <CardContent className="p-3">
-                      <p className="text-[10px] text-muted-foreground mb-1 font-medium uppercase">Extrato Bancário</p>
-                      <p className="font-semibold">{linha?.descricao}</p>
-                      <p className={`text-lg font-bold mt-1 ${isCP ? 'text-destructive' : 'text-success'}`}>{linha ? fmt(linha.valor) : '—'}</p>
-                      <p className="text-xs text-muted-foreground">Data: {linha ? formatDateBR(parseLocalDate(linha.data)) : ''}</p>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                <div className="bg-muted/50 rounded-lg p-3 text-sm">
-                  <p className="font-medium text-foreground mb-1">Ao confirmar:</p>
-                  <ul className="text-muted-foreground space-y-1 text-xs">
-                    <li>✅ {isCP ? 'Conta a pagar marcada como PAGO' : 'Conta a receber marcada como RECEBIDO'}</li>
-                    <li>✅ Lançamento realizado criado e conciliado</li>
-                    {'recorrente' in match.raw && match.raw.recorrente && <li>✅ Próxima parcela recorrente gerada automaticamente</li>}
-                  </ul>
-                </div>
-
-                <DialogFooter className="gap-2">
-                  <Button variant="outline" onClick={() => setConfirmDialog({ open: false, linhaIndex: -1, match: null })}>Cancelar</Button>
-                  <Button onClick={confirmarBaixa} disabled={processando}>
-                    {processando ? <RefreshCw className="w-4 h-4 mr-1 animate-spin" /> : <CheckCircle className="w-4 h-4 mr-1" />}
-                    Confirmar {isCP ? 'Baixa' : 'Recebimento'}
-                  </Button>
-                </DialogFooter>
-              </div>
-            );
-          })()}
-        </DialogContent>
-      </Dialog>
 
       {/* ========== TRANSFER DIALOG ========== */}
       <Dialog open={transferDialog.open} onOpenChange={(open) => { if (!open) { setTransferDialog({ open: false, linhaIndex: -1 }); setTransferContaDestino(''); } }}>
