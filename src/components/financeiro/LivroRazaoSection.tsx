@@ -91,6 +91,7 @@ const ORIGEM_LABEL: Record<string, { text: string; cls: string; tooltip: string 
   espelho_cp: { text: 'Espelho CP', cls: 'bg-warning/10 text-warning-foreground border-warning/20', tooltip: 'Lancamento gerado pela baixa de uma Conta a Pagar' },
   espelho_cr: { text: 'Espelho CR', cls: 'bg-success/10 text-success border-success/20', tooltip: 'Lancamento gerado pelo recebimento de uma Conta a Receber' },
   transferencia: { text: 'Transferencia', cls: 'bg-accent text-accent-foreground border-border', tooltip: 'Movimentacao entre contas financeiras' },
+  ajuste_pagamento: { text: 'Ajuste', cls: 'bg-info/10 text-info border-info/20', tooltip: 'Diferenca entre o valor do boleto e o valor debitado no extrato (juros, tarifa ou desconto)' },
 };
 
 const STATUS_COLOR: Record<string, string> = {
@@ -625,6 +626,7 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
                 <SelectItem value="espelho_cp">Espelho CP</SelectItem>
                 <SelectItem value="espelho_cr">Espelho CR</SelectItem>
                 <SelectItem value="transferencia">Transferencia</SelectItem>
+                <SelectItem value="ajuste_pagamento">Ajuste de baixa</SelectItem>
               </SelectContent>
             </Select>
             <Select value={filtroConta} onValueChange={setFiltroConta}>

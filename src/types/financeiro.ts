@@ -62,6 +62,8 @@ export interface CategoriaFinRef {
   nome: string;
   tipo?: string | null;
   centro_custo_padrao_id: string | null;
+  /** Herdado da raiz por trigger: fora do resultado do DRE/DFC e dos relatórios. */
+  excluir_dos_totais?: boolean | null;
 }
 
 /** Centro de custo (projection: id, nome) */

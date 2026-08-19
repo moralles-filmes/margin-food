@@ -5,6 +5,12 @@ export function mapPagamentoError(err: unknown): string {
     return 'Selecione a conta bancária de onde o pagamento saiu.';
   if (msg.includes('CONTA_DIVERGENTE'))
     return 'Este lançamento pertence a outra conta bancária. Concilie pelo extrato da conta correta.';
+  if (msg.includes('CATEGORIA_OPERACIONAL'))
+    return 'O desconto obtido não pode ir para uma categoria de receita operacional — ele somaria no faturamento do DRE. Use "Descontos Obtidos" ou outra categoria sob RECEITAS NÃO OPERACIONAIS.';
+  if (msg.includes('DIVERGENCIA_VALOR'))
+    return 'O valor do extrato não bate com o do título. Classifique a diferença como juros, tarifa ou desconto antes de baixar.';
+  if (msg.includes('AJUSTE_INVALIDO'))
+    return 'A classificação da diferença não corresponde ao sinal: banco debitou a mais é juros/tarifa, a menos é desconto.';
   if (msg.includes('CATEGORY_REQUIRED'))
     return 'O lançamento está sem categoria. Informe a categoria antes de conciliar.';
   if (msg.includes('EXTERNAL_ID_CONFLICT'))

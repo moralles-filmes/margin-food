@@ -91,6 +91,7 @@ const ORIGEM_LABEL: Record<string, string> = {
   espelho_cp: 'Espelho Conta a Pagar',
   espelho_cr: 'Espelho Conta a Receber',
   transferencia: 'Transferencia entre Contas',
+  ajuste_pagamento: 'Ajuste de Baixa (juros/tarifa/desconto)',
 };
 
 function InfoField({ label, value, editable }: { label: string; value: string | null | undefined; editable?: boolean }) {
