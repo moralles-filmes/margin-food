@@ -100,7 +100,7 @@ export default function ProductSearchCombobox({
         </Button>
       </PopoverTrigger>
       <PopoverContent
-        className="w-[--radix-popover-trigger-width] p-0"
+        className="w-[--radix-popover-trigger-width] min-w-[240px] max-w-[92vw] p-0"
         align="start"
       >
         <Command filter={(value, search) => {
@@ -132,16 +132,16 @@ export default function ProductSearchCombobox({
                   const id = currValue.split('|')[0];
                   handleSelect(id);
                 }}
-                className="text-xs gap-1.5"
+                className="text-xs gap-1.5 items-start"
               >
                 <Check
                   className={cn(
-                    'w-3 h-3',
+                    'w-3 h-3 mt-0.5 shrink-0',
                     value === opt.id ? 'opacity-100' : 'opacity-0',
                   )}
                 />
                 <div className="flex flex-col min-w-0">
-                  <span className="truncate">{opt.label}</span>
+                  <span className="break-words">{opt.label}</span>
                   {opt.sublabel && (
                     <span className="text-[9px] text-muted-foreground">
                       {opt.sublabel}

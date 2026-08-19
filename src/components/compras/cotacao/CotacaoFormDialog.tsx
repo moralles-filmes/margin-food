@@ -247,15 +247,15 @@ export default function CotacaoFormDialog({ open, onOpenChange, store, editing, 
 
               <div className="space-y-1.5 mt-2">
                 {itens.map((it, idx) => (
-                  <div key={idx} className="flex items-center gap-2 bg-secondary/40 rounded-lg px-2.5 py-1.5">
-                    <span className="flex-1 min-w-0 text-xs text-foreground truncate">
+                  <div key={idx} className="flex items-start gap-2 bg-secondary/40 rounded-lg px-2.5 py-1.5">
+                    <span className="flex-1 min-w-0 text-xs text-foreground break-words pt-1">
                       {it.produto_nome_snapshot}
                       {!it.produto_id && <span className="ml-1 text-[9px] text-muted-foreground">(avulso)</span>}
                     </span>
                     <Input type="number" min={0} step="0.01" value={it.quantidade || ''} onChange={e => setItemQty(idx, e.target.value)}
-                      className="w-16 h-7 text-xs bg-card border-border text-foreground" />
-                    <span className="text-[10px] text-muted-foreground w-8">{it.purchase_unit_snapshot || it.unidade_snapshot || 'UN'}</span>
-                    <button type="button" onClick={() => removeItem(idx)} className="p-1 text-destructive hover:bg-destructive/10 rounded">
+                      className="w-16 h-7 text-xs bg-card border-border text-foreground shrink-0" />
+                    <span className="text-[10px] text-muted-foreground w-8 pt-1.5 shrink-0">{it.purchase_unit_snapshot || it.unidade_snapshot || 'UN'}</span>
+                    <button type="button" onClick={() => removeItem(idx)} className="p-1 text-destructive hover:bg-destructive/10 rounded shrink-0">
                       <X className="w-3.5 h-3.5" />
                     </button>
                   </div>
@@ -276,10 +276,10 @@ export default function CotacaoFormDialog({ open, onOpenChange, store, editing, 
                   const sel = selectedSupplierIds.includes(s.id);
                   return (
                     <button type="button" key={s.id} onClick={() => toggleSupplier(s.id)}
-                      className={`w-full flex items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 border transition-colors ${sel ? 'border-primary bg-primary/10' : 'border-border bg-secondary/40 hover:border-primary/40'}`}>
-                      <div className="flex items-center gap-2 min-w-0">
-                        <input type="checkbox" checked={sel} readOnly className="accent-primary pointer-events-none" />
-                        <span className="text-xs text-foreground truncate">{s.name}</span>
+                      className={`w-full flex items-start justify-between gap-2 rounded-lg px-2.5 py-1.5 border transition-colors ${sel ? 'border-primary bg-primary/10' : 'border-border bg-secondary/40 hover:border-primary/40'}`}>
+                      <div className="flex items-start gap-2 min-w-0">
+                        <input type="checkbox" checked={sel} readOnly className="accent-primary pointer-events-none mt-0.5 shrink-0" />
+                        <span className="text-xs text-foreground break-words text-left">{s.name}</span>
                       </div>
                       <span className="text-[10px] text-muted-foreground shrink-0">
                         mín. {formatMoneyBR(s.pedidoMinimoValor || 0)}{s.whatsappNumber ? ' • zap' : ''}

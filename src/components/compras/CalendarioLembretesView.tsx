@@ -338,10 +338,10 @@ export default function CalendarioLembretesView() {
               <Label className="text-xs">Itens específicos (opcional)</Label>
               <div className="max-h-32 overflow-y-auto border rounded-lg p-2 mt-1 space-y-1">
                 {produtos.filter(p => p.ativo).slice(0, 50).map(p => (
-                  <label key={p.id} className="flex items-center gap-2 text-[10px] cursor-pointer">
-                    <input type="checkbox" checked={form.item_ids.includes(p.id)} onChange={() => toggleItem(p.id)} className="rounded" />
-                    <span className="truncate">{p.nomeProduto}</span>
-                    <span className="text-muted-foreground ml-auto">{p.unidadeCompra || p.unidadeMedida}</span>
+                  <label key={p.id} className="flex items-start gap-2 text-[10px] cursor-pointer">
+                    <input type="checkbox" checked={form.item_ids.includes(p.id)} onChange={() => toggleItem(p.id)} className="rounded mt-0.5 shrink-0" />
+                    <span className="flex-1 min-w-0 break-words">{p.nomeProduto}</span>
+                    <span className="text-muted-foreground ml-auto shrink-0">{p.unidadeCompra || p.unidadeMedida}</span>
                   </label>
                 ))}
               </div>

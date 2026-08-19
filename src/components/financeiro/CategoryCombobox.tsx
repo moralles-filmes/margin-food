@@ -62,7 +62,7 @@ export default function CategoryCombobox({
           <ChevronsUpDown className="ml-1 h-3 w-3 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[280px] p-0" align="start">
+      <PopoverContent className="w-[320px] max-w-[92vw] p-0" align="start">
         <Command filter={(value, search) => { if (!search) return 1; return normalizeSearchText(value).includes(normalizeSearchText(search)) ? 1 : 0; }}>
           <CommandInput placeholder="Buscar categoria..." />
           <CommandList className="max-h-[300px] overflow-y-auto">
@@ -73,13 +73,14 @@ export default function CategoryCombobox({
                   <CommandItem
                     key={opt.id}
                     value={getCategoryCommandValue(opt)}
+                    className="items-start"
                     onSelect={() => {
                       onValueChange(opt.id === value ? '' : opt.id);
                       setOpen(false);
                     }}
                   >
-                    <Check className={cn('mr-2 h-3 w-3', value === opt.id ? 'opacity-100' : 'opacity-0')} />
-                    <span className="truncate text-xs">
+                    <Check className={cn('mr-2 mt-0.5 h-3 w-3 shrink-0', value === opt.id ? 'opacity-100' : 'opacity-0')} />
+                    <span className="break-words text-xs">
                       {opt.codigo ? `${opt.codigo} — ${opt.nome}` : opt.nome}
                     </span>
                   </CommandItem>
