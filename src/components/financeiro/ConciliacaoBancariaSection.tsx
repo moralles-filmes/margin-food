@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { emitDataEvent, useDataEvent } from '@/lib/dataEvents';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -244,7 +244,7 @@ export default function ConciliacaoBancariaSection() {
         if (data && data.length > 0 && !contaSel) setContaSel(data[0].id);
       });
     Promise.all([
-      supabase.from('fin_categorias').select('id, nome, tipo, parent_id, centro_custo_padrao_id').eq('ativo', true).order('nome'),
+      supabase.from('fin_categorias').select('id, nome, tipo, parent_id, centro_custo_padrao_id, excluir_dos_totais').eq('ativo', true).order('nome'),
       supabase.from('fin_centros_custo').select('id, nome').eq('ativo', true).order('nome'),
     ]).then(([catRes, ccRes]) => {
       setCategorias(buildCategoryOptions(catRes.data || []));
@@ -1302,8 +1302,11 @@ export default function ConciliacaoBancariaSection() {
         if (next[i]) continue;
         const linha = linhas[i];
         const diff = linha ? diferencaBaixa(linha) : 0;
-        // Sugere a classificação pelo sinal; a categoria continua escolha da pessoa.
-        next[i] = { tipo: diff > 0 ? 'JUROS' : diff < 0 ? 'DESCONTO' : '', categoriaId: '' };
+        // Sugere a classificação pelo sinal; a categoria continua escolha da pessoa,
+        // menos no desconto, onde o padrão não operacional já vem escolhido.
+        next[i] = diff < 0
+          ? { tipo: 'DESCONTO', categoriaId: categoriaDescontoPadraoId }
+          : { tipo: diff > 0 ? 'JUROS' : '', categoriaId: '' };
       }
       return next;
     });
@@ -1597,6 +1600,18 @@ export default function ConciliacaoBancariaSection() {
   // Categorias filtradas pelo tipo da linha (tipo lowercase no banco; categorias sem tipo valem para ambos)
   const categoriasForTipo = (tipo: 'RECEITA' | 'DESPESA') =>
     categorias.filter(c => tipo === 'RECEITA' ? (c.tipo === 'receita' || !c.tipo) : (c.tipo === 'despesa' || !c.tipo));
+
+  // Desconto obtido é dinheiro que deixou de sair, não venda: só categoria fora do
+  // resultado (sob RECEITAS NÃO OPERACIONAIS), senão soma no faturamento do DRE.
+  // `reconcile_pay_conta_pagar` recusa com CATEGORIA_OPERACIONAL de qualquer jeito.
+  const categoriasDesconto = useMemo(
+    () => categorias.filter(c => c.tipo === 'receita' && c.excluir_dos_totais === true),
+    [categorias],
+  );
+  const categoriaDescontoPadraoId = useMemo(
+    () => categoriasDesconto.find(c => normalizeSearchText(c.nome) === 'descontos obtidos')?.id || '',
+    [categoriasDesconto],
+  );
   const setLinhaCategoria = (i: number, categoriaId: string) =>
     setLinhas(prev => prev.map((l, j) => j === i ? { ...l, categoriaId } : l));
 
@@ -2204,8 +2219,9 @@ export default function ConciliacaoBancariaSection() {
                 const diff = diferencaBaixa(linha);
                 const diverge = Math.abs(diff) >= 0.01;
                 const ajuste = ajustesBaixa[i] || { tipo: '' as AjusteTipo, categoriaId: '' };
-                // Extrato maior = despesa a mais (juros/tarifa). Menor = receita (desconto).
-                const categoriasAjuste = categoriasForTipo(diff > 0 ? 'DESPESA' : 'RECEITA');
+                // Extrato maior = despesa a mais (juros/tarifa). Menor = receita (desconto),
+                // e aí só categoria fora do resultado — desconto não é faturamento.
+                const categoriasAjuste = diff > 0 ? categoriasForTipo('DESPESA') : categoriasDesconto;
 
                 return (
                   <Card key={i} className={diverge ? 'border-warning/40' : ''}>
@@ -2283,6 +2299,7 @@ export default function ConciliacaoBancariaSection() {
                           <p className="text-[11px] text-muted-foreground">
                             O título entra no razão por {fmt(valorTitulo)} na categoria dele, e a diferença
                             vira um lançamento separado. A soma bate com o extrato.
+                            {diff < 0 && ' O desconto fica em categoria não operacional: entra no saldo da conta, mas fora do faturamento do DRE, do DFC e dos relatórios.'}
                           </p>
                         </div>
                       ) : (

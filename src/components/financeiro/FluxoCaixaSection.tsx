@@ -60,6 +60,7 @@ const origemBadge: Record<string, { text: string; cls: string }> = {
   espelho_cp: { text: 'Espelho CP', cls: 'bg-warning/10 text-warning border-warning/20' },
   espelho_cr: { text: 'Espelho CR', cls: 'bg-success/10 text-success border-success/20' },
   transferencia: { text: 'Transferência', cls: 'bg-accent text-accent-foreground border-border' },
+  ajuste_pagamento: { text: 'Ajuste', cls: 'bg-info/10 text-info border-info/20' },
   conta_pagar: { text: 'Conta a Pagar', cls: 'bg-warning/10 text-warning border-warning/20' },
   conta_receber: { text: 'Conta a Receber', cls: 'bg-success/10 text-success border-success/20' },
   conta_pagar_vencida: { text: 'Pagar (Vencida)', cls: 'bg-destructive/10 text-destructive border-destructive/20' },
