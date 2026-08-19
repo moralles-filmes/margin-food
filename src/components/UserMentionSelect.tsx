@@ -97,14 +97,14 @@ export default function UserMentionSelect({
             <button
               key={u.id}
               onMouseDown={(e) => { e.preventDefault(); handleSelect(u); }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-accent/50 transition-colors"
+              className="w-full flex items-start gap-2 px-3 py-2 text-left hover:bg-accent/50 transition-colors"
             >
-              <Avatar className="h-5 w-5">
+              <Avatar className="h-5 w-5 shrink-0 mt-0.5">
                 <AvatarFallback className="text-[9px] bg-primary/10 text-primary">{u.nome.charAt(0).toUpperCase()}</AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium text-foreground truncate">{u.nome}</p>
-                <p className="text-[10px] text-muted-foreground truncate">{u.email}</p>
+                <p className="text-xs font-medium text-foreground break-words">{u.nome}</p>
+                <p className="text-[10px] text-muted-foreground break-words">{u.email}</p>
               </div>
             </button>
           ))}

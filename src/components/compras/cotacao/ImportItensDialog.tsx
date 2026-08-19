@@ -141,11 +141,11 @@ export default function ImportItensDialog({ open, onOpenChange, onImport }: Impo
               const sel = selected.has(r._key);
               return (
                 <button type="button" key={r._key} onClick={() => toggle(r._key)}
-                  className={`w-full flex items-center gap-2 rounded-lg px-2.5 py-2 border text-left transition-colors ${sel ? 'border-primary bg-primary/10' : 'border-border bg-secondary/40 hover:border-primary/40'}`}>
-                  <span className={`w-4 h-4 rounded flex items-center justify-center shrink-0 border ${sel ? 'bg-primary border-primary' : 'border-border'}`}>
+                  className={`w-full flex items-start gap-2 rounded-lg px-2.5 py-2 border text-left transition-colors ${sel ? 'border-primary bg-primary/10' : 'border-border bg-secondary/40 hover:border-primary/40'}`}>
+                  <span className={`w-4 h-4 mt-0.5 rounded flex items-center justify-center shrink-0 border ${sel ? 'bg-primary border-primary' : 'border-border'}`}>
                     {sel && <Check className="w-3 h-3 text-primary-foreground" />}
                   </span>
-                  <span className="text-xs text-foreground truncate">{r._label}</span>
+                  <span className="text-xs text-foreground break-words">{r._label}</span>
                 </button>
               );
             })

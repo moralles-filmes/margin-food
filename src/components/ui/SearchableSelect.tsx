@@ -55,7 +55,7 @@ export default function SearchableSelect({
           <ChevronsUpDown className="ml-1 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[--radix-popover-trigger-width] min-w-[200px] p-0" align="start">
+      <PopoverContent className="w-[--radix-popover-trigger-width] min-w-[240px] max-w-[92vw] p-0" align="start">
         <Command filter={(val, search) => {
           if (!search) return 1;
           return normalizeSearchText(val).includes(normalizeSearchText(search)) ? 1 : 0;
@@ -68,13 +68,14 @@ export default function SearchableSelect({
                 <CommandItem
                   key={opt.value}
                   value={opt.label}
+                  className="items-start"
                   onSelect={() => {
                     onValueChange(allowClear && opt.value === value ? '' : opt.value);
                     setOpen(false);
                   }}
                 >
-                  <Check className={cn('mr-2 h-4 w-4 shrink-0', value === opt.value ? 'opacity-100' : 'opacity-0')} />
-                  <span className="truncate">{opt.label}</span>
+                  <Check className={cn('mr-2 mt-0.5 h-4 w-4 shrink-0', value === opt.value ? 'opacity-100' : 'opacity-0')} />
+                  <span className="break-words">{opt.label}</span>
                 </CommandItem>
               ))}
             </CommandGroup>
