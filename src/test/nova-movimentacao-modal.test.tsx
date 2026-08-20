@@ -8,6 +8,22 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import NovaMovimentacaoModal, { type MovModalPreset } from '@/components/estoque/NovaMovimentacaoModal';
 import type { ProdutoExtended } from '@/types/estoque';
 
+// NovaMovimentacaoModal fetches setores from stock_sectors on open — mock the
+// client so tests don't depend on VITE_SUPABASE_* env vars or the network.
+vi.mock('@/integrations/supabase/client', () => ({
+  supabase: {
+    from: () => ({
+      select: () => ({
+        eq: () => ({
+          order: () => ({
+            order: () => Promise.resolve({ data: [], error: null }),
+          }),
+        }),
+      }),
+    }),
+  },
+}));
+
 // ─── Helpers ───
 
 const baseProd: ProdutoExtended = {

@@ -67,8 +67,6 @@ interface Requisicao {
   requisicao_estoque_itens: RequisicaoItem[];
 }
 
-const SETORES = ['Cozinha', 'Sushi', 'Limpeza', 'Salão', 'Copa'];
-
 async function extractEdgeFnErrorMessage(error: unknown, fallback: string): Promise<string> {
   try {
     if (error && typeof error === 'object' && 'context' in error) {
@@ -116,7 +114,16 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
   const [historicoLoadingMore, setHistoricoLoadingMore] = useState(false);
   const [expandedHistReq, setExpandedHistReq] = useState<string | null>(null);
 
-  const [setor, setSetor] = useState(profile?.sector || 'Cozinha');
+  const [setor, setSetor] = useState(profile?.sector || '');
+  const [setores, setSetores] = useState<string[]>([]);
+  useEffect(() => {
+    supabase.from('stock_sectors').select('name').eq('is_active', true).order('sort_order').order('name')
+      .then(({ data }) => {
+        const nomes = (data || []).map((s: { name: string }) => s.name);
+        setSetores(nomes);
+        setSetor(current => current || nomes[0] || '');
+      });
+  }, []);
   const [observacao, setObservacao] = useState('');
   const [itens, setItens] = useState<ManualItem[]>([]);
   const [itemProd, setItemProd] = useState('');
@@ -620,7 +627,7 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
                 <Select value={setor} onValueChange={setSetor}>
                   <SelectTrigger className="bg-secondary border-border text-foreground"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {SETORES.map(setorOption => <SelectItem key={setorOption} value={setorOption}>{setorOption}</SelectItem>)}
+                    {setores.map(setorOption => <SelectItem key={setorOption} value={setorOption}>{setorOption}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>

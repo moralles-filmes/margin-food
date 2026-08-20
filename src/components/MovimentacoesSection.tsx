@@ -33,8 +33,6 @@ interface MovimentacaoComStatus extends MovimentacaoEstoque {
   direction?: string;
 }
 
-const SETORES = ['Cozinha', 'Salão', 'Limpeza', 'Sushi', 'Peixaria', 'Copa', 'Administrativo', 'Delivery'];
-
 interface Props {
   movimentacoes: MovimentacaoComStatus[];
   produtos: Produto[];
@@ -80,6 +78,11 @@ export default function MovimentacoesSection({
   const [filterProduto, setFilterProduto] = useState('all');
   const [filterCategoria, setFilterCategoria] = useState('all');
   const [filterSetor, setFilterSetor] = useState('all');
+  const [setores, setSetores] = useState<string[]>([]);
+  useEffect(() => {
+    supabase.from('stock_sectors').select('name').eq('is_active', true).order('sort_order').order('name')
+      .then(({ data }) => setSetores((data || []).map((s: { name: string }) => s.name)));
+  }, []);
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
   const [showFilters, setShowFilters] = useState(false);
@@ -355,7 +358,7 @@ export default function MovimentacoesSection({
                   <SelectTrigger className="h-8 text-xs bg-secondary border-border"><SelectValue placeholder="Todos" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos</SelectItem>
-                    {SETORES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                    {setores.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>

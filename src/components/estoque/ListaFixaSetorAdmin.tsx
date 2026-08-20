@@ -19,7 +19,6 @@ import { Badge } from '@/components/ui/badge';
 import { Settings2, Plus, Trash2, Search, X, GripVertical, Save, ArrowUp, ArrowDown } from 'lucide-react';
 import type { ProdutoExtended } from '@/types/estoque';
 import { toRequisitionDisplayProduct } from '@/domain/estoque/requisition';
-const SETORES = ['Cozinha', 'Sushi', 'Limpeza', 'Salão', 'Copa'];
 
 interface ListaFixa {
   id: string;
@@ -48,7 +47,16 @@ export default function ListaFixaSetorAdmin({ produtos }: Props) {
   const { confirm, ConfirmDialog } = useConfirmDialog();
 
   const [listas, setListas] = useState<ListaFixa[]>([]);
-  const [selectedSetor, setSelectedSetor] = useState(SETORES[0]);
+  const [setores, setSetores] = useState<string[]>([]);
+  const [selectedSetor, setSelectedSetor] = useState('');
+  useEffect(() => {
+    supabase.from('stock_sectors').select('name').eq('is_active', true).order('sort_order').order('name')
+      .then(({ data }) => {
+        const nomes = (data || []).map((s: { name: string }) => s.name);
+        setSetores(nomes);
+        setSelectedSetor(current => current || nomes[0] || '');
+      });
+  }, []);
   const [items, setItems] = useState<ListaFixaItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -238,7 +246,7 @@ export default function ListaFixaSetorAdmin({ produtos }: Props) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {SETORES.map(s => (
+                {setores.map(s => (
                   <SelectItem key={s} value={s}>
                     {s}
                     {listas.some(l => l.setor === s) && (

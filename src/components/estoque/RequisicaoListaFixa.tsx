@@ -15,8 +15,6 @@ import { ClipboardList, Eye, Send, ArrowLeft, Inbox, AlertTriangle, ShoppingCart
 import type { ProdutoExtended } from '@/types/estoque';
 import { toRequisitionDisplayProduct } from '@/domain/estoque/requisition';
 
-const SETORES = ['Cozinha', 'Sushi', 'Limpeza', 'Salão', 'Copa'];
-
 interface ListaFixaItem {
   id: string;
   produto_id: string;
@@ -40,7 +38,16 @@ function getRequisitionProductDisplay(prod: ProdutoExtended) {
 export default function RequisicaoListaFixa({ produtos, saldos, onSuccess, onCancel }: Props) {
   const { profile } = useAuth();
   const { confirm, ConfirmDialog } = useConfirmDialog();
-  const [setor, setSetor] = useState(profile?.sector || SETORES[0]);
+  const [setor, setSetor] = useState(profile?.sector || '');
+  const [setores, setSetores] = useState<string[]>([]);
+  useEffect(() => {
+    supabase.from('stock_sectors').select('name').eq('is_active', true).order('sort_order').order('name')
+      .then(({ data }) => {
+        const nomes = (data || []).map((s: { name: string }) => s.name);
+        setSetores(nomes);
+        setSetor(current => current || nomes[0] || '');
+      });
+  }, []);
   const [observacao, setObservacao] = useState('');
   const [items, setItems] = useState<ListaFixaItem[]>([]);
   const [quantities, setQuantities] = useState<Record<string, string>>({});
@@ -222,7 +229,7 @@ export default function RequisicaoListaFixa({ produtos, saldos, onSuccess, onCan
                 <Select value={setor} onValueChange={handleSetorChange}>
                   <SelectTrigger className="bg-secondary border-border text-foreground"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {SETORES.map(sector => <SelectItem key={sector} value={sector}>{sector}</SelectItem>)}
+                    {setores.map(sector => <SelectItem key={sector} value={sector}>{sector}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
