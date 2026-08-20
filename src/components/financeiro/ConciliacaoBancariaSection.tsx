@@ -137,6 +137,7 @@ function clearSaldoExtrato(contaId: string) {
 interface ConciliadoRow {
   id: string;
   data_competencia: string;
+  data_pagamento: string | null;
   valor: number;
   tipo: string;
   descricao: string | null;
@@ -792,7 +793,7 @@ export default function ConciliacaoBancariaSection() {
     const data: ConciliadoRow[] = [];
     for (let from = 0; ; from += pageSize) {
       const { data: page, error } = await supabase.from('fin_lancamentos')
-        .select('id, data_competencia, valor, tipo, descricao')
+        .select('id, data_competencia, data_pagamento, valor, tipo, descricao')
         .eq('conta_id', contaSel).eq('conciliado', true).eq('status', 'REALIZADO')
         .range(from, from + pageSize - 1);
       if (error) throw error;
@@ -802,12 +803,35 @@ export default function ConciliacaoBancariaSection() {
     return { data };
   };
 
+  /**
+   * Lançamentos pendentes (não conciliados) da própria conta selecionada — fonte
+   * primária de candidatos para "já existe no razão" e sugestões. Pagina de
+   * verdade pelo mesmo motivo de fetchConciliadosExtrato: sem isso, uma conta com
+   * muito histórico em aberto cai no limite padrão do PostgREST e um lançamento
+   * pendente antigo some das sugestões, virando candidato a duplicata na próxima
+   * importação.
+   */
+  const fetchLancamentosPendentesConta = async () => {
+    if (!contaSel) return { data: [] as LancamentoCandidate[] };
+    const pageSize = 1000;
+    const data: LancamentoCandidate[] = [];
+    for (let from = 0; ; from += pageSize) {
+      const { data: page, error } = await supabase.from('fin_lancamentos')
+        .select('id, data_competencia, data_pagamento, valor, tipo, descricao, conciliado, conta_id, origem')
+        .eq('conta_id', contaSel).eq('status', 'REALIZADO').or('conciliado.is.null,conciliado.eq.false')
+        .range(from, from + pageSize - 1);
+      if (error) throw error;
+      data.push(...((page || []) as LancamentoCandidate[]));
+      if (!page || page.length < pageSize) break;
+    }
+    return { data };
+  };
+
   /** Busca lançamentos/CP/CR candidatos + sets de já-conciliadas/ignoradas para a conta selecionada. */
   const fetchMatchContext = async (): Promise<MatchContext> => {
     // Busca dados para match + entradas já conciliadas + entradas ignoradas
     const [lancRes, lancAllRes, cpRes, crRes, conciliadosRes, ignoradasRes, vinculosRes, transferRes, espelhosRes] = await Promise.all([
-      contaSel ? supabase.from('fin_lancamentos').select('id, data_competencia, data_pagamento, valor, tipo, descricao, conciliado, conta_id, origem')
-        .eq('conta_id', contaSel).eq('status', 'REALIZADO').or('conciliado.is.null,conciliado.eq.false') : Promise.resolve({ data: [] }),
+      fetchLancamentosPendentesConta(),
       supabase.from('fin_lancamentos').select('id, data_competencia, data_pagamento, valor, tipo, descricao, conciliado, conta_id, origem')
         .eq('status', 'REALIZADO').or('conciliado.is.null,conciliado.eq.false').limit(500),
       supabase.from('fin_contas_pagar').select('id, descricao, valor, data_vencimento, status, fornecedor, recorrente, recorrencia_config')
@@ -856,7 +880,14 @@ export default function ConciliacaoBancariaSection() {
     const conciliadosCounts = new Map<string, number>();
     for (const l of (conciliadosRes.data || []) as ConciliadoRow[]) {
       if (lancamentosVinculados.has(l.id)) continue;
-      const key = bankLineKey({ data: l.data_competencia, valor: l.valor, tipo: l.tipo, descricao: l.descricao });
+      // Mesma regra do loop de sugestões abaixo: a linha do extrato traz a data em
+      // que o dinheiro se moveu, que para uma baixa de CP/CR é `data_pagamento` —
+      // `data_competencia` é a competência do boleto e pode estar semanas atrás.
+      // Usar só `data_competencia` aqui deixava um boleto pago com atraso e
+      // reimportado (sem FITID estável, ou via CSV) não bater como "já
+      // conciliada", criando um segundo lançamento real para o mesmo pagamento.
+      const dataChave = l.data_pagamento || l.data_competencia;
+      const key = bankLineKey({ data: dataChave, valor: l.valor, tipo: l.tipo, descricao: l.descricao });
       conciliadosCounts.set(key, (conciliadosCounts.get(key) || 0) + 1);
     }
 
