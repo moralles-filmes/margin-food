@@ -9880,6 +9880,7 @@ export type Database = {
           p_descricao: string
           p_external_id?: string
           p_force_duplicate?: boolean
+          p_occurrence_index?: number
           p_rateio_linhas?: Json
           p_tipo: string
           p_user_id: string
