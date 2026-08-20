@@ -223,8 +223,8 @@ export default function SalmonMigrationWizard({
               month_num: month,
               category: meta.categoria || 'salmao',
               target_value: meta.metaValorCompra || 0,
-              alert_yellow_percent: meta.alertaAmareloPercent || 80,
-              alert_red_percent: meta.alertaVermelhoPercent || 100,
+              alert_yellow_pct: meta.alertaAmareloPercent || 80,
+              alert_red_pct: meta.alertaVermelhoPercent || 100,
             }, { onConflict: 'year_num,month_num,category' });
           }
         }

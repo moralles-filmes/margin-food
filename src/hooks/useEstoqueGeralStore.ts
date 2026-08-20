@@ -680,7 +680,9 @@ export function useEstoqueGeralStore() {
     if (updates.packageMeasureUnit !== undefined) dbUpdates.package_measure_unit = updates.packageMeasureUnit;
     if (updates.conversionMode !== undefined) dbUpdates.conversion_mode = updates.conversionMode;
 
-    const { error } = await supabase.from('produtos').update(dbUpdates).eq('id', id);
+    const { error } = await supabase.from('produtos')
+      .update(dbUpdates as import('@/integrations/supabase/types').Database['public']['Tables']['produtos']['Update'])
+      .eq('id', id);
     if (error) {
       console.error('[useEstoqueGeralStore.updateProduto] update error', error);
       throw error;

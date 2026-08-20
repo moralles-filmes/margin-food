@@ -45,7 +45,7 @@ export default function CmvTabs({ cmvData, visibleSubtabs, ranking, errorRanking
               {cmvData.cmvPorCategoria.length > 0 ? (
                 <ResponsiveContainer width="100%" height={250}>
                   <RPieChart>
-                    <Pie data={cmvData.cmvPorCategoria} dataKey="custo" nameKey="categoria" cx="50%" cy="50%" outerRadius={80} label={({ categoria, percentCmv }) => `${categoria} ${formatPercentBR(percentCmv)}`}>
+                    <Pie data={cmvData.cmvPorCategoria} dataKey="custo" nameKey="categoria" cx="50%" cy="50%" outerRadius={80} label={(props) => { const { categoria, percentCmv } = props as unknown as { categoria: string; percentCmv: number }; return `${categoria} ${formatPercentBR(percentCmv)}`; }}>
                       {cmvData.cmvPorCategoria.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                     </Pie>
                     <Tooltip formatter={(v: number) => fmtBRL(v)} />

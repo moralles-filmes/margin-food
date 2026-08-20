@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useCan, useModuleAccess } from '@/permissions/hooks';
 import { toast } from 'sonner';
 import { formatFixedBR, fmtBRL, formatPercentBR, formatDateBR, formatInBR, todayBR, parseLocalDate } from '@/lib/formatters';
+import { formatDateBR as formatDateISO } from '@/lib/datetime';
 
 const COLORS = [
   'hsl(var(--primary))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))',
@@ -237,7 +238,8 @@ function RhViewInner({ visibleSubtabs, user }: {
   }, [user, showInativos]);
 
   const fetchPontos = useCallback(async () => {
-    const dateStr = formatDateBR(pontoDate);
+    // Coluna `data` é date no Postgres: exige yyyy-MM-dd (datetime), não dd/MM/yyyy (formatters)
+    const dateStr = formatDateISO(pontoDate);
     const { data, error } = await supabase.from('rh_ponto_registros').select('id, colaborador_id, data, tipo, hora, metodo, justificativa, aprovado, aprovado_por, status, created_at')
       .eq('data', dateStr)
       .neq('status', 'REJEITADO')
@@ -387,7 +389,7 @@ function RhViewInner({ visibleSubtabs, user }: {
     setApprovingPonto(pontoId);
     try {
       const { error } = await supabase.from('rh_ponto_registros').update({
-        aprovado: true, aprovado_por: user?.id,
+        aprovado: true, aprovado_por: user?.id, status: 'APROVADO',
       }).eq('id', pontoId).eq('aprovado', false);
       if (error) { toast.error('Erro: ' + error.message); return; }
       toast.success('Ponto aprovado!');
@@ -470,7 +472,7 @@ function RhViewInner({ visibleSubtabs, user }: {
 
   const meusPontos = pontos.filter(p => p.colaborador_id === myColaboradorId);
   const todosAprovados = pontos.filter(p => !p.aprovado);
-  const isToday = formatDateBR(pontoDate) === todayBR();
+  const isToday = formatDateISO(pontoDate) === todayBR();
 
   const getColabNome = (id: string) => colaboradores.find(c => c.id === id)?.nome || 'Desconhecido';
 

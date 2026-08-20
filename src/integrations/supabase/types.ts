@@ -14,6 +14,47 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_actions_log: {
+        Row: {
+          action: string
+          actor_user_id: string
+          company_id: string
+          created_at: string
+          details: Json | null
+          id: string
+          target_email: string | null
+          target_user_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_user_id: string
+          company_id: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          target_email?: string | null
+          target_user_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_user_id?: string
+          company_id?: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          target_email?: string | null
+          target_user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_actions_log_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_insights: {
         Row: {
           agente: string
@@ -6904,7 +6945,12 @@ export type Database = {
           id: string
           justificativa: string | null
           metodo: string
+          motivo_rejeicao: string | null
+          rejeitado_em: string | null
+          rejeitado_por: string | null
+          status: string
           tipo: string
+          updated_at: string
         }
         Insert: {
           aprovado?: boolean | null
@@ -6922,7 +6968,12 @@ export type Database = {
           id?: string
           justificativa?: string | null
           metodo?: string
+          motivo_rejeicao?: string | null
+          rejeitado_em?: string | null
+          rejeitado_por?: string | null
+          status?: string
           tipo: string
+          updated_at?: string
         }
         Update: {
           aprovado?: boolean | null
@@ -6940,7 +6991,12 @@ export type Database = {
           id?: string
           justificativa?: string | null
           metodo?: string
+          motivo_rejeicao?: string | null
+          rejeitado_em?: string | null
+          rejeitado_por?: string | null
+          status?: string
           tipo?: string
+          updated_at?: string
         }
         Relationships: [
           {

@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import type { Database } from '@/integrations/supabase/types';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCompanyId } from '@/hooks/useCompanyId';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -50,6 +52,7 @@ const STATUS_COLORS: Record<string, string> = {
 
 export default function BugTrackerView() {
   const { user } = useAuth();
+  const { companyId } = useCompanyId();
   const [bugs, setBugs] = useState<SystemBug[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -107,7 +110,7 @@ export default function BugTrackerView() {
     setSaving(true);
 
     if (editingBug) {
-      const updates: Record<string, unknown> = {
+      const updates: Database['public']['Tables']['system_bugs']['Update'] = {
         title: form.title,
         description: form.description,
         module: form.module,
@@ -131,6 +134,12 @@ export default function BugTrackerView() {
       if (error) toast.error('Erro: ' + error.message);
       else { toast.success('Bug atualizado'); setDialogOpen(false); fetchBugs(); }
     } else {
+      // INSERT em tabela multi-tenant exige company_id explícito no payload (RLS não preenche)
+      if (!companyId || !user?.id) {
+        toast.error('Empresa ou usuário não resolvidos. Recarregue a página.');
+        setSaving(false);
+        return;
+      }
       const { error } = await supabase
         .from('system_bugs')
         .insert({
@@ -140,7 +149,8 @@ export default function BugTrackerView() {
           severity: form.severity,
           status: form.status,
           notes: form.notes || null,
-          created_by: user?.id,
+          created_by: user.id,
+          company_id: companyId,
         });
       if (error) toast.error('Erro: ' + error.message);
       else { toast.success('Bug registrado'); setDialogOpen(false); fetchBugs(); }

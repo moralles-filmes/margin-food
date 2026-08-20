@@ -166,8 +166,8 @@ export default function OnboardingSection({
     };
     // @enterprise-exception: dynamic field name requires JSON cast for Supabase update
     const { error } = await supabase.from('rh_onboarding').update({
-      [field]: list as unknown as import('@/integrations/supabase/types').Json[],
-    }).eq('id', onbId);
+      [field]: list,
+    } as unknown as import('@/integrations/supabase/types').Database['public']['Tables']['rh_onboarding']['Update']).eq('id', onbId);
     if (error) { toast.error('Erro: ' + error.message); return; }
     fetchOnboardings();
   };
@@ -197,7 +197,9 @@ export default function OnboardingSection({
       updates.concluido_em = new Date().toISOString();
     }
 
-    const { error } = await supabase.from('rh_onboarding').update(updates).eq('id', showAvaliacao.onboardingId);
+    const { error } = await supabase.from('rh_onboarding')
+      .update(updates as import('@/integrations/supabase/types').Database['public']['Tables']['rh_onboarding']['Update'])
+      .eq('id', showAvaliacao.onboardingId);
     if (error) { toast.error('Erro: ' + error.message); return; }
     toast.success('Avaliação registrada!');
     setShowAvaliacao(null);

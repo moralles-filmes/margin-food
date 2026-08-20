@@ -63,6 +63,7 @@ const baseProd: ProdutoExtended = {
   packageQuantity: null,
   packageMeasureUnit: null,
   conversionMode: 'auto',
+  saldoAtual: 100,
 };
 
 const defaultProps = {

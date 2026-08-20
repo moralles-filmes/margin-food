@@ -97,7 +97,7 @@ export default function ConfiguracoesView({ store, initialSubTab }: Props) {
       <SubmoduleSwitcher
         items={visibleViews}
         value={effectiveActive}
-        onChange={setActiveView}
+        onChange={(id) => setActiveView(id as SubView)}
       />
 
       {effectiveActive === 'geral' && (

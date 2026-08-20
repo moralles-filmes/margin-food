@@ -775,7 +775,7 @@ export default function PedidosComprasMercadoView() {
       <SubmoduleSwitcher
         items={subTabs.map(t => ({ ...t, badge: t.count }))}
         value={subTab}
-        onChange={setSubTab}
+        onChange={(id) => setSubTab(id as SubTab)}
       />
 
       {/* Filters */}

@@ -205,7 +205,7 @@ export default function DashboardCharts() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <ResponsiveContainer width="100%" height={240}>
                   <PieChart>
-                    <Pie data={despesas_por_categoria} dataKey="valor" nameKey="nome" cx="50%" cy="50%" outerRadius={90} label={({ nome, percent }) => `${String(nome).slice(0, 15)} ${formatDecimalBR(percent * 100, 0)}%`} labelLine={false} fontSize={10}>
+                    <Pie data={despesas_por_categoria} dataKey="valor" nameKey="nome" cx="50%" cy="50%" outerRadius={90} label={(props) => { const { nome, percent } = props as unknown as { nome: string; percent: number }; return `${String(nome).slice(0, 15)} ${formatDecimalBR(percent * 100, 0)}%`; }} labelLine={false} fontSize={10}>
                       {despesas_por_categoria.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
                     </Pie>
                     <Tooltip formatter={(v: number) => fmt(v)} />

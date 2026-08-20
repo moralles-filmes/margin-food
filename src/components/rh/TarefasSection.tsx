@@ -153,7 +153,9 @@ export default function TarefasSection({
       updates.concluida_em = new Date().toISOString();
       updates.concluida_por = user?.id;
     }
-    const { error } = await supabase.from('rh_tarefas').update(updates).eq('id', id);
+    const { error } = await supabase.from('rh_tarefas')
+      .update(updates as import('@/integrations/supabase/types').Database['public']['Tables']['rh_tarefas']['Update'])
+      .eq('id', id);
     if (error) { toast.error('Erro: ' + error.message); return; }
     toast.success(`Tarefa ${newStatus === 'CONCLUIDA' ? 'concluída' : 'atualizada'}!`);
     fetchTarefas();

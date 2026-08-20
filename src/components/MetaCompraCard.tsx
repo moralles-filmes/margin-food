@@ -8,7 +8,8 @@ import { CurrencyInput } from '@/components/ui/brl-input';
 import { DollarSign, Settings2, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
 import { startOfMonth, endOfMonth, getDaysInMonth } from 'date-fns';
 import { getWeeksOfMonth } from './WeeklyBreakdown';
-import { formatDateBR, formatInBR, fmtBRL, formatPercentBR, parseLocalDate } from '@/lib/formatters';
+import { formatInBR, fmtBRL, formatPercentBR, parseLocalDate } from '@/lib/formatters';
+import { formatDateBR as formatDateISO } from '@/lib/datetime';
 
 export function getMetaStatus(percent: number, amarelo: number, vermelho: number) {
   if (percent >= vermelho) return 'estourado';
@@ -45,7 +46,7 @@ export function calcProjecao(
   const diasNoMes = getDaysInMonth(new Date(year, month - 1));
   const weeks = getWeeksOfMonth(year, month);
   const semanasNoMes = weeks.length;
-  const todayStr = formatDateBR(); // yyyy-MM-dd in BR timezone
+  const todayStr = formatDateISO(); // yyyy-MM-dd in BR timezone
   const [tY, tM, tD] = todayStr.split('-').map(Number);
   const isCurrentMonth = tY === year && tM === month;
   const currentDay = isCurrentMonth ? tD : (new Date(tY, tM - 1, tD) > monthEnd ? diasNoMes : 0);
@@ -104,7 +105,7 @@ export function calcProjecao(
 
 export function useMetaMensal(entries: SalmonEntry[], metas: MetaCompraMensal[], targetMonth?: string, categoria = 'salmao') {
   return useMemo(() => {
-    const mesAno = targetMonth || formatDateBR(new Date()).slice(0, 7);
+    const mesAno = targetMonth || formatDateISO(new Date()).slice(0, 7);
     const meta = metas.find(m => m.mesAno === mesAno && m.categoria === categoria);
     const proj = calcProjecao(entries, mesAno, meta);
 

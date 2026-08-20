@@ -91,7 +91,7 @@ export default function FluxoCaixaSection({ onNavigate }: FluxoCaixaProps) {
   const canExport = useCan('financeiro:fluxo:export');
 
   const [dias, setDias] = useState<DiaCashflow[]>([]);
-  const [totais, setTotais] = useState<Totais>({ entradas: 0, saidas: 0, prev_entradas: 0, prev_saidas: 0 });
+  const [totais, setTotais] = useState<Totais>({ entradas: 0, saidas: 0, prev_entradas: 0, prev_saidas: 0, saldo_acumulado: 0 });
   const [loading, setLoading] = useState(true);
   const [modo, setModo] = useState<'realizado' | 'previsto' | 'ambos'>('ambos');
   const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());

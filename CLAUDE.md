@@ -253,7 +253,6 @@ Todas as Edge Functions usam CORS compartilhado via `supabase/functions/_shared/
 - [ ] Validar isolamento: logar como user do tenant A e tentar `GET /rest/v1/faturamento_periodos_legacy` — deve retornar só registros do mesmo tenant
 - [ ] Dropar tabelas `*_bkp_reset_20260301` (18 tabelas) e `z_canary_test`
 - [ ] Auditar outras telas (Compras, CMV, Financeiro, Relatórios) por padrão `select sem limit + reduce client`
-- [ ] Auditar bugs latentes de `formatDateBR` importado do módulo errado: `MetaCompraCard.tsx:107`, `RhView.tsx:473`
 - [ ] Auditar outros INSERTs diretos via PostgREST em tabelas multi-tenant sem `company_id` explícito
 - [ ] Conciliação: permitir override de competência no lançamento criado pela conciliação (`p_competencia` em `reconcile_import_lancamento`)
 - [ ] Otimizar `rbac_sql_lint_report()` completo para não estourar `statement_timeout` em produção (`bun run security:check` usa o fallback `rbac_sql_lint_report_quick()`)

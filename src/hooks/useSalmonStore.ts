@@ -219,8 +219,9 @@ export function useSalmonStore() {
   useEffect(() => {
     (async () => {
       try {
-        const { data: kpis, error } = await supabase.rpc('get_salmon_inventory_adjustment_kg');
+        const { data, error } = await supabase.rpc('get_salmon_inventory_adjustment_kg');
         if (error) throw error;
+        const kpis = data as { produto_found?: boolean; adjustment_kg?: number } | null;
         if (kpis?.produto_found) {
           setInventoryAdjustmentKg(Number(kpis.adjustment_kg));
         }

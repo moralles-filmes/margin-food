@@ -81,7 +81,7 @@ export async function exportTableToPdf(options: ExportOptions): Promise<boolean>
       })
     );
 
-    const colStyles: Record<number, { halign: string }> = {};
+    const colStyles: Record<string, { halign: 'left' | 'right' | 'center' }> = {};
     columns.forEach((col, i) => {
       if (col.align) colStyles[i] = { halign: col.align };
     });

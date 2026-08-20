@@ -74,6 +74,7 @@ export interface CotacaoItem {
   produto_nome_snapshot: string;
   unidade_snapshot: string | null;
   purchase_unit_snapshot: string | null;
+  conversion_factor_snapshot: number;
   quantidade: number;
   observacao: string | null;
   created_at: string;

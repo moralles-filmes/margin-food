@@ -89,10 +89,31 @@ ${colorConfig
 
 const ChartTooltip = RechartsPrimitive.Tooltip;
 
+// recharts v3 injeta payload/label/active em runtime, mas não os expõe mais em
+// ComponentProps<typeof Tooltip> — os tipos abaixo replicam o shape injetado.
+type ChartTooltipItem = {
+  dataKey?: string | number;
+  name?: string | number;
+  value?: number | string;
+  color?: string;
+  payload?: Record<string, unknown> & { fill?: string };
+};
+
 const ChartTooltipContent = React.forwardRef<
   HTMLDivElement,
-  React.ComponentProps<typeof RechartsPrimitive.Tooltip> &
-    React.ComponentProps<"div"> & {
+  React.ComponentProps<"div"> & {
+      active?: boolean;
+      payload?: ChartTooltipItem[];
+      label?: unknown;
+      labelFormatter?: (value: unknown, payload: ChartTooltipItem[]) => React.ReactNode;
+      labelClassName?: string;
+      formatter?: (
+        value: unknown,
+        name: unknown,
+        item: ChartTooltipItem,
+        index: number,
+        payload: unknown,
+      ) => React.ReactNode;
       hideLabel?: boolean;
       hideIndicator?: boolean;
       indicator?: "line" | "dot" | "dashed";
@@ -163,7 +184,7 @@ const ChartTooltipContent = React.forwardRef<
           {payload.map((item, index) => {
             const key = `${nameKey || item.name || item.dataKey || "value"}`;
             const itemConfig = getPayloadConfigFromPayload(config, item, key);
-            const indicatorColor = color || item.payload.fill || item.color;
+            const indicatorColor = color || item.payload?.fill || item.color;
 
             return (
               <div
@@ -227,10 +248,17 @@ ChartTooltipContent.displayName = "ChartTooltip";
 
 const ChartLegend = RechartsPrimitive.Legend;
 
+type ChartLegendItem = {
+  value?: string;
+  dataKey?: string | number;
+  color?: string;
+};
+
 const ChartLegendContent = React.forwardRef<
   HTMLDivElement,
-  React.ComponentProps<"div"> &
-    Pick<RechartsPrimitive.LegendProps, "payload" | "verticalAlign"> & {
+  React.ComponentProps<"div"> & {
+      payload?: ChartLegendItem[];
+      verticalAlign?: "top" | "middle" | "bottom";
       hideIcon?: boolean;
       nameKey?: string;
     }

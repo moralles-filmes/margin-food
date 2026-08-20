@@ -23,8 +23,13 @@ export default function SalmonReconciliationReport() {
   const runCheck = async () => {
     setLoading(true);
     try {
-      const { data: kpis, error } = await supabase.rpc('get_salmon_reconciliation_kpis');
+      const { data: kpisRaw, error } = await supabase.rpc('get_salmon_reconciliation_kpis');
       if (error) throw error;
+      const kpis = kpisRaw as {
+        entries: { count: number; total_kg: number };
+        manips: { count: number; total_kg: number };
+        ledger_saldo: number;
+      };
 
       const dbEntriesCount = Number(kpis.entries.count);
       const dbEntriesKg    = Number(kpis.entries.total_kg);
