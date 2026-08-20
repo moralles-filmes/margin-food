@@ -25,13 +25,12 @@ import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { mapFinanceiroDeleteError } from '@/lib/financeiroErrorMap';
 import { buildCategoryOptions } from '@/lib/categoriaOptions';
 import { matchesImportFilter, type ImportFilter } from '@/lib/conciliacaoFilters';
-import { cn } from '@/lib/utils';
+import { cn, normalizeSearchText } from '@/lib/utils';
 import { runOptionalAutoBind } from '@/lib/conciliacaoAutoBind';
 import { extractSupabaseErrorMessage } from '@/lib/supabaseErrors';
 import { computeScore } from '@/lib/conciliacaoScore';
 import { matchTransferCandidate, findTransferWarnings, type TransferCandidate, type TransferWarning } from '@/lib/conciliacaoTransferMatch';
 import type { ContaBancariaRef, CategoriaFinRef, CentroCustoRef, LancamentoConciliacao, LancamentoCandidate, ContaPagarCandidate, ContaReceberCandidate, ContaPagarAberta } from '@/types/financeiro';
-import { normalizeSearchText } from '@/lib/utils';
 import { mapPagamentoError } from '@/lib/financeiroErrorMap';
 import DateRangePresets from './DateRangePresets';
 import { subDays } from 'date-fns';
@@ -124,7 +123,10 @@ interface ConciliadoRow {
 }
 
 function bankLineKey(linha: { data: string; valor: number; tipo: string; descricao?: string | null }) {
-  return `${linha.data}|${Number(linha.valor)}|${linha.tipo}|${linha.descricao || ''}`;
+  // Normalizado (sem acento/maiúsculas/espaços extras): o banco pode truncar a
+  // descrição em tamanho diferente entre dois downloads do mesmo extrato, e
+  // igualdade exata deixaria passar despercebida a mesma reimportação.
+  return `${linha.data}|${Number(linha.valor)}|${linha.tipo}|${normalizeSearchText(linha.descricao || '')}`;
 }
 
 function consumeCount(counts: Map<string, number>, key: string): boolean {
@@ -177,6 +179,14 @@ export default function ConciliacaoBancariaSection() {
   // Confirmação das linhas que casaram com uma baixa já registrada em CP/CR
   const [jaNoRazaoDialog, setJaNoRazaoDialog] = useState<{ open: boolean; indices: number[] }>({ open: false, indices: [] });
 
+  // Linhas que a RPC recusou a importar por já existir um lançamento igual
+  // (mesma conta/valor/data/descrição) com um FITID diferente — extrato
+  // reimportado do banco. Ver reconcile_import_lancamento(p_force_duplicate).
+  const [duplicataDialog, setDuplicataDialog] = useState<{
+    open: boolean;
+    itens: { linha: LinhaExtrato; lancamentoId: string; criadoEm?: string }[];
+  }>({ open: false, itens: [] });
+
   // Revisão obrigatória antes de dar baixa em boleto. Sem ela, o "Processar"
   // baixou 21 contas em 3 segundos sem ninguém confirmar nada.
   const [baixaDialog, setBaixaDialog] = useState<{ open: boolean; indices: number[]; escopo: 'lote' | 'individual' }>(
@@ -215,6 +225,17 @@ export default function ConciliacaoBancariaSection() {
     extratoInfo: ExtratoConta;
     saldoFinalArquivo?: { valor: number; data: string };
     fileName: string;
+  } | null>(null);
+
+  // Aviso antes de substituir linhas ainda não processadas de um upload anterior
+  // (desaparecerem silenciosamente da fila e do sessionStorage era o próprio bug).
+  const [substituirExtratoDialog, setSubstituirExtratoDialog] = useState<{
+    open: boolean;
+    parsed: LinhaExtrato[];
+    extratoInfo: ExtratoConta;
+    saldoFinalArquivo?: { valor: number; data: string };
+    fileName: string;
+    pendentes: number;
   } | null>(null);
 
   // Dialogo de conferência do saldo final do extrato (dispara após a checagem de conta)
@@ -1046,6 +1067,38 @@ export default function ConciliacaoBancariaSection() {
     });
   };
 
+  /** Continuação de handleFile após a checagem de linhas pendentes (direto, ou após confirmar substituição). */
+  const continuarComArquivo = (
+    parsed: LinhaExtrato[],
+    extratoInfo: ExtratoConta,
+    saldoFinalArquivo: { valor: number; data: string } | undefined,
+    fileName: string,
+  ) => {
+    // Verifica se o extrato pertence à conta selecionada
+    const contaCadastro = contas.find(c => c.id === contaSel);
+    const verdict = verifyContaExtrato(extratoInfo, contaCadastro);
+
+    if (verdict.status === 'mismatch') {
+      // Bloqueia — abre dialog com opção de override
+      setContaMismatch({ open: true, parsed, extratoInfo, saldoFinalArquivo, fileName });
+      return;
+    }
+
+    if (verdict.status === 'unverified' && (extratoInfo.numeroConta || extratoInfo.agencia)) {
+      // O extrato tem info de conta mas não foi possível comparar (ex: cadastro sem nº/agência)
+      toast.warning('Não foi possível confirmar a conta do extrato — verifique se a conta selecionada está correta.');
+    }
+
+    openConfirmSaldo(parsed, saldoFinalArquivo, fileName);
+  };
+
+  const confirmarSubstituirExtrato = () => {
+    if (!substituirExtratoDialog) return;
+    const { parsed, extratoInfo, saldoFinalArquivo, fileName } = substituirExtratoDialog;
+    setSubstituirExtratoDialog(null);
+    continuarComArquivo(parsed, extratoInfo, saldoFinalArquivo, fileName);
+  };
+
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -1061,25 +1114,20 @@ export default function ConciliacaoBancariaSection() {
         return;
       }
 
-      // Verifica se o extrato pertence à conta selecionada
-      const contaCadastro = contas.find(c => c.id === contaSel);
-      const verdict = verifyContaExtrato(result.conta, contaCadastro);
-
-      if (verdict.status === 'mismatch') {
-        // Bloqueia — abre dialog com opção de override
-        setContaMismatch({
+      // Linhas de um upload anterior ainda não resolvidas (nem conciliadas, nem
+      // ignoradas): substituir sem avisar as fazia sumir da fila de trabalho e
+      // do sessionStorage sem qualquer confirmação — ficavam pendentes de
+      // categoria/rateio já escolhidos e nunca eram reprocessadas.
+      const pendentes = linhas.filter(l => !l.jaConciliada && !l.ignorada).length;
+      if (pendentes > 0) {
+        setSubstituirExtratoDialog({
           open: true, parsed, extratoInfo: result.conta,
-          saldoFinalArquivo: result.saldoFinalArquivo, fileName: file.name,
+          saldoFinalArquivo: result.saldoFinalArquivo, fileName: file.name, pendentes,
         });
         return;
       }
 
-      if (verdict.status === 'unverified' && (result.conta.numeroConta || result.conta.agencia)) {
-        // O extrato tem info de conta mas não foi possível comparar (ex: cadastro sem nº/agência)
-        toast.warning('Não foi possível confirmar a conta do extrato — verifique se a conta selecionada está correta.');
-      }
-
-      openConfirmSaldo(parsed, result.saldoFinalArquivo, file.name);
+      continuarComArquivo(parsed, result.conta, result.saldoFinalArquivo, file.name);
     } catch (err) {
       console.error('[ConciliacaoBancariaSection.handleFile]', err);
       toast.error('Erro ao processar arquivo');
@@ -1284,6 +1332,64 @@ export default function ConciliacaoBancariaSection() {
     if (error) throw error;
   };
 
+  /** Rateio (ou categoria única) da linha, no formato que a RPC de importação espera. */
+  const buildRateioPayload = (l: LinhaExtrato) => {
+    if (l.rateioLinhas && l.rateioLinhas.length > 0) {
+      return l.rateioLinhas.map(r => ({
+        categoria_id: r.categoria_id || null,
+        centro_custo_id: r.centro_custo_id || null,
+        valor: r.valor,
+        percentual: r.percentual || null,
+        observacao: r.observacao || null,
+      }));
+    }
+    if (l.categoriaId) {
+      const cat = categorias.find(c => c.id === l.categoriaId);
+      return [{
+        categoria_id: l.categoriaId,
+        centro_custo_id: cat?.centro_custo_padrao_id || null,
+        valor: l.valor,
+        percentual: 100,
+        observacao: null,
+      }];
+    }
+    return null;
+  };
+
+  /** Linha sinalizada como possível duplicata: usuário confirmou que é uma
+   *  transação legítima repetida (ex.: duas vendas iguais no mesmo dia) e
+   *  quer importar mesmo assim. */
+  const forcarImportarDuplicata = async (item: { linha: LinhaExtrato; lancamentoId: string; criadoEm?: string }) => {
+    const l = item.linha;
+    try {
+      const { data, error } = await supabase.rpc('reconcile_import_lancamento', {
+        p_data: l.data, p_descricao: l.descricao, p_valor: l.valor, p_tipo: l.tipo,
+        p_conta_id: contaSel, p_user_id: user?.id,
+        p_rateio_linhas: buildRateioPayload(l),
+        p_external_id: l.fitId || null,
+        p_force_duplicate: true,
+      });
+      if (error) throw error;
+      const result = data as { lancamento_id?: string } | null;
+      await bindExtratoLine(l, result?.lancamento_id);
+      setLinhas(prev => prev.filter(x => x !== l));
+      setDuplicataDialog(prev => ({ ...prev, itens: prev.itens.filter(it => it.linha !== l) }));
+      loadLancamentos();
+      emitDataEvent('financeiro:lancamentos');
+      emitDataEvent('financeiro:conciliacao');
+      toast.success('Lançamento importado como transação legítima repetida.');
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao importar');
+    }
+  };
+
+  /** Linha sinalizada como possível duplicata: usuário confirmou que é a mesma
+   *  cobrança e prefere só marcá-la como ignorada (não entra no razão). */
+  const ignorarDuplicata = (item: { linha: LinhaExtrato; lancamentoId: string; criadoEm?: string }) => {
+    const idx = linhas.findIndex(x => x === item.linha);
+    setDuplicataDialog(prev => ({ ...prev, itens: prev.itens.filter(it => it.linha !== item.linha) }));
+    if (idx >= 0) ignorarLinha(idx);
+  };
 
   /** Valor do boleto/título escolhido para a linha (o do extrato é `linha.valor`). */
   const valorDoTitulo = (linha: LinhaExtrato): number => {
@@ -1303,9 +1409,14 @@ export default function ConciliacaoBancariaSection() {
         const linha = linhas[i];
         const diff = linha ? diferencaBaixa(linha) : 0;
         // Sugere a classificação pelo sinal; a categoria continua escolha da pessoa,
-        // menos no desconto, onde o padrão não operacional já vem escolhido.
+        // menos no desconto, onde o padrão não operacional já vem escolhido — o
+        // conjunto de categorias muda de lado (receita x despesa) conforme
+        // matchOrigin, mas o sinal que decide DESCONTO x JUROS é o mesmo dos dois lados.
+        const descontoPadraoId = linha?.matchOrigin === 'conta_receber'
+          ? categoriaDescontoConcedidoPadraoId
+          : categoriaDescontoPadraoId;
         next[i] = diff < 0
-          ? { tipo: 'DESCONTO', categoriaId: categoriaDescontoPadraoId }
+          ? { tipo: 'DESCONTO', categoriaId: descontoPadraoId }
           : { tipo: diff > 0 ? 'JUROS' : '', categoriaId: '' };
       }
       return next;
@@ -1320,7 +1431,7 @@ export default function ConciliacaoBancariaSection() {
       const diff = diferencaBaixa(linha);
       if (Math.abs(diff) < 0.01) continue;
 
-      if (linha.matchOrigin !== 'conta_pagar') {
+      if (linha.matchOrigin !== 'conta_pagar' && linha.matchOrigin !== 'conta_receber') {
         toast.error(`"${linha.matchDescricao}": o valor recebido difere do título. Ajuste o título antes de baixar.`);
         return;
       }
@@ -1369,7 +1480,10 @@ export default function ConciliacaoBancariaSection() {
           const { data, error } = await supabase.rpc('reconcile_receive_conta_receber', {
             p_conta_receber_id: l.matchId!, p_conta_bancaria_id: contaSel,
             p_data_recebimento: l.data, p_user_id: user?.id,
-          });
+            p_valor_extrato: l.valor,
+            p_ajuste_tipo: temDiferenca ? (ajuste?.tipo || null) : null,
+            p_ajuste_categoria_id: temDiferenca ? (ajuste?.categoriaId || null) : null,
+          } as any);
           if (error) throw error;
           const result = data as { lancamento_id?: string } | null;
           await bindExtratoLine(l, result?.lancamento_id);
@@ -1441,40 +1555,30 @@ export default function ConciliacaoBancariaSection() {
       return;
     }
 
+    const duplicatasDetectadas: { linha: LinhaExtrato; lancamentoId: string; criadoEm?: string }[] = [];
+
     setImportando(true);
     try {
       if (toImport.length > 0) {
         for (const l of toImport) {
-          let rateioPayload = l.rateioLinhas && l.rateioLinhas.length > 0
-            ? l.rateioLinhas.map(r => ({
-                categoria_id: r.categoria_id || null,
-                centro_custo_id: r.centro_custo_id || null,
-                valor: r.valor,
-                percentual: r.percentual || null,
-                observacao: r.observacao || null,
-              }))
-            : null;
-
-          // Categoria escolhida inline (sem rateio) → rateio de 1 linha, para a RPC gravar categoria no INSERT
-          if (!rateioPayload && l.categoriaId) {
-            const cat = categorias.find(c => c.id === l.categoriaId);
-            rateioPayload = [{
-              categoria_id: l.categoriaId,
-              centro_custo_id: cat?.centro_custo_padrao_id || null,
-              valor: l.valor,
-              percentual: 100,
-              observacao: null,
-            }];
-          }
-
           const { data, error } = await supabase.rpc('reconcile_import_lancamento', {
             p_data: l.data, p_descricao: l.descricao, p_valor: l.valor, p_tipo: l.tipo,
             p_conta_id: contaSel, p_user_id: user?.id,
-            p_rateio_linhas: rateioPayload || null,
+            p_rateio_linhas: buildRateioPayload(l),
             p_external_id: l.fitId || null,
           });
           if (error) throw error;
-          const result = data as { lancamento_id?: string } | null;
+          const result = data as { status?: string; lancamento_id?: string; criado_em?: string } | null;
+
+          // Mesmo valor/data/descrição/conta já conciliados com um FITID
+          // diferente — provável reimportação do mesmo extrato. Não insere:
+          // fica pendente para a pessoa decidir (ver duplicataDialog).
+          if (result?.status === 'possible_duplicate' && result.lancamento_id) {
+            duplicatasDetectadas.push({ linha: l, lancamentoId: result.lancamento_id, criadoEm: result.criado_em });
+            processadas.delete(l);
+            continue;
+          }
+
           await bindExtratoLine(l, result?.lancamento_id);
         }
       }
@@ -1520,22 +1624,34 @@ export default function ConciliacaoBancariaSection() {
       }
 
       for (const l of pendingCR) {
+        // Mesmo tratamento de pendingCP: o valor do extrato vai junto, a RPC
+        // recusa a baixa se houver diferença sem classificação.
+        const idx = linhas.indexOf(l);
+        const ajuste = ajustesBaixa[idx];
+        const temDiferenca = Math.abs(diferencaBaixa(l)) >= 0.01;
         const { data, error } = await supabase.rpc('reconcile_receive_conta_receber', {
           p_conta_receber_id: l.matchId!, p_conta_bancaria_id: contaSel,
           p_data_recebimento: l.data, p_user_id: user?.id,
-        });
+          p_valor_extrato: l.valor,
+          p_ajuste_tipo: temDiferenca ? (ajuste?.tipo || null) : null,
+          p_ajuste_categoria_id: temDiferenca ? (ajuste?.categoriaId || null) : null,
+        } as any);
         if (error) throw error;
         const result = data as { lancamento_id?: string } | null;
         await bindExtratoLine(l, result?.lancamento_id);
       }
 
-      const total = toImport.length + toLinkExisting.length + toReconcileLanc.length + pendingCP.length + pendingCR.length;
+      const total = toImport.length + toLinkExisting.length + toReconcileLanc.length + pendingCP.length + pendingCR.length - duplicatasDetectadas.length;
       const vinculadas = toLinkExisting.length > 0
         ? ` (${toLinkExisting.length} vinculada(s) a baixas já lançadas, sem duplicar)`
         : '';
-      toast.success(`${total} operação(ões) processada(s) com sucesso${vinculadas}`);
-      // Remove apenas as linhas processadas; as demais (não selecionadas, sem match, ignoradas, já conciliadas)
-      // permanecem na lista. setLinhas já persiste o resultado no sessionStorage via saveLinhas.
+      if (total > 0) toast.success(`${total} operação(ões) processada(s) com sucesso${vinculadas}`);
+      if (duplicatasDetectadas.length > 0) {
+        toast.warning(`${duplicatasDetectadas.length} linha(s) não foram importadas por parecerem duplicatas de um lançamento já existente — revise antes de confirmar.`);
+        setDuplicataDialog({ open: true, itens: duplicatasDetectadas });
+      }
+      // Remove apenas as linhas processadas; as demais (não selecionadas, sem match, ignoradas, já conciliadas,
+      // ou sinalizadas como possível duplicata) permanecem na lista. setLinhas já persiste no sessionStorage.
       setLinhas(prev => prev.filter(l => !processadas.has(l)));
       loadLancamentos();
       emitDataEvent('financeiro:lancamentos');
@@ -1611,6 +1727,18 @@ export default function ConciliacaoBancariaSection() {
   const categoriaDescontoPadraoId = useMemo(
     () => categoriasDesconto.find(c => normalizeSearchText(c.nome) === 'descontos obtidos')?.id || '',
     [categoriasDesconto],
+  );
+  // Espelho de categoriasDesconto para o lado de recebimento: receber a menos que o
+  // título é desconto CONCEDIDO ao cliente — DESPESA fora do resultado (DESPESAS NÃO
+  // OPERACIONAIS), senão infla despesas operacionais no DRE. `reconcile_receive_conta_receber`
+  // recusa com CATEGORIA_OPERACIONAL do mesmo jeito.
+  const categoriasDescontoConcedido = useMemo(
+    () => categorias.filter(c => c.tipo === 'despesa' && c.excluir_dos_totais === true),
+    [categorias],
+  );
+  const categoriaDescontoConcedidoPadraoId = useMemo(
+    () => categoriasDescontoConcedido.find(c => normalizeSearchText(c.nome) === 'descontos concedidos')?.id || '',
+    [categoriasDescontoConcedido],
   );
   const setLinhaCategoria = (i: number, categoriaId: string) =>
     setLinhas(prev => prev.map((l, j) => j === i ? { ...l, categoriaId } : l));
@@ -2219,9 +2347,14 @@ export default function ConciliacaoBancariaSection() {
                 const diff = diferencaBaixa(linha);
                 const diverge = Math.abs(diff) >= 0.01;
                 const ajuste = ajustesBaixa[i] || { tipo: '' as AjusteTipo, categoriaId: '' };
-                // Extrato maior = despesa a mais (juros/tarifa). Menor = receita (desconto),
-                // e aí só categoria fora do resultado — desconto não é faturamento.
-                const categoriasAjuste = diff > 0 ? categoriasForTipo('DESPESA') : categoriasDesconto;
+                const isRecebimento = linha.matchOrigin === 'conta_receber';
+                // CP: extrato maior = despesa a mais (juros/tarifa); menor = receita (desconto),
+                // categoria fora do resultado — desconto não é faturamento.
+                // CR (espelhado): extrato maior = receita a mais (juros/multa cobrados do
+                // cliente); menor = despesa (desconto concedido), também fora do resultado.
+                const categoriasAjuste = isRecebimento
+                  ? (diff > 0 ? categoriasForTipo('RECEITA') : categoriasDescontoConcedido)
+                  : (diff > 0 ? categoriasForTipo('DESPESA') : categoriasDesconto);
 
                 return (
                   <Card key={i} className={diverge ? 'border-warning/40' : ''}>
@@ -2247,59 +2380,52 @@ export default function ConciliacaoBancariaSection() {
                           <p className="text-xs text-warning flex items-center gap-1.5">
                             <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
                             <span>
-                              O banco {diff > 0 ? 'debitou' : 'debitou'} <strong>{fmt(Math.abs(diff))}</strong>
+                              O banco {isRecebimento ? 'creditou' : 'debitou'} <strong>{fmt(Math.abs(diff))}</strong>
                               {diff > 0 ? ' a mais' : ' a menos'} que o título.
                             </span>
                           </p>
 
-                          {linha.matchOrigin === 'conta_pagar' ? (
-                            <div className="grid grid-cols-2 gap-2">
-                              <div>
-                                <Label className="text-[10px] text-muted-foreground">Lançar a diferença como</Label>
-                                <Select
-                                  value={ajuste.tipo}
-                                  onValueChange={v => setAjustesBaixa(prev => ({
-                                    ...prev, [i]: { tipo: v as AjusteTipo, categoriaId: prev[i]?.categoriaId || '' },
-                                  }))}
-                                >
-                                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecione" /></SelectTrigger>
-                                  <SelectContent>
-                                    {diff > 0 ? (
-                                      <>
-                                        <SelectItem value="JUROS">Juros / multa</SelectItem>
-                                        <SelectItem value="TARIFA">Tarifa bancária</SelectItem>
-                                      </>
-                                    ) : (
-                                      <SelectItem value="DESCONTO">Desconto obtido</SelectItem>
-                                    )}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                              <div>
-                                <Label className="text-[10px] text-muted-foreground">Categoria da diferença</Label>
-                                <CategoryCombobox
-                                  value={ajuste.categoriaId}
-                                  onValueChange={v => setAjustesBaixa(prev => ({
-                                    ...prev, [i]: { tipo: prev[i]?.tipo || '', categoriaId: v },
-                                  }))}
-                                  options={categoriasAjuste}
-                                  placeholder="Selecione"
-                                  className="h-8 text-xs"
-                                  modal={false}
-                                />
-                              </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <Label className="text-[10px] text-muted-foreground">Lançar a diferença como</Label>
+                              <Select
+                                value={ajuste.tipo}
+                                onValueChange={v => setAjustesBaixa(prev => ({
+                                  ...prev, [i]: { tipo: v as AjusteTipo, categoriaId: prev[i]?.categoriaId || '' },
+                                }))}
+                              >
+                                <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecione" /></SelectTrigger>
+                                <SelectContent>
+                                  {diff > 0 ? (
+                                    <>
+                                      <SelectItem value="JUROS">{isRecebimento ? 'Juros / multa cobrados' : 'Juros / multa'}</SelectItem>
+                                      <SelectItem value="TARIFA">Tarifa bancária</SelectItem>
+                                    </>
+                                  ) : (
+                                    <SelectItem value="DESCONTO">{isRecebimento ? 'Desconto concedido' : 'Desconto obtido'}</SelectItem>
+                                  )}
+                                </SelectContent>
+                              </Select>
                             </div>
-                          ) : (
-                            <p className="text-[11px] text-muted-foreground">
-                              Diferença em conta a receber ainda não é lançada automaticamente. Ajuste o
-                              valor do título antes de baixar.
-                            </p>
-                          )}
+                            <div>
+                              <Label className="text-[10px] text-muted-foreground">Categoria da diferença</Label>
+                              <CategoryCombobox
+                                value={ajuste.categoriaId}
+                                onValueChange={v => setAjustesBaixa(prev => ({
+                                  ...prev, [i]: { tipo: prev[i]?.tipo || '', categoriaId: v },
+                                }))}
+                                options={categoriasAjuste}
+                                placeholder="Selecione"
+                                className="h-8 text-xs"
+                                modal={false}
+                              />
+                            </div>
+                          </div>
 
                           <p className="text-[11px] text-muted-foreground">
                             O título entra no razão por {fmt(valorTitulo)} na categoria dele, e a diferença
                             vira um lançamento separado. A soma bate com o extrato.
-                            {diff < 0 && ' O desconto fica em categoria não operacional: entra no saldo da conta, mas fora do faturamento do DRE, do DFC e dos relatórios.'}
+                            {diff < 0 && ` O desconto ${isRecebimento ? 'concedido' : 'obtido'} fica em categoria não operacional: entra no saldo da conta, mas fora do resultado no DRE, do DFC e dos relatórios.`}
                           </p>
                         </div>
                       ) : (
@@ -2487,6 +2613,66 @@ export default function ConciliacaoBancariaSection() {
             }}>
               Confirmar e processar
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ========== POSSÍVEL DUPLICATA (mesma conta/valor/data/descrição já conciliados) ========== */}
+      <AlertDialog open={duplicataDialog.open} onOpenChange={(open) => !open && setDuplicataDialog({ open: false, itens: [] })}>
+        <AlertDialogContent className="max-w-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-warning" />
+              {duplicataDialog.itens.length === 1
+                ? '1 linha parece duplicada'
+                : `${duplicataDialog.itens.length} linhas parecem duplicadas`}
+            </AlertDialogTitle>
+          </AlertDialogHeader>
+
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Já existe um lançamento com a <strong>mesma conta, valor, data e descrição</strong>, importado
+              anteriormente com um identificador bancário diferente — provavelmente o extrato foi reimportado
+              (alguns bancos trocam esse identificador a cada exportação). Nada foi lançado para estas linhas.
+              Se for mesmo uma cobrança repetida legítima (ex.: duas vendas iguais no mesmo dia), use
+              "Importar mesmo assim"; senão, marque como ignorada.
+            </p>
+
+            <div className="space-y-2 max-h-[40vh] overflow-y-auto">
+              {duplicataDialog.itens.map((item) => (
+                <Card key={`${item.linha.data}-${item.linha.valor}-${item.linha.descricao}-${item.linha.fitId ?? ''}`} className="border-warning/30">
+                  <CardContent className="p-3 flex items-center justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium break-words">{item.linha.descricao}</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {formatDateBR(parseLocalDate(item.linha.data))}
+                        {item.criadoEm && ` • já conciliado em ${formatInBR(new Date(item.criadoEm), "dd/MM/yyyy 'às' HH:mm")}`}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-sm font-bold text-destructive">{fmt(item.linha.valor)}</span>
+                      <Button size="sm" variant="ghost" className="h-7 text-xs"
+                        onClick={() => ignorarDuplicata(item)}>
+                        Ignorar
+                      </Button>
+                      <Button size="sm" variant="outline" className="h-7 text-xs"
+                        onClick={() => forcarImportarDuplicata(item)}>
+                        Importar mesmo assim
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+              {duplicataDialog.itens.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-3">
+                  Todas as linhas foram resolvidas.
+                </p>
+              )}
+            </div>
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDuplicataDialog({ open: false, itens: [] })}>Fechar</AlertDialogCancel>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -2760,6 +2946,41 @@ export default function ConciliacaoBancariaSection() {
                 }}
               >
                 Importar mesmo assim
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+
+      {/* ========== SUBSTITUIR EXTRATO COM LINHAS PENDENTES ========== */}
+      {substituirExtratoDialog && (
+        <AlertDialog open={substituirExtratoDialog.open}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2 text-warning">
+                <AlertTriangle className="w-5 h-5 shrink-0" />
+                {substituirExtratoDialog.pendentes === 1
+                  ? 'Ainda há 1 linha não processada'
+                  : `Ainda há ${substituirExtratoDialog.pendentes} linhas não processadas`}
+              </AlertDialogTitle>
+            </AlertDialogHeader>
+
+            <p className="text-sm text-muted-foreground">
+              Importar “{substituirExtratoDialog.fileName}” substitui a lista atual — as linhas do extrato
+              anterior que ainda não foram conciliadas nem ignoradas (com categoria/rateio já escolhidos, se for
+              o caso) vão sumir da tela sem serem processadas. Cancele e finalize-as antes, ou continue se elas
+              não importam mais.
+            </p>
+
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setSubstituirExtratoDialog(null)}>
+                Cancelar
+              </AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+                onClick={confirmarSubstituirExtrato}
+              >
+                Substituir mesmo assim
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

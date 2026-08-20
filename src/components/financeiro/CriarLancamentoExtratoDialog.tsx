@@ -208,29 +208,29 @@ export default function CriarLancamentoExtratoDialog({
           p_external_id: linha?.fitId || null,
         });
         if (error) throw error;
-        const importResult = data as { lancamento_id?: string } | null;
+        const importResult = data as { status?: string; lancamento_id?: string } | null;
+
+        // Mesma conta/valor/data/descrição já conciliados com um FITID diferente —
+        // provável reimportação do mesmo extrato (ver reconcile_import_lancamento).
+        // Nada foi lançado: para forçar como transação legítima repetida, use
+        // "Processar" na tela de conciliação, que oferece a opção por linha.
+        if (importResult?.status === 'possible_duplicate') {
+          toast.error('Já existe um lançamento igual (mesma conta, valor, data e descrição) — nada foi criado. Se for uma cobrança repetida legítima, use "Importar mesmo assim" na tela de conciliação.');
+          setSaving(false);
+          return;
+        }
+
         await bindExtratoLine(importResult?.lancamento_id);
 
         // Update the just-created lancamento with extra fields if needed.
         // NÃO incluir categoria_id aqui: é campo vigiado pelo trigger de lançamento REALIZADO.
-        if (dataVencimento || dataPagamento || observacoes) {
-          // Find the lancamento we just created (most recent for this account)
-          const { data: recent } = await supabase.from('fin_lancamentos')
-            .select('id')
-            .eq('conta_id', contaBancariaId)
-            .eq('descricao', descricao)
-            .eq('data_competencia', dataCompetencia)
-            .order('created_at', { ascending: false })
-            .limit(1);
-
-          if (recent && recent.length > 0) {
-            const updatePayload: any = {};
-            if (dataVencimento) updatePayload.data_vencimento = dataVencimento;
-            if (dataPagamento) updatePayload.data_pagamento = dataPagamento;
-            if (observacoes) updatePayload.observacoes = observacoes;
-            if (Object.keys(updatePayload).length > 0) {
-              await supabase.from('fin_lancamentos').update(updatePayload).eq('id', recent[0].id);
-            }
+        if (importResult?.lancamento_id && (dataVencimento || dataPagamento || observacoes)) {
+          const updatePayload: any = {};
+          if (dataVencimento) updatePayload.data_vencimento = dataVencimento;
+          if (dataPagamento) updatePayload.data_pagamento = dataPagamento;
+          if (observacoes) updatePayload.observacoes = observacoes;
+          if (Object.keys(updatePayload).length > 0) {
+            await supabase.from('fin_lancamentos').update(updatePayload).eq('id', importResult.lancamento_id);
           }
         }
 
@@ -239,6 +239,28 @@ export default function CriarLancamentoExtratoDialog({
         onCreated({ id: 'lancamento-created', destino: 'lancamento' });
 
       } else if (destino === 'conta_pagar') {
+        // A RPC roda ANTES do insert do título: se vier possible_duplicate, nada é
+        // criado — evita ficar com uma conta a pagar "PAGO" sem despesa nenhuma no
+        // razão, órfã e sem correção possível depois (o título já nasceria pago).
+        const { data: lancData, error: lancError } = await supabase.rpc('reconcile_import_lancamento', {
+          p_data: dataCompetencia,
+          p_descricao: descricao,
+          p_valor: valor,
+          p_tipo: 'DESPESA',
+          p_conta_id: contaBancariaId,
+          p_user_id: user?.id,
+          p_rateio_linhas: effectivePayload,
+          p_external_id: linha?.fitId || null,
+        });
+        if (lancError) throw lancError;
+        const lancResult = lancData as { status?: string; lancamento_id?: string } | null;
+
+        if (lancResult?.status === 'possible_duplicate') {
+          toast.error('Já existe um lançamento igual (mesma conta, valor, data e descrição) — nada foi criado. Se for uma cobrança repetida legítima, use "Importar mesmo assim" na tela de conciliação.');
+          setSaving(false);
+          return;
+        }
+
         const payload: any = {
           descricao,
           valor,
@@ -251,44 +273,30 @@ export default function CriarLancamentoExtratoDialog({
           observacoes: observacoes || null,
           categoria_id: useRateio ? null : (categoriaId || null),
           supplier_id: supplierId || null,
+          lancamento_id: lancResult?.lancamento_id || null,
         };
 
         const { data: cpData, error: cpError } = await supabase.from('fin_contas_pagar').insert(payload).select('id').single();
-        if (cpError) throw cpError;
+        if (cpError) {
+          // O lançamento já foi criado/conciliado pela RPC acima — se esse insert
+          // falhar agora, ele fica no razão sem conta a pagar vinculada. Repetir a
+          // mesma ação reconcilia sozinho (idempotency_key bate de novo), mas o
+          // aviso precisa deixar isso explícito em vez de um erro genérico.
+          throw new Error(`Lançamento já foi criado no razão, mas a conta a pagar não pôde ser gravada (${cpError.message}). Tente novamente — a repetição não duplica.`);
+        }
 
-        // Create corresponding lancamento for the ledger with proper referencia linking
-        const { data: lancData, error: lancError } = await supabase.rpc('reconcile_import_lancamento', {
-          p_data: dataCompetencia,
-          p_descricao: descricao,
-          p_valor: valor,
-          p_tipo: 'DESPESA',
-          p_conta_id: contaBancariaId,
-          p_user_id: user?.id,
-          p_rateio_linhas: effectivePayload,
-          p_external_id: linha?.fitId || null,
-        });
-        if (lancError) console.warn('Lancamento mirror for CP:', lancError.message);
-        else await bindExtratoLine((lancData as { lancamento_id?: string } | null)?.lancamento_id);
+        await bindExtratoLine(lancResult?.lancamento_id);
 
-        // Link the lancamento back to CP via referencia fields
-        if (cpData) {
-          const { data: recentLanc } = await supabase.from('fin_lancamentos')
-            .select('id')
-            .eq('conta_id', contaBancariaId)
-            .eq('descricao', descricao)
-            .eq('data_competencia', dataCompetencia)
-            .order('created_at', { ascending: false })
-            .limit(1);
-          if (recentLanc && recentLanc.length > 0) {
-            await supabase.from('fin_lancamentos').update({
-              referencia_modulo: 'contas_pagar',
-              referencia_id: cpData.id,
-              origem: 'espelho_cp',
-            }).eq('id', recentLanc[0].id);
-            await supabase.from('fin_contas_pagar').update({
-              lancamento_id: recentLanc[0].id,
-            }).eq('id', cpData.id);
-          }
+        // Link o lançamento de volta à CP via referencia fields, usando o id que a
+        // própria RPC retornou — nunca "o lançamento mais recente para esta
+        // conta/descrição/data", que podia roubar o vínculo de outro lançamento
+        // legítimo criado quase ao mesmo tempo (duas cobranças iguais no mesmo dia).
+        if (lancResult?.lancamento_id) {
+          await supabase.from('fin_lancamentos').update({
+            referencia_modulo: 'contas_pagar',
+            referencia_id: cpData.id,
+            origem: 'espelho_cp',
+          }).eq('id', lancResult.lancamento_id);
         }
 
         toast.success('Conta a pagar criada (já baixada) e conciliada!');
@@ -297,6 +305,27 @@ export default function CriarLancamentoExtratoDialog({
         onCreated({ id: cpData?.id || 'cp-created', destino: 'conta_pagar' });
 
       } else if (destino === 'conta_receber') {
+        // Mesmo motivo do bloco de Conta a Pagar: a RPC roda ANTES do insert do
+        // título, para nunca deixar um recebível "RECEBIDO" órfão sem lançamento.
+        const { data: lancData, error: lancError } = await supabase.rpc('reconcile_import_lancamento', {
+          p_data: dataCompetencia,
+          p_descricao: descricao,
+          p_valor: valor,
+          p_tipo: 'RECEITA',
+          p_conta_id: contaBancariaId,
+          p_user_id: user?.id,
+          p_rateio_linhas: effectivePayload,
+          p_external_id: linha?.fitId || null,
+        });
+        if (lancError) throw lancError;
+        const lancResult = lancData as { status?: string; lancamento_id?: string } | null;
+
+        if (lancResult?.status === 'possible_duplicate') {
+          toast.error('Já existe um lançamento igual (mesma conta, valor, data e descrição) — nada foi criado. Se for uma cobrança repetida legítima, use "Importar mesmo assim" na tela de conciliação.');
+          setSaving(false);
+          return;
+        }
+
         const payload: any = {
           descricao,
           valor,
@@ -310,44 +339,25 @@ export default function CriarLancamentoExtratoDialog({
           categoria_id: useRateio ? null : (categoriaId || null),
           cliente: cliente || null,
           supplier_id: supplierId || null,
+          lancamento_id: lancResult?.lancamento_id || null,
         };
 
         const { data: crData, error: crError } = await supabase.from('fin_contas_receber').insert(payload).select('id').single();
-        if (crError) throw crError;
+        if (crError) {
+          // Mesmo motivo do bloco de Conta a Pagar acima.
+          throw new Error(`Lançamento já foi criado no razão, mas a conta a receber não pôde ser gravada (${crError.message}). Tente novamente — a repetição não duplica.`);
+        }
 
-        // Create corresponding lancamento for the ledger
-        const { data: lancData, error: lancError } = await supabase.rpc('reconcile_import_lancamento', {
-          p_data: dataCompetencia,
-          p_descricao: descricao,
-          p_valor: valor,
-          p_tipo: 'RECEITA',
-          p_conta_id: contaBancariaId,
-          p_user_id: user?.id,
-          p_rateio_linhas: effectivePayload,
-          p_external_id: linha?.fitId || null,
-        });
-        if (lancError) console.warn('Lancamento mirror for CR:', lancError.message);
-        else await bindExtratoLine((lancData as { lancamento_id?: string } | null)?.lancamento_id);
+        await bindExtratoLine(lancResult?.lancamento_id);
 
-        // Link the lancamento back to CR via referencia fields
-        if (crData) {
-          const { data: recentLanc } = await supabase.from('fin_lancamentos')
-            .select('id')
-            .eq('conta_id', contaBancariaId)
-            .eq('descricao', descricao)
-            .eq('data_competencia', dataCompetencia)
-            .order('created_at', { ascending: false })
-            .limit(1);
-          if (recentLanc && recentLanc.length > 0) {
-            await supabase.from('fin_lancamentos').update({
-              referencia_modulo: 'contas_receber',
-              referencia_id: crData.id,
-              origem: 'espelho_cr',
-            }).eq('id', recentLanc[0].id);
-            await supabase.from('fin_contas_receber').update({
-              lancamento_id: recentLanc[0].id,
-            }).eq('id', crData.id);
-          }
+        // Link o lançamento de volta à CR via referencia fields (mesmo motivo do
+        // bloco de Conta a Pagar acima).
+        if (lancResult?.lancamento_id) {
+          await supabase.from('fin_lancamentos').update({
+            referencia_modulo: 'contas_receber',
+            referencia_id: crData.id,
+            origem: 'espelho_cr',
+          }).eq('id', lancResult.lancamento_id);
         }
 
         toast.success('Conta a receber criada (já recebida) e conciliada!');
