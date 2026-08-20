@@ -113,6 +113,26 @@ function clearLinhas(contaId: string) {
   try { sessionStorage.removeItem(SESSION_KEY(contaId)); } catch (_) { /* sessionStorage indisponível */ }
 }
 
+/** Saldo final do extrato confirmado pelo usuário — referência da conferência pós-processamento. */
+const SALDO_EXTRATO_KEY = (contaId: string) => `conciliacao_saldo_extrato_${contaId}`;
+
+interface SaldoExtratoRef { valor: number; data: string }
+
+function saveSaldoExtrato(contaId: string, saldo: SaldoExtratoRef) {
+  try { sessionStorage.setItem(SALDO_EXTRATO_KEY(contaId), JSON.stringify(saldo)); } catch (_) { /* sessionStorage indisponível */ }
+}
+
+function loadSaldoExtrato(contaId: string): SaldoExtratoRef | null {
+  try {
+    const raw = sessionStorage.getItem(SALDO_EXTRATO_KEY(contaId));
+    return raw ? JSON.parse(raw) : null;
+  } catch (_) { return null; }
+}
+
+function clearSaldoExtrato(contaId: string) {
+  try { sessionStorage.removeItem(SALDO_EXTRATO_KEY(contaId)); } catch (_) { /* sessionStorage indisponível */ }
+}
+
 /** Lançamento já conciliado da conta, usado para reconhecer linha de extrato repetida. */
 interface ConciliadoRow {
   id: string;
@@ -150,6 +170,15 @@ export default function ConciliacaoBancariaSection() {
   const [linhas, setLinhasState] = useState<LinhaExtrato[]>([]);
   const [importFilter, setImportFilter] = useState<ImportFilter>('todos');
   const [importando, setImportando] = useState(false);
+
+  // Conferência de saldo pós-processamento: compara o saldo oficial do extrato
+  // (confirmado no upload) com o saldo do sistema + linhas ainda pendentes.
+  // É a rede final contra linha engolida/ignorada indevidamente: qualquer venda
+  // que o processamento deixe de lançar aparece aqui como diferença em R$.
+  const [saldoExtrato, setSaldoExtrato] = useState<SaldoExtratoRef | null>(null);
+  const [conferenciaSaldo, setConferenciaSaldo] = useState<{
+    sistema: number; projetado: number; pendentesDelta: number; diferenca: number;
+  } | null>(null);
 
   const [lancamentos, setLancamentos] = useState<LancamentoConciliacao[]>([]);
   const [lancamentoRateioCategoryIds, setLancamentoRateioCategoryIds] = useState<Record<string, string[]>>({});
@@ -276,10 +305,13 @@ export default function ConciliacaoBancariaSection() {
   // Restaura linhas do sessionStorage quando a conta é selecionada
   useEffect(() => {
     setImportFilter('todos');
+    setConferenciaSaldo(null);
     if (!contaSel) {
       setLinhasState([]);
+      setSaldoExtrato(null);
       return;
     }
+    setSaldoExtrato(loadSaldoExtrato(contaSel));
     const saved = loadLinhas(contaSel);
     if (saved && saved.length > 0) {
       setLinhasState(saved);
@@ -291,6 +323,39 @@ export default function ConciliacaoBancariaSection() {
       setLinhasState([]);
     }
   }, [contaSel]);
+
+  // Recalcula a conferência de saldo sempre que as linhas mudam (processar,
+  // ignorar, desconciliar). Debounce curto para agrupar mutações em sequência.
+  useEffect(() => {
+    if (!contaSel || !saldoExtrato) {
+      setConferenciaSaldo(null);
+      return;
+    }
+    const t = setTimeout(async () => {
+      const { data, error } = await supabase.rpc('get_fin_saldo_conta_em', {
+        p_conta_id: contaSel,
+        p_data: saldoExtrato.data,
+      });
+      if (error) {
+        console.error('[ConciliacaoBancariaSection.conferenciaSaldo]', error);
+        return;
+      }
+      const sistema = Number(data) || 0;
+      // Linhas ainda não resolvidas entram como projeção: quando tudo for
+      // processado, projetado === sistema e a comparação vira definitiva.
+      const pendentesDelta = linhas
+        .filter(l => !l.jaConciliada && !l.ignorada)
+        .reduce((s, l) => s + (l.tipo === 'RECEITA' ? l.valor : -l.valor), 0);
+      const projetado = sistema + pendentesDelta;
+      setConferenciaSaldo({
+        sistema,
+        projetado,
+        pendentesDelta,
+        diferenca: saldoExtrato.valor - projetado,
+      });
+    }, 600);
+    return () => clearTimeout(t);
+  }, [contaSel, saldoExtrato, linhas]);
 
   useEffect(() => {
     if (contaSel && view === 'conciliar') loadLancamentos();
@@ -688,7 +753,11 @@ export default function ConciliacaoBancariaSection() {
     contasReceber: ContaReceberCandidate[];
     conciliadosCounts: Map<string, number>;
     ignoradasCounts: Map<string, number>;
-    externalIdsProcessados: Set<string>;
+    /** `tipo|external_id` → lancamento_id do vínculo. Mapa (e não Set) de
+     *  propósito: dentro de UM arquivo, cada lançamento só pode ser reivindicado
+     *  por uma linha — dois FITIDs distintos do mesmo arquivo apontando para o
+     *  mesmo lançamento significa que uma das linhas está sem par no razão. */
+    externalIdsProcessados: Map<string, string>;
     /** Lançamentos já amarrados a alguma linha bancária — não podem ser
      *  oferecidos de novo, senão duas linhas do extrato apontariam para a mesma
      *  baixa e uma despesa real sumiria da conciliação. */
@@ -774,7 +843,7 @@ export default function ConciliacaoBancariaSection() {
     const contasReceber = (crRes.data || []) as ContaReceberCandidate[];
 
     const vinculos = (vinculosRes.data || []) as { external_id: string; tipo: string; lancamento_id: string }[];
-    const externalIdsProcessados = new Set(vinculos.map(v => `${v.tipo}|${v.external_id}`));
+    const externalIdsProcessados = new Map(vinculos.map(v => [`${v.tipo}|${v.external_id}`, v.lancamento_id]));
     const lancamentosVinculados = new Set(vinculos.map(v => v.lancamento_id).filter(Boolean));
 
     // Já conciliadas — mostrar com badge em vez de filtrar silenciosamente.
@@ -825,8 +894,18 @@ export default function ConciliacaoBancariaSection() {
 
     // FITID é a identidade bancária estável e tem precedência sobre campos
     // editáveis do lançamento (descrição/categoria/data de competência).
-    if (linha.fitId && ctx.externalIdsProcessados.has(`${linha.tipo}|${linha.fitId}`)) {
-      return { ...base, selecionada: false, jaConciliada: true, ignorada: false };
+    // Consumo 1:1 dentro do arquivo: se o lançamento deste vínculo já foi
+    // reivindicado por OUTRA linha deste mesmo arquivo, esta linha NÃO está
+    // coberta no razão — deixa cair no fluxo normal (pendente/nova) em vez de
+    // marcá-la "já conciliada". Sem isso, duas vendas idênticas do mesmo dia
+    // vinculadas por engano ao mesmo lançamento ficavam ambas verdes e a venda
+    // que faltava sumia do saldo (15 vendas, R$ 3.060,15 em produção).
+    if (linha.fitId) {
+      const vincLancId = ctx.externalIdsProcessados.get(`${linha.tipo}|${linha.fitId}`);
+      if (vincLancId && !usedIds.has(`vinculo-lanc-${vincLancId}`)) {
+        usedIds.add(`vinculo-lanc-${vincLancId}`);
+        return { ...base, selecionada: false, jaConciliada: true, ignorada: false };
+      }
     }
 
     // Já conciliada — exibir informativo, sem ação
@@ -1142,6 +1221,9 @@ export default function ConciliacaoBancariaSection() {
     setLinhasState([]);
     setImportFilter('todos');
     setNomeArquivo('');
+    setSaldoExtrato(null);
+    setConferenciaSaldo(null);
+    if (contaSel) clearSaldoExtrato(contaSel);
     if (contaSel) clearLinhas(contaSel);
   };
 
@@ -1873,6 +1955,47 @@ export default function ConciliacaoBancariaSection() {
               </p>
             </CardContent>
           </Card>
+
+          {/* Conferência de saldo contra o banco: rede final contra linha engolida/
+              ignorada indevidamente. Fica fora do bloco `linhas.length > 0` de
+              propósito — o veredito importa justamente DEPOIS de tudo processado. */}
+          {saldoExtrato && conferenciaSaldo && (
+            Math.abs(conferenciaSaldo.diferenca) < 0.01 ? (
+              <Card className="border-success/30 bg-success/5">
+                <CardContent className="p-3 flex items-center gap-2 text-sm">
+                  <CheckCircle className="w-4 h-4 text-success shrink-0" />
+                  <span>
+                    Saldo confere com o extrato do banco:{' '}
+                    <span className="font-mono font-medium">{fmtBRL(saldoExtrato.valor)}</span>{' '}
+                    em {formatDateBR(parseLocalDate(saldoExtrato.data))}
+                    {Math.abs(conferenciaSaldo.pendentesDelta) >= 0.01 && (
+                      <span className="text-muted-foreground"> (projetado com as linhas ainda pendentes)</span>
+                    )}
+                  </span>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card className="border-destructive/30 bg-destructive/5">
+                <CardContent className="p-3 space-y-1 text-sm">
+                  <div className="flex items-center gap-2 font-medium text-destructive">
+                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                    Saldo NÃO confere com o extrato do banco — diferença de{' '}
+                    <span className="font-mono">{fmtBRL(conferenciaSaldo.diferenca)}</span>
+                  </div>
+                  <p className="text-muted-foreground">
+                    Banco em {formatDateBR(parseLocalDate(saldoExtrato.data))}:{' '}
+                    <span className="font-mono text-foreground">{fmtBRL(saldoExtrato.valor)}</span>
+                    {' · '}Sistema{Math.abs(conferenciaSaldo.pendentesDelta) >= 0.01 ? ' (com linhas pendentes)' : ''}:{' '}
+                    <span className="font-mono text-foreground">{fmtBRL(conferenciaSaldo.projetado)}</span>
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Pode haver linha marcada como duplicata/ignorada que na verdade é uma transação real,
+                    ou lançamento incorreto no período. Revise antes de confiar no saldo.
+                  </p>
+                </CardContent>
+              </Card>
+            )
+          )}
 
           {linhas.length > 0 && (
             <>
@@ -3016,9 +3139,13 @@ export default function ConciliacaoBancariaSection() {
           saldoSugerido={confirmSaldoDialog.saldoSugerido}
           contaId={contaSel}
           onCancel={() => setConfirmSaldoDialog(null)}
-          onConfirmed={async () => {
+          onConfirmed={async (saldoConfirmado) => {
             const pending = confirmSaldoDialog.parsed;
             setConfirmSaldoDialog(null);
+            // Guarda o saldo oficial do extrato: é a referência da conferência
+            // pós-processamento (banner verde/vermelho acima da lista).
+            setSaldoExtrato(saldoConfirmado);
+            if (contaSel) saveSaldoExtrato(contaSel, saldoConfirmado);
             setLoading(true);
             await processarLinhas(pending);
             setLoading(false);

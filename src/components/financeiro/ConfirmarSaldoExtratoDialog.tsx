@@ -19,7 +19,9 @@ interface ConfirmarSaldoExtratoDialogProps {
   saldoSugerido?: { valor: number; data: string };
   contaId: string;
   onCancel: () => void;
-  onConfirmed: () => void;
+  /** Recebe o saldo final confirmado pelo usuário — o pai o usa como referência
+   *  da conferência pós-processamento (inclusive no "Continuar mesmo assim"). */
+  onConfirmed: (saldoConfirmado: { valor: number; data: string }) => void;
 }
 
 interface Divergencia {
@@ -64,7 +66,7 @@ export default function ConfirmarSaldoExtratoDialog({
 
       if (Math.abs(diferenca) < TOLERANCIA) {
         toast.success('Saldo confere!');
-        onConfirmed();
+        onConfirmed({ valor: informado, data: periodoFim });
       } else {
         setDivergencia({ informado, calculado, diferenca });
       }
@@ -140,7 +142,12 @@ export default function ConfirmarSaldoExtratoDialog({
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={onCancel}>Cancelar importação</Button>
-              <Button variant="destructive" onClick={onConfirmed}>Continuar mesmo assim</Button>
+              <Button
+                variant="destructive"
+                onClick={() => onConfirmed({ valor: divergencia.informado, data: periodoFim })}
+              >
+                Continuar mesmo assim
+              </Button>
             </DialogFooter>
           </>
         )}
