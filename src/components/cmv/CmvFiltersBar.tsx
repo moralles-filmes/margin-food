@@ -1,11 +1,11 @@
+import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RefreshCw } from 'lucide-react';
-
-const SETORES = ['Cozinha', 'Salão', 'Limpeza', 'Sushi', 'Peixaria', 'Copa', 'Administrativo', 'Delivery'];
+import { supabase } from '@/integrations/supabase/client';
 
 interface CmvFiltersBarProps {
   dataInicio: string;
@@ -26,6 +26,12 @@ export default function CmvFiltersBar({
   dataInicio, dataFim, metodo, escopo, filterSetor, loading,
   onDataInicioChange, onDataFimChange, onMetodoChange, onEscopoChange, onSetorChange, onCalcular,
 }: CmvFiltersBarProps) {
+  const [setores, setSetores] = useState<string[]>([]);
+  useEffect(() => {
+    supabase.from('stock_sectors').select('name').eq('is_active', true).order('sort_order').order('name')
+      .then(({ data }) => setSetores((data || []).map((s: { name: string }) => s.name)));
+  }, []);
+
   return (
     <Card>
       <CardContent className="pt-6">
@@ -65,7 +71,7 @@ export default function CmvFiltersBar({
               <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos</SelectItem>
-                {SETORES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                {setores.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>

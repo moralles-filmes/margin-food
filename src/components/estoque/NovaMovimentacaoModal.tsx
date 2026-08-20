@@ -23,6 +23,7 @@ import { CurrencyInput } from '@/components/ui/brl-input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import ProductSearchCombobox, { type ProductOption } from '@/components/ui/ProductSearchCombobox';
+import { supabase } from '@/integrations/supabase/client';
 import { useFormDirtyGuard } from '@/hooks/useFormDirtyGuard';
 import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
 import { formatFixedBR, formatDateBR, todayBR, fmtBRL, normalizeBRLMoneyToNumber } from '@/lib/formatters';
@@ -48,8 +49,6 @@ interface MovFormState {
   setor: string;
   usePurchaseUnit: boolean;
 }
-
-const SETORES = ['Cozinha', 'Salão', 'Limpeza', 'Sushi', 'Peixaria', 'Copa', 'Administrativo', 'Delivery'];
 
 const PRESET_DEFAULTS: Record<MovModalPreset, MovTipo> = {
   entrada: 'ENTRADA',
@@ -110,6 +109,14 @@ export default function NovaMovimentacaoModal({
   const [costLocked, setCostLocked] = useState(true);
   const [saving, setSaving] = useState(false);
   const initializedRef = useRef(false);
+
+  // Setores (Controle de Estoque -> Cadastros -> Setores)
+  const [setores, setSetores] = useState<string[]>([]);
+  useEffect(() => {
+    if (!open) return;
+    supabase.from('stock_sectors').select('name').eq('is_active', true).order('sort_order').order('name')
+      .then(({ data }) => setSetores((data || []).map((s: { name: string }) => s.name)));
+  }, [open]);
 
   // Product options
   const productOptions: ProductOption[] = useMemo(() =>
@@ -501,7 +508,7 @@ export default function NovaMovimentacaoModal({
                 <Select value={form.setor} onValueChange={v => setForm(f => ({ ...f, setor: v }))}>
                   <SelectTrigger className="bg-secondary border-border text-foreground"><SelectValue placeholder="Selecione o setor" /></SelectTrigger>
                   <SelectContent>
-                    {SETORES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                    {setores.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
