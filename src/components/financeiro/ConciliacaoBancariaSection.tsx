@@ -1560,13 +1560,31 @@ export default function ConciliacaoBancariaSection() {
     setImportando(true);
     try {
       if (toImport.length > 0) {
+        // Quantas linhas do MESMO conteúdo (mesma bankLineKey) já foram
+        // reconhecidas como "já conciliada" nesta conta — a RPC precisa saber
+        // isso para não recusar como duplicata uma 2ª/3ª venda idêntica no
+        // mesmo dia que já sobrou depois da 1ª ocorrência ser reconhecida.
+        const jaConciliadaKeyCounts = new Map<string, number>();
+        for (const l of linhas) {
+          if (!l.jaConciliada) continue;
+          const key = bankLineKey(l);
+          jaConciliadaKeyCounts.set(key, (jaConciliadaKeyCounts.get(key) || 0) + 1);
+        }
+        const occurrenceCounters = new Map<string, number>();
+
         for (const l of toImport) {
+          const key = bankLineKey(l);
+          const jaReconhecidas = jaConciliadaKeyCounts.get(key) || 0;
+          const dentroDoLote = occurrenceCounters.get(key) || 0;
+          occurrenceCounters.set(key, dentroDoLote + 1);
+
           const { data, error } = await supabase.rpc('reconcile_import_lancamento', {
             p_data: l.data, p_descricao: l.descricao, p_valor: l.valor, p_tipo: l.tipo,
             p_conta_id: contaSel, p_user_id: user?.id,
             p_rateio_linhas: buildRateioPayload(l),
             p_external_id: l.fitId || null,
-          });
+            p_occurrence_index: jaReconhecidas + dentroDoLote,
+          } as any);
           if (error) throw error;
           const result = data as { status?: string; lancamento_id?: string; criado_em?: string } | null;
 
