@@ -154,6 +154,28 @@ describe('parseExtrato — OFC legado', () => {
   });
 });
 
+describe('parseExtrato — valores numéricos do CSV', () => {
+  it('interpreta decimal brasileiro (vírgula, sem separador de milhar)', () => {
+    const result = parseExtrato('extrato.csv', '05/08/2026;Venda;150,00\n');
+    expect(result.linhas).toEqual([{ data: '2026-08-05', descricao: 'Venda', valor: 150, tipo: 'RECEITA' }]);
+  });
+
+  it('interpreta decimal brasileiro com separador de milhar', () => {
+    const result = parseExtrato('extrato.csv', '05/08/2026;Venda grande;1.234,56\n');
+    expect(result.linhas[0].valor).toBe(1234.56);
+  });
+
+  it('não infla em 100x um CSV com decimal em ponto e sem separador de milhar (locale EN)', () => {
+    const result = parseExtrato('extrato.csv', '05/08/2026,Compra,150.00\n');
+    expect(result.linhas[0].valor).toBe(150);
+  });
+
+  it('interpreta decimal em ponto com separador de milhar em vírgula (locale EN)', () => {
+    const result = parseExtrato('extrato.csv', '05/08/2026;Compra grande;1,234.56\n');
+    expect(result.linhas[0].valor).toBe(1234.56);
+  });
+});
+
 describe('diaAnterior', () => {
   it('retorna o dia anterior dentro do mesmo mês', () => {
     expect(diaAnterior('2026-08-05')).toBe('2026-08-04');

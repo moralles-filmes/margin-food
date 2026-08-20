@@ -214,11 +214,7 @@ function parseCSV(text: string): ExtratoParseResult {
     descricao = parts[1] || '';
 
     for (let j = parts.length - 1; j >= 2; j--) {
-      const numStr = parts[j]
-        .replace(/\./g, '')
-        .replace(',', '.')
-        .replace(/[^\d.-]/g, '');
-      const num = parseFloat(numStr);
+      const num = parseOFXNumber(parts[j]);
       if (!isNaN(num) && num !== 0) { valor = num; break; }
     }
 

@@ -1774,6 +1774,30 @@ export type Database = {
           },
         ]
       }
+      fin_config: {
+        Row: {
+          company_id: string
+          key: string
+          updated_at: string
+          updated_by: string | null
+          value: string
+        }
+        Insert: {
+          company_id?: string
+          key: string
+          updated_at?: string
+          updated_by?: string | null
+          value: string
+        }
+        Update: {
+          company_id?: string
+          key?: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: string
+        }
+        Relationships: []
+      }
       fin_contas: {
         Row: {
           agencia: string | null
@@ -1847,9 +1871,11 @@ export type Database = {
           data_pagamento: string | null
           data_vencimento: string
           descricao: string
+          descricao_unaccent: string | null
           excluir_dos_relatorios: boolean
           forma_pagamento: string | null
           fornecedor: string | null
+          fornecedor_unaccent: string | null
           id: string
           justificativa: string | null
           lancamento_id: string | null
@@ -1882,9 +1908,11 @@ export type Database = {
           data_pagamento?: string | null
           data_vencimento?: string
           descricao?: string
+          descricao_unaccent?: string | null
           excluir_dos_relatorios?: boolean
           forma_pagamento?: string | null
           fornecedor?: string | null
+          fornecedor_unaccent?: string | null
           id?: string
           justificativa?: string | null
           lancamento_id?: string | null
@@ -1917,9 +1945,11 @@ export type Database = {
           data_pagamento?: string | null
           data_vencimento?: string
           descricao?: string
+          descricao_unaccent?: string | null
           excluir_dos_relatorios?: boolean
           forma_pagamento?: string | null
           fornecedor?: string | null
+          fornecedor_unaccent?: string | null
           id?: string
           justificativa?: string | null
           lancamento_id?: string | null
@@ -9168,6 +9198,44 @@ export type Database = {
           valor: number
         }[]
       }
+      fin_categoria_fora_do_resultado: {
+        Args: { p_categoria_id: string; p_company_id: string }
+        Returns: boolean
+      }
+      fin_category_is_excluded: {
+        Args: { p_category_id: string; p_company_id: string }
+        Returns: boolean
+      }
+      fin_ensure_non_operational_categories: {
+        Args: { p_company_id: string }
+        Returns: undefined
+      }
+      fin_entity_has_category: {
+        Args: {
+          p_company_id: string
+          p_direct_category_id: string
+          p_entity_id: string
+        }
+        Returns: boolean
+      }
+      fin_get_categoria_desconto_baixa: {
+        Args: { p_company_id: string }
+        Returns: string
+      }
+      fin_get_categoria_desconto_concedido: {
+        Args: { p_company_id: string }
+        Returns: string
+      }
+      fin_get_limite_aprovacao: {
+        Args: { p_company_id: string }
+        Returns: number
+      }
+      fin_get_limite_aprovacao_atual: { Args: never; Returns: number }
+      fin_recompute_entity_report_exclusion: {
+        Args: { p_company_id: string; p_entity_id: string }
+        Returns: undefined
+      }
+      fin_set_limite_aprovacao: { Args: { p_valor: number }; Returns: Json }
       finalize_inventory_atomic: {
         Args: { p_id: string; p_justificativa: string }
         Returns: Json
@@ -9265,13 +9333,23 @@ export type Database = {
         | { Args: { p_end: string; p_start: string }; Returns: Json }
       get_fin_lancamentos_totais: {
         Args: {
+          p_categoria_id?: string
           p_conta_id?: string
           p_end?: string
           p_origem?: string
+          p_sem_categoria?: boolean
           p_start?: string
           p_tipo?: string
         }
         Returns: Json
+      }
+      get_fin_saldo_atual: {
+        Args: { p_conta_id?: string; p_data?: string }
+        Returns: number
+      }
+      get_fin_saldo_conta_em: {
+        Args: { p_conta_id: string; p_data: string }
+        Returns: number
       }
       get_inactive_stock_items: { Args: never; Returns: Json }
       get_movimentacoes_kpis: {
@@ -9437,24 +9515,43 @@ export type Database = {
       }
       immutable_unaccent: { Args: { "": string }; Returns: string }
       list_companies: { Args: never; Returns: Json }
+      list_fin_contas_pagar_abertas: {
+        Args: {
+          p_data?: string
+          p_limit?: number
+          p_search?: string
+          p_valor?: number
+        }
+        Returns: Json
+      }
       list_fin_contas_pagar_cursor: {
         Args: {
+          p_categoria_id?: string
+          p_conta_id?: string
           p_cursor_date?: string
           p_cursor_id?: string
+          p_data_ate?: string
+          p_data_de?: string
           p_fornecedor?: string
           p_limit?: number
           p_search?: string
+          p_sem_categoria?: boolean
           p_status?: string
         }
         Returns: Json
       }
       list_fin_contas_receber_cursor: {
         Args: {
+          p_categoria_id?: string
           p_cliente?: string
+          p_conta_id?: string
           p_cursor_date?: string
           p_cursor_id?: string
+          p_data_ate?: string
+          p_data_de?: string
           p_limit?: number
           p_search?: string
+          p_sem_categoria?: boolean
           p_status?: string
         }
         Returns: Json
@@ -9476,6 +9573,7 @@ export type Database = {
           }
         | {
             Args: {
+              p_categoria_id?: string
               p_conta_id?: string
               p_cursor_date?: string
               p_cursor_id?: string
@@ -9483,6 +9581,7 @@ export type Database = {
               p_limit?: number
               p_origem?: string
               p_search?: string
+              p_sem_categoria?: boolean
               p_start?: string
               p_status?: string
               p_tipo?: string
@@ -9680,6 +9779,7 @@ export type Database = {
       orcamento_execucao_mensal: { Args: { p_mes: string }; Returns: Json }
       pay_conta_pagar: {
         Args: {
+          p_conta_id?: string
           p_data_pagamento?: string
           p_expected_updated_at: string
           p_id: string
@@ -9734,12 +9834,12 @@ export type Database = {
         Args: { p_items: Json; p_metadata?: Json; p_order_id: string }
         Returns: Json
       }
-      reconcile_batch_lancamentos: {
-        Args: { p_lancamento_ids: string[] }
-        Returns: Json
-      }
       reconcile_auto_bind_transfer_counterparts: {
         Args: { p_conta_id: string; p_lines: Json }
+        Returns: Json
+      }
+      reconcile_batch_lancamentos: {
+        Args: { p_lancamento_ids: string[] }
         Returns: Json
       }
       reconcile_bind_extrato: {
@@ -9778,7 +9878,8 @@ export type Database = {
           p_conta_id: string
           p_data: string
           p_descricao: string
-          p_external_id?: string | null
+          p_external_id?: string
+          p_force_duplicate?: boolean
           p_rateio_linhas?: Json
           p_tipo: string
           p_user_id: string
@@ -9786,21 +9887,37 @@ export type Database = {
         }
         Returns: Json
       }
+      reconcile_link_existing_lancamento: {
+        Args: {
+          p_conta_id: string
+          p_data_extrato?: string
+          p_external_id?: string
+          p_lancamento_id: string
+          p_tipo?: string
+        }
+        Returns: Json
+      }
       reconcile_pay_conta_pagar: {
         Args: {
+          p_ajuste_categoria_id?: string
+          p_ajuste_tipo?: string
           p_conta_bancaria_id: string
           p_conta_pagar_id: string
           p_data_pagamento: string
           p_user_id: string
+          p_valor_extrato?: number
         }
         Returns: Json
       }
       reconcile_receive_conta_receber: {
         Args: {
+          p_ajuste_categoria_id?: string
+          p_ajuste_tipo?: string
           p_conta_bancaria_id: string
           p_conta_receber_id: string
           p_data_recebimento: string
           p_user_id: string
+          p_valor_extrato?: number
         }
         Returns: Json
       }
@@ -9960,6 +10077,7 @@ export type Database = {
         Returns: Json
       }
       unaccent: { Args: { "": string }; Returns: string }
+      unreconcile_lancamento: { Args: { p_id: string }; Returns: Json }
       update_company: {
         Args: {
           p_ativo?: boolean
