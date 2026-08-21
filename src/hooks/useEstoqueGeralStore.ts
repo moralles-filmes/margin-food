@@ -433,7 +433,7 @@ export function useEstoqueGeralStore() {
     } finally {
       setProdCatalogLoading(false);
     }
-  }, [fetchSaldos, fetchProdutoGlobalCounts, prodFilters]);
+  }, [fetchProdutoGlobalCounts, prodFilters]);
 
   // === Fetch movimentacoes via cursor-based RPC ===
   const fetchMovimentacoes = useCallback(async (filters?: MovFilters, cursor?: { created_at: string; id: string } | null, append = false, opts: { skipKpis?: boolean } = {}) => {
@@ -680,12 +680,18 @@ export function useEstoqueGeralStore() {
     if (updates.packageMeasureUnit !== undefined) dbUpdates.package_measure_unit = updates.packageMeasureUnit;
     if (updates.conversionMode !== undefined) dbUpdates.conversion_mode = updates.conversionMode;
 
-    const { error } = await supabase.from('produtos')
+    const { data: updatedRows, error } = await supabase.from('produtos')
       .update(dbUpdates as import('@/integrations/supabase/types').Database['public']['Tables']['produtos']['Update'])
-      .eq('id', id);
+      .eq('id', id)
+      .select('id');
     if (error) {
       console.error('[useEstoqueGeralStore.updateProduto] update error', error);
       throw error;
+    }
+    if (!updatedRows || updatedRows.length === 0) {
+      const notFoundError = new Error('Produto não encontrado ou você não tem permissão para editá-lo.');
+      console.error('[useEstoqueGeralStore.updateProduto] no rows affected', { id });
+      throw notFoundError;
     }
     setProdutos(prev => prev.map(p => p.id === id ? { ...p, ...updates } as ProdutoExtended : p));
     fetchProdutoGlobalCounts();
@@ -693,10 +699,18 @@ export function useEstoqueGeralStore() {
   }, [fetchProdutoGlobalCounts]);
 
   const deleteProduto = useCallback(async (id: string) => {
-    const { error } = await supabase.from('produtos').update({ ativo: false }).eq('id', id);
+    const { data: updatedRows, error } = await supabase.from('produtos')
+      .update({ ativo: false })
+      .eq('id', id)
+      .select('id');
     if (error) {
       console.error('[useEstoqueGeralStore.deleteProduto] update(ativo=false) error', error);
       throw error;
+    }
+    if (!updatedRows || updatedRows.length === 0) {
+      const notFoundError = new Error('Produto não encontrado ou você não tem permissão para excluí-lo.');
+      console.error('[useEstoqueGeralStore.deleteProduto] no rows affected', { id });
+      throw notFoundError;
     }
     setProdutos(prev => prev.map(p => p.id === id ? { ...p, ativo: false } : p));
     fetchProdutoGlobalCounts();
@@ -705,12 +719,12 @@ export function useEstoqueGeralStore() {
 
   // === Movimentação (DB) ===
   const addMovimentacao = useCallback(async (m: Omit<MovimentacaoEstoque, 'id' | 'createdAt'> & { setor?: string }) => {
-    await resolveCompanyIdOrThrow();
+    const companyId = await resolveCompanyIdOrThrow();
     const insertPayload: {
       produto_id: string; data: string; tipo: string; quantidade: number;
       custo_unitario: number; custo_total: number; origem: string;
       referencia_id: string | null; observacao: string | null;
-      created_by: string | null; setor?: string;
+      created_by: string | null; company_id: string; setor?: string;
     } = {
       produto_id: m.produtoId,
       data: m.data,
@@ -722,6 +736,7 @@ export function useEstoqueGeralStore() {
       referencia_id: m.referenciaId || null,
       observacao: m.observacao || null,
       created_by: m.createdBy || null,
+      company_id: companyId,
     };
     if (m.setor) insertPayload.setor = m.setor;
     const { data, error } = await supabase
@@ -729,7 +744,10 @@ export function useEstoqueGeralStore() {
       .insert(insertPayload)
       .select()
       .single();
-    if (error) throw error;
+    if (error) {
+      console.error('[useEstoqueGeralStore.addMovimentacao] insert error', error);
+      throw error;
+    }
     const newMov = dbToMov(data as unknown as MovimentacaoRow);
     setMovCursor(null);
     await Promise.all([

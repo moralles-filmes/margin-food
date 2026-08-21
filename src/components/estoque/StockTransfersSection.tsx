@@ -136,6 +136,7 @@ export default function StockTransfersSection({
       store.refreshSaldos();
       fetchTransfers(0);
     } catch (err: any) {
+      console.error('Error creating stock transfer:', err);
       toast.error(err?.message || 'Erro ao realizar transferência');
     }
     setSaving(false);

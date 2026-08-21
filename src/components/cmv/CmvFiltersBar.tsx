@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useCanAny } from '@/permissions/hooks';
 
 interface CmvFiltersBarProps {
   dataInicio: string;
@@ -26,11 +27,13 @@ export default function CmvFiltersBar({
   dataInicio, dataFim, metodo, escopo, filterSetor, loading,
   onDataInicioChange, onDataFimChange, onMetodoChange, onEscopoChange, onSetorChange, onCalcular,
 }: CmvFiltersBarProps) {
+  const canViewCmv = useCanAny('cmv:categoria:view', 'cmv:setor:view', 'cmv:top-itens:view', 'cmv:semanal:view');
   const [setores, setSetores] = useState<string[]>([]);
   useEffect(() => {
+    if (!canViewCmv) return;
     supabase.from('stock_sectors').select('name').eq('is_active', true).order('sort_order').order('name')
       .then(({ data }) => setSetores((data || []).map((s: { name: string }) => s.name)));
-  }, []);
+  }, [canViewCmv]);
 
   return (
     <Card>

@@ -5,6 +5,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCan } from '@/permissions/hooks';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -37,17 +38,19 @@ function getRequisitionProductDisplay(prod: ProdutoExtended) {
 
 export default function RequisicaoListaFixa({ produtos, saldos, onSuccess, onCancel }: Props) {
   const { profile } = useAuth();
+  const canCreate = useCan('estoque:requisicoes:create');
   const { confirm, ConfirmDialog } = useConfirmDialog();
   const [setor, setSetor] = useState(profile?.sector || '');
   const [setores, setSetores] = useState<string[]>([]);
   useEffect(() => {
+    if (!canCreate) return;
     supabase.from('stock_sectors').select('name').eq('is_active', true).order('sort_order').order('name')
       .then(({ data }) => {
         const nomes = (data || []).map((s: { name: string }) => s.name);
         setSetores(nomes);
         setSetor(current => current || nomes[0] || '');
       });
-  }, []);
+  }, [canCreate]);
   const [observacao, setObservacao] = useState('');
   const [items, setItems] = useState<ListaFixaItem[]>([]);
   const [quantities, setQuantities] = useState<Record<string, string>>({});
@@ -151,6 +154,10 @@ export default function RequisicaoListaFixa({ produtos, saldos, onSuccess, onCan
 
   const handleSubmit = async () => {
     if (submitting) return;
+    if (!canCreate) {
+      toast.error('Sem permissão para criar requisições.');
+      return;
+    }
 
     const ok = await confirm({
       title: 'Confirmar requisição',

@@ -139,7 +139,7 @@ serve(async (req) => {
       if (invRes.error) throw invRes.error
 
       const { data: logs } = await adminClient.from('audit_inventario_log')
-        .select('*').eq('inventario_id', id).order('created_at', { ascending: false }).limit(50)
+        .select('*').eq('inventario_id', id).eq('company_id', companyId).order('created_at', { ascending: false }).limit(50)
 
       return json({ inventario: invRes.data, itens: itensRes.data || [], auditLogs: logs || [] })
     }
@@ -250,8 +250,21 @@ serve(async (req) => {
       }
       if (!existingItem.contagem_inicio) update.contagem_inicio = update.contagem_fim
 
-      const antes = { contagem_fisica: existingItem.contagem_fisica }
-      await adminClient.from('inventario_itens').update(update).eq('id', item_id).eq('company_id', companyId)
+      // Optimistic lock: só aplica o update se contagem_fisica ainda é o valor lido acima —
+      // evita que duas contagens concorrentes do mesmo item se sobrescrevam silenciosamente.
+      const previousContagem = existingItem.contagem_fisica
+      let updateQuery = adminClient.from('inventario_itens').update(update).eq('id', item_id).eq('company_id', companyId)
+      updateQuery = previousContagem === null
+        ? updateQuery.is('contagem_fisica', null)
+        : updateQuery.eq('contagem_fisica', previousContagem)
+
+      const { data: updatedRows, error: updateErr } = await updateQuery.select('id')
+      if (updateErr) throw updateErr
+      if (!updatedRows || updatedRows.length === 0) {
+        return json({ error: 'Este item já foi contado por outro usuário nesse meio-tempo. Recarregue e tente novamente.' }, 409)
+      }
+
+      const antes = { contagem_fisica: previousContagem }
       await auditLog(existingItem.inventario_id, 'CONTAGEM', antes, { contagem_fisica: fisica, diferenca_qtd, classificacao }, item_id)
 
       return json({ success: true, diferenca_qtd, diferenca_percent, impacto_financeiro, classificacao })
@@ -381,9 +394,10 @@ serve(async (req) => {
 
       // Update risk score post-finalization (non-critical, best-effort)
       if (scoreRisco > 0 || flagRisco) {
-        await adminClient.from('inventarios').update({
+        const { error: scoreErr } = await adminClient.from('inventarios').update({
           score_risco: scoreRisco, flag_risco: flagRisco,
         }).eq('id', id).eq('company_id', companyId)
+        if (scoreErr) console.error('Failed to update score_risco/flag_risco:', scoreErr)
       }
 
       // Global audit log entry
@@ -437,6 +451,9 @@ serve(async (req) => {
 
       const { data: inv } = await adminClient.from('inventarios').select('data').eq('id', inventario_id).eq('company_id', companyId).is('deleted_at', null).single()
       if (!inv) return json({ error: 'Inventário não encontrado' }, 404)
+
+      const { data: produtoTenant } = await adminClient.from('produtos').select('id').eq('id', produto_id).eq('company_id', companyId).maybeSingle()
+      if (!produtoTenant) return json({ error: 'Produto não pertence a esta empresa' }, 400)
 
       const { data: item } = await adminClient.from('inventario_itens')
         .select('custo_snapshot').eq('inventario_id', inventario_id).eq('company_id', companyId).eq('produto_id', produto_id).maybeSingle()

@@ -39,6 +39,7 @@ export default function QuickInventorySection() {
 
   // Counted items
   const [countedItems, setCountedItems] = useState<CountedItem[]>([]);
+  const idempotencyKeyRef = useRef<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveResult, setSaveResult] = useState<{ total_items: number; adjusted: number; total_impact: number } | null>(null);
@@ -148,10 +149,12 @@ export default function QuickInventorySection() {
         counted_quantity: Number(item.countedQty),
       }));
 
+      if (!idempotencyKeyRef.current) idempotencyKeyRef.current = crypto.randomUUID();
+
       const { data, error } = await supabase.rpc('create_quick_inventory_atomic', {
         p_items: items as any,
         p_observacao: `Inventário Rápido — ${validItems.length} itens`,
-        p_idempotency_key: crypto.randomUUID(),
+        p_idempotency_key: idempotencyKeyRef.current,
       });
 
       if (error) throw error;
@@ -183,6 +186,7 @@ export default function QuickInventorySection() {
     setCategoryFilter('');
     setSaved(false);
     setSaveResult(null);
+    idempotencyKeyRef.current = null;
   };
 
   // Success screen

@@ -1,31 +1,7 @@
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
-
-// ─── Inline logic from stock-reversal.ts ───
-export const ESTORNO_TYPES = new Set(["ENTRADA_ESTORNO", "SAIDA_ESTORNO"]);
-
-export interface StockMovementReversalCandidate {
-  tipo?: string | null;
-  origem?: string | null;
-  estorno_de_id?: string | null;
-}
-
-export function isEstornoMovement(movement: StockMovementReversalCandidate): boolean {
-  return Boolean(
-    movement.estorno_de_id ||
-      movement.origem === "ESTORNO" ||
-      (movement.tipo && ESTORNO_TYPES.has(movement.tipo))
-  );
-}
-
-export function isOriginalEntradaForReversal(tipo: string): boolean {
-  return tipo === "ENTRADA" || tipo === "AJUSTE" || tipo.startsWith("ENTRADA");
-}
-
-export function getReversalTipo(tipo: string): "SAIDA_ESTORNO" | "ENTRADA_ESTORNO" {
-  return isOriginalEntradaForReversal(tipo) ? "SAIDA_ESTORNO" : "ENTRADA_ESTORNO";
-}
+import { isEstornoMovement, isOriginalEntradaForReversal, getReversalTipo } from "./stock-reversal.ts";
 
 let corsHeaders = getCorsHeaders();
 
@@ -390,7 +366,12 @@ serve(async (req) => {
           setor: mov.setor || null,
           company_id: companyId,
         });
-      if (reversalErr) throw reversalErr;
+      if (reversalErr) {
+        // 23505 = unique_violation — outra requisição concorrente já criou o estorno
+        // (uq_movimentacoes_estorno_de_id_ativo). Trata como conflito, não como erro 500.
+        if (reversalErr.code === "23505") return conflict("Movimentação já cancelada. Estorno já existe.");
+        throw reversalErr;
+      }
 
       // 2) Mark original as CANCELADO (after reversal is safely inserted)
       const { data: cancelled, error: cancelErr } = await adminClient
@@ -451,8 +432,20 @@ serve(async (req) => {
     // ACTION: criar requisição
     // ========================
     if (action === "criar") {
+      const hasCreateAccess = await hasAnyPermission(adminClient, userId, [
+        "estoque:requisicoes:create",
+        "stock:requisitions:create",
+        "system:global:manage",
+      ]);
+      if (!hasCreateAccess) return forbidden("FORBIDDEN_RBAC", "Sem permissão para criar requisições");
+
       const { setor, observacao, itens } = body;
       if (!setor || !itens || itens.length === 0) return badRequest("Setor e itens são obrigatórios");
+      for (const item of itens) {
+        if (!(Number(item.quantidade) > 0)) {
+          return badRequest(`Quantidade inválida para o produto ${item.produto_id}.`);
+        }
+      }
 
       const resultados: { produto_id: string; saldo: number; solicitado: number; tem_estoque: boolean }[] = [];
       const validatedUnits = new Map<string, string>();
