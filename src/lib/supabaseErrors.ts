@@ -6,7 +6,7 @@
  * prefira este helper a `err.message` cru.
  */
 
-export interface PostgrestLikeError {
+interface PostgrestLikeError {
   message?: string;
   code?: string;
   details?: string | null;
@@ -40,12 +40,4 @@ export function extractSupabaseErrorMessage(err: unknown, fallback: string): str
 
   if (err instanceof Error && err.message) return err.message;
   return fallback;
-}
-
-/**
- * Detecta se um erro é provavelmente um PostgrestError do supabase-js.
- * Útil para escolher entre tratamento específico e genérico.
- */
-export function isPostgrestError(err: unknown): err is PostgrestLikeError {
-  return isObject(err) && ('code' in err || 'details' in err || 'hint' in err);
 }

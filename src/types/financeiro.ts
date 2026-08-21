@@ -38,14 +38,6 @@ export interface DfcCategoria {
   updated_at: string;
 }
 
-/** Job role (admin panel) */
-export interface JobRole {
-  id: string;
-  nome: string;
-  descricao: string | null;
-  is_active: boolean;
-  created_at: string;
-}
 
 /** Conta bancária (projection: id, nome + campos opcionais para verificação de extrato) */
 export interface ContaBancariaRef {
@@ -154,25 +146,3 @@ export interface ContaReceberCandidate {
   recorrencia_config: unknown;
 }
 
-/** Paginated response contract */
-export interface PaginatedResponse<T> {
-  data: T[];
-  count: number | null;
-  hasMore: boolean;
-}
-
-/** Audit log row */
-export interface AuditRow {
-  id: string;
-  action: string;
-  entity: string;
-  entity_id: string | null;
-  module: string;
-  severity: string;
-  actor_email: string | null;
-  actor_role: string | null;
-  created_at: string;
-  before: unknown;
-  after: unknown;
-  metadata: unknown;
-}

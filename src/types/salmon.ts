@@ -131,15 +131,6 @@ export interface MetaProvisionadaSalmao {
   createdAt: string;
 }
 
-export interface PurchaseRecord {
-  id: string;
-  date: string;
-  totalValue: number;
-  supplier: string;
-  categoria: string;
-  source: 'salmon' | 'geral';
-}
-
 export interface AuditoriaCompra {
   id: string;
   entradaId: string;
@@ -205,27 +196,6 @@ export interface MovimentacaoEstoque {
   observacao: string;
   createdBy: string;
   createdAt: string;
-}
-
-export interface SolicitacaoEstoque {
-  id: string;
-  setor: string;
-  solicitanteUserId: string;
-  data: string;
-  status: 'RASCUNHO' | 'ENVIADA' | 'APROVADA' | 'REJEITADA' | 'ATENDIDA_PARCIAL' | 'CANCELADA';
-  observacao: string;
-  itens: ItemSolicitacao[];
-  createdAt: string;
-}
-
-export interface ItemSolicitacao {
-  id: string;
-  solicitacaoId: string;
-  produtoId: string;
-  quantidadeSolicitada: number;
-  quantidadeAprovada: number;
-  quantidadeAtendida: number;
-  unidade: string;
 }
 
 export interface CalendarioCompras {

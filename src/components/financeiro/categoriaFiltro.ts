@@ -1,7 +1,7 @@
 import type { SearchableSelectOption } from '@/components/ui/SearchableSelect';
 
 export const CATEGORIA_FILTRO_TODOS = 'todos';
-export const CATEGORIA_FILTRO_SEM_CATEGORIA = 'sem_categoria';
+const CATEGORIA_FILTRO_SEM_CATEGORIA = 'sem_categoria';
 
 interface CategoriaComGrupo {
   id: string;

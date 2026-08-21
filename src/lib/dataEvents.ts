@@ -131,10 +131,3 @@ export function useDataEvent(channel: string, handler: Listener) {
     return onDataEvent(channel, () => ref.current());
   }, [channel]);
 }
-
-/**
- * Emit multiple channels at once (convenience).
- */
-export function emitDataEvents(...channels: string[]) {
-  channels.forEach(emitDataEvent);
-}

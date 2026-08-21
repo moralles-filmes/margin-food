@@ -40,7 +40,3 @@ export async function resolveCompanyIdOrThrow(): Promise<string> {
 
   return companyId;
 }
-
-export function isPlaceholderCompanyId(id: string | null | undefined): boolean {
-  return !id || id === PLACEHOLDER_COMPANY_ID;
-}

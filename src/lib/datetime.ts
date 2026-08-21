@@ -38,11 +38,6 @@ export function todayBR(): string {
 }
 
 /**
- * Alias for todayBR() — matches stack-overflow pattern name.
- */
-export const todayBRString = todayBR;
-
-/**
  * Convert a UTC timestamptz string (from Postgres) to
  * a human-readable BR date/time string: "dd/MM/yyyy HH:mm".
  */
@@ -50,18 +45,6 @@ export function parseUTCToBR(ts: string): string {
   const d = new Date(ts);
   if (isNaN(d.getTime())) return ts;
   return formatTZ(d, 'dd/MM/yyyy HH:mm', { timeZone: TZ_BR });
-}
-
-/**
- * Normalize a date input value (from <input type="date">) to yyyy-MM-dd.
- * Handles edge cases where the browser may interpret the date differently.
- */
-export function ensureDateBRInput(value: string): string {
-  if (!value) return todayBR();
-  // Input type=date always gives yyyy-MM-dd; parse as local
-  const [y, m, d] = value.split('-').map(Number);
-  if (!y || !m || !d) return value;
-  return `${String(y).padStart(4, '0')}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 
 /**
@@ -77,6 +60,3 @@ export function formatDateTimeBR(date: Date): string {
 export function formatInBR(date: Date, pattern: string): string {
   return formatTZ(date, pattern, { timeZone: TZ_BR, locale: ptBR });
 }
-
-/** Re-export parseLocalDate for convenience */
-export { parseLocalDate } from './dateUtils';

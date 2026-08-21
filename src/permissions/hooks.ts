@@ -164,6 +164,3 @@ export function createPermissionChecker(effectivePermissions: string[], permissi
     return resolvePermission(perm, effectivePermissions, userId, companyId);
   };
 }
-
-/** Whether legacy fallback is enabled (for UI display / debugging) */
-export const LEGACY_ENABLED = ENABLE_LEGACY_PERMISSIONS;

@@ -3,12 +3,6 @@ import autoTable from 'jspdf-autotable';
 import { APP_NAME } from '@/lib/brand';
 import { fmtBRL } from '@/lib/money';
 
-interface PDFListaCompra {
-  titulo: string;
-  data: string;
-  itens: { produto: string; quantidade: number; unidade: string; categoria: string; prioridade: string }[];
-}
-
 interface PDFPedido {
   fornecedor: string;
   data: string;
@@ -16,35 +10,6 @@ interface PDFPedido {
   formaPagamento: string;
   itens: { produto: string; quantidade: number; precoUnitario: number; total: number }[];
   observacao: string;
-}
-
-interface PDFCotacao {
-  categoria: string;
-  data: string;
-  fornecedores: { nome: string; itens: { produto: string; quantidade: number; preco: number }[]; frete: number; prazo: number }[];
-}
-
-export function gerarPDFListaCompras(lista: PDFListaCompra) {
-  const doc = new jsPDF();
-  doc.setFontSize(16);
-  doc.text(APP_NAME, 14, 15);
-  doc.setFontSize(10);
-  doc.text(`Lista de Compras — ${lista.data}`, 14, 22);
-  doc.setFontSize(8);
-  doc.text(lista.titulo, 14, 28);
-
-  autoTable(doc, {
-    startY: 35,
-    head: [['Produto', 'Qtd', 'Unidade', 'Categoria', 'Prioridade']],
-    body: lista.itens.map(i => [i.produto, i.quantidade.toString(), i.unidade, i.categoria, i.prioridade]),
-    styles: { fontSize: 8, cellPadding: 3 },
-    headStyles: { fillColor: [220, 80, 50], textColor: 255 },
-    alternateRowStyles: { fillColor: [245, 245, 245] },
-  });
-
-  doc.setFontSize(7);
-  doc.text(`Gerado por ${APP_NAME} em ${new Date().toLocaleString('pt-BR')}`, 14, doc.internal.pageSize.height - 10);
-  doc.save(`lista-compras-${lista.data}.pdf`);
 }
 
 export function gerarPDFPedido(pedido: PDFPedido) {
@@ -82,54 +47,3 @@ export function gerarPDFPedido(pedido: PDFPedido) {
   doc.save(`pedido-${pedido.fornecedor}-${pedido.data}.pdf`);
 }
 
-export function gerarPDFCotacao(cotacao: PDFCotacao) {
-  const doc = new jsPDF('landscape');
-  doc.setFontSize(16);
-  doc.text(APP_NAME, 14, 15);
-  doc.setFontSize(12);
-  doc.text(`Cotação — ${cotacao.categoria}`, 14, 23);
-  doc.setFontSize(9);
-  doc.text(`Data: ${cotacao.data}`, 14, 30);
-
-  // Build comparison table
-  const allProducts = [...new Set(cotacao.fornecedores.flatMap(f => f.itens.map(i => i.produto)))];
-  const head = ['Produto', ...cotacao.fornecedores.map(f => f.nome)];
-  const body = allProducts.map(prod => {
-    const row = [prod];
-    cotacao.fornecedores.forEach(f => {
-      const item = f.itens.find(i => i.produto === prod);
-      row.push(item ? fmtBRL(item.preco) : '—');
-    });
-    return row;
-  });
-
-  // Add totals row
-  const totalsRow = ['TOTAL'];
-  cotacao.fornecedores.forEach(f => {
-    const total = f.itens.reduce((s, i) => s + i.preco * i.quantidade, 0);
-    totalsRow.push(fmtBRL(total));
-  });
-  body.push(totalsRow);
-
-  // Frete row
-  const freteRow = ['Frete'];
-  cotacao.fornecedores.forEach(f => freteRow.push(fmtBRL(f.frete)));
-  body.push(freteRow);
-
-  // Prazo row
-  const prazoRow = ['Prazo (dias)'];
-  cotacao.fornecedores.forEach(f => prazoRow.push(f.prazo.toString()));
-  body.push(prazoRow);
-
-  autoTable(doc, {
-    startY: 38,
-    head: [head],
-    body,
-    styles: { fontSize: 8, cellPadding: 3 },
-    headStyles: { fillColor: [220, 80, 50], textColor: 255 },
-  });
-
-  doc.setFontSize(7);
-  doc.text(`Gerado por ${APP_NAME} em ${new Date().toLocaleString('pt-BR')}`, 14, doc.internal.pageSize.height - 10);
-  doc.save(`cotacao-${cotacao.categoria}-${cotacao.data}.pdf`);
-}

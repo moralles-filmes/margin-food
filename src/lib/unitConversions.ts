@@ -52,7 +52,7 @@ function normalizeSymbol(sym: string): string {
  *
  * Returns null if they are not directly convertible.
  */
-export function getDirectConversionFactor(fromSymbol: string, toSymbol: string): number | null {
+function getDirectConversionFactor(fromSymbol: string, toSymbol: string): number | null {
   const from = normalizeSymbol(fromSymbol);
   const to = normalizeSymbol(toSymbol);
 
@@ -98,26 +98,6 @@ export function calcPackageConversionFactor(
 }
 
 /**
- * Convert a quantity from one unit to another using the static conversion table.
- *
- * Returns null if the conversion is not possible (different families or unknown units).
- */
-export function convertUnits(qty: number, fromUnit: string, toUnit: string): number | null {
-  const factor = getDirectConversionFactor(fromUnit, toUnit);
-  if (factor === null) return null;
-  return parseFloat((qty * factor).toFixed(6));
-}
-
-/**
- * Convert purchase quantity to base unit using the product's conversion factor.
- *
- * Example: 10 garrafas × fator 0.9 = 9 litros
- */
-export function purchaseToBase(purchaseQty: number, conversionFactor: number): number {
-  return parseFloat((purchaseQty * conversionFactor).toFixed(6));
-}
-
-/**
  * Convert base quantity to purchase units using the product's conversion factor.
  *
  * Example: 9 litros ÷ fator 0.9 = 10 garrafas
@@ -125,32 +105,6 @@ export function purchaseToBase(purchaseQty: number, conversionFactor: number): n
 export function baseToPurchase(baseQty: number, conversionFactor: number): number {
   if (conversionFactor <= 0) return baseQty;
   return parseFloat((baseQty / conversionFactor).toFixed(6));
-}
-
-/**
- * Get the base unit symbol for a measurement type.
- */
-export function getBaseUnit(tipo: 'peso' | 'volume' | 'unidade'): string {
-  switch (tipo) {
-    case 'peso': return 'KG';
-    case 'volume': return 'L';
-    case 'unidade': return 'UN';
-  }
-}
-
-/**
- * Determine the measurement type from a unit symbol.
- */
-export function getUnitType(symbol: string): 'peso' | 'volume' | 'unidade' | null {
-  const norm = normalizeSymbol(symbol);
-  const entry = TO_BASE[norm];
-  if (!entry) return null;
-  switch (entry.base) {
-    case 'KG': return 'peso';
-    case 'L': return 'volume';
-    case 'UN': return 'unidade';
-    default: return null;
-  }
 }
 
 /**

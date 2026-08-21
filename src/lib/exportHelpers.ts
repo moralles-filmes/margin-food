@@ -8,15 +8,14 @@
  * - Error handling
  *
  * Usage:
- *   import { exportTableToPdf, exportTableToExcel } from '@/lib/exportHelpers';
+ *   import { exportTableToExcel } from '@/lib/exportHelpers';
  */
 
-import { APP_NAME } from '@/lib/brand';
 import { todayBR } from '@/lib/datetime';
 import { toast } from 'sonner';
 
 /** Column definition for table exports */
-export interface ExportColumn {
+interface ExportColumn {
   header: string;
   key: string;
   /** Optional formatter — receives the raw value, returns display string */
@@ -48,84 +47,6 @@ export interface ExportOptions {
  */
 export function exportFileName(module: string, section: string, ext: string): string {
   return `${module}_${section}_${todayBR()}.${ext}`;
-}
-
-/**
- * Export a table to PDF using the enterprise standard format.
- * Returns true on success, false on error.
- */
-export async function exportTableToPdf(options: ExportOptions): Promise<boolean> {
-  try {
-    const { default: jsPDF } = await import('jspdf');
-    const { default: autoTable } = await import('jspdf-autotable');
-    const doc = new jsPDF();
-    const { title, subtitle, columns, rows, summaryRows, module, section } = options;
-
-    // Header
-    doc.setFontSize(14);
-    doc.text(APP_NAME, 14, 15);
-    doc.setFontSize(11);
-    doc.text(title, 14, 23);
-    if (subtitle) {
-      doc.setFontSize(8);
-      doc.text(subtitle, 14, 29);
-    }
-
-    // Table
-    const startY = subtitle ? 35 : 30;
-    const head = [columns.map(c => c.header)];
-    const body = rows.map(row =>
-      columns.map(col => {
-        const raw = row[col.key];
-        return col.format ? col.format(raw) : String(raw ?? '');
-      })
-    );
-
-    const colStyles: Record<string, { halign: 'left' | 'right' | 'center' }> = {};
-    columns.forEach((col, i) => {
-      if (col.align) colStyles[i] = { halign: col.align };
-    });
-
-    autoTable(doc, {
-      startY,
-      head,
-      body,
-      styles: { fontSize: 8, cellPadding: 3 },
-      headStyles: { fillColor: [41, 37, 36] },
-      columnStyles: colStyles,
-    });
-
-    // Summary
-    if (summaryRows && summaryRows.length > 0) {
-      const finalY = (doc as any).lastAutoTable?.finalY || startY + 20;
-      let y = finalY + 10;
-      doc.setFontSize(9);
-      for (const sr of summaryRows) {
-        doc.text(`${sr.label}: ${sr.value}`, 14, y);
-        y += 6;
-      }
-    }
-
-    // Footer
-    const pageCount = doc.getNumberOfPages();
-    for (let i = 1; i <= pageCount; i++) {
-      doc.setPage(i);
-      doc.setFontSize(7);
-      doc.text(
-        `${APP_NAME} — Gerado em ${todayBR()} — Página ${i}/${pageCount}`,
-        14,
-        doc.internal.pageSize.height - 10,
-      );
-    }
-
-    doc.save(exportFileName(module, section, 'pdf'));
-    toast.success('PDF exportado com sucesso');
-    return true;
-  } catch (err) {
-    console.error('Export PDF error:', err);
-    toast.error('Erro ao exportar PDF');
-    return false;
-  }
 }
 
 /**

@@ -15,7 +15,7 @@ import { toast } from 'sonner';
 import * as XLSX from '@/lib/safeXlsx';
 
 /* ─── Types ─── */
-export type EntidadeTipo = 'lancamento' | 'conta_pagar' | 'conta_receber';
+type EntidadeTipo = 'lancamento' | 'conta_pagar' | 'conta_receber';
 
 export interface FluxoNavigateParams {
   tab: 'lancamentos' | 'pagar' | 'receber';

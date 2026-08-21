@@ -8,7 +8,7 @@
  * CSV: varredura best-effort das primeiras linhas por padrões de agência/conta.
  */
 
-export interface ExtratoLinha {
+interface ExtratoLinha {
   data: string;       // ISO yyyy-MM-dd
   descricao: string;
   valor: number;      // absoluto
@@ -243,7 +243,7 @@ export function parseExtrato(filename: string, text: string): ExtratoParseResult
 
 /* ───────── Verificação de conta ───────── */
 
-export type ContaVerdictStatus = 'match' | 'mismatch' | 'unverified';
+type ContaVerdictStatus = 'match' | 'mismatch' | 'unverified';
 
 export interface ContaVerdict {
   status: ContaVerdictStatus;
