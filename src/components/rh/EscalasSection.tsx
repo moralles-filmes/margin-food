@@ -2,23 +2,18 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Textarea } from '@/components/ui/textarea';
-import {
-  CalendarDays, ChevronLeft, ChevronRight, Plus, Send, ArrowRightLeft,
-  DollarSign, CheckCircle2, XCircle, Eye
-} from 'lucide-react';
-import { format, addDays, startOfWeek, parseISO, addWeeks, subWeeks } from 'date-fns';
+import { CalendarDays, ChevronLeft, ChevronRight, Plus, Send, ArrowRightLeft, DollarSign, CheckCircle2, XCircle } from 'lucide-react';
+import { format, addDays, startOfWeek, addWeeks, subWeeks } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { fmtBRL } from '@/lib/formatters';
-import { formatDateBR } from '@/lib/datetime';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 
 import { useCan } from '@/permissions/hooks';

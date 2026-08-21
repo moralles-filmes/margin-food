@@ -17,7 +17,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useCan } from '@/permissions';
 import { useDataEvent } from '@/lib/dataEvents';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';

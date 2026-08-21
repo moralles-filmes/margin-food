@@ -15,9 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Plus, Edit, Trash2, Landmark, Search, Download, ShieldAlert, FileText
-} from 'lucide-react';
+import { Plus, Landmark, Search, Download, ShieldAlert, FileText } from 'lucide-react';
 import { useFormDirtyGuard } from '@/hooks/useFormDirtyGuard';
 import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
 import TableActions from '@/components/ui/TableActions';

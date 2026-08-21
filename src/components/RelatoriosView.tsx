@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useRelatoriosData } from '@/hooks/useRelatoriosData';
 import PeriodFilter, { PeriodRange, getDefaultRange } from './PeriodFilter';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line, Cell } from 'recharts';
-import { TrendingUp, TrendingDown, DollarSign, Percent, Package, BarChart3, Building2, Zap, AlertTriangle, ArrowUpDown, Target, Brain, Calculator, Layers, BoxesIcon, Loader2, ShieldCheck, ShieldX } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line } from 'recharts';
+import { TrendingUp, BarChart3, Building2, Zap, AlertTriangle, Brain, Calculator, Layers, Loader2, ShieldX } from 'lucide-react';
 import AnaliseItemView from './AnaliseItemView';
 import GastosPorSetorChart from './relatorios/GastosPorSetorChart';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,7 @@ import { DecimalInput, parseDecimal } from '@/components/ui/decimal-input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useModuleAccess } from '@/permissions/hooks';
 import { useCan } from '@/permissions/hooks';
-import { fmtBRL, formatPercentBR, formatFixedBR, formatIntegerBR, parseLocalDate } from '@/lib/formatters';
+import { fmtBRL, formatPercentBR, formatFixedBR, formatIntegerBR } from '@/lib/formatters';
 
 function fmt(n: number) { return formatIntegerBR(n); }
 const fmtR$ = fmtBRL;

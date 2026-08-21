@@ -1,17 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
-import { DollarSign, Package, AlertTriangle, AlertCircle, TrendingDown, RefreshCw, ArrowDown, ArrowUp, Minus, Inbox } from 'lucide-react';
+import { DollarSign, Package, AlertTriangle, AlertCircle, RefreshCw, ArrowDown, ArrowUp, Minus, Inbox } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
 import StockInactivityAlert from './StockInactivityAlert';
-import { fmtBRL, fmtBRLCompact, formatDecimalBR, formatIntegerBR, parseUTCToBR } from '@/lib/formatters';
+import { fmtBRL, fmtBRLCompact, formatDecimalBR, parseUTCToBR } from '@/lib/formatters';
 import KpiCard from '@/components/ui/KpiCard';
-import StatusBadge from '@/components/ui/StatusBadge';
 import type { StockHealthStatus } from '@/domain/estoque/rules';
 
 import { useCan } from '@/permissions/hooks';

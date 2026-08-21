@@ -13,7 +13,7 @@ import { useMetaMensal, getMetaStatus, calcProjecao } from './MetaCompraCard';
 import { calcWeeklyIdeal, getWeekForDay } from './WeeklyBreakdown';
 import PurchaseRadar from './PurchaseRadar';
 import SimuladorCompra from './SimuladorCompra';
-import { todayBR, formatInBR, formatDateBR, fmtBRL, formatFixedBR, formatDecimalBR, normalizeBRLMoneyToNumber, parseLocalDate } from '@/lib/formatters';
+import { todayBR, formatInBR, formatDateBR, fmtBRL, formatFixedBR, normalizeBRLMoneyToNumber, parseLocalDate } from '@/lib/formatters';
 import {
   AlertDialog,
   AlertDialogAction,

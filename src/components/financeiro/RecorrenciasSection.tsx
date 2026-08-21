@@ -10,8 +10,8 @@ import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/comp
 import { supabase } from '@/integrations/supabase/client';
 import { useCan } from '@/permissions/hooks';
 import { toast } from 'sonner';
-import { RefreshCw, Repeat, Play, ExternalLink, ShieldX, Download, FileText } from 'lucide-react';
-import { fmtBRL, todayBR, formatInBR } from '@/lib/formatters';
+import { RefreshCw, Repeat, Play, ExternalLink, ShieldX, Download } from 'lucide-react';
+import { fmtBRL, todayBR } from '@/lib/formatters';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import * as XLSX from '@/lib/safeXlsx';

@@ -35,7 +35,6 @@ export {
 export { parseLocalDate } from './dateUtils';
 
 // ─── Aliases matching the prompt naming ───
-import { formatNumberToBRLWithSymbol, formatNumberToBRL } from './money';
 
 /**
  * Format a number as BRL currency.

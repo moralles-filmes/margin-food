@@ -21,16 +21,13 @@ function showTenantErrorToast(msg: string) {
     duration: 10000,
   });
 }
-import { Package, Search, Filter, Plus, ArrowUpDown, AlertTriangle, CheckCircle, TrendingDown, Inbox, ClipboardList, BarChart3, Edit2, Trash2, X, Check, Eye, ArrowDown, ArrowUp, Minus, Calculator, RefreshCw, ShoppingCart, Settings2, Shield, Copy, MoreVertical, Power, PowerOff, LayoutDashboard, ArrowLeftRight, Brain } from 'lucide-react';
+import { Package, Search, Plus, ArrowUpDown, AlertTriangle, CheckCircle, TrendingDown, Inbox, ClipboardList, BarChart3, Edit2, Trash2, X, ArrowDown, ArrowUp, Minus, ShoppingCart, Settings2, Shield, Copy, MoreVertical, Power, PowerOff, LayoutDashboard, ArrowLeftRight, Brain } from 'lucide-react';
 import { SubmoduleSwitcher } from '@/components/ui/SubmoduleSwitcher';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { normalizeBRLMoneyToNumber, fmtBRL } from '@/lib/formatters';
-import { formatDecimalBR, formatIntegerBR, formatFixedBR } from '@/lib/formatters';
+import { formatIntegerBR, formatFixedBR } from '@/lib/formatters';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { BRLInput, CurrencyInput } from '@/components/ui/brl-input';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { useEstoqueGeralStoreContext } from '@/contexts/EstoqueGeralStoreContext';
@@ -39,7 +36,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCan, useModuleAccess } from '@/permissions';
 import { supabase } from '@/integrations/supabase/client';
 import type { Produto, MovimentacaoEstoque } from '@/types/salmon';
-import type { ProdutoExtended, ProdutoComSaldo, ProdutoFormData } from '@/types/estoque';
+import type { ProdutoExtended, ProdutoFormData } from '@/types/estoque';
 import { classifyStockHealth, countStockHealth, STOCK_HEALTH_CONFIG } from '@/domain/estoque/rules';
 import { toast } from 'sonner';
 import SimuladorCompraGeral from './SimuladorCompraGeral';
@@ -56,16 +53,12 @@ import StockPredictiveSection from './estoque/StockPredictiveSection';
 import { cacheInvalidate } from '@/components/cmv/cmvCache';
 import StockInactivityAlert from './estoque/StockInactivityAlert';
 import ProdutoFormPanel, { emptyProdForm } from './estoque/ProdutoFormPanel';
-import ProductSearchCombobox, { type ProductOption } from '@/components/ui/ProductSearchCombobox';
+import { type ProductOption } from '@/components/ui/ProductSearchCombobox';
 import { todayBR } from '@/lib/datetime';
 import NovaMovimentacaoModal, { type MovModalPreset } from './estoque/NovaMovimentacaoModal';
 
 type SubView = 'dashboard' | 'ranking' | 'perdas' | 'transferencias' | 'preditivo' | 'saldo' | 'movimentacoes' | 'solicitacoes' | 'produtos' | 'simulador' | 'cadastros';
-import {
-  decomposeStockLayers,
-  formatStockLayers,
-  PURCHASE_UNITS,
-} from '@/lib/unitConversions';
+import { decomposeStockLayers, formatStockLayers } from '@/lib/unitConversions';
 
 // Map SubView ids to registry subtab keys
 const SUB_VIEW_REGISTRY_MAP: Record<SubView, string> = {

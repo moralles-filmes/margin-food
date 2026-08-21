@@ -3,7 +3,7 @@ import { SalmonEntry, Manipulation, DailyRecord, StockConfig, StockState, Suppli
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { emitDataEvent } from '@/lib/dataEvents';
-import { todayBR, formatInBR } from '@/lib/datetime';
+import { todayBR } from '@/lib/datetime';
 
 const defaultStockConfig: StockConfig = {
   minGrossKg: 50, minCleanKg: 30, staleDaysLimit: 7,

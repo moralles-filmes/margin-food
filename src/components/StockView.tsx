@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { fmtBRL, formatFixedBR, formatDateBR, formatInBR, parseLocalDate } from '@/lib/formatters';
+import { fmtBRL, formatFixedBR, formatDateBR, parseLocalDate } from '@/lib/formatters';
 import { useSalmonStore } from '@/hooks/useSalmonStore';
-import { Warehouse, Droplets, Clock, Settings2, Check, AlertTriangle, Zap, ShieldAlert } from 'lucide-react';
+import { Warehouse, Droplets, Clock, Settings2, Check, AlertTriangle, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { DecimalInput, parseDecimal } from '@/components/ui/decimal-input';

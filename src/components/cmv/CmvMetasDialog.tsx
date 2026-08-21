@@ -6,7 +6,7 @@ import { DecimalInput } from '@/components/ui/decimal-input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Target, RefreshCw } from 'lucide-react';
 import type { CmvResult, MetaCmv } from './types';
-import { formatFixedBR, fmtBRL, formatPercentBR } from '@/lib/formatters';
+import { fmtBRL, formatPercentBR } from '@/lib/formatters';
 
 const COLORS = [
   'hsl(var(--primary))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))',

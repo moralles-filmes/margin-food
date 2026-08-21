@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { CalendarioCompras, RequisicaoCompra, PedidoCompra } from '@/types/salmon';
 
 // Extended types for compras

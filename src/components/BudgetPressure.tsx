@@ -1,10 +1,9 @@
 import { useMemo } from 'react';
 import { SalmonEntry, MetaCompraMensal } from '@/types/salmon';
-import { todayBR, formatDateBR, formatInBR, fmtBRL, formatPercentBR, formatDecimalBR, parseLocalDate } from '@/lib/formatters';
+import { todayBR, fmtBRL, formatPercentBR, formatDecimalBR, parseLocalDate } from '@/lib/formatters';
 import { getWeeksOfMonth, WeekDef } from './WeeklyBreakdown';
-import { Gauge, TrendingUp, Activity, ShieldAlert, BarChart3, Info } from 'lucide-react';
+import { Gauge, Activity, ShieldAlert, BarChart3, Info } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Badge } from '@/components/ui/badge';
 
 const fmtR = (v: number) => fmtBRL(v);
 

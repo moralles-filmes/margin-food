@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { emitDataEvent, useDataEvent } from '@/lib/dataEvents';
+import { emitDataEvent } from '@/lib/dataEvents';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,7 +16,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { parseExtrato, verifyContaExtrato, type ExtratoConta } from '@/lib/extratoParser';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import { Upload, CheckCircle, Save, RefreshCw, ArrowRight, Receipt, Eye, Plus, Trash2, PieChart, ArrowRightLeft, Search, CreditCard, FileText, EyeOff, X, AlertTriangle, Edit } from 'lucide-react';
+import { Upload, CheckCircle, Save, RefreshCw, ArrowRight, Receipt, Plus, Trash2, PieChart, ArrowRightLeft, Search, CreditCard, FileText, EyeOff, X, AlertTriangle, Edit } from 'lucide-react';
 import CriarLancamentoExtratoDialog from '@/components/financeiro/CriarLancamentoExtratoDialog';
 import CategoryCombobox from '@/components/financeiro/CategoryCombobox';
 import ContaFormDialog, { type ContaFormData, type RateioLine } from '@/components/financeiro/ContaFormDialog';

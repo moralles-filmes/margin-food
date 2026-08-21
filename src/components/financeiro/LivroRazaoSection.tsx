@@ -14,10 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import {
-  TrendingUp, TrendingDown, ArrowUpRight,
-  RefreshCw, Link2, Repeat, ShieldAlert, Download, Edit, Trash2,
-} from 'lucide-react';
+import { TrendingUp, TrendingDown, ArrowUpRight, RefreshCw, Repeat, ShieldAlert, Download, Edit, Trash2 } from 'lucide-react';
 import { useFormDirtyGuard } from '@/hooks/useFormDirtyGuard';
 import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
 import ContaDetailDialog, { type ContaDetailData, type ContaDetailRateio } from './ContaDetailDialog';

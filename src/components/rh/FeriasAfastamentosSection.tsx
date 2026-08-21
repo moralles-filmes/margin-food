@@ -17,7 +17,7 @@ import {
   Plus, CalendarIcon, Palmtree, Stethoscope, FileWarning,
   CheckCircle2, XCircle, Clock, CalendarDays, AlertTriangle
 } from 'lucide-react';
-import { format, parseISO, differenceInBusinessDays, addDays, isWithinInterval, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
+import { format, parseISO, differenceInBusinessDays, isWithinInterval, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 

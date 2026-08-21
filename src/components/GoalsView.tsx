@@ -6,10 +6,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NumericInput } from '@/components/ui/numeric-input';
 import { parseDecimal } from '@/components/ui/decimal-input';
-import { Users, TrendingUp, Fish, Target, Check } from 'lucide-react';
+import { Users, Fish, Target, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import PeriodFilter, { PeriodRange, getDefaultRange, filterByPeriod } from './PeriodFilter';
-import { todayBR, formatInBR, formatDateBR, formatDecimalBR, formatPercentBR, parseLocalDate } from '@/lib/formatters';
+import { todayBR, formatDateBR, formatDecimalBR, formatPercentBR, parseLocalDate } from '@/lib/formatters';
 
 function parseLocalDateGoals(d: string) { const [y, m, dd] = d.split('-').map(Number); return new Date(y, m - 1, dd); }
 

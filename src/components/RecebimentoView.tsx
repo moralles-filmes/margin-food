@@ -8,10 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import {
-  Package, Check, ChevronRight, AlertTriangle, CheckCircle2,
-  XCircle, Inbox, Search, Eye, Truck, ArrowRight,
-} from 'lucide-react';
+import { Package, Check, ChevronRight, AlertTriangle, CheckCircle2, XCircle, Inbox, Search, Eye, ArrowRight } from 'lucide-react';
 import { formatDateBR, formatDateTimeBR } from '@/lib/formatters';
 import { includesNormalized } from '@/lib/utils';
 

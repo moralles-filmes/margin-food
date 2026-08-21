@@ -16,7 +16,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Settings2, Plus, Trash2, Search, X, GripVertical, Save, ArrowUp, ArrowDown } from 'lucide-react';
+import { Settings2, Plus, Trash2, Search, X, ArrowUp, ArrowDown } from 'lucide-react';
 import type { ProdutoExtended } from '@/types/estoque';
 import { toRequisitionDisplayProduct } from '@/domain/estoque/requisition';
 

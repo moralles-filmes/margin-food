@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Tag, MapPin, Building2, Plus, Edit2, Power, PowerOff, Trash2, Check, X, Loader2 } from 'lucide-react';
+import { Tag, MapPin, Building2, Plus, Edit2, Power, PowerOff, Trash2, Loader2 } from 'lucide-react';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';

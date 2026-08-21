@@ -4,20 +4,15 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import SearchableSelect from '@/components/ui/SearchableSelect';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
-import {
-  Plus, UserCheck, Clock, CheckCircle2, GraduationCap, Star, ChevronRight, Users
-} from 'lucide-react';
+import { Plus, GraduationCap, Star, ChevronRight } from 'lucide-react';
 import { format, parseISO, differenceInDays } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 
 import { useCan } from '@/permissions/hooks';
 interface Colaborador {

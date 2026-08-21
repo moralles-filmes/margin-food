@@ -7,7 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useCan, useModuleAccess } from '@/permissions/hooks';
 import { toast } from 'sonner';
-import { formatFixedBR, fmtBRL, formatPercentBR, formatDateBR, formatInBR, todayBR, parseLocalDate } from '@/lib/formatters';
+import { fmtBRL, formatDateBR, formatInBR, todayBR } from '@/lib/formatters';
 import { formatDateBR as formatDateISO } from '@/lib/datetime';
 
 const COLORS = [
@@ -20,7 +20,7 @@ function fmt(v: number) {
 }
 
 import { SubmoduleSwitcher } from '@/components/ui/SubmoduleSwitcher';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -32,12 +32,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Switch } from '@/components/ui/switch';
-import {
-  UserPlus, Clock, Timer, Users, Play, Square, Coffee, CheckCircle2,
-  AlertTriangle, TrendingUp, Calendar as CalendarIcon2, Edit2, Eye, CalendarDays, GraduationCap, Palmtree, FileText,
-  XCircle, Search, MoreHorizontal, UserX, CalendarIcon, Calculator
-} from 'lucide-react';
-import { format, differenceInMinutes, parseISO } from 'date-fns';
+import { UserPlus, Clock, Timer, Users, Play, Square, Coffee, CheckCircle2, Calendar as CalendarIcon2, Edit2, CalendarDays, GraduationCap, Palmtree, FileText, XCircle, UserX, CalendarIcon, Calculator } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import EscalasSection from '@/components/rh/EscalasSection';
