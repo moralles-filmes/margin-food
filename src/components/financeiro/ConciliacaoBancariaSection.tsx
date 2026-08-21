@@ -774,6 +774,9 @@ export default function ConciliacaoBancariaSection() {
       const { data: page, error } = await supabase.from('fin_conciliacao_vinculos')
         .select('external_id, tipo, lancamento_id')
         .eq('conta_id', contaSel)
+        // Ordem estável é obrigatória: cada página é uma query separada e, sem
+        // ORDER BY, o Postgres pode repetir/pular linhas entre páginas.
+        .order('id', { ascending: true })
         .range(from, from + pageSize - 1);
       if (error) throw error;
       data.push(...(page || []));
@@ -795,6 +798,7 @@ export default function ConciliacaoBancariaSection() {
       const { data: page, error } = await supabase.from('fin_lancamentos')
         .select('id, data_competencia, data_pagamento, valor, tipo, descricao')
         .eq('conta_id', contaSel).eq('conciliado', true).eq('status', 'REALIZADO')
+        .order('id', { ascending: true })
         .range(from, from + pageSize - 1);
       if (error) throw error;
       data.push(...((page || []) as ConciliadoRow[]));
@@ -819,6 +823,7 @@ export default function ConciliacaoBancariaSection() {
       const { data: page, error } = await supabase.from('fin_lancamentos')
         .select('id, data_competencia, data_pagamento, valor, tipo, descricao, conciliado, conta_id, origem')
         .eq('conta_id', contaSel).eq('status', 'REALIZADO').or('conciliado.is.null,conciliado.eq.false')
+        .order('id', { ascending: true })
         .range(from, from + pageSize - 1);
       if (error) throw error;
       data.push(...((page || []) as LancamentoCandidate[]));
