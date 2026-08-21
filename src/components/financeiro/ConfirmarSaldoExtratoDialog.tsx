@@ -9,6 +9,7 @@ import { fmtBRL, formatDateBR, parseLocalDate } from '@/lib/formatters';
 import { normalizeBRLMoneyToNumber, formatNumberToBRL } from '@/lib/money';
 import { toast } from 'sonner';
 import { AlertTriangle } from 'lucide-react';
+import { useCan } from '@/permissions/hooks';
 
 interface ConfirmarSaldoExtratoDialogProps {
   open: boolean;
@@ -41,8 +42,13 @@ export default function ConfirmarSaldoExtratoDialog({
   );
   const [loading, setLoading] = useState(false);
   const [divergencia, setDivergencia] = useState<Divergencia | null>(null);
+  const canViewConciliacao = useCan('financeiro:conciliacao:view');
 
   const handleConfirmarValor = async () => {
+    if (!canViewConciliacao) {
+      toast.error('Sem permissão para conciliação bancária.');
+      return;
+    }
     const informado = normalizeBRLMoneyToNumber(valorInput);
     if (informado == null) {
       toast.error('Informe o saldo final do extrato.');
