@@ -2457,6 +2457,9 @@ export default function ConciliacaoBancariaSection() {
                       <span className="text-xs" title={rateioCategoryNames.join(' • ') || categoriaNome}>
                         {categoryLabel}
                       </span>
+                    ) : item.tipo === 'TRANSFERENCIA' ? (
+                      // Transferência não exige categoria (mesma isenção de findLancamentosSemCategoria)
+                      <span className="text-xs text-muted-foreground">—</span>
                     ) : (
                       <span className="text-xs text-warning flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Sem categoria</span>
                     )}
