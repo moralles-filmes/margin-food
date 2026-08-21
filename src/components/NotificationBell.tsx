@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Bell, CheckCheck, ExternalLink, Inbox } from 'lucide-react';
+import { Bell, CheckCheck, Inbox } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { type AppNotification } from '@/hooks/useNotifications';

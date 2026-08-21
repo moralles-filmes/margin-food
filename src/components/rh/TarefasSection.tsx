@@ -10,13 +10,11 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   Plus, CheckCircle2, Clock, AlertTriangle, ListChecks, Filter, Play, XCircle
 } from 'lucide-react';
 import { format, parseISO, isPast } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 
 import { useCan } from '@/permissions/hooks';
 interface Colaborador {

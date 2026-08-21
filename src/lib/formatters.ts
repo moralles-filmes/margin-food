@@ -18,8 +18,6 @@ export {
   fmtBRL,
   fmtBRLRaw,
   fmtBRLCompact,
-  formatNumberToBRL,
-  formatNumberToBRLWithSymbol,
   normalizeBRLMoneyToNumber,
 } from './money';
 
@@ -33,9 +31,6 @@ export {
 } from './datetime';
 
 export { parseLocalDate } from './dateUtils';
-
-// ─── Aliases matching the prompt naming ───
-import { formatNumberToBRLWithSymbol, formatNumberToBRL } from './money';
 
 /**
  * Format a number as BRL currency.

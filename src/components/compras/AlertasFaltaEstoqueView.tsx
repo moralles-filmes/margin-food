@@ -21,16 +21,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import {
-  ShieldAlert,
-  AlertTriangle,
-  CheckCircle2,
-  Search,
-  RefreshCw,
-  Inbox,
-  Package,
-  Eye,
-} from 'lucide-react';
+import { ShieldAlert, AlertTriangle, CheckCircle2, Search, RefreshCw, Inbox, Eye } from 'lucide-react';
 import { parseUTCToBR } from '@/lib/datetime';
 import { includesNormalized } from '@/lib/utils';
 

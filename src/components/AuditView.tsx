@@ -2,7 +2,6 @@ import { useState, useMemo } from 'react';
 import { includesNormalized } from '@/lib/utils';
 import { fmtBRL, fmtBRLRaw, formatPercentBR } from '@/lib/formatters';
 import { useSalmonStore } from '@/hooks/useSalmonStore';
-import { AuditoriaCompra } from '@/types/salmon';
 import { format } from 'date-fns';
 import { ShieldAlert, Download, Eye, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';

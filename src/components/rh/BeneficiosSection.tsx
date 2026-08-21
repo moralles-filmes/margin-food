@@ -13,13 +13,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Heart, Plus, Shield, Bus, UtensilsCrossed, Stethoscope, Eye,
-  Trash2, Edit2, DollarSign, Users, AlertTriangle
-} from 'lucide-react';
+import { Heart, Plus, Shield, Bus, UtensilsCrossed, Stethoscope, Trash2, Edit2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { todayBR } from '@/lib/datetime';
-import { formatFixedBR, fmtBRL } from '@/lib/formatters';
+import { formatFixedBR } from '@/lib/formatters';
 
 import { useCan } from '@/permissions/hooks';
 interface Colaborador {

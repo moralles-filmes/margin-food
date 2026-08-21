@@ -1,16 +1,9 @@
 import { useState, useMemo, useEffect } from 'react';
 import { usePersistedTab } from '@/hooks/usePersistedTab';
-import { ShoppingCart, Calendar, BarChart3, ClipboardList, Plus, Search, Inbox, X, Check, Trash2, Crown, Award, Medal, Zap, AlertTriangle, ShoppingBag, Building2, ShieldAlert, PackageX, FileText } from 'lucide-react';
+import { ShoppingCart, Calendar, BarChart3, ClipboardList, ShoppingBag, Building2, ShieldAlert, PackageX, FileText } from 'lucide-react';
 import { SubmoduleSwitcher } from '@/components/ui/SubmoduleSwitcher';
 import { useAuth } from '@/contexts/AuthContext';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useSalmonStoreContext } from '@/contexts/SalmonStoreContext';
-import { CalendarioCompras, Produto } from '@/types/salmon';
-import { toast } from 'sonner';
-import { gerarPDFPedido } from '@/lib/pdfGenerator';
 import PedidosComprasMercadoView from '@/components/PedidosComprasMercadoView';
 import AlertasFaltaEstoqueView from '@/components/compras/AlertasFaltaEstoqueView';
 import SuppliersView from '@/components/SuppliersView';

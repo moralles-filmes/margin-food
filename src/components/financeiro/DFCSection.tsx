@@ -3,7 +3,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { subMonths, startOfMonth, endOfMonth } from 'date-fns';
-import { formatDateBR, formatInBR } from '@/lib/formatters';
+import { formatInBR } from '@/lib/formatters';
 import { formatDateBR as formatDateISO } from '@/lib/datetime';
 import { FileDown, FileSpreadsheet, ShieldAlert } from 'lucide-react';
 import { exportDemonstrativoPDF, exportDemonstrativoExcel } from '@/lib/exportDemonstrativo';

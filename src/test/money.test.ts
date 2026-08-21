@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { normalizeBRLMoneyToNumber, fmtBRL, fmtBRLRaw, fmtBRLCompact, formatNumberToBRL, formatNumberToBRLWithSymbol } from "@/lib/money";
+import { normalizeBRLMoneyToNumber, fmtBRL, fmtBRLRaw, fmtBRLCompact } from "@/lib/money";
 import { formatPercentBR, formatDecimalBR, formatIntegerBR, formatFixedBR, formatMoneyBR, formatQuantityBR } from "@/lib/formatters";
 import { parseDecimal } from "@/components/ui/decimal-input";
 

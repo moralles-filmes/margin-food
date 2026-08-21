@@ -16,7 +16,7 @@ import SupplierCombobox from './SupplierCombobox';
 import { Plus, Trash2, Repeat } from 'lucide-react';
 
 /* ─── Types ─── */
-export type ContaFormVariant = 'pagar' | 'receber' | 'lancamento';
+type ContaFormVariant = 'pagar' | 'receber' | 'lancamento';
 
 export interface RateioLine {
   key: string;

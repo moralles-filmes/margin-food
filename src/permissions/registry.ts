@@ -26,13 +26,13 @@ export interface ModuleManifest {
   subtabs: SubtabManifest[];
 }
 
-export interface SubtabManifest {
+interface SubtabManifest {
   key: string;       // e.g. "dashboard"
   label: string;
   actions: ActionManifest[];
 }
 
-export interface ActionManifest {
+interface ActionManifest {
   action: string;    // e.g. "view"
   label: string;
   description?: string;
@@ -517,11 +517,6 @@ export function buildPermissionEntries(): PermissionEntry[] {
 
 /** All permission keys as a flat string array */
 export const ALL_PERMISSION_KEYS: string[] = buildPermissionEntries().map(e => e.key);
-
-/** Get permission entries for a specific module */
-export function getModulePermissions(moduleKey: string): PermissionEntry[] {
-  return buildPermissionEntries().filter(e => e.module === moduleKey);
-}
 
 /** Get the view permission key for a subtab */
 export function subtabViewKey(moduleKey: string, subtabKey: string): string {

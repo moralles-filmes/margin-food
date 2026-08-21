@@ -8,9 +8,9 @@
  * Extra actions: approve, close, reconcile, cancel, simulate
  */
 
-export const BASE_ACTIONS = ['view', 'create', 'edit', 'delete', 'export', 'manage'] as const;
+const BASE_ACTIONS = ['view', 'create', 'edit', 'delete', 'export', 'manage'] as const;
 
-export const EXTRA_ACTIONS = ['approve', 'close', 'reconcile', 'cancel', 'simulate'] as const;
+const EXTRA_ACTIONS = ['approve', 'close', 'reconcile', 'cancel', 'simulate'] as const;
 
 /** All 11 officially allowed actions */
 export const ALLOWED_ACTIONS = [...BASE_ACTIONS, ...EXTRA_ACTIONS] as const;

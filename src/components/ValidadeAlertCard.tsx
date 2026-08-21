@@ -1,4 +1,4 @@
-import { AlertTriangle, Clock, ShieldAlert } from 'lucide-react';
+import { Clock, ShieldAlert } from 'lucide-react';
 import { LoteSalmaoLimpo } from '@/types/salmon';
 import { format } from 'date-fns';
 import { fmtBRL, formatFixedBR } from '@/lib/formatters';

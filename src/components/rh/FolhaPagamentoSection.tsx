@@ -7,14 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Textarea } from '@/components/ui/textarea';
-import {
-  Calculator, DollarSign, TrendingUp, TrendingDown, CheckCircle2,
-  Clock, FileText, Download, Users, AlertTriangle, ChevronRight
-} from 'lucide-react';
+import { Calculator, DollarSign, TrendingUp, TrendingDown, CheckCircle2, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatInBR } from '@/lib/datetime';
 import { formatFixedBR } from '@/lib/formatters';

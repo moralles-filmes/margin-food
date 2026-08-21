@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 
 /* ─── Types ─── */
-export type ContaDetailVariant = 'pagar' | 'receber' | 'lancamento';
+type ContaDetailVariant = 'pagar' | 'receber' | 'lancamento';
 
 export interface ContaDetailRateio {
   categoria_nome: string;

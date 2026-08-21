@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import PasswordInput from '@/components/PasswordInput';
 import { toast } from 'sonner';
-import { APP_NAME, APP_TAGLINE } from '@/lib/brand';
+import { APP_TAGLINE } from '@/lib/brand';
 import logoMarginPro from '@/assets/logo-marginpro.png';
 
 export default function Login() {

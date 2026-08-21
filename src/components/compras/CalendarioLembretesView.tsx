@@ -14,7 +14,7 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Plus, Calendar, Pencil, Trash2, Zap, Inbox } from 'lucide-react';
+import { Plus, Calendar, Pencil, Trash2, Zap } from 'lucide-react';
 import UserMentionSelect from '@/components/UserMentionSelect';
 import { todayBR } from '@/lib/datetime';
 

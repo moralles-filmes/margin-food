@@ -32,7 +32,6 @@ import FechamentoCaixaSection from '@/components/financeiro/FechamentoCaixaSecti
 import CadastroBaseTree from '@/components/financeiro/CadastroBaseTree';
 import ContasBancariasSection from '@/components/financeiro/ContasBancariasSection';
 import LivroRazaoSection from '@/components/financeiro/LivroRazaoSection';
-import CategoriasFinSection from '@/components/financeiro/CategoriasFinSection';
 import PlanoContasFinSection from '@/components/financeiro/PlanoContasFinSection';
 import CentrosCustoFinSection from '@/components/financeiro/CentrosCustoFinSection';
 

@@ -8,14 +8,7 @@
  * Source of truth: docs/DOMAIN_RULES.md
  */
 
-import {
-  REALIZADO_STATUSES,
-  PENDENTE_STATUSES,
-  EXCLUDED_STATUSES,
-  EXCLUDED_TIPOS_FROM_RESULT,
-  type RealizadoStatus,
-  type Natureza,
-} from './invariants';
+import { REALIZADO_STATUSES, PENDENTE_STATUSES, EXCLUDED_STATUSES, EXCLUDED_TIPOS_FROM_RESULT, type RealizadoStatus } from './invariants';
 import type { FinancialSummary, InadimplenciaSummary, RateioResolvedItem } from './contracts';
 
 // ── Status predicates ──

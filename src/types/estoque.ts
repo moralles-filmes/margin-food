@@ -53,11 +53,6 @@ export interface ProdutoComSaldo extends ProdutoExtended {
   status: StockHealthStatus;
 }
 
-/** Saldo map from RPC */
-export interface SaldoMap {
-  [produtoId: string]: { saldo: number };
-}
-
 /** Product form shape for create/edit */
 export interface ProdutoFormData {
   nomeProduto: string;

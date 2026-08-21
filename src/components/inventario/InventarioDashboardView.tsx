@@ -1,14 +1,14 @@
 /**
  * Inventario Dashboard sub-view — extracted from InventarioView monolith.
  */
-import { Loader2, ShieldAlert, Clock, Users, TrendingDown, TrendingUp, Flame, BarChart3, ArrowLeft, Lock, AlertTriangle } from 'lucide-react';
+import { Loader2, ShieldAlert, Clock, Users, TrendingDown, TrendingUp, Flame, BarChart3, ArrowLeft, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { formatDisplayBR } from '@/lib/datetime';
 import { parseLocalDate } from '@/lib/dateUtils';
 import { formatInBR } from '@/lib/datetime';
 import { fmtBRL, formatPercentBR } from '@/lib/formatters';
-import type { Inventario, InventarioItem, DashboardData } from '@/hooks/useInventarioStore';
+import type { Inventario, DashboardData } from '@/hooks/useInventarioStore';
 
 function KPICard({ label, value, color, large }: { label: string; value: string; color?: string; large?: boolean }) {
   return (

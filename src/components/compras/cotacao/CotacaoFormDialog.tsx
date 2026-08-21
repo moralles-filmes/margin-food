@@ -9,7 +9,7 @@ import { useFormDirtyGuard } from '@/hooks/useFormDirtyGuard';
 import { useEstoqueGeralStoreContext } from '@/contexts/EstoqueGeralStoreContext';
 import { useSalmonStoreContext } from '@/contexts/SalmonStoreContext';
 import { toast } from 'sonner';
-import { Plus, X, Trash2, Package, Building2, Download, PencilLine } from 'lucide-react';
+import { Plus, X, Package, Building2, Download, PencilLine } from 'lucide-react';
 import { includesNormalized } from '@/lib/utils';
 import { formatMoneyBR } from '@/lib/formatters';
 import { mapCotacaoError } from '@/lib/cotacaoErrors';

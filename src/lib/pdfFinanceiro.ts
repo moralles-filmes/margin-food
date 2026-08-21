@@ -26,32 +26,6 @@ function addFooter(doc: jsPDF) {
 
 const fmtBRL = fmtBRLMoney;
 
-export function gerarPDFDre(dados: { mes: string; linhas: { codigo: string; nome: string; valor: number; pctReceita: string; tipo: string }[] }) {
-  const doc = new jsPDF();
-  addHeader(doc, 'DRE — Demonstrativo de Resultado', `Competência: ${dados.mes}`);
-
-  autoTable(doc, {
-    startY: 36,
-    head: [['Cód.', 'Linha', 'Valor', '% Receita']],
-    body: dados.linhas.map(l => [l.codigo, l.nome, fmtBRL(l.valor), l.pctReceita]),
-    styles: { fontSize: 8, cellPadding: 2.5 },
-    headStyles: { fillColor: HEADER_COLOR, textColor: 255 },
-    alternateRowStyles: { fillColor: [245, 245, 245] },
-    didParseCell: (data: any) => {
-      const row = dados.linhas[data.row.index];
-      if (row && (row.tipo === 'subtotal' || row.tipo === 'resultado')) {
-        data.cell.styles.fontStyle = 'bold';
-        if (row.tipo === 'resultado') {
-          data.cell.styles.fillColor = row.valor >= 0 ? [220, 252, 231] : [254, 226, 226];
-        }
-      }
-    },
-  });
-
-  addFooter(doc);
-  doc.save(`dre-${dados.mes}.pdf`);
-}
-
 export function gerarPDFFluxoCaixa(dados: {
   periodo: string;
   totais: { entradas: number; saidas: number; previstoEntradas: number; previstoSaidas: number };

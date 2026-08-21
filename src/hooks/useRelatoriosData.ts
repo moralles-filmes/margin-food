@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { PeriodRange } from '@/components/PeriodFilter';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';

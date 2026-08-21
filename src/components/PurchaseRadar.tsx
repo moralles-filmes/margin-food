@@ -1,10 +1,9 @@
 import { useMemo } from 'react';
 import { SalmonEntry, MetaCompraMensal } from '@/types/salmon';
-import { getDaysInMonth } from 'date-fns';
 import { Radar, TrendingUp, AlertTriangle, CheckCircle2, BarChart3, Activity } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { getWeeksOfMonth, calcWeeklyIdeal, WeekData } from './WeeklyBreakdown';
-import { parseLocalDate, fmtBRL, formatPercentBR, formatFixedBR } from '@/lib/formatters';
+import { getWeeksOfMonth, calcWeeklyIdeal } from './WeeklyBreakdown';
+import { parseLocalDate, fmtBRL, formatPercentBR } from '@/lib/formatters';
 
 const fmtR = fmtBRL;
 

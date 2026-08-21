@@ -10,15 +10,10 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
 import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import {
-  Plus, BookOpen, Award, ChevronRight, Users, GraduationCap,
-  FileText, Video, HelpCircle, CheckCircle2, Clock
-} from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { Plus, Award, ChevronRight, Users, GraduationCap, FileText, Video, HelpCircle } from 'lucide-react';
 
 import { useCan } from '@/permissions/hooks';
 interface Colaborador {

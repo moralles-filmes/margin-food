@@ -14,10 +14,7 @@ import { Switch } from '@/components/ui/switch';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import {
-  Plus, FileText, Upload, Download, AlertTriangle, CheckCircle2,
-  Clock, Shield, CalendarIcon, Trash2, Eye, FileWarning, Search
-} from 'lucide-react';
+import { Plus, FileText, Download, AlertTriangle, CheckCircle2, Clock, Shield, CalendarIcon, Trash2, FileWarning, Search } from 'lucide-react';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';

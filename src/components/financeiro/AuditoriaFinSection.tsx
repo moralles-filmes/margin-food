@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { parseUTCToBR, formatDateBR, parseLocalDate } from '@/lib/formatters';
+import { parseUTCToBR } from '@/lib/formatters';
 import { RefreshCw, Shield, Search, FileDown, Ban, ChevronDown, ChevronRight, Plus, Pencil, Trash2, Users } from 'lucide-react';
 import { useCan } from '@/permissions/hooks';
 import { useDataEvent } from '@/lib/dataEvents';

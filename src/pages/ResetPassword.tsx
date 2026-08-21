@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import PasswordInput from '@/components/PasswordInput';
 import { toast } from 'sonner';
-import { APP_NAME } from '@/lib/brand';
 import { useNavigate } from 'react-router-dom';
 import { usePasswordValidation } from '@/hooks/usePasswordValidation';
 import PasswordStrengthMeter from '@/components/PasswordStrengthMeter';

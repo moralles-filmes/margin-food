@@ -2,8 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { emitDataEvent } from '@/lib/dataEvents';
 import { supabase } from '@/integrations/supabase/client';
 import type { Produto, MovimentacaoEstoque } from '@/types/salmon';
-import type { ProdutoExtended, MovimentacaoExtended, ProdutoFormData } from '@/types/estoque';
-import { todayBR } from '@/lib/datetime';
+import type { ProdutoExtended, MovimentacaoExtended } from '@/types/estoque';
 import { resolveCompanyIdOrThrow } from '@/lib/tenant';
 import { narrowRows } from '@/lib/guards';
 import { normalizeSearchText } from '@/lib/utils';
@@ -400,7 +399,6 @@ export function useEstoqueGeralStore() {
 
     try {
       const { data, error, count } = await query;
-      console.log('[fetchProdutos] resultado:', { dataLen: data?.length, count, error: error?.message, filters: f });
       if (error) {
         console.error('[useEstoqueGeralStore] fetchProdutos error:', error.message, error);
         setProdCatalogError(error.message);

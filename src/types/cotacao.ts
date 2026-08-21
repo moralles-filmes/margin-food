@@ -17,9 +17,9 @@ export type CotacaoStatus =
   | 'CONVERTIDA'
   | 'CANCELADA';
 
-export type CotacaoOriginType = 'MANUAL' | 'ALERTA' | 'REQUISICAO';
+type CotacaoOriginType = 'MANUAL' | 'ALERTA' | 'REQUISICAO';
 
-export type CotacaoFornecedorStatus =
+type CotacaoFornecedorStatus =
   | 'AGUARDANDO'
   | 'ENVIADO'
   | 'RESPONDIDO'
@@ -27,7 +27,7 @@ export type CotacaoFornecedorStatus =
   | 'NEGOCIANDO'
   | 'FECHADO';
 
-export type CotacaoSugestaoTipo =
+type CotacaoSugestaoTipo =
   | 'MENOR_PRECO'
   | 'OTIMIZADA_PEDIDO_MINIMO'
   | 'MENOS_FORNECEDORES'
@@ -42,7 +42,7 @@ export type CotacaoWhatsappTipo =
   | 'FECHAMENTO_PEDIDO'
   | 'CONFIRMACAO_PRAZO';
 
-export type CotacaoWhatsappStatus = 'PENDING' | 'SENT' | 'ERROR';
+type CotacaoWhatsappStatus = 'PENDING' | 'SENT' | 'ERROR';
 
 /** Cabeçalho da cotação (tabela `cotacoes`). */
 export interface Cotacao {

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
-import { useInventarioStore, Inventario, InventarioItem, AuditLog } from '@/hooks/useInventarioStore';
+import { useInventarioStore, Inventario, InventarioItem } from '@/hooks/useInventarioStore';
 
 import { useCan, useModuleAccess } from '@/permissions/hooks';
 import { Button } from '@/components/ui/button';
@@ -13,11 +13,7 @@ import SearchableSelect from '@/components/ui/SearchableSelect';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import {
-  ClipboardCheck, Plus, ArrowLeft, Search, AlertTriangle, CheckCircle, TrendingDown, TrendingUp,
-  BarChart3, Lock, Loader2, ShieldAlert, Users, Clock, FileText, Flame, Shield, Eye,
-  MoreVertical, Pencil, Trash2, RotateCcw, UserPlus, UserMinus, Settings, Zap, Printer
-} from 'lucide-react';
+import { ClipboardCheck, Plus, ArrowLeft, Search, AlertTriangle, CheckCircle, BarChart3, Lock, Loader2, ShieldAlert, Users, FileText, Flame, Shield, Eye, MoreVertical, Trash2, RotateCcw, UserPlus, UserMinus, Settings, Zap, Printer } from 'lucide-react';
 import { todayBR, formatDisplayBR, formatInBR, parseUTCToBR } from '@/lib/datetime';
 import { parseLocalDate } from '@/lib/dateUtils';
 import { fmtBRL, formatPercentBR } from '@/lib/formatters';

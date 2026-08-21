@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import SearchableSelect from '@/components/ui/SearchableSelect';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { ArrowRight, ArrowLeftRight, Loader2, Package, MapPin, RefreshCw, Search } from 'lucide-react';
+import { ArrowRight, ArrowLeftRight, Loader2, Package, MapPin, RefreshCw } from 'lucide-react';
 import { format, subDays } from 'date-fns';
 import { fmtBRL, formatFixedBR } from '@/lib/formatters';
 

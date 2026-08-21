@@ -181,19 +181,3 @@ export default function SuppliersView({ store }: SuppliersViewProps) {
     </div>
   );
 }
-
-// Quick add supplier modal for inline use
-export function QuickSupplierForm({ onAdd, onCancel }: { onAdd: (name: string) => void; onCancel: () => void }) {
-  const [name, setName] = useState('');
-  return (
-    <div className="flex items-center gap-2 p-2 bg-secondary/50 rounded-lg animate-scale-in">
-      <Input value={name} onChange={e => setName(e.target.value)} placeholder="Nome do fornecedor" className="h-8 text-xs bg-card border-border text-foreground flex-1" autoFocus />
-      <Button size="sm" className="h-8 text-xs gradient-salmon text-primary-foreground border-0" onClick={() => { if (name.trim()) onAdd(name.trim()); }} disabled={!name.trim()}>
-        <Check className="w-3.5 h-3.5" />
-      </Button>
-      <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={onCancel}>
-        <X className="w-3.5 h-3.5" />
-      </Button>
-    </div>
-  );
-}

@@ -1,8 +1,7 @@
-import { useMemo, useState } from 'react';
-import { Badge } from '@/components/ui/badge';
+import { useState } from 'react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { TrendingUp, TrendingDown, Minus, Calendar, Truck, Info } from 'lucide-react';
+import { TrendingUp, TrendingDown, Calendar, Truck, Info } from 'lucide-react';
 import { fmtBRL, formatDecimalBR, formatDateBR } from '@/lib/formatters';
 import type { ProdutoExtended } from '@/types/estoque';
 

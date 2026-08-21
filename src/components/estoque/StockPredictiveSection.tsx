@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, ReferenceLine, Area, ComposedChart } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ReferenceLine, Area, ComposedChart } from 'recharts';
 import { AlertTriangle, TrendingUp, TrendingDown, Minus, ShieldAlert, ShoppingCart, Activity, RefreshCw, Brain, Package, CalendarDays, Info, ChevronDown, ChevronUp } from 'lucide-react';
 import { fmtBRL as fmtBRLMoney, formatDecimalBR } from '@/lib/formatters';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';

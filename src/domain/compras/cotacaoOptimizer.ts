@@ -16,12 +16,12 @@ export type ScenarioType =
   | 'MENOS_FORNECEDORES'
   | 'CUSTO_BENEFICIO';
 
-export interface OptItem { id: string; nome: string; qty: number }
-export interface OptSupplier { id: string; nome: string; minOrder: number; frete: number; prazo: number }
-export interface OptQuote { price: number; available: boolean }
+interface OptItem { id: string; nome: string; qty: number }
+interface OptSupplier { id: string; nome: string; minOrder: number; frete: number; prazo: number }
+interface OptQuote { price: number; available: boolean }
 
-export interface SupplierLine { itemId: string; nome: string; qty: number; price: number; subtotal: number }
-export interface SupplierBreakdown {
+interface SupplierLine { itemId: string; nome: string; qty: number; price: number; subtotal: number }
+interface SupplierBreakdown {
   supplierId: string;
   nome: string;
   lines: SupplierLine[];
@@ -32,7 +32,7 @@ export interface SupplierBreakdown {
   meetsMin: boolean;
   minReachable: boolean;
 }
-export interface Reallocation { itemId: string; nome: string; fromNome: string | null; toNome: string | null; delta: number }
+interface Reallocation { itemId: string; nome: string; fromNome: string | null; toNome: string | null; delta: number }
 export interface Scenario {
   tipo: ScenarioType;
   /** itemId -> supplierId escolhido */
