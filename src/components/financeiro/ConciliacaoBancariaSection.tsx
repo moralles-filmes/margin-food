@@ -133,6 +133,62 @@ function clearSaldoExtrato(contaId: string) {
   try { sessionStorage.removeItem(SALDO_EXTRATO_KEY(contaId)); } catch (_) { /* sessionStorage indisponível */ }
 }
 
+/**
+ * Localiza o dia em que o saldo do banco (reconstruído a partir de `saldoExtrato.valor`
+ * subtraindo as linhas do extrato posteriores a cada data) começou a divergir do saldo
+ * projetado do sistema (`get_fin_saldo_conta_em` + linhas ainda pendentes até aquela data).
+ * Busca binária sobre as datas distintas do extrato — assume que, uma vez que a diferença
+ * aparece, ela não se autocorrige nos dias seguintes (heurística de diagnóstico, não prova).
+ */
+async function localizarDiaDivergencia(
+  contaId: string,
+  saldoExtrato: SaldoExtratoRef,
+  linhas: LinhaExtrato[],
+): Promise<{ status: 'found' | 'before_period'; data: string } | null> {
+  const dateSet = new Set(linhas.map(l => l.data).filter(d => d <= saldoExtrato.data));
+  if (dateSet.size === 0) return null;
+  dateSet.add(saldoExtrato.data);
+  const dates = Array.from(dateSet).sort();
+
+  const signedValor = (l: LinhaExtrato) => (l.tipo === 'RECEITA' ? l.valor : -l.valor);
+  const bancoAt = (date: string) =>
+    saldoExtrato.valor - linhas.filter(l => l.data > date).reduce((s, l) => s + signedValor(l), 0);
+  const pendingUpTo = (date: string) =>
+    linhas.filter(l => !l.jaConciliada && !l.ignorada && l.data <= date).reduce((s, l) => s + signedValor(l), 0);
+
+  const sistemaCache = new Map<string, number>();
+  const sistemaAt = async (date: string) => {
+    if (sistemaCache.has(date)) return sistemaCache.get(date)!;
+    const { data, error } = await supabase.rpc('get_fin_saldo_conta_em', { p_conta_id: contaId, p_data: date });
+    if (error) throw error;
+    const v = Number(data) || 0;
+    sistemaCache.set(date, v);
+    return v;
+  };
+  const match = async (date: string) => Math.abs(bancoAt(date) - ((await sistemaAt(date)) + pendingUpTo(date))) < 0.01;
+
+  const baselineDate = formatInBR(subDays(parseLocalDate(dates[0]), 1), 'yyyy-MM-dd');
+  if (!(await match(baselineDate))) {
+    return { status: 'before_period', data: dates[0] };
+  }
+
+  // Busca o primeiro índice em que a comparação deixa de bater — dates[dates.length - 1]
+  // é sempre saldoExtrato.data, cujo `match` reproduz a `diferenca` do card (por construção
+  // é falso aqui, já que esta função só roda quando o card está vermelho).
+  let lo = 0;
+  let hi = dates.length - 1;
+  while (lo < hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    // eslint-disable-next-line no-await-in-loop -- busca binária sequencial, cada passo depende do anterior
+    if (await match(dates[mid])) {
+      lo = mid + 1;
+    } else {
+      hi = mid;
+    }
+  }
+  return { status: 'found', data: dates[lo] };
+}
+
 /** Lançamento já conciliado da conta, usado para reconhecer linha de extrato repetida. */
 interface ConciliadoRow {
   id: string;
@@ -180,6 +236,9 @@ export default function ConciliacaoBancariaSection() {
   const [conferenciaSaldo, setConferenciaSaldo] = useState<{
     sistema: number; projetado: number; pendentesDelta: number; diferenca: number;
   } | null>(null);
+  /** Dia em que a diferença acima começou a existir — best-effort, calculado por busca
+   *  binária (ver `localizarDiaDivergencia`), só quando o card de conferência está vermelho. */
+  const [diaDivergencia, setDiaDivergencia] = useState<{ status: 'found' | 'before_period'; data: string } | null>(null);
 
   const [lancamentos, setLancamentos] = useState<LancamentoConciliacao[]>([]);
   const [lancamentoRateioCategoryIds, setLancamentoRateioCategoryIds] = useState<Record<string, string[]>>({});
@@ -330,6 +389,7 @@ export default function ConciliacaoBancariaSection() {
   useEffect(() => {
     if (!contaSel || !saldoExtrato) {
       setConferenciaSaldo(null);
+      setDiaDivergencia(null);
       return;
     }
     const t = setTimeout(async () => {
@@ -348,12 +408,19 @@ export default function ConciliacaoBancariaSection() {
         .filter(l => !l.jaConciliada && !l.ignorada)
         .reduce((s, l) => s + (l.tipo === 'RECEITA' ? l.valor : -l.valor), 0);
       const projetado = sistema + pendentesDelta;
-      setConferenciaSaldo({
-        sistema,
-        projetado,
-        pendentesDelta,
-        diferenca: saldoExtrato.valor - projetado,
-      });
+      const diferenca = saldoExtrato.valor - projetado;
+      setConferenciaSaldo({ sistema, projetado, pendentesDelta, diferenca });
+
+      if (Math.abs(diferenca) < 0.01) {
+        setDiaDivergencia(null);
+        return;
+      }
+      try {
+        setDiaDivergencia(await localizarDiaDivergencia(contaSel, saldoExtrato, linhas));
+      } catch (err) {
+        console.error('[ConciliacaoBancariaSection.diaDivergencia]', err);
+        setDiaDivergencia(null);
+      }
     }, 600);
     return () => clearTimeout(t);
   }, [contaSel, saldoExtrato, linhas]);
@@ -2024,6 +2091,19 @@ export default function ConciliacaoBancariaSection() {
                     {' · '}Sistema{Math.abs(conferenciaSaldo.pendentesDelta) >= 0.01 ? ' (com linhas pendentes)' : ''}:{' '}
                     <span className="font-mono text-foreground">{fmtBRL(conferenciaSaldo.projetado)}</span>
                   </p>
+                  {diaDivergencia && (
+                    <p className="text-muted-foreground">
+                      {diaDivergencia.status === 'found' ? (
+                        <>A diferença começou em{' '}
+                          <span className="font-mono text-foreground">{formatDateBR(parseLocalDate(diaDivergencia.data))}</span>
+                          {' '}— revise as linhas dessa data.</>
+                      ) : (
+                        <>A diferença já existia antes de{' '}
+                          <span className="font-mono text-foreground">{formatDateBR(parseLocalDate(diaDivergencia.data))}</span>
+                          {' '}(fora do período deste extrato).</>
+                      )}
+                    </p>
+                  )}
                   <p className="text-[11px] text-muted-foreground">
                     Pode haver linha marcada como duplicata/ignorada que na verdade é uma transação real,
                     ou lançamento incorreto no período. Revise antes de confiar no saldo.
