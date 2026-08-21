@@ -400,7 +400,6 @@ export function useEstoqueGeralStore() {
 
     try {
       const { data, error, count } = await query;
-      console.log('[fetchProdutos] resultado:', { dataLen: data?.length, count, error: error?.message, filters: f });
       if (error) {
         console.error('[useEstoqueGeralStore] fetchProdutos error:', error.message, error);
         setProdCatalogError(error.message);

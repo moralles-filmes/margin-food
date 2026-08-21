@@ -399,16 +399,3 @@ export function useAuth() {
   return ctx;
 }
 
-/** Check a single permission for the current user */
-export function useCan(perm: string): boolean {
-  const { hasPermission, permissionState } = useAuth();
-  if (permissionState !== 'READY') return false;
-  return hasPermission(perm);
-}
-
-/** Check if user has ANY of the given permissions */
-export function useCanAny(...perms: string[]): boolean {
-  const { hasPermission, permissionState } = useAuth();
-  if (permissionState !== 'READY') return false;
-  return perms.some(p => hasPermission(p));
-}
