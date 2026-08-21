@@ -1,14 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  canRejectItem,
-  canAttendItem,
-  canActOnRequisicao,
-  hasPendingItems,
-  itemStatusLabel,
-  requisicaoStatusLabel,
-  requisicaoStatusStyle,
-  itemStatusStyle,
-} from '@/domain/estoque/requisitionStatus';
+import { canRejectItem, canAttendItem, canActOnRequisicao, hasPendingItems, itemStatusLabel, requisicaoStatusLabel, requisicaoStatusStyle } from '@/domain/estoque/requisitionStatus';
 
 // ─── Per-item independent processing rules ───────────────────────────────
 

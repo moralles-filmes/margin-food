@@ -21,13 +21,7 @@ import { extractSupabaseErrorMessage } from '@/lib/supabaseErrors';
 import type { Produto } from '@/types/salmon';
 import type { ProdutoExtended, ProdutoFormData } from '@/types/estoque';
 import type { ProdutoCreateInput, ProdutoUpdateInput } from '@/hooks/useEstoqueGeralStore';
-import {
-  calcPackageConversionFactor as calcAutoFactor,
-  formatConversionLabel,
-  BASE_UNITS,
-  PACKAGE_MEASURE_UNITS,
-  PURCHASE_UNITS,
-} from '@/lib/unitConversions';
+import { calcPackageConversionFactor as calcAutoFactor, formatConversionLabel, PACKAGE_MEASURE_UNITS, PURCHASE_UNITS } from '@/lib/unitConversions';
 
 const UNIDADES_BASE: Produto['unidadeMedida'][] = ['KG', 'L', 'UN'];
 const UNIDADES_COMPRA = [...PURCHASE_UNITS];

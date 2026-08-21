@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -20,10 +20,7 @@ import ProductSearchCombobox, { type ProductOption } from '@/components/ui/Produ
 import { LoteSalmaoLimpo } from '@/types/salmon';
 import { DecimalInput } from '@/components/ui/decimal-input';
 import { CurrencyInput } from '@/components/ui/brl-input';
-import {
-  Plus, Trash2, Save, RefreshCw, Search, ChefHat, Layers, Package, ShoppingBag,
-  DollarSign, TrendingUp, Calculator, BarChart3, Settings2, ArrowRight, X, Fish
-} from 'lucide-react';
+import { Plus, Trash2, Save, RefreshCw, Search, ChefHat, Layers, ShoppingBag, DollarSign, TrendingUp, Calculator, BarChart3, Settings2, ArrowRight, X, Fish } from 'lucide-react';
 import { SubmoduleSwitcher } from '@/components/ui/SubmoduleSwitcher';
 
 import { fmtBRL, formatPercentBR, formatFixedBR } from '@/lib/formatters';

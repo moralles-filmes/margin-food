@@ -6,10 +6,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import SearchableSelect from '@/components/ui/SearchableSelect';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
-import { TrendingDown, TrendingUp, Minus, RefreshCw, BarChart3, Package, DollarSign, Calendar } from 'lucide-react';
+import { RefreshCw, BarChart3, Package, DollarSign, Calendar } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { formatFixedBR, formatDateBR, formatInBR, fmtBRL } from '@/lib/formatters';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, LineChart, Line, ResponsiveContainer, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, LineChart, Line, Cell } from 'recharts';
 
 import { useCan } from '@/permissions/hooks';
 interface ConsumptionData {

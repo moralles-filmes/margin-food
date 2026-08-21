@@ -8,14 +8,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import UserMentionSelect from '@/components/UserMentionSelect';
 import ProductSearchCombobox, { type ProductOption } from '@/components/ui/ProductSearchCombobox';
-import {
-  Plus, ShoppingBag, X, Check, ChevronRight, ChevronDown, AlertTriangle,
-  Clock, CheckCircle2, XCircle, Shield, Inbox, Package, Search
-} from 'lucide-react';
+import { Plus, ShoppingBag, X, Check, ChevronRight, Clock, CheckCircle2, XCircle, Shield, Inbox, Package, Search } from 'lucide-react';
 
 const PRIORIDADE_COLORS: Record<string, string> = {
   urgente: 'bg-destructive/15 text-destructive',

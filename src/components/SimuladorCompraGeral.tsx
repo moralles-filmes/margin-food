@@ -12,10 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCan } from '@/permissions/hooks';
 import { toast } from 'sonner';
-import {
-  ShoppingCart, RefreshCw, AlertTriangle, CheckCircle, TrendingDown,
-  Package, DollarSign, Shield, Clock, ArrowRight, FileText, Zap
-} from 'lucide-react';
+import { ShoppingCart, RefreshCw, AlertTriangle, Package, DollarSign, Shield, Clock, ArrowRight, FileText, Zap } from 'lucide-react';
 
 interface SimItem {
   produtoId: string;
@@ -47,7 +44,7 @@ interface SimResumo {
   top10Impacto: SimItem[];
 }
 
-import { formatFixedBR, fmtBRL } from '@/lib/formatters';
+import { formatFixedBR } from '@/lib/formatters';
 const fmt = (v: number) => formatFixedBR(v, 2);
 
 export default function SimuladorCompraGeral() {

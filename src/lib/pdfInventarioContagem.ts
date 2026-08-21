@@ -4,7 +4,7 @@ import { APP_NAME } from '@/lib/brand';
 import { exportFileName } from '@/lib/exportHelpers';
 import { formatDisplayBR, formatDateTimeBR } from '@/lib/datetime';
 import { parseLocalDate } from '@/lib/dateUtils';
-import { decomposeStockLayers, formatStockLayers, baseToPurchase } from '@/lib/unitConversions';
+import { decomposeStockLayers, formatStockLayers } from '@/lib/unitConversions';
 import type { Inventario, InventarioItem } from '@/hooks/useInventarioStore';
 
 export interface GerarPDFListaContagemOpcoes {

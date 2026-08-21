@@ -1,16 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import {
-  Users, TrendingUp, TrendingDown, Clock, DollarSign,
-  AlertTriangle, UserMinus, CalendarOff, Award, Heart
-} from 'lucide-react';
-import { format, subMonths, differenceInDays, parseISO } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, CartesianGrid, Legend } from 'recharts';
-import { cn } from '@/lib/utils';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Users, Clock, DollarSign, AlertTriangle, CalendarOff, Award, Heart } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, CartesianGrid } from 'recharts';
 import { formatFixedBR, fmtBRL, formatPercentBR } from '@/lib/formatters';
 import GlobalKpiCard from '@/components/ui/KpiCard';
 

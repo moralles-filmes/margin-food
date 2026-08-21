@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,10 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  HardHat, Stethoscope, AlertTriangle, Plus, Edit2, Trash2,
-  ShieldCheck, CalendarClock, CheckCircle2, XCircle
-} from 'lucide-react';
+import { HardHat, Stethoscope, AlertTriangle, Plus, Trash2, ShieldCheck, CalendarClock, CheckCircle2, XCircle } from 'lucide-react';
 import { format, differenceInDays, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 import GlobalKpiCard from '@/components/ui/KpiCard';

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useDataEvent } from '@/lib/dataEvents';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
 import { useCan } from '@/permissions/hooks';
 import { toast } from 'sonner';
-import { formatDateBR, todayBR, fmtBRL, formatPercentBR } from '@/lib/formatters';
+import { todayBR, fmtBRL, formatPercentBR } from '@/lib/formatters';
 import { formatDateBR as formatDateISO } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';

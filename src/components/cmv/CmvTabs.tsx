@@ -4,7 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart as RPieChart, Pie, Cell } from 'recharts';
 import CmvRankingTable from './CmvRankingTable';
 import type { CmvResult, RankingItem } from './types';
-import { formatFixedBR, fmtBRL, formatPercentBR } from '@/lib/formatters';
+import { fmtBRL, formatPercentBR } from '@/lib/formatters';
 
 const COLORS = [
   'hsl(var(--primary))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))',

@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { fmtBRL } from '@/lib/money';
-import { ShoppingCart, Check, X, RefreshCw, Inbox, Package, AlertTriangle, ChevronRight, Send, CheckCircle2 } from 'lucide-react';
+import { ShoppingCart, Check, X, RefreshCw, Inbox, ChevronRight, Send, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCan } from '@/permissions/hooks';
-import { PurchaseOrder, PurchaseOrderItem } from '@/hooks/usePurchaseOrdersStore';
+import { PurchaseOrderItem } from '@/hooks/usePurchaseOrdersStore';
 import { usePurchaseOrdersStoreContext } from '@/contexts/PurchaseOrdersStoreContext';
 import { supabase } from '@/integrations/supabase/client';
 

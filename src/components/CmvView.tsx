@@ -1,11 +1,10 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useCan, useModuleAccess } from '@/permissions/hooks';
 import { startOfMonth, endOfMonth } from 'date-fns';
-import { formatInBR, formatFixedBR, fmtBRL, parseLocalDate, formatPercentBR } from '@/lib/formatters';
+import { formatInBR, fmtBRL, parseLocalDate, formatPercentBR } from '@/lib/formatters';
 import { formatDateBR } from '@/lib/datetime';
 
 const COLORS = [

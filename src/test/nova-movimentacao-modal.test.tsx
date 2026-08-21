@@ -4,7 +4,7 @@
  * and prevents regression to the old inline form pattern.
  */
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import NovaMovimentacaoModal, { type MovModalPreset } from '@/components/estoque/NovaMovimentacaoModal';
 import type { ProdutoExtended } from '@/types/estoque';
 

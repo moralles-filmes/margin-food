@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { RefreshCw, ChevronDown } from 'lucide-react';
 import type { RankingItem } from './types';
-import { formatFixedBR, formatPercentBR, fmtBRL } from '@/lib/formatters';
+import { formatPercentBR, fmtBRL } from '@/lib/formatters';
 
 function fmt(v: number) {
   return fmtBRL(v);

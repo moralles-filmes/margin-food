@@ -16,7 +16,7 @@ import { Plus, Edit, Trash2, RefreshCw, DollarSign, Calendar, FileDown, FileSpre
 import { useFormDirtyGuard } from '@/hooks/useFormDirtyGuard';
 import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
 import { startOfMonth, endOfMonth } from 'date-fns';
-import { formatDateBR, formatDisplayBR, todayBR } from '@/lib/datetime';
+import { formatDateBR, todayBR } from '@/lib/datetime';
 import { fmtBRL, normalizeBRLMoneyToNumber, formatFixedBR, parseLocalDate } from '@/lib/formatters';
 import { useCan } from '@/permissions/hooks';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';

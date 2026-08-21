@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import { calcVariacaoPct } from '@/domain/financeiro';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { formatInBR, fmtBRL, formatPercentBR, formatDecimalBR, formatDateBR } from '@/lib/formatters';
+import { formatInBR, fmtBRL, formatPercentBR, formatDecimalBR } from '@/lib/formatters';
 import { subMonths } from 'date-fns';
 import { RefreshCw, ArrowRight, Equal, FileDown, Ban, AlertTriangle } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';

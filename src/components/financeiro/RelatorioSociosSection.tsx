@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { subMonths } from 'date-fns';
-import { formatInBR, formatDateTimeBR, fmtBRL, parseLocalDate, formatDateBR, formatPercentBR } from '@/lib/formatters';
+import { formatInBR, formatDateTimeBR, fmtBRL, formatPercentBR } from '@/lib/formatters';
 import { FileDown, FileSpreadsheet, TrendingUp, TrendingDown, DollarSign, BarChart3, Loader2, CheckCircle2, AlertTriangle, ShieldX } from 'lucide-react';
 import { useDataEvent } from '@/lib/dataEvents';
 import { useCan } from '@/permissions/hooks';

@@ -1,9 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Clock, AlertTriangle, ChevronDown, ChevronUp, Package, Filter } from 'lucide-react';
+import { Clock, AlertTriangle, ChevronDown, ChevronUp, Package } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import SearchableSelect from '@/components/ui/SearchableSelect';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';

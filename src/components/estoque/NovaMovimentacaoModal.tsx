@@ -13,8 +13,8 @@
  * @enterprise-safe  Mantém RBAC, tenant, dirty-guard e audit.
  */
 
-import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { ArrowDown, ArrowUp, Settings2, X } from 'lucide-react';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { ArrowDown, ArrowUp, Settings2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,12 +26,12 @@ import ProductSearchCombobox, { type ProductOption } from '@/components/ui/Produ
 import { supabase } from '@/integrations/supabase/client';
 import { useFormDirtyGuard } from '@/hooks/useFormDirtyGuard';
 import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
-import { formatFixedBR, formatDateBR, todayBR, fmtBRL, normalizeBRLMoneyToNumber } from '@/lib/formatters';
+import { formatFixedBR, todayBR, fmtBRL, normalizeBRLMoneyToNumber } from '@/lib/formatters';
 import { toast } from 'sonner';
 import { TenantError } from '@/lib/tenant';
 import { getCostOrigin, getCostLabel, getActiveCostBase, getActiveCostPurchase } from '@/components/estoque/CustoItemDisplay';
 import { Badge } from '@/components/ui/badge';
-import type { Produto, MovimentacaoEstoque } from '@/types/salmon';
+import type { MovimentacaoEstoque } from '@/types/salmon';
 import type { ProdutoExtended } from '@/types/estoque';
 
 // ─── Public Types ───

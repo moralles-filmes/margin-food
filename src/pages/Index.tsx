@@ -6,7 +6,6 @@ import { SalmonStoreProvider, useSalmonStoreContext } from '@/contexts/SalmonSto
 import { EstoqueGeralStoreProvider, useEstoqueGeralStoreContext } from '@/contexts/EstoqueGeralStoreContext';
 import { PurchaseOrdersStoreProvider } from '@/contexts/PurchaseOrdersStoreContext';
 import { useAuth } from '@/contexts/AuthContext';
-import type { AppPermission } from '@/contexts/AuthContext';
 import AppLayout from '@/components/AppLayout';
 
 const SalmonControlView = lazy(() => import('@/components/SalmonControlView'));
@@ -27,7 +26,6 @@ import { RefreshCw, LogOut, AlertTriangle, ShieldAlert } from 'lucide-react';
 import { toast } from 'sonner';
 import { useMentionToast } from '@/hooks/useMentionToast';
 import { useModuleAccess } from '@/permissions/hooks';
-import { MODULE_MANIFESTS } from '@/permissions/registry';
 
 // Map each TabId to its module key in the registry
 const TAB_MODULE_MAP: Record<TabId, string> = {

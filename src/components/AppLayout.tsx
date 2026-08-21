@@ -1,19 +1,14 @@
 import { ReactNode, useMemo, useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { TabId, MetaCompraMensal, SalmonEntry } from '@/types/salmon';
-import {
-  Package, ShoppingCart, ClipboardList, Building2, Settings, AlertTriangle, BarChart3,
-  LayoutDashboard, Target, Menu, Moon, Sun, User, ChevronLeft, ChevronRight, X, LogOut, Users, Fish, ClipboardCheck, TrendingDown, BookOpen, Brain, UserCheck, DollarSign, Shield
-} from 'lucide-react';
+import { Package, ShoppingCart, ClipboardList, Settings, AlertTriangle, BarChart3, LayoutDashboard, Menu, Moon, Sun, User, ChevronLeft, X, LogOut, Users, Fish, ClipboardCheck, TrendingDown, BookOpen, Brain, UserCheck, DollarSign, Shield } from 'lucide-react';
 import NotificationBell from '@/components/NotificationBell';
-import { APP_NAME, APP_TAGLINE } from '@/lib/brand';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { MODULE_MANIFESTS } from '@/permissions/registry';
-import type { AppPermission } from '@/contexts/AuthContext';
 
 function parseLocalDate(s: string) { const [y,m,d] = s.split('-').map(Number); return new Date(y,m-1,d); }
 
