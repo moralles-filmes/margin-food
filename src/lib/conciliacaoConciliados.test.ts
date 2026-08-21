@@ -1,0 +1,104 @@
+import { describe, expect, it } from 'vitest';
+import { bankLineKey, buildConciliadosCounts, fitidKey, type ConciliadoRow, type VinculoRow } from './conciliacaoConciliados';
+
+function conciliado(overrides: Partial<ConciliadoRow> = {}): ConciliadoRow {
+  return {
+    id: 'lanc-1',
+    data_competencia: '2026-08-05',
+    data_pagamento: '2026-08-05',
+    valor: 3246.92,
+    tipo: 'RECEITA',
+    descricao: 'Pix Recebido 99 FOOD LTDA',
+    ...overrides,
+  };
+}
+
+function vinculo(overrides: Partial<VinculoRow> = {}): VinculoRow {
+  return {
+    external_id: 'FITID-DOWNLOAD-ANTIGO',
+    tipo: 'RECEITA',
+    lancamento_id: 'lanc-1',
+    ...overrides,
+  };
+}
+
+const linhaKey = bankLineKey({ data: '2026-08-05', valor: 3246.92, tipo: 'RECEITA', descricao: 'Pix Recebido 99 FOOD LTDA' });
+
+describe('buildConciliadosCounts', () => {
+  it('conta lançamento cujo vínculo aponta para FITID ausente do arquivo (Santander regenera FITID a cada download)', () => {
+    // Cenário real (2026-08-21, conta Santander Marilda): o FITID do Santander
+    // embute o timestamp do download; um novo download do mesmo extrato troca o
+    // FITID de todas as linhas. O vínculo antigo não bate com nada no arquivo
+    // novo — o lançamento PRECISA ser reconhecível por conteúdo, senão a linha
+    // reaparece como "Criar novo" a cada download.
+    const counts = buildConciliadosCounts(
+      [conciliado()],
+      [vinculo({ external_id: '0004130130282202608181441330' })],
+      new Set([fitidKey('RECEITA', '0004130130282202608211830000')]),
+    );
+    expect(counts.get(linhaKey)).toBe(1);
+  });
+
+  it('NÃO conta lançamento cujo vínculo de FITID está presente no arquivo (será reivindicado pelo fast-path)', () => {
+    // Guarda do incidente das 15 vendas (R$ 3.060,15): contar aqui também faria a
+    // mesma baixa ser reivindicada duas vezes — uma pelo FITID e outra por conteúdo.
+    const counts = buildConciliadosCounts(
+      [conciliado()],
+      [vinculo({ external_id: 'FITID-PRESENTE' })],
+      new Set([fitidKey('RECEITA', 'FITID-PRESENTE')]),
+    );
+    expect(counts.get(linhaKey)).toBeUndefined();
+  });
+
+  it('vendas idênticas no mesmo dia: conta apenas as que não serão reivindicadas por FITID', () => {
+    const counts = buildConciliadosCounts(
+      [
+        conciliado({ id: 'lanc-1' }),
+        conciliado({ id: 'lanc-2' }),
+      ],
+      [vinculo({ lancamento_id: 'lanc-1', external_id: 'FITID-PRESENTE' })],
+      new Set([fitidKey('RECEITA', 'FITID-PRESENTE')]),
+    );
+    expect(counts.get(linhaKey)).toBe(1);
+  });
+
+  it('arquivo sem FITIDs (CSV): todos os conciliados contam, mesmo com vínculo antigo', () => {
+    const counts = buildConciliadosCounts(
+      [conciliado({ id: 'lanc-1' }), conciliado({ id: 'lanc-2' })],
+      [vinculo({ lancamento_id: 'lanc-1' })],
+      new Set(),
+    );
+    expect(counts.get(linhaKey)).toBe(2);
+  });
+
+  it('usa data_pagamento (não data_competencia) como chave — boleto pago com atraso', () => {
+    const counts = buildConciliadosCounts(
+      [conciliado({ data_competencia: '2026-07-10', data_pagamento: '2026-08-05' })],
+      [],
+      new Set(),
+    );
+    expect(counts.get(linhaKey)).toBe(1);
+    expect(counts.get(bankLineKey({ data: '2026-07-10', valor: 3246.92, tipo: 'RECEITA', descricao: 'Pix Recebido 99 FOOD LTDA' }))).toBeUndefined();
+  });
+
+  it('lançamento com múltiplos vínculos: basta UM FITID presente no arquivo para excluí-lo do contador', () => {
+    const counts = buildConciliadosCounts(
+      [conciliado()],
+      [
+        vinculo({ external_id: 'FITID-ANTIGO' }),
+        vinculo({ external_id: 'FITID-PRESENTE' }),
+      ],
+      new Set([fitidKey('RECEITA', 'FITID-PRESENTE')]),
+    );
+    expect(counts.get(linhaKey)).toBeUndefined();
+  });
+
+  it('a comparação de FITID considera o tipo: mesmo external_id com tipo diferente não exclui', () => {
+    const counts = buildConciliadosCounts(
+      [conciliado()],
+      [vinculo({ external_id: 'FITID-X', tipo: 'RECEITA' })],
+      new Set([fitidKey('DESPESA', 'FITID-X')]),
+    );
+    expect(counts.get(linhaKey)).toBe(1);
+  });
+});

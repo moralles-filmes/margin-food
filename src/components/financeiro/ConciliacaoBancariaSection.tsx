@@ -30,6 +30,7 @@ import { runOptionalAutoBind } from '@/lib/conciliacaoAutoBind';
 import { extractSupabaseErrorMessage } from '@/lib/supabaseErrors';
 import { computeScore } from '@/lib/conciliacaoScore';
 import { matchTransferCandidate, findTransferWarnings, type TransferCandidate, type TransferWarning } from '@/lib/conciliacaoTransferMatch';
+import { bankLineKey, buildConciliadosCounts, fitidKey, type ConciliadoRow, type VinculoRow } from '@/lib/conciliacaoConciliados';
 import type { ContaBancariaRef, CategoriaFinRef, CentroCustoRef, LancamentoConciliacao, LancamentoCandidate, ContaPagarCandidate, ContaReceberCandidate, ContaPagarAberta } from '@/types/financeiro';
 import { mapPagamentoError } from '@/lib/financeiroErrorMap';
 import DateRangePresets from './DateRangePresets';
@@ -189,29 +190,21 @@ async function localizarDiaDivergencia(
   return { status: 'found', data: dates[lo] };
 }
 
-/** Lançamento já conciliado da conta, usado para reconhecer linha de extrato repetida. */
-interface ConciliadoRow {
-  id: string;
-  data_competencia: string;
-  data_pagamento: string | null;
-  valor: number;
-  tipo: string;
-  descricao: string | null;
-}
-
-function bankLineKey(linha: { data: string; valor: number; tipo: string; descricao?: string | null }) {
-  // Normalizado (sem acento/maiúsculas/espaços extras): o banco pode truncar a
-  // descrição em tamanho diferente entre dois downloads do mesmo extrato, e
-  // igualdade exata deixaria passar despercebida a mesma reimportação.
-  return `${linha.data}|${Number(linha.valor)}|${linha.tipo}|${normalizeSearchText(linha.descricao || '')}`;
-}
-
 function consumeCount(counts: Map<string, number>, key: string): boolean {
   const remaining = counts.get(key) || 0;
   if (remaining <= 0) return false;
   if (remaining === 1) counts.delete(key);
   else counts.set(key, remaining - 1);
   return true;
+}
+
+/** Chaves `tipo|fitId` de todas as linhas do arquivo — insumo de buildConciliadosCounts. */
+function fitidsDasLinhas(linhas: Pick<LinhaExtrato, 'tipo' | 'fitId'>[]): Set<string> {
+  const set = new Set<string>();
+  for (const l of linhas) {
+    if (l.fitId) set.add(fitidKey(l.tipo, l.fitId));
+  }
+  return set;
 }
 
 export default function ConciliacaoBancariaSection() {
@@ -899,8 +892,12 @@ export default function ConciliacaoBancariaSection() {
     return { data };
   };
 
-  /** Busca lançamentos/CP/CR candidatos + sets de já-conciliadas/ignoradas para a conta selecionada. */
-  const fetchMatchContext = async (): Promise<MatchContext> => {
+  /**
+   * Busca lançamentos/CP/CR candidatos + sets de já-conciliadas/ignoradas para a conta selecionada.
+   * `fitidsNoArquivo` (chaves `tipo|fitId` das linhas do arquivo sendo importado) decide quais
+   * lançamentos vinculados saem do reconhecimento por conteúdo — ver buildConciliadosCounts.
+   */
+  const fetchMatchContext = async (fitidsNoArquivo: ReadonlySet<string>): Promise<MatchContext> => {
     // Busca dados para match + entradas já conciliadas + entradas ignoradas
     const [lancRes, lancAllRes, cpRes, crRes, conciliadosRes, ignoradasRes, vinculosRes, transferRes, espelhosRes] = await Promise.all([
       fetchLancamentosPendentesConta(),
@@ -938,30 +935,18 @@ export default function ConciliacaoBancariaSection() {
     const contasPagar = (cpRes.data || []) as ContaPagarCandidate[];
     const contasReceber = (crRes.data || []) as ContaReceberCandidate[];
 
-    const vinculos = (vinculosRes.data || []) as { external_id: string; tipo: string; lancamento_id: string }[];
-    const externalIdsProcessados = new Map(vinculos.map(v => [`${v.tipo}|${v.external_id}`, v.lancamento_id]));
+    const vinculos = (vinculosRes.data || []) as VinculoRow[];
+    const externalIdsProcessados = new Map(vinculos.map(v => [fitidKey(v.tipo, v.external_id), v.lancamento_id]));
     const lancamentosVinculados = new Set(vinculos.map(v => v.lancamento_id).filter(Boolean));
 
     // Já conciliadas — mostrar com badge em vez de filtrar silenciosamente.
-    // Lançamento que já tem vínculo de FITID fica FORA deste contador: ele é
-    // reconhecido pela identidade bancária, e contá-lo aqui também faria a MESMA
-    // baixa ser reivindicada duas vezes — uma pelo FITID e outra por
-    // valor/data/descrição. Em vendas legítimas repetidas no mesmo dia (mesmo valor,
-    // mesma bandeira) isso marcava as duas linhas como "já conciliada" e a venda que
-    // de fato faltava no razão sumia da lista de pendentes.
-    const conciliadosCounts = new Map<string, number>();
-    for (const l of (conciliadosRes.data || []) as ConciliadoRow[]) {
-      if (lancamentosVinculados.has(l.id)) continue;
-      // Mesma regra do loop de sugestões abaixo: a linha do extrato traz a data em
-      // que o dinheiro se moveu, que para uma baixa de CP/CR é `data_pagamento` —
-      // `data_competencia` é a competência do boleto e pode estar semanas atrás.
-      // Usar só `data_competencia` aqui deixava um boleto pago com atraso e
-      // reimportado (sem FITID estável, ou via CSV) não bater como "já
-      // conciliada", criando um segundo lançamento real para o mesmo pagamento.
-      const dataChave = l.data_pagamento || l.data_competencia;
-      const key = bankLineKey({ data: dataChave, valor: l.valor, tipo: l.tipo, descricao: l.descricao });
-      conciliadosCounts.set(key, (conciliadosCounts.get(key) || 0) + 1);
-    }
+    // Regras de exclusão (vínculo de FITID presente no arquivo) e de data
+    // (data_pagamento antes de data_competencia) documentadas em buildConciliadosCounts.
+    const conciliadosCounts = buildConciliadosCounts(
+      (conciliadosRes.data || []) as ConciliadoRow[],
+      vinculos,
+      fitidsNoArquivo,
+    );
 
     // Ignoradas — mostrar com badge "Ignorado"
     const ignoradasCounts = new Map<string, number>();
@@ -1004,7 +989,7 @@ export default function ConciliacaoBancariaSection() {
     // vinculadas por engano ao mesmo lançamento ficavam ambas verdes e a venda
     // que faltava sumia do saldo (15 vendas, R$ 3.060,15 em produção).
     if (linha.fitId) {
-      const vincLancId = ctx.externalIdsProcessados.get(`${linha.tipo}|${linha.fitId}`);
+      const vincLancId = ctx.externalIdsProcessados.get(fitidKey(linha.tipo, linha.fitId));
       if (vincLancId && !usedIds.has(`vinculo-lanc-${vincLancId}`)) {
         usedIds.add(`vinculo-lanc-${vincLancId}`);
         return { ...base, selecionada: false, jaConciliada: true, ignorada: false };
@@ -1175,7 +1160,7 @@ export default function ConciliacaoBancariaSection() {
   const processarLinhas = async (parsed: LinhaExtrato[]) => {
     try {
       await autoBindTransferCounterparts(parsed);
-      const ctx = await fetchMatchContext();
+      const ctx = await fetchMatchContext(fitidsDasLinhas(parsed));
       const usedIds = new Set<string>();
       const final = parsed.map(linha => matchLinha(linha, ctx, usedIds));
 
@@ -1219,7 +1204,10 @@ export default function ConciliacaoBancariaSection() {
     const base = source || linhas;
     if (!base.some(l => l.jaConciliada || l.ignorada)) return;
     try {
-      const ctx = await fetchMatchContext();
+      // O set de FITIDs vem do arquivo INTEIRO (base), não só das linhas travadas:
+      // a exclusão em buildConciliadosCounts depende de qualquer linha do arquivo
+      // poder reivindicar o vínculo, mesmo que ela não esteja sendo re-matchada aqui.
+      const ctx = await fetchMatchContext(fitidsDasLinhas(base));
       const usedIds = new Set<string>();
       for (const l of base) {
         if (!l.jaConciliada && !l.ignorada && l.matchId && l.matchOrigin) {
