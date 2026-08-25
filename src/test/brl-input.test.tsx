@@ -31,15 +31,37 @@ describe('currency inputs', () => {
     expect(input.value).toBe('84,02');
   });
 
-  it('accepts a dot and formats it with a Brazilian decimal comma on blur', () => {
+  it('converts a keypad dot to a Brazilian decimal comma while typing', () => {
     render(<NumericCurrencyHarness />);
     const input = screen.getByLabelText('Valor') as HTMLInputElement;
 
     fireEvent.focus(input);
     fireEvent.change(input, { target: { value: '84.02' } });
+    expect(input.value).toBe('84,02');
     fireEvent.blur(input);
 
     expect(input.value).toBe('84,02');
+  });
+
+  it('keeps cents editable in the bank-import allocation numeric field', () => {
+    function BankImportAllocationHarness() {
+      const [value, setValue] = useState(2644.93);
+      return <BRLInput aria-label="Valor do rateio" numericValue={value} onNumericChange={setValue} showPrefix />;
+    }
+
+    render(<BankImportAllocationHarness />);
+    const input = screen.getByLabelText('Valor do rateio') as HTMLInputElement;
+
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: '2644.93' } });
+    expect(input.value).toBe('2644,93');
+
+    fireEvent.change(input, { target: { value: '1234,' } });
+    expect(input.value).toBe('1234,');
+    fireEvent.change(input, { target: { value: '1234,56' } });
+    expect(input.value).toBe('1234,56');
+    fireEvent.blur(input);
+    expect(input.value).toBe('1.234,56');
   });
 
   it('formats thousands and keeps numeric-state BRL fields editable', () => {
