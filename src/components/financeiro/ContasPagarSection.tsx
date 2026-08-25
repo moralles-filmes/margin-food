@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Plus, AlertTriangle, CheckCircle, Clock, Ban, FileDown, RefreshCw, Undo2 } from 'lucide-react';
+import { Plus, AlertTriangle, CheckCircle, Clock, Ban, FileDown, RefreshCw, Undo2, Search } from 'lucide-react';
 import { useFormDirtyGuard } from '@/hooks/useFormDirtyGuard';
 import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
 import { gerarPDFContasPagar } from '@/lib/pdfFinanceiro';
@@ -27,6 +27,7 @@ import MonthNavigator from './MonthNavigator';
 import SearchableSelect from '@/components/ui/SearchableSelect';
 import { type FiltroPeriodo, computePeriodoRange } from './periodoFiltro';
 import { buildCategoriaFilterOptions, categoriaFiltroToParams, CATEGORIA_FILTRO_TODOS } from './categoriaFiltro';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 
 /* ─── Types ─── */
 interface ContaPagar {
@@ -94,10 +95,13 @@ export default function ContasPagarSection() {
   const [mesFiltro, setMesFiltro] = useState(() => formatInBR(new Date(), 'yyyy-MM'));
   const [filtroConta, setFiltroConta] = useState('todos');
   const [filtroCategoria, setFiltroCategoria] = useState(CATEGORIA_FILTRO_TODOS);
+  const [busca, setBusca] = useState('');
+  const buscaAplicada = useDebouncedValue(busca.trim(), 300);
   const [hasMore, setHasMore] = useState(false);
   const [cursorDate, setCursorDate] = useState<string | null>(null);
   const [cursorId, setCursorId] = useState<string | null>(null);
   const [serverTotals, setServerTotals] = useState({ totalPendente: 0, vencidas: 0 });
+  const [filteredSummary, setFilteredSummary] = useState({ total: 0, count: 0 });
 
   const [form, setForm] = useState<ContaFormData>({
     descricao: '', valor: 0, data_vencimento: todayBR(), data_competencia: '',
@@ -127,17 +131,12 @@ export default function ContasPagarSection() {
   const [limiteInput, setLimiteInput] = useState(0);
   const [limiteSaving, setLimiteSaving] = useState(false);
 
-  useEffect(() => { if (canView) load(); }, [canView]);
-  useEffect(() => { if (!canView) return; setCursorDate(null); setCursorId(null); setItems([]); loadPage(null, null); loadTotals(); }, [filtroStatus, filtroPeriodo, mesFiltro, filtroConta, filtroCategoria, canView]);
-  useDataEvent('financeiro:cadastros', useCallback(() => { if (canView) loadAux(); }, [canView]));
-  useDataEvent('financeiro:pagar', useCallback(() => { if (canView) { loadPage(null, null); loadTotals(); } }, [canView]));
-
   const categoriaFilterOptions = useMemo(
     () => buildCategoriaFilterOptions(categorias.filter(c => c.tipo === 'despesa')),
     [categorias]
   );
 
-  const loadPage = async (cDate: string | null, cId: string | null) => {
+  const loadPage = useCallback(async (cDate: string | null, cId: string | null) => {
     setLoading(true);
     const { de, ate } = computePeriodoRange(filtroPeriodo, mesFiltro);
     const { data, error } = await supabase.rpc('list_fin_contas_pagar_cursor', {
@@ -145,23 +144,36 @@ export default function ContasPagarSection() {
       p_limit: PAGE_SIZE, p_cursor_date: cDate, p_cursor_id: cId,
       p_data_de: de, p_data_ate: ate,
       p_conta_id: filtroConta !== 'todos' ? filtroConta : null,
+      p_search: buscaAplicada || null,
       ...categoriaFiltroToParams(filtroCategoria),
     } as any);
     if (error) { console.error(error); setLoading(false); return; }
     const result = (data as unknown) as CursorListResponse<ContaPagar> | null;
     const newItems: ContaPagar[] = result?.items || [];
     setHasMore(result?.has_more || false);
-    if (!cDate) setItems(newItems); else setItems(prev => [...prev, ...newItems]);
+    if (!cDate) {
+      setItems(newItems);
+      setFilteredSummary({
+        total: Number(result?.filtered_total) || 0,
+        count: Number(result?.filtered_count) || 0,
+      });
+    } else setItems(prev => [...prev, ...newItems]);
     if (newItems.length > 0) { const last = newItems[newItems.length - 1]; setCursorDate(last.data_vencimento); setCursorId(last.id); }
     setLoading(false);
-  };
+  }, [buscaAplicada, filtroCategoria, filtroConta, filtroPeriodo, filtroStatus, mesFiltro]);
 
-  const loadTotals = async () => {
+  const loadTotals = useCallback(async () => {
     const { data } = await supabase.rpc('get_fin_counts_by_status');
     if (data) { const d = (data as unknown) as FinStatusCounts; setServerTotals({ totalPendente: Number(d.total_pagar_pendente) || 0, vencidas: Number(d.vencidas_pagar) || 0 }); }
-  };
+  }, []);
 
-  const loadAux = async () => {
+  const loadLimiteAprovacao = useCallback(async () => {
+    const { data, error } = await (supabase.rpc as any)('fin_get_limite_aprovacao_atual');
+    if (error) { console.error('[ContasPagarSection.loadLimiteAprovacao]', error); return; }
+    setLimiteAprovacao(Number(data) || 0);
+  }, []);
+
+  const loadAux = useCallback(async () => {
     const [catRes, ccRes, contRes, supRes] = await Promise.all([
       supabase.from('fin_categorias').select('id, nome, tipo, codigo, parent_id, centro_custo_padrao_id').eq('ativo', true).order('nome'),
       supabase.from('fin_centros_custo').select('id, nome').eq('ativo', true).order('nome'),
@@ -172,14 +184,23 @@ export default function ContasPagarSection() {
     setCentros((ccRes.data as Centro[]) || []);
     setContas((contRes.data as Conta[]) || []);
     setSuppliers((supRes.data as Supplier[]) || []);
-    loadLimiteAprovacao();
-  };
+    void loadLimiteAprovacao();
+  }, [loadLimiteAprovacao]);
 
-  const loadLimiteAprovacao = async () => {
-    const { data, error } = await (supabase.rpc as any)('fin_get_limite_aprovacao_atual');
-    if (error) { console.error('[ContasPagarSection.loadLimiteAprovacao]', error); return; }
-    setLimiteAprovacao(Number(data) || 0);
-  };
+  useEffect(() => { if (canView) void loadAux(); }, [canView, loadAux]);
+  useEffect(() => { if (canView) void loadTotals(); }, [canView, loadTotals]);
+  useEffect(() => {
+    if (!canView) return;
+    setCursorDate(null);
+    setCursorId(null);
+    setItems([]);
+    setFilteredSummary({ total: 0, count: 0 });
+    void loadPage(null, null);
+  }, [canView, loadPage]);
+  useDataEvent('financeiro:cadastros', useCallback(() => { if (canView) void loadAux(); }, [canView, loadAux]));
+  useDataEvent('financeiro:pagar', useCallback(() => {
+    if (canView) void Promise.all([loadPage(null, null), loadTotals()]);
+  }, [canView, loadPage, loadTotals]));
 
   const salvarLimiteAprovacao = async () => {
     if (limiteSaving) return;
@@ -197,12 +218,6 @@ export default function ContasPagarSection() {
     } finally {
       setLimiteSaving(false);
     }
-  };
-
-  const load = async () => {
-    setCursorDate(null); setCursorId(null);
-    await Promise.all([loadPage(null, null), loadAux()]);
-    loadTotals();
   };
 
   /* ─── Detail view ─── */
@@ -518,6 +533,11 @@ export default function ContasPagarSection() {
 
   const fmt = fmtBRL;
   const today = todayBR();
+  const hasActiveFilters = filtroPeriodo !== 'todos'
+    || filtroStatus !== 'todos'
+    || filtroConta !== 'todos'
+    || filtroCategoria !== CATEGORIA_FILTRO_TODOS
+    || buscaAplicada.length > 0;
 
   return (
     <div className="space-y-4">
@@ -602,6 +622,28 @@ export default function ContasPagarSection() {
           className="w-52 h-9"
           allowClear={false}
         />
+        <div className="relative flex-1 min-w-[220px] max-w-sm">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+          <Input
+            type="search"
+            value={busca}
+            onChange={event => setBusca(event.target.value)}
+            placeholder="Buscar pela descrição..."
+            aria-label="Buscar conta a pagar pela descrição"
+            className="h-9 pl-9"
+          />
+        </div>
+        {hasActiveFilters && (
+          <div className="flex h-9 items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3" aria-live="polite">
+            <span className="text-xs text-muted-foreground">Total filtrado</span>
+            <strong className="whitespace-nowrap text-sm text-foreground">
+              {loading && items.length === 0 ? 'Calculando...' : fmt(filteredSummary.total)}
+            </strong>
+            {!loading || items.length > 0 ? (
+              <span className="whitespace-nowrap text-xs text-muted-foreground">• {filteredSummary.count} lançamento(s)</span>
+            ) : null}
+          </div>
+        )}
       </div>
 
       <Table>
@@ -621,8 +663,8 @@ export default function ContasPagarSection() {
           ) : items.length === 0 ? (
             <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Nenhuma conta a pagar</TableCell></TableRow>
           ) : items.map(item => {
-            const sc = STATUS_CONFIG[item.status] || STATUS_CONFIG.RASCUNHO;
             const isVencida = item.data_vencimento < today && !['PAGO', 'CANCELADO'].includes(item.status);
+            const sc = isVencida ? STATUS_CONFIG.VENCIDO : (STATUS_CONFIG[item.status] || STATUS_CONFIG.RASCUNHO);
             return (
               <TableRow
                 key={item.id}
@@ -639,7 +681,7 @@ export default function ContasPagarSection() {
                     {item.status === 'AGUARDANDO_APROVACAO' && canApprove && (
                       <Button size="sm" variant="outline" onClick={() => aprovar(item)} disabled={saving} className="text-xs h-7">Aprovar</Button>
                     )}
-                    {item.status === 'APROVADO' && (
+                    {['APROVADO', 'VENCIDO'].includes(item.status) && (
                       <Button size="sm" variant="default" onClick={() => abrirPagamento(item)} disabled={saving} className="text-xs h-7">Pagar</Button>
                     )}
                     {item.status === 'PAGO' && (
