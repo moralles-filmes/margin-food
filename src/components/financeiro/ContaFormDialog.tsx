@@ -14,6 +14,7 @@ import { fmtBRL, formatPercentBR } from '@/lib/formatters';
 import CategoryCombobox from './CategoryCombobox';
 import SupplierCombobox from './SupplierCombobox';
 import { Plus, Trash2, Repeat } from 'lucide-react';
+import { getRecurrenceLimit } from '@/domain/financeiro/recurrence';
 
 /* ─── Types ─── */
 type ContaFormVariant = 'pagar' | 'receber' | 'lancamento';
@@ -94,6 +95,7 @@ export default function ContaFormDialog({
   const isTransfer = variant === 'lancamento' && form.tipo === 'TRANSFERENCIA';
   const titleLabel = variant === 'pagar' ? 'Conta a Pagar' : variant === 'receber' ? 'Conta a Receber' : 'Lancamento';
   const catFilterType = variant === 'pagar' ? 'despesa' : variant === 'receber' ? 'receita' : (form.tipo?.toLowerCase() || '');
+  const recurrenceLimit = getRecurrenceLimit(form.frequencia);
 
   // ─── Rateio helpers ───
   const addRateioLine = () => {
@@ -385,14 +387,20 @@ export default function ContaFormDialog({
                 </div>
                 <Switch
                   checked={form.recorrente}
-                  onCheckedChange={v => set({ recorrente: v })}
+                  onCheckedChange={v => set({ recorrente: v, parcelas: v ? Math.max(form.parcelas, 2) : 0 })}
                 />
               </div>
               {form.recorrente && (
                 <div className="grid grid-cols-2 gap-4 mt-3">
                   <div>
                     <Label className="text-xs text-muted-foreground">Frequencia</Label>
-                    <Select value={form.frequencia} onValueChange={v => set({ frequencia: v })}>
+                    <Select
+                      value={form.frequencia}
+                      onValueChange={v => {
+                        const nextLimit = getRecurrenceLimit(v);
+                        set({ frequencia: v, parcelas: Math.min(Math.max(form.parcelas, 2), nextLimit) });
+                      }}
+                    >
                       <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="mensal">Mensal</SelectItem>
@@ -402,15 +410,22 @@ export default function ContaFormDialog({
                     </Select>
                   </div>
                   <div>
-                    <Label className="text-xs text-muted-foreground">Parcelas (0 = infinito)</Label>
+                    <Label className="text-xs text-muted-foreground">
+                      Total de lançamentos (máx. {recurrenceLimit})
+                    </Label>
                     <Input
-                      type="text"
-                      inputMode="numeric"
-                      value={form.parcelas || ''}
-                      onChange={e => set({ parcelas: parseInt(e.target.value, 10) || 0 })}
-                      placeholder="0"
+                      type="number"
+                      min={2}
+                      max={recurrenceLimit}
+                      step={1}
+                      value={form.parcelas || 2}
+                      onChange={e => {
+                        const value = Number.parseInt(e.target.value, 10);
+                        set({ parcelas: Number.isNaN(value) ? 2 : Math.min(Math.max(value, 2), recurrenceLimit) });
+                      }}
                       className="mt-1"
                     />
+                    <p className="mt-1 text-[11px] text-muted-foreground">Inclui o lançamento atual.</p>
                   </div>
                 </div>
               )}

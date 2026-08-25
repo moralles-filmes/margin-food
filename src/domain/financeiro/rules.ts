@@ -144,8 +144,8 @@ export const RULES: Record<string, DomainRule> = {
   'FIN-RECORRENCIA': {
     id: 'FIN-RECORRENCIA',
     name: 'Recorrência Financeira',
-    description: 'Parcelas futuras geradas por generate_series com base em recorrencia_config. Consolidadas por origem:id para evitar colisões.',
-    sourceOfTruth: 'RPC expand_recorrencias / scheduled-jobs edge function',
+    description: 'Contas a Pagar/Receber materializam toda a série na criação; Livro Razão mantém geração por recorrencia_config. Consolidadas por origem:id para evitar colisões.',
+    sourceOfTruth: 'RPCs _guarded_create_conta_pagar/_guarded_create_conta_receber e gerar_parcela_recorrente',
     consumers: ['Recorrências', 'Projeção de Fluxo'],
   },
   'FIN-CONCILIACAO': {
