@@ -74,6 +74,7 @@ interface Props {
   editPrevStatus?: string | null;
   justificativa?: string;
   onJustificativaChange?: (v: string) => void;
+  classificationOnly?: boolean;
 }
 
 export default function ContaFormDialog({
@@ -81,6 +82,7 @@ export default function ContaFormDialog({
   categorias, centros, contas, suppliers,
   isEditing, saving, onSave, onClose,
   editPrevStatus, justificativa, onJustificativaChange,
+  classificationOnly = false,
 }: Props) {
   const [enableRateio, setEnableRateio] = useState(false);
 
@@ -164,12 +166,25 @@ export default function ContaFormDialog({
         {/* Header */}
         <div className="flex items-center px-6 py-4 border-b">
           <h2 className="text-lg font-semibold text-foreground">
-            {isEditing ? `Editar ${titleLabel}` : `Nova ${variant === 'pagar' ? 'despesa' : variant === 'receber' ? 'receita' : (form.tipo === 'RECEITA' ? 'receita' : form.tipo === 'TRANSFERENCIA' ? 'transferencia' : 'despesa')}`}
+            {classificationOnly
+              ? 'Editar classificacao'
+              : isEditing
+                ? `Editar ${titleLabel}`
+                : `Nova ${variant === 'pagar' ? 'despesa' : variant === 'receber' ? 'receita' : (form.tipo === 'RECEITA' ? 'receita' : form.tipo === 'TRANSFERENCIA' ? 'transferencia' : 'despesa')}`}
           </h2>
         </div>
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
+          {classificationOnly && (
+            <div className="rounded-lg border border-success/30 bg-success/5 px-4 py-3 text-sm">
+              <p className="font-medium text-foreground">A conciliacao bancaria sera mantida.</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Somente categoria, centro de custo, rateio e observacoes podem ser alterados. Valor, data, conta, tipo e descricao bancaria permanecem bloqueados.
+              </p>
+            </div>
+          )}
+
           {/* Informacoes do lancamento */}
           <section className="bg-card border border-border rounded-xl p-5 space-y-4">
             <h3 className="text-sm font-semibold text-foreground italic">Informacoes do lancamento</h3>
@@ -179,7 +194,7 @@ export default function ContaFormDialog({
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="text-xs text-muted-foreground">Tipo</Label>
-                  <Select value={form.tipo || 'DESPESA'} onValueChange={v => set({ tipo: v })} disabled={isEditing && form.tipo === 'TRANSFERENCIA'}>
+                  <Select value={form.tipo || 'DESPESA'} onValueChange={v => set({ tipo: v })} disabled={classificationOnly || (isEditing && form.tipo === 'TRANSFERENCIA')}>
                     <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="RECEITA">Receita</SelectItem>
@@ -190,7 +205,7 @@ export default function ContaFormDialog({
                 </div>
                 <div>
                   <Label className="text-xs text-muted-foreground">Status</Label>
-                  <Select value={form.status || 'PREVISTO'} onValueChange={v => set({ status: v })}>
+                  <Select value={form.status || 'PREVISTO'} onValueChange={v => set({ status: v })} disabled={classificationOnly}>
                     <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="PREVISTO">Previsto</SelectItem>
@@ -207,6 +222,7 @@ export default function ContaFormDialog({
               <Input
                 value={form.descricao}
                 onChange={e => set({ descricao: e.target.value })}
+                disabled={classificationOnly}
                 className="mt-1"
               />
             </div>
@@ -239,6 +255,7 @@ export default function ContaFormDialog({
                 <DateInput
                   value={form.data_competencia}
                   onValueChange={v => set({ data_competencia: v })}
+                  disabled={classificationOnly}
                   className="mt-1"
                 />
               </div>
@@ -248,6 +265,7 @@ export default function ContaFormDialog({
                   numericValue={form.valor}
                   onNumericChange={v => set({ valor: v })}
                   showPrefix
+                  disabled={classificationOnly}
                   className="mt-1"
                 />
               </div>
@@ -358,7 +376,7 @@ export default function ContaFormDialog({
           </section>
 
           {/* Repetir lancamento */}
-          {!isTransfer && (
+          {!isTransfer && !classificationOnly && (
             <section className="bg-card border border-border rounded-xl p-5 space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -400,7 +418,7 @@ export default function ContaFormDialog({
           )}
 
           {/* Condicao de pagamento */}
-          <section className="bg-card border border-border rounded-xl p-5 space-y-4">
+          {!classificationOnly && <section className="bg-card border border-border rounded-xl p-5 space-y-4">
             <h3 className="text-sm font-semibold text-foreground">Condicao de pagamento</h3>
             <div className="grid grid-cols-4 gap-4 items-end">
               {variant !== 'lancamento' && (
@@ -474,13 +492,17 @@ export default function ContaFormDialog({
                 Transferencias criam automaticamente dois lancamentos vinculados (saida da origem + entrada no destino) e nao afetam relatorios de receitas/despesas.
               </div>
             )}
-          </section>
+          </section>}
 
           {/* Justificativa for REALIZADO edits */}
-          {variant === 'lancamento' && isEditing && editPrevStatus === 'REALIZADO' && (
+          {variant === 'lancamento' && isEditing && (classificationOnly || editPrevStatus === 'REALIZADO') && (
             <section className="border border-warning/30 bg-warning/5 rounded-xl p-5 space-y-3">
               <Label className="text-sm font-semibold text-warning-foreground">Justificativa obrigatoria</Label>
-              <p className="text-xs text-muted-foreground">Este lancamento ja esta REALIZADO. Informe o motivo da alteracao.</p>
+              <p className="text-xs text-muted-foreground">
+                {classificationOnly
+                  ? 'Informe o motivo da reclassificacao. A justificativa ficara registrada na auditoria.'
+                  : 'Este lancamento ja esta REALIZADO. Informe o motivo da alteracao.'}
+              </p>
               <Textarea
                 value={justificativa || ''}
                 onChange={e => onJustificativaChange?.(e.target.value)}
