@@ -6,6 +6,8 @@
 export interface CursorListResponse<T> {
   items: T[];
   has_more: boolean;
+  filtered_total?: number;
+  filtered_count?: number;
 }
 
 /** Status counts returned by get_fin_counts_by_status */
@@ -145,4 +147,3 @@ export interface ContaReceberCandidate {
   recorrente: boolean;
   recorrencia_config: unknown;
 }
-

@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Plus, FileDown, RefreshCw, Ban, Undo2 } from 'lucide-react';
+import { Plus, FileDown, RefreshCw, Ban, Undo2, Search } from 'lucide-react';
 import { useFormDirtyGuard } from '@/hooks/useFormDirtyGuard';
 import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
 import { gerarPDFContasReceber } from '@/lib/pdfFinanceiro';
@@ -26,6 +26,7 @@ import MonthNavigator from './MonthNavigator';
 import SearchableSelect from '@/components/ui/SearchableSelect';
 import { type FiltroPeriodo, computePeriodoRange } from './periodoFiltro';
 import { buildCategoriaFilterOptions, categoriaFiltroToParams, CATEGORIA_FILTRO_TODOS } from './categoriaFiltro';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 
 /* ─── Types ─── */
 interface ContaReceber {
@@ -89,10 +90,13 @@ export default function ContasReceberSection() {
   const [mesFiltro, setMesFiltro] = useState(() => formatInBR(new Date(), 'yyyy-MM'));
   const [filtroConta, setFiltroConta] = useState('todos');
   const [filtroCategoria, setFiltroCategoria] = useState(CATEGORIA_FILTRO_TODOS);
+  const [busca, setBusca] = useState('');
+  const buscaAplicada = useDebouncedValue(busca.trim(), 300);
   const [hasMore, setHasMore] = useState(false);
   const [cursorDate, setCursorDate] = useState<string | null>(null);
   const [cursorId, setCursorId] = useState<string | null>(null);
   const [serverTotals, setServerTotals] = useState({ totalPendente: 0, vencidas: 0 });
+  const [filteredSummary, setFilteredSummary] = useState({ total: 0, count: 0 });
 
   const [form, setForm] = useState<ContaFormData>({
     descricao: '', valor: 0, data_vencimento: todayBR(), data_competencia: '',
@@ -113,17 +117,12 @@ export default function ContasReceberSection() {
   const [recTarget, setRecTarget] = useState<ContaReceber | null>(null);
   const [recDate, setRecDate] = useState<string>(todayBR());
 
-  useEffect(() => { if (canView) load(); }, [canView]);
-  useEffect(() => { if (!canView) return; setCursorDate(null); setCursorId(null); setItems([]); loadPage(null, null); loadTotals(); }, [filtroStatus, filtroPeriodo, mesFiltro, filtroConta, filtroCategoria, canView]);
-  useDataEvent('financeiro:cadastros', useCallback(() => { if (canView) loadAux(); }, [canView]));
-  useDataEvent('financeiro:receber', useCallback(() => { if (canView) { loadPage(null, null); loadTotals(); } }, [canView]));
-
   const categoriaFilterOptions = useMemo(
     () => buildCategoriaFilterOptions(categorias.filter(c => c.tipo === 'receita')),
     [categorias]
   );
 
-  const loadPage = async (cDate: string | null, cId: string | null) => {
+  const loadPage = useCallback(async (cDate: string | null, cId: string | null) => {
     setLoading(true);
     const { de, ate } = computePeriodoRange(filtroPeriodo, mesFiltro);
     const { data, error } = await supabase.rpc('list_fin_contas_receber_cursor', {
@@ -131,23 +130,30 @@ export default function ContasReceberSection() {
       p_limit: PAGE_SIZE, p_cursor_date: cDate, p_cursor_id: cId,
       p_data_de: de, p_data_ate: ate,
       p_conta_id: filtroConta !== 'todos' ? filtroConta : null,
+      p_search: buscaAplicada || null,
       ...categoriaFiltroToParams(filtroCategoria),
     } as any);
     if (error) { console.error(error); setLoading(false); return; }
     const result = (data as unknown) as CursorListResponse<ContaReceber> | null;
     const newItems: ContaReceber[] = result?.items || [];
     setHasMore(result?.has_more || false);
-    if (!cDate) setItems(newItems); else setItems(prev => [...prev, ...newItems]);
+    if (!cDate) {
+      setItems(newItems);
+      setFilteredSummary({
+        total: Number(result?.filtered_total) || 0,
+        count: Number(result?.filtered_count) || 0,
+      });
+    } else setItems(prev => [...prev, ...newItems]);
     if (newItems.length > 0) { const last = newItems[newItems.length - 1]; setCursorDate(last.data_vencimento); setCursorId(last.id); }
     setLoading(false);
-  };
+  }, [buscaAplicada, filtroCategoria, filtroConta, filtroPeriodo, filtroStatus, mesFiltro]);
 
-  const loadTotals = async () => {
+  const loadTotals = useCallback(async () => {
     const { data } = await supabase.rpc('get_fin_counts_by_status');
     if (data) { const d = (data as unknown) as FinStatusCounts; setServerTotals({ totalPendente: Number(d.total_receber_pendente) || 0, vencidas: Number(d.vencidas_receber) || 0 }); }
-  };
+  }, []);
 
-  const loadAux = async () => {
+  const loadAux = useCallback(async () => {
     const [catRes, ccRes, contRes] = await Promise.all([
       supabase.from('fin_categorias').select('id, nome, tipo, codigo, parent_id, centro_custo_padrao_id').eq('ativo', true).order('nome'),
       supabase.from('fin_centros_custo').select('id, nome').eq('ativo', true).order('nome'),
@@ -156,13 +162,22 @@ export default function ContasReceberSection() {
     setCategorias(buildCategoryOptions((catRes.data as Categoria[]) || []));
     setCentros((ccRes.data as Centro[]) || []);
     setContas((contRes.data as Conta[]) || []);
-  };
+  }, []);
 
-  const load = async () => {
-    setCursorDate(null); setCursorId(null);
-    await Promise.all([loadPage(null, null), loadAux()]);
-    loadTotals();
-  };
+  useEffect(() => { if (canView) void loadAux(); }, [canView, loadAux]);
+  useEffect(() => { if (canView) void loadTotals(); }, [canView, loadTotals]);
+  useEffect(() => {
+    if (!canView) return;
+    setCursorDate(null);
+    setCursorId(null);
+    setItems([]);
+    setFilteredSummary({ total: 0, count: 0 });
+    void loadPage(null, null);
+  }, [canView, loadPage]);
+  useDataEvent('financeiro:cadastros', useCallback(() => { if (canView) void loadAux(); }, [canView, loadAux]));
+  useDataEvent('financeiro:receber', useCallback(() => {
+    if (canView) void Promise.all([loadPage(null, null), loadTotals()]);
+  }, [canView, loadPage, loadTotals]));
 
   /* ─── Detail view ─── */
   const openDetail = async (item: ContaReceber) => {
@@ -413,6 +428,11 @@ export default function ContasReceberSection() {
 
   const fmt = fmtBRL;
   const today = todayBR();
+  const hasActiveFilters = filtroPeriodo !== 'todos'
+    || filtroStatus !== 'todos'
+    || filtroConta !== 'todos'
+    || filtroCategoria !== CATEGORIA_FILTRO_TODOS
+    || buscaAplicada.length > 0;
 
   return (
     <div className="space-y-4">
@@ -481,6 +501,28 @@ export default function ContasReceberSection() {
           className="w-52 h-9"
           allowClear={false}
         />
+        <div className="relative flex-1 min-w-[220px] max-w-sm">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+          <Input
+            type="search"
+            value={busca}
+            onChange={event => setBusca(event.target.value)}
+            placeholder="Buscar pela descrição..."
+            aria-label="Buscar conta a receber pela descrição"
+            className="h-9 pl-9"
+          />
+        </div>
+        {hasActiveFilters && (
+          <div className="flex h-9 items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3" aria-live="polite">
+            <span className="text-xs text-muted-foreground">Total filtrado</span>
+            <strong className="whitespace-nowrap text-sm text-foreground">
+              {loading && items.length === 0 ? 'Calculando...' : fmt(filteredSummary.total)}
+            </strong>
+            {!loading || items.length > 0 ? (
+              <span className="whitespace-nowrap text-xs text-muted-foreground">• {filteredSummary.count} lançamento(s)</span>
+            ) : null}
+          </div>
+        )}
       </div>
 
       <Table>
@@ -500,8 +542,8 @@ export default function ContasReceberSection() {
           ) : items.length === 0 ? (
             <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Nenhuma conta a receber</TableCell></TableRow>
           ) : items.map(item => {
-            const sc = STATUS_CONFIG[item.status] || STATUS_CONFIG.RASCUNHO;
             const isVencida = item.data_vencimento < today && !['RECEBIDO', 'CANCELADO'].includes(item.status);
+            const sc = isVencida ? STATUS_CONFIG.VENCIDO : (STATUS_CONFIG[item.status] || STATUS_CONFIG.RASCUNHO);
             return (
               <TableRow
                 key={item.id}
@@ -515,7 +557,7 @@ export default function ContasReceberSection() {
                 <TableCell><span className={`text-xs px-2 py-0.5 rounded-full border ${sc.color}`}>{sc.label}</span></TableCell>
                 <TableCell>
                   <div className="flex gap-1 items-center justify-end" onClick={e => e.stopPropagation()}>
-                    {item.status === 'A_RECEBER' && canEdit && (
+                    {['A_RECEBER', 'VENCIDO'].includes(item.status) && canEdit && (
                       <Button size="sm" variant="default" onClick={() => abrirRecebimento(item)} disabled={saving} className="text-xs h-7">Receber</Button>
                     )}
                     {item.status === 'RECEBIDO' && (

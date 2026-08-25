@@ -2181,6 +2181,7 @@ export type Database = {
           data_recebimento: string | null
           data_vencimento: string
           descricao: string
+          descricao_unaccent: string | null
           excluir_dos_relatorios: boolean
           forma_pagamento: string | null
           id: string
@@ -2210,6 +2211,7 @@ export type Database = {
           data_recebimento?: string | null
           data_vencimento?: string
           descricao?: string
+          descricao_unaccent?: string | null
           excluir_dos_relatorios?: boolean
           forma_pagamento?: string | null
           id?: string
@@ -2239,6 +2241,7 @@ export type Database = {
           data_recebimento?: string | null
           data_vencimento?: string
           descricao?: string
+          descricao_unaccent?: string | null
           excluir_dos_relatorios?: boolean
           forma_pagamento?: string | null
           id?: string
