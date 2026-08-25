@@ -7,7 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useCan, useModuleAccess } from '@/permissions/hooks';
 import { toast } from 'sonner';
-import { fmtBRL, formatDateBR, formatInBR, todayBR } from '@/lib/formatters';
+import { fmtBRL, formatDateBR, formatInBR, normalizeBRLMoneyToNumber, todayBR } from '@/lib/formatters';
 import { formatDateBR as formatDateISO } from '@/lib/datetime';
 
 const COLORS = [
@@ -283,8 +283,8 @@ function RhViewInner({ visibleSubtabs, user }: {
         cpf: formColab.cpf, cargo: formColab.cargo, funcao: formColab.funcao,
         setor: formColab.setor, tipo_contrato: formColab.tipo_contrato,
         carga_horaria_semanal: parseDecimal(formColab.carga_horaria_semanal) ?? 44,
-        salario: parseDecimal(formColab.salario) ?? 0,
-        valor_hora: parseDecimal(formColab.valor_hora) ?? 0,
+        salario: normalizeBRLMoneyToNumber(formColab.salario) ?? 0,
+        valor_hora: normalizeBRLMoneyToNumber(formColab.valor_hora) ?? 0,
         data_admissao: formColab.data_admissao,
         created_by: user?.id,
       };
@@ -322,8 +322,8 @@ function RhViewInner({ visibleSubtabs, user }: {
         cpf: editForm.cpf || null, cargo: editForm.cargo, funcao: editForm.funcao,
         setor: editForm.setor, tipo_contrato: editForm.tipo_contrato,
         carga_horaria_semanal: parseDecimal(editForm.carga_horaria_semanal) ?? 44,
-        salario: parseDecimal(editForm.salario) ?? 0,
-        valor_hora: parseDecimal(editForm.valor_hora) ?? 0,
+        salario: normalizeBRLMoneyToNumber(editForm.salario) ?? 0,
+        valor_hora: normalizeBRLMoneyToNumber(editForm.valor_hora) ?? 0,
         data_admissao: editForm.data_admissao,
         user_id: editForm.user_id || null,
       };

@@ -3,7 +3,8 @@ import { emitDataEvent } from '@/lib/dataEvents';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { CurrencyInput } from '@/components/ui/brl-input';
+import { BRLInput } from '@/components/ui/brl-input';
+import { DecimalInput } from '@/components/ui/decimal-input';
 import { fmtBRL, formatDateBR, parseLocalDate, todayBR } from '@/lib/formatters';
 import { Label } from '@/components/ui/label';
 import { Badge, badgeVariants } from '@/components/ui/badge';
@@ -2975,11 +2976,11 @@ export default function ConciliacaoBancariaSection() {
                     </div>
                     <div className="col-span-2">
                       <Label className="text-[10px] text-muted-foreground">Valor (R$)</Label>
-                      <CurrencyInput className="h-8 text-xs" value={String(rl.valor || '')} onValueChange={(raw, parsed) => { updateRateioLinha(idx, 'valor', parsed ?? 0); }} showPrefix maxDecimals={2} />
+                      <BRLInput className="h-8 text-xs" numericValue={rl.valor} onNumericChange={value => updateRateioLinha(idx, 'valor', value)} showPrefix />
                     </div>
                     <div className="col-span-2">
                       <Label className="text-[10px] text-muted-foreground">%</Label>
-                      <Input className="h-8 text-xs" type="text" inputMode="decimal" value={rl.percentual || ''} onChange={e => { const v = e.target.value.replace(',', '.'); updateRateioLinha(idx, 'percentual', v === '' ? 0 : Number(v) || 0); }} />
+                      <DecimalInput className="h-8 text-xs" value={String(rl.percentual || '')} onValueChange={(_, parsed) => updateRateioLinha(idx, 'percentual', parsed ?? 0)} maxDecimals={2} suffix="%" />
                     </div>
                     <div className="col-span-1 flex justify-center">
                       {rateioLinhas.length > 1 && (

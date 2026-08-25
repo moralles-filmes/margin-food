@@ -1,11 +1,13 @@
 import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { CurrencyInput } from '@/components/ui/brl-input';
 import { toast } from 'sonner';
 import { Save, Ban } from 'lucide-react';
 import { mapCotacaoError } from '@/lib/cotacaoErrors';
 import type { useCotacoesStore, CotacaoRespostaInput, CotacaoFornecedorMetaInput } from '@/hooks/useCotacoesStore';
 import type { CotacaoItem, CotacaoFornecedor, CotacaoResposta } from '@/types/cotacao';
+import { normalizeBRLMoneyToNumber } from '@/lib/money';
 
 interface Cell { preco: string; disp: boolean }
 
@@ -66,14 +68,14 @@ export default function CotacaoRespostasMatrix({ cotacaoId, itens, fornecedores,
         respostasPayload.push({
           cotacao_fornecedor_id: f.id,
           cotacao_item_id: it.id,
-          preco_unitario: c.preco === '' ? null : c.preco.replace(',', '.'),
+          preco_unitario: c.preco === '' ? null : normalizeBRLMoneyToNumber(c.preco),
           disponivel: c.disp,
         });
       }
     }));
     const metaPayload: CotacaoFornecedorMetaInput[] = fornecedores.map(f => ({
       cotacao_fornecedor_id: f.id,
-      frete: (meta[f.id]?.frete ?? '').replace(',', '.'),
+      frete: normalizeBRLMoneyToNumber(meta[f.id]?.frete ?? '') ?? '',
       prazo_entrega_dias: meta[f.id]?.prazo ?? '',
       condicao_pagamento: meta[f.id]?.condicao || null,
     }));
@@ -104,8 +106,8 @@ export default function CotacaoRespostasMatrix({ cotacaoId, itens, fornecedores,
         {fornecedores.map(f => (
           <div key={f.id} className="flex items-center gap-1.5 text-[11px]">
             <span className="w-24 shrink-0 truncate text-foreground" title={f.supplier_nome_snapshot}>{f.supplier_nome_snapshot}</span>
-            <Input value={meta[f.id]?.frete ?? ''} onChange={e => setMetaField(f.id, 'frete', e.target.value)} disabled={!canEdit}
-              type="number" min={0} step="0.01" placeholder="frete R$" className="h-7 text-[11px] bg-secondary border-border w-20" />
+            <CurrencyInput value={meta[f.id]?.frete ?? ''} onValueChange={raw => setMetaField(f.id, 'frete', raw)} disabled={!canEdit}
+              min={0} showPrefix placeholder="frete R$" className="h-7 text-[11px] bg-secondary border-border w-20" />
             <Input value={meta[f.id]?.prazo ?? ''} onChange={e => setMetaField(f.id, 'prazo', e.target.value)} disabled={!canEdit}
               type="number" min={0} placeholder="prazo d" className="h-7 text-[11px] bg-secondary border-border w-16" />
             <Input value={meta[f.id]?.condicao ?? ''} onChange={e => setMetaField(f.id, 'condicao', e.target.value)} disabled={!canEdit}
@@ -139,11 +141,12 @@ export default function CotacaoRespostasMatrix({ cotacaoId, itens, fornecedores,
                   return (
                     <td key={f.id} className="px-1.5 py-1">
                       <div className="flex items-center gap-1">
-                        <Input
+                        <CurrencyInput
                           value={c.disp ? c.preco : ''}
-                          onChange={e => setPreco(f.id, it.id, e.target.value)}
+                          onValueChange={raw => setPreco(f.id, it.id, raw)}
                           disabled={!canEdit || !c.disp}
-                          type="number" min={0} step="0.01"
+                          min={0}
+                          showPrefix
                           placeholder={c.disp ? `R$/${it.purchase_unit_snapshot || it.unidade_snapshot || 'un'}` : '—'}
                           className={`h-7 text-xs bg-secondary border-border text-right ${!c.disp ? 'opacity-50' : ''}`}
                         />

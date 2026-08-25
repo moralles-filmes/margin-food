@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useEstoqueGeralStoreContext } from '@/contexts/EstoqueGeralStoreContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { DecimalInput } from '@/components/ui/decimal-input';
+import { CurrencyInput } from '@/components/ui/brl-input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import SearchableSelect from '@/components/ui/SearchableSelect';
@@ -281,10 +281,11 @@ export default function RankingFornecedoresView() {
               </div>
               <div>
                 <Label className="text-xs">Custo (R$) *</Label>
-                <DecimalInput
+                <CurrencyInput
                   value={priceForm.unit_cost}
                   onValueChange={(raw) => setPriceForm(f => ({ ...f, unit_cost: raw }))}
                   maxDecimals={2}
+                  showPrefix
                   placeholder="0,00"
                   className="text-sm"
                 />

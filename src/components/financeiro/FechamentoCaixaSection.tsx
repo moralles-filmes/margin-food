@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { MoneyInput } from '@/components/ui/numeric-input';
+import { CurrencyInput } from '@/components/ui/brl-input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
@@ -86,7 +86,7 @@ export default function FechamentoCaixaSection() {
   const [startDate, setStartDate] = useState(formatDateBR(startOfMonth(now)));
   const [endDate, setEndDate] = useState(formatDateBR(endOfMonth(now)));
 
-  // Form (string-based for MoneyInput)
+  // Form (string-based for CurrencyInput)
   const [formData, setFormData] = useState('');
   const [formBruto, setFormBruto] = useState('');
   const [formTaxas, setFormTaxas] = useState('');
@@ -378,26 +378,29 @@ export default function FechamentoCaixaSection() {
                   </div>
                   <div>
                     <Label>Faturamento Bruto (R$)</Label>
-                    <MoneyInput
+                    <CurrencyInput
                       value={formBruto}
                       onValueChange={(raw) => setFormBruto(raw)}
+                      showPrefix
                       placeholder="0,00"
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <Label>Taxas (R$)</Label>
-                      <MoneyInput
+                      <CurrencyInput
                         value={formTaxas}
                         onValueChange={(raw) => setFormTaxas(raw)}
+                        showPrefix
                         placeholder="0,00"
                       />
                     </div>
                     <div>
                       <Label>Descontos (R$)</Label>
-                      <MoneyInput
+                      <CurrencyInput
                         value={formDescontos}
                         onValueChange={(raw) => setFormDescontos(raw)}
+                        showPrefix
                         placeholder="0,00"
                       />
                     </div>
@@ -536,4 +539,3 @@ export default function FechamentoCaixaSection() {
     </div>
   );
 }
-

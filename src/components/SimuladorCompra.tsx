@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { CurrencyInput } from '@/components/ui/brl-input';
-import { DecimalInput } from '@/components/ui/decimal-input';
+import { DecimalInput, parseDecimal } from '@/components/ui/decimal-input';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Calculator, ArrowRight, CheckCircle2, AlertTriangle, XCircle, Zap } from 'lucide-react';
 import { useMetaMensal, calcProjecao, getMetaStatus } from './MetaCompraCard';
@@ -12,7 +12,7 @@ import { calcWeeklyIdeal, getWeekForDay } from './WeeklyBreakdown';
 import { calcBudgetPressure } from './BudgetPressure';
 import { todayBR } from '@/lib/datetime';
 
-import { fmtBRL } from '@/lib/formatters';
+import { fmtBRL, normalizeBRLMoneyToNumber } from '@/lib/formatters';
 const fmtR = (v: number) => fmtBRL(v);
 
 /** Typed simulation result */
@@ -78,7 +78,7 @@ export default function SimuladorCompra({ open, onClose, entries, metas, activeS
   const [simKg, setSimKg] = useState('');
   const [simulated, setSimulated] = useState(false);
 
-  const valor = Number(simValor) || 0;
+  const valor = normalizeBRLMoneyToNumber(simValor) || 0;
   const simMonth = simDate.slice(0, 7);
 
   const realMeta = useMetaMensal(entries, metas, simMonth);
@@ -99,7 +99,7 @@ export default function SimuladorCompra({ open, onClose, entries, metas, activeS
     // After
     const fakeEntry: SalmonEntry = {
       id: '__sim__', date: simDate, lot: simLot, sif: '', supplier: simSupplier,
-      totalValue: valor, boxes: 0, units: 0, grossKg: Number(simKg) || 0, notes: '', createdAt: '',
+      totalValue: valor, boxes: 0, units: 0, grossKg: parseDecimal(simKg) || 0, notes: '', createdAt: '',
     };
     const simEntries = [...entries, fakeEntry];
     const projAfter = calcProjecao(simEntries, simMonth, meta);

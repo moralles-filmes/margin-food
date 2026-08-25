@@ -16,7 +16,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Heart, Plus, Shield, Bus, UtensilsCrossed, Stethoscope, Trash2, Edit2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { todayBR } from '@/lib/datetime';
-import { formatFixedBR } from '@/lib/formatters';
+import { formatFixedBR, normalizeBRLMoneyToNumber } from '@/lib/formatters';
 
 import { useCan } from '@/permissions/hooks';
 interface Colaborador {
@@ -127,8 +127,8 @@ export default function BeneficiosSection({
         tipo: form.tipo,
         nome: form.nome,
         descricao: form.descricao,
-        valor_empresa: parseDecimal(form.valor_empresa) ?? 0,
-        valor_colaborador: parseDecimal(form.valor_colaborador) ?? 0,
+        valor_empresa: normalizeBRLMoneyToNumber(form.valor_empresa) ?? 0,
+        valor_colaborador: normalizeBRLMoneyToNumber(form.valor_colaborador) ?? 0,
         percentual_desconto: parseDecimal(form.percentual_desconto) ?? 0,
         elegivel: form.elegivel,
         data_inicio: form.data_inicio,

@@ -18,12 +18,12 @@ import { Slider } from '@/components/ui/slider';
 import { toast } from 'sonner';
 import ProductSearchCombobox, { type ProductOption } from '@/components/ui/ProductSearchCombobox';
 import { LoteSalmaoLimpo } from '@/types/salmon';
-import { DecimalInput } from '@/components/ui/decimal-input';
+import { DecimalInput, parseDecimal } from '@/components/ui/decimal-input';
 import { CurrencyInput } from '@/components/ui/brl-input';
 import { Plus, Trash2, Save, RefreshCw, Search, ChefHat, Layers, ShoppingBag, DollarSign, TrendingUp, Calculator, BarChart3, Settings2, ArrowRight, X, Fish } from 'lucide-react';
 import { SubmoduleSwitcher } from '@/components/ui/SubmoduleSwitcher';
 
-import { fmtBRL, formatPercentBR, formatFixedBR } from '@/lib/formatters';
+import { fmtBRL, formatPercentBR, formatFixedBR, normalizeBRLMoneyToNumber } from '@/lib/formatters';
 const R$ = (v: number) => fmtBRL(v);
 const pct = (v: number) => formatPercentBR(v);
 const qty = (v: number, d = 1) => formatFixedBR(v, d);
@@ -609,11 +609,11 @@ function ComponenteFormDialog({ open, onClose, componente, forcedTipo, component
     try {
       const res = await invokeApi('salvar_componente', {
         id: componente?.id, tipo: form.tipo, nome: form.nome, categoria: form.categoria,
-        rendimento: Number(form.rendimento) || 1, unidade_rendimento: form.unidade_rendimento,
-        perda_estimada_percent: Number(form.perda_estimada_percent) || 0,
-        custo_indireto: Number(form.custo_indireto) || 0,
-        peso_por_unidade: form.peso_por_unidade ? Number(form.peso_por_unidade) : null,
-        tempo_preparo_min: form.tempo_preparo_min ? Number(form.tempo_preparo_min) : null,
+        rendimento: parseDecimal(form.rendimento) || 1, unidade_rendimento: form.unidade_rendimento,
+        perda_estimada_percent: parseDecimal(form.perda_estimada_percent) || 0,
+        custo_indireto: normalizeBRLMoneyToNumber(form.custo_indireto) || 0,
+        peso_por_unidade: form.peso_por_unidade ? parseDecimal(form.peso_por_unidade) : null,
+        tempo_preparo_min: form.tempo_preparo_min ? parseDecimal(form.tempo_preparo_min) : null,
         modo_preparo: form.modo_preparo, observacoes: form.observacoes,
       });
       const compId = componente?.id || res.id;
@@ -686,8 +686,8 @@ function ComponenteFormDialog({ open, onClose, componente, forcedTipo, component
   const custoEstimado = bomItens.reduce((s, i) => s + (i.quantidade * (i.custoBase || 0)), 0);
   const custoSalmaoEstimado = bomItens.filter(i => i.isSalmao).reduce((s, i) => s + (i.quantidade * (i.custoBase || 0)), 0);
   const salmaoPctCusto = custoEstimado > 0 ? (custoSalmaoEstimado / custoEstimado) * 100 : 0;
-  const rendLiq = (Number(form.rendimento) || 1) * (1 - (Number(form.perda_estimada_percent) || 0) / 100);
-  const custoUnit = rendLiq > 0 ? (custoEstimado + (Number(form.custo_indireto) || 0)) / rendLiq : 0;
+  const rendLiq = (parseDecimal(form.rendimento) || 1) * (1 - (parseDecimal(form.perda_estimada_percent) || 0) / 100);
+  const custoUnit = rendLiq > 0 ? (custoEstimado + (normalizeBRLMoneyToNumber(form.custo_indireto) || 0)) / rendLiq : 0;
 
   // Labels by tipo
   const tipoLabels: Record<ComponenteTipo, { title: string; rendLabel: string; unitDefault: string }> = {
@@ -899,7 +899,14 @@ function CanalFormDialog({ open, onClose, canal, onSaved }: {
     if (!form.nome.trim()) { toast.error('Nome obrigatório'); return; }
     setSaving(true);
     try {
-      await invokeApi('salvar_canal', { id: canal?.id, nome: form.nome, taxa_percentual: Number(form.taxa_percentual) || 0, taxa_fixa: Number(form.taxa_fixa) || 0, imposto_percent: Number(form.imposto_percent) || 0, custo_embalagem_adicional: Number(form.custo_embalagem_adicional) || 0 });
+      await invokeApi('salvar_canal', {
+        id: canal?.id,
+        nome: form.nome,
+        taxa_percentual: parseDecimal(form.taxa_percentual) || 0,
+        taxa_fixa: normalizeBRLMoneyToNumber(form.taxa_fixa) || 0,
+        imposto_percent: parseDecimal(form.imposto_percent) || 0,
+        custo_embalagem_adicional: normalizeBRLMoneyToNumber(form.custo_embalagem_adicional) || 0,
+      });
       toast.success('Canal salvo');
       onSaved();
     } catch (e: any) { toast.error(e.message); }
@@ -1048,7 +1055,10 @@ function PrecificacaoDialog({ open, onClose, componente, canais, onSaved }: {
     try {
       await invokeApi('salvar_precificacao', {
         componente_id: componente.id,
-        precos: Object.entries(precos).map(([canal_id, preco_venda]) => ({ canal_id, preco_venda: Number(preco_venda) || 0 })),
+        precos: Object.entries(precos).map(([canal_id, preco_venda]) => ({
+          canal_id,
+          preco_venda: normalizeBRLMoneyToNumber(preco_venda) || 0,
+        })),
       });
       toast.success('Precificação salva');
       const res = await invokeApi('get_precificacao', { componente_id: componente.id });
@@ -1136,8 +1146,8 @@ function SimuladorDialog({ open, onClose, componente, canais }: {
       const res = await invokeApi('simular_cenario', {
         componente_id: componente.id, ajuste_custo_percent: ajusteCusto,
         ajuste_perda_percent: ajustePerda, ajuste_porcionamento_g: ajustePorc,
-        ajuste_preco_final: precoFinal ? Number(precoFinal) : undefined,
-        volume_vendas_mensal: Number(volumeMensal) || 0,
+        ajuste_preco_final: precoFinal ? normalizeBRLMoneyToNumber(precoFinal) ?? undefined : undefined,
+        volume_vendas_mensal: parseDecimal(volumeMensal) || 0,
       });
       setResultado(res);
     } catch (e: any) { toast.error(e.message); }
@@ -1341,7 +1351,7 @@ function SalmonConfigDialog({ open, onClose, salmonRef, isAdmin, onSaved }: {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await invokeApi('set_preco_referencia_salmao', { preco_manual: Number(manualPrice) || 0 });
+      await invokeApi('set_preco_referencia_salmao', { preco_manual: normalizeBRLMoneyToNumber(manualPrice) || 0 });
       toast.success('Preço de referência do salmão atualizado');
       onSaved();
     } catch (e: any) { toast.error(e.message); }

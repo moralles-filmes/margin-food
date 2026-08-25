@@ -18,6 +18,11 @@ Este arquivo serve para sincronizar o progresso do desenvolvimento entre os dife
 (Nenhuma tarefa em progresso)
 
 ## ✅ Concluído (Done)
+- [x] **Padronização de campos monetários em pt-BR (2026-08-25)**
+    - Corrigida a perda de vírgula/ponto durante a digitação nos rateios do Financeiro e na criação por extrato
+    - Campos monetários padronizados com `BRLInput`/`CurrencyInput`, exibição `1.234,56` e parsing centralizado antes de salvar
+    - Auditoria aplicada também em Estoque, Salmão, Ficha Técnica, RH, Fornecedores, Cotação e Fechamento de Caixa
+    - Testes de regressão cobrem vírgula, ponto, milhares e parent numérico com rerender por tecla
 - [x] **Multi-Tenant Onboarding — Gestão de Empresas (2026-04-01)**
     - Hardened `get_current_company_id()`: removido fallback perigoso que retornava "primeira empresa ativa" — agora retorna NULL se perfil sem empresa
     - Nova RPC `onboard_new_company()`: cria empresa + seed de cargos padrão + audit log

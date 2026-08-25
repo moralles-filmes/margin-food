@@ -11,8 +11,11 @@ import { useSalmonStore } from '@/hooks/useSalmonStore';
 
 import { useCan, useModuleAccess } from '@/permissions';
 import { Input } from '@/components/ui/input';
+import { CurrencyInput } from '@/components/ui/brl-input';
+import { DecimalInput, parseDecimal } from '@/components/ui/decimal-input';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { normalizeBRLMoneyToNumber } from '@/lib/money';
 
 // Map internal subtab keys to module registry keys
 const SUBTAB_MAP: Record<string, string> = {
@@ -61,8 +64,8 @@ export default function ConfiguracoesView({ store, initialSubTab }: Props) {
   const handleSaveSalmaoConfig = () => {
     setStockConfig({
       ...stockConfig,
-      perdaPercentAlerta: parseFloat(perdaPercent) || 15,
-      perdaValorAlerta: parseFloat(perdaValor) || 500,
+      perdaPercentAlerta: parseDecimal(perdaPercent) || 15,
+      perdaValorAlerta: normalizeBRLMoneyToNumber(perdaValor) || 500,
       validadePadraoDias: parseInt(validadeDias) || 2,
       alertaVencimentoDias: parseInt(alertaVencimento) || 1,
     });
@@ -123,15 +126,13 @@ export default function ConfiguracoesView({ store, initialSubTab }: Props) {
               <div className="space-y-1.5">
                 <label className="text-[11px] text-muted-foreground font-medium">Perda % máxima</label>
                 <div className="flex items-center gap-1.5">
-                  <Input type="text" inputMode="decimal" value={perdaPercent} onChange={e => setPerdaPercent(e.target.value.replace(/[^0-9.,]/g, ''))} className="bg-secondary border-border text-foreground h-8 text-sm" disabled={!canManageGeral} />
-                  <span className="text-xs text-muted-foreground">%</span>
+                  <DecimalInput value={perdaPercent} onValueChange={raw => setPerdaPercent(raw)} maxDecimals={2} suffix="%" className="bg-secondary border-border text-foreground h-8 text-sm" disabled={!canManageGeral} />
                 </div>
               </div>
               <div className="space-y-1.5">
                 <label className="text-[11px] text-muted-foreground font-medium">Perda R$ máxima</label>
                 <div className="flex items-center gap-1.5">
-                  <Input type="text" inputMode="decimal" value={perdaValor} onChange={e => setPerdaValor(e.target.value.replace(/[^0-9.,]/g, ''))} className="bg-secondary border-border text-foreground h-8 text-sm" disabled={!canManageGeral} />
-                  <span className="text-xs text-muted-foreground">R$</span>
+                  <CurrencyInput value={perdaValor} onValueChange={raw => setPerdaValor(raw)} showPrefix className="bg-secondary border-border text-foreground h-8 text-sm" disabled={!canManageGeral} />
                 </div>
               </div>
             </div>
