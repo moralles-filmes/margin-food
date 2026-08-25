@@ -73,7 +73,7 @@ function SkeletonTableRows() {
     <>
       {[...Array(5)].map((_, i) => (
         <TableRow key={i}>
-          {[...Array(8)].map((_, j) => (
+          {[...Array(7)].map((_, j) => (
             <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
           ))}
         </TableRow>
@@ -698,7 +698,6 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
               <TableHead>Tipo</TableHead>
               <TableHead>Origem</TableHead>
               <TableHead>Valor</TableHead>
-              <TableHead>Saldo</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="w-20">Acoes</TableHead>
             </TableRow>
@@ -707,7 +706,7 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
             {loading && items.length === 0 ? (
               <SkeletonTableRows />
             ) : items.length === 0 ? (
-              <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">Nenhum lancamento encontrado</TableCell></TableRow>
+              <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">Nenhum lancamento encontrado</TableCell></TableRow>
             ) : items.map((item, idx) => {
               const orig = ORIGEM_LABEL[item.origem || (item.tipo === 'TRANSFERENCIA' ? 'transferencia' : 'manual')] || ORIGEM_LABEL.manual;
               const isNewDay = idx === 0 || items[idx - 1].data_ledger !== item.data_ledger;
@@ -716,7 +715,7 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
                 <Fragment key={item.id}>
                   {isNewDay && (
                     <TableRow className="hover:bg-transparent border-0">
-                      <TableCell colSpan={8} className="p-0">
+                      <TableCell colSpan={7} className="p-0">
                         <div className="flex items-center justify-between px-4 py-3 my-1.5 rounded-lg bg-muted/60">
                           <span className="text-sm font-semibold text-foreground">
                             {capitalizeFirst(formatDayHeaderLabel(parseLocalDate(item.data_ledger)))}
@@ -778,9 +777,6 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
                       </TableCell>
                     );
                   })()}
-                  <TableCell className={item.saldo_apos != null && item.saldo_apos < 0 ? 'text-destructive font-medium' : 'text-foreground font-medium'}>
-                    {item.saldo_apos != null ? fmt(item.saldo_apos) : '—'}
-                  </TableCell>
                   <TableCell><span className={`text-xs px-2 py-0.5 rounded-full border ${STATUS_COLOR[item.status] || ''}`}>{item.status}</span></TableCell>
                   <TableCell>
                     <div className="flex gap-1" onClick={e => e.stopPropagation()}>
