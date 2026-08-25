@@ -27,6 +27,7 @@ import SearchableSelect from '@/components/ui/SearchableSelect';
 import { type FiltroPeriodo, computePeriodoRange } from './periodoFiltro';
 import { buildCategoriaFilterOptions, categoriaFiltroToParams, CATEGORIA_FILTRO_TODOS } from './categoriaFiltro';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
+import { getRecurrenceValidationMessage } from '@/domain/financeiro/recurrence';
 
 /* ─── Types ─── */
 interface ContaReceber {
@@ -43,6 +44,7 @@ interface ContaReceber {
 interface Categoria { id: string; nome: string; tipo: string; codigo: string | null; parent_id: string | null; centro_custo_padrao_id: string | null; groupLabel?: string; }
 interface Centro { id: string; nome: string; }
 interface Conta { id: string; nome: string; }
+interface SaveContaReceberResult { lancamentos_criados?: number; }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   RASCUNHO: { label: 'Rascunho', color: 'bg-muted text-muted-foreground' },
@@ -314,6 +316,10 @@ export default function ContasReceberSection() {
   const save = async () => {
     if (saving) return;
     if (!form.descricao.trim() || form.valor <= 0) { toast.error('Descricao e valor obrigatorios'); return; }
+    const recurrenceError = form.recorrente
+      ? getRecurrenceValidationMessage(form.frequencia, form.parcelas)
+      : null;
+    if (recurrenceError) { toast.error(recurrenceError); return; }
     const rateioValido = rateioLines.length === 0 || Math.abs(form.valor - rateioLines.reduce((s, l) => s + Number(l.valor || 0), 0)) < 0.01;
     if (rateioLines.length > 0 && !rateioValido) { toast.error('Rateio incompleto'); return; }
 
@@ -330,10 +336,10 @@ export default function ContasReceberSection() {
         : [];
 
       const recorrencia = form.recorrente
-        ? { frequencia: form.frequencia, parcelas: form.parcelas || null, parcelas_geradas: 0 }
+        ? { frequencia: form.frequencia, parcelas: form.parcelas, parcelas_geradas: 0 }
         : null;
 
-      const { error } = await (supabase.rpc as any)(editingItem ? '_guarded_update_conta_receber' : '_guarded_create_conta_receber', {
+      const { data, error } = await (supabase.rpc as any)(editingItem ? '_guarded_update_conta_receber' : '_guarded_create_conta_receber', {
         p_id: editingItem?.id,
         p_descricao: form.descricao,
         p_cliente: form.cliente || null,
@@ -351,7 +357,11 @@ export default function ContasReceberSection() {
       });
 
       if (error) { toast.error(error.message); return; }
-      toast.success(editingItem ? 'Conta atualizada' : 'Conta a receber criada');
+      const result = data as SaveContaReceberResult | null;
+      const createdCount = Number(result?.lancamentos_criados) || 1;
+      toast.success(editingItem
+        ? 'Conta atualizada'
+        : `${createdCount} conta${createdCount > 1 ? 's' : ''} a receber criada${createdCount > 1 ? 's' : ''}`);
       handleCloseForm();
       load();
       emitDataEvent('financeiro:receber');

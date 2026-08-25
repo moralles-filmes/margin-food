@@ -28,6 +28,7 @@ import SearchableSelect from '@/components/ui/SearchableSelect';
 import { type FiltroPeriodo, computePeriodoRange } from './periodoFiltro';
 import { buildCategoriaFilterOptions, categoriaFiltroToParams, CATEGORIA_FILTRO_TODOS } from './categoriaFiltro';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
+import { getRecurrenceValidationMessage } from '@/domain/financeiro/recurrence';
 
 /* ─── Types ─── */
 interface ContaPagar {
@@ -45,6 +46,7 @@ interface Categoria { id: string; nome: string; tipo: string; codigo: string | n
 interface Centro { id: string; nome: string; }
 interface Conta { id: string; nome: string; }
 interface Supplier { id: string; name: string; }
+interface SaveContaPagarResult { status?: string; lancamentos_criados?: number; }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: typeof Clock }> = {
   RASCUNHO: { label: 'Rascunho', color: 'bg-muted text-muted-foreground', icon: Clock },
@@ -358,6 +360,10 @@ export default function ContasPagarSection() {
   const save = async () => {
     if (saving) return;
     if (!form.descricao.trim() || form.valor <= 0) { toast.error('Descricao e valor obrigatorios'); return; }
+    const recurrenceError = form.recorrente
+      ? getRecurrenceValidationMessage(form.frequencia, form.parcelas)
+      : null;
+    if (recurrenceError) { toast.error(recurrenceError); return; }
     const rateioValido = rateioLines.length === 0 || Math.abs(form.valor - rateioLines.reduce((s, l) => s + Number(l.valor || 0), 0)) < 0.01;
     if (rateioLines.length > 0 && !rateioValido) { toast.error('Rateio incompleto'); return; }
 
@@ -382,7 +388,7 @@ export default function ContasPagarSection() {
         : [];
 
       const recorrencia = form.recorrente
-        ? { frequencia: form.frequencia, parcelas: form.parcelas || null, parcelas_geradas: 0 }
+        ? { frequencia: form.frequencia, parcelas: form.parcelas, parcelas_geradas: 0 }
         : null;
 
       const { data, error } = await (supabase.rpc as any)(editingItem ? '_guarded_update_conta_pagar' : '_guarded_create_conta_pagar', {
@@ -404,12 +410,13 @@ export default function ContasPagarSection() {
       });
 
       if (error) { toast.error(error.message); return; }
-      const result = data as any;
+      const result = data as SaveContaPagarResult | null;
+      const createdCount = Number(result?.lancamentos_criados) || 1;
       const statusMsg = editingItem
         ? 'Conta atualizada'
         : result?.status === 'AGUARDANDO_APROVACAO'
-          ? 'Conta criada — aguardando aprovacao'
-          : 'Conta a pagar criada';
+          ? `${createdCount} conta${createdCount > 1 ? 's' : ''} criada${createdCount > 1 ? 's' : ''} — aguardando aprovação`
+          : `${createdCount} conta${createdCount > 1 ? 's' : ''} a pagar criada${createdCount > 1 ? 's' : ''}`;
       toast.success(statusMsg);
       handleCloseForm();
       load();
