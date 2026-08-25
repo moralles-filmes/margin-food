@@ -56,6 +56,9 @@ interface Lancamento {
 interface CategoriaRef { id: string; nome: string; tipo: string; parent_id: string | null; centro_custo_padrao_id: string | null; groupLabel?: string }
 interface CentroCustoRef { id: string; nome: string }
 interface ContaRef { id: string; nome: string }
+type UntypedRpc = (name: string, params: Record<string, unknown>) => Promise<{ error: { message: string } | null }>;
+
+const callUntypedRpc = supabase.rpc as unknown as UntypedRpc;
 
 // ─── Helpers ───
 function NoAccess() {
@@ -129,6 +132,7 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
   const [editId, setEditId] = useState<string | null>(null);
   const [editUpdatedAt, setEditUpdatedAt] = useState<string | null>(null);
   const [editPrevStatus, setEditPrevStatus] = useState<string | null>(null);
+  const [editClassificationOnly, setEditClassificationOnly] = useState(false);
   const [justificativa, setJustificativa] = useState('');
   const [filtroTipo, setFiltroTipo] = useState('todos');
   const [filtroOrigem, setFiltroOrigem] = useState('todos');
@@ -339,6 +343,7 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
     setEditId(null);
     setEditUpdatedAt(null);
     setEditPrevStatus(null);
+    setEditClassificationOnly(false);
     setJustificativa('');
     setForm({ tipo: 'DESPESA', valor: 0, data_competencia: todayBR(), data_vencimento: '', data_pagamento: '', descricao: '', conta_id: '', conta_destino_id: '', forma_pagamento: 'pix', status: 'PREVISTO', recorrente: false, frequencia: 'mensal', parcelas: 0, observacoes: '', categoria_id: '', centro_custo_id: '' });
     setRateioLines([]);
@@ -349,10 +354,6 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
   if (!canView) return <NoAccess />;
 
   const openEdit = async (item: Lancamento) => {
-    if (item.conciliado) {
-      toast.error('Lancamentos conciliados devem ser desconciliados antes da edicao.');
-      return;
-    }
     if (item.origem === 'espelho_cp') {
       toast.error('Este lancamento foi gerado por uma Conta a Pagar. Edite diretamente em Contas a Pagar.');
       return;
@@ -361,10 +362,15 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
       toast.error('Este lancamento foi gerado por uma Conta a Receber. Edite diretamente em Contas a Receber.');
       return;
     }
+    if (item.conciliado && item.tipo === 'TRANSFERENCIA') {
+      toast.error('Transferencias conciliadas nao possuem classificacao contabil editavel.');
+      return;
+    }
 
     setEditId(item.id);
     setEditUpdatedAt(item.updated_at);
     setEditPrevStatus(item.status);
+    setEditClassificationOnly(!!item.conciliado);
     setJustificativa('');
 
     // Load rateios from database
@@ -407,6 +413,69 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
     }
     setShowDetail(false);
     setShowForm(true);
+  };
+
+  const saveReconciledClassification = async () => {
+    if (saving || !editId) return;
+
+    const totalRateio = rateioLines.reduce((sum, line) => sum + Number(line.valor || 0), 0);
+    const rateioValido = rateioLines.length === 0 || Math.abs(form.valor - totalRateio) < 0.01;
+
+    if (rateioLines.length === 0 && !form.categoria_id) {
+      toast.error('Selecione uma categoria.');
+      return;
+    }
+    if (rateioLines.length > 0 && !rateioValido) {
+      toast.error(`Rateio incompleto. Ajuste os valores para totalizar ${fmt(form.valor)}.`);
+      return;
+    }
+    if (rateioLines.some(line => !line.categoria_id || Number(line.valor || 0) <= 0)) {
+      toast.error('Todas as linhas de rateio precisam de categoria e valor maior que zero.');
+      return;
+    }
+    if (!justificativa.trim()) {
+      toast.error('Justificativa obrigatoria para reclassificar um lancamento conciliado.');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const rateiosPayload = rateioLines.map(line => ({
+        categoria_id: line.categoria_id,
+        centro_custo_id: line.centro_custo_id || null,
+        valor: Number(line.valor),
+        percentual: line.percentual || null,
+        observacao: null,
+      }));
+
+      const { error } = await callUntypedRpc('_guarded_update_reconciled_classification', {
+        p_id: editId,
+        p_categoria_id: rateioLines.length === 0 ? (form.categoria_id || null) : null,
+        p_centro_custo_id: rateioLines.length === 0 ? (form.centro_custo_id || null) : null,
+        p_observacoes: form.observacoes || null,
+        p_rateios: rateiosPayload,
+        p_expected_updated_at: editUpdatedAt,
+        p_justificativa_edicao: justificativa.trim(),
+      });
+
+      if (error) {
+        console.error('[LivroRazaoSection.saveReconciledClassification]', error);
+        if (error.message?.includes('OPTIMISTIC_LOCK_CONFLICT')) {
+          toast.error('Este registro foi alterado por outro usuario. Recarregue a pagina.');
+        } else {
+          toast.error(error.message);
+        }
+        return;
+      }
+
+      toast.success('Classificacao atualizada sem desfazer a conciliacao.');
+      resetForm();
+      load();
+      emitDataEvent('financeiro:lancamentos');
+      emitDataEvent('financeiro:conciliacao');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const deleteLancamento = async (item: Lancamento) => {
@@ -781,7 +850,7 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
                   <TableCell>
                     <div className="flex gap-1" onClick={e => e.stopPropagation()}>
                       {canEdit && (
-                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(item)} disabled={saving} title="Editar">
+                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(item)} disabled={saving} title={item.conciliado ? 'Editar classificacao' : 'Editar'}>
                           <Edit className="w-3.5 h-3.5" />
                         </Button>
                       )}
@@ -834,11 +903,12 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
         contas={contas}
         isEditing={!!editId}
         saving={saving}
-        onSave={save}
+        onSave={editClassificationOnly ? saveReconciledClassification : save}
         onClose={guardedClose}
         editPrevStatus={editPrevStatus}
         justificativa={justificativa}
         onJustificativaChange={setJustificativa}
+        classificationOnly={editClassificationOnly}
       />
 
       <FormCloseConfirmDialog open={showConfirm} onConfirmLeave={confirmClose} onCancelLeave={cancelClose} />
