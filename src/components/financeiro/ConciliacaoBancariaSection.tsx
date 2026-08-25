@@ -17,7 +17,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { parseExtrato, verifyContaExtrato, type ExtratoConta } from '@/lib/extratoParser';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import { Upload, CheckCircle, Save, RefreshCw, ArrowRight, Receipt, Plus, Trash2, PieChart, ArrowRightLeft, Search, CreditCard, FileText, EyeOff, X, AlertTriangle, Edit } from 'lucide-react';
+import { Upload, CheckCircle, Save, RefreshCw, ArrowRight, Receipt, Plus, Trash2, PieChart, ArrowRightLeft, Search, CreditCard, FileText, EyeOff, X, AlertTriangle, Edit, RotateCcw } from 'lucide-react';
 import CriarLancamentoExtratoDialog from '@/components/financeiro/CriarLancamentoExtratoDialog';
 import CategoryCombobox from '@/components/financeiro/CategoryCombobox';
 import ContaFormDialog, { type ContaFormData, type RateioLine } from '@/components/financeiro/ContaFormDialog';
@@ -79,6 +79,9 @@ interface LinhaExtrato {
    *  automaticamente — exibidas como alerta para conferência manual. */
   transferAlertas?: TransferWarning[];
   ignorada?: boolean;
+  /** Identifica exatamente a ocorrência persistida para que “Reconsiderar” não
+   *  remova outra transação idêntica do mesmo dia. */
+  ignoradaId?: string;
 }
 
 /** Classificação da diferença entre o valor do boleto e o que saiu do banco. */
@@ -246,6 +249,7 @@ export default function ConciliacaoBancariaSection() {
   const [selectedLancamentoIds, setSelectedLancamentoIds] = useState<Set<string>>(new Set());
 
   const [processando, setProcessando] = useState(false);
+  const [reconsiderandoId, setReconsiderandoId] = useState<string | null>(null);
 
   const [suggestionsDialog, setSuggestionsDialog] = useState<{ open: boolean; linhaIndex: number }>({ open: false, linhaIndex: -1 });
 
@@ -814,7 +818,7 @@ export default function ConciliacaoBancariaSection() {
     contasPagar: ContaPagarCandidate[];
     contasReceber: ContaReceberCandidate[];
     conciliadosCounts: Map<string, number>;
-    ignoradasCounts: Map<string, number>;
+    ignoradasIds: Map<string, string[]>;
     /** `tipo|external_id` → lancamento_id do vínculo. Mapa (e não Set) de
      *  propósito: dentro de UM arquivo, cada lançamento só pode ser reivindicado
      *  por uma linha — dois FITIDs distintos do mesmo arquivo apontando para o
@@ -910,7 +914,7 @@ export default function ConciliacaoBancariaSection() {
         .eq('status', 'A_RECEBER').order('data_vencimento'),
       fetchConciliadosExtrato(),
       // Entradas ignoradas para esta conta
-      contaSel ? supabase.from('fin_conciliacao_ignoradas').select('data, valor, tipo, descricao')
+      contaSel ? supabase.from('fin_conciliacao_ignoradas').select('id, data, valor, tipo, descricao')
         .eq('conta_id', contaSel) : Promise.resolve({ data: [] }),
       fetchVinculosExtrato(),
       // Transferências que tocam esta conta (origem OU destino) — candidatas a
@@ -950,10 +954,12 @@ export default function ConciliacaoBancariaSection() {
     );
 
     // Ignoradas — mostrar com badge "Ignorado"
-    const ignoradasCounts = new Map<string, number>();
-    for (const l of (ignoradasRes.data || []) as { data: string; valor: number; tipo: string; descricao: string | null }[]) {
+    const ignoradasIds = new Map<string, string[]>();
+    for (const l of (ignoradasRes.data || []) as { id: string; data: string; valor: number; tipo: string; descricao: string | null }[]) {
       const key = bankLineKey(l);
-      ignoradasCounts.set(key, (ignoradasCounts.get(key) || 0) + 1);
+      const ids = ignoradasIds.get(key) || [];
+      ids.push(l.id);
+      ignoradasIds.set(key, ids);
     }
 
     const espelhos = ((espelhosRes as { data: LancamentoCandidate[] | null }).data || []) as LancamentoCandidate[];
@@ -968,7 +974,7 @@ export default function ConciliacaoBancariaSection() {
 
     const transferCandidates = (transferRes.data || []) as TransferCandidate[];
 
-    return { allLancamentos, contasPagar, contasReceber, conciliadosCounts, ignoradasCounts, externalIdsProcessados, lancamentosVinculados, transferCandidates };
+    return { allLancamentos, contasPagar, contasReceber, conciliadosCounts, ignoradasIds, externalIdsProcessados, lancamentosVinculados, transferCandidates };
   };
 
   /** Recalcula o estado de match de UMA linha (já conciliada/ignorada/sugestão) contra o contexto atual do banco. */
@@ -979,6 +985,7 @@ export default function ConciliacaoBancariaSection() {
       matchId: undefined, matchOrigin: undefined, matchDescricao: undefined, matchRaw: undefined,
       matchJaNoRazao: undefined, suggestions: undefined,
       transferReconhecida: undefined, transferAlertas: undefined,
+      ignoradaId: undefined,
     };
 
     // FITID é a identidade bancária estável e tem precedência sobre campos
@@ -1003,8 +1010,11 @@ export default function ConciliacaoBancariaSection() {
     }
 
     // Ignorada — exibir informativo, sem ação
-    if (consumeCount(ctx.ignoradasCounts, key)) {
-      return { ...base, selecionada: false, ignorada: true, jaConciliada: false };
+    const ignoredIds = ctx.ignoradasIds.get(key);
+    const ignoradaId = ignoredIds?.shift();
+    if (ignoredIds?.length === 0) ctx.ignoradasIds.delete(key);
+    if (ignoradaId) {
+      return { ...base, selecionada: false, ignorada: true, ignoradaId, jaConciliada: false };
     }
 
     // Contrapartida de transferência já lançada pela outra conta — reconhece por
@@ -1337,6 +1347,33 @@ export default function ConciliacaoBancariaSection() {
       toast.success('Entrada ignorada. Não aparecerá em reimportações.');
     } catch (err: any) {
       toast.error(err.message || 'Erro ao ignorar entrada');
+    }
+  };
+
+  // ========== Reconsiderar linha ignorada ==========
+  const reconsiderarLinha = async (i: number) => {
+    const linha = linhas[i];
+    if (!linha?.ignoradaId || reconsiderandoId) return;
+
+    setReconsiderandoId(linha.ignoradaId);
+    try {
+      const { error } = await supabase.rpc('reconcile_reconsiderar_ignorada', {
+        p_ignorada_id: linha.ignoradaId,
+      });
+      if (error) throw error;
+
+      setLinhas(prev => prev.map((item, j) => j === i ? {
+        ...item,
+        ignorada: false,
+        ignoradaId: undefined,
+        selecionada: true,
+      } : item));
+      toast.success('Entrada reconsiderada e devolvida para análise.');
+    } catch (err) {
+      console.error('[ConciliacaoBancariaSection.reconsiderarLinha]', err);
+      toast.error(extractSupabaseErrorMessage(err, 'Erro ao reconsiderar entrada'));
+    } finally {
+      setReconsiderandoId(null);
     }
   };
 
@@ -2255,7 +2292,19 @@ export default function ConciliacaoBancariaSection() {
                           {linha.tipo === 'RECEITA' ? '+' : '-'} {fmt(linha.valor)}
                         </TableCell>
                         <TableCell>
-                          {isInactive ? null : (
+                          {isIgnorada ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-xs"
+                              title="Voltar esta entrada para análise"
+                              disabled={!linha.ignoradaId || reconsiderandoId !== null}
+                              onClick={() => reconsiderarLinha(i)}
+                            >
+                              <RotateCcw className="w-3 h-3 mr-1" />
+                              {reconsiderandoId === linha.ignoradaId ? 'Reconsiderando...' : 'Reconsiderar'}
+                            </Button>
+                          ) : isJaConciliada ? null : (
                             <div className="flex gap-1">
                               {!isDone && linha.suggestions && linha.suggestions.length > 0 && (
                                 <Button size="sm" variant={hasMatch ? 'default' : 'outline'} className="h-7 text-xs"

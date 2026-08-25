@@ -9929,6 +9929,10 @@ export type Database = {
         }
         Returns: Json
       }
+      reconcile_reconsiderar_ignorada: {
+        Args: { p_ignorada_id: string }
+        Returns: Json
+      }
       reconcile_import_lancamento: {
         Args: {
           p_conta_id: string
