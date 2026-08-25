@@ -13,7 +13,9 @@ function filterCurrencyInput(value: string, maxDecimals: number): string {
       result += ch;
     } else if ((ch === "." || ch === ",") && !hasDecimal && maxDecimals > 0) {
       hasDecimal = true;
-      result += ch;
+      // Keypads commonly emit a dot even in pt-BR. Keep the editable value in
+      // Brazilian notation regardless of which decimal key the user presses.
+      result += ",";
     } else if (ch >= "0" && ch <= "9") {
       if (hasDecimal) {
         if (decCount < maxDecimals) {
@@ -94,7 +96,7 @@ const BRLInput = React.forwardRef<HTMLInputElement, BRLInputProps>(
 
     const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
       const pasted = e.clipboardData.getData("text");
-      if (/[R$\s]/.test(pasted) || (pasted.includes(".") && pasted.includes(","))) {
+      if (/[R$\s]/.test(pasted) || pasted.includes(".") || pasted.includes(",")) {
         const parsed = normalizeBRLMoneyToNumber(pasted);
         if (parsed != null) {
           e.preventDefault();
@@ -117,6 +119,7 @@ const BRLInput = React.forwardRef<HTMLInputElement, BRLInputProps>(
           ref={ref}
           type="text"
           inputMode="decimal"
+          lang="pt-BR"
           value={raw}
           onChange={handleChange}
           onBlur={handleBlur}
@@ -226,7 +229,7 @@ const CurrencyInput = React.forwardRef<HTMLInputElement, CurrencyInputProps>(
 
     const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
       const pasted = e.clipboardData.getData("text");
-      if (/[R$\s]/.test(pasted) || (pasted.includes(".") && pasted.includes(","))) {
+      if (/[R$\s]/.test(pasted) || pasted.includes(".") || pasted.includes(",")) {
         const parsed = normalizeBRLMoneyToNumber(pasted);
         if (parsed != null) {
           e.preventDefault();
@@ -251,6 +254,7 @@ const CurrencyInput = React.forwardRef<HTMLInputElement, CurrencyInputProps>(
           ref={ref}
           type="text"
           inputMode="decimal"
+          lang="pt-BR"
           value={raw}
           onChange={handleChange}
           onBlur={handleBlur}
