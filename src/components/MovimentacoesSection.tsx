@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { CurrencyInput } from '@/components/ui/brl-input';
 import { DecimalInput } from '@/components/ui/decimal-input';
-import { fmtBRL, formatFixedBR } from '@/lib/formatters';
+import { fmtBRL, formatFixedBR, normalizeBRLMoneyToNumber } from '@/lib/formatters';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import SearchableSelect from '@/components/ui/SearchableSelect';
@@ -191,10 +191,10 @@ export default function MovimentacoesSection({
     setProcessing(true);
     try {
       const updates: Record<string, any> = {};
-      const newQty = parseFloat(editForm.quantidade);
-      const newCost = parseFloat(editForm.custoUnitario);
-      if (!isNaN(newQty) && newQty > 0 && newQty !== editMov.quantidade) updates.quantidade = newQty;
-      if (!isNaN(newCost) && newCost >= 0 && newCost !== editMov.custoUnitario) updates.custo_unitario = newCost;
+      const newQty = normalizeBRLMoneyToNumber(editForm.quantidade);
+      const newCost = normalizeBRLMoneyToNumber(editForm.custoUnitario);
+      if (newQty != null && newQty > 0 && newQty !== editMov.quantidade) updates.quantidade = newQty;
+      if (newCost != null && newCost >= 0 && newCost !== editMov.custoUnitario) updates.custo_unitario = newCost;
       if (editForm.data !== editMov.data) updates.data = editForm.data;
       if (editForm.observacao !== (editMov.observacao || '')) updates.observacao = (editForm.observacao || '').slice(0, 500);
 

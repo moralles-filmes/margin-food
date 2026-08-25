@@ -231,6 +231,7 @@ Todas as Edge Functions usam CORS compartilhado via `supabase/functions/_shared/
 - **DateRangePresets** (`components/financeiro/DateRangePresets.tsx`) — atalhos de período em strings `yyyy-MM-dd`, importar de `@/lib/datetime`. Query consumidora deve tratar `from`/`to` vazio condicionalmente (`.gte()` com string vazia quebra no Postgres).
 - **MonthNavigator** (`components/financeiro/MonthNavigator.tsx`) — navegação de mês (setas + select), aritmética pura em `yyyy-MM` (sem passar por `new Date`).
 - **DateInput** (`components/ui/DateInput.tsx`) — usar em todo campo de data financeira (nunca `Input type="date"` cru) — limita ano a 4 dígitos, backstop de um CHECK constraint no banco.
+- **Campos monetários** — estado numérico usa `BRLInput`; estado string usa `CurrencyInput` e salva com `normalizeBRLMoneyToNumber()`; nunca converter moeda formatada com `Number`/`parseFloat` nem atualizar estado numérico a cada tecla.
 - **SubmoduleSwitcher** (`components/ui/SubmoduleSwitcher.tsx`) — obrigatório para navegação de sub-módulos (substitui fileira horizontal de botões).
 
 ### Padrões de Busca de Texto (OBRIGATÓRIO)

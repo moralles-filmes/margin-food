@@ -3,12 +3,12 @@ import { MetaCompraMensal, SalmonEntry } from '@/types/salmon';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { DecimalInput } from '@/components/ui/decimal-input';
+import { DecimalInput, parseDecimal } from '@/components/ui/decimal-input';
 import { CurrencyInput } from '@/components/ui/brl-input';
 import { DollarSign, Settings2, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
 import { startOfMonth, endOfMonth, getDaysInMonth } from 'date-fns';
 import { getWeeksOfMonth } from './WeeklyBreakdown';
-import { formatInBR, fmtBRL, formatPercentBR, parseLocalDate } from '@/lib/formatters';
+import { formatInBR, fmtBRL, formatPercentBR, normalizeBRLMoneyToNumber, parseLocalDate } from '@/lib/formatters';
 import { formatDateBR as formatDateISO } from '@/lib/datetime';
 
 export function getMetaStatus(percent: number, amarelo: number, vermelho: number) {
@@ -166,14 +166,14 @@ export default function MetaCompraCard({ entries, metas, onSaveMeta, targetMonth
 
   const handleSave = () => {
     if (saving) return;
-    const valor = Number(formValor);
+    const valor = normalizeBRLMoneyToNumber(formValor);
     if (!valor || valor <= 0) return;
     onSaveMeta({
       mesAno,
       categoria,
       metaValorCompra: valor,
-      alertaAmareloPercent: Number(formAmarelo) || 85,
-      alertaVermelhoPercent: Number(formVermelho) || 100,
+      alertaAmareloPercent: parseDecimal(formAmarelo) || 85,
+      alertaVermelhoPercent: parseDecimal(formVermelho) || 100,
     });
     setEditing(false);
   };

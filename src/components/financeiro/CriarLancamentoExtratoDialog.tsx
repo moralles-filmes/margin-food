@@ -7,7 +7,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { CurrencyInput } from '@/components/ui/brl-input';
+import { BRLInput } from '@/components/ui/brl-input';
+import { DecimalInput } from '@/components/ui/decimal-input';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { emitDataEvent } from '@/lib/dataEvents';
@@ -451,7 +452,7 @@ export default function CriarLancamentoExtratoDialog({
             </div>
             <div>
               <Label className="text-xs">Valor (R$)</Label>
-              <CurrencyInput value={String(valor)} onValueChange={(_, parsed) => setValor(parsed ?? 0)} showPrefix maxDecimals={2} className="h-9" />
+              <BRLInput numericValue={valor} onNumericChange={setValor} showPrefix className="h-9" />
             </div>
           </div>
 
@@ -510,14 +511,11 @@ export default function CriarLancamentoExtratoDialog({
                     </div>
                     <div className="col-span-3">
                       <Label className="text-[10px] text-muted-foreground">Valor (R$)</Label>
-                      <CurrencyInput className="h-8 text-xs" value={String(rl.valor || '')} onValueChange={(_, parsed) => updateRateioLinha(idx, 'valor', parsed ?? 0)} showPrefix maxDecimals={2} />
+                      <BRLInput className="h-8 text-xs" numericValue={rl.valor} onNumericChange={value => updateRateioLinha(idx, 'valor', value)} showPrefix />
                     </div>
                     <div className="col-span-2">
                       <Label className="text-[10px] text-muted-foreground">%</Label>
-                      <Input className="h-8 text-xs" type="text" inputMode="decimal" value={rl.percentual || ''} onChange={e => {
-                        const v = e.target.value.replace(',', '.');
-                        updateRateioLinha(idx, 'percentual', v === '' ? 0 : Number(v) || 0);
-                      }} />
+                      <DecimalInput className="h-8 text-xs" value={String(rl.percentual || '')} onValueChange={(_, parsed) => updateRateioLinha(idx, 'percentual', parsed ?? 0)} maxDecimals={2} suffix="%" />
                     </div>
                     <div className="col-span-2 flex justify-end gap-1">
                       {rateioLinhas.length > 1 && (

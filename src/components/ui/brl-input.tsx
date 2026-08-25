@@ -2,6 +2,38 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 import { normalizeBRLMoneyToNumber, formatNumberToBRL } from "@/lib/money";
 
+function filterCurrencyInput(value: string, maxDecimals: number): string {
+  let result = "";
+  let hasDecimal = false;
+  let decCount = 0;
+
+  for (let i = 0; i < value.length; i++) {
+    const ch = value[i];
+    if (ch === "-" && i === 0) {
+      result += ch;
+    } else if ((ch === "." || ch === ",") && !hasDecimal && maxDecimals > 0) {
+      hasDecimal = true;
+      result += ch;
+    } else if (ch >= "0" && ch <= "9") {
+      if (hasDecimal) {
+        if (decCount < maxDecimals) {
+          result += ch;
+          decCount++;
+        }
+      } else {
+        result += ch;
+      }
+    }
+  }
+  return result;
+}
+
+function toEditableBRL(value: string, maxDecimals: number): string {
+  const parsed = normalizeBRLMoneyToNumber(value);
+  if (parsed == null) return "";
+  return parsed.toFixed(maxDecimals).replace(".", ",");
+}
+
 /**
  * BRLInput — drop-in replacement for `<Input>` on R$ / decimal fields.
  *
@@ -27,21 +59,21 @@ export interface BRLInputProps
 }
 
 const BRLInput = React.forwardRef<HTMLInputElement, BRLInputProps>(
-  ({ className, numericValue, onNumericChange, showPrefix, onBlur, onFocus, placeholder, ...props }, ref) => {
+  ({ className, numericValue, onNumericChange, showPrefix, onBlur, onFocus, onPaste, placeholder, ...props }, ref) => {
     const [raw, setRaw] = React.useState(() =>
-      numericValue ? formatNumberToBRL(numericValue) : ""
+      numericValue != null ? formatNumberToBRL(numericValue) : ""
     );
     const [focused, setFocused] = React.useState(false);
 
     // Sync from parent when not focused (e.g. form reset)
     React.useEffect(() => {
       if (!focused) {
-        setRaw(numericValue ? formatNumberToBRL(numericValue) : "");
+        setRaw(numericValue != null ? formatNumberToBRL(numericValue) : "");
       }
     }, [numericValue, focused]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      setRaw(e.target.value);
+      setRaw(filterCurrencyInput(e.target.value, 2));
     };
 
     const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
@@ -56,7 +88,20 @@ const BRLInput = React.forwardRef<HTMLInputElement, BRLInputProps>(
 
     const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
       setFocused(true);
+      setRaw(toEditableBRL(raw, 2));
       onFocus?.(e);
+    };
+
+    const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+      const pasted = e.clipboardData.getData("text");
+      if (/[R$\s]/.test(pasted) || (pasted.includes(".") && pasted.includes(","))) {
+        const parsed = normalizeBRLMoneyToNumber(pasted);
+        if (parsed != null) {
+          e.preventDefault();
+          setRaw(toEditableBRL(String(parsed), 2));
+        }
+      }
+      onPaste?.(e);
     };
 
     const displayPrefix = showPrefix && !focused && raw ? "R$" : "";
@@ -76,6 +121,7 @@ const BRLInput = React.forwardRef<HTMLInputElement, BRLInputProps>(
           onChange={handleChange}
           onBlur={handleBlur}
           onFocus={handleFocus}
+          onPaste={handlePaste}
           placeholder={placeholder ?? "0,00"}
           className={cn(
             "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
@@ -116,32 +162,6 @@ export interface CurrencyInputProps
   maxDecimals?: number;
 }
 
-function filterCurrencyInput(value: string, maxDecimals: number): string {
-  let result = "";
-  let hasDecimal = false;
-  let decCount = 0;
-
-  for (let i = 0; i < value.length; i++) {
-    const ch = value[i];
-    if (ch === "-" && i === 0) {
-      result += ch;
-    } else if ((ch === "." || ch === ",") && !hasDecimal && maxDecimals > 0) {
-      hasDecimal = true;
-      result += ch;
-    } else if (ch >= "0" && ch <= "9") {
-      if (hasDecimal) {
-        if (decCount < maxDecimals) {
-          result += ch;
-          decCount++;
-        }
-      } else {
-        result += ch;
-      }
-    }
-  }
-  return result;
-}
-
 const CurrencyInput = React.forwardRef<HTMLInputElement, CurrencyInputProps>(
   (
     {
@@ -152,41 +172,73 @@ const CurrencyInput = React.forwardRef<HTMLInputElement, CurrencyInputProps>(
       maxDecimals = 2,
       onBlur,
       onFocus,
+      onPaste,
       placeholder,
       ...props
     },
     ref
   ) => {
+    const [raw, setRaw] = React.useState(() => {
+      const parsed = normalizeBRLMoneyToNumber(value);
+      return parsed == null ? "" : formatNumberToBRL(parsed, maxDecimals);
+    });
     const [focused, setFocused] = React.useState(false);
 
+    // Numeric parents often pass String(number) back on every keystroke. Keep
+    // the user's partial value (for example "84," or "84.") while focused.
+    React.useEffect(() => {
+      if (!focused) {
+        const parsed = normalizeBRLMoneyToNumber(value);
+        setRaw(parsed == null ? "" : formatNumberToBRL(parsed, maxDecimals));
+      }
+    }, [value, focused, maxDecimals]);
+
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const raw = filterCurrencyInput(e.target.value, maxDecimals);
-      onValueChange(raw, normalizeBRLMoneyToNumber(raw));
+      const nextRaw = filterCurrencyInput(e.target.value, maxDecimals);
+      setRaw(nextRaw);
+      onValueChange(nextRaw, normalizeBRLMoneyToNumber(nextRaw));
     };
 
     const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
       setFocused(false);
-      if (value) {
-        const n = normalizeBRLMoneyToNumber(value);
+      if (raw) {
+        const n = normalizeBRLMoneyToNumber(raw);
         if (n != null) {
           // Format with thousand separators: 5000 → "5.000,00"
           const formatted = formatNumberToBRL(n, maxDecimals);
-          if (formatted !== value) {
-            onValueChange(formatted, n);
-          }
-        } else if (value !== "") {
+          setRaw(formatted);
+          onValueChange(formatted, n);
+        } else {
+          setRaw("");
           onValueChange("", null);
         }
+      } else if (value !== "") {
+        onValueChange("", null);
       }
       onBlur?.(e);
     };
 
     const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
       setFocused(true);
+      setRaw(toEditableBRL(raw, maxDecimals));
       onFocus?.(e);
     };
 
-    const displayPrefix = showPrefix && !focused && value;
+    const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+      const pasted = e.clipboardData.getData("text");
+      if (/[R$\s]/.test(pasted) || (pasted.includes(".") && pasted.includes(","))) {
+        const parsed = normalizeBRLMoneyToNumber(pasted);
+        if (parsed != null) {
+          e.preventDefault();
+          const nextRaw = toEditableBRL(String(parsed), maxDecimals);
+          setRaw(nextRaw);
+          onValueChange(nextRaw, parsed);
+        }
+      }
+      onPaste?.(e);
+    };
+
+    const displayPrefix = showPrefix && !focused && raw;
 
     return (
       <div className="relative">
@@ -199,10 +251,11 @@ const CurrencyInput = React.forwardRef<HTMLInputElement, CurrencyInputProps>(
           ref={ref}
           type="text"
           inputMode="decimal"
-          value={value}
+          value={raw}
           onChange={handleChange}
           onBlur={handleBlur}
           onFocus={handleFocus}
+          onPaste={handlePaste}
           placeholder={placeholder ?? "0,00"}
           className={cn(
             "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",

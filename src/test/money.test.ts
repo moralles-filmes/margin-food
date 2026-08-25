@@ -32,6 +32,14 @@ describe("normalizeBRLMoneyToNumber", () => {
     expect(normalizeBRLMoneyToNumber("1.90")).toBe(1.9);
   });
 
+  it('"1.234" → 1234 (Brazilian thousands)', () => {
+    expect(normalizeBRLMoneyToNumber("1.234")).toBe(1234);
+  });
+
+  it('"1.234.567" → 1234567 (Brazilian grouped integer)', () => {
+    expect(normalizeBRLMoneyToNumber("1.234.567")).toBe(1234567);
+  });
+
   it('"1900,50" → 1900.5', () => {
     expect(normalizeBRLMoneyToNumber("1900,50")).toBe(1900.5);
   });

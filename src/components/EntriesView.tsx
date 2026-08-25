@@ -3,6 +3,7 @@ import { useCan } from '@/permissions/hooks';
 import { useSalmonStore } from '@/hooks/useSalmonStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { CurrencyInput } from '@/components/ui/brl-input';
 import { Label } from '@/components/ui/label';
 import { Plus, Copy, ChevronDown, ChevronUp, Pencil, Trash2, X, Check, Calculator } from 'lucide-react';
 import { toast } from 'sonner';
@@ -316,7 +317,7 @@ export default function EntriesView({ store }: EntriesViewProps) {
             </div>
             <div>
               <Label className="text-[11px] text-muted-foreground">Valor Total (R$)</Label>
-              <Input type="text" inputMode="decimal" value={form.totalValue} onChange={e => setForm(f => ({ ...f, totalValue: e.target.value }))} placeholder="0,00" className="bg-secondary border-border text-foreground" />
+              <CurrencyInput value={form.totalValue} onValueChange={raw => setForm(f => ({ ...f, totalValue: raw }))} showPrefix placeholder="0,00" className="bg-secondary border-border text-foreground" />
             </div>
             <div>
               <Label className="text-[11px] text-muted-foreground">Kg Bruto</Label>

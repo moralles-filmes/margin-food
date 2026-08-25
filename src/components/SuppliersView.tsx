@@ -3,6 +3,7 @@ import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { useSalmonStore } from '@/hooks/useSalmonStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { BRLInput } from '@/components/ui/brl-input';
 import { Label } from '@/components/ui/label';
 import { Plus, Edit2, Trash2, Building2, Check, X } from 'lucide-react';
 import { toast } from 'sonner';
@@ -108,7 +109,7 @@ export default function SuppliersView({ store }: SuppliersViewProps) {
             </div>
             <div>
               <Label className="text-[11px] text-muted-foreground">Pedido mínimo (R$)</Label>
-              <Input type="number" min={0} step="0.01" value={form.pedidoMinimoValor || ''} onChange={e => setForm(f => ({ ...f, pedidoMinimoValor: parseFloat(e.target.value) || 0 }))} placeholder="0,00" className="bg-secondary border-border text-foreground" />
+              <BRLInput numericValue={form.pedidoMinimoValor} onNumericChange={value => setForm(f => ({ ...f, pedidoMinimoValor: value }))} showPrefix min={0} placeholder="0,00" className="bg-secondary border-border text-foreground" />
             </div>
             <div>
               <Label className="text-[11px] text-muted-foreground">WhatsApp (Z-API)</Label>

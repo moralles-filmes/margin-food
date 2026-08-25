@@ -67,28 +67,36 @@ const DecimalInput = React.forwardRef<HTMLInputElement, DecimalInputProps>(
     },
     ref
   ) => {
+    const [raw, setRaw] = React.useState(value);
     const [focused, setFocused] = React.useState(false);
 
+    React.useEffect(() => {
+      if (!focused) setRaw(value);
+    }, [value, focused]);
+
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const raw = filterDecimalInput(e.target.value, allowNegative, maxDecimals);
-      onValueChange(raw, parseDecimal(raw));
+      const nextRaw = filterDecimalInput(e.target.value, allowNegative, maxDecimals);
+      setRaw(nextRaw);
+      onValueChange(nextRaw, parseDecimal(nextRaw));
     };
 
     const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
       setFocused(false);
-      if (value) {
-        const n = parseDecimal(value);
+      if (raw) {
+        const n = parseDecimal(raw);
         if (n != null) {
           // Normalise: remove trailing zeros, use comma as display separator
           const fixed = n.toFixed(maxDecimals);
           const trimmed = fixed.replace(/\.?0+$/, "");
           const display = trimmed.replace(".", ",");
-          if (display !== value) {
-            onValueChange(display, n);
-          }
-        } else if (value !== "") {
+          setRaw(display);
+          onValueChange(display, n);
+        } else {
+          setRaw("");
           onValueChange("", null);
         }
+      } else if (value !== "") {
+        onValueChange("", null);
       }
       onBlur?.(e);
     };
@@ -104,7 +112,7 @@ const DecimalInput = React.forwardRef<HTMLInputElement, DecimalInputProps>(
           ref={ref}
           type="text"
           inputMode="decimal"
-          value={value}
+          value={raw}
           onChange={handleChange}
           onBlur={handleBlur}
           onFocus={handleFocus}
@@ -115,7 +123,7 @@ const DecimalInput = React.forwardRef<HTMLInputElement, DecimalInputProps>(
           )}
           {...props}
         />
-        {suffix && !focused && value && (
+        {suffix && !focused && raw && (
           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm pointer-events-none">
             {suffix}
           </span>

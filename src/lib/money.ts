@@ -36,8 +36,18 @@ export function normalizeBRLMoneyToNumber(value: string | null | undefined): num
     // Comma is the decimal separator (pt-BR style: 1.234,56)
     numericString = str.replace(/\./g, '').replace(',', '.');
   } else if (lastDot > lastComma) {
-    // Dot is the decimal separator (US style: 1,234.56)
-    numericString = str.replace(/,/g, '');
+    const dotCount = (str.match(/\./g) || []).length;
+    const digitsAfterDot = str.length - lastDot - 1;
+    if (lastComma < 0 && digitsAfterDot === 3) {
+      // Brazilian thousands without decimal cents: 1.234 → 1234
+      numericString = str.replace(/\./g, '');
+    } else if (dotCount > 1 && lastComma < 0) {
+      // Brazilian grouped integer: 1.234.567 → 1234567
+      numericString = str.replace(/\./g, '');
+    } else {
+      // Dot is the decimal separator (US style: 1,234.56 or typed 84.02)
+      numericString = str.replace(/,/g, '');
+    }
   } else {
     // Only one type of separator or none
     if (lastComma >= 0) {
