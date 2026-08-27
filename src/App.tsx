@@ -167,6 +167,8 @@ const App = () => {
                   <Route path="/recebimentos" element={<Index />} />
                   <Route path="/mercados-sazonais" element={<Index />} />
                   <Route path="/confirmacoes-recebimento" element={<Index />} />
+                  <Route path="/financeiro/relatorio-socios" element={<Index />} />
+                  <Route path="/financeiro/relatorio-socios/:detail" element={<Index />} />
                   <Route path="/admin" element={<AdminPanel />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
