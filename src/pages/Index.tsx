@@ -188,6 +188,16 @@ const Index = () => {
   }, [location.pathname, permissionState, canAccessTab, navigate]);
 
   useEffect(() => {
+    if (permissionState !== 'READY' || !location.pathname.startsWith('/financeiro/')) return;
+    if (!canAccessTab('financeiro')) {
+      toast.error('Sem permissão.');
+      navigate('/', { replace: true });
+      return;
+    }
+    setActiveTab('financeiro');
+  }, [location.pathname, permissionState, canAccessTab, navigate, setActiveTab]);
+
+  useEffect(() => {
     const handleOnline = () => setIsOffline(false);
     const handleOffline = () => setIsOffline(true);
     window.addEventListener('online', handleOnline);

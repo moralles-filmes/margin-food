@@ -18,6 +18,48 @@ Este arquivo serve para sincronizar o progresso do desenvolvimento entre os dife
 (Nenhuma tarefa em progresso)
 
 ## ✅ Concluído (Done)
+- [x] **Fechamento operacional das Fases 7 a 12 da Apresentação Sócios (2026-08-26)**
+    - Nove migrations da apresentação reconciliadas no histórico remoto, incluindo decisões, reuniões/atas e o hardening de `search_path`; nenhuma migration antiga alheia foi reaplicada
+    - Smoke tests transacionais no Supabase real cobriram RLS, RBAC, isolamento entre empresas, RPCs financeiras, lifecycle, revisões imutáveis, auditoria, notificações, exportação e optimistic locking, com rollback e zero resíduo
+    - Contratos TypeScript regenerados do schema remoto e validações locais completas aprovadas; publicação segue em branch dedicada, sem push direto para `main`
+- [x] **Apresentação Sócios — Fase 12: ritual executivo, ata, follow-up e prestação de contas (2026-08-26)**
+    - Sessões executivas versionadas com pauta estruturada, participantes, responsável pela ata, modo reunião, revisões imutáveis e fluxo `DRAFT → IN_PROGRESS → IN_REVIEW → APPROVED/CANCELLED`
+    - Snapshot financeiro auditável reutiliza `get_fin_presentation_plan`; decisões e ações permanecem entidades canônicas da Fase 11 e são apenas referenciadas pela ata
+    - Follow-up factual identifica pendências, vencidos, itens sem prazo/prioridade e mudanças desde o snapshot, com filtros persistidos na URL e comparação entre sessões homogêneas
+    - RPCs `SECURITY DEFINER` com RBAC separado para `view/manage/approve/export`, RLS forçada, optimistic locking, auditoria antes/depois, notificações e preservação de nomes históricos
+    - Editor responsivo com rascunho em `sessionStorage` isolado por usuário/empresa/sessão, proteção contra perda, referências obsoletas explícitas e estados acessíveis
+    - PDF e PowerPoint preto/branco/dourado compartilham paginação, marca textual `RASCUNHO`, IDs, versões, fontes, regras e timestamps; 49 páginas/slides extremos inspecionados visualmente sem corte
+    - Migration `20260826204351_presentation_executive_sessions.sql` validada em PostgreSQL real efêmero e aplicada no Supabase pelo fluxo controlado de aplicação/reconciliação
+- [x] **Apresentação Sócios — Fase 11: decisões, plano de ação e governança executiva (2026-08-26)**
+    - Registro versionado de decisões com snapshot financeiro imutável, fontes, regras, premissas, cenário exato e histórico de revisões sem criar uma segunda verdade financeira
+    - Plano de ação com responsável tenant-scoped, prazo, prioridade, estados explícitos e notificações; decisão avança automaticamente apenas ao iniciar ação e só conclui por comando explícito
+    - RPCs `SECURITY DEFINER` com RBAC, RLS forçada, optimistic locking, transições validadas, auditoria antes/depois e preservação do nome após exclusão do usuário
+    - Área executiva responsiva com cadastro, filtros/deep links, detalhe, timeline, comparação homogênea com o plano atual, conflitos recuperáveis e confirmação contra perda de rascunho
+    - Slides condicionais de compromissos e acompanhamento integrados ao canvas, PDF e PowerPoint, com paginação, IDs, versões, fontes, fórmulas e regras auditáveis nas notas
+    - Contratos defensivos e testes cobrem isolamento entre empresas, permissões, concorrência, revisões, transições, zero sem percentual inventado, remoção de usuário, acessibilidade e exportações
+    - Migration `20260826190950_presentation_decisions_governance.sql` validada em PostgreSQL real efêmero e aplicada no Supabase pelo fluxo controlado de aplicação/reconciliação
+- [x] **Apresentação Sócios — Fase 10: cenários, sensibilidade e apoio à decisão (2026-08-26)**
+    - Simulação determinística sobre base explícita realizado/orçado/projeção, reutilizando `get_fin_presentation_plan`, `fin_orcamentos` e `metas_cmv.meta_cmv_total` sem alterar dados canônicos
+    - Alavancas absolutas ou percentuais para receita, despesa, categorias e CMV, com centavos/pontos-base exatos, bloqueio pai/filho, CMV explícito e validação tenant-scoped
+    - Área executiva responsiva com premissas, cards, ponte de resultado, ranking, tabela por categoria e sensibilidade de uma variável, sempre identificada como `SIMULAÇÃO`
+    - Rascunho em `sessionStorage` isolado por usuário, empresa, período e filtros; permissão dedicada `financeiro:relatorio-socios:simulate` registrada sem nova action
+    - Slides condicionais de cenário e sensibilidade integrados ao canvas, PDF e PowerPoint com fontes, regras, fórmulas e premissas auditáveis nas notas
+    - Contratos defensivos e testes cobrem indisponibilidade, dupla contagem, valores extremos, payloads inválidos, URL, acessibilidade e exportações; nenhuma migration ou alteração remota foi necessária
+- [x] **Apresentação Sócios — Fase 9: metas, orçamento e projeção executiva (2026-08-25)**
+    - Fontes canônicas reutilizadas: `fin_orcamentos` para valores mensais e `metas_cmv.meta_cmv_total` para meta percentual; realizado permanece idêntico à apresentação por competência
+    - Nova RPC paginada e tenant-scoped compara realizado/orçado/projetado, herda grupo CMV, respeita rateios, sinaliza cobertura parcial e não incorpora contas em aberto
+    - Orçamento agora aceita receita e despesa operacionais, bloqueia conflito pai/filho, exige optimistic locking e registra auditoria financeira
+    - Dashboard, detalhes, deep links, modo apresentação, PDF e PowerPoint preservam o modo comparativo; slides de meta só existem quando há alvo configurado
+    - Migration validada em PostgreSQL real efêmero com RBAC, isolamento, rateio, meta CMV, hierarquia, auditoria e conflito otimista; aplicada no Supabase pelo fluxo controlado de aplicação/reconciliação
+- [x] **Apresentação Sócios — Fase 8: detalhes e drill-down (2026-08-25)**
+    - Rotas profundas para receita, despesa, resultado, margem, CMV, contas em aberto e rankings, com contexto completo do dashboard preservado na URL
+    - Painel compartilhado com KPIs, comparações, fórmulas, evolução, árvores progressivas, rankings e linhas relacionadas paginadas
+    - RPCs tenant-scoped validam RBAC e categoria, resolvem rateio sem dupla contagem e herdam `grupo = 'cmv'` pela hierarquia
+    - Testes cobrem navegação, teclado, retorno, contrato paginado, isolamento, estados visuais e números finitos; apresentação e exportações permanecem intactas
+- [x] **Apresentação Sócios — nova Fase 7: dashboard executivo (2026-08-25)**
+    - Tela principal compactada conforme referências, com filtros Mês/Meses/Ano/Total, unidade atual, cinco KPIs, gráfico, insights determinísticos, análises rápidas, árvores expansíveis, contas e rankings interativos
+    - CMV identificado pelo `grupo` configurável das categorias via RPC tenant-scoped; nenhuma inferência por nome e nenhuma alteração em DRE/DFC
+    - Modo apresentação, PDF, PowerPoint e relatório mensal legado preservados; próxima fase: rotas de detalhe e drill-down completo
 - [x] **Padronização de campos monetários em pt-BR (2026-08-25)**
     - Corrigida a perda de vírgula/ponto durante a digitação nos rateios do Financeiro e na criação por extrato
     - Campos monetários padronizados com `BRLInput`/`CurrencyInput`, exibição `1.234,56` e parsing centralizado antes de salvar

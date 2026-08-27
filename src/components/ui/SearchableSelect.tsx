@@ -17,6 +17,7 @@ interface SearchableSelectProps {
   placeholder?: string;
   searchPlaceholder?: string;
   emptyMessage?: string;
+  ariaLabel?: string;
   className?: string;
   disabled?: boolean;
   /** Set to true when used inside a Dialog/Sheet */
@@ -32,6 +33,7 @@ export default function SearchableSelect({
   placeholder = 'Selecione...',
   searchPlaceholder = 'Buscar...',
   emptyMessage = 'Nenhum resultado encontrado.',
+  ariaLabel,
   className,
   disabled,
   modal = false,
@@ -47,6 +49,7 @@ export default function SearchableSelect({
         <Button
           variant="outline"
           role="combobox"
+          aria-label={ariaLabel}
           aria-expanded={open}
           disabled={disabled}
           className={cn('w-full justify-between font-normal', !value && 'text-muted-foreground', className)}

@@ -302,7 +302,6 @@ export default function ContasReceberSection() {
       });
       if (error) throw error;
       toast.success('Conta excluída');
-      load();
       emitDataEvent('financeiro:receber');
     } catch (err: unknown) {
       console.error('[ContasReceberSection.handleDelete]', err);
@@ -363,7 +362,6 @@ export default function ContasReceberSection() {
         ? 'Conta atualizada'
         : `${createdCount} conta${createdCount > 1 ? 's' : ''} a receber criada${createdCount > 1 ? 's' : ''}`);
       handleCloseForm();
-      load();
       emitDataEvent('financeiro:receber');
       emitDataEvent('financeiro:lancamentos');
     } finally {
@@ -390,11 +388,10 @@ export default function ContasReceberSection() {
         p_expected_updated_at: recTarget.updated_at,
         p_data_recebimento: recDate,
       });
-      if (error) { toast.error(error.message); load(); return; }
+      if (error) { toast.error(error.message); void loadPage(null, null); return; }
       toast.success('Recebimento registrado + lancamento gerado');
       setRecOpen(false);
       setShowDetail(false);
-      load();
       emitDataEvent('financeiro:receber');
       emitDataEvent('financeiro:lancamentos');
     } finally {
@@ -410,10 +407,9 @@ export default function ContasReceberSection() {
     setSaving(true);
     try {
       const { error } = await supabase.rpc('_guarded_estornar_conta_receber', { p_id: target.id } as any);
-      if (error) { toast.error(error.message); load(); return; }
+      if (error) { toast.error(error.message); void loadPage(null, null); return; }
       toast.success('Recebimento estornado');
       setShowDetail(false);
-      load();
       emitDataEvent('financeiro:receber');
       emitDataEvent('financeiro:lancamentos');
     } finally {

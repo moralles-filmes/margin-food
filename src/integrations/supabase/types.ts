@@ -10,7 +10,32 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.4"
+    PostgrestVersion: "14.17"
+  }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
   public: {
     Tables: {
@@ -2916,6 +2941,583 @@ export type Database = {
             columns: ["pai_id"]
             isOneToOne: false
             referencedRelation: "fin_plano_contas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fin_presentation_agenda_items: {
+        Row: {
+          company_id: string
+          conclusion: string | null
+          created_at: string
+          created_by: string | null
+          created_by_name_snapshot: string
+          discussion_notes: string
+          id: string
+          item_type: string
+          objective: string
+          position: number
+          reference_id: string | null
+          reference_status: string | null
+          reference_type: string | null
+          reference_version: number | null
+          review_state: string
+          session_id: string
+          title: string
+          title_unaccent: string | null
+          updated_at: string
+          updated_by: string | null
+          updated_by_name_snapshot: string
+        }
+        Insert: {
+          company_id: string
+          conclusion?: string | null
+          created_at?: string
+          created_by?: string | null
+          created_by_name_snapshot: string
+          discussion_notes?: string
+          id?: string
+          item_type: string
+          objective?: string
+          position: number
+          reference_id?: string | null
+          reference_status?: string | null
+          reference_type?: string | null
+          reference_version?: number | null
+          review_state?: string
+          session_id: string
+          title: string
+          title_unaccent?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          updated_by_name_snapshot: string
+        }
+        Update: {
+          company_id?: string
+          conclusion?: string | null
+          created_at?: string
+          created_by?: string | null
+          created_by_name_snapshot?: string
+          discussion_notes?: string
+          id?: string
+          item_type?: string
+          objective?: string
+          position?: number
+          reference_id?: string | null
+          reference_status?: string | null
+          reference_type?: string | null
+          reference_version?: number | null
+          review_state?: string
+          session_id?: string
+          title?: string
+          title_unaccent?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          updated_by_name_snapshot?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fin_presentation_agenda_items_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fin_presentation_agenda_items_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "fin_presentation_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fin_presentation_decision_actions: {
+        Row: {
+          cancelled_at: string | null
+          company_id: string
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          created_by_name_snapshot: string
+          decision_id: string
+          description: string
+          description_unaccent: string | null
+          due_date: string | null
+          id: string
+          outcome_note: string | null
+          priority: string | null
+          responsible_name_snapshot: string
+          responsible_user_id: string | null
+          status: string
+          updated_at: string
+          updated_by: string | null
+          updated_by_name_snapshot: string
+          version: number
+        }
+        Insert: {
+          cancelled_at?: string | null
+          company_id: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          created_by_name_snapshot: string
+          decision_id: string
+          description: string
+          description_unaccent?: string | null
+          due_date?: string | null
+          id?: string
+          outcome_note?: string | null
+          priority?: string | null
+          responsible_name_snapshot: string
+          responsible_user_id?: string | null
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+          updated_by_name_snapshot: string
+          version?: number
+        }
+        Update: {
+          cancelled_at?: string | null
+          company_id?: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          created_by_name_snapshot?: string
+          decision_id?: string
+          description?: string
+          description_unaccent?: string | null
+          due_date?: string | null
+          id?: string
+          outcome_note?: string | null
+          priority?: string | null
+          responsible_name_snapshot?: string
+          responsible_user_id?: string | null
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+          updated_by_name_snapshot?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fin_presentation_decision_actions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fin_presentation_decision_actions_decision_id_fkey"
+            columns: ["decision_id"]
+            isOneToOne: false
+            referencedRelation: "fin_presentation_decisions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fin_presentation_decision_revisions: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          approved_by_name_snapshot: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          created_by_name_snapshot: string
+          decision_id: string
+          id: string
+          reference_type: string
+          revision_number: number
+          revision_reason: string
+          snapshot: Json
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          approved_by_name_snapshot?: string | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          created_by_name_snapshot: string
+          decision_id: string
+          id?: string
+          reference_type: string
+          revision_number: number
+          revision_reason: string
+          snapshot: Json
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          approved_by_name_snapshot?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          created_by_name_snapshot?: string
+          decision_id?: string
+          id?: string
+          reference_type?: string
+          revision_number?: number
+          revision_reason?: string
+          snapshot?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fin_presentation_decision_revisions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fin_presentation_decision_revisions_decision_id_fkey"
+            columns: ["decision_id"]
+            isOneToOne: false
+            referencedRelation: "fin_presentation_decisions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fin_presentation_decisions: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          approved_by_name_snapshot: string | null
+          cancelled_at: string | null
+          company_id: string
+          completed_at: string | null
+          context: string
+          created_at: string
+          created_by: string | null
+          created_by_name_snapshot: string
+          current_revision_id: string | null
+          ever_approved: boolean
+          executive_responsible_name_snapshot: string | null
+          executive_responsible_user_id: string | null
+          granularity: string
+          id: string
+          latest_justification: string | null
+          period_end_exclusive: string
+          period_start: string
+          reference_type: string
+          status: string
+          title: string
+          title_unaccent: string | null
+          updated_at: string
+          updated_by: string | null
+          updated_by_name_snapshot: string
+          version: number
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          approved_by_name_snapshot?: string | null
+          cancelled_at?: string | null
+          company_id: string
+          completed_at?: string | null
+          context: string
+          created_at?: string
+          created_by?: string | null
+          created_by_name_snapshot: string
+          current_revision_id?: string | null
+          ever_approved?: boolean
+          executive_responsible_name_snapshot?: string | null
+          executive_responsible_user_id?: string | null
+          granularity: string
+          id?: string
+          latest_justification?: string | null
+          period_end_exclusive: string
+          period_start: string
+          reference_type: string
+          status?: string
+          title: string
+          title_unaccent?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          updated_by_name_snapshot: string
+          version?: number
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          approved_by_name_snapshot?: string | null
+          cancelled_at?: string | null
+          company_id?: string
+          completed_at?: string | null
+          context?: string
+          created_at?: string
+          created_by?: string | null
+          created_by_name_snapshot?: string
+          current_revision_id?: string | null
+          ever_approved?: boolean
+          executive_responsible_name_snapshot?: string | null
+          executive_responsible_user_id?: string | null
+          granularity?: string
+          id?: string
+          latest_justification?: string | null
+          period_end_exclusive?: string
+          period_start?: string
+          reference_type?: string
+          status?: string
+          title?: string
+          title_unaccent?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          updated_by_name_snapshot?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fin_presentation_decisions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fin_presentation_decisions_current_revision_fk"
+            columns: ["current_revision_id"]
+            isOneToOne: false
+            referencedRelation: "fin_presentation_decision_revisions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fin_presentation_minutes_revisions: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          approved_by_name_snapshot: string | null
+          company_id: string
+          content: Json
+          created_at: string
+          created_by: string | null
+          created_by_name_snapshot: string
+          id: string
+          revision_number: number
+          revision_reason: string
+          session_id: string
+          state: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          approved_by_name_snapshot?: string | null
+          company_id: string
+          content: Json
+          created_at?: string
+          created_by?: string | null
+          created_by_name_snapshot: string
+          id?: string
+          revision_number: number
+          revision_reason: string
+          session_id: string
+          state?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          approved_by_name_snapshot?: string | null
+          company_id?: string
+          content?: Json
+          created_at?: string
+          created_by?: string | null
+          created_by_name_snapshot?: string
+          id?: string
+          revision_number?: number
+          revision_reason?: string
+          session_id?: string
+          state?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fin_presentation_minutes_revisions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fin_presentation_minutes_revisions_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "fin_presentation_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fin_presentation_session_participants: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          created_by_name_snapshot: string
+          email_snapshot: string | null
+          id: string
+          name_snapshot: string
+          position: number
+          session_id: string
+          user_id: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          created_by_name_snapshot: string
+          email_snapshot?: string | null
+          id?: string
+          name_snapshot: string
+          position: number
+          session_id: string
+          user_id?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          created_by_name_snapshot?: string
+          email_snapshot?: string | null
+          id?: string
+          name_snapshot?: string
+          position?: number
+          session_id?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fin_presentation_session_participants_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fin_presentation_session_participants_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "fin_presentation_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fin_presentation_sessions: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          approved_by_name_snapshot: string | null
+          cancelled_at: string | null
+          company_id: string
+          context: string
+          created_at: string
+          created_by: string | null
+          created_by_name_snapshot: string
+          current_revision_id: string | null
+          granularity: string
+          id: string
+          latest_justification: string | null
+          meeting_date: string
+          meeting_snapshot: Json | null
+          minutes_responsible_email_snapshot: string | null
+          minutes_responsible_name_snapshot: string
+          minutes_responsible_user_id: string | null
+          period_end_exclusive: string
+          period_start: string
+          previous_session_id: string | null
+          started_at: string | null
+          status: string
+          submitted_at: string | null
+          title: string
+          title_unaccent: string | null
+          updated_at: string
+          updated_by: string | null
+          updated_by_name_snapshot: string
+          version: number
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          approved_by_name_snapshot?: string | null
+          cancelled_at?: string | null
+          company_id: string
+          context?: string
+          created_at?: string
+          created_by?: string | null
+          created_by_name_snapshot: string
+          current_revision_id?: string | null
+          granularity: string
+          id?: string
+          latest_justification?: string | null
+          meeting_date: string
+          meeting_snapshot?: Json | null
+          minutes_responsible_email_snapshot?: string | null
+          minutes_responsible_name_snapshot: string
+          minutes_responsible_user_id?: string | null
+          period_end_exclusive: string
+          period_start: string
+          previous_session_id?: string | null
+          started_at?: string | null
+          status?: string
+          submitted_at?: string | null
+          title: string
+          title_unaccent?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          updated_by_name_snapshot: string
+          version?: number
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          approved_by_name_snapshot?: string | null
+          cancelled_at?: string | null
+          company_id?: string
+          context?: string
+          created_at?: string
+          created_by?: string | null
+          created_by_name_snapshot?: string
+          current_revision_id?: string | null
+          granularity?: string
+          id?: string
+          latest_justification?: string | null
+          meeting_date?: string
+          meeting_snapshot?: Json | null
+          minutes_responsible_email_snapshot?: string | null
+          minutes_responsible_name_snapshot?: string
+          minutes_responsible_user_id?: string | null
+          period_end_exclusive?: string
+          period_start?: string
+          previous_session_id?: string | null
+          started_at?: string | null
+          status?: string
+          submitted_at?: string | null
+          title?: string
+          title_unaccent?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          updated_by_name_snapshot?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fin_presentation_sessions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fin_presentation_sessions_current_revision_fk"
+            columns: ["current_revision_id"]
+            isOneToOne: false
+            referencedRelation: "fin_presentation_minutes_revisions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fin_presentation_sessions_previous_session_id_fkey"
+            columns: ["previous_session_id"]
+            isOneToOne: false
+            referencedRelation: "fin_presentation_sessions"
             referencedColumns: ["id"]
           },
         ]
@@ -8793,6 +9395,17 @@ export type Database = {
       }
     }
     Functions: {
+      _guarded_add_presentation_decision_revision: {
+        Args: {
+          p_decision_id: string
+          p_expected_status: string
+          p_expected_updated_at: string
+          p_reason: string
+          p_reference_type: string
+          p_snapshot: Json
+        }
+        Returns: Json
+      }
       _guarded_aprovar_conta_pagar: {
         Args: { p_expected_updated_at: string; p_id: string }
         Returns: Json
@@ -8830,6 +9443,46 @@ export type Database = {
           p_recorrencia?: Json
           p_supplier_id?: string
           p_valor?: number
+        }
+        Returns: Json
+      }
+      _guarded_create_presentation_decision: {
+        Args: {
+          p_context: string
+          p_executive_responsible_user_id?: string
+          p_granularity: string
+          p_period_end_exclusive: string
+          p_period_start: string
+          p_reference_type: string
+          p_snapshot: Json
+          p_title: string
+        }
+        Returns: Json
+      }
+      _guarded_create_presentation_decision_action: {
+        Args: {
+          p_decision_id: string
+          p_description: string
+          p_due_date: string
+          p_expected_decision_status: string
+          p_expected_decision_updated_at: string
+          p_priority: string
+          p_responsible_user_id: string
+        }
+        Returns: Json
+      }
+      _guarded_create_presentation_session: {
+        Args: {
+          p_agenda_items: Json
+          p_context: string
+          p_granularity: string
+          p_meeting_date: string
+          p_minutes_responsible_user_id: string
+          p_participant_user_ids: string[]
+          p_period_end_exclusive: string
+          p_period_start: string
+          p_previous_session_id: string
+          p_title: string
         }
         Returns: Json
       }
@@ -8879,6 +9532,69 @@ export type Database = {
           p_cursor_id?: string
           p_limit?: number
           p_mes?: string
+        }
+        Returns: Json
+      }
+      _guarded_save_presentation_session: {
+        Args: {
+          p_agenda_items: Json
+          p_context: string
+          p_expected_status: string
+          p_expected_updated_at: string
+          p_meeting_date: string
+          p_minutes_responsible_user_id: string
+          p_participant_user_ids: string[]
+          p_previous_session_id: string
+          p_session_id: string
+          p_title: string
+        }
+        Returns: Json
+      }
+      _guarded_start_presentation_session: {
+        Args: {
+          p_expected_status: string
+          p_expected_updated_at: string
+          p_session_id: string
+          p_snapshot: Json
+        }
+        Returns: Json
+      }
+      _guarded_submit_presentation_minutes: {
+        Args: {
+          p_expected_status: string
+          p_expected_updated_at: string
+          p_revision_reason: string
+          p_session_id: string
+        }
+        Returns: Json
+      }
+      _guarded_transition_presentation_decision: {
+        Args: {
+          p_decision_id: string
+          p_expected_status: string
+          p_expected_updated_at: string
+          p_justification: string
+          p_target_status: string
+        }
+        Returns: Json
+      }
+      _guarded_transition_presentation_decision_action: {
+        Args: {
+          p_action_id: string
+          p_expected_status: string
+          p_expected_updated_at: string
+          p_outcome_note: string
+          p_target_status: string
+        }
+        Returns: Json
+      }
+      _guarded_transition_presentation_session: {
+        Args: {
+          p_expected_status: string
+          p_expected_updated_at: string
+          p_justification: string
+          p_session_id: string
+          p_target_status: string
         }
         Returns: Json
       }
@@ -8968,6 +9684,43 @@ export type Database = {
         }
         Returns: Json
       }
+      _guarded_update_presentation_decision_action: {
+        Args: {
+          p_action_id: string
+          p_description: string
+          p_due_date: string
+          p_expected_status: string
+          p_expected_updated_at: string
+          p_priority: string
+          p_responsible_user_id: string
+        }
+        Returns: Json
+      }
+      _guarded_update_presentation_decision_draft: {
+        Args: {
+          p_context: string
+          p_decision_id: string
+          p_executive_responsible_user_id: string
+          p_expected_updated_at: string
+          p_title: string
+        }
+        Returns: Json
+      }
+      _guarded_update_reconciled_classification: {
+        Args: {
+          p_categoria_id?: string
+          p_centro_custo_id?: string
+          p_expected_updated_at?: string
+          p_id: string
+          p_justificativa_edicao?: string
+          p_observacoes?: string
+          p_rateios?: Json
+        }
+        Returns: {
+          id: string
+          updated_at: string
+        }[]
+      }
       _guarded_upsert_lancamento: {
         Args: {
           p_categoria_id?: string
@@ -8996,7 +9749,12 @@ export type Database = {
         }[]
       }
       _guarded_upsert_orcamento: {
-        Args: { p_categoria_id: string; p_mes_ano: string; p_valor: number }
+        Args: {
+          p_categoria_id: string
+          p_expected_updated_at?: string
+          p_mes_ano: string
+          p_valor: number
+        }
         Returns: Json
       }
       _planning_delete_meta_guarded: { Args: { p_id: string }; Returns: Json }
@@ -9046,6 +9804,17 @@ export type Database = {
         Args: { p_end: string; p_start: string }
         Returns: Json
       }
+      _replace_fin_presentation_session_content: {
+        Args: {
+          p_actor_name: string
+          p_actor_user_id: string
+          p_agenda_items: Json
+          p_company_id: string
+          p_participant_user_ids: string[]
+          p_session_id: string
+        }
+        Returns: Json
+      }
       _salmon_cancel_entry_guarded: {
         Args: { p_entry_id: string; p_reason?: string }
         Returns: Json
@@ -9087,6 +9856,26 @@ export type Database = {
       _simulate_relatorios_guarded: {
         Args: { p_end: string; p_params?: Json; p_start: string }
         Returns: Json
+      }
+      _validate_fin_presentation_decision_snapshot: {
+        Args: {
+          p_granularity: string
+          p_period_end_exclusive: string
+          p_period_start: string
+          p_reference_type: string
+          p_snapshot: Json
+        }
+        Returns: undefined
+      }
+      _validate_fin_presentation_meeting_snapshot: {
+        Args: {
+          p_company_id: string
+          p_granularity: string
+          p_period_end_exclusive: string
+          p_period_start: string
+          p_snapshot: Json
+        }
+        Returns: undefined
       }
       admin_checkup_suite: { Args: never; Returns: Json }
       admin_has_permission: {
@@ -9294,7 +10083,15 @@ export type Database = {
         Args: { p_company_id: string; p_entity_id: string }
         Returns: undefined
       }
+      fin_recorrencia_config_valida: {
+        Args: { p_config: Json }
+        Returns: boolean
+      }
       fin_set_limite_aprovacao: { Args: { p_valor: number }; Returns: Json }
+      fin_validate_recorrencia_config: {
+        Args: { p_config: Json }
+        Returns: Json
+      }
       finalize_inventory_atomic: {
         Args: { p_id: string; p_justificativa: string }
         Returns: Json
@@ -9399,6 +10196,69 @@ export type Database = {
           p_sem_categoria?: boolean
           p_start?: string
           p_tipo?: string
+        }
+        Returns: Json
+      }
+      get_fin_presentation_category_metadata: { Args: never; Returns: Json }
+      get_fin_presentation_decision: {
+        Args: { p_decision_id: string }
+        Returns: Json
+      }
+      get_fin_presentation_detail_rows: {
+        Args: {
+          p_category_id?: string
+          p_end_exclusive: string
+          p_group?: string
+          p_kind?: string
+          p_nature?: string
+          p_page?: number
+          p_page_size?: number
+          p_start: string
+        }
+        Returns: Json
+      }
+      get_fin_presentation_detail_series: {
+        Args: {
+          p_category_id?: string
+          p_end_exclusive: string
+          p_granularity?: string
+          p_group?: string
+          p_nature?: string
+          p_start: string
+        }
+        Returns: Json
+      }
+      get_fin_presentation_minutes_export: {
+        Args: { p_session_id: string }
+        Returns: Json
+      }
+      get_fin_presentation_plan: {
+        Args: {
+          p_category_group?: string
+          p_category_id?: string
+          p_category_nature?: string
+          p_end_exclusive: string
+          p_granularity?: string
+          p_page?: number
+          p_page_size?: number
+          p_start: string
+        }
+        Returns: Json
+      }
+      get_fin_presentation_session: {
+        Args: { p_session_id: string }
+        Returns: Json
+      }
+      get_fin_presentation_socios: {
+        Args: {
+          p_end_exclusive: string
+          p_granularity?: string
+          p_previous_end_exclusive: string
+          p_previous_start: string
+          p_previous_year_end_exclusive: string
+          p_previous_year_start: string
+          p_ranking_limit?: number
+          p_start: string
         }
         Returns: Json
       }
@@ -9647,6 +10507,32 @@ export type Database = {
             }
             Returns: Json
           }
+      list_fin_presentation_decisions: {
+        Args: {
+          p_due_filter?: string
+          p_page?: number
+          p_page_size?: number
+          p_period_end_exclusive?: string
+          p_period_start?: string
+          p_responsible_user_id?: string
+          p_search?: string
+          p_status?: string
+        }
+        Returns: Json
+      }
+      list_fin_presentation_sessions: {
+        Args: {
+          p_page?: number
+          p_page_size?: number
+          p_participant_user_id?: string
+          p_period_end_exclusive?: string
+          p_period_start?: string
+          p_responsible_user_id?: string
+          p_search?: string
+          p_status?: string
+        }
+        Returns: Json
+      }
       list_movimentacoes_cursor: {
         Args: {
           p_categoria?: string
@@ -9932,10 +10818,6 @@ export type Database = {
         }
         Returns: Json
       }
-      reconcile_reconsiderar_ignorada: {
-        Args: { p_ignorada_id: string }
-        Returns: Json
-      }
       reconcile_import_lancamento: {
         Args: {
           p_conta_id: string
@@ -9983,6 +10865,10 @@ export type Database = {
           p_user_id: string
           p_valor_extrato?: number
         }
+        Returns: Json
+      }
+      reconcile_reconsiderar_ignorada: {
+        Args: { p_ignorada_id: string }
         Returns: Json
       }
       refresh_materialized_views: { Args: never; Returns: Json }
@@ -10319,6 +11205,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       app_role: [

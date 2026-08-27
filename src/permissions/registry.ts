@@ -450,7 +450,12 @@ export const MODULE_MANIFESTS: ModuleManifest[] = [
         { action: 'delete', label: 'Excluir Regra' },
         { action: 'manage', label: 'Aplicar Categorização' },
       ]},
-      { key: 'relatorio-socios', label: 'Relatório Sócios', actions: VIEW_EXPORT },
+      { key: 'relatorio-socios', label: 'Relatório Sócios', actions: [
+        ...VIEW_EXPORT,
+        { action: 'manage', label: 'Gerenciar decisões e ações' },
+        { action: 'approve', label: 'Aprovar e encerrar decisões' },
+        { action: 'simulate', label: 'Simular cenários' },
+      ] },
       { key: 'projecao', label: 'Projeção', actions: VIEW_EXPORT },
       { key: 'kpis', label: 'KPIs', actions: VIEW_EXPORT },
       { key: 'auditoria', label: 'Auditoria', actions: VIEW_EXPORT },

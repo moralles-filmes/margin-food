@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
 import { usePersistedTab } from '@/hooks/usePersistedTab';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useCan, useModuleAccess } from '@/permissions';
@@ -23,7 +24,7 @@ const ConciliacaoBancariaSection = lazy(() => import('@/components/financeiro/Co
 import AlertasSection from '@/components/financeiro/AlertasSection';
 import RecorrenciasSection from '@/components/financeiro/RecorrenciasSection';
 import CategorizacaoSection from '@/components/financeiro/CategorizacaoSection';
-const RelatorioSociosSection = lazy(() => import('@/components/financeiro/RelatorioSociosSection'));
+const RelatorioSociosWorkspace = lazy(() => import('@/components/financeiro/RelatorioSociosWorkspace'));
 const ProjecaoFluxoSection = lazy(() => import('@/components/financeiro/ProjecaoFluxoSection'));
 const KPIsSection = lazy(() => import('@/components/financeiro/KPIsSection'));
 const AuditoriaFinSection = lazy(() => import('@/components/financeiro/AuditoriaFinSection'));
@@ -163,6 +164,21 @@ export default function FinanceiroView() {
   const [fluxoDateFrom, setFluxoDateFrom] = useState<string | undefined>(undefined);
   const [fluxoDateTo, setFluxoDateTo] = useState<string | undefined>(undefined);
   const { visibleSubtabs } = useModuleAccess('financeiro');
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (location.pathname.startsWith('/financeiro/relatorio-socios')) {
+      setActiveTab('relatorio_socios');
+    }
+  }, [location.pathname, setActiveTab]);
+
+  const handleTabSelect = useCallback((tab: FinSubTab) => {
+    if (tab !== 'relatorio_socios' && location.pathname.startsWith('/financeiro/relatorio-socios')) {
+      navigate('/');
+    }
+    setActiveTab(tab);
+  }, [location.pathname, navigate, setActiveTab]);
 
   // Contas a Pagar pending count
   const [pagarPendingCount, setPagarPendingCount] = useState(0);
@@ -271,7 +287,7 @@ export default function FinanceiroView() {
         {groupedTabs.some(g => g.group === 'dashboard') && (
           <button
             type="button"
-            onClick={() => setActiveTab('dashboard')}
+            onClick={() => handleTabSelect('dashboard')}
             className={cn(
               'flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium',
               effectiveTab === 'dashboard'
@@ -292,7 +308,7 @@ export default function FinanceiroView() {
               key={group}
               items={groupTabs}
               value={effectiveTab}
-              onChange={v => setActiveTab(v as FinSubTab)}
+              onChange={v => handleTabSelect(v as FinSubTab)}
               groupLabel={meta.label ?? undefined}
               groupIcon={GROUP_ICONS[group]}
             />
@@ -314,7 +330,7 @@ export default function FinanceiroView() {
       {effectiveTab === 'alertas' && <AlertasSection onNavigate={(t) => setActiveTab(t as FinSubTab)} />}
       {effectiveTab === 'recorrencias' && <RecorrenciasSection onNavigate={(t) => setActiveTab(t as FinSubTab)} />}
       {effectiveTab === 'categorizacao' && <CategorizacaoSection />}
-      {effectiveTab === 'relatorio_socios' && <Suspense fallback={<FinSpinner />}><RelatorioSociosSection /></Suspense>}
+      {effectiveTab === 'relatorio_socios' && <Suspense fallback={<FinSpinner />}><RelatorioSociosWorkspace /></Suspense>}
       {effectiveTab === 'projecao' && <Suspense fallback={<FinSpinner />}><ProjecaoFluxoSection /></Suspense>}
       {effectiveTab === 'kpis' && <Suspense fallback={<FinSpinner />}><KPIsSection /></Suspense>}
       {effectiveTab === 'auditoria' && <Suspense fallback={<FinSpinner />}><AuditoriaFinSection /></Suspense>}

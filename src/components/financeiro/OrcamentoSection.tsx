@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { fmtBRL, formatInBR, formatDecimalBR } from '@/lib/formatters';
+import { fmtBRL, formatInBR } from '@/lib/formatters';
 import { BRLInput } from '@/components/ui/brl-input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -102,7 +102,14 @@ export default function OrcamentoSection() {
     try {
       const [execRes, catRes] = await Promise.all([
         supabase.rpc('orcamento_execucao_mensal', { p_mes: mesAtual }),
-        supabase.from('fin_categorias').select('id, nome, tipo').eq('ativo', true).eq('tipo', 'despesa').order('nome'),
+        supabase
+          .from('fin_categorias')
+          .select('id, nome, tipo')
+          .eq('ativo', true)
+          .eq('excluir_dos_totais', false)
+          .in('tipo', ['despesa', 'receita'])
+          .order('tipo')
+          .order('nome'),
       ]);
 
       if (execRes.error) throw execRes.error;
@@ -149,6 +156,9 @@ export default function OrcamentoSection() {
         p_categoria_id: catId,
         p_mes_ano: mesAtual,
         p_valor: form.valor_orcado,
+        p_expected_updated_at: editingId
+          ? items.find(item => item.id === editingId)?.updated_at
+          : undefined,
       });
       if (error) throw error;
       toast.success(editingId ? 'Orçamento atualizado' : 'Orçamento criado');
@@ -156,9 +166,17 @@ export default function OrcamentoSection() {
       setEditingId(null);
       setForm({ categoria_id: '', valor_orcado: 0 });
       emitDataEvent('financeiro:orcamento');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      if (err?.message?.includes('23505') || err?.code === '23505') {
+      const errorShape = typeof err === 'object' && err !== null
+        ? err as { code?: unknown; message?: unknown }
+        : {};
+      const message = typeof errorShape.message === 'string' ? errorShape.message : '';
+      if (message.includes('OPTIMISTIC_LOCK')) {
+        toast.error('Este orçamento foi alterado por outra pessoa. Recarregue e tente novamente.');
+      } else if (message.includes('ORCAMENTO_HIERARQUIA_CONFLITANTE')) {
+        toast.error('Defina o orçamento no pai ou nos filhos, nunca nos dois no mesmo mês.');
+      } else if (message.includes('23505') || errorShape.code === '23505') {
         toast.error('Já existe orçamento para esta categoria neste mês');
       } else {
         toast.error('Erro ao salvar orçamento');
@@ -230,9 +248,12 @@ export default function OrcamentoSection() {
   };
 
   // ── Totals ──
-  const totalOrcado = items.reduce((s, c) => s + c.valorOrcado, 0);
-  const totalRealizado = items.reduce((s, c) => s + c.valorRealizado, 0);
-  const pctGlobal = totalOrcado > 0 ? formatDecimalBR((totalRealizado / totalOrcado) * 100, 1) : '—';
+  const revenueItems = items.filter(item => item.categoriaTipo === 'receita');
+  const expenseItems = items.filter(item => item.categoriaTipo === 'despesa');
+  const totalRevenueBudget = revenueItems.reduce((sum, item) => sum + item.valorOrcado, 0);
+  const totalRevenueActual = revenueItems.reduce((sum, item) => sum + item.valorRealizado, 0);
+  const totalExpenseBudget = expenseItems.reduce((sum, item) => sum + item.valorOrcado, 0);
+  const totalExpenseActual = expenseItems.reduce((sum, item) => sum + item.valorRealizado, 0);
 
   const fmt = fmtBRL;
 
@@ -250,17 +271,21 @@ export default function OrcamentoSection() {
     doc.setFontSize(16);
     doc.text('Orçamento vs Realizado', w / 2, 18, { align: 'center' });
     doc.setFontSize(10);
-    doc.text(`Período: ${formatMonthBR(mesAtual)}  |  Orçado: ${fmt(totalOrcado)}  |  Realizado: ${fmt(totalRealizado)}  |  Execução: ${pctGlobal}%`, w / 2, 26, { align: 'center' });
+    doc.text(`Período: ${formatMonthBR(mesAtual)}  |  Regime de competência`, w / 2, 26, { align: 'center' });
+    doc.text(`Receita: ${fmt(totalRevenueActual)} / ${fmt(totalRevenueBudget)}  |  Despesa: ${fmt(totalExpenseActual)} / ${fmt(totalExpenseBudget)} (realizado / orçado)`, w / 2, 31, { align: 'center' });
 
     autoTable(doc, {
-      startY: 34,
-      head: [['Categoria', 'Orçado', 'Realizado', '% Exec.', 'Status', 'Excedido']],
+      startY: 38,
+      head: [['Tipo', 'Categoria', 'Orçado', 'Realizado', '% Exec.', 'Status', 'Desvio']],
       body: items.map(i => [
+        i.categoriaTipo === 'receita' ? 'Receita' : 'Despesa',
         i.categoriaNome,
         fmt(i.valorOrcado),
         fmt(i.valorRealizado),
         `${i.pctExecucao}%`,
-        i.statusExecucao === 'estourado' ? 'ESTOURADO' : i.statusExecucao === 'alerta' ? 'ALERTA' : 'OK',
+        i.statusExecucao === 'estourado'
+          ? i.categoriaTipo === 'receita' ? 'ABAIXO DA META' : 'ESTOURADO'
+          : i.statusExecucao === 'alerta' ? 'ATENÇÃO' : 'EM LINHA',
         i.valorExcedido > 0 ? fmt(i.valorExcedido) : '—',
       ]),
       theme: 'striped',
@@ -276,20 +301,24 @@ export default function OrcamentoSection() {
     if (items.length === 0) return;
     const wb = XLSX.utils.book_new();
     const rows = [
-      ['Categoria', 'Orçado', 'Realizado', '% Execução', 'Status', 'Excedido'],
+      ['Tipo', 'Categoria', 'Orçado', 'Realizado', '% Execução', 'Status', 'Desvio desfavorável'],
       ...items.map(i => [
+        i.categoriaTipo === 'receita' ? 'Receita' : 'Despesa',
         i.categoriaNome,
         i.valorOrcado,
         i.valorRealizado,
         `${i.pctExecucao}%`,
-        i.statusExecucao === 'estourado' ? 'ESTOURADO' : i.statusExecucao === 'alerta' ? 'ALERTA' : 'OK',
+        i.statusExecucao === 'estourado'
+          ? i.categoriaTipo === 'receita' ? 'ABAIXO DA META' : 'ESTOURADO'
+          : i.statusExecucao === 'alerta' ? 'ATENÇÃO' : 'EM LINHA',
         i.valorExcedido > 0 ? i.valorExcedido : 0,
       ]),
       [],
-      ['TOTAL', totalOrcado, totalRealizado, `${pctGlobal}%`, '', ''],
+      ['Receita operacional', '', totalRevenueBudget, totalRevenueActual, '', '', ''],
+      ['Despesa operacional', '', totalExpenseBudget, totalExpenseActual, '', '', ''],
     ];
     const ws = XLSX.utils.aoa_to_sheet(rows);
-    ws['!cols'] = [{ wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 15 }];
+    ws['!cols'] = [{ wch: 12 }, { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 12 }, { wch: 18 }, { wch: 18 }];
     XLSX.utils.book_append_sheet(wb, ws, 'Orçamento');
     XLSX.writeFile(wb, `orcamento-${mesAtual}.xlsx`);
     toast.success('Excel gerado');
@@ -307,7 +336,7 @@ export default function OrcamentoSection() {
         <div>
           <h2 className="text-xl font-bold text-foreground">Orçamento vs Realizado</h2>
           <p className="text-sm text-muted-foreground">
-            Despesas por competência • Orçado: {fmt(totalOrcado)} | Realizado: {fmt(totalRealizado)} | Exec: {pctGlobal}%
+            Competência • Receita {fmt(totalRevenueActual)} / {fmt(totalRevenueBudget)} • Despesa {fmt(totalExpenseActual)} / {fmt(totalExpenseBudget)} (realizado / orçado)
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -349,7 +378,7 @@ export default function OrcamentoSection() {
         <Card><CardContent className="p-8 text-center text-muted-foreground">
           <Target className="w-10 h-10 mx-auto mb-3 opacity-30" />
           <p className="font-medium">Nenhum orçamento definido para {formatMonthBR(mesAtual)}.</p>
-          <p className="text-sm">Clique em "Novo" para definir metas por categoria de despesa.</p>
+          <p className="text-sm">Clique em "Novo" para definir metas por categoria operacional.</p>
         </CardContent></Card>
       ) : (
         <div className="space-y-3">
@@ -364,6 +393,7 @@ export default function OrcamentoSection() {
                     {item.statusExecucao === 'estourado' && <AlertTriangle className="w-4 h-4 text-destructive" />}
                     {item.statusExecucao === 'alerta' && <AlertTriangle className="w-4 h-4 text-warning" />}
                     <span className="font-medium">{item.categoriaNome}</span>
+                    <span className="text-xs text-muted-foreground">{item.categoriaTipo === 'receita' ? 'Receita' : 'Despesa'}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className={`text-sm font-bold ${
@@ -389,7 +419,9 @@ export default function OrcamentoSection() {
                   <span>Realizado: {fmt(item.valorRealizado)}</span>
                   <span>Orçado: {fmt(item.valorOrcado)}</span>
                   {item.statusExecucao === 'estourado' && (
-                    <span className="text-destructive font-medium">Excedido em {fmt(item.valorExcedido)}</span>
+                    <span className="text-destructive font-medium">
+                      {item.categoriaTipo === 'receita' ? 'Abaixo da meta em ' : 'Excedido em '}{fmt(item.valorExcedido)}
+                    </span>
                   )}
                 </div>
               </CardContent>
@@ -406,7 +438,7 @@ export default function OrcamentoSection() {
           </DialogHeader>
           <div className="space-y-3">
             <div>
-              <Label>Categoria de Despesa</Label>
+              <Label>Categoria operacional</Label>
               {editingId ? (
                 <p className="text-sm font-medium mt-1">{items.find(i => i.id === editingId)?.categoriaNome}</p>
               ) : (
@@ -414,7 +446,9 @@ export default function OrcamentoSection() {
                   <SelectTrigger><SelectValue placeholder="Selecione uma categoria" /></SelectTrigger>
                   <SelectContent>
                     {categoriasDisponiveis.map(c => (
-                      <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.tipo === 'receita' ? 'Receita' : 'Despesa'} — {c.nome}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
