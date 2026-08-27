@@ -346,7 +346,6 @@ export default function ContasPagarSection() {
       });
       if (error) throw error;
       toast.success('Conta excluída');
-      load();
       emitDataEvent('financeiro:pagar');
     } catch (err: unknown) {
       console.error('[ContasPagarSection.handleDelete]', err);
@@ -419,7 +418,6 @@ export default function ContasPagarSection() {
           : `${createdCount} conta${createdCount > 1 ? 's' : ''} a pagar criada${createdCount > 1 ? 's' : ''}`;
       toast.success(statusMsg);
       handleCloseForm();
-      load();
       emitDataEvent('financeiro:pagar');
     } finally {
       setSaving(false);
@@ -436,10 +434,9 @@ export default function ContasPagarSection() {
         p_id: target.id,
         p_expected_updated_at: target.updated_at,
       } as any);
-      if (error) { toast.error(error.message); load(); return; }
+      if (error) { toast.error(error.message); void loadPage(null, null); return; }
       toast.success('Aprovado');
       setShowDetail(false);
-      load();
       emitDataEvent('financeiro:pagar');
     } finally {
       setSaving(false);
@@ -489,13 +486,12 @@ export default function ContasPagarSection() {
       if (error) {
         console.error('[ContasPagarSection.confirmarPagamento]', error);
         toast.error(mapPagamentoError(error));
-        load();
+        void loadPage(null, null);
         return;
       }
       toast.success('Pagamento registrado + lancamento gerado');
       setPayOpen(false);
       setShowDetail(false);
-      load();
       emitDataEvent('financeiro:pagar');
       emitDataEvent('financeiro:lancamentos');
       emitDataEvent('financeiro:conciliacao');
@@ -512,10 +508,9 @@ export default function ContasPagarSection() {
     setSaving(true);
     try {
       const { error } = await supabase.rpc('_guarded_estornar_conta_pagar', { p_id: target.id } as any);
-      if (error) { toast.error(error.message); load(); return; }
+      if (error) { toast.error(error.message); void loadPage(null, null); return; }
       toast.success('Pagamento estornado');
       setShowDetail(false);
-      load();
       emitDataEvent('financeiro:pagar');
       emitDataEvent('financeiro:lancamentos');
     } finally {
