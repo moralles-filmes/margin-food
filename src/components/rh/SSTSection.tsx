@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DateInput } from '@/components/ui/DateInput';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -41,10 +42,10 @@ const TIPOS_EXAME = [
   { value: 'demissional', label: 'Demissional' },
 ];
 const GRAVIDADES = [
-  { value: 'leve', label: 'Leve', color: 'bg-warning/10 text-warning' },
-  { value: 'moderado', label: 'Moderado', color: 'bg-warning/20 text-warning' },
-  { value: 'grave', label: 'Grave', color: 'bg-destructive/10 text-destructive' },
-  { value: 'fatal', label: 'Fatal', color: 'bg-destructive/20 text-destructive' },
+  { value: 'leve', label: 'Leve', color: 'bg-warning-soft text-warning' },
+  { value: 'moderado', label: 'Moderado', color: 'bg-warning-soft text-warning border border-warning-border' },
+  { value: 'grave', label: 'Grave', color: 'bg-destructive-soft text-destructive' },
+  { value: 'fatal', label: 'Fatal', color: 'bg-destructive-soft text-destructive border border-destructive-border' },
 ];
 
 const R = (v: number) => formatIntegerBR(v);
@@ -206,8 +207,8 @@ function EpisTab({ epis, colaboradores, canManage, user, getColabNome, onRefresh
                 </div>
                 <div className="grid grid-cols-3 gap-3">
                   <div><Label className="text-xs">CA Nº</Label><Input className="h-8 text-xs" value={form.ca_numero} onChange={e => setForm(p => ({ ...p, ca_numero: e.target.value }))} /></div>
-                  <div><Label className="text-xs">Data Entrega</Label><Input type="date" className="h-8 text-xs" value={form.data_entrega} onChange={e => setForm(p => ({ ...p, data_entrega: e.target.value }))} /></div>
-                  <div><Label className="text-xs">Validade</Label><Input type="date" className="h-8 text-xs" value={form.data_validade} onChange={e => setForm(p => ({ ...p, data_validade: e.target.value }))} /></div>
+                  <div><Label className="text-xs">Data Entrega</Label><DateInput className="h-8 text-xs" value={form.data_entrega} onValueChange={v => setForm(p => ({ ...p, data_entrega: v }))} /></div>
+                  <div><Label className="text-xs">Validade</Label><DateInput className="h-8 text-xs" value={form.data_validade} onValueChange={v => setForm(p => ({ ...p, data_validade: v }))} /></div>
                 </div>
                 <div><Label className="text-xs">Qtd</Label><Input type="number" className="h-8 text-xs w-20" value={form.quantidade || ''} onChange={e => setForm(p => ({ ...p, quantidade: Number(e.target.value) }))} /></div>
                 <Button onClick={handleSave} className="w-full">Registrar</Button>
@@ -347,8 +348,8 @@ function ExamesTab({ exames, colaboradores, canManage, user, getColabNome, onRef
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <div><Label className="text-xs">Data Realização</Label><Input type="date" className="h-8 text-xs" value={form.data_realizacao} onChange={e => setForm(p => ({ ...p, data_realizacao: e.target.value }))} /></div>
-                  <div><Label className="text-xs">Vencimento</Label><Input type="date" className="h-8 text-xs" value={form.data_vencimento} onChange={e => setForm(p => ({ ...p, data_vencimento: e.target.value }))} /></div>
+                  <div><Label className="text-xs">Data Realização</Label><DateInput className="h-8 text-xs" value={form.data_realizacao} onValueChange={v => setForm(p => ({ ...p, data_realizacao: v }))} /></div>
+                  <div><Label className="text-xs">Vencimento</Label><DateInput className="h-8 text-xs" value={form.data_vencimento} onValueChange={v => setForm(p => ({ ...p, data_vencimento: v }))} /></div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div><Label className="text-xs">Clínica</Label><Input className="h-8 text-xs" value={form.clinica} onChange={e => setForm(p => ({ ...p, clinica: e.target.value }))} /></div>
@@ -494,7 +495,7 @@ function IncidentesTab({ incidentes, colaboradores, canManage, user, getColabNom
                       <SelectContent>{GRAVIDADES.map(g => <SelectItem key={g.value} value={g.value}>{g.label}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
-                  <div><Label className="text-xs">Data</Label><Input type="date" className="h-8 text-xs" value={form.data_ocorrencia} onChange={e => setForm(p => ({ ...p, data_ocorrencia: e.target.value }))} /></div>
+                  <div><Label className="text-xs">Data</Label><DateInput className="h-8 text-xs" value={form.data_ocorrencia} onValueChange={v => setForm(p => ({ ...p, data_ocorrencia: v }))} /></div>
                   <div><Label className="text-xs">Local</Label><Input className="h-8 text-xs" value={form.local} onChange={e => setForm(p => ({ ...p, local: e.target.value }))} /></div>
                 </div>
                 <div><Label className="text-xs">Descrição *</Label><Textarea className="text-xs" rows={2} value={form.descricao} onChange={e => setForm(p => ({ ...p, descricao: e.target.value }))} /></div>
@@ -523,7 +524,7 @@ function IncidentesTab({ incidentes, colaboradores, canManage, user, getColabNom
               {incidentes.map((i: any) => {
                 const grav = GRAVIDADES.find(g => g.value === i.gravidade);
                 return (
-                  <Card key={i.id} className={cn("border-l-4", i.gravidade === 'grave' || i.gravidade === 'fatal' ? "border-l-destructive" : i.gravidade === 'moderado' ? "border-l-warning" : "border-l-warning/50")}>
+                  <Card key={i.id} className={cn("border-l-4", i.gravidade === 'grave' || i.gravidade === 'fatal' ? "border-l-destructive" : i.gravidade === 'moderado' ? "border-l-warning" : "border-l-warning-border")}>
                     <CardContent className="py-3">
                       <div className="flex items-start justify-between gap-2">
                         <div className="space-y-1 flex-1">

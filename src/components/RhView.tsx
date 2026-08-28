@@ -11,8 +11,8 @@ import { fmtBRL, formatDateBR, formatInBR, normalizeBRLMoneyToNumber, todayBR } 
 import { formatDateBR as formatDateISO } from '@/lib/datetime';
 
 const COLORS = [
-  'hsl(var(--primary))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))',
-  'hsl(var(--chart-4))', 'hsl(var(--chart-5))', 'hsl(var(--accent))',
+  'hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))',
+  'hsl(var(--chart-4))', 'hsl(var(--chart-5))', 'hsl(var(--chart-6))',
 ];
 
 function fmt(v: number) {
@@ -29,12 +29,11 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { DatePicker } from '@/components/ui/DatePicker';
+import { DateInput } from '@/components/ui/DateInput';
 import { Switch } from '@/components/ui/switch';
-import { UserPlus, Clock, Timer, Users, Play, Square, Coffee, CheckCircle2, Calendar as CalendarIcon2, Edit2, CalendarDays, GraduationCap, Palmtree, FileText, XCircle, UserX, CalendarIcon, Calculator } from 'lucide-react';
+import { UserPlus, Clock, Timer, Users, Play, Square, Coffee, CheckCircle2, Calendar as CalendarIcon2, Edit2, CalendarDays, GraduationCap, Palmtree, FileText, XCircle, UserX, Calculator } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import EscalasSection from '@/components/rh/EscalasSection';
 import TarefasSection from '@/components/rh/TarefasSection';
@@ -549,7 +548,7 @@ function RhViewInner({ visibleSubtabs, user }: {
       <div className="grid grid-cols-2 gap-3">
         <div>
           <Label>Data Admissão</Label>
-          <Input type="date" value={form.data_admissao} onChange={e => setForm(p => ({ ...p, data_admissao: e.target.value }))} />
+          <DateInput value={form.data_admissao} onValueChange={v => setForm(p => ({ ...p, data_admissao: v }))} />
         </div>
         <div>
           <Label>Vincular Usuário (opcional)</Label>
@@ -624,6 +623,8 @@ function RhViewInner({ visibleSubtabs, user }: {
                           </Badge>
                         </TableCell>
                         <TableCell>
+                          {/* Ativar/Desativar alterna ícone+ação conforme status — não é um par edit/delete,
+                              mantido manual (TableActions não cobre toggle de estado 1:1). */}
                           <div className="flex gap-1">
                             {(canEditProntuario || canManageProntuario) && (
                               <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleOpenEdit(c)}>
@@ -673,7 +674,7 @@ function RhViewInner({ visibleSubtabs, user }: {
         {effectiveSubTab === 'ponto' && <div className="space-y-4 mt-4">
           {/* My quick punch */}
           {myColaboradorId && isToday && canPonto && (
-            <Card className="bg-primary/5 border-primary/20">
+            <Card className="bg-primary-soft border-primary-border">
               <CardContent className="py-3">
                 <p className="text-xs font-medium mb-2">Registrar Ponto</p>
                 <div className="flex flex-wrap gap-2">
@@ -697,17 +698,11 @@ function RhViewInner({ visibleSubtabs, user }: {
           {/* Date filter */}
           <div className="flex items-center gap-2">
             <Label className="text-xs">Data:</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className="h-8 text-xs gap-1">
-                  <CalendarIcon className="w-3.5 h-3.5" />
-                  {formatDateBR(pontoDate)}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar mode="single" selected={pontoDate} onSelect={d => d && setPontoDate(d)} locale={ptBR} className="p-3 pointer-events-auto" />
-              </PopoverContent>
-            </Popover>
+            <DatePicker
+              date={pontoDate}
+              onDateChange={d => d && setPontoDate(d)}
+              className="h-8 w-auto text-xs gap-1"
+            />
           </div>
 
           {/* Ponto table */}
@@ -743,6 +738,8 @@ function RhViewInner({ visibleSubtabs, user }: {
                           </Badge>
                         </TableCell>
                         <TableCell>
+                          {/* Editar/Aprovar/Rejeitar é um fluxo de 3 ações, não o par edit/delete de
+                              TableActions — mantido manual. */}
                           <div className="flex gap-1">
                             {canManagePonto && !p.aprovado && (
                               <>

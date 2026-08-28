@@ -139,10 +139,10 @@ function NivelTable({ tipo, tipoLabel, tipoIcon, componentes, canCreate, canEdit
   return (
     <div className="space-y-4">
       {/* Header info */}
-      <Card className="border-primary/20 bg-primary/5">
+      <Card className="border-primary-border bg-primary-soft">
         <CardContent className="p-4">
           <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary flex-shrink-0">{tipoIcon}</div>
+            <div className="w-10 h-10 rounded-lg bg-primary-soft flex items-center justify-center text-primary-ink flex-shrink-0">{tipoIcon}</div>
             <div className="flex-1 min-w-0">
               <h3 className="font-semibold text-foreground text-sm">{tipoLabel}</h3>
               <p className="text-xs text-muted-foreground mt-0.5">{descriptions[tipo]}</p>
@@ -182,7 +182,7 @@ function NivelTable({ tipo, tipoLabel, tipoIcon, componentes, canCreate, canEdit
               {filtered.length === 0 ? (
                 <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Nenhum {tipoLabel.toLowerCase()} encontrado</TableCell></TableRow>
               ) : filtered.map(c => (
-                <TableRow key={c.id} className="cursor-pointer hover:bg-muted/50" onClick={() => onDetalhe(c.id)}>
+                <TableRow key={c.id} className="cursor-pointer hover:bg-surface-hover" onClick={() => onDetalhe(c.id)}>
                   <TableCell className="font-medium">{c.nome}</TableCell>
                   <TableCell className="text-muted-foreground">{c.categoria}</TableCell>
                   <TableCell className="text-right">{c.rendimento} {c.unidade_rendimento}</TableCell>
@@ -706,7 +706,7 @@ function ComponenteFormDialog({ open, onClose, componente, forcedTipo, component
 
         <div className="space-y-4">
           {/* Hierarchy info banner */}
-          <div className="bg-muted/50 rounded-lg p-3 text-xs space-y-1">
+          <div className="bg-background-subtle rounded-lg p-3 text-xs space-y-1">
             <p className="font-semibold text-foreground">📐 Regras de composição — {labels.title}</p>
             {form.tipo === 'PRE_PREPARO' && <p className="text-muted-foreground">✔ Insumos e outros pré-preparos. ❌ Itens prontos e produtos finais.</p>}
             {form.tipo === 'ITEM_PRONTO' && <p className="text-muted-foreground">✔ Insumos, pré-preparos e salmão. ❌ Produtos finais.</p>}
@@ -731,7 +731,7 @@ function ComponenteFormDialog({ open, onClose, componente, forcedTipo, component
           <div><Label>Nome</Label><Input value={form.nome} onChange={e => setForm(f => ({ ...f, nome: e.target.value }))} placeholder={form.tipo === 'PRE_PREPARO' ? 'Ex: Gohan pronto, Molho tarê...' : form.tipo === 'ITEM_PRONTO' ? 'Ex: Nigiri salmão, Jyo...' : 'Ex: Combinado 20 peças, Combo casal...'} /></div>
 
           <div className="grid grid-cols-3 gap-3">
-            <div><Label>{labels.rendLabel}</Label><Input type="text" inputMode="decimal" value={form.rendimento} onChange={e => setForm(f => ({ ...f, rendimento: e.target.value.replace(/[^0-9.,]/g, '') }))} /></div>
+            <div><Label>{labels.rendLabel}</Label><DecimalInput value={form.rendimento} onValueChange={raw => setForm(f => ({ ...f, rendimento: raw }))} maxDecimals={3} /></div>
             <div>
               <Label>Unidade</Label>
               <Select value={form.unidade_rendimento} onValueChange={v => setForm(f => ({ ...f, unidade_rendimento: v }))}>
@@ -745,13 +745,13 @@ function ComponenteFormDialog({ open, onClose, componente, forcedTipo, component
                 </SelectContent>
               </Select>
             </div>
-            <div><Label>Perda %</Label><Input type="text" inputMode="decimal" value={form.perda_estimada_percent} onChange={e => setForm(f => ({ ...f, perda_estimada_percent: e.target.value.replace(/[^0-9.,]/g, '') }))} /></div>
+            <div><Label>Perda %</Label><DecimalInput value={form.perda_estimada_percent} onValueChange={raw => setForm(f => ({ ...f, perda_estimada_percent: raw }))} maxDecimals={2} suffix="%" /></div>
           </div>
 
           <div className="grid grid-cols-3 gap-3">
             <div><Label>Custo indireto (R$)</Label><CurrencyInput value={form.custo_indireto} onValueChange={(raw) => setForm(f => ({ ...f, custo_indireto: raw }))} showPrefix maxDecimals={2} /></div>
-            <div><Label>Peso/un (g)</Label><Input type="text" inputMode="decimal" value={form.peso_por_unidade} onChange={e => setForm(f => ({ ...f, peso_por_unidade: e.target.value.replace(/[^0-9.,]/g, '') }))} placeholder="Opcional" /></div>
-            <div><Label>Tempo (min)</Label><Input type="text" inputMode="decimal" value={form.tempo_preparo_min} onChange={e => setForm(f => ({ ...f, tempo_preparo_min: e.target.value.replace(/[^0-9.,]/g, '') }))} placeholder="Opcional" /></div>
+            <div><Label>Peso/un (g)</Label><DecimalInput value={form.peso_por_unidade} onValueChange={raw => setForm(f => ({ ...f, peso_por_unidade: raw }))} maxDecimals={2} placeholder="Opcional" /></div>
+            <div><Label>Tempo (min)</Label><DecimalInput value={form.tempo_preparo_min} onValueChange={raw => setForm(f => ({ ...f, tempo_preparo_min: raw }))} maxDecimals={2} placeholder="Opcional" /></div>
           </div>
 
           {/* BOM */}
@@ -808,7 +808,7 @@ function ComponenteFormDialog({ open, onClose, componente, forcedTipo, component
                 </TableHeader>
                 <TableBody>
                   {bomItens.map((item, idx) => (
-                    <TableRow key={idx} className={item.isSalmao ? 'bg-primary/5' : ''}>
+                    <TableRow key={idx} className={item.isSalmao ? 'bg-primary-soft' : ''}>
                       <TableCell className="text-xs font-medium">
                         {item.nome}
                         {item.isSalmao && <Badge variant="outline" className="ml-1 text-[9px] px-1">SALMÃO</Badge>}
@@ -938,6 +938,23 @@ function CanalFormDialog({ open, onClose, canal, onSaved }: {
 }
 
 // ============================================================
+// MINI STAT - small stat block reused inside dialogs (Detalhe, Simulador)
+// ============================================================
+function MiniStat({ value, label, tone = 'neutral' }: { value: React.ReactNode; label: string; tone?: 'neutral' | 'success' | 'destructive' }) {
+  const toneClasses: Record<string, string> = {
+    neutral: 'bg-background-subtle text-foreground',
+    success: 'bg-success-soft text-success',
+    destructive: 'bg-destructive-soft text-destructive',
+  };
+  return (
+    <div className={`rounded-lg p-3 text-center ${toneClasses[tone]}`}>
+      <p className="text-lg font-bold">{value}</p>
+      <p className="text-[10px] text-muted-foreground">{label}</p>
+    </div>
+  );
+}
+
+// ============================================================
 // DETALHE DIALOG
 // ============================================================
 function DetalheDialog({ open, onClose, componente, itens, custo }: {
@@ -957,22 +974,13 @@ function DetalheDialog({ open, onClose, componente, itens, custo }: {
 
         <div className="space-y-4">
           <div className="grid grid-cols-3 gap-3">
-            <div className="bg-muted/50 rounded-lg p-3 text-center">
-              <p className="text-lg font-bold text-foreground">{R$(custo?.custoUnitario || 0)}</p>
-              <p className="text-[10px] text-muted-foreground">Custo unitário</p>
-            </div>
-            <div className="bg-muted/50 rounded-lg p-3 text-center">
-              <p className="text-lg font-bold text-foreground">{R$(custo?.custoTotal || 0)}</p>
-              <p className="text-[10px] text-muted-foreground">Custo total</p>
-            </div>
-            <div className="bg-muted/50 rounded-lg p-3 text-center">
-              <p className="text-lg font-bold text-foreground">{qty(rendLiq, 1)} {componente.unidade_rendimento}</p>
-              <p className="text-[10px] text-muted-foreground">Rendimento líq.</p>
-            </div>
+            <MiniStat value={R$(custo?.custoUnitario || 0)} label="Custo unitário" />
+            <MiniStat value={R$(custo?.custoTotal || 0)} label="Custo total" />
+            <MiniStat value={`${qty(rendLiq, 1)} ${componente.unidade_rendimento}`} label="Rendimento líq." />
           </div>
 
           {(custo?.custoSalmao || 0) > 0 && (
-            <div className="bg-primary/5 border border-primary/10 rounded-lg p-3 flex items-center gap-4">
+            <div className="bg-primary-soft border border-primary-border rounded-lg p-3 flex items-center gap-4">
               <Fish className="w-5 h-5 text-primary flex-shrink-0" />
               <div className="flex-1">
                 <p className="text-xs font-semibold text-foreground">Impacto do Salmão</p>
@@ -997,7 +1005,7 @@ function DetalheDialog({ open, onClose, componente, itens, custo }: {
               </TableHeader>
               <TableBody>
                 {(custo?.detalhes || []).map((d: any, idx: number) => (
-                  <TableRow key={idx} className={d.isSalmao ? 'bg-primary/5' : ''}>
+                  <TableRow key={idx} className={d.isSalmao ? 'bg-primary-soft' : ''}>
                     <TableCell className="text-xs">
                       {d.nome}
                       {d.isSalmao && <Badge variant="outline" className="ml-1 text-[9px] px-1">SALMÃO</Badge>}
@@ -1077,7 +1085,7 @@ function PrecificacaoDialog({ open, onClose, componente, canais, onSaved }: {
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader><DialogTitle>Precificação: {componente.nome}</DialogTitle></DialogHeader>
         <div className="space-y-4">
-          <div className="bg-muted/50 rounded-lg p-3 flex gap-6 text-sm">
+          <div className="bg-background-subtle rounded-lg p-3 flex gap-6 text-sm">
             <span>Custo: <strong>{R$(componente.custo_unitario_calculado)}</strong></span>
             <span>Meta margem 30%: <strong>{metaMarkup(30)}</strong></span>
             <span>Meta margem 40%: <strong>{metaMarkup(40)}</strong></span>
@@ -1172,7 +1180,7 @@ function SimuladorDialog({ open, onClose, componente, canais }: {
               <Slider value={[ajustePorc]} onValueChange={v => setAjustePorc(v[0])} min={-20} max={20} step={1} />
               <p className="text-xs text-center text-muted-foreground mt-1">{ajustePorc > 0 ? '+' : ''}{ajustePorc}g</p></div>
             <div><Label className="text-xs">Volume mensal (vendas)</Label>
-              <Input type="text" inputMode="decimal" value={volumeMensal} onChange={e => setVolumeMensal(e.target.value.replace(/[^0-9.,]/g, ''))} /></div>
+              <DecimalInput value={volumeMensal} onValueChange={raw => setVolumeMensal(raw)} maxDecimals={0} /></div>
           </div>
           <div><Label className="text-xs">Preço final override (R$)</Label>
             <CurrencyInput value={precoFinal} onValueChange={(raw) => setPrecoFinal(raw)} showPrefix maxDecimals={2} placeholder="Deixe vazio para usar preço atual" /></div>
@@ -1182,15 +1190,9 @@ function SimuladorDialog({ open, onClose, componente, canais }: {
           {resultado && (
             <div className="space-y-3">
               <div className="grid grid-cols-3 gap-3">
-                <div className="bg-muted/50 rounded-lg p-3 text-center">
-                  <p className="text-lg font-bold text-foreground">{R$(resultado.custoOriginal)}</p>
-                  <p className="text-[10px] text-muted-foreground">Custo original</p></div>
-                <div className="bg-muted/50 rounded-lg p-3 text-center">
-                  <p className="text-lg font-bold text-foreground">{R$(resultado.novoCusto)}</p>
-                  <p className="text-[10px] text-muted-foreground">Novo custo</p></div>
-                <div className={`rounded-lg p-3 text-center ${resultado.economia >= 0 ? 'bg-success/10' : 'bg-destructive/10'}`}>
-                  <p className={`text-lg font-bold ${resultado.economia >= 0 ? 'text-success' : 'text-destructive'}`}>{R$(resultado.economia)}</p>
-                  <p className="text-[10px] text-muted-foreground">Economia/un</p></div>
+                <MiniStat value={R$(resultado.custoOriginal)} label="Custo original" />
+                <MiniStat value={R$(resultado.novoCusto)} label="Novo custo" />
+                <MiniStat value={R$(resultado.economia)} label="Economia/un" tone={resultado.economia >= 0 ? 'success' : 'destructive'} />
               </div>
               {resultado.resultadoCanais?.length > 0 && (
                 <Table>
@@ -1238,21 +1240,21 @@ function AnaliseTab({ componentes }: { componentes: Componente[] }) {
   return (
     <div className="space-y-4">
       {/* Hierarchy overview */}
-      <Card className="border-primary/20">
+      <Card className="border-primary-border">
         <CardHeader className="pb-2"><CardTitle className="text-sm">Hierarquia da Ficha Técnica</CardTitle></CardHeader>
         <CardContent>
           <div className="flex items-center gap-3 text-xs">
-            <div className="flex items-center gap-1 bg-muted/50 rounded-lg px-3 py-2">
+            <div className="flex items-center gap-1 bg-background-subtle rounded-lg px-3 py-2">
               <ChefHat className="w-4 h-4 text-primary" />
               <span className="font-medium">{prePreparos.length} Pré-Preparos</span>
             </div>
             <ArrowRight className="w-4 h-4 text-muted-foreground" />
-            <div className="flex items-center gap-1 bg-muted/50 rounded-lg px-3 py-2">
+            <div className="flex items-center gap-1 bg-background-subtle rounded-lg px-3 py-2">
               <Layers className="w-4 h-4 text-primary" />
               <span className="font-medium">{itensProntos.length} Itens Prontos</span>
             </div>
             <ArrowRight className="w-4 h-4 text-muted-foreground" />
-            <div className="flex items-center gap-1 bg-muted/50 rounded-lg px-3 py-2">
+            <div className="flex items-center gap-1 bg-background-subtle rounded-lg px-3 py-2">
               <ShoppingBag className="w-4 h-4 text-primary" />
               <span className="font-medium">{produtosFinais.length} Produtos Finais</span>
             </div>
@@ -1309,22 +1311,22 @@ function MarkupExplicacao() {
           <CardDescription>Entenda os conceitos de CMV, margem e markup para precificar corretamente</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 text-sm">
-          <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+          <div className="bg-background-subtle rounded-lg p-4 space-y-2">
             <h4 className="font-semibold text-foreground">CMV (Custo da Mercadoria Vendida)</h4>
             <p className="text-muted-foreground">CMV% = (Custo ÷ Preço de Venda) × 100</p>
             <p className="text-xs text-muted-foreground">Ex: Custo R$15 / Preço R$50 = CMV 30%</p>
           </div>
-          <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+          <div className="bg-background-subtle rounded-lg p-4 space-y-2">
             <h4 className="font-semibold text-foreground">Margem Bruta</h4>
             <p className="text-muted-foreground">Margem% = 100 - CMV%</p>
             <p className="text-xs text-muted-foreground">Ex: 100 - 30 = 70% de margem bruta</p>
           </div>
-          <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+          <div className="bg-background-subtle rounded-lg p-4 space-y-2">
             <h4 className="font-semibold text-foreground">Markup</h4>
             <p className="text-muted-foreground">Markup = Preço de Venda ÷ Custo</p>
             <p className="text-xs text-muted-foreground">Ex: R$50 ÷ R$15 = 3.33x</p>
           </div>
-          <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 space-y-2">
+          <div className="bg-primary-soft border border-primary-border rounded-lg p-4 space-y-2">
             <h4 className="font-semibold text-foreground">💡 Precificação por Meta de Margem</h4>
             <p className="text-muted-foreground">Preço Sugerido = Custo ÷ (1 - Margem Desejada)</p>
             <p className="text-xs text-muted-foreground">Ex: Para margem de 70%: R$15 ÷ (1 - 0.70) = R$50,00</p>
@@ -1370,7 +1372,7 @@ function SalmonConfigDialog({ open, onClose, salmonRef, isAdmin, onSaved }: {
 
         <div className="space-y-4">
           {/* Current status */}
-          <div className="bg-muted/50 rounded-lg p-4 space-y-2 text-sm">
+          <div className="bg-background-subtle rounded-lg p-4 space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Preço atual em uso:</span>
               <span className="font-bold text-foreground">{salmonRef.preco > 0 ? R$(salmonRef.preco) + '/kg' : 'Não definido'}</span>
@@ -1388,7 +1390,7 @@ function SalmonConfigDialog({ open, onClose, salmonRef, isAdmin, onSaved }: {
 
           {/* Auto price info */}
           {salmonRef.preco_auto > 0 && (
-            <div className="bg-primary/5 rounded-lg p-3 text-xs">
+            <div className="bg-primary-soft rounded-lg p-3 text-xs">
               <p className="font-semibold text-foreground">📦 Preço automático (lote mais recente)</p>
               <p className="text-muted-foreground mt-1">{R$(salmonRef.preco_auto)}/kg limpo</p>
               <p className="text-[10px] text-muted-foreground mt-0.5">Atualizado automaticamente quando há lotes no módulo de salmão</p>
@@ -1410,7 +1412,7 @@ function SalmonConfigDialog({ open, onClose, salmonRef, isAdmin, onSaved }: {
           </div>
 
           {/* Explanation */}
-          <div className="bg-muted/50 rounded-lg p-3 text-xs space-y-1">
+          <div className="bg-background-subtle rounded-lg p-3 text-xs space-y-1">
             <p className="font-semibold text-foreground">ℹ️ Como funciona</p>
             <p className="text-muted-foreground">1. O sistema usa o preço do <strong>lote mais recente</strong> do módulo de salmão (preço/kg limpo)</p>
             <p className="text-muted-foreground">2. Se não houver lote, usa o <strong>preço manual</strong> definido aqui</p>

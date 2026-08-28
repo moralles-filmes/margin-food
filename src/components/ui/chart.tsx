@@ -2,6 +2,7 @@ import * as React from "react";
 import * as RechartsPrimitive from "recharts";
 
 import { cn } from "@/lib/utils";
+import { formatDecimalBR } from "@/lib/formatters";
 
 // Format: { THEME_NAME: CSS_SELECTOR }
 const THEMES = { light: "", dark: ".dark" } as const;
@@ -45,7 +46,7 @@ const ChartContainer = React.forwardRef<
         data-chart={chartId}
         ref={ref}
         className={cn(
-          "flex aspect-video justify-center text-xs [&_.recharts-cartesian-axis-tick_text]:fill-muted-foreground [&_.recharts-cartesian-grid_line[stroke='#ccc']]:stroke-border/50 [&_.recharts-curve.recharts-tooltip-cursor]:stroke-border [&_.recharts-dot[stroke='#fff']]:stroke-transparent [&_.recharts-layer]:outline-none [&_.recharts-polar-grid_[stroke='#ccc']]:stroke-border [&_.recharts-radial-bar-background-sector]:fill-muted [&_.recharts-rectangle.recharts-tooltip-cursor]:fill-muted [&_.recharts-reference-line_[stroke='#ccc']]:stroke-border [&_.recharts-sector[stroke='#fff']]:stroke-transparent [&_.recharts-sector]:outline-none [&_.recharts-surface]:outline-none",
+          "flex aspect-video justify-center text-xs [&_.recharts-cartesian-axis-tick_text]:fill-chart-label [&_.recharts-cartesian-grid_line[stroke='#ccc']]:stroke-chart-grid [&_.recharts-curve.recharts-tooltip-cursor]:stroke-chart-cursor [&_.recharts-dot[stroke='#fff']]:stroke-transparent [&_.recharts-layer]:outline-none [&_.recharts-polar-grid_[stroke='#ccc']]:stroke-chart-grid [&_.recharts-radial-bar-background-sector]:fill-muted [&_.recharts-rectangle.recharts-tooltip-cursor]:fill-chart-cursor [&_.recharts-reference-line_[stroke='#ccc']]:stroke-chart-grid [&_.recharts-sector[stroke='#fff']]:stroke-transparent [&_.recharts-sector]:outline-none [&_.recharts-surface]:outline-none",
           className,
         )}
         {...props}
@@ -175,7 +176,7 @@ const ChartTooltipContent = React.forwardRef<
       <div
         ref={ref}
         className={cn(
-          "grid min-w-[8rem] items-start gap-1.5 rounded-lg border border-border/50 bg-background px-2.5 py-1.5 text-xs shadow-xl",
+          "grid min-w-[8rem] items-start gap-1.5 rounded-lg border border-chart-tooltip-border bg-chart-tooltip px-2.5 py-1.5 text-xs text-chart-tooltip-foreground shadow-md",
           className,
         )}
       >
@@ -228,9 +229,9 @@ const ChartTooltipContent = React.forwardRef<
                         {nestLabel ? tooltipLabel : null}
                         <span className="text-muted-foreground">{itemConfig?.label || item.name}</span>
                       </div>
-                      {item.value && (
-                        <span className="font-mono font-medium tabular-nums text-foreground">
-                          {item.value.toLocaleString()}
+                      {item.value != null && (
+                        <span className="font-mono font-medium tabular-nums text-chart-tooltip-foreground">
+                          {typeof item.value === "number" ? formatDecimalBR(item.value) : item.value}
                         </span>
                       )}
                     </div>

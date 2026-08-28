@@ -10,6 +10,18 @@ import { formatDateBR, formatInBR } from '@/lib/datetime';
 import { fmtBRL, formatDecimalBR } from '@/lib/formatters';
 import { toast } from 'sonner';
 import { AlertTriangle } from 'lucide-react';
+import {
+  axisProps,
+  gridProps,
+  tooltipProps,
+  legendProps,
+  SERIES_COLORS,
+  SEMANTIC_CHART_COLORS,
+  chartValueFormatters,
+  makeActiveDot,
+} from '@/lib/chartTheme';
+import { ChartTooltip } from '@/components/ui/ChartTooltip';
+import { ChartLegend } from '@/components/ui/ChartLegend';
 
 import { useCan } from '@/permissions/hooks';
 // ── Types ──
@@ -32,25 +44,8 @@ interface ChartsData {
   despesas_por_categoria: CategoriaItem[];
 }
 
-// Use CSS custom properties for theme-aware colors
-const CHART_COLORS = [
-  'hsl(var(--success))',
-  'hsl(var(--destructive))',
-  'hsl(var(--primary))',
-  'hsl(var(--warning, 45 93% 47%))',
-  'hsl(var(--accent))',
-  'hsl(var(--muted-foreground))',
-];
-
-// Theme-aware categorical palette (gold-centric, no dominant blue)
-const PIE_COLORS = [
-  'hsl(var(--primary))',
-  'hsl(var(--info))',
-  'hsl(var(--warning))',
-  'hsl(var(--gold-light))',
-  'hsl(var(--success))',
-  'hsl(var(--destructive))',
-];
+// Paleta categórica centralizada — ver src/lib/chartTheme.ts
+const PIE_COLORS = SERIES_COLORS;
 
 export default function DashboardCharts() {
   const canViewRbac = useCan('financeiro:dashboard:view');
@@ -169,13 +164,13 @@ export default function DashboardCharts() {
           <CardContent>
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={evolucao_mensal}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-border/30" />
-                <XAxis dataKey="mesLabel" fontSize={11} />
-                <YAxis fontSize={11} tickFormatter={v => `${formatDecimalBR(v / 1000, 0)}k`} />
-                <Tooltip formatter={(v: number) => fmt(v)} />
-                <Legend />
-                <Bar dataKey="receitas" name="Receitas" fill="hsl(var(--success))" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="despesas" name="Despesas" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
+                <CartesianGrid {...gridProps} />
+                <XAxis dataKey="mesLabel" {...axisProps} />
+                <YAxis {...axisProps} tickFormatter={chartValueFormatters.moneyCompact} />
+                <Tooltip {...tooltipProps} content={<ChartTooltip valueFormatter={v => fmt(Number(v))} />} />
+                <Legend {...legendProps} content={<ChartLegend />} />
+                <Bar dataKey="receitas" name="Receitas" fill={SEMANTIC_CHART_COLORS.positive} radius={[4, 4, 0, 0]} />
+                <Bar dataKey="despesas" name="Despesas" fill={SEMANTIC_CHART_COLORS.negative} radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -186,11 +181,11 @@ export default function DashboardCharts() {
           <CardContent>
             <ResponsiveContainer width="100%" height={260}>
               <LineChart data={evolucao_mensal}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-border/30" />
-                <XAxis dataKey="mesLabel" fontSize={11} />
-                <YAxis fontSize={11} tickFormatter={v => `${formatDecimalBR(v / 1000, 0)}k`} />
-                <Tooltip formatter={(v: number) => fmt(v)} />
-                <Line type="monotone" dataKey="resultado" name="Resultado" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 4 }} />
+                <CartesianGrid {...gridProps} />
+                <XAxis dataKey="mesLabel" {...axisProps} />
+                <YAxis {...axisProps} tickFormatter={chartValueFormatters.moneyCompact} />
+                <Tooltip {...tooltipProps} content={<ChartTooltip valueFormatter={v => fmt(Number(v))} />} />
+                <Line type="monotone" dataKey="resultado" name="Resultado" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 4 }} activeDot={makeActiveDot('hsl(var(--primary))')} />
               </LineChart>
             </ResponsiveContainer>
           </CardContent>
@@ -208,7 +203,7 @@ export default function DashboardCharts() {
                     <Pie data={despesas_por_categoria} dataKey="valor" nameKey="nome" cx="50%" cy="50%" outerRadius={90} label={(props) => { const { nome, percent } = props as unknown as { nome: string; percent: number }; return `${String(nome).slice(0, 15)} ${formatDecimalBR(percent * 100, 0)}%`; }} labelLine={false} fontSize={10}>
                       {despesas_por_categoria.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
                     </Pie>
-                    <Tooltip formatter={(v: number) => fmt(v)} />
+                    <Tooltip content={<ChartTooltip valueFormatter={v => fmt(Number(v))} />} />
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="space-y-1.5">

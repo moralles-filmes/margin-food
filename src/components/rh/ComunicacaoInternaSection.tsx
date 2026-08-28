@@ -5,13 +5,15 @@ import { toast } from 'sonner';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DateInput } from '@/components/ui/DateInput';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Megaphone, Plus, Pin, Trash2, Edit2, AlertTriangle, Info, Bell, Star, Calendar } from 'lucide-react';
+import TableActions from '@/components/ui/TableActions';
+import { Megaphone, Plus, Pin, AlertTriangle, Info, Bell, Star, Calendar } from 'lucide-react';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -238,7 +240,7 @@ export default function ComunicacaoInternaSection({
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label className="text-xs">Expiração (opcional)</Label>
-                    <Input type="date" className="h-8 text-xs" value={form.data_expiracao} onChange={e => setForm(p => ({ ...p, data_expiracao: e.target.value }))} />
+                    <DateInput className="h-8 text-xs" value={form.data_expiracao} onValueChange={v => setForm(p => ({ ...p, data_expiracao: v }))} />
                   </div>
                   <div className="flex items-end pb-1">
                     <label className="flex items-center gap-2 text-xs">
@@ -293,8 +295,8 @@ function ComunicadoCard({ comunicado: c, canManage, onEdit, onDelete, onTogglePi
   return (
     <Card className={cn(
       "transition-shadow hover:shadow-md",
-      c.fixado && "border-primary/30 bg-primary/5",
-      c.prioridade === 'urgente' && "border-destructive/40",
+      c.fixado && "border-primary-border bg-primary-soft",
+      c.prioridade === 'urgente' && "border-destructive-border",
       expirado && "opacity-60",
     )}>
       <CardContent className="py-3">
@@ -325,16 +327,17 @@ function ComunicadoCard({ comunicado: c, canManage, onEdit, onDelete, onTogglePi
             </div>
           </div>
           {canManage && (
-            <div className="flex gap-1 shrink-0">
+            <div className="flex items-center gap-1 shrink-0">
+              {/* Fixar/Desfixar alterna estado (não é edit/delete) — mantido manual. */}
               <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onTogglePin(c.id, c.fixado)} title={c.fixado ? 'Desfixar' : 'Fixar'}>
                 <Pin className={cn("w-3 h-3", c.fixado && "text-primary")} />
               </Button>
-              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onEdit(c)}>
-                <Edit2 className="w-3 h-3" />
-              </Button>
-              <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => onDelete(c.id)}>
-                <Trash2 className="w-3 h-3" />
-              </Button>
+              <TableActions
+                onEdit={() => onEdit(c)}
+                onDelete={() => onDelete(c.id)}
+                deleteConfirmTitle="Remover comunicado"
+                deleteConfirmDescription="Tem certeza que deseja remover este comunicado do mural?"
+              />
             </div>
           )}
         </div>

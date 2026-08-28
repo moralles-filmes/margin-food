@@ -12,7 +12,9 @@ import { formatInBR, fmtBRL, formatPercentBR, formatDecimalBR } from '@/lib/form
 import { subMonths } from 'date-fns';
 import { RefreshCw, ArrowRight, Equal, FileDown, Ban, AlertTriangle } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { fmtBRLCompact } from '@/lib/money';
+import { axisProps, gridProps, tooltipProps, legendProps, SERIES_COLORS, chartValueFormatters } from '@/lib/chartTheme';
+import { ChartTooltip } from '@/components/ui/ChartTooltip';
+import { ChartLegend } from '@/components/ui/ChartLegend';
 import { useCan } from '@/permissions/hooks';
 import { useDataEvent } from '@/lib/dataEvents';
 import * as XLSX from '@/lib/safeXlsx';
@@ -346,13 +348,13 @@ export default function ComparativoSection() {
                 <h3 className="font-semibold mb-3">Comparativo Visual</h3>
                 <ResponsiveContainer width="100%" height={250}>
                   <BarChart data={data.grafico}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                    <XAxis dataKey="indicador" tick={{ fontSize: 11 }} />
-                    <YAxis tick={{ fontSize: 10 }} tickFormatter={fmtBRLCompact} />
-                    <Tooltip formatter={(val: number) => fmt(val)} />
-                    <Legend />
-                    <Bar dataKey="periodo_a" name={mesALabel} fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="periodo_b" name={mesBLabel} fill="hsl(var(--primary) / 0.4)" radius={[4, 4, 0, 0]} />
+                    <CartesianGrid {...gridProps} />
+                    <XAxis dataKey="indicador" {...axisProps} />
+                    <YAxis {...axisProps} tickFormatter={chartValueFormatters.moneyCompact} />
+                    <Tooltip {...tooltipProps} content={<ChartTooltip valueFormatter={val => fmt(Number(val))} />} />
+                    <Legend {...legendProps} content={<ChartLegend />} />
+                    <Bar dataKey="periodo_a" name={mesALabel} fill={SERIES_COLORS[0]} radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="periodo_b" name={mesBLabel} fill={SERIES_COLORS[1]} radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>

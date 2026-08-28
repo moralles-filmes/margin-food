@@ -193,7 +193,7 @@ export default function QuickInventorySection() {
   if (saved && saveResult) {
     return (
       <div className="space-y-4">
-        <div className="bg-card border border-success/30 rounded-xl p-8 text-center animate-fade-up">
+        <div className="bg-card border border-success-border rounded-xl p-8 text-center animate-fade-up">
           <CheckCircle className="w-12 h-12 text-success mx-auto mb-3" />
           <h3 className="text-lg font-bold text-foreground mb-1">Inventário Rápido Registrado!</h3>
           <p className="text-xs text-muted-foreground mb-4">Contagem salva com sucesso e ajustes aplicados automaticamente.</p>
@@ -275,7 +275,7 @@ export default function QuickInventorySection() {
             {searchResults.map(p => (
               <button
                 key={p.id}
-                className="w-full flex items-center justify-between px-3 py-2 text-xs hover:bg-secondary/50 transition-colors text-left"
+                className="w-full flex items-center justify-between px-3 py-2 text-xs hover:bg-surface-hover transition-colors text-left"
                 onClick={() => addToCount(p)}
               >
                 <div className="flex items-center gap-2">
@@ -296,7 +296,7 @@ export default function QuickInventorySection() {
       {/* Counted Items */}
       {countedItems.length > 0 && (
         <div className="bg-card border border-border rounded-xl overflow-hidden">
-          <div className="px-4 py-2 bg-secondary/50 border-b border-border">
+          <div className="px-4 py-2 bg-background-subtle border-b border-border">
             <p className="text-xs font-medium text-foreground">
               {countedItems.length} produto(s) na contagem
               {validItems.length > 0 && (
@@ -336,7 +336,7 @@ export default function QuickInventorySection() {
                     <span className="text-[10px] text-muted-foreground w-6">{item.unidadeMedida}</span>
 
                     {hasDiff && (
-                      <Badge className={`text-[9px] px-1.5 h-5 ${diff > 0 ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
+                      <Badge className={`text-[9px] px-1.5 h-5 ${diff > 0 ? 'bg-success-soft text-success border-success-border' : 'bg-destructive-soft text-destructive border-destructive-border'}`}>
                         {diff > 0 ? '+' : ''}{formatFixedBR(diff, 2)}
                       </Badge>
                     )}
@@ -353,7 +353,7 @@ export default function QuickInventorySection() {
 
           {/* Summary */}
           {validItems.length > 0 && (
-            <div className="px-4 py-2 bg-secondary/30 border-t border-border">
+            <div className="px-4 py-2 bg-background-subtle border-t border-border">
               <div className="flex items-center gap-4 text-[10px] text-muted-foreground">
                 {(() => {
                   const diffs = validItems.filter(i => Number(i.countedQty) !== i.saldoTeorico);

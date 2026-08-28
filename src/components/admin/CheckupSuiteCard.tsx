@@ -45,7 +45,7 @@ function SectionRow({ title, status, children }: { title: string; status: string
   return (
     <div className="border border-border rounded-lg">
       <button
-        className="w-full flex items-center justify-between p-3 text-left hover:bg-muted/30 transition-colors"
+        className="w-full flex items-center justify-between p-3 text-left hover:bg-surface-hover transition-colors"
         onClick={() => setOpen(!open)}
       >
         <div className="flex items-center gap-2">
@@ -315,7 +315,7 @@ export default function CheckupSuiteCard() {
           <Stethoscope className="w-4 h-4" /> Checkup Suite
           {overallStatus && (
             <span className={`ml-2 text-xs px-2 py-0.5 rounded-full font-medium ${
-              overallStatus === 'ALL PASS' ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'
+              overallStatus === 'ALL PASS' ? 'bg-success-soft text-success' : 'bg-destructive-soft text-destructive'
             }`}>
               {overallStatus}
             </span>

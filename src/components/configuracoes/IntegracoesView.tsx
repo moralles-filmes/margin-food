@@ -96,7 +96,7 @@ export default function IntegracoesView() {
           <p className="text-sm font-semibold text-foreground flex items-center gap-2">
             <MessageCircle className="w-4 h-4 text-success" /> WhatsApp (Z-API)
           </p>
-          <span className={`text-[10px] px-2 py-0.5 rounded-full inline-flex items-center gap-1 ${zapiConnected ? 'bg-success/15 text-success' : 'bg-muted text-muted-foreground'}`}>
+          <span className={`text-[10px] px-2 py-0.5 rounded-full inline-flex items-center gap-1 ${zapiConnected ? 'bg-success-soft text-success' : 'bg-muted text-muted-foreground'}`}>
             <ShieldCheck className="w-3 h-3" /> {zapiConnected ? 'Conectada' : 'Não configurada'}
           </span>
         </div>
@@ -139,7 +139,7 @@ export default function IntegracoesView() {
             <Switch checked={zapiAtivo} onCheckedChange={setZapiAtivo} disabled={!canManage} /> Integração ativa
           </label>
           {canManage && (
-            <Button size="sm" className="gradient-salmon text-primary-foreground border-0 gap-1.5 h-8 text-xs" onClick={handleSaveZapi} disabled={savingZapi}>
+            <Button size="sm" className="gap-1.5 h-8 text-xs" onClick={handleSaveZapi} disabled={savingZapi}>
               <Save className="w-3.5 h-3.5" /> {savingZapi ? 'Salvando…' : 'Salvar Z-API'}
             </Button>
           )}
@@ -156,7 +156,7 @@ export default function IntegracoesView() {
           <p className="text-sm font-semibold text-foreground flex items-center gap-2">
             <Bot className="w-4 h-4 text-primary" /> Inteligência Artificial
           </p>
-          <span className={`text-[10px] px-2 py-0.5 rounded-full inline-flex items-center gap-1 ${ia?.has_api_key && ia?.ativo ? 'bg-success/15 text-success' : 'bg-muted text-muted-foreground'}`}>
+          <span className={`text-[10px] px-2 py-0.5 rounded-full inline-flex items-center gap-1 ${ia?.has_api_key && ia?.ativo ? 'bg-success-soft text-success' : 'bg-muted text-muted-foreground'}`}>
             <ShieldCheck className="w-3 h-3" /> {ia?.has_api_key ? 'Chave salva' : 'Sem chave'}
           </span>
         </div>
@@ -195,7 +195,7 @@ export default function IntegracoesView() {
             <Switch checked={iaAtivo} onCheckedChange={setIaAtivo} disabled={!canManage} /> IA ativa
           </label>
           {canManage && (
-            <Button size="sm" className="gradient-salmon text-primary-foreground border-0 gap-1.5 h-8 text-xs" onClick={handleSaveIa} disabled={savingIa}>
+            <Button size="sm" className="gap-1.5 h-8 text-xs" onClick={handleSaveIa} disabled={savingIa}>
               <Save className="w-3.5 h-3.5" /> {savingIa ? 'Salvando…' : 'Salvar IA'}
             </Button>
           )}

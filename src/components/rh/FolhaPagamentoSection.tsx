@@ -2,13 +2,14 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import KpiCard from '@/components/ui/KpiCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Calculator, DollarSign, TrendingUp, TrendingDown, CheckCircle2, ChevronRight } from 'lucide-react';
+import { Calculator, DollarSign, TrendingUp, TrendingDown, CheckCircle2, ChevronRight, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatInBR } from '@/lib/datetime';
 import { formatFixedBR } from '@/lib/formatters';
@@ -295,7 +296,7 @@ export default function FolhaPagamentoSection({
         </div>
 
         {/* Líquido */}
-        <Card className="bg-primary/5 border-primary/20">
+        <Card className="bg-primary-soft border-primary-border">
           <CardContent className="py-4">
             <div className="flex items-center justify-between">
               <span className="text-sm font-semibold">Salário Líquido</span>
@@ -330,30 +331,10 @@ export default function FolhaPagamentoSection({
     <div className="space-y-4">
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="text-xs">Total Proventos</CardDescription>
-            <CardTitle className="text-lg text-success">R$ {R(totalProventos)}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="text-xs">Total Descontos</CardDescription>
-            <CardTitle className="text-lg text-destructive">R$ {R(totalDescontos)}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="text-xs">Total Líquido</CardDescription>
-            <CardTitle className="text-lg text-primary">R$ {R(totalLiquido)}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="text-xs">Folhas</CardDescription>
-            <CardTitle className="text-lg">{folhas.length} <span className="text-xs font-normal text-muted-foreground">/ {colaboradores.length}</span></CardTitle>
-          </CardHeader>
-        </Card>
+        <KpiCard label="Total Proventos" value={`R$ ${R(totalProventos)}`} icon={TrendingUp} variant="success" />
+        <KpiCard label="Total Descontos" value={`R$ ${R(totalDescontos)}`} icon={TrendingDown} variant="danger" />
+        <KpiCard label="Total Líquido" value={`R$ ${R(totalLiquido)}`} icon={DollarSign} variant="primary" />
+        <KpiCard label="Folhas" value={folhas.length} sub={`/ ${colaboradores.length} colaboradores`} icon={Users} />
       </div>
 
       {/* Controls */}
@@ -402,7 +383,7 @@ export default function FolhaPagamentoSection({
                   {folhas.map(f => {
                     const status = STATUS_CONFIG[f.status] || STATUS_CONFIG.RASCUNHO;
                     return (
-                      <TableRow key={f.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setSelectedFolha(f)}>
+                      <TableRow key={f.id} className="cursor-pointer hover:bg-surface-hover" onClick={() => setSelectedFolha(f)}>
                         <TableCell className="text-xs font-medium">{getColabNome(f.colaborador_id)}</TableCell>
                         <TableCell className="text-xs text-right">R$ {R(f.salario_base)}</TableCell>
                         <TableCell className="text-xs text-right text-success">R$ {R(f.total_proventos)}</TableCell>
@@ -416,7 +397,7 @@ export default function FolhaPagamentoSection({
                     );
                   })}
                   {/* Totals row */}
-                  <TableRow className="bg-muted/30 font-semibold">
+                  <TableRow className="bg-background-subtle font-semibold">
                     <TableCell className="text-xs">TOTAL ({folhas.length})</TableCell>
                     <TableCell className="text-xs text-right">—</TableCell>
                     <TableCell className="text-xs text-right text-success">R$ {R(totalProventos)}</TableCell>

@@ -80,7 +80,7 @@ export default function CustoItemDisplay({ produto: p, saldoBase, showSelector =
     return (
       <div className="space-y-0.5">
         <div className="flex items-center gap-1.5">
-          <span className="text-[9px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium">
+          <span className="text-[9px] px-1.5 py-0.5 rounded bg-primary-soft text-primary-soft-foreground font-medium">
             {getCostLabel(origin)}
           </span>
         </div>
@@ -103,18 +103,18 @@ export default function CustoItemDisplay({ produto: p, saldoBase, showSelector =
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-semibold text-foreground">📌 Custo Atual</span>
-          <span className="text-[9px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
+          <span className="text-[9px] px-2 py-0.5 rounded-full bg-primary-soft text-primary-soft-foreground font-medium">
             Origem: {getCostLabel(origin)}
           </span>
         </div>
         {p.needsCostReview && (
-          <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-warning/15 text-warning font-medium">⚠️ Revisar</span>
+          <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-warning-soft text-warning font-medium">⚠️ Revisar</span>
         )}
       </div>
 
       {/* Conversion block */}
       {showDual && (
-        <div className="bg-muted/50 rounded-lg px-3 py-2 flex items-center justify-between text-[10px]">
+        <div className="bg-background-subtle rounded-lg px-3 py-2 flex items-center justify-between text-[10px]">
           <span className="text-muted-foreground">📦 Conversão</span>
           <span className="font-semibold text-foreground">1 {unCompra} = {fator} {p.unidadeMedida}</span>
         </div>
@@ -124,7 +124,7 @@ export default function CustoItemDisplay({ produto: p, saldoBase, showSelector =
       <div className="grid gap-2">
         {/* A) Last Purchase */}
         {hasLastCost && (
-          <div className={`rounded-lg border p-2.5 space-y-1 ${viewMode === 'ultima' ? 'border-primary/30 bg-primary/5' : 'border-border bg-card'}`}>
+          <div className={`rounded-lg border p-2.5 space-y-1 ${viewMode === 'ultima' ? 'border-primary-border bg-primary-soft' : 'border-border bg-card'}`}>
             <div className="flex items-center justify-between">
               <p className="text-[10px] font-semibold text-foreground">🛒 Última Compra</p>
               {p.lastPurchaseDate && (
@@ -155,7 +155,7 @@ export default function CustoItemDisplay({ produto: p, saldoBase, showSelector =
 
         {/* B) Average 30 days */}
         {hasAvg30 && (
-          <div className={`rounded-lg border p-2.5 space-y-1 ${viewMode === 'media30' ? 'border-primary/30 bg-primary/5' : 'border-border bg-card'}`}>
+          <div className={`rounded-lg border p-2.5 space-y-1 ${viewMode === 'media30' ? 'border-primary-border bg-primary-soft' : 'border-border bg-card'}`}>
             <div className="flex items-center justify-between">
               <p className="text-[10px] font-semibold text-foreground">📊 Média 30 dias</p>
               {variation !== 0 && (
@@ -182,7 +182,7 @@ export default function CustoItemDisplay({ produto: p, saldoBase, showSelector =
 
         {/* C) Default cost */}
         {hasDefault && (
-          <div className={`rounded-lg border p-2.5 space-y-1 ${viewMode === 'padrao' ? 'border-primary/30 bg-primary/5' : 'border-border bg-card'}`}>
+          <div className={`rounded-lg border p-2.5 space-y-1 ${viewMode === 'padrao' ? 'border-primary-border bg-primary-soft' : 'border-border bg-card'}`}>
             <p className="text-[10px] font-semibold text-foreground">📋 Custo Padrão Inicial</p>
             <div className="flex items-center gap-4">
               <div>
@@ -208,7 +208,7 @@ export default function CustoItemDisplay({ produto: p, saldoBase, showSelector =
       </div>
 
       {/* Stock value */}
-      <div className="bg-muted/50 rounded-lg px-3 py-2 space-y-1">
+      <div className="bg-background-subtle rounded-lg px-3 py-2 space-y-1">
         <div className="flex items-center justify-between text-[10px]">
           <span className="text-muted-foreground">Estoque atual</span>
           <span className="font-semibold text-foreground">

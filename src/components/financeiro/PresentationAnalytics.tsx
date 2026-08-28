@@ -1,7 +1,5 @@
 import { type ReactNode, useMemo, useState } from 'react';
 import {
-  ArrowDownRight,
-  ArrowUpRight,
   Boxes,
   ChevronDown,
   ChevronRight,
@@ -11,7 +9,6 @@ import {
   Landmark,
   Lightbulb,
   Loader2,
-  Minus,
   ReceiptText,
   Scale,
   TrendingDown,
@@ -30,6 +27,18 @@ import {
   YAxis,
 } from 'recharts';
 import {
+  axisProps,
+  gridProps,
+  tooltipProps,
+  legendProps,
+  SEMANTIC_CHART_COLORS,
+  chartValueFormatters,
+  makeActiveDot,
+} from '@/lib/chartTheme';
+import { ChartTooltip } from '@/components/ui/ChartTooltip';
+import { ChartLegend } from '@/components/ui/ChartLegend';
+import KpiCard, { type KpiCardDelta, type KpiVariant } from '@/components/ui/KpiCard';
+import {
   buildPresentationDashboardInsights,
   calculatePresentationDeltas,
   calculatePresentationGroupMetric,
@@ -37,7 +46,6 @@ import {
   formatMonthPeriodPtBR,
   type CategoryCompositionNode,
   type DataAvailability,
-  type MetricDelta,
   type PresentationCategoryMetadataMap,
   type PresentationDashboardInsight,
   type PresentationMetricDeltas,
@@ -173,31 +181,17 @@ function comparisonUnavailableLabel(comparison: PresentationAnalyticsComparisonD
   return null;
 }
 
-function deltaTone(delta: MetricDelta, invertPositive: boolean): string {
-  if (delta.state === 'unavailable' || delta.value === 0) return 'text-muted-foreground';
-  const positive = invertPositive ? delta.value < 0 : delta.value > 0;
-  return positive ? 'text-success' : 'text-destructive';
-}
-
-function DeltaLine({
-  label,
-  metricKey,
-  current,
-  comparison,
-}: {
-  label: string;
-  metricKey: MetricKey;
-  current: PresentationAnalyticsSnapshot;
-  comparison: PresentationAnalyticsComparisonData;
-}) {
+/** Builds the "vs. período anterior" comparison line for KpiCard's delta slot */
+function buildExecutiveDelta(
+  metricKey: MetricKey,
+  current: PresentationAnalyticsSnapshot,
+  comparison: PresentationAnalyticsComparisonData,
+): KpiCardDelta {
+  const label = 'vs. período anterior';
   const compared = availabilityData(comparison.snapshot);
   const unavailableLabel = comparisonUnavailableLabel(comparison);
   if (!compared) {
-    return (
-      <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
-        <span>{label}</span><span>{unavailableLabel ?? 'Sem dados'}</span>
-      </div>
-    );
+    return { label, formatted: unavailableLabel ?? 'Sem dados', direction: 'none', tone: 'neutral' };
   }
 
   const delta = calculatePresentationDeltas(
@@ -205,27 +199,29 @@ function DeltaLine({
     compared.metrics.managerialResult,
   )[metricKey];
   if (delta.state === 'unavailable') {
-    return (
-      <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
-        <span>{label}</span><span>Base zero</span>
-      </div>
-    );
+    return { label, formatted: 'Base zero', direction: 'none', tone: 'neutral' };
   }
 
   const invertPositive = metricKey === 'expense';
-  const Icon = delta.value > 0 ? ArrowUpRight : delta.value < 0 ? ArrowDownRight : Minus;
+  const positive = delta.value !== 0 && (invertPositive ? delta.value < 0 : delta.value > 0);
+  const negative = delta.value !== 0 && (invertPositive ? delta.value > 0 : delta.value < 0);
   const formatted = delta.unit === 'percentage-points'
     ? `${delta.value.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} p.p.`
     : formatPercentBR(delta.value, 1);
-  return (
-    <div className="flex items-center justify-between gap-2 text-[11px]">
-      <span className="text-muted-foreground">{label}</span>
-      <span className={cn('inline-flex items-center gap-0.5 font-semibold', deltaTone(delta, invertPositive))}>
-        <Icon className="h-3 w-3" aria-hidden="true" /> {formatted}
-      </span>
-    </div>
-  );
+  return {
+    label,
+    formatted,
+    direction: delta.value > 0 ? 'up' : delta.value < 0 ? 'down' : 'flat',
+    tone: positive ? 'positive' : negative ? 'negative' : 'neutral',
+  };
 }
+
+const EXECUTIVE_TONE_TO_VARIANT: Record<MetricCardDefinition['tone'], KpiVariant> = {
+  positive: 'success',
+  negative: 'danger',
+  result: 'primary',
+  neutral: 'default',
+};
 
 function ExecutiveMetricCard({
   definition,
@@ -238,42 +234,20 @@ function ExecutiveMetricCard({
   previousPeriod: PresentationAnalyticsComparisonData;
   onSelect: (target: PresentationDetailTarget) => void;
 }) {
-  const Icon = definition.icon;
-  const toneClass = definition.tone === 'positive'
-    ? 'text-success'
-    : definition.tone === 'negative'
-      ? 'text-destructive'
-      : definition.tone === 'result'
-        ? definition.value >= 0 ? 'text-success' : 'text-destructive'
-        : 'text-foreground';
+  const variant = definition.tone === 'result'
+    ? (definition.value >= 0 ? 'success' : 'danger')
+    : EXECUTIVE_TONE_TO_VARIANT[definition.tone];
 
   return (
-    <button
-      type="button"
+    <KpiCard
+      label={definition.label}
+      value={definition.format(definition.value)}
+      icon={definition.icon}
+      variant={variant}
+      delta={buildExecutiveDelta(definition.key, current, previousPeriod)}
       onClick={() => onSelect(definition.target)}
-      className="group min-w-0 rounded-xl border border-border/80 bg-card text-left shadow-sm transition hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-      aria-label={`Ver detalhes de ${definition.label}`}
-    >
-      <div className="h-full border-l-4 border-primary px-4 py-3.5">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <p className="truncate text-xs font-medium text-muted-foreground">{definition.label}</p>
-            <p className={cn('mt-2 truncate text-xl font-bold tracking-tight', toneClass)}>
-              {definition.format(definition.value)}
-            </p>
-          </div>
-          <Icon className={cn('h-5 w-5 shrink-0 transition-transform group-hover:scale-110', toneClass)} aria-hidden="true" />
-        </div>
-        <div className="mt-3 border-t border-border/70 pt-2">
-          <DeltaLine
-            label="vs. período anterior"
-            metricKey={definition.key}
-            current={current}
-            comparison={previousPeriod}
-          />
-        </div>
-      </div>
-    </button>
+      ariaLabel={`Ver detalhes de ${definition.label}`}
+    />
   );
 }
 
@@ -290,31 +264,19 @@ function CmvMetricCard({
 }) {
   const metric = metadata ? calculatePresentationGroupMetric(snapshot, metadata, 'cmv') : null;
   return (
-    <button
-      type="button"
+    <KpiCard
+      label="CMV"
+      value={metric ? fmtBRL(metric.amount) : loading ? 'Calculando…' : 'Indisponível'}
+      icon={Boxes}
+      variant="primary"
+      sub={metric?.revenueSharePercent !== null && metric
+        ? `${formatPercentBR(metric.revenueSharePercent, 1)} da receita operacional`
+        : loading
+          ? 'Lendo classificação gerencial'
+          : 'Classificação gerencial indisponível'}
       onClick={() => onSelect('cmv')}
-      className="group min-w-0 rounded-xl border border-border/80 bg-card text-left shadow-sm transition hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-      aria-label="Ver detalhes de CMV"
-    >
-      <div className="h-full border-l-4 border-primary px-4 py-3.5">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <p className="text-xs font-medium text-muted-foreground">CMV</p>
-            <p className="mt-2 truncate text-xl font-bold tracking-tight text-foreground">
-              {metric ? fmtBRL(metric.amount) : loading ? 'Calculando…' : 'Indisponível'}
-            </p>
-          </div>
-          <Boxes className="h-5 w-5 shrink-0 text-gold-dark transition-transform group-hover:scale-110 dark:text-primary" aria-hidden="true" />
-        </div>
-        <div className="mt-3 border-t border-border/70 pt-2 text-[11px] text-muted-foreground">
-          {metric?.revenueSharePercent !== null && metric
-            ? `${formatPercentBR(metric.revenueSharePercent, 1)} da receita operacional`
-            : loading
-              ? 'Lendo classificação gerencial'
-              : 'Classificação gerencial indisponível'}
-        </div>
-      </div>
-    </button>
+      ariaLabel="Ver detalhes de CMV"
+    />
   );
 }
 
@@ -348,22 +310,14 @@ function TimeSeriesCard({ snapshot }: { snapshot: PresentationAnalyticsSnapshot 
         <div className="h-[270px] w-full" role="img" aria-label="Gráfico da evolução de receitas, despesas e resultado no período">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData} margin={{ top: 12, right: 10, left: 0, bottom: 2 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-              <XAxis dataKey="label" tick={{ fontSize: 10 }} minTickGap={22} axisLine={false} tickLine={false} />
-              <YAxis tickFormatter={fmtBRLCompact} tick={{ fontSize: 10 }} width={64} axisLine={false} tickLine={false} />
-              <Tooltip
-                formatter={(value: number) => fmtBRL(value)}
-                contentStyle={{
-                  background: 'hsl(var(--popover))',
-                  border: '1px solid hsl(var(--border))',
-                  borderRadius: '0.5rem',
-                  color: 'hsl(var(--popover-foreground))',
-                }}
-              />
-              <Legend iconType="circle" iconSize={7} wrapperStyle={{ fontSize: 11 }} />
-              <Line type="monotone" dataKey="Receita" stroke="hsl(var(--success))" strokeWidth={2.5} dot={{ r: 2.5 }} activeDot={{ r: 4 }} />
-              <Line type="monotone" dataKey="Despesa" stroke="hsl(var(--destructive))" strokeWidth={2.5} dot={{ r: 2.5 }} activeDot={{ r: 4 }} />
-              <Line type="monotone" dataKey="Resultado" stroke="hsl(var(--primary))" strokeWidth={2.25} dot={false} />
+              <CartesianGrid {...gridProps} />
+              <XAxis dataKey="label" {...axisProps} minTickGap={22} />
+              <YAxis {...axisProps} tickFormatter={chartValueFormatters.moneyCompact} width={64} />
+              <Tooltip {...tooltipProps} content={<ChartTooltip valueFormatter={value => fmtBRL(Number(value))} />} />
+              <Legend {...legendProps} content={<ChartLegend />} />
+              <Line type="monotone" dataKey="Receita" stroke={SEMANTIC_CHART_COLORS.positive} strokeWidth={2.5} dot={{ r: 2.5 }} activeDot={makeActiveDot(SEMANTIC_CHART_COLORS.positive)} />
+              <Line type="monotone" dataKey="Despesa" stroke={SEMANTIC_CHART_COLORS.negative} strokeWidth={2.5} dot={{ r: 2.5 }} activeDot={makeActiveDot(SEMANTIC_CHART_COLORS.negative)} />
+              <Line type="monotone" dataKey="Resultado" stroke="hsl(var(--primary))" strokeWidth={2.25} dot={false} activeDot={makeActiveDot('hsl(var(--primary))')} />
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -388,7 +342,7 @@ function InsightsPanel({
   const toneClass = {
     positive: 'text-success',
     negative: 'text-destructive',
-    warning: 'text-gold-dark dark:text-primary',
+    warning: 'text-primary-ink',
     neutral: 'text-info',
   } as const;
 
@@ -396,7 +350,7 @@ function InsightsPanel({
     <Card className="border-border/80 shadow-sm">
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2 text-sm">
-          <Lightbulb className="h-4 w-4 text-gold-dark dark:text-primary" aria-hidden="true" /> Insights do período
+          <Lightbulb className="h-4 w-4 text-primary-ink" aria-hidden="true" /> Insights do período
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-1 px-3 pb-3">
@@ -438,7 +392,7 @@ function OpenItemsPanel({
         <button
           type="button"
           onClick={() => onSelect('payables')}
-          className="rounded-lg border border-warning/25 bg-warning/[0.04] p-3 text-left transition hover:border-warning/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="rounded-xl border border-warning-border bg-warning-soft p-3 text-left transition hover:border-warning focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <span className="flex items-center justify-between text-[11px] text-muted-foreground">Contas a pagar <ReceiptText className="h-4 w-4 text-warning" /></span>
           <span className="mt-1 block text-lg font-bold text-warning">{fmtBRL(payable.amount)}</span>
@@ -447,7 +401,7 @@ function OpenItemsPanel({
         <button
           type="button"
           onClick={() => onSelect('receivables')}
-          className="rounded-lg border border-success/25 bg-success/[0.04] p-3 text-left transition hover:border-success/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="rounded-xl border border-success-border bg-success-soft p-3 text-left transition hover:border-success focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <span className="flex items-center justify-between text-[11px] text-muted-foreground">Contas a receber <Landmark className="h-4 w-4 text-success" /></span>
           <span className="mt-1 block text-lg font-bold text-success">{fmtBRL(receivable.amount)}</span>
@@ -476,7 +430,7 @@ function RankingColumn({
         <ol className="space-y-2">
           {items.slice(0, 3).map(item => (
             <li key={`${item.rank}-${item.categoryId ?? item.label}`} className="flex items-center gap-2 text-[11px]">
-              <span className="w-4 font-bold text-gold-dark dark:text-primary">{item.rank}</span>
+              <span className="w-4 font-bold text-primary-ink">{item.rank}</span>
               <span className="min-w-0 flex-1 truncate text-foreground">{item.label}</span>
               <span className="whitespace-nowrap font-mono text-muted-foreground">{fmtBRLCompact(item.amount)}</span>
             </li>

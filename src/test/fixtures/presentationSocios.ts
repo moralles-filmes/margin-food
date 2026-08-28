@@ -2,11 +2,11 @@ import {
   calculatePresentationDeltas,
   type PresentationPlanData,
 } from '@/domain/financeiro/presentation';
-import type {
-  PresentationAnalyticsSnapshot,
-  PresentationSociosData,
+import {
+  attachPresentationResults,
+  type PresentationAnalyticsSnapshot,
+  type PresentationSociosData,
 } from '@/lib/financeiroPresentationAdapter';
-import { buildPresentationSlides } from '@/lib/presentationSlides';
 
 const currentMetrics = { revenue: 1_200, expense: 700, result: 500, marginPercent: 41.6667 };
 const zeroMetrics = { revenue: 0, expense: 0, result: 0, marginPercent: 0 };
@@ -351,5 +351,5 @@ export function createPresentationSociosData(
     slides: [],
   };
 
-  return { ...base, slides: buildPresentationSlides(base) };
+  return attachPresentationResults(base);
 }

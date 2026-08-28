@@ -14,6 +14,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import {
   Plus, CheckCircle2, Clock, AlertTriangle, ListChecks, Filter, Play, XCircle
 } from 'lucide-react';
+import KpiCard from '@/components/ui/KpiCard';
 import { format, parseISO, isPast } from 'date-fns';
 
 import { useCan } from '@/permissions/hooks';
@@ -57,9 +58,9 @@ const SETOR_LABELS: Record<string, string> = {
 };
 const PRIORIDADE_LABELS: Record<string, { label: string; color: string }> = {
   baixa: { label: 'Baixa', color: 'bg-muted text-muted-foreground' },
-  media: { label: 'Média', color: 'bg-warning/10 text-warning' },
-  alta: { label: 'Alta', color: 'bg-warning/20 text-warning' },
-  critica: { label: 'Crítica', color: 'bg-destructive/10 text-destructive' },
+  media: { label: 'Média', color: 'bg-warning-soft text-warning' },
+  alta: { label: 'Alta', color: 'bg-warning-soft text-warning border border-warning-border' },
+  critica: { label: 'Crítica', color: 'bg-destructive-soft text-destructive' },
 };
 const STATUS_LABELS: Record<string, { label: string; icon: typeof Clock }> = {
   PENDENTE: { label: 'Pendente', icon: Clock },
@@ -204,10 +205,10 @@ export default function TarefasSection({
     <div className="space-y-4">
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Card><CardHeader className="pb-2"><CardDescription className="text-xs">Pendentes</CardDescription><CardTitle className="text-lg">{pendentes}</CardTitle></CardHeader></Card>
-        <Card><CardHeader className="pb-2"><CardDescription className="text-xs">Em Andamento</CardDescription><CardTitle className="text-lg text-primary">{emAndamento}</CardTitle></CardHeader></Card>
-        <Card><CardHeader className="pb-2"><CardDescription className="text-xs">Concluídas</CardDescription><CardTitle className="text-lg text-success">{concluidas}</CardTitle></CardHeader></Card>
-        <Card><CardHeader className="pb-2"><CardDescription className="text-xs">Atrasadas</CardDescription><CardTitle className="text-lg text-destructive">{atrasadas}</CardTitle></CardHeader></Card>
+        <KpiCard label="Pendentes" value={pendentes} icon={Clock} />
+        <KpiCard label="Em Andamento" value={emAndamento} icon={Play} variant="primary" />
+        <KpiCard label="Concluídas" value={concluidas} icon={CheckCircle2} variant="success" />
+        <KpiCard label="Atrasadas" value={atrasadas} icon={AlertTriangle} variant={atrasadas > 0 ? 'danger' : 'default'} />
       </div>
 
       {/* Toolbar */}
@@ -313,7 +314,7 @@ export default function TarefasSection({
             const checkTotal = t.checklist.length;
 
             return (
-              <Card key={t.id} className={`hover:shadow-md transition-shadow ${isAtrasada ? 'border-destructive/50' : ''}`}>
+              <Card key={t.id} className={`hover:shadow-md transition-shadow ${isAtrasada ? 'border-destructive-border' : ''}`}>
                 <CardHeader className="pb-2">
                   <div className="flex items-start justify-between gap-2">
                     <CardTitle className="text-sm font-semibold leading-tight">{t.titulo}</CardTitle>

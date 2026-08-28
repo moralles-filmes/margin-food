@@ -2,17 +2,17 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useDataEvent } from '@/lib/dataEvents';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
+import { DateInput } from '@/components/ui/DateInput';
+import { DatePicker } from '@/components/ui/DatePicker';
 import { Skeleton } from '@/components/ui/skeleton';
+import KpiCard, { type KpiCardDelta, type KpiVariant } from '@/components/ui/KpiCard';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { supabase } from '@/integrations/supabase/client';
 import { useCan } from '@/permissions/hooks';
 import { toast } from 'sonner';
 import { todayBR, fmtBRL, formatPercentBR } from '@/lib/formatters';
 import { formatDateBR as formatDateISO } from '@/lib/datetime';
-import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { APP_NAME } from '@/lib/brand';
@@ -22,8 +22,7 @@ import * as XLSX from '@/lib/safeXlsx';
 import DashboardCharts from '@/components/financeiro/DashboardCharts';
 import {
   DollarSign, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight,
-  ChevronRight, RefreshCw, CalendarDays, AlertTriangle, FileDown, FileSpreadsheet,
-  ArrowUp, ArrowDown, Minus,
+  RefreshCw, AlertTriangle, FileDown, FileSpreadsheet,
 } from 'lucide-react';
 
 // ── Types ──
@@ -55,28 +54,18 @@ function NoAccess() {
 
 import { calcVariacaoPct } from '@/domain/financeiro';
 
-/** Calculate percentage change — delegates to official domain selector */
-function pctChange(current: number, previous: number): number | null {
-  return calcVariacaoPct(current, previous);
-}
-
-function DeltaBadge({ current, previous, invert = false }: { current: number; previous: number; invert?: boolean }) {
-  const pct = pctChange(current, previous);
-  if (pct == null) return null;
+/** Builds the "vs. período anterior" comparison line for KpiCard's delta slot */
+function buildDelta(current: number, previous: number, invert = false): KpiCardDelta | undefined {
+  const pct = calcVariacaoPct(current, previous);
+  if (pct == null) return undefined;
   const isPositive = invert ? pct < 0 : pct > 0;
   const isNegative = invert ? pct > 0 : pct < 0;
-  const Icon = pct > 0 ? ArrowUp : pct < 0 ? ArrowDown : Minus;
-  return (
-    <span className={cn(
-      'inline-flex items-center gap-0.5 text-[10px] font-medium rounded px-1 py-0.5',
-      isPositive && 'text-success bg-success/10',
-      isNegative && 'text-destructive bg-destructive/10',
-      !isPositive && !isNegative && 'text-muted-foreground bg-muted'
-    )}>
-      <Icon className="w-2.5 h-2.5" />
-      {formatPercentBR(Math.abs(pct), 1)}
-    </span>
-  );
+  return {
+    label: 'vs. período anterior',
+    formatted: formatPercentBR(Math.abs(pct), 1),
+    direction: pct > 0 ? 'up' : pct < 0 ? 'down' : 'flat',
+    tone: isPositive ? 'positive' : isNegative ? 'negative' : 'neutral',
+  };
 }
 
 // ── Component ──
@@ -244,15 +233,15 @@ export default function DashboardFinanceiroSection({ onNavigate }: { onNavigate?
 
   if (!canView) return <NoAccess />;
 
-  const cards: { label: string; value: number; icon: typeof DollarSign; color: string; target?: FinSubTab; prevValue?: number; invertDelta?: boolean; sub?: string }[] = [
-    { label: 'Saldo em Caixa', value: resumo.saldoCaixa, icon: DollarSign, color: 'text-success', target: 'fluxo' },
-    { label: 'Contas a Receber', value: resumo.aReceber, icon: ArrowUpRight, color: 'text-primary', target: 'receber' },
-    { label: 'Contas a Pagar', value: resumo.aPagar, icon: ArrowDownRight, color: 'text-warning', target: 'pagar' },
-    { label: 'Contas Vencidas', value: resumo.aPagarVencido, icon: AlertTriangle, color: 'text-destructive', target: 'pagar', sub: resumo.aPagarVencidoQtd > 0 ? `${resumo.aPagarVencidoQtd} boleto${resumo.aPagarVencidoQtd > 1 ? 's' : ''}` : undefined },
-    { label: 'Receita do Período', value: resumo.receita, icon: TrendingUp, color: 'text-success', target: 'lancamentos', prevValue: resumo.receitaPrev },
-    { label: 'Despesa Realizada', value: resumo.despesa, icon: TrendingDown, color: 'text-destructive', target: 'lancamentos', prevValue: resumo.despesaPrev, invertDelta: true },
-    { label: 'Despesas Provisionadas', value: despesasProvisionadas, icon: DollarSign, color: 'text-warning', target: 'pagar' },
-    { label: 'Resultado', value: resumo.resultado, icon: DollarSign, color: resumo.resultado >= 0 ? 'text-success' : 'text-destructive', target: 'dre', prevValue: resumo.resultadoPrev },
+  const cards: { label: string; value: number; icon: typeof DollarSign; variant: KpiVariant; target?: FinSubTab; delta?: KpiCardDelta; sub?: string }[] = [
+    { label: 'Saldo em Caixa', value: resumo.saldoCaixa, icon: DollarSign, variant: 'success', target: 'fluxo' },
+    { label: 'Contas a Receber', value: resumo.aReceber, icon: ArrowUpRight, variant: 'primary', target: 'receber' },
+    { label: 'Contas a Pagar', value: resumo.aPagar, icon: ArrowDownRight, variant: 'warning', target: 'pagar' },
+    { label: 'Contas Vencidas', value: resumo.aPagarVencido, icon: AlertTriangle, variant: 'danger', target: 'pagar', sub: resumo.aPagarVencidoQtd > 0 ? `${resumo.aPagarVencidoQtd} boleto${resumo.aPagarVencidoQtd > 1 ? 's' : ''}` : undefined },
+    { label: 'Receita do Período', value: resumo.receita, icon: TrendingUp, variant: 'success', target: 'lancamentos', delta: buildDelta(resumo.receita, resumo.receitaPrev) },
+    { label: 'Despesa Realizada', value: resumo.despesa, icon: TrendingDown, variant: 'danger', target: 'lancamentos', delta: buildDelta(resumo.despesa, resumo.despesaPrev, true) },
+    { label: 'Despesas Provisionadas', value: despesasProvisionadas, icon: DollarSign, variant: 'warning', target: 'pagar' },
+    { label: 'Resultado', value: resumo.resultado, icon: DollarSign, variant: resumo.resultado >= 0 ? 'success' : 'danger', target: 'dre', delta: buildDelta(resumo.resultado, resumo.resultadoPrev) },
   ];
 
   return (
@@ -263,20 +252,15 @@ export default function DashboardFinanceiroSection({ onNavigate }: { onNavigate?
           <p className="text-sm text-muted-foreground">Visão executiva consolidada</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center rounded-lg border border-border overflow-hidden h-9">
-            <button
-              onClick={() => setFilterType('dia')}
-              className={cn('px-3 h-full text-xs font-medium transition-colors', filterType === 'dia' ? 'bg-primary text-primary-foreground' : 'bg-muted/50 text-muted-foreground hover:text-foreground')}
-            >Dia</button>
-            <button
-              onClick={() => setFilterType('mes')}
-              className={cn('px-3 h-full text-xs font-medium transition-colors', filterType === 'mes' ? 'bg-primary text-primary-foreground' : 'bg-muted/50 text-muted-foreground hover:text-foreground')}
-            >Mês</button>
-            <button
-              onClick={() => setFilterType('periodo')}
-              className={cn('px-3 h-full text-xs font-medium transition-colors', filterType === 'periodo' ? 'bg-primary text-primary-foreground' : 'bg-muted/50 text-muted-foreground hover:text-foreground')}
-            >Período</button>
-          </div>
+          <SegmentedControl
+            options={[
+              { value: 'dia', label: 'Dia' },
+              { value: 'mes', label: 'Mês' },
+              { value: 'periodo', label: 'Período' },
+            ]}
+            value={filterType}
+            onChange={(v) => setFilterType(v as 'mes' | 'dia' | 'periodo')}
+          />
 
           {filterType === 'mes' && (
             <Select value={mesAno} onValueChange={setMesAno}>
@@ -288,24 +272,19 @@ export default function DashboardFinanceiroSection({ onNavigate }: { onNavigate?
           )}
 
           {filterType === 'dia' && (
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className="h-9 w-[200px] justify-start text-left font-normal">
-                  <CalendarDays className="w-4 h-4 mr-2" />
-                  {format(selectedDate, "dd 'de' MMMM, yyyy", { locale: ptBR })}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar mode="single" selected={selectedDate} onSelect={(d) => d && setSelectedDate(d)} initialFocus className="p-3 pointer-events-auto" />
-              </PopoverContent>
-            </Popover>
+            <DatePicker
+              date={selectedDate}
+              onDateChange={d => d && setSelectedDate(d)}
+              formatValue={d => format(d, "dd 'de' MMMM, yyyy", { locale: ptBR })}
+              className="h-9 w-[200px]"
+            />
           )}
 
           {filterType === 'periodo' && (
             <div className="flex items-center gap-2">
-              <Input type="date" value={periodoInicio} onChange={e => setPeriodoInicio(e.target.value)} className="h-9 text-xs w-[140px]" />
+              <DateInput value={periodoInicio} onValueChange={setPeriodoInicio} className="h-9 text-xs w-[140px]" />
               <span className="text-xs text-muted-foreground">a</span>
-              <Input type="date" value={periodoFim} onChange={e => setPeriodoFim(e.target.value)} className="h-9 text-xs w-[140px]" />
+              <DateInput value={periodoFim} onValueChange={setPeriodoFim} className="h-9 text-xs w-[140px]" />
               <Button size="sm" className="h-9" onClick={loadResumo} disabled={loading || !periodoInicio || !periodoFim}>Aplicar</Button>
             </div>
           )}
@@ -339,38 +318,18 @@ export default function DashboardFinanceiroSection({ onNavigate }: { onNavigate?
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-8 gap-3">
-          {cards.map(c => {
-            const Icon = c.icon;
-            const isClickable = !!c.target && !!onNavigate;
-            return (
-              <Card
-                key={c.label}
-                className={cn(
-                  'border-border/50 transition-all',
-                  isClickable && 'cursor-pointer hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
-                )}
-                role={isClickable ? 'button' : undefined}
-                tabIndex={isClickable ? 0 : undefined}
-                onClick={() => isClickable && onNavigate(c.target!)}
-                onKeyDown={(e) => { if (isClickable && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); onNavigate(c.target!); } }}
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Icon className={`w-4 h-4 ${c.color}`} />
-                    <span className="text-[11px] text-muted-foreground font-medium truncate">{c.label}</span>
-                    {isClickable && <ChevronRight className="w-3 h-3 text-muted-foreground/50 ml-auto" />}
-                  </div>
-                  <p className={`text-lg font-bold ${c.color}`}>{fmtBRL(c.value)}</p>
-                  {c.prevValue !== undefined && (
-                    <div className="mt-1">
-                      <DeltaBadge current={c.value} previous={c.prevValue} invert={c.invertDelta} />
-                    </div>
-                  )}
-                  {c.sub && <p className="text-[10px] text-muted-foreground mt-1">{c.sub}</p>}
-                </CardContent>
-              </Card>
-            );
-          })}
+          {cards.map(c => (
+            <KpiCard
+              key={c.label}
+              label={c.label}
+              value={fmtBRL(c.value)}
+              icon={c.icon}
+              variant={c.variant}
+              sub={c.sub}
+              delta={c.delta}
+              onClick={c.target && onNavigate ? () => onNavigate(c.target!) : undefined}
+            />
+          ))}
         </div>
       )}
 

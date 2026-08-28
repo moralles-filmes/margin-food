@@ -4,11 +4,12 @@ import { useEstoqueGeralStore } from '@/hooks/useEstoqueGeralStore';
 import { usePlanningStore } from '@/hooks/usePlanningStore';
 import { useModuleAccess, useCan } from '@/permissions/hooks';
 import { SalmonEntry } from '@/types/salmon';
-import { formatInBR, formatDateBR } from '@/lib/datetime';
+import { formatDateBR } from '@/lib/datetime';
 import { ChevronDown, ChevronUp, Expand, Shrink, Filter, Loader2, AlertTriangle, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import MonthNavigator from '@/components/financeiro/MonthNavigator';
 import MetaCompraCard from './MetaCompraCard';
 import WeeklyBreakdown from './WeeklyBreakdown';
 import PurchaseRadar from './PurchaseRadar';
@@ -19,21 +20,6 @@ import BudgetPressure from './BudgetPressure';
 interface PlanningViewProps {
   store: ReturnType<typeof useSalmonStore>;
   estoqueStore?: ReturnType<typeof useEstoqueGeralStore>;
-}
-
-const MONTHS = [
-  { value: '01', label: 'Janeiro' }, { value: '02', label: 'Fevereiro' },
-  { value: '03', label: 'Março' }, { value: '04', label: 'Abril' },
-  { value: '05', label: 'Maio' }, { value: '06', label: 'Junho' },
-  { value: '07', label: 'Julho' }, { value: '08', label: 'Agosto' },
-  { value: '09', label: 'Setembro' }, { value: '10', label: 'Outubro' },
-  { value: '11', label: 'Novembro' }, { value: '12', label: 'Dezembro' },
-];
-
-function getYearOptions() {
-  const currentStr = formatDateBR();
-  const current = parseInt(currentStr.split('-')[0]);
-  return [current - 1, current, current + 1].map(y => ({ value: String(y), label: String(y) }));
 }
 
 type SourceFilter = 'tudo' | 'salmao' | 'geral';
@@ -81,9 +67,7 @@ export default function PlanningView({ store, estoqueStore }: PlanningViewProps)
   const canEditMeta = useCan('planning:meta-compras:edit');
 
   const nowStr = formatDateBR(); // yyyy-MM-dd BR timezone
-  const [nowY, nowM] = nowStr.split('-');
-  const [selectedMonth, setSelectedMonth] = useState(nowM);
-  const [selectedYear, setSelectedYear] = useState(nowY);
+  const [targetMonth, setTargetMonth] = useState(nowStr.slice(0, 7));
   const [showSimulador, setShowSimulador] = useState(false);
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>('tudo');
   const [categoryFilter, setCategoryFilter] = useState<string>('todas');
@@ -92,8 +76,7 @@ export default function PlanningView({ store, estoqueStore }: PlanningViewProps)
     meta: true, projecao: true, semanal: false, pressao: false, radar: false, simulador: false,
   });
 
-  const targetMonth = `${selectedYear}-${selectedMonth}`;
-  const monthLabel = formatInBR(new Date(parseInt(selectedYear), parseInt(selectedMonth) - 1), 'MMMM yyyy');
+  const [selectedYear, selectedMonth] = targetMonth.split('-');
 
   useEffect(() => {
     planningStore.fetchMetas(parseInt(selectedYear));
@@ -209,7 +192,7 @@ export default function PlanningView({ store, estoqueStore }: PlanningViewProps)
         <div className="bg-card border border-primary/20 rounded-xl p-5 space-y-3 animate-fade-up">
           <p className="text-sm text-foreground font-medium">Simule uma compra e veja impacto antes de salvar.</p>
           <p className="text-xs text-muted-foreground">Teste cenários hipotéticos para meta, projeção e ritmo semanal.</p>
-          <Button onClick={() => setShowSimulador(true)} className="gradient-salmon text-primary-foreground border-0 gap-1.5">
+          <Button onClick={() => setShowSimulador(true)} className="bg-primary-strong text-primary-foreground border-0 gap-1.5">
             Simular compra
           </Button>
         </div>
@@ -232,17 +215,7 @@ export default function PlanningView({ store, estoqueStore }: PlanningViewProps)
           <p className="text-xs text-muted-foreground">Controle de compras por categoria, metas e projeções</p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-            <SelectTrigger className="w-[130px] h-8 text-xs bg-secondary border-border"><SelectValue /></SelectTrigger>
-            <SelectContent>{MONTHS.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>
-          </Select>
-          <Select value={selectedYear} onValueChange={setSelectedYear}>
-            <SelectTrigger className="w-[90px] h-8 text-xs bg-secondary border-border"><SelectValue /></SelectTrigger>
-            <SelectContent>{getYearOptions().map(y => <SelectItem key={y.value} value={y.value}>{y.label}</SelectItem>)}</SelectContent>
-          </Select>
-          <span className="text-xs text-muted-foreground ml-auto capitalize">{monthLabel}</span>
-        </div>
+        <MonthNavigator value={targetMonth} onChange={setTargetMonth} monthsBack={12} monthsForward={3} />
 
         <div className="flex items-center gap-2 flex-wrap">
           <Filter className="w-3.5 h-3.5 text-muted-foreground" />

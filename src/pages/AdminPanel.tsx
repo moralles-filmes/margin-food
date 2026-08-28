@@ -74,7 +74,7 @@ export default function AdminPanel() {
     if (r.loading) return <span className="text-muted-foreground text-xs animate-pulse">Carregando...</span>;
     if (r.error) return <span className="text-destructive text-xs">ERROR: {r.error}</span>;
     return (
-      <pre className="text-xs bg-muted/50 p-3 rounded-lg overflow-auto max-h-80 whitespace-pre-wrap break-all border border-border">
+      <pre className="text-xs bg-background-subtle p-3 rounded-lg overflow-auto max-h-80 whitespace-pre-wrap break-all border border-border">
         {JSON.stringify(r.data, null, 2)}
       </pre>
     );
@@ -91,7 +91,7 @@ export default function AdminPanel() {
           </Button>
           <Shield className="w-6 h-6 text-primary" />
           <h1 className="text-2xl font-display font-bold text-foreground">Painel Admin</h1>
-          <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">super_admin</span>
+          <span className="text-xs px-2 py-0.5 rounded-full bg-primary-soft text-primary-ink font-medium">super_admin</span>
         </div>
 
         <Tabs defaultValue="dashboard" className="w-full">
@@ -218,7 +218,7 @@ export default function AdminPanel() {
                     <div className="w-2 h-2 rounded-full bg-primary" />
                     <span>company_id NOT NULL: <strong className="text-foreground">100%</strong></span>
                   </div>
-                  <div className="flex items-center gap-2 mt-3 p-2 rounded-lg bg-warning/10 border border-warning/20">
+                  <div className="flex items-center gap-2 mt-3 p-2 rounded-lg bg-warning-soft border border-warning-border">
                     <div className="w-2 h-2 rounded-full bg-warning" />
                     <span className="text-warning">pg_net extension in public — <strong>mitigado</strong> (REVOKE + risk register)</span>
                   </div>

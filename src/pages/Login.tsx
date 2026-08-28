@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import PasswordInput from '@/components/PasswordInput';
@@ -66,7 +67,7 @@ export default function Login() {
           <p className="text-xs text-muted-foreground">{APP_TAGLINE}</p>
         </div>
 
-        <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
+        <Card className="p-6 shadow-sm">
           {isForgot ? (
             <form onSubmit={handleForgotPassword} className="space-y-4">
               <h2 className="text-lg font-semibold text-foreground">Recuperar Senha</h2>
@@ -78,9 +79,9 @@ export default function Login() {
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? 'Enviando...' : 'Enviar link'}
               </Button>
-              <button type="button" onClick={() => setIsForgot(false)} className="text-xs text-primary hover:underline w-full text-center">
+              <Button type="button" variant="link" onClick={() => setIsForgot(false)} className="text-xs h-auto p-0 w-full">
                 Voltar ao login
-              </button>
+              </Button>
             </form>
           ) : (
             <form onSubmit={handleLogin} className="space-y-4">
@@ -96,9 +97,9 @@ export default function Login() {
                 <PasswordInput value={password} onChange={e => setPassword(e.target.value)} required wrapperClassName="mt-1" />
               </div>
 
-              <button type="button" onClick={() => setIsForgot(true)} className="text-xs text-primary hover:underline">
+              <Button type="button" variant="link" onClick={() => setIsForgot(true)} className="text-xs h-auto p-0">
                 Esqueceu a senha?
-              </button>
+              </Button>
 
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? 'Carregando...' : 'Entrar'}
@@ -109,7 +110,7 @@ export default function Login() {
               </p>
             </form>
           )}
-        </div>
+        </Card>
       </div>
     </div>
   );

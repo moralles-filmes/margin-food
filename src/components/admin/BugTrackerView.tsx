@@ -37,17 +37,17 @@ type SystemBug = {
 };
 
 const SEVERITY_COLORS: Record<string, string> = {
-  critical: 'bg-destructive/15 text-destructive border-destructive/30',
-  high: 'bg-warning/15 text-warning border-warning/30',
-  medium: 'bg-warning/15 text-warning border-warning/30',
+  critical: 'bg-destructive-soft text-destructive border-destructive-border',
+  high: 'bg-warning-soft text-warning border-warning-border',
+  medium: 'bg-warning-soft text-warning border-warning-border',
   low: 'bg-muted text-muted-foreground border-border',
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  open: 'bg-destructive/10 text-destructive',
-  in_progress: 'bg-info/10 text-info',
-  fixed: 'bg-success/10 text-success',
-  validated: 'bg-primary/10 text-primary',
+  open: 'bg-destructive-soft text-destructive',
+  in_progress: 'bg-info-soft text-info',
+  fixed: 'bg-success-soft text-success',
+  validated: 'bg-primary-soft text-primary-ink',
 };
 
 export default function BugTrackerView() {
@@ -210,7 +210,7 @@ export default function BugTrackerView() {
       ) : (
         <div className="space-y-2">
           {filtered.map(bug => (
-            <Card key={bug.id} className={`cursor-pointer hover:border-primary/30 transition-colors ${bug.severity === 'critical' ? 'border-destructive/30' : ''}`} onClick={() => openEdit(bug)}>
+            <Card key={bug.id} className={`cursor-pointer hover:border-primary-border transition-colors ${bug.severity === 'critical' ? 'border-destructive-border' : ''}`} onClick={() => openEdit(bug)}>
               <CardContent className="py-3 px-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">

@@ -3,6 +3,7 @@ import { emitDataEvent } from '@/lib/dataEvents';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DateInput } from '@/components/ui/DateInput';
 import { BRLInput } from '@/components/ui/brl-input';
 import { DecimalInput } from '@/components/ui/decimal-input';
 import { fmtBRL, formatDateBR, parseLocalDate, todayBR } from '@/lib/formatters';
@@ -2396,20 +2397,18 @@ export default function ConciliacaoBancariaSection() {
               {totalPendentesConta} pendente(s) • {totalConciliadosConta} conciliado(s)
             </p>
             <div className="flex items-center gap-2 flex-wrap">
-              <Input
-                type="date"
+              <DateInput
                 value={filtroDataDe}
                 max={filtroDataAte || undefined}
-                onChange={e => setFiltroDataDe(e.target.value)}
+                onValueChange={setFiltroDataDe}
                 className="w-36 h-9 text-xs"
                 aria-label="Data inicial"
               />
               <span className="text-muted-foreground text-xs">até</span>
-              <Input
-                type="date"
+              <DateInput
                 value={filtroDataAte}
                 min={filtroDataDe || undefined}
-                onChange={e => setFiltroDataAte(e.target.value)}
+                onValueChange={setFiltroDataAte}
                 className="w-36 h-9 text-xs"
                 aria-label="Data final"
               />

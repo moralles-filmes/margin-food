@@ -14,6 +14,8 @@ import { Input } from '@/components/ui/input';
 import { CurrencyInput } from '@/components/ui/brl-input';
 import { DecimalInput, parseDecimal } from '@/components/ui/decimal-input';
 import { Button } from '@/components/ui/button';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import KpiCard from '@/components/ui/KpiCard';
 import { toast } from 'sonner';
 import { normalizeBRLMoneyToNumber } from '@/lib/money';
 
@@ -82,11 +84,13 @@ export default function ConfiguracoesView({ store, initialSubTab }: Props) {
 
   if (visibleViews.length === 0) {
     return (
-      <div className="bg-card border border-border rounded-xl p-8 text-center">
-        <Shield className="w-12 h-12 mx-auto text-destructive/30 mb-3" />
-        <p className="text-sm font-medium text-foreground">Acesso Negado</p>
-        <p className="text-xs text-muted-foreground">Você não possui permissões para acessar as configurações.</p>
-      </div>
+      <Card>
+        <CardContent className="p-8 text-center">
+          <Shield className="w-12 h-12 mx-auto text-destructive/30 mb-3" />
+          <p className="text-sm font-medium text-foreground">Acesso Negado</p>
+          <p className="text-xs text-muted-foreground">Você não possui permissões para acessar as configurações.</p>
+        </CardContent>
+      </Card>
     );
   }
 
@@ -105,62 +109,70 @@ export default function ConfiguracoesView({ store, initialSubTab }: Props) {
 
       {effectiveActive === 'geral' && (
         <div className="space-y-3">
-          <div className="bg-card border border-border rounded-xl p-4 space-y-3">
-            <p className="text-sm font-semibold text-foreground flex items-center gap-2"><Database className="w-4 h-4 text-primary" /> Dados do Sistema</p>
-            <div className="grid grid-cols-2 gap-3 text-[11px]">
-              <div className="bg-secondary rounded-lg p-3"><p className="text-muted-foreground">Entradas salmão</p><p className="text-lg font-bold text-foreground">{store.entries.length}</p></div>
-              <div className="bg-secondary rounded-lg p-3"><p className="text-muted-foreground">Manipulações</p><p className="text-lg font-bold text-foreground">{store.manipulations.length}</p></div>
-              <div className="bg-secondary rounded-lg p-3"><p className="text-muted-foreground">Fornecedores</p><p className="text-lg font-bold text-foreground">{store.suppliers.length}</p></div>
-              <div className="bg-secondary rounded-lg p-3"><p className="text-muted-foreground">Auditorias</p><p className="text-lg font-bold text-foreground">{store.auditorias.length}</p></div>
-            </div>
+          <p className="text-xs font-semibold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+            <Database className="w-3.5 h-3.5 text-primary" /> Dados do Sistema
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <KpiCard label="Entradas salmão" value={store.entries.length} />
+            <KpiCard label="Manipulações" value={store.manipulations.length} />
+            <KpiCard label="Fornecedores" value={store.suppliers.length} />
+            <KpiCard label="Auditorias" value={store.auditorias.length} />
           </div>
         </div>
       )}
 
       {effectiveActive === 'salmao' && (
         <div className="space-y-3">
-          <div className="bg-card border border-border rounded-xl p-4 space-y-4">
-            <p className="text-sm font-semibold text-foreground flex items-center gap-2"><Fish className="w-4 h-4 text-primary" /> Alertas de Perda (Manipulação)</p>
-            <p className="text-[11px] text-muted-foreground">Limites para destaque visual de perda nas manipulações.</p>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <label className="text-[11px] text-muted-foreground font-medium">Perda % máxima</label>
-                <div className="flex items-center gap-1.5">
-                  <DecimalInput value={perdaPercent} onValueChange={raw => setPerdaPercent(raw)} maxDecimals={2} suffix="%" className="bg-secondary border-border text-foreground h-8 text-sm" disabled={!canManageGeral} />
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm flex items-center gap-2"><Fish className="w-4 h-4 text-primary" /> Alertas de Perda (Manipulação)</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0 space-y-4">
+              <p className="text-[11px] text-muted-foreground">Limites para destaque visual de perda nas manipulações.</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] text-muted-foreground font-medium">Perda % máxima</label>
+                  <div className="flex items-center gap-1.5">
+                    <DecimalInput value={perdaPercent} onValueChange={raw => setPerdaPercent(raw)} maxDecimals={2} suffix="%" className="bg-secondary border-border text-foreground h-8 text-sm" disabled={!canManageGeral} />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[11px] text-muted-foreground font-medium">Perda R$ máxima</label>
+                  <div className="flex items-center gap-1.5">
+                    <CurrencyInput value={perdaValor} onValueChange={raw => setPerdaValor(raw)} showPrefix className="bg-secondary border-border text-foreground h-8 text-sm" disabled={!canManageGeral} />
+                  </div>
                 </div>
               </div>
-              <div className="space-y-1.5">
-                <label className="text-[11px] text-muted-foreground font-medium">Perda R$ máxima</label>
-                <div className="flex items-center gap-1.5">
-                  <CurrencyInput value={perdaValor} onValueChange={raw => setPerdaValor(raw)} showPrefix className="bg-secondary border-border text-foreground h-8 text-sm" disabled={!canManageGeral} />
-                </div>
-              </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
 
-          <div className="bg-card border border-border rounded-xl p-4 space-y-4">
-            <p className="text-sm font-semibold text-foreground flex items-center gap-2"><Fish className="w-4 h-4 text-success" /> Validade do Salmão Limpo</p>
-            <p className="text-[11px] text-muted-foreground">Configure a validade padrão após manipulação e o alerta de vencimento.</p>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <label className="text-[11px] text-muted-foreground font-medium">Validade padrão (dias)</label>
-                <div className="flex items-center gap-1.5">
-                  <Input type="number" step="1" value={validadeDias} onChange={e => setValidadeDias(e.target.value)} className="bg-secondary border-border text-foreground h-8 text-sm" disabled={!canManageGeral} />
-                  <span className="text-xs text-muted-foreground">dias</span>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm flex items-center gap-2"><Fish className="w-4 h-4 text-success" /> Validade do Salmão Limpo</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0 space-y-4">
+              <p className="text-[11px] text-muted-foreground">Configure a validade padrão após manipulação e o alerta de vencimento.</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] text-muted-foreground font-medium">Validade padrão (dias)</label>
+                  <div className="flex items-center gap-1.5">
+                    <Input type="number" step="1" value={validadeDias} onChange={e => setValidadeDias(e.target.value)} className="bg-secondary border-border text-foreground h-8 text-sm" disabled={!canManageGeral} />
+                    <span className="text-xs text-muted-foreground">dias</span>
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[11px] text-muted-foreground font-medium">Alerta de vencimento (dias antes)</label>
+                  <div className="flex items-center gap-1.5">
+                    <Input type="number" step="1" value={alertaVencimento} onChange={e => setAlertaVencimento(e.target.value)} className="bg-secondary border-border text-foreground h-8 text-sm" disabled={!canManageGeral} />
+                    <span className="text-xs text-muted-foreground">dias</span>
+                  </div>
                 </div>
               </div>
-              <div className="space-y-1.5">
-                <label className="text-[11px] text-muted-foreground font-medium">Alerta de vencimento (dias antes)</label>
-                <div className="flex items-center gap-1.5">
-                  <Input type="number" step="1" value={alertaVencimento} onChange={e => setAlertaVencimento(e.target.value)} className="bg-secondary border-border text-foreground h-8 text-sm" disabled={!canManageGeral} />
-                  <span className="text-xs text-muted-foreground">dias</span>
-                </div>
-              </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
 
           {canManageGeral && (
-            <Button size="sm" className="gradient-salmon text-primary-foreground border-0 text-xs" onClick={handleSaveSalmaoConfig}>
+            <Button size="sm" className="text-xs" onClick={handleSaveSalmaoConfig}>
               Salvar Configurações
             </Button>
           )}
@@ -171,11 +183,13 @@ export default function ConfiguracoesView({ store, initialSubTab }: Props) {
 
       {effectiveActive === 'usuarios' && (
         canManageUsuarios ? <AdminUsersView /> : (
-          <div className="bg-card border border-border rounded-xl p-8 text-center">
-            <Shield className="w-12 h-12 mx-auto text-destructive/30 mb-3" />
-            <p className="text-sm font-medium text-foreground">Acesso Restrito</p>
-            <p className="text-xs text-muted-foreground">Você pode visualizar esta aba, mas a gestão de usuários requer a permissão <code className="text-[10px] bg-muted px-1 rounded">configuracoes:usuarios:manage</code>.</p>
-          </div>
+          <Card>
+            <CardContent className="p-8 text-center">
+              <Shield className="w-12 h-12 mx-auto text-destructive/30 mb-3" />
+              <p className="text-sm font-medium text-foreground">Acesso Restrito</p>
+              <p className="text-xs text-muted-foreground">Você pode visualizar esta aba, mas a gestão de usuários requer a permissão <code className="text-[10px] bg-muted px-1 rounded">configuracoes:usuarios:manage</code>.</p>
+            </CardContent>
+          </Card>
         )
       )}
       {effectiveActive === 'audit-global' && <GlobalAuditView />}

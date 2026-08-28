@@ -315,7 +315,7 @@ export default function NovaMovimentacaoModal({
           <DialogHeader className="pb-3 border-b border-border flex-shrink-0">
             <DialogTitle className="flex items-center gap-2 text-sm">
               <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${
-                preset === 'entrada' ? 'bg-success/15' : preset === 'saida' ? 'bg-destructive/15' : 'bg-primary/15'
+                preset === 'entrada' ? 'bg-success-soft' : preset === 'saida' ? 'bg-destructive-soft' : 'bg-primary-soft'
               }`}>
                 <Icon className={`w-4 h-4 ${
                   preset === 'entrada' ? 'text-success' : preset === 'saida' ? 'text-destructive' : 'text-primary'
@@ -372,7 +372,7 @@ export default function NovaMovimentacaoModal({
                     if (!v) return;
                     setForm(f => ({ ...f, usePurchaseUnit: v === 'purchase' }));
                   }}
-                  className="grid grid-cols-2 gap-1 bg-secondary/60 p-1 rounded-md border border-border w-full"
+                  className="grid grid-cols-2 gap-1 bg-background-subtle p-1 rounded-md border border-border w-full"
                 >
                   <ToggleGroupItem
                     value="base"
@@ -404,7 +404,7 @@ export default function NovaMovimentacaoModal({
 
             {/* Purchase unit info for saídas */}
             {isSaida && hasPurchaseUnit && selectedProd && (
-              <div className="bg-primary/5 border border-primary/20 rounded-lg p-2.5 grid grid-cols-3 gap-2">
+              <div className="bg-primary-soft border border-primary-border rounded-lg p-2.5 grid grid-cols-3 gap-2">
                 <div className="text-center">
                   <p className="text-[10px] text-muted-foreground">Conversão</p>
                   <p className="text-xs font-medium text-foreground">1 {selectedUnCompra} = {selectedFator} {selectedProd.unidadeMedida}</p>
@@ -422,7 +422,7 @@ export default function NovaMovimentacaoModal({
 
             {/* Cost info for saídas */}
             {isSaida && selectedProd && saidaCostInfo && (
-              <div className="bg-accent/30 border border-accent/50 rounded-lg p-2.5 space-y-1.5">
+              <div className="bg-background-subtle border border-border rounded-lg p-2.5 space-y-1.5">
                 <div className="flex items-center justify-between">
                   <p className="text-[10px] font-semibold text-foreground">📌 Custo utilizado nesta saída</p>
                   <Badge variant="secondary" className="text-[8px] px-1.5 py-0 h-4">{saidaCostInfo.label}</Badge>
@@ -442,7 +442,7 @@ export default function NovaMovimentacaoModal({
                       {saidaBaseCalc > 0 && (
                         <div>
                           <span className="text-muted-foreground">Total: </span>
-                          <span className="font-bold text-primary">{fmtBRL(saidaTotalEstimate)}</span>
+                          <span className="font-bold text-primary-ink">{fmtBRL(saidaTotalEstimate)}</span>
                         </div>
                       )}
                   </div>
@@ -467,14 +467,14 @@ export default function NovaMovimentacaoModal({
                     <CurrencyInput value={movPrecoTotal} onValueChange={setMovPrecoTotal} showPrefix maxDecimals={2} className="bg-secondary border-border text-foreground" placeholder="0,00" />
                   </div>
                 </div>
-                <div className="bg-primary/5 border border-primary/20 rounded-lg p-2.5 grid grid-cols-4 gap-2">
+                <div className="bg-primary-soft border border-primary-border rounded-lg p-2.5 grid grid-cols-4 gap-2">
                   <div className="text-center">
                     <p className="text-[10px] text-muted-foreground">Qtd Base</p>
                     <p className="text-sm font-bold text-foreground">{formatFixedBR(quantidadeBaseCalc, 2)} {selectedProd?.unidadeMedida || ''}</p>
                   </div>
                    <div className="text-center">
                     <p className="text-[10px] text-muted-foreground">R$/{selectedProd?.unidadeMedida || 'base'}</p>
-                    <p className="text-sm font-bold text-primary">{precoBaseCalc > 0 ? fmtBRL(precoBaseCalc) : '—'}</p>
+                    <p className="text-sm font-bold text-primary-ink">{precoBaseCalc > 0 ? fmtBRL(precoBaseCalc) : '—'}</p>
                   </div>
                   <div className="text-center">
                     <p className="text-[10px] text-muted-foreground">R$/{selectedUnCompra || 'emb.'}</p>
@@ -494,7 +494,7 @@ export default function NovaMovimentacaoModal({
                 <div className="flex items-center justify-between">
                   <Label className="text-[11px] text-muted-foreground">Custo unitário ({hasPurchaseUnit ? `R$/${selectedProd?.unidadeMedida}` : 'R$'})</Label>
                   {costLocked && saidaCostInfo?.hasCost && (canEditPricing || hasPermission('finance:manage')) && (
-                    <button type="button" onClick={() => setCostLocked(false)} className="text-[9px] text-primary underline">Editar custo</button>
+                    <button type="button" onClick={() => setCostLocked(false)} className="text-[9px] text-primary-ink underline">Editar custo</button>
                   )}
                 </div>
                 <CurrencyInput value={form.custoUnitario} onValueChange={raw => setForm(f => ({ ...f, custoUnitario: raw }))} showPrefix maxDecimals={2} className={`bg-secondary border-border text-foreground ${costLocked ? 'opacity-70' : ''}`} disabled={costLocked} />
@@ -525,7 +525,7 @@ export default function NovaMovimentacaoModal({
               <Button type="button" variant="ghost" size="sm" onClick={guardedClose} disabled={saving}>
                 Cancelar
               </Button>
-              <Button type="submit" size="sm" className="gradient-salmon text-primary-foreground border-0" disabled={saving}>
+              <Button type="submit" size="sm" className="bg-primary-strong text-primary-foreground border-0" disabled={saving}>
                 {saving ? 'Registrando...' : 'Registrar'}
               </Button>
             </DialogFooter>

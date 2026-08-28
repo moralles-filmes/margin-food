@@ -62,7 +62,7 @@ export function SubmoduleSwitcher<T extends string>({
       {DisplayIcon && <DisplayIcon className="w-4 h-4 shrink-0" />}
       <span className="flex-1 text-left">{displayLabel}</span>
       {displayItem && !!displayItem.badge && (
-        <span className="min-w-5 h-5 px-1 rounded-full bg-destructive/80 text-[10px] text-destructive-foreground flex items-center justify-center font-bold leading-none">
+        <span className="min-w-5 h-5 px-1 rounded-full bg-destructive text-[10px] text-destructive-foreground flex items-center justify-center font-bold leading-none">
           {displayItem.badge > 99 ? '99+' : displayItem.badge}
         </span>
       )}
@@ -70,8 +70,8 @@ export function SubmoduleSwitcher<T extends string>({
     </>
   );
 
-  const activeCls = 'gradient-salmon text-primary-foreground shadow-md';
-  const inactiveCls = 'bg-secondary text-foreground hover:bg-secondary/80 transition-colors';
+  const activeCls = 'bg-primary-soft text-primary-soft-foreground border border-primary-border font-medium';
+  const inactiveCls = 'bg-secondary text-foreground border border-transparent hover:bg-secondary/80 transition-colors';
 
   if (isMobile) {
     return (
@@ -108,14 +108,14 @@ export function SubmoduleSwitcher<T extends string>({
                     className={cn(
                       'flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-colors text-left w-full',
                       isActive
-                        ? 'gradient-salmon text-primary-foreground shadow-sm'
+                        ? 'bg-primary-soft text-primary-soft-foreground'
                         : 'hover:bg-secondary text-foreground',
                     )}
                   >
                     <Icon className="w-4 h-4 shrink-0" />
                     <span className="flex-1">{item.label}</span>
                     {!!item.badge && (
-                      <span className="min-w-5 h-5 px-1 rounded-full bg-destructive/80 text-[10px] text-destructive-foreground flex items-center justify-center font-bold leading-none">
+                      <span className="min-w-5 h-5 px-1 rounded-full bg-destructive text-[10px] text-destructive-foreground flex items-center justify-center font-bold leading-none">
                         {item.badge > 99 ? '99+' : item.badge}
                       </span>
                     )}
@@ -154,17 +154,17 @@ export function SubmoduleSwitcher<T extends string>({
                 onClick={() => handleSelect(item.id)}
                 className={cn(
                   'flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm cursor-pointer',
-                  isActive && 'bg-primary/10 text-primary font-medium',
+                  isActive && 'bg-primary-soft text-primary-soft-foreground font-medium',
                 )}
               >
                 <Icon className="w-4 h-4 shrink-0" />
                 <span className="flex-1">{item.label}</span>
                 {!!item.badge && (
-                  <span className="min-w-5 h-5 px-1 rounded-full bg-destructive/80 text-[10px] text-destructive-foreground flex items-center justify-center font-bold leading-none">
+                  <span className="min-w-5 h-5 px-1 rounded-full bg-destructive text-[10px] text-destructive-foreground flex items-center justify-center font-bold leading-none">
                     {item.badge > 99 ? '99+' : item.badge}
                   </span>
                 )}
-                {isActive && <Check className="w-4 h-4 shrink-0 text-primary" />}
+                {isActive && <Check className="w-4 h-4 shrink-0 text-primary-soft-foreground" />}
               </DropdownMenuItem>
             );
           })}

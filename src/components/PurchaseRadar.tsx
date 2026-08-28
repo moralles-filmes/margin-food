@@ -1,9 +1,11 @@
 import { useMemo } from 'react';
 import { SalmonEntry, MetaCompraMensal } from '@/types/salmon';
 import { Radar, TrendingUp, AlertTriangle, CheckCircle2, BarChart3, Activity } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
 import { getWeeksOfMonth, calcWeeklyIdeal } from './WeeklyBreakdown';
 import { parseLocalDate, fmtBRL, formatPercentBR } from '@/lib/formatters';
+import { axisProps, gridProps, tooltipProps, SEMANTIC_CHART_COLORS } from '@/lib/chartTheme';
+import { ChartTooltip } from '@/components/ui/ChartTooltip';
 
 const fmtR = fmtBRL;
 
@@ -150,10 +152,10 @@ export default function PurchaseRadar({ entries, targetMonth, compact, metas, co
   } = analysis;
 
   const estabColor = { alta: 'text-success', media: 'text-warning', baixa: 'text-destructive' };
-  const estabBg = { alta: 'bg-success/10 border-success/30', media: 'bg-warning/10 border-warning/30', baixa: 'bg-destructive/10 border-destructive/30' };
+  const estabAccent = { alta: 'border-l-success', media: 'border-l-warning', baixa: 'border-l-destructive' };
   const estabIcon = { alta: <CheckCircle2 className="w-4 h-4 text-success" />, media: <AlertTriangle className="w-4 h-4 text-warning" />, baixa: <AlertTriangle className="w-4 h-4 text-destructive" /> };
   const concColor = { ok: 'text-success', atencao: 'text-warning', alta: 'text-destructive' };
-  const concBg = { ok: 'bg-success/10 border-success/30', atencao: 'bg-warning/10 border-warning/30', alta: 'bg-destructive/10 border-destructive/30' };
+  const concAccent = { ok: 'border-l-success', atencao: 'border-l-warning', alta: 'border-l-destructive' };
 
   // Compact view (for Entries tab)
   if (compact) {
@@ -216,13 +218,14 @@ export default function PurchaseRadar({ entries, targetMonth, compact, metas, co
             <div className="h-36">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={weeklyChart} barGap={2}>
-                  <XAxis dataKey="label" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <CartesianGrid {...gridProps} />
+                  <XAxis dataKey="label" {...axisProps} />
                   <YAxis hide />
                   <Tooltip
-                    formatter={(value: number, name: string) => [fmtR(value), name === 'gasto' ? 'Gasto Real' : 'Ideal']}
-                    contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid hsl(var(--border))' }}
+                    {...tooltipProps}
+                    content={<ChartTooltip valueFormatter={v => fmtR(Number(v))} />}
                   />
-                  <Bar dataKey="gasto" radius={[4, 4, 0, 0]}>
+                  <Bar dataKey="gasto" name="Gasto Real" radius={[4, 4, 0, 0]}>
                     {weeklyChart.map((w, i) => (
                       <Cell key={i} fill={
                         w.status === 'estourado' ? 'hsl(var(--destructive))'
@@ -232,7 +235,7 @@ export default function PurchaseRadar({ entries, targetMonth, compact, metas, co
                     ))}
                   </Bar>
                   {weeklyChart.some(w => w.ideal > 0) && (
-                    <Bar dataKey="ideal" fill="hsl(var(--success) / 0.3)" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="ideal" name="Ideal" fill={SEMANTIC_CHART_COLORS.projected} fillOpacity={0.3} radius={[4, 4, 0, 0]} />
                   )}
                 </BarChart>
               </ResponsiveContainer>
@@ -265,7 +268,7 @@ export default function PurchaseRadar({ entries, targetMonth, compact, metas, co
           </div>
 
           {/* BLOCO B — Estabilidade */}
-          <div className={`rounded-lg border px-3 py-3 space-y-2 ${estabBg[estabilidadeStatus]}`}>
+          <div className={`bg-card rounded-lg border border-border border-l-4 px-3 py-3 space-y-2 ${estabAccent[estabilidadeStatus]}`}>
             <div className="flex items-center gap-2">
               {estabIcon[estabilidadeStatus]}
               <p className="text-[11px] font-semibold text-foreground">Estabilidade de Compra do Mês</p>
@@ -289,7 +292,7 @@ export default function PurchaseRadar({ entries, targetMonth, compact, metas, co
           </div>
 
           {/* BLOCO C — Concentração */}
-          <div className={`rounded-lg border px-3 py-3 space-y-1.5 ${concBg[concentracaoStatus]}`}>
+          <div className={`bg-card rounded-lg border border-border border-l-4 px-3 py-3 space-y-1.5 ${concAccent[concentracaoStatus]}`}>
             <p className="text-[11px] font-semibold text-foreground flex items-center gap-1.5">
               <TrendingUp className="w-3.5 h-3.5" /> Concentração Semanal
             </p>

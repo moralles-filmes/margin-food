@@ -207,7 +207,7 @@ export default function AccessManagementCard() {
                 </thead>
                 <tbody>
                   {users.map(u => (
-                    <tr key={u.id} className="border-b border-border/50 hover:bg-muted/30">
+                    <tr key={u.id} className="border-b border-border hover:bg-surface-hover">
                       <td className="py-2 px-2 font-mono text-foreground">{u.email}</td>
                       <td className="py-2 px-2 text-foreground">{u.name || '—'}</td>
                       <td className="py-2 px-2 text-center">
@@ -247,7 +247,7 @@ export default function AccessManagementCard() {
               </h4>
               <div className="space-y-1 max-h-48 overflow-auto">
                 {auditLogs.map(log => (
-                  <div key={log.id} className="flex items-center gap-2 text-[11px] font-mono border-b border-border/30 py-1">
+                  <div key={log.id} className="flex items-center gap-2 text-[11px] font-mono border-b border-border py-1">
                     <span className="text-muted-foreground whitespace-nowrap">
                       {new Date(log.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                     </span>

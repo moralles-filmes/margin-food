@@ -23,6 +23,17 @@ import {
   YAxis,
 } from 'recharts';
 import {
+  axisProps,
+  gridProps,
+  tooltipProps,
+  legendProps,
+  SEMANTIC_CHART_COLORS,
+  chartValueFormatters,
+  makeActiveDot,
+} from '@/lib/chartTheme';
+import { ChartTooltip, type ChartTooltipPayloadItem } from '@/components/ui/ChartTooltip';
+import { ChartLegend } from '@/components/ui/ChartLegend';
+import {
   calculatePresentationGroupMetric,
   filterPresentationCategoriesByGroup,
   formatMonthPeriodPtBR,
@@ -55,7 +66,6 @@ import type { PresentationSociosData } from '@/lib/financeiroPresentationAdapter
 import type { PresentationDetailTarget } from '@/lib/presentationDetailNavigation';
 import {
   fmtBRL,
-  fmtBRLCompact,
   formatDateBR,
   formatPercentBR,
   parseLocalDate,
@@ -395,14 +405,25 @@ function DetailTrend({
           <div className="h-64" role="img" aria-label="Gráfico de evolução do detalhe">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 2 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                <XAxis dataKey="label" tick={{ fontSize: 10 }} minTickGap={20} axisLine={false} tickLine={false} />
-                <YAxis yAxisId="amount" tickFormatter={target === 'margin' ? value => `${value}%` : fmtBRLCompact} tick={{ fontSize: 10 }} width={64} axisLine={false} tickLine={false} />
-                {target === 'cmv' ? <YAxis yAxisId="percent" orientation="right" tickFormatter={value => `${value}%`} tick={{ fontSize: 10 }} width={48} axisLine={false} tickLine={false} /> : null}
-                <Tooltip formatter={(value: number, name: string) => name === '% da receita' ? formatPercentBR(value, 1) : target === 'margin' ? formatPercentBR(value, 1) : fmtBRL(value)} />
-                <Legend iconType="circle" iconSize={7} />
-                <Line yAxisId="amount" type="monotone" dataKey="value" name={target === 'margin' ? 'Margem' : 'Valor'} stroke="hsl(var(--primary))" strokeWidth={2.5} dot={{ r: 2.5 }} />
-                {target === 'cmv' ? <Line yAxisId="percent" type="monotone" dataKey="percent" name="% da receita" stroke="hsl(var(--destructive))" strokeWidth={2} dot={false} /> : null}
+                <CartesianGrid {...gridProps} />
+                <XAxis dataKey="label" {...axisProps} minTickGap={20} />
+                <YAxis yAxisId="amount" {...axisProps} tickFormatter={target === 'margin' ? value => `${value}%` : chartValueFormatters.moneyCompact} width={64} />
+                {target === 'cmv' ? <YAxis yAxisId="percent" orientation="right" {...axisProps} tickFormatter={value => `${value}%`} width={48} /> : null}
+                <Tooltip
+                  {...tooltipProps}
+                  content={(
+                    <ChartTooltip
+                      valueFormatter={(value: number | string, item: ChartTooltipPayloadItem) => (
+                        item.name === '% da receita' || target === 'margin'
+                          ? formatPercentBR(Number(value), 1)
+                          : fmtBRL(Number(value))
+                      )}
+                    />
+                  )}
+                />
+                <Legend {...legendProps} content={<ChartLegend />} />
+                <Line yAxisId="amount" type="monotone" dataKey="value" name={target === 'margin' ? 'Margem' : 'Valor'} stroke="hsl(var(--primary))" strokeWidth={2.5} dot={{ r: 2.5 }} activeDot={makeActiveDot('hsl(var(--primary))')} />
+                {target === 'cmv' ? <Line yAxisId="percent" type="monotone" dataKey="percent" name="% da receita" stroke={SEMANTIC_CHART_COLORS.negative} strokeWidth={2} dot={false} activeDot={makeActiveDot(SEMANTIC_CHART_COLORS.negative)} /> : null}
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -450,7 +471,7 @@ function RankingTable({
           <ol className="space-y-2">
             {items.map(item => (
               <li key={`${item.rank}-${item.categoryId ?? item.label}`} className="grid grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-2 rounded-lg border border-border/70 p-3">
-                <span className="font-bold text-gold-dark dark:text-primary">{item.rank}</span>
+                <span className="font-bold text-primary-ink">{item.rank}</span>
                 {item.categoryId ? (
                   <button type="button" onClick={() => onSelectCategory(item.categoryId ?? undefined)} className="truncate rounded-sm text-left text-sm font-medium text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                     {item.label}
@@ -592,7 +613,7 @@ export default function PresentationDetailPage({
 
       <header className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-border/80 bg-card p-5 shadow-sm">
         <div className="flex items-start gap-3">
-          <span className="rounded-lg bg-primary/10 p-2.5"><Icon className="h-5 w-5 text-gold-dark dark:text-primary" aria-hidden="true" /></span>
+          <span className="rounded-lg bg-primary/10 p-2.5"><Icon className="h-5 w-5 text-primary-ink" aria-hidden="true" /></span>
           <div><h2 id="presentation-detail-title" className="text-xl font-bold text-foreground">{categoryPath?.at(-1)?.name ?? definition.title}</h2><p className="mt-1 text-sm text-muted-foreground">{definition.description}</p><p className="mt-2 text-xs text-muted-foreground">{data.periodLabel} • {unitName ?? 'Unidade atual'} • {snapshot.timeSeries.granularity}</p></div>
         </div>
         <Button type="button" variant="outline" onClick={onBack} aria-label="Voltar para a Apresentação Sócios"><ArrowLeft className="mr-2 h-4 w-4" aria-hidden="true" /> Voltar</Button>

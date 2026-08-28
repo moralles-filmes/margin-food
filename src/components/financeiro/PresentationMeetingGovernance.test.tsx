@@ -70,7 +70,7 @@ vi.mock('@/hooks/usePresentationMeetings', async importOriginal => {
 function renderGovernance(options: { canManage?: boolean; canApprove?: boolean; canExport?: boolean } = {}) {
   const plan = createPresentationPlanData();
   return render(
-    <MemoryRouter initialEntries={[`/financeiro/relatorio-socios?session=${MEETING_ID}`]}>
+    <MemoryRouter initialEntries={[`/financeiro/apresentacao-socios?session=${MEETING_ID}`]}>
       <PresentationMeetingGovernance
         companyId="99999999-2222-4999-8999-999999999999"
         userId="dddddddd-dddd-4ddd-8ddd-dddddddddddd"

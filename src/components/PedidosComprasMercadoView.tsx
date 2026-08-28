@@ -8,6 +8,7 @@ import { useEstoqueGeralStoreContext } from '@/contexts/EstoqueGeralStoreContext
 import { useSalmonStoreContext } from '@/contexts/SalmonStoreContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DateInput } from '@/components/ui/DateInput';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
@@ -26,24 +27,28 @@ import {
 } from 'lucide-react';
 import ExportPedidoModal from '@/components/compras/ExportPedidoModal';
 import { supabase } from '@/integrations/supabase/client';
+import StatusBadge, { type StatusType } from '@/components/ui/StatusBadge';
 
 type SubTab = 'pedidos' | 'recebimento' | 'concluidos' | 'nao-entregues';
 
+// Severidade da prioridade não bate 1:1 com as 5 variantes do StatusBadge
+// (URGENTE e ALTA são ambas "danger" no design system, mas precisam de intensidade
+// visual distinta) — mantido como Record local com tokens semânticos.
 const PRIORITY_COLORS: Record<string, string> = {
-  URGENTE: 'bg-destructive/15 text-destructive',
-  ALTA: 'bg-destructive/10 text-destructive',
-  MEDIA: 'bg-warning/10 text-warning',
-  BAIXA: 'bg-success/10 text-success',
+  URGENTE: 'bg-destructive text-destructive-foreground',
+  ALTA: 'bg-destructive-soft text-destructive',
+  MEDIA: 'bg-warning-soft text-warning',
+  BAIXA: 'bg-success-soft text-success',
 };
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; icon: typeof Clock }> = {
-  PENDING: { label: 'Pendente (Compra)', color: 'bg-warning/15 text-warning', icon: ShoppingCart },
-  SHOPPING_OK: { label: 'Compra OK', color: 'bg-success/15 text-success', icon: CheckCircle2 },
-  OPEN: { label: 'Aberto', color: 'bg-primary/15 text-primary', icon: Clock },
-  IN_RECEIVING: { label: 'Em Recebimento', color: 'bg-warning/15 text-warning', icon: Package },
-  PARTIAL: { label: 'Parcial', color: 'bg-warning/15 text-warning', icon: AlertTriangle },
-  COMPLETED: { label: 'Concluído', color: 'bg-success/15 text-success', icon: CheckCircle2 },
-  CANCELLED: { label: 'Cancelado', color: 'bg-muted text-muted-foreground', icon: XCircle },
+const STATUS_CONFIG: Record<string, { label: string; variant: StatusType; icon: typeof Clock }> = {
+  PENDING: { label: 'Pendente (Compra)', variant: 'warning', icon: ShoppingCart },
+  SHOPPING_OK: { label: 'Compra OK', variant: 'success', icon: CheckCircle2 },
+  OPEN: { label: 'Aberto', variant: 'info', icon: Clock },
+  IN_RECEIVING: { label: 'Em Recebimento', variant: 'warning', icon: Package },
+  PARTIAL: { label: 'Parcial', variant: 'warning', icon: AlertTriangle },
+  COMPLETED: { label: 'Concluído', variant: 'success', icon: CheckCircle2 },
+  CANCELLED: { label: 'Cancelado', variant: 'neutral', icon: XCircle },
 };
 
 
@@ -490,7 +495,7 @@ export default function PedidosComprasMercadoView() {
           </DialogDescription>
         </DialogHeader>
         {hasReceivedItems && (
-          <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3 text-xs space-y-1">
+          <div className="bg-destructive-soft border border-destructive-border rounded-lg p-3 text-xs space-y-1">
             <p className="font-semibold text-destructive">Itens com recebimento que serão estornados:</p>
             {deleteItems.filter(i => i.qty_received > 0).map(i => (
               <p key={i.id} className="text-foreground">• {i.name_snapshot}: {i.qty_received} {i.unit_snapshot} recebidos</p>
@@ -565,15 +570,16 @@ export default function PedidosComprasMercadoView() {
             <div>
               <h3 className="text-lg font-bold text-foreground">{selectedOrder.title}</h3>
               <div className="flex items-center gap-2 mt-1 flex-wrap">
-                <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${sc.color}`}>
-                  <Icon className="w-3 h-3 inline mr-1" />{sc.label}
+                <span className="inline-flex items-center gap-1">
+                  <Icon className="w-3 h-3 text-muted-foreground" />
+                  <StatusBadge status={sc.variant} label={sc.label} />
                 </span>
                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${PRIORITY_COLORS[selectedOrder.priority]}`}>
                    {selectedOrder.priority}
                  </span>
                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">{selectedOrder.type}</span>
                  {selectedOrder.origin === 'REQUISICAO' && (
-                   <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-primary/15 text-primary">📋 Origem: Requisição</span>
+                   <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-primary-soft text-primary-ink">📋 Origem: Requisição</span>
                  )}
                  {selectedOrder.category && parseCategories(selectedOrder.category).map(cat => (
                    <span key={cat} className="text-[10px] px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">{cat}</span>
@@ -593,11 +599,11 @@ export default function PedidosComprasMercadoView() {
           {selectedOrder.notes && <p className="text-xs text-muted-foreground italic mb-4">{selectedOrder.notes}</p>}
 
           <div className="grid grid-cols-2 gap-3 mb-4">
-            <div className="bg-secondary/50 rounded-lg p-3">
+            <div className="bg-background-subtle rounded-lg p-3">
               <p className="text-[10px] text-muted-foreground">Total Estimado</p>
               <p className="text-lg font-bold text-foreground">{fmtBRL(selectedOrder.total_estimated)}</p>
             </div>
-            <div className="bg-secondary/50 rounded-lg p-3">
+            <div className="bg-background-subtle rounded-lg p-3">
               <p className="text-[10px] text-muted-foreground">Total Confirmado</p>
               <p className="text-lg font-bold text-foreground">{fmtBRL(selectedOrder.total_confirmed)}</p>
             </div>
@@ -643,8 +649,8 @@ export default function PedidosComprasMercadoView() {
               const r = receivingQtds[item.id];
               return (
                 <div key={item.id} className={`border rounded-lg p-3 transition-all ${
-                  item.received_status === 'RECEIVED' ? 'bg-success/5 border-success/30' :
-                  item.received_status === 'NOT_DELIVERED' ? 'bg-destructive/5 border-destructive/30' :
+                  item.received_status === 'RECEIVED' ? 'bg-success-soft border-success-border' :
+                  item.received_status === 'NOT_DELIVERED' ? 'bg-destructive-soft border-destructive-border' :
                   'border-border'
                 }`}>
                   <div className="flex items-start justify-between">
@@ -652,7 +658,7 @@ export default function PedidosComprasMercadoView() {
                       <div className="mt-0.5">
                         {item.received_status === 'RECEIVED' ? <CheckCircle2 className="w-5 h-5 text-success" /> :
                          item.received_status === 'NOT_DELIVERED' ? <XCircle className="w-5 h-5 text-destructive" /> :
-                         <div className="w-5 h-5 rounded border-2 border-muted-foreground/30" />}
+                         <div className="w-5 h-5 rounded border-2 border-border-strong" />}
                       </div>
                       <div>
                         <p className={`text-sm font-medium ${item.received_status === 'RECEIVED' ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
@@ -672,7 +678,7 @@ export default function PedidosComprasMercadoView() {
                   </div>
 
                   {isPending && item.received_status === 'PENDING' && canReceive && r && (
-                    <div className="mt-3 bg-secondary/50 rounded-lg p-3 space-y-2">
+                    <div className="mt-3 bg-background-subtle rounded-lg p-3 space-y-2">
                       <div className="flex gap-2 items-end">
                         <div className="flex-1">
                           <Label className="text-[10px] text-muted-foreground">Qtd recebida</Label>
@@ -698,7 +704,7 @@ export default function PedidosComprasMercadoView() {
                   {isPartial && item.received_status === 'NOT_DELIVERED' && canReceive && (
                     <div className="mt-3">
                       {finalizingItemId === item.id ? (
-                        <div className="bg-secondary/50 rounded-lg p-3 space-y-2">
+                        <div className="bg-background-subtle rounded-lg p-3 space-y-2">
                           <div className="flex gap-2 items-end">
                             <div className="flex-1">
                               <Label className="text-[10px] text-muted-foreground">Qtd recebida agora</Label>
@@ -731,7 +737,7 @@ export default function PedidosComprasMercadoView() {
               </h4>
               <div className="space-y-2">
                 {unavailableItems.map(item => (
-                  <div key={item.id} className="border border-destructive/30 bg-destructive/5 rounded-lg p-3">
+                  <div key={item.id} className="border border-destructive-border bg-destructive-soft rounded-lg p-3">
                     <div className="flex items-start gap-3">
                       <XCircle className="w-5 h-5 text-destructive mt-0.5 shrink-0" />
                       <div>
@@ -765,7 +771,7 @@ export default function PedidosComprasMercadoView() {
           <p className="text-[10px] text-muted-foreground">Fornecedores, Mercado e Sazonais — fluxo unificado</p>
         </div>
         {canCreate && (
-          <Button size="sm" className="gradient-salmon text-primary-foreground border-0 gap-1.5 text-xs" onClick={() => { closeForm(); setShowForm(true); }}>
+          <Button size="sm" className="bg-primary-strong text-primary-foreground border-0 gap-1.5 text-xs" onClick={() => { closeForm(); setShowForm(true); }}>
             <Plus className="w-3.5 h-3.5" /> Nova Solicitação
           </Button>
         )}
@@ -822,7 +828,7 @@ export default function PedidosComprasMercadoView() {
           </h4>
 
           {editingOrder?.status === 'COMPLETED' && (
-            <div className="bg-warning/10 border border-warning/30 rounded-lg p-2 text-xs text-warning">
+            <div className="bg-warning-soft border border-warning-border rounded-lg p-2 text-xs text-warning">
               ⚠️ Pedido concluído — apenas campos do cabeçalho podem ser editados. Itens/quantidades estão travados.
             </div>
           )}
@@ -863,7 +869,7 @@ export default function PedidosComprasMercadoView() {
                     {parseCategories(form.category).length > 0 ? (
                       <div className="flex flex-wrap gap-1">
                         {parseCategories(form.category).map(cat => (
-                          <span key={cat} className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-primary/15 text-primary font-medium">
+                          <span key={cat} className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-primary-soft text-primary-ink font-medium">
                             {cat}
                             <button type="button" onClick={(e) => { e.stopPropagation(); toggleCategory(cat); }} className="hover:text-destructive">
                               <X className="w-2.5 h-2.5" />
@@ -952,11 +958,11 @@ export default function PedidosComprasMercadoView() {
             </div>
             <div>
               <Label className="text-[10px] text-muted-foreground">Data necessidade</Label>
-              <Input type="date" value={form.need_by_date} onChange={e => setForm(f => ({ ...f, need_by_date: e.target.value }))} className="text-xs mt-1" />
+              <DateInput value={form.need_by_date} onValueChange={v => setForm(f => ({ ...f, need_by_date: v }))} className="text-xs mt-1" />
             </div>
             <div>
               <Label className="text-[10px] text-muted-foreground">Previsão de entrega</Label>
-              <Input type="date" value={form.delivery_forecast_date} onChange={e => setForm(f => ({ ...f, delivery_forecast_date: e.target.value }))} className="text-xs mt-1" />
+              <DateInput value={form.delivery_forecast_date} onValueChange={v => setForm(f => ({ ...f, delivery_forecast_date: v }))} className="text-xs mt-1" />
             </div>
             <div>
               <Label className="text-[10px] text-muted-foreground">
@@ -985,7 +991,7 @@ export default function PedidosComprasMercadoView() {
               <Label className="text-[10px] text-muted-foreground mb-1">Itens já recebidos (somente leitura)</Label>
               <div className="space-y-1">
                 {editLockedItems.map(item => (
-                  <div key={item.id} className="flex items-center justify-between bg-success/5 border border-success/20 rounded-lg px-3 py-1.5 text-xs">
+                  <div key={item.id} className="flex items-center justify-between bg-success-soft border border-success-border rounded-lg px-3 py-1.5 text-xs">
                     <span className="text-muted-foreground">🔒 {item.name_snapshot}</span>
                     <span className="text-muted-foreground">{item.qty_received} {item.unit_snapshot} recebidos — {fmtBRL(item.qty_received * item.estimated_unit_value)}</span>
                   </div>
@@ -1018,7 +1024,7 @@ export default function PedidosComprasMercadoView() {
           {formItems.length > 0 && (
             <div className="space-y-1">
               {formItems.map((item, i) => (
-                <div key={i} className="flex items-center justify-between bg-secondary/50 rounded-lg px-3 py-1.5 text-xs">
+                <div key={i} className="flex items-center justify-between bg-background-subtle rounded-lg px-3 py-1.5 text-xs">
                   <span className="text-foreground">{item.name_snapshot}</span>
                   <div className="flex items-center gap-2">
                     <span className="text-muted-foreground">{item.qty_requested} {item.unit_snapshot} × {fmtBRL(item.estimated_unit_value)}</span>
@@ -1035,7 +1041,7 @@ export default function PedidosComprasMercadoView() {
 
           <div className="flex justify-end gap-2">
             <Button variant="ghost" size="sm" onClick={closeForm}>Cancelar</Button>
-            <Button size="sm" className="gradient-salmon text-primary-foreground border-0" onClick={handleSubmit}>
+            <Button size="sm" className="bg-primary-strong text-primary-foreground border-0" onClick={handleSubmit}>
               {editingOrder ? 'Salvar Alterações' : 'Criar Solicitação'}
             </Button>
           </div>
@@ -1044,7 +1050,7 @@ export default function PedidosComprasMercadoView() {
 
       {/* Orders List */}
       {store.errorMessage && (
-        <div className="bg-warning/10 border border-warning/30 rounded-xl p-3 text-xs text-warning">
+        <div className="bg-warning-soft border border-warning-border rounded-xl p-3 text-xs text-warning">
           {store.errorMessage}
         </div>
       )}
@@ -1068,7 +1074,7 @@ export default function PedidosComprasMercadoView() {
             return (
               <div key={order.id}
                 className={`w-full bg-card border rounded-xl p-3 hover:border-primary/30 transition-all animate-fade-up ${
-                  isNaoEntregues && !acked ? 'border-warning/30' : 'border-border'
+                  isNaoEntregues && !acked ? 'border-warning-border' : 'border-border'
                 }`}
                 style={{ animationDelay: `${i * 30}ms` }}>
                 <div className="flex items-center justify-between">
@@ -1077,11 +1083,11 @@ export default function PedidosComprasMercadoView() {
                       <p className="text-sm font-semibold text-foreground truncate">{order.title}</p>
                     </div>
                     <div className="flex items-center gap-2 mt-1 flex-wrap">
-                      <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-semibold ${sc.color}`}>{sc.label}</span>
+                      <StatusBadge status={sc.variant} label={sc.label} size="xs" />
                       <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-semibold ${PRIORITY_COLORS[order.priority]}`}>{order.priority}</span>
                       <span className="text-[9px] text-muted-foreground">{order.type}</span>
                       {order.origin === 'REQUISICAO' && (
-                        <span className="text-[9px] px-1.5 py-0.5 rounded-full font-semibold bg-primary/15 text-primary">📋 Requisição</span>
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-full font-semibold bg-primary-soft text-primary-ink">📋 Requisição</span>
                       )}
                       {order.supplier_name && <span className="text-[9px] text-muted-foreground">• {order.supplier_name}</span>}
                       <span className="text-[9px] text-muted-foreground">
@@ -1094,7 +1100,7 @@ export default function PedidosComprasMercadoView() {
                   </div>
                 </div>
                 {isNaoEntregues && (
-                  <div className={`mt-2 rounded-lg p-2 text-xs ${acked ? 'bg-success/10 border border-success/20' : 'bg-warning/10 border border-warning/20'}`}>
+                  <div className={`mt-2 rounded-lg p-2 text-xs ${acked ? 'bg-success-soft border border-success-border' : 'bg-warning-soft border border-warning-border'}`}>
                     {acked ? (
                       <div className="flex items-center gap-1.5 text-success">
                         <CheckCircle2 className="w-3.5 h-3.5" />
@@ -1107,7 +1113,7 @@ export default function PedidosComprasMercadoView() {
                           <span>Aguardando confirmação de ciência do criador</span>
                         </div>
                         {canAck && (
-                          <Button size="sm" variant="outline" className="text-[10px] h-7 gap-1 border-warning/30 text-warning hover:bg-warning/10"
+                          <Button size="sm" variant="outline" className="text-[10px] h-7 gap-1 border-warning-border text-warning hover:bg-warning/10"
                             onClick={(e) => { e.stopPropagation(); store.acknowledgeNotDelivered(order.id); }}>
                             <Check className="w-3 h-3" /> Confirmo ciência
                           </Button>
@@ -1122,7 +1128,7 @@ export default function PedidosComprasMercadoView() {
         </div>
       ) : (
         <div className="bg-card border border-border rounded-xl p-8 text-center space-y-4">
-          <Inbox className="w-12 h-12 mx-auto text-muted-foreground/30" />
+          <Inbox className="w-12 h-12 mx-auto text-muted-foreground" />
           <div>
             <p className="text-sm font-medium text-foreground mb-1">{emptyState.title}</p>
             <p className="text-xs text-muted-foreground">{emptyState.description}</p>

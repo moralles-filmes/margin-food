@@ -345,10 +345,8 @@ export default function BudgetPressure({ entries, targetMonth, metas, config, ca
 
       {/* Card 2: Mudança de Comportamento */}
       {analysis.historicoSuficiente && (
-        <div className={`rounded-xl border p-4 space-y-2 ${
-          analysis.foraDoPadrao
-            ? 'bg-warning/5 border-warning/30'
-            : 'bg-success/5 border-success/30'
+        <div className={`bg-card rounded-xl border border-border border-l-4 p-4 space-y-2 ${
+          analysis.foraDoPadrao ? 'border-l-warning' : 'border-l-success'
         }`}>
           <div className="flex items-center gap-1.5">
             <Activity className="w-3.5 h-3.5 text-primary" />
@@ -406,10 +404,10 @@ export default function BudgetPressure({ entries, targetMonth, metas, config, ca
       )}
 
       {/* Card 4: Risco de Estouro */}
-      <div className={`rounded-xl border p-4 space-y-3 ${
-        analysis.riscoStatus === 'alto' ? 'bg-destructive/5 border-destructive/30'
-          : analysis.riscoStatus === 'medio' ? 'bg-warning/5 border-warning/30'
-            : 'bg-card border-border'
+      <div className={`bg-card rounded-xl border border-border p-4 space-y-3 ${
+        analysis.riscoStatus === 'alto' ? 'border-l-4 border-l-destructive'
+          : analysis.riscoStatus === 'medio' ? 'border-l-4 border-l-warning'
+            : ''
       }`}>
         <div className="flex items-center gap-1.5">
           <ShieldAlert className="w-3.5 h-3.5 text-primary" />

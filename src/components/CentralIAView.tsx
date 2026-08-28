@@ -39,7 +39,7 @@ const agentes: Agente[] = [
   {
     id: 'geral', label: 'Consultor Geral', icon: Brain,
     description: 'Visão executiva integrada de todo o restaurante',
-    color: 'bg-primary/10 text-primary',
+    color: 'bg-primary-soft text-primary-soft-foreground',
     questions: [
       'Como está minha operação essa semana?',
       'Quais são os 3 maiores riscos agora?',
@@ -49,7 +49,7 @@ const agentes: Agente[] = [
   {
     id: 'salmao', label: 'Salmão Intelligence', icon: Fish,
     description: 'Perda, custo, manipulação e porcionamento',
-    color: 'bg-warning/10 text-warning',
+    color: 'bg-warning-soft text-warning',
     questions: [
       'Por que meu CMV salmão subiu essa semana?',
       'Estou manipulando salmão demais?',
@@ -59,7 +59,7 @@ const agentes: Agente[] = [
   {
     id: 'estoque', label: 'Estoque Geral', icon: Package,
     description: 'Giro, ruptura, cobertura e itens críticos',
-    color: 'bg-info/10 text-info',
+    color: 'bg-info-soft text-info',
     questions: [
       'O que preciso comprar essa semana?',
       'Tenho estoque parado?',
@@ -69,7 +69,7 @@ const agentes: Agente[] = [
   {
     id: 'cmv', label: 'Analista de CMV', icon: TrendingDown,
     description: 'Margem, meta vs realizado, ranking de impacto',
-    color: 'bg-destructive/10 text-destructive',
+    color: 'bg-destructive-soft text-destructive',
     questions: [
       'Por que meu CMV aumentou?',
       'Quais 3 itens estão destruindo minha margem?',
@@ -79,7 +79,7 @@ const agentes: Agente[] = [
   {
     id: 'compras', label: 'Consultor de Compras', icon: ShoppingCart,
     description: 'Fornecedores, preços e economia',
-    color: 'bg-success/10 text-success',
+    color: 'bg-success-soft text-success',
     questions: [
       'Qual fornecedor está mais caro?',
       'Estou comprando certo?',
@@ -89,7 +89,7 @@ const agentes: Agente[] = [
   {
     id: 'ficha-tecnica', label: 'Ficha Técnica', icon: BookOpen,
     description: 'Custo por produto, markup e margem por canal',
-    color: 'bg-info/10 text-info',
+    color: 'bg-info-soft text-info',
     questions: [
       'Qual produto devo aumentar preço?',
       'Qual canal está com margem negativa?',
@@ -99,7 +99,7 @@ const agentes: Agente[] = [
   {
     id: 'financeiro', label: 'Consultor Financeiro', icon: DollarSign,
     description: 'Fluxo de caixa, DRE, contas a pagar/receber e projeções',
-    color: 'bg-success/10 text-success',
+    color: 'bg-success-soft text-success',
     questions: [
       'Como está meu fluxo de caixa?',
       'Tenho contas vencidas?',
@@ -109,7 +109,7 @@ const agentes: Agente[] = [
   {
     id: 'rh', label: 'Consultor de RH', icon: UserCheck,
     description: 'Custos de pessoal, absenteísmo, escalas e compliance',
-    color: 'bg-warning/10 text-warning',
+    color: 'bg-warning-soft text-warning',
     questions: [
       'Qual o custo total de pessoal este mês?',
       'Tem funcionário com banco de horas alto?',
@@ -281,8 +281,8 @@ export default function CentralIAView() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-          <Brain className="w-5 h-5 text-primary" />
+        <div className="w-10 h-10 rounded-xl bg-primary-soft flex items-center justify-center">
+          <Brain className="w-5 h-5 text-primary-ink" />
         </div>
         <div>
           <h1 className="text-xl font-display font-bold text-foreground">Central de IA</h1>
@@ -303,8 +303,8 @@ export default function CentralIAView() {
                 onClick={() => handleAgentChange(a.id)}
                 className={`w-full text-left p-3 rounded-xl border transition-all duration-200 ${
                   isActive
-                    ? 'border-primary bg-primary/5 shadow-sm'
-                    : 'border-border hover:border-primary/30 hover:bg-accent/50'
+                    ? 'border-primary bg-primary-soft shadow-sm'
+                    : 'border-border hover:border-primary-border hover:bg-surface-hover'
                 }`}
               >
                 <div className="flex items-center gap-2.5">
@@ -360,7 +360,7 @@ export default function CentralIAView() {
                           key={i}
                           onClick={() => canCreate && sendMessage(q)}
                           disabled={!canCreate}
-                          className="w-full text-left p-3 rounded-xl border border-border hover:border-primary/30 hover:bg-accent/50 transition-all text-sm text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="w-full text-left p-3 rounded-xl border border-border hover:border-primary-border hover:bg-surface-hover transition-all text-sm text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <span className="text-primary mr-1.5">→</span> {q}
                         </button>
@@ -379,13 +379,13 @@ export default function CentralIAView() {
                         <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm ${
                           msg.role === 'user'
                             ? 'bg-primary text-primary-foreground rounded-br-md'
-                            : 'bg-muted/50 text-foreground rounded-bl-md'
+                            : 'bg-background-subtle text-foreground rounded-bl-md'
                         }`}>
                           <div className="whitespace-pre-wrap break-words leading-relaxed">{msg.content}</div>
                         </div>
                         {msg.role === 'user' && (
-                          <div className="w-7 h-7 rounded-lg flex-shrink-0 flex items-center justify-center bg-primary/10">
-                            <User className="w-3.5 h-3.5 text-primary" />
+                          <div className="w-7 h-7 rounded-lg flex-shrink-0 flex items-center justify-center bg-primary-soft">
+                            <User className="w-3.5 h-3.5 text-primary-ink" />
                           </div>
                         )}
                       </div>
@@ -395,7 +395,7 @@ export default function CentralIAView() {
                         <div className={`w-7 h-7 rounded-lg flex-shrink-0 flex items-center justify-center ${agent.color}`}>
                           <Bot className="w-3.5 h-3.5" />
                         </div>
-                        <div className="bg-muted/50 rounded-2xl rounded-bl-md px-4 py-3">
+                        <div className="bg-background-subtle rounded-2xl rounded-bl-md px-4 py-3">
                           <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
                         </div>
                       </div>

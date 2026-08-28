@@ -582,7 +582,7 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
                 <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={() => setFormMode('lista-fixa')}>
                   <ClipboardList className="w-3.5 h-3.5" /> Lista Fixa
                 </Button>
-                <Button size="sm" className="gradient-salmon text-primary-foreground border-0 gap-1.5 text-xs" onClick={() => setFormMode('manual')}>
+                <Button size="sm" className="bg-primary-strong text-primary-foreground border-0 gap-1.5 text-xs" onClick={() => setFormMode('manual')}>
                   <Plus className="w-3.5 h-3.5" /> Manual
                 </Button>
               </>
@@ -593,7 +593,7 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
         {canManage && formMode === 'none' && (
           <Collapsible open={listaFixaOpen} onOpenChange={setListaFixaOpen}>
             <CollapsibleTrigger asChild>
-              <button type="button" className="w-full flex items-center justify-between bg-card border border-border rounded-xl px-4 py-3 hover:bg-accent/50 transition-colors">
+              <button type="button" className="w-full flex items-center justify-between bg-card border border-border rounded-xl px-4 py-3 hover:bg-surface-hover transition-colors">
                 <div className="flex items-center gap-2">
                   <ClipboardList className="w-4 h-4 text-primary" />
                   <span className="text-sm font-semibold text-foreground">Gerenciar Listas Fixas por Setor</span>
@@ -698,7 +698,7 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
               </div>
 
               {selectedProductDisplay && !selectedProductDisplay.hasValidPurchaseUnit && (
-                <div className="mt-2 flex items-center gap-2 rounded-lg border border-warning/20 bg-warning/10 px-3 py-2 text-[11px] text-warning">
+                <div className="mt-2 flex items-center gap-2 rounded-lg border border-warning-border bg-warning-soft px-3 py-2 text-[11px] text-warning">
                   <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
                   <span>{selectedProductDisplay.issueMessage}</span>
                 </div>
@@ -711,7 +711,7 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
                   const saldo = getSaldo(item.produtoId);
                   const semEstoque = saldo < item.quantidade;
                   return (
-                    <div key={index} className={`flex items-center justify-between rounded-lg px-3 py-1.5 text-xs ${semEstoque ? 'bg-destructive/10 border border-destructive/20' : 'bg-secondary/50'}`}>
+                    <div key={index} className={`flex items-center justify-between rounded-lg px-3 py-1.5 text-xs ${semEstoque ? 'bg-destructive-soft border border-destructive-border' : 'bg-background-subtle'}`}>
                       <div className="flex items-center gap-2">
                         <span className="text-foreground">{getProdNome(item.produtoId)}</span>
                         {semEstoque && (
@@ -731,7 +731,7 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
                 })}
 
                 {itens.some(item => getSaldo(item.produtoId) < item.quantidade) && (
-                  <div className="flex items-center gap-2 p-2 bg-warning/10 border border-warning/20 rounded-lg text-[10px] text-warning">
+                  <div className="flex items-center gap-2 p-2 bg-warning-soft border border-warning-border rounded-lg text-[10px] text-warning">
                     <ShoppingCart className="w-3.5 h-3.5 shrink-0" />
                     <span>Itens sem estoque serão enviados como Solicitação de Compra para o setor de Compras.</span>
                   </div>
@@ -741,7 +741,7 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
 
             <div className="flex justify-end gap-2">
               <Button type="button" variant="ghost" size="sm" onClick={resetManualForm}>Cancelar</Button>
-              <Button type="submit" size="sm" className="gradient-salmon text-primary-foreground border-0" disabled={submitting}>
+              <Button type="submit" size="sm" className="bg-primary-strong text-primary-foreground border-0" disabled={submitting}>
                 {submitting ? 'Enviando...' : 'Enviar'}
               </Button>
             </div>
@@ -787,8 +787,8 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
                       </span>
                       {['ATENDIDA', 'PARCIALMENTE_ATENDIDA', 'NEGADA'].includes(req.status) && (
                         req.confirmado_pelo_solicitante_em
-                          ? <Badge variant="outline" className="text-[9px] h-4 px-1.5 text-success border-success/30">✓ Visto</Badge>
-                          : <Badge variant="outline" className="text-[9px] h-4 px-1.5 text-warning border-warning/30">⏱ Aguardando</Badge>
+                          ? <Badge variant="outline" className="text-[9px] h-4 px-1.5 text-success border-success-border">✓ Visto</Badge>
+                          : <Badge variant="outline" className="text-[9px] h-4 px-1.5 text-warning border-warning-border">⏱ Aguardando</Badge>
                       )}
                       {isExpanded ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />}
                     </div>
@@ -812,7 +812,7 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
                           <Button
                             size="sm"
                             variant="outline"
-                            className="h-7 text-[10px] gap-1 text-destructive border-destructive/30 hover:bg-destructive/10"
+                            className="h-7 text-[10px] gap-1 text-destructive border-destructive-border hover:bg-destructive-soft"
                             onClick={() => handleNegar(req.id)}
                           >
                             <Ban className="w-3 h-3" /> Negar Tudo
@@ -834,10 +834,10 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
                               key={item.id}
                               className={`rounded-lg px-3 py-2 text-[11px] ${
                                 item.status === 'RECUSADO'
-                                  ? 'bg-destructive/5 border border-destructive/15'
+                                  ? 'bg-destructive-soft border border-destructive-border'
                                   : item.status === 'ATENDIDO'
-                                    ? 'bg-success/5 border border-success/15'
-                                    : 'bg-secondary/30'
+                                    ? 'bg-success-soft border border-success-border'
+                                    : 'bg-background-subtle'
                               }`}
                             >
                               <div className="flex items-center justify-between">
@@ -855,7 +855,7 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
                                     </div>
                                   )}
                                   {item.status === 'RECUSADO' && item.motivo_recusa && (
-                                    <p className="mt-0.5 text-[9px] text-destructive/80 italic">
+                                    <p className="mt-0.5 text-[9px] text-destructive italic">
                                       Motivo: {item.motivo_recusa}
                                     </p>
                                   )}
@@ -871,7 +871,7 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
                                       {item.quantidade_solicitada} {listedItemDisplay.unitLabel ?? 'Configurar'}
                                     </span>
                                     {isItemPending && canApprove && (
-                                      <p className="text-[9px] text-muted-foreground/70">
+                                      <p className="text-[9px] text-muted-foreground">
                                         Disp: {saldoProduto.toFixed(1)}
                                       </p>
                                     )}
@@ -883,7 +883,7 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
                                       <Button
                                         size="sm"
                                         variant="ghost"
-                                        className="h-6 w-6 p-0 text-primary hover:bg-primary/10"
+                                        className="h-6 w-6 p-0 text-primary hover:bg-primary-soft"
                                         onClick={() => openAttendDialog(req.id, item)}
                                         disabled={!!actionLoading}
                                         title="Atender com ajuste de quantidade"
@@ -894,7 +894,7 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
                                       <Button
                                         size="sm"
                                         variant="ghost"
-                                        className="h-6 w-6 p-0 text-success hover:bg-success/10"
+                                        className="h-6 w-6 p-0 text-success hover:bg-success-soft"
                                         onClick={() => handleAtenderItemDirect(req.id, item.id)}
                                         disabled={actionLoading === item.id}
                                         title="Atender quantidade total"
@@ -904,7 +904,7 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
                                       <Button
                                         size="sm"
                                         variant="ghost"
-                                        className="h-6 w-6 p-0 text-destructive hover:bg-destructive/10"
+                                        className="h-6 w-6 p-0 text-destructive hover:bg-destructive-soft"
                                         onClick={() => openRejectDialog(req.id, item.id, item.produtos?.nome_produto || getProdNome(item.produto_id))}
                                         disabled={!!actionLoading}
                                         title="Recusar item"
@@ -926,7 +926,7 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
                           <Button
                             size="sm"
                             variant="outline"
-                            className="h-7 text-[10px] gap-1 text-destructive border-destructive/30 hover:bg-destructive/10"
+                            className="h-7 text-[10px] gap-1 text-destructive border-destructive-border hover:bg-destructive-soft"
                             onClick={() => handleCancelar(req.id)}
                             disabled={cancelling === req.id}
                           >
@@ -1071,7 +1071,7 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
             </Button>
             <Button
               size="sm"
-              className="gradient-salmon text-primary-foreground border-0"
+              className="bg-primary-strong text-primary-foreground border-0"
               onClick={handleConfirmAttend}
               disabled={attendSubmitting || !attendQty || parseFloat(attendQty) <= 0}
             >
@@ -1132,8 +1132,8 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
                           </span>
                           {['ATENDIDA', 'PARCIALMENTE_ATENDIDA', 'NEGADA'].includes(req.status) && (
                             req.confirmado_pelo_solicitante_em
-                              ? <Badge variant="outline" className="text-[9px] h-4 px-1.5 text-success border-success/30">✓ Visto</Badge>
-                              : <Badge variant="outline" className="text-[9px] h-4 px-1.5 text-warning border-warning/30">⏱ Aguardando</Badge>
+                              ? <Badge variant="outline" className="text-[9px] h-4 px-1.5 text-success border-success-border">✓ Visto</Badge>
+                              : <Badge variant="outline" className="text-[9px] h-4 px-1.5 text-warning border-warning-border">⏱ Aguardando</Badge>
                           )}
                           {isExpanded ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />}
                         </div>
@@ -1150,10 +1150,10 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
                                 key={item.id}
                                 className={`rounded-lg px-3 py-2 text-[11px] ${
                                   item.status === 'RECUSADO'
-                                    ? 'bg-destructive/5 border border-destructive/15'
+                                    ? 'bg-destructive-soft border border-destructive-border'
                                     : item.status === 'ATENDIDO'
-                                      ? 'bg-success/5 border border-success/15'
-                                      : 'bg-secondary/30'
+                                      ? 'bg-success-soft border border-success-border'
+                                      : 'bg-background-subtle'
                                 }`}
                               >
                                 <div className="flex items-center justify-between">
@@ -1165,7 +1165,7 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
                                       </span>
                                     </div>
                                     {item.status === 'RECUSADO' && item.motivo_recusa && (
-                                      <p className="mt-0.5 text-[9px] text-destructive/80 italic">
+                                      <p className="mt-0.5 text-[9px] text-destructive italic">
                                         Motivo: {item.motivo_recusa}
                                       </p>
                                     )}

@@ -74,7 +74,7 @@ export default function DateRangePresets({ from, to, onChange, className, hideLa
             variant={isActive ? 'default' : 'outline'}
             className={`text-[11px] h-7 px-2.5 whitespace-nowrap ${
               isActive
-                ? 'gradient-salmon text-primary-foreground border-0'
+                ? 'bg-primary-strong text-primary-strong-foreground border-0 hover:bg-primary-hover'
                 : 'border-border text-muted-foreground'
             }`}
             onClick={() => onChange(preset.from(), preset.to())}

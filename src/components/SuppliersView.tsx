@@ -79,7 +79,7 @@ export default function SuppliersView({ store }: SuppliersViewProps) {
           <p className="text-xs text-muted-foreground">{suppliers.length} cadastrados • {suppliers.filter(s => s.active).length} ativos</p>
         </div>
         {canCreate && (
-          <Button onClick={() => { setShowForm(!showForm); setEditId(null); setForm(emptyForm); }} size="sm" className="gradient-salmon text-primary-foreground border-0 gap-1.5">
+          <Button onClick={() => { setShowForm(!showForm); setEditId(null); setForm(emptyForm); }} size="sm" className="bg-primary-strong text-primary-foreground border-0 gap-1.5">
             <Plus className="w-4 h-4" /> Novo
           </Button>
         )}
@@ -123,7 +123,7 @@ export default function SuppliersView({ store }: SuppliersViewProps) {
             </label>
             <div className="flex gap-2">
               <Button type="button" variant="ghost" size="sm" onClick={() => { setShowForm(false); setEditId(null); }}>Cancelar</Button>
-              <Button type="submit" size="sm" className="gradient-salmon text-primary-foreground border-0">{editId ? 'Atualizar' : 'Salvar'}</Button>
+              <Button type="submit" size="sm" className="bg-primary-strong text-primary-foreground border-0">{editId ? 'Atualizar' : 'Salvar'}</Button>
             </div>
           </div>
         </form>

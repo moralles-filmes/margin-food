@@ -2,10 +2,12 @@ import { useMemo } from 'react';
 import { SalmonEntry, MetaCompraMensal } from '@/types/salmon';
 import { getDaysInMonth } from 'date-fns';
 import { CheckCircle2, AlertTriangle, XCircle, CalendarDays, Info } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { useMetaMensal } from './MetaCompraCard';
 import { parseLocalDate } from '@/lib/dateUtils';
 import { todayBR } from '@/lib/datetime';
+import { axisProps, gridProps, tooltipProps, SEMANTIC_CHART_COLORS } from '@/lib/chartTheme';
+import { ChartTooltip } from '@/components/ui/ChartTooltip';
 
 import { fmtBRL } from '@/lib/formatters';
 const fmtR = (v: number) => fmtBRL(v);
@@ -224,14 +226,15 @@ export default function WeeklyBreakdown({ entries, metas, targetMonth, compact, 
       <div className="h-36">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={chartData} barGap={2}>
-            <XAxis dataKey="name" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+            <CartesianGrid {...gridProps} />
+            <XAxis dataKey="name" {...axisProps} />
             <YAxis hide />
             <Tooltip
-              formatter={(value: number, name: string) => [fmtR(value), name === 'real' ? 'Gasto Real' : 'Ideal']}
-              contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid hsl(var(--border))' }}
+              {...tooltipProps}
+              content={<ChartTooltip valueFormatter={v => fmtR(Number(v))} />}
             />
-            <Bar dataKey="real" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="ideal" fill="hsl(var(--success) / 0.35)" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="real" name="Gasto Real" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="ideal" name="Ideal" fill={SEMANTIC_CHART_COLORS.projected} fillOpacity={0.3} radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -278,7 +281,7 @@ export default function WeeklyBreakdown({ entries, metas, targetMonth, compact, 
 
       <div className="flex items-center gap-3 text-[9px] text-muted-foreground">
         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-primary inline-block" /> Real</span>
-        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-success/35 inline-block" /> Ideal</span>
+        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-chart-projected/30 inline-block" /> Ideal</span>
         <span className="flex items-center gap-1"><CheckCircle2 className="w-2.5 h-2.5 text-success" /> OK</span>
         <span className="flex items-center gap-1"><AlertTriangle className="w-2.5 h-2.5 text-warning" /> 90%+</span>
         <span className="flex items-center gap-1"><XCircle className="w-2.5 h-2.5 text-destructive" /> 100%+</span>

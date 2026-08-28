@@ -399,7 +399,7 @@ export default function StockCadastrosSection() {
         <TabsContent value="categorias" className="space-y-3 mt-3">
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold text-foreground">Categorias de Estoque</p>
-            <Button size="sm" className="gradient-salmon text-primary-foreground border-0 gap-1.5 text-xs" onClick={() => openCatDialog()}>
+            <Button size="sm" className="bg-primary-strong text-primary-foreground border-0 gap-1.5 text-xs" onClick={() => openCatDialog()}>
               <Plus className="w-3.5 h-3.5" /> Nova Categoria
             </Button>
           </div>
@@ -417,7 +417,7 @@ export default function StockCadastrosSection() {
           ) : (
             <div className="space-y-2">
               {categories.map(cat => (
-                <div key={cat.id} className={`bg-card border rounded-xl p-3 flex items-center justify-between ${cat.is_active ? 'border-border' : 'border-border/50 opacity-80'}`}>
+                <div key={cat.id} className={`bg-card border rounded-xl p-3 flex items-center justify-between ${cat.is_active ? 'border-border' : 'border-border opacity-80'}`}>
                   <div>
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-semibold text-foreground">{cat.name}</p>
@@ -430,10 +430,10 @@ export default function StockCadastrosSection() {
                     <button onClick={() => openCatDialog(cat)} className="p-1.5 rounded-lg text-muted-foreground hover:bg-secondary">
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
-                    <button onClick={() => toggleCatActive(cat)} className={`p-1.5 rounded-lg ${cat.is_active ? 'text-warning hover:bg-warning/10' : 'text-success hover:bg-success/10'}`}>
+                    <button onClick={() => toggleCatActive(cat)} className={`p-1.5 rounded-lg ${cat.is_active ? 'text-warning hover:bg-warning-soft' : 'text-success hover:bg-success-soft'}`}>
                       {cat.is_active ? <PowerOff className="w-3.5 h-3.5" /> : <Power className="w-3.5 h-3.5" />}
                     </button>
-                    <button onClick={() => deleteCat(cat)} className="p-1.5 rounded-lg text-destructive hover:bg-destructive/10">
+                    <button onClick={() => deleteCat(cat)} className="p-1.5 rounded-lg text-destructive hover:bg-destructive-soft">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
@@ -447,7 +447,7 @@ export default function StockCadastrosSection() {
         <TabsContent value="locais" className="space-y-3 mt-3">
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold text-foreground">Locais de Armazenagem</p>
-            <Button size="sm" className="gradient-salmon text-primary-foreground border-0 gap-1.5 text-xs" onClick={() => openLocDialog()}>
+            <Button size="sm" className="bg-primary-strong text-primary-foreground border-0 gap-1.5 text-xs" onClick={() => openLocDialog()}>
               <Plus className="w-3.5 h-3.5" /> Novo Local
             </Button>
           </div>
@@ -465,7 +465,7 @@ export default function StockCadastrosSection() {
           ) : (
             <div className="space-y-2">
               {locations.map(loc => (
-                <div key={loc.id} className={`bg-card border rounded-xl p-3 flex items-center justify-between ${loc.is_active ? 'border-border' : 'border-border/50 opacity-80'}`}>
+                <div key={loc.id} className={`bg-card border rounded-xl p-3 flex items-center justify-between ${loc.is_active ? 'border-border' : 'border-border opacity-80'}`}>
                   <div>
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-semibold text-foreground">{loc.name}</p>
@@ -480,10 +480,10 @@ export default function StockCadastrosSection() {
                     <button onClick={() => openLocDialog(loc)} className="p-1.5 rounded-lg text-muted-foreground hover:bg-secondary">
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
-                    <button onClick={() => toggleLocActive(loc)} className={`p-1.5 rounded-lg ${loc.is_active ? 'text-warning hover:bg-warning/10' : 'text-success hover:bg-success/10'}`}>
+                    <button onClick={() => toggleLocActive(loc)} className={`p-1.5 rounded-lg ${loc.is_active ? 'text-warning hover:bg-warning-soft' : 'text-success hover:bg-success-soft'}`}>
                       {loc.is_active ? <PowerOff className="w-3.5 h-3.5" /> : <Power className="w-3.5 h-3.5" />}
                     </button>
-                    <button onClick={() => deleteLoc(loc)} className="p-1.5 rounded-lg text-destructive hover:bg-destructive/10">
+                    <button onClick={() => deleteLoc(loc)} className="p-1.5 rounded-lg text-destructive hover:bg-destructive-soft">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
@@ -497,7 +497,7 @@ export default function StockCadastrosSection() {
         <TabsContent value="setores" className="space-y-3 mt-3">
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold text-foreground">Setores</p>
-            <Button size="sm" className="gradient-salmon text-primary-foreground border-0 gap-1.5 text-xs" onClick={() => openSecDialog()}>
+            <Button size="sm" className="bg-primary-strong text-primary-foreground border-0 gap-1.5 text-xs" onClick={() => openSecDialog()}>
               <Plus className="w-3.5 h-3.5" /> Novo Setor
             </Button>
           </div>
@@ -515,7 +515,7 @@ export default function StockCadastrosSection() {
           ) : (
             <div className="space-y-2">
               {sectors.map(sec => (
-                <div key={sec.id} className={`bg-card border rounded-xl p-3 flex items-center justify-between ${sec.is_active ? 'border-border' : 'border-border/50 opacity-80'}`}>
+                <div key={sec.id} className={`bg-card border rounded-xl p-3 flex items-center justify-between ${sec.is_active ? 'border-border' : 'border-border opacity-80'}`}>
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-semibold text-foreground">{sec.name}</p>
                     {!sec.is_active && <Badge variant="outline" className="text-[9px] h-4">Inativo</Badge>}
@@ -524,10 +524,10 @@ export default function StockCadastrosSection() {
                     <button onClick={() => openSecDialog(sec)} className="p-1.5 rounded-lg text-muted-foreground hover:bg-secondary">
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
-                    <button onClick={() => toggleSecActive(sec)} className={`p-1.5 rounded-lg ${sec.is_active ? 'text-warning hover:bg-warning/10' : 'text-success hover:bg-success/10'}`}>
+                    <button onClick={() => toggleSecActive(sec)} className={`p-1.5 rounded-lg ${sec.is_active ? 'text-warning hover:bg-warning-soft' : 'text-success hover:bg-success-soft'}`}>
                       {sec.is_active ? <PowerOff className="w-3.5 h-3.5" /> : <Power className="w-3.5 h-3.5" />}
                     </button>
-                    <button onClick={() => deleteSec(sec)} className="p-1.5 rounded-lg text-destructive hover:bg-destructive/10">
+                    <button onClick={() => deleteSec(sec)} className="p-1.5 rounded-lg text-destructive hover:bg-destructive-soft">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
@@ -557,7 +557,7 @@ export default function StockCadastrosSection() {
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setCatDialog(false)}>Cancelar</Button>
-            <Button onClick={handleSaveCat} disabled={savingCat} className="gradient-salmon text-primary-foreground border-0">
+            <Button onClick={handleSaveCat} disabled={savingCat} className="bg-primary-strong text-primary-foreground border-0">
               {savingCat ? <Loader2 className="w-4 h-4 animate-spin" /> : editCat ? 'Atualizar' : 'Criar'}
             </Button>
           </DialogFooter>
@@ -593,7 +593,7 @@ export default function StockCadastrosSection() {
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setLocDialog(false)}>Cancelar</Button>
-            <Button onClick={handleSaveLoc} disabled={savingLoc} className="gradient-salmon text-primary-foreground border-0">
+            <Button onClick={handleSaveLoc} disabled={savingLoc} className="bg-primary-strong text-primary-foreground border-0">
               {savingLoc ? <Loader2 className="w-4 h-4 animate-spin" /> : editLoc ? 'Atualizar' : 'Criar'}
             </Button>
           </DialogFooter>
@@ -614,7 +614,7 @@ export default function StockCadastrosSection() {
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setSecDialog(false)}>Cancelar</Button>
-            <Button onClick={handleSaveSec} disabled={savingSec} className="gradient-salmon text-primary-foreground border-0">
+            <Button onClick={handleSaveSec} disabled={savingSec} className="bg-primary-strong text-primary-foreground border-0">
               {savingSec ? <Loader2 className="w-4 h-4 animate-spin" /> : editSec ? 'Atualizar' : 'Criar'}
             </Button>
           </DialogFooter>

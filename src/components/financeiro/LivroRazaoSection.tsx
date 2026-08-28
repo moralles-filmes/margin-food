@@ -9,7 +9,7 @@ import { fmtBRL, todayBR, parseLocalDate } from '@/lib/formatters';
 import { formatDateBR, formatInBR } from '@/lib/datetime';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { DateInput } from '@/components/ui/DateInput';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -671,9 +671,9 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
             <p className="text-sm text-muted-foreground">Ledger central — registra todas as movimentacoes financeiras realizadas</p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <Input type="date" value={filtroDataDe} onChange={e => setFiltroDataDe(e.target.value)} className="w-36 h-9 text-xs" />
+            <DateInput value={filtroDataDe} onValueChange={setFiltroDataDe} className="w-36 h-9 text-xs" />
             <span className="text-muted-foreground text-xs">ate</span>
-            <Input type="date" value={filtroDataAte} onChange={e => setFiltroDataAte(e.target.value)} className="w-36 h-9 text-xs" />
+            <DateInput value={filtroDataAte} onValueChange={setFiltroDataAte} className="w-36 h-9 text-xs" />
             <Select value={filtroTipo} onValueChange={setFiltroTipo}>
               <SelectTrigger className="w-36 h-9"><SelectValue /></SelectTrigger>
               <SelectContent>

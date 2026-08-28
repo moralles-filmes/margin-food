@@ -4,16 +4,19 @@ import { CurrencyInput } from '@/components/ui/brl-input';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DateInput } from '@/components/ui/DateInput';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
-import { Heart, Plus, Shield, Bus, UtensilsCrossed, Stethoscope, Trash2, Edit2 } from 'lucide-react';
+import TableActions from '@/components/ui/TableActions';
+import KpiCard from '@/components/ui/KpiCard';
+import { Heart, Plus, Shield, Bus, UtensilsCrossed, Stethoscope, Users, DollarSign } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { todayBR } from '@/lib/datetime';
 import { formatFixedBR, normalizeBRLMoneyToNumber } from '@/lib/formatters';
@@ -248,30 +251,10 @@ export default function BeneficiosSection({
     <div className="space-y-4">
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="text-xs">Benefícios Ativos</CardDescription>
-            <CardTitle className="text-lg">{ativos.length}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="text-xs">Custo Empresa/mês</CardDescription>
-            <CardTitle className="text-lg text-destructive">R$ {R(custoTotalEmpresa)}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="text-xs">Desc. Colaborador/mês</CardDescription>
-            <CardTitle className="text-lg text-muted-foreground">R$ {R(custoTotalColab)}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="text-xs">Colaboradores</CardDescription>
-            <CardTitle className="text-lg">{new Set(ativos.map(b => b.colaborador_id)).size} <span className="text-xs font-normal text-muted-foreground">/ {colaboradores.length}</span></CardTitle>
-          </CardHeader>
-        </Card>
+        <KpiCard label="Benefícios Ativos" value={ativos.length} icon={Heart} />
+        <KpiCard label="Custo Empresa/mês" value={`R$ ${R(custoTotalEmpresa)}`} icon={DollarSign} variant="danger" />
+        <KpiCard label="Desc. Colaborador/mês" value={`R$ ${R(custoTotalColab)}`} icon={DollarSign} />
+        <KpiCard label="Colaboradores" value={new Set(ativos.map(b => b.colaborador_id)).size} sub={`/ ${colaboradores.length} total`} icon={Users} />
       </div>
 
       {/* Tipo breakdown */}
@@ -375,11 +358,11 @@ export default function BeneficiosSection({
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <Label className="text-xs">Data Início</Label>
-                      <Input type="date" className="h-8 text-xs" value={form.data_inicio} onChange={e => setForm(p => ({ ...p, data_inicio: e.target.value }))} />
+                      <DateInput className="h-8 text-xs" value={form.data_inicio} onValueChange={v => setForm(p => ({ ...p, data_inicio: v }))} />
                     </div>
                     <div>
                       <Label className="text-xs">Data Fim (opcional)</Label>
-                      <Input type="date" className="h-8 text-xs" value={form.data_fim} onChange={e => setForm(p => ({ ...p, data_fim: e.target.value }))} />
+                      <DateInput className="h-8 text-xs" value={form.data_fim} onValueChange={v => setForm(p => ({ ...p, data_fim: v }))} />
                     </div>
                   </div>
                   <div>
@@ -447,21 +430,19 @@ export default function BeneficiosSection({
                         </TableCell>
                         {canManage && (
                           <TableCell>
-                            <div className="flex gap-1">
-                              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleEdit(b)}>
-                                <Edit2 className="w-3 h-3" />
-                              </Button>
-                              <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => handleDelete(b.id)}>
-                                <Trash2 className="w-3 h-3" />
-                              </Button>
-                            </div>
+                            <TableActions
+                              onEdit={() => handleEdit(b)}
+                              onDelete={() => handleDelete(b.id)}
+                              deleteConfirmTitle="Cancelar benefício"
+                              deleteConfirmDescription="Tem certeza que deseja cancelar este benefício?"
+                            />
                           </TableCell>
                         )}
                       </TableRow>
                     );
                   })}
                   {/* Totals */}
-                  <TableRow className="bg-muted/30 font-semibold">
+                  <TableRow className="bg-background-subtle font-semibold">
                     <TableCell className="text-xs" colSpan={3}>TOTAL ({filtered.filter(b => b.status === 'ATIVO').length} ativos)</TableCell>
                     <TableCell className="text-xs text-right text-destructive">
                       R$ {R(filtered.filter(b => b.status === 'ATIVO').reduce((s, b) => s + b.valor_empresa, 0))}

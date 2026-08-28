@@ -110,7 +110,7 @@ export default function EtiquetaModal({ manipulation, dataValidade, onClose }: P
           <Button variant="outline" size="sm" className="flex-1 text-xs border-border text-muted-foreground" onClick={onClose}>
             Fechar
           </Button>
-          <Button size="sm" className="flex-1 gradient-salmon text-primary-foreground border-0 text-xs gap-1" onClick={handlePrint}>
+          <Button size="sm" className="flex-1 bg-primary-strong text-primary-foreground border-0 text-xs gap-1" onClick={handlePrint}>
             <Printer className="w-3.5 h-3.5" /> Imprimir
           </Button>
         </div>

@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { todayBR } from '@/lib/datetime';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import KpiCard from '@/components/ui/KpiCard';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { DateInput } from '@/components/ui/DateInput';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import SearchableSelect from '@/components/ui/SearchableSelect';
@@ -13,6 +14,9 @@ import { supabase } from '@/integrations/supabase/client';
 import EmptyState from '@/components/ui/EmptyState';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Cell, PieChart, Pie, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { fmtBRL, fmtBRLCompact, formatFixedBR, formatPercentBR } from '@/lib/formatters';
+import { getSeriesColor, SERIES_COLORS, tooltipProps, legendProps } from '@/lib/chartTheme';
+import { ChartTooltip as RawChartTooltip } from '@/components/ui/ChartTooltip';
+import { ChartLegend as RawChartLegend } from '@/components/ui/ChartLegend';
 
 import { useCan } from '@/permissions/hooks';
 interface RankedItem {
@@ -39,15 +43,13 @@ interface TopConsumedData {
   consumo_total: number; custo_total: number; itens_criticos: number; itens_sem_custo: number; dias_periodo: number;
 }
 
-const CHART_COLORS = [
-  'hsl(221, 83%, 53%)', 'hsl(38, 92%, 50%)', 'hsl(142, 71%, 45%)', 'hsl(280, 65%, 60%)',
-  'hsl(190, 80%, 42%)', 'hsl(350, 80%, 55%)', 'hsl(60, 70%, 50%)', 'hsl(160, 60%, 40%)',
-  'hsl(30, 70%, 50%)', 'hsl(300, 50%, 50%)',
-];
-
+/**
+ * 4 status de saúde de estoque — mesma paleta de app usada por KpiCard/Badge, não uma série
+ * categórica (`atencao` não tem `--chart-*` semântico dedicado, ver PROGRESSO.md § Fase 8).
+ */
 const STATUS_CONFIG: Record<string, { label: string; color: string; badgeVariant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
-  ok: { label: 'OK', color: 'hsl(142, 71%, 45%)', badgeVariant: 'default' },
-  atencao: { label: 'Atenção', color: 'hsl(38, 92%, 50%)', badgeVariant: 'secondary' },
+  ok: { label: 'OK', color: 'hsl(var(--success))', badgeVariant: 'default' },
+  atencao: { label: 'Atenção', color: 'hsl(var(--warning))', badgeVariant: 'secondary' },
   critico: { label: 'Crítico', color: 'hsl(var(--destructive))', badgeVariant: 'destructive' },
   sem_estoque: { label: 'Sem Estoque', color: 'hsl(var(--muted-foreground))', badgeVariant: 'outline' },
 };
@@ -55,7 +57,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; badgeVariant
 const formatCurrency = fmtBRL;
 const formatQty = (v: number) => formatFixedBR(v, 2);
 
-const chartConfig: ChartConfig = { consumo_total: { label: 'Consumo', color: 'hsl(221, 83%, 53%)' } };
+const chartConfig: ChartConfig = { consumo_total: { label: 'Consumo', color: SERIES_COLORS[0] } };
 
 type PeriodPreset = '7' | '30' | '90' | 'custom';
 type RankBy = 'quantity' | 'cost';
@@ -132,11 +134,11 @@ export default function StockTopConsumedSection({
           <>
             <div>
               <label className="text-[10px] text-muted-foreground font-medium mb-1 block">De</label>
-              <Input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className="h-7 text-xs w-32" />
+              <DateInput value={customStart} onValueChange={setCustomStart} className="h-7 text-xs w-32" />
             </div>
             <div>
               <label className="text-[10px] text-muted-foreground font-medium mb-1 block">Até</label>
-              <Input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="h-7 text-xs w-32" />
+              <DateInput value={customEnd} onValueChange={setCustomEnd} className="h-7 text-xs w-32" />
             </div>
           </>
         )}
@@ -176,7 +178,7 @@ export default function StockTopConsumedSection({
 
       {/* Error */}
       {error && (
-        <Card className="bg-card border-destructive/30">
+        <Card className="bg-card border-destructive-border">
           <CardContent className="p-6 text-center">
             <AlertCircle className="w-8 h-8 mx-auto text-destructive mb-2" />
             <p className="text-sm text-destructive font-medium mb-2">Erro ao carregar ranking</p>
@@ -202,48 +204,15 @@ export default function StockTopConsumedSection({
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card className="bg-card border-border">
-          <CardContent className="p-3">
-            <div className="flex items-center gap-2 mb-1">
-              <TrendingDown className="w-4 h-4 text-primary" />
-              <span className="text-[10px] text-muted-foreground font-medium">Consumo Total</span>
-            </div>
-            <p className="text-lg font-bold text-foreground">{formatQty(data.consumo_total)}</p>
-            <p className="text-[10px] text-muted-foreground">{data.dias_periodo ?? 0} dias</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-card border-border">
-          <CardContent className="p-3">
-            <div className="flex items-center gap-2 mb-1">
-              <DollarSign className="w-4 h-4 text-primary" />
-              <span className="text-[10px] text-muted-foreground font-medium">Custo Consumido</span>
-            </div>
-            <p className="text-lg font-bold text-foreground">{data ? formatCurrency(data.custo_total) : '—'}</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-card border-border">
-          <CardContent className="p-3">
-            <div className="flex items-center gap-2 mb-1">
-              <AlertCircle className="w-4 h-4 text-destructive" />
-              <span className="text-[10px] text-muted-foreground font-medium">Itens Críticos</span>
-            </div>
-            <p className="text-lg font-bold text-destructive">{data?.itens_criticos ?? '—'}</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-card border-border">
-          <CardContent className="p-3">
-            <div className="flex items-center gap-2 mb-1">
-              <ShieldAlert className="w-4 h-4 text-muted-foreground" />
-              <span className="text-[10px] text-muted-foreground font-medium">Sem Custo</span>
-            </div>
-            <p className="text-lg font-bold text-muted-foreground">{data?.itens_sem_custo ?? '—'}</p>
-          </CardContent>
-        </Card>
+        <KpiCard label="Consumo Total" value={formatQty(data.consumo_total)} sub={`${data.dias_periodo ?? 0} dias`} icon={TrendingDown} variant="primary" />
+        <KpiCard label="Custo Consumido" value={data ? formatCurrency(data.custo_total) : '—'} icon={DollarSign} variant="primary" />
+        <KpiCard label="Itens Críticos" value={data?.itens_criticos ?? '—'} icon={AlertCircle} variant="danger" />
+        <KpiCard label="Sem Custo" value={data?.itens_sem_custo ?? '—'} icon={ShieldAlert} />
       </div>
 
       {/* Alerts */}
       {data?.alertas && data.alertas.length > 0 && (
-        <Card className="bg-card border-destructive/30">
+        <Card className="bg-card border-destructive-border">
           <CardHeader className="p-3 pb-1">
             <CardTitle className="text-xs font-semibold flex items-center gap-1.5">
               <AlertTriangle className="w-3.5 h-3.5 text-destructive" />
@@ -299,9 +268,9 @@ export default function StockTopConsumedSection({
                 <ChartTooltip content={<ChartTooltipContent formatter={(v) => rankBy === 'cost' ? formatCurrency(Number(v)) : formatQty(Number(v))} />} />
                 <Bar dataKey="display_value" radius={[0, 4, 4, 0]}>
                   {data.items.slice(0, 10).map((item, i) => {
-                    const statusColor = STATUS_CONFIG[item.status_estoque]?.color || CHART_COLORS[i % CHART_COLORS.length];
+                    const statusColor = STATUS_CONFIG[item.status_estoque]?.color || getSeriesColor(i);
                     const isAlert = item.status_estoque === 'critico' || item.status_estoque === 'sem_estoque';
-                    return <Cell key={i} fill={isAlert ? statusColor : CHART_COLORS[i % CHART_COLORS.length]} />;
+                    return <Cell key={i} fill={isAlert ? statusColor : getSeriesColor(i)} />;
                   })}
                 </Bar>
               </BarChart>
@@ -323,7 +292,7 @@ export default function StockTopConsumedSection({
             {(() => {
               const top = data.items.slice(0, 8);
               const othersTotal = data.items.slice(8).reduce((s, i) => s + i.consumo_total, 0);
-              const pieData = top.map((i, idx) => ({ name: i.nome_produto, value: i.consumo_total, fill: CHART_COLORS[idx % CHART_COLORS.length] }));
+              const pieData = top.map((i, idx) => ({ name: i.nome_produto, value: i.consumo_total, fill: getSeriesColor(idx) }));
               if (othersTotal > 0) pieData.push({ name: 'Outros', value: othersTotal, fill: 'hsl(var(--muted-foreground))' });
               return (
                 <ResponsiveContainer width="100%" height={260}>
@@ -331,8 +300,8 @@ export default function StockTopConsumedSection({
                     <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} innerRadius={40} paddingAngle={2} label={({ name, percent }) => `${name.length > 12 ? name.slice(0, 12) + '…' : name} ${formatPercentBR(percent * 100, 0)}`} labelLine={false} className="text-[9px]">
                       {pieData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
                     </Pie>
-                    <Tooltip formatter={(v: number) => formatQty(v)} />
-                    <Legend wrapperStyle={{ fontSize: '10px' }} />
+                    <Tooltip {...tooltipProps} content={<RawChartTooltip valueFormatter={v => formatQty(Number(v))} />} />
+                    <Legend {...legendProps} content={<RawChartLegend />} />
                   </PieChart>
                 </ResponsiveContainer>
               );
@@ -350,7 +319,7 @@ export default function StockTopConsumedSection({
               const cats = (data.categorias || []).filter(c => c.consumo_total > 0).sort((a, b) => b.consumo_total - a.consumo_total);
               const topCats = cats.slice(0, 8);
               const othersTotal = cats.slice(8).reduce((s, c) => s + c.consumo_total, 0);
-              const pieData = topCats.map((c, idx) => ({ name: c.categoria || 'Sem Categoria', value: c.consumo_total, fill: CHART_COLORS[idx % CHART_COLORS.length] }));
+              const pieData = topCats.map((c, idx) => ({ name: c.categoria || 'Sem Categoria', value: c.consumo_total, fill: getSeriesColor(idx) }));
               if (othersTotal > 0) pieData.push({ name: 'Outros', value: othersTotal, fill: 'hsl(var(--muted-foreground))' });
               if (pieData.length === 0) return <p className="text-xs text-muted-foreground text-center py-8">Sem dados de categoria</p>;
               return (
@@ -359,8 +328,8 @@ export default function StockTopConsumedSection({
                     <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} innerRadius={40} paddingAngle={2} label={({ name, percent }) => `${name.length > 12 ? name.slice(0, 12) + '…' : name} ${formatPercentBR(percent * 100, 0)}`} labelLine={false} className="text-[9px]">
                       {pieData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
                     </Pie>
-                    <Tooltip formatter={(v: number) => formatQty(v)} />
-                    <Legend wrapperStyle={{ fontSize: '10px' }} />
+                    <Tooltip {...tooltipProps} content={<RawChartTooltip valueFormatter={v => formatQty(Number(v))} />} />
+                    <Legend {...legendProps} content={<RawChartLegend />} />
                   </PieChart>
                 </ResponsiveContainer>
               );

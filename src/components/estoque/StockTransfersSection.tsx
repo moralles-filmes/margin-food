@@ -240,7 +240,7 @@ export default function StockTransfersSection({
 
           {/* Preview */}
           {formProduct && formFrom && formTo && Number(formQty) > 0 && (
-            <div className="bg-secondary/50 border border-border rounded-lg p-3 flex items-center justify-center gap-3 text-xs">
+            <div className="bg-background-subtle border border-border rounded-lg p-3 flex items-center justify-center gap-3 text-xs">
               <div className="text-center">
                 <MapPin className="w-3.5 h-3.5 mx-auto text-destructive mb-0.5" />
                 <p className="font-medium text-foreground">{formFrom}</p>
@@ -322,7 +322,7 @@ export default function StockTransfersSection({
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="border-b border-border bg-secondary/50">
+                <tr className="border-b border-border bg-background-subtle">
                   <th className="text-left p-2 font-medium text-muted-foreground">Data</th>
                   <th className="text-left p-2 font-medium text-muted-foreground">Produto</th>
                   <th className="text-left p-2 font-medium text-muted-foreground">Origem → Destino</th>
@@ -334,7 +334,7 @@ export default function StockTransfersSection({
               </thead>
               <tbody>
                 {transfers.map((t, i) => (
-                  <tr key={t.transfer_group_id || i} className="border-b border-border/50 hover:bg-secondary/30 transition-colors">
+                  <tr key={t.transfer_group_id || i} className="border-b border-border hover:bg-surface-hover transition-colors">
                     <td className="p-2 whitespace-nowrap">
                       {t.data ? format(new Date(t.data + 'T12:00:00'), 'dd/MM/yy') : '-'}
                     </td>
@@ -347,11 +347,11 @@ export default function StockTransfersSection({
                     </td>
                     <td className="p-2">
                       <div className="flex items-center gap-1.5">
-                        <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-5 border-destructive/30 text-destructive">
+                        <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-5 border-destructive-border text-destructive">
                           {t.from_location}
                         </Badge>
                         <ArrowRight className="w-3 h-3 text-muted-foreground" />
-                        <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-5 border-success/30 text-success">
+                        <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-5 border-success-border text-success">
                           {t.to_location}
                         </Badge>
                       </div>
@@ -378,7 +378,7 @@ export default function StockTransfersSection({
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between p-2 border-t border-border bg-secondary/30">
+            <div className="flex items-center justify-between p-2 border-t border-border bg-background-subtle">
               <Button variant="ghost" size="sm" className="h-7 text-[10px]" disabled={page === 0}
                 onClick={() => { setPage(p => p - 1); fetchTransfers(page - 1); }}>
                 Anterior

@@ -13,7 +13,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Progress } from '@/components/ui/progress';
 import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Plus, Award, ChevronRight, Users, GraduationCap, FileText, Video, HelpCircle } from 'lucide-react';
+import { Plus, Award, ChevronRight, Users, GraduationCap, FileText, Video, HelpCircle, BookOpen, CheckCircle2 } from 'lucide-react';
+import KpiCard from '@/components/ui/KpiCard';
 
 import { useCan } from '@/permissions/hooks';
 interface Colaborador {
@@ -368,10 +369,10 @@ export default function TreinamentoSection({
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Card><CardHeader className="pb-2"><CardDescription className="text-xs">Trilhas</CardDescription><CardTitle className="text-lg">{stats.total}</CardTitle></CardHeader></Card>
-        <Card><CardHeader className="pb-2"><CardDescription className="text-xs">Obrigatórias</CardDescription><CardTitle className="text-lg text-destructive">{stats.obrigatorias}</CardTitle></CardHeader></Card>
-        <Card><CardHeader className="pb-2"><CardDescription className="text-xs">Inscrições</CardDescription><CardTitle className="text-lg">{stats.inscritos}</CardTitle></CardHeader></Card>
-        <Card><CardHeader className="pb-2"><CardDescription className="text-xs">Concluídos</CardDescription><CardTitle className="text-lg text-success">{stats.concluidos}</CardTitle></CardHeader></Card>
+        <KpiCard label="Trilhas" value={stats.total} icon={GraduationCap} />
+        <KpiCard label="Obrigatórias" value={stats.obrigatorias} icon={BookOpen} variant={stats.obrigatorias > 0 ? 'danger' : 'default'} />
+        <KpiCard label="Inscrições" value={stats.inscritos} icon={Users} />
+        <KpiCard label="Concluídos" value={stats.concluidos} icon={CheckCircle2} variant="success" />
       </div>
 
       <div className="flex items-center justify-between">
@@ -405,7 +406,7 @@ export default function TreinamentoSection({
                 <div className="border-t pt-3 space-y-2">
                   <h4 className="text-sm font-medium">Módulos ({formModulos.length})</h4>
                   {formModulos.map((m, i) => (
-                    <div key={i} className="flex items-center gap-2 text-xs p-2 rounded bg-muted/50">
+                    <div key={i} className="flex items-center gap-2 text-xs p-2 rounded bg-background-subtle">
                       <Badge variant="outline" className="text-[10px]">{m.tipo}</Badge>
                       <span className="font-medium">{m.titulo}</span>
                     </div>

@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { formatMoneyBR } from '@/lib/formatters';
 import { TrendingDown, Users, Coins, AlertTriangle, Check } from 'lucide-react';
+import KpiCard from '@/components/ui/KpiCard';
 import type { CotacaoItem, CotacaoFornecedor, CotacaoResposta } from '@/types/cotacao';
 
 interface CotacaoComparativoTableProps {
@@ -63,18 +64,9 @@ export default function CotacaoComparativoTable({ itens, fornecedores, respostas
     <div className="space-y-3">
       {/* Resumo consolidado */}
       <div className="grid grid-cols-3 gap-2">
-        <div className="bg-card border border-border rounded-lg p-2.5">
-          <div className="flex items-center gap-1 text-[10px] uppercase text-muted-foreground"><Coins className="w-3 h-3" /> Total recomendado</div>
-          <div className="text-sm font-bold text-foreground">{formatMoneyBR(data.totalRecomendado)}</div>
-        </div>
-        <div className="bg-card border border-border rounded-lg p-2.5">
-          <div className="flex items-center gap-1 text-[10px] uppercase text-muted-foreground"><TrendingDown className="w-3 h-3" /> Economia est.</div>
-          <div className="text-sm font-bold text-success">{formatMoneyBR(data.economia)}</div>
-        </div>
-        <div className="bg-card border border-border rounded-lg p-2.5">
-          <div className="flex items-center gap-1 text-[10px] uppercase text-muted-foreground"><Users className="w-3 h-3" /> Fornecedores</div>
-          <div className="text-sm font-bold text-foreground">{data.suppliersUsed}</div>
-        </div>
+        <KpiCard label="Total recomendado" value={formatMoneyBR(data.totalRecomendado)} icon={Coins} variant="default" />
+        <KpiCard label="Economia est." value={formatMoneyBR(data.economia)} icon={TrendingDown} variant="success" />
+        <KpiCard label="Fornecedores" value={data.suppliersUsed} icon={Users} variant="default" />
       </div>
 
       {!hasAnyPrice && (
@@ -85,8 +77,8 @@ export default function CotacaoComparativoTable({ itens, fornecedores, respostas
       <div className="overflow-x-auto border border-border rounded-lg">
         <table className="w-full text-xs">
           <thead>
-            <tr className="bg-secondary/60">
-              <th className="text-left font-medium text-muted-foreground px-2 py-1.5 sticky left-0 bg-secondary/60 min-w-[130px]">Item</th>
+            <tr className="bg-muted">
+              <th className="text-left font-medium text-muted-foreground px-2 py-1.5 sticky left-0 bg-muted min-w-[130px]">Item</th>
               {fornecedores.map(f => (
                 <th key={f.id} className="text-right font-medium text-foreground px-2 py-1.5 min-w-[90px] truncate">{f.supplier_nome_snapshot}</th>
               ))}
@@ -103,9 +95,9 @@ export default function CotacaoComparativoTable({ itens, fornecedores, respostas
                 {row.prices.map(p => {
                   const isBest = row.bestFornId === p.fornId && p.price != null;
                   return (
-                    <td key={p.fornId} className={`text-right px-2 py-1 ${isBest ? 'bg-success/10 font-semibold text-success' : 'text-foreground'}`}>
+                    <td key={p.fornId} className={`text-right px-2 py-1 ${isBest ? 'bg-success-soft font-semibold text-success' : 'text-foreground'}`}>
                       {p.unavailable ? <span className="text-destructive text-[10px]">indisp.</span>
-                        : p.price == null ? <span className="text-muted-foreground/50">—</span>
+                        : p.price == null ? <span className="text-muted-foreground">—</span>
                         : formatMoneyBR(p.price)}
                     </td>
                   );
@@ -117,15 +109,15 @@ export default function CotacaoComparativoTable({ itens, fornecedores, respostas
             ))}
           </tbody>
           <tfoot>
-            <tr className="border-t-2 border-border bg-secondary/40">
-              <td className="px-2 py-1.5 sticky left-0 bg-secondary/40 font-medium text-foreground">Subtotal (melhor)</td>
+            <tr className="border-t-2 border-border bg-muted">
+              <td className="px-2 py-1.5 sticky left-0 bg-muted font-medium text-foreground">Subtotal (melhor)</td>
               {fornecedores.map(f => (
                 <td key={f.id} className="text-right px-2 py-1.5 font-semibold text-foreground">{formatMoneyBR(data.subtotal[f.id])}</td>
               ))}
               <td />
             </tr>
-            <tr className="bg-secondary/40">
-              <td className="px-2 py-1 sticky left-0 bg-secondary/40 text-[10px] text-muted-foreground">Pedido mínimo</td>
+            <tr className="bg-muted">
+              <td className="px-2 py-1 sticky left-0 bg-muted text-[10px] text-muted-foreground">Pedido mínimo</td>
               {fornecedores.map(f => {
                 const sub = data.subtotal[f.id];
                 const min = Number(f.pedido_minimo_snapshot) || 0;
@@ -134,11 +126,11 @@ export default function CotacaoComparativoTable({ itens, fornecedores, respostas
                 return (
                   <td key={f.id} className="text-right px-2 py-1 text-[10px]">
                     {min > 0 ? (
-                      <span className={`inline-flex items-center gap-0.5 ${!used ? 'text-muted-foreground/50' : meets ? 'text-success' : 'text-warning'}`}>
+                      <span className={`inline-flex items-center gap-0.5 ${!used ? 'text-muted-foreground' : meets ? 'text-success' : 'text-warning'}`}>
                         {used && (meets ? <Check className="w-3 h-3" /> : <AlertTriangle className="w-3 h-3" />)}
                         {formatMoneyBR(min)}
                       </span>
-                    ) : <span className="text-muted-foreground/40">—</span>}
+                    ) : <span className="text-muted-foreground">—</span>}
                   </td>
                 );
               })}
@@ -149,7 +141,7 @@ export default function CotacaoComparativoTable({ itens, fornecedores, respostas
       </div>
 
       {data.itemsSemResposta.length > 0 && (
-        <div className="flex items-start gap-2 text-[11px] text-warning bg-warning/10 rounded-lg p-2.5">
+        <div className="flex items-start gap-2 text-[11px] text-warning bg-warning-soft rounded-lg p-2.5">
           <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
           <span>Sem preço: {data.itemsSemResposta.slice(0, 6).join(', ')}{data.itemsSemResposta.length > 6 ? `… (+${data.itemsSemResposta.length - 6})` : ''}</span>
         </div>

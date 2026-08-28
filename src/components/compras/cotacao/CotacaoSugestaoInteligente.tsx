@@ -233,7 +233,7 @@ export default function CotacaoSugestaoInteligente({ cotacaoId, itens, fornecedo
 
           {canEdit && (
             <div className="flex justify-end">
-              <Button size="sm" className="gradient-salmon text-primary-foreground border-0 gap-1.5" onClick={handleSave} disabled={saving}>
+              <Button size="sm" className="bg-primary-strong text-primary-foreground border-0 gap-1.5" onClick={handleSave} disabled={saving}>
                 <Save className="w-3.5 h-3.5" /> {saving ? 'Salvando…' : 'Salvar sugestão'}
               </Button>
             </div>

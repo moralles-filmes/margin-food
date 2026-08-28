@@ -11,6 +11,8 @@ import { todayBR, formatInBR, formatFixedBR, fmtBRL, formatPercentBR, formatInte
 import ValidadeAlertCard from './ValidadeAlertCard';
 import KpiCard from '@/components/ui/KpiCard';
 import type { KpiVariant } from '@/components/ui/KpiCard';
+import { axisProps, gridProps, tooltipProps, chartValueFormatters, SEMANTIC_CHART_COLORS } from '@/lib/chartTheme';
+import { ChartTooltip } from '@/components/ui/ChartTooltip';
 
 const VARIANT_MAP: Record<string, KpiVariant> = {
   default: 'default', salmon: 'primary', gold: 'gold', success: 'success', destructive: 'danger',
@@ -88,7 +90,7 @@ export default function DashboardView({ store, onNavigate }: DashboardViewProps)
 
   if (dash.error) {
     return (
-      <div className="bg-destructive/10 border border-destructive/30 rounded-xl p-6 text-center">
+      <div className="bg-destructive-soft border border-destructive-border rounded-xl p-6 text-center">
         <AlertTriangle className="w-8 h-8 text-destructive mx-auto mb-2" />
         <p className="text-sm text-destructive font-semibold">Erro ao carregar dashboard</p>
         <p className="text-xs text-muted-foreground mt-1">{dash.error}</p>
@@ -109,17 +111,23 @@ export default function DashboardView({ store, onNavigate }: DashboardViewProps)
 
       {/* Stock alerts */}
       {(dash.lowGross || dash.lowClean) && (
-        <div className="bg-destructive/10 border border-destructive/30 rounded-xl p-3 animate-scale-in">
-          <p className="text-xs font-semibold text-destructive">⚠️ Estoque Baixo!</p>
-          {dash.lowGross && <p className="text-[11px] text-destructive/80 mt-1">Bruto: {formatFixedBR(dash.saldoBrutoKg, 1)} kg (mín: {dash.minGrossKg} kg)</p>}
-          {dash.lowClean && <p className="text-[11px] text-destructive/80 mt-0.5">Limpo: {formatFixedBR(dash.estoqueLimpoKg, 1)} kg (mín: {dash.minCleanKg} kg)</p>}
+        <div className="bg-destructive-soft border border-destructive-border rounded-xl p-3 flex items-start gap-2 animate-scale-in">
+          <AlertTriangle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
+          <div>
+            <p className="text-xs font-semibold text-destructive">Estoque Baixo</p>
+            {dash.lowGross && <p className="text-[11px] text-destructive mt-1">Bruto: {formatFixedBR(dash.saldoBrutoKg, 1)} kg (mín: {dash.minGrossKg} kg)</p>}
+            {dash.lowClean && <p className="text-[11px] text-destructive mt-0.5">Limpo: {formatFixedBR(dash.estoqueLimpoKg, 1)} kg (mín: {dash.minCleanKg} kg)</p>}
+          </div>
         </div>
       )}
 
       {dash.daysRemaining > 0 && dash.daysRemaining < 7 && (
-        <div className="bg-warning/10 border border-warning/30 rounded-xl p-3 animate-scale-in">
-          <p className="text-xs font-semibold text-warning">📈 Previsão de Compra</p>
-          <p className="text-[11px] text-muted-foreground mt-1">Estoque acaba em ~{dash.daysRemaining} dias • Consumo: {formatFixedBR(dash.avgDailyConsumptionKg, 1)} kg/dia</p>
+        <div className="bg-warning-soft border border-warning-border rounded-xl p-3 flex items-start gap-2 animate-scale-in">
+          <TrendingUp className="w-4 h-4 text-warning shrink-0 mt-0.5" />
+          <div>
+            <p className="text-xs font-semibold text-warning">Previsão de Compra</p>
+            <p className="text-[11px] text-muted-foreground mt-1">Estoque acaba em ~{dash.daysRemaining} dias • Consumo: {formatFixedBR(dash.avgDailyConsumptionKg, 1)} kg/dia</p>
+          </div>
         </div>
       )}
 
@@ -127,7 +135,7 @@ export default function DashboardView({ store, onNavigate }: DashboardViewProps)
       <ValidadeAlertCard lotesLimpos={lotesLimpos} />
 
       {/* Clean Stock Quick View */}
-      <div className="bg-card border border-success/20 rounded-xl p-4 space-y-2">
+      <div className="bg-card border border-success-border rounded-xl p-4 space-y-2">
         <p className="text-xs font-semibold text-foreground uppercase tracking-wider flex items-center gap-1.5">
           <Droplets className="w-3.5 h-3.5 text-success" /> Estoque Limpo
         </p>
@@ -152,7 +160,7 @@ export default function DashboardView({ store, onNavigate }: DashboardViewProps)
 
       {/* Meta g/cliente */}
       {metaProv && (
-        <div className="bg-card border border-primary/20 rounded-xl p-4 space-y-2">
+        <div className="bg-card border border-primary-border rounded-xl p-4 space-y-2">
           <p className="text-xs font-semibold text-foreground uppercase tracking-wider flex items-center gap-1.5">
             <Users className="w-3.5 h-3.5 text-primary" /> Meta g/Cliente (mês)
           </p>
@@ -174,17 +182,17 @@ export default function DashboardView({ store, onNavigate }: DashboardViewProps)
       )}
 
       {/* Planning shortcut */}
-      <div className="bg-card border border-primary/20 rounded-xl p-4 flex items-center justify-between animate-fade-up">
+      <div className="bg-card border border-primary-border rounded-xl p-4 flex items-center justify-between animate-fade-up">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center">
-            <ClipboardList className="w-5 h-5 text-primary" />
+          <div className="w-10 h-10 rounded-xl bg-primary-soft flex items-center justify-center">
+            <ClipboardList className="w-5 h-5 text-primary-ink" />
           </div>
           <div>
             <p className="text-sm font-semibold text-foreground">Planejamento de Compras</p>
             <p className="text-[11px] text-muted-foreground">Meta, projeção, ritmo semanal</p>
           </div>
         </div>
-        <Button onClick={() => onNavigate?.('planning')} size="sm" className="gradient-salmon text-primary-foreground border-0 text-xs">Abrir</Button>
+        <Button onClick={() => onNavigate?.('planning')} size="sm" className="bg-primary-strong text-primary-foreground border-0 text-xs">Abrir</Button>
       </div>
 
       {/* Audit summary */}
@@ -195,9 +203,9 @@ export default function DashboardView({ store, onNavigate }: DashboardViewProps)
         const overrideHoje = auditMes.some(a => a.overrideAlerta && a.dataEntrada === today);
         if (auditMes.length === 0) return null;
         return (
-          <div className="bg-card border border-destructive/20 rounded-xl p-4 space-y-2 animate-fade-up">
+          <div className="bg-card border border-destructive-border rounded-xl p-4 space-y-2 animate-fade-up">
             {overrideHoje && (
-              <div className="bg-destructive/10 border border-destructive/30 rounded-lg px-3 py-1.5 mb-1">
+              <div className="bg-destructive-soft border border-destructive-border rounded-lg px-3 py-1.5 mb-1">
                 <p className="text-[11px] text-destructive font-medium">⚠️ Houve compra acima do limite hoje</p>
               </div>
             )}
@@ -225,7 +233,7 @@ export default function DashboardView({ store, onNavigate }: DashboardViewProps)
             {dash.fifoRecomendados.slice(0, 3).map((lot, i) => (
               <div key={lot.entry_id} className="flex items-center justify-between py-1.5 text-[11px]">
                 <div className="flex items-center gap-2">
-                  <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold ${i === 0 ? 'bg-success/15 text-success' : 'bg-secondary text-muted-foreground'}`}>{i + 1}</span>
+                  <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold ${i === 0 ? 'bg-success-soft text-success' : 'bg-secondary text-muted-foreground'}`}>{i + 1}</span>
                   <span className="text-foreground font-medium">{lot.lot || '—'}</span>
                   <span className="text-muted-foreground">{lot.supplier}</span>
                 </div>
@@ -251,7 +259,7 @@ export default function DashboardView({ store, onNavigate }: DashboardViewProps)
       )}
 
       {/* Cost & CMV */}
-      <div className="bg-card border border-warning/20 rounded-xl p-4 space-y-2">
+      <div className="bg-card border border-warning-border rounded-xl p-4 space-y-2">
         <p className="text-xs font-semibold text-foreground uppercase tracking-wider flex items-center gap-1.5">
           <DollarSign className="w-3.5 h-3.5 text-warning" /> Custo & CMV
         </p>
@@ -265,7 +273,7 @@ export default function DashboardView({ store, onNavigate }: DashboardViewProps)
 
       {/* Loss KPIs */}
       {dash.manipulationCount > 0 && (
-        <div className="bg-card border border-destructive/20 rounded-xl p-4 space-y-3">
+        <div className="bg-card border border-destructive-border rounded-xl p-4 space-y-3">
           <p className="text-xs font-semibold text-foreground uppercase tracking-wider flex items-center gap-1.5">
             <TrendingDown className="w-3.5 h-3.5 text-destructive" /> Perdas no Período
           </p>
@@ -280,11 +288,11 @@ export default function DashboardView({ store, onNavigate }: DashboardViewProps)
               <p className="text-[10px] text-muted-foreground mb-2">Perda em R$ por semana</p>
               <ResponsiveContainer width="100%" height={160}>
                 <BarChart data={weeklyLossData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="semana" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} />
-                  <YAxis tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} />
-                  <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '11px' }} formatter={(value: number) => [fmtBRL(value), 'Perda']} />
-                  <Bar dataKey="perdaR$" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
+                  <CartesianGrid {...gridProps} />
+                  <XAxis dataKey="semana" {...axisProps} />
+                  <YAxis {...axisProps} tickFormatter={chartValueFormatters.moneyCompact} />
+                  <Tooltip {...tooltipProps} content={<ChartTooltip valueFormatter={v => fmtBRL(Number(v))} />} />
+                  <Bar dataKey="perdaR$" name="Perda" fill={SEMANTIC_CHART_COLORS.negative} radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -294,7 +302,7 @@ export default function DashboardView({ store, onNavigate }: DashboardViewProps)
 
       {/* Financial Risk from Expiry */}
       {emRisco.length > 0 && (
-        <div className="bg-card border border-destructive/20 rounded-xl p-4 space-y-2">
+        <div className="bg-card border border-destructive-border rounded-xl p-4 space-y-2">
           <p className="text-xs font-semibold text-foreground uppercase tracking-wider flex items-center gap-1.5">
             <Clock className="w-3.5 h-3.5 text-destructive" /> Risco Financeiro (Validade)
           </p>
@@ -321,7 +329,7 @@ export default function DashboardView({ store, onNavigate }: DashboardViewProps)
 
       {entries.length === 0 && dash.totalEntriesKg === 0 && (
         <div className="text-center py-8">
-          <div className="w-16 h-16 mx-auto rounded-2xl gradient-salmon flex items-center justify-center mb-3 opacity-60">
+          <div className="w-16 h-16 mx-auto rounded-2xl bg-primary-strong flex items-center justify-center mb-3 opacity-60">
             <Fish className="w-8 h-8 text-primary-foreground" />
           </div>
           <p className="text-sm text-muted-foreground">Nenhum dado ainda</p>

@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { useSalmonStore } from '@/hooks/useSalmonStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DateInput } from '@/components/ui/DateInput';
 import { DecimalInput, parseDecimal } from '@/components/ui/decimal-input';
 import { Plus, Check, ChevronLeft, ChevronRight, Edit2, Trash2, AlertTriangle, Snowflake, Package, Lock, AlertCircle, Zap, DollarSign, Printer, Loader2 } from 'lucide-react';
 import { useCan } from '@/permissions/hooks';
@@ -280,7 +281,7 @@ export default function ManipulationView({ store, preSelectedEntryId, onClearPre
           <p className="text-xs text-muted-foreground">Estoque bruto: {formatFixedBR(stock.grossKg, 1)} kg • Limpo: {formatFixedBR(stock.cleanKg, 1)} kg</p>
         </div>
         {!showWizard && canCreate && (
-          <Button onClick={() => startNewWizard()} size="sm" className="gradient-salmon text-primary-foreground border-0 gap-1.5">
+          <Button onClick={() => startNewWizard()} size="sm" className="bg-primary-strong text-primary-foreground border-0 gap-1.5">
             <Plus className="w-4 h-4" /> Nova
           </Button>
         )}
@@ -300,14 +301,14 @@ export default function ManipulationView({ store, preSelectedEntryId, onClearPre
             <div className="flex items-center justify-between mb-3">
               <div>
                 <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Manipulação do dia</p>
-                <Input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} className="h-8 w-auto text-sm bg-secondary border-border text-foreground mt-1" />
+                <DateInput value={selectedDate} onValueChange={setSelectedDate} className="h-8 w-auto text-sm bg-secondary border-border text-foreground mt-1" />
               </div>
               <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={() => setShowWizard(false)}>Cancelar</Button>
             </div>
 
             <div className="flex gap-1 mb-4">
               {stepLabels.map((_, i) => (
-                <div key={i} className={`h-1 flex-1 rounded-full transition-all ${i <= step ? 'gradient-salmon' : 'bg-secondary'}`} />
+                <div key={i} className={`h-1 flex-1 rounded-full transition-all ${i <= step ? 'bg-primary-strong' : 'bg-secondary'}`} />
               ))}
             </div>
 
@@ -442,9 +443,9 @@ export default function ManipulationView({ store, preSelectedEntryId, onClearPre
                   <ChevronLeft className="w-3.5 h-3.5" /> Voltar
                 </Button>
                 {step === 5 && confirmed[step] ? (
-                  <Button size="sm" className="gradient-salmon text-primary-foreground border-0 text-xs" onClick={handleSave}>Salvar Manipulação</Button>
+                  <Button size="sm" className="bg-primary-strong text-primary-foreground border-0 text-xs" onClick={handleSave}>Salvar Manipulação</Button>
                 ) : (
-                  <Button size="sm" className="gradient-salmon text-primary-foreground border-0 text-xs gap-1" onClick={confirmStep} disabled={step === 0 && availableLots.length === 0}>
+                  <Button size="sm" className="bg-primary-strong text-primary-foreground border-0 text-xs gap-1" onClick={confirmStep} disabled={step === 0 && availableLots.length === 0}>
                     Confirmar <ChevronRight className="w-3.5 h-3.5" />
                   </Button>
                 )}
@@ -604,7 +605,7 @@ export default function ManipulationView({ store, preSelectedEntryId, onClearPre
               {leftoverForm?.id === m.id ? (
                 <div className="flex items-center gap-1.5 animate-scale-in">
                   <DecimalInput value={leftoverForm.kg} onValueChange={(raw) => setLeftoverForm({ ...leftoverForm, kg: raw })} maxDecimals={1} placeholder="kg sobra" className="h-7 w-20 text-xs bg-secondary border-border text-foreground" autoFocus />
-                  <Button size="sm" className="h-7 text-[10px] gradient-salmon text-primary-foreground border-0 px-2" onClick={handleLeftoverSave} disabled={leftoverSaving}>{leftoverSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}</Button>
+                  <Button size="sm" className="h-7 text-[10px] bg-primary-strong text-primary-foreground border-0 px-2" onClick={handleLeftoverSave} disabled={leftoverSaving}>{leftoverSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}</Button>
                   <Button size="sm" variant="ghost" className="h-7 text-[10px] px-2" onClick={() => setLeftoverForm(null)}>✕</Button>
                 </div>
               ) : (

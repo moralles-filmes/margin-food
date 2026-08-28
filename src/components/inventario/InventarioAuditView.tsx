@@ -23,8 +23,8 @@ export default function InventarioAuditView({ auditLogs, onBack }: Props) {
           {auditLogs.length === 0 ? (
             <p className="text-xs text-muted-foreground text-center py-4">Nenhum registro de auditoria</p>
           ) : auditLogs.map(log => (
-            <div key={log.id} className="flex items-start gap-3 border-b border-border/30 pb-2 last:border-0">
-              <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+            <div key={log.id} className="flex items-start gap-3 border-b border-border pb-2 last:border-0">
+              <div className="w-7 h-7 rounded-full bg-primary-soft flex items-center justify-center flex-shrink-0 mt-0.5">
                 <Shield className="w-3.5 h-3.5 text-primary" />
               </div>
               <div className="flex-1 min-w-0">
@@ -35,7 +35,7 @@ export default function InventarioAuditView({ auditLogs, onBack }: Props) {
                 <p className="text-[10px] text-muted-foreground">{parseUTCToBR(log.created_at)}</p>
                 {log.ip_address && <p className="text-[9px] text-muted-foreground">IP: {log.ip_address}</p>}
                 {log.depois && (
-                  <pre className="text-[9px] text-muted-foreground mt-1 bg-muted/30 p-1.5 rounded overflow-x-auto">
+                  <pre className="text-[9px] text-muted-foreground mt-1 bg-background-subtle p-1.5 rounded overflow-x-auto">
                     {typeof log.depois === 'string' ? log.depois : JSON.stringify(log.depois, null, 2)}
                   </pre>
                 )}

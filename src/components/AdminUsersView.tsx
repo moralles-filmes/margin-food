@@ -11,8 +11,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { UserPlus, Shield, Ban, CheckCircle, Loader2, Pencil, KeyRound, Power, Trash2, Briefcase, Plus, X } from 'lucide-react';
+import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
+import StatusBadge from '@/components/ui/StatusBadge';
+import TableActions from '@/components/ui/TableActions';
+import { UserPlus, Shield, Ban, CheckCircle, Loader2, Pencil, KeyRound, Power, Trash2, Briefcase, Plus } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from '@/components/ui/dialog';
 import {
   AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle,
   AlertDialogDescription, AlertDialogFooter, AlertDialogCancel,
@@ -38,8 +44,8 @@ interface JobRole {
 }
 
 const ROLE_LABELS: Record<string, { label: string; color: string }> = {
-  admin: { label: 'Admin', color: 'bg-destructive/10 text-destructive' },
-  operador: { label: 'Operador', color: 'bg-primary/10 text-primary' },
+  admin: { label: 'Admin', color: 'bg-destructive-soft text-destructive border border-destructive-border' },
+  operador: { label: 'Operador', color: 'bg-primary-soft text-primary-ink border border-primary-border' },
   sem_role: { label: 'Sem Role', color: 'bg-muted text-muted-foreground' },
 };
 
@@ -230,7 +236,7 @@ export default function AdminUsersView() {
   if (!canManageUsers) {
     return (
       <div className="bg-card border border-border rounded-xl p-8 text-center">
-        <Shield className="w-12 h-12 mx-auto text-destructive/30 mb-3" />
+        <Shield className="w-12 h-12 mx-auto text-destructive mb-3" />
         <p className="text-sm font-medium text-foreground">Acesso Negado</p>
         <p className="text-xs text-muted-foreground">Apenas Diretor e Gerente Geral podem gerenciar usuários.</p>
       </div>
@@ -399,7 +405,7 @@ export default function AdminUsersView() {
 
           {loadError ? (
             <div className="bg-card border border-border rounded-xl p-8 text-center space-y-3">
-              <Shield className="w-10 h-10 mx-auto text-destructive/40" />
+              <Shield className="w-10 h-10 mx-auto text-destructive" />
               <p className="text-sm font-medium text-foreground">{loadError}</p>
               <Button size="sm" variant="outline" onClick={fetchUsers} className="gap-1.5 text-xs">
                 <Loader2 className="w-3.5 h-3.5" /> Tentar novamente
@@ -407,59 +413,78 @@ export default function AdminUsersView() {
             </div>
           ) : loading ? (
             <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
+          ) : users.length === 0 ? (
+            <div className="bg-card border border-border rounded-xl p-8 text-center">
+              <p className="text-sm text-muted-foreground">Nenhum usuário cadastrado.</p>
+            </div>
           ) : (
-            <div className="space-y-2">
-              {users.map(u => {
-                const roleInfo = ROLE_LABELS[u.role] || ROLE_LABELS.sem_role;
-                return (
-                  <div key={u.id} className={`bg-card border rounded-xl p-3 flex items-center justify-between ${u.disabled ? 'border-destructive/30 opacity-60' : 'border-border'}`}>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-semibold text-foreground truncate">{u.nome || '—'}</p>
-                        {u.disabled && (
-                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-destructive/10 text-destructive">Inativo</span>
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground truncate">{u.email}</p>
-                      <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                        <span className={`inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full ${roleInfo.color}`}>
-                          {roleInfo.label}
-                        </span>
-                        {u.job_role_name && (
-                          <span className="inline-block text-[10px] font-medium px-2 py-0.5 rounded-full bg-primary/5 text-primary border border-primary/20">
-                            {u.job_role_name}
+            <div className="bg-card border border-border rounded-xl overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Usuário</TableHead>
+                    <TableHead>Perfil</TableHead>
+                    <TableHead>Cargo / Setor</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {users.map(u => {
+                    const roleInfo = ROLE_LABELS[u.role] || ROLE_LABELS.sem_role;
+                    return (
+                      <TableRow key={u.id} className={u.disabled ? 'opacity-60' : undefined}>
+                        <TableCell>
+                          <p className="text-sm font-semibold text-foreground truncate max-w-[220px]">{u.nome || '—'}</p>
+                          <p className="text-xs text-muted-foreground truncate max-w-[220px]">{u.email}</p>
+                        </TableCell>
+                        <TableCell>
+                          <span className={`inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full ${roleInfo.color}`}>
+                            {roleInfo.label}
                           </span>
-                        )}
-                        {u.sector && (
-                          <span className="inline-block text-[10px] font-medium px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
-                            {u.sector}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Button variant="ghost" size="sm" className="text-xs h-7 px-2" title="Editar usuário"
-                        onClick={() => openEdit(u)}>
-                        <Pencil className="w-3 h-3" />
-                      </Button>
-                      <Button variant="ghost" size="sm" className="text-xs h-7 px-2" title="Resetar senha"
-                        onClick={() => { setResetUser(u); resetPw.setPassword(''); }}>
-                        <KeyRound className="w-3 h-3" />
-                      </Button>
-                      <Button variant="ghost" size="sm" title={u.disabled ? 'Reativar' : 'Desativar'}
-                        className={`text-xs h-7 px-2 ${u.disabled ? 'text-success hover:text-success' : 'text-destructive hover:text-destructive'}`}
-                        onClick={() => handleToggleStatus(u)}>
-                        {u.disabled ? <Power className="w-3 h-3" /> : <Ban className="w-3 h-3" />}
-                      </Button>
-                      <Button variant="ghost" size="sm" title="Excluir usuário"
-                        className="text-xs h-7 px-2 text-destructive hover:text-destructive"
-                        onClick={() => { setDeleteUser(u); setDeleteMotivo(''); }}>
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {u.job_role_name && (
+                              <span className="inline-block text-[10px] font-medium px-2 py-0.5 rounded-full bg-primary-soft text-primary-ink border border-primary-border">
+                                {u.job_role_name}
+                              </span>
+                            )}
+                            {u.sector && (
+                              <span className="inline-block text-[10px] font-medium px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
+                                {u.sector}
+                              </span>
+                            )}
+                            {!u.job_role_name && !u.sector && <span className="text-xs text-muted-foreground">—</span>}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <StatusBadge status={u.disabled ? 'inativo' : 'ativo'} size="xs" />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button variant="ghost" size="icon" title="Resetar senha"
+                              className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                              onClick={() => { setResetUser(u); resetPw.setPassword(''); }}>
+                              <KeyRound className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button variant="ghost" size="icon" title={u.disabled ? 'Reativar' : 'Desativar'}
+                              className={`h-7 w-7 ${u.disabled ? 'text-success hover:text-success' : 'text-destructive hover:text-destructive'}`}
+                              onClick={() => handleToggleStatus(u)}>
+                              {u.disabled ? <Power className="w-3.5 h-3.5" /> : <Ban className="w-3.5 h-3.5" />}
+                            </Button>
+                            <TableActions
+                              onEdit={() => openEdit(u)}
+                              onDelete={() => { setDeleteUser(u); setDeleteMotivo(''); }}
+                              hideConfirm
+                            />
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
             </div>
           )}
         </TabsContent>
@@ -496,163 +521,153 @@ export default function AdminUsersView() {
       </Tabs>
 
       {/* ─── CREATE USER DIALOG ─── */}
-      <AlertDialog open={showCreate} onOpenChange={setShowCreate}>
-        <AlertDialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <button onClick={() => setShowCreate(false)} className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"><X className="h-4 w-4" /><span className="sr-only">Fechar</span></button>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
+      <Dialog open={showCreate} onOpenChange={setShowCreate}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
               <UserPlus className="w-4 h-4 text-primary" /> Criar Novo Usuário
-            </AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <form onSubmit={handleCreateUser} className="space-y-4 text-left mt-2">
-                {/* Section 1: User data */}
-                <p className="text-xs font-semibold text-foreground border-b border-border pb-1">Dados do Usuário</p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Nome completo</Label>
-                    <Input value={newNome} onChange={e => setNewNome(e.target.value)} required className="mt-1" />
-                  </div>
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Email</Label>
-                    <Input type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} required className="mt-1" />
-                  </div>
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Senha (mín. 12 caracteres)</Label>
-                    <PasswordInput value={pwValidation.password} onChange={e => pwValidation.setPassword(e.target.value)} required minLength={12} wrapperClassName="mt-1" />
-                    <PasswordStrengthMeter strength={pwValidation.strength} strengthLabel={pwValidation.strengthLabel} strengthColor={pwValidation.strengthColor} errors={pwValidation.localErrors} serverErrors={pwValidation.serverErrors} />
-                  </div>
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Role base (sistema)</Label>
-                    <select value={newRole} onChange={e => { setNewRole(e.target.value); setNewPermissions(new Set(rolePermissionsMap[e.target.value] || [])); }}
-                      className="w-full h-9 rounded-md border border-border bg-secondary px-3 text-sm text-foreground mt-1">
-                      {ALL_ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Cargo (opcional)</Label>
-                    <select value={newJobRoleId} onChange={e => setNewJobRoleId(e.target.value)}
-                      className="w-full h-9 rounded-md border border-border bg-secondary px-3 text-sm text-foreground mt-1">
-                      <option value="">Nenhum</option>
-                      {jobRoles.filter(j => j.is_active).map(j => <option key={j.id} value={j.id}>{j.nome}</option>)}
-                    </select>
-                  </div>
-                </div>
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleCreateUser} className="space-y-4 text-left mt-2">
+            {/* Section 1: User data */}
+            <p className="text-xs font-semibold text-foreground border-b border-border pb-1">Dados do Usuário</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs text-muted-foreground">Nome completo</Label>
+                <Input value={newNome} onChange={e => setNewNome(e.target.value)} required className="mt-1" />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Email</Label>
+                <Input type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} required className="mt-1" />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Senha (mín. 12 caracteres)</Label>
+                <PasswordInput value={pwValidation.password} onChange={e => pwValidation.setPassword(e.target.value)} required minLength={12} wrapperClassName="mt-1" />
+                <PasswordStrengthMeter strength={pwValidation.strength} strengthLabel={pwValidation.strengthLabel} strengthColor={pwValidation.strengthColor} errors={pwValidation.localErrors} serverErrors={pwValidation.serverErrors} />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Role base (sistema)</Label>
+                <select value={newRole} onChange={e => { setNewRole(e.target.value); setNewPermissions(new Set(rolePermissionsMap[e.target.value] || [])); }}
+                  className="w-full h-9 rounded-md border border-border bg-secondary px-3 text-sm text-foreground mt-1">
+                  {ALL_ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Cargo (opcional)</Label>
+                <select value={newJobRoleId} onChange={e => setNewJobRoleId(e.target.value)}
+                  className="w-full h-9 rounded-md border border-border bg-secondary px-3 text-sm text-foreground mt-1">
+                  <option value="">Nenhum</option>
+                  {jobRoles.filter(j => j.is_active).map(j => <option key={j.id} value={j.id}>{j.nome}</option>)}
+                </select>
+              </div>
+            </div>
 
-                {/* Section 2: Permissions */}
-                <p className="text-xs font-semibold text-foreground border-b border-border pb-1 pt-2">
-                  Acessos (Permissões Adicionais)
-                </p>
-                <p className="text-[10px] text-muted-foreground">
-                  O role base já inclui permissões padrão. Marque aqui permissões adicionais ou use um template.
-                </p>
-                <PermissionMatrix selected={newPermissions} onChange={setNewPermissions} />
+            {/* Section 2: Permissions */}
+            <p className="text-xs font-semibold text-foreground border-b border-border pb-1 pt-2">
+              Acessos (Permissões Adicionais)
+            </p>
+            <p className="text-[10px] text-muted-foreground">
+              O role base já inclui permissões padrão. Marque aqui permissões adicionais ou use um template.
+            </p>
+            <PermissionMatrix selected={newPermissions} onChange={setNewPermissions} />
 
-                <div className="flex justify-end gap-2 pt-2">
-                  <Button type="button" variant="outline" size="sm" onClick={() => setShowCreate(false)}>Cancelar</Button>
-                  <Button type="submit" size="sm" disabled={creating || pwValidation.isChecking || pwValidation.localErrors.length > 0}>
-                    {creating ? <><Loader2 className="w-3 h-3 animate-spin mr-1" /> Criando...</> : 'Criar Usuário'}
-                  </Button>
-                </div>
-              </form>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-        </AlertDialogContent>
-      </AlertDialog>
+            <DialogFooter className="pt-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => setShowCreate(false)}>Cancelar</Button>
+              <Button type="submit" size="sm" disabled={creating || pwValidation.isChecking || pwValidation.localErrors.length > 0}>
+                {creating ? <><Loader2 className="w-3 h-3 animate-spin mr-1" /> Criando...</> : 'Criar Usuário'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* ─── EDIT USER DIALOG ─── */}
-      <AlertDialog open={!!editingUser} onOpenChange={open => !open && setEditingUser(null)}>
-        <AlertDialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <button onClick={() => setEditingUser(null)} className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"><X className="h-4 w-4" /><span className="sr-only">Fechar</span></button>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
+      <Dialog open={!!editingUser} onOpenChange={open => !open && setEditingUser(null)}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
               <Pencil className="w-4 h-4 text-primary" /> Editar Usuário
-            </AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-4 mt-2 text-left">
-                <p className="text-xs font-semibold text-foreground border-b border-border pb-1">Dados do Usuário</p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Nome</Label>
-                    <Input value={editNome} onChange={e => setEditNome(e.target.value)} className="mt-1" />
-                  </div>
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Email</Label>
-                    <Input type="email" value={editEmail} onChange={e => setEditEmail(e.target.value)} className="mt-1" />
-                  </div>
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Perfil de acesso</Label>
-                    <select value={editRole} onChange={e => {
-                        const newR = e.target.value;
-                        setEditRole(newR);
-                        const defaults = rolePermissionsMap[newR] || [];
-                        setEditPermissions(new Set(defaults));
-                      }}
-                      className="w-full h-9 rounded-md border border-border bg-secondary px-3 text-sm text-foreground mt-1">
-                      {ALL_ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Cargo (opcional)</Label>
-                    <select value={editJobRoleId} onChange={e => setEditJobRoleId(e.target.value)}
-                      className="w-full h-9 rounded-md border border-border bg-secondary px-3 text-sm text-foreground mt-1">
-                      <option value="">Nenhum</option>
-                      {jobRoles.filter(j => j.is_active).map(j => <option key={j.id} value={j.id}>{j.nome}</option>)}
-                    </select>
-                  </div>
-                </div>
-
-                <p className="text-xs font-semibold text-foreground border-b border-border pb-1 pt-2">
-                  Permissões Adicionais (override)
-                </p>
-                <PermissionMatrix selected={editPermissions} onChange={setEditPermissions} />
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-2 text-left">
+            <p className="text-xs font-semibold text-foreground border-b border-border pb-1">Dados do Usuário</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs text-muted-foreground">Nome</Label>
+                <Input value={editNome} onChange={e => setEditNome(e.target.value)} className="mt-1" />
               </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <div>
+                <Label className="text-xs text-muted-foreground">Email</Label>
+                <Input type="email" value={editEmail} onChange={e => setEditEmail(e.target.value)} className="mt-1" />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Perfil de acesso</Label>
+                <select value={editRole} onChange={e => {
+                    const newR = e.target.value;
+                    setEditRole(newR);
+                    const defaults = rolePermissionsMap[newR] || [];
+                    setEditPermissions(new Set(defaults));
+                  }}
+                  className="w-full h-9 rounded-md border border-border bg-secondary px-3 text-sm text-foreground mt-1">
+                  {ALL_ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Cargo (opcional)</Label>
+                <select value={editJobRoleId} onChange={e => setEditJobRoleId(e.target.value)}
+                  className="w-full h-9 rounded-md border border-border bg-secondary px-3 text-sm text-foreground mt-1">
+                  <option value="">Nenhum</option>
+                  {jobRoles.filter(j => j.is_active).map(j => <option key={j.id} value={j.id}>{j.nome}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <p className="text-xs font-semibold text-foreground border-b border-border pb-1 pt-2">
+              Permissões Adicionais (override)
+            </p>
+            <PermissionMatrix selected={editPermissions} onChange={setEditPermissions} />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setEditingUser(null)} disabled={saving}>Cancelar</Button>
             <Button size="sm" onClick={handleEditUser} disabled={saving}>
               {saving ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <CheckCircle className="w-3 h-3 mr-1" />}
               Salvar
             </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ─── RESET PASSWORD DIALOG ─── */}
-      <AlertDialog open={!!resetUser} onOpenChange={open => { if (!open) { setResetUser(null); resetPw.setPassword(''); } }}>
-        <AlertDialogContent>
-          <button onClick={() => { setResetUser(null); resetPw.setPassword(''); }} className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"><X className="h-4 w-4" /><span className="sr-only">Fechar</span></button>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
+      <Dialog open={!!resetUser} onOpenChange={open => { if (!open) { setResetUser(null); resetPw.setPassword(''); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
               <KeyRound className="w-4 h-4 text-primary" /> Resetar Senha
-            </AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-3 mt-2 text-left">
-                <p className="text-xs text-muted-foreground">
-                  Definir nova senha temporária para <span className="font-semibold text-foreground">{resetUser?.nome || resetUser?.email}</span>.
-                </p>
-                <div>
-                  <Label className="text-xs text-muted-foreground">Nova senha (mín. 12 caracteres)</Label>
-                  <PasswordInput value={resetPw.password} onChange={e => resetPw.setPassword(e.target.value)} required minLength={12} wrapperClassName="mt-1" />
-                  <PasswordStrengthMeter strength={resetPw.strength} strengthLabel={resetPw.strengthLabel} strengthColor={resetPw.strengthColor} errors={resetPw.localErrors} serverErrors={resetPw.serverErrors} />
-                </div>
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 mt-2 text-left">
+            <p className="text-xs text-muted-foreground">
+              Definir nova senha temporária para <span className="font-semibold text-foreground">{resetUser?.nome || resetUser?.email}</span>.
+            </p>
+            <div>
+              <Label className="text-xs text-muted-foreground">Nova senha (mín. 12 caracteres)</Label>
+              <PasswordInput value={resetPw.password} onChange={e => resetPw.setPassword(e.target.value)} required minLength={12} wrapperClassName="mt-1" />
+              <PasswordStrengthMeter strength={resetPw.strength} strengthLabel={resetPw.strengthLabel} strengthColor={resetPw.strengthColor} errors={resetPw.localErrors} serverErrors={resetPw.serverErrors} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => { setResetUser(null); resetPw.setPassword(''); }} disabled={resetting}>Cancelar</Button>
             <Button size="sm" onClick={handleResetPassword} disabled={resetting || resetPw.isChecking || resetPw.localErrors.length > 0}>
               {resetting ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <KeyRound className="w-3 h-3 mr-1" />}
               Resetar Senha
             </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ─── DELETE USER DIALOG ─── */}
       <AlertDialog open={!!deleteUser} onOpenChange={open => { if (!open) { setDeleteUser(null); setDeleteMotivo(''); } }}>
         <AlertDialogContent>
-          <button onClick={() => { setDeleteUser(null); setDeleteMotivo(''); }} className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"><X className="h-4 w-4" /><span className="sr-only">Fechar</span></button>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2 text-destructive">
               <Trash2 className="w-4 h-4" /> Excluir Usuário
@@ -681,35 +696,32 @@ export default function AdminUsersView() {
       </AlertDialog>
 
       {/* ─── CREATE JOB ROLE DIALOG ─── */}
-      <AlertDialog open={showCreateJobRole} onOpenChange={setShowCreateJobRole}>
-        <AlertDialogContent>
-          <button onClick={() => setShowCreateJobRole(false)} className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"><X className="h-4 w-4" /><span className="sr-only">Fechar</span></button>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
+      <Dialog open={showCreateJobRole} onOpenChange={setShowCreateJobRole}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
               <Briefcase className="w-4 h-4 text-primary" /> Novo Cargo
-            </AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-3 mt-2 text-left">
-                <div>
-                  <Label className="text-xs text-muted-foreground">Nome do cargo</Label>
-                  <Input value={newJrNome} onChange={e => setNewJrNome(e.target.value)} placeholder="Ex: Peixaria, Bar..." className="mt-1" />
-                </div>
-                <div>
-                  <Label className="text-xs text-muted-foreground">Descrição (opcional)</Label>
-                  <Input value={newJrDescricao} onChange={e => setNewJrDescricao(e.target.value)} placeholder="Descrição do cargo" className="mt-1" />
-                </div>
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 mt-2 text-left">
+            <div>
+              <Label className="text-xs text-muted-foreground">Nome do cargo</Label>
+              <Input value={newJrNome} onChange={e => setNewJrNome(e.target.value)} placeholder="Ex: Peixaria, Bar..." className="mt-1" />
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground">Descrição (opcional)</Label>
+              <Input value={newJrDescricao} onChange={e => setNewJrDescricao(e.target.value)} placeholder="Descrição do cargo" className="mt-1" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setShowCreateJobRole(false)} disabled={creatingJr}>Cancelar</Button>
             <Button size="sm" onClick={handleCreateJobRole} disabled={creatingJr || !newJrNome.trim()}>
               {creatingJr ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Plus className="w-3 h-3 mr-1" />}
               Criar
             </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
       <ConfirmDialog />
     </>
