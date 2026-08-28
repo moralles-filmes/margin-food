@@ -15,7 +15,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
-import { parseExtrato, verifyContaExtrato, type ExtratoConta } from '@/lib/extratoParser';
+import { parseExtrato, verifyContaExtrato, decodeExtratoBuffer, type ExtratoConta } from '@/lib/extratoParser';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Upload, CheckCircle, Save, RefreshCw, ArrowRight, Receipt, Plus, Trash2, PieChart, ArrowRightLeft, Search, CreditCard, FileText, EyeOff, X, AlertTriangle, Edit, RotateCcw } from 'lucide-react';
@@ -1287,13 +1287,22 @@ export default function ConciliacaoBancariaSection() {
     setNomeArquivo(file.name);
     setLoading(true);
     try {
-      const text = await file.text();
+      // `file.text()` decodifica sempre como UTF-8; extrato brasileiro costuma
+      // vir em Windows-1252 e os acentos viravam caractere de substituição,
+      // desestabilizando a descrição que serve de chave contra duplicata.
+      const text = decodeExtratoBuffer(await file.arrayBuffer());
       const result = parseExtrato(file.name, text);
       const parsed: LinhaExtrato[] = result.linhas.map(l => ({ ...l, selecionada: true }));
 
       if (parsed.length === 0) {
         toast.error('Nenhuma transação encontrada no arquivo.');
         return;
+      }
+
+      // Anomalias do arquivo (mais de uma conta, encoding corrompido, sinal
+      // deduzido do TRNTYPE) precisam de conferência humana antes de conciliar.
+      for (const aviso of result.avisos) {
+        toast.warning(aviso, { duration: 12000 });
       }
 
       // Linhas de um upload anterior ainda não resolvidas (nem conciliadas, nem

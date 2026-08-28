@@ -101,4 +101,20 @@ describe('buildConciliadosCounts', () => {
     );
     expect(counts.get(linhaKey)).toBe(1);
   });
+
+  it('reconhece a mesma linha com espaçamento interno diferente na descrição (Santander Gm, 2026-08-28: 143 lançamentos duplicados)', () => {
+    // O MEMO do OFX do Santander varia o espaçamento interno entre downloads do
+    // mesmo extrato — a chave por conteúdo precisa colapsar espaços, senão a
+    // linha reimportada não bate com o lançamento já conciliado.
+    const linhaComEspacamentoDiferente = bankLineKey({
+      data: '2026-08-05',
+      valor: 3246.92,
+      tipo: 'RECEITA',
+      descricao: 'Pix   Recebido      99 FOOD LTDA',
+    });
+    expect(linhaComEspacamentoDiferente).toBe(linhaKey);
+
+    const counts = buildConciliadosCounts([conciliado()], [], new Set());
+    expect(counts.get(linhaComEspacamentoDiferente)).toBe(1);
+  });
 });
