@@ -1,5 +1,6 @@
 export * from './contracts';
 export * from './chapters';
+export * from './revenue';
 export * from './metrics';
 export * from './periods';
 export * from './categories';
