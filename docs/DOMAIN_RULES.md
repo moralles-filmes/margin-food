@@ -22,9 +22,9 @@
 | **Descrição** | Soma de lançamentos tipo RECEITA com status REALIZADO ou CONCILIADO |
 | **Fórmula** | `SUM(valor) WHERE tipo=RECEITA AND status IN (REALIZADO, CONCILIADO)` |
 | **Exclusões** | `tipo = TRANSFERENCIA`, `status = CANCELADO` |
-| **Regime** | Competência (data_competencia) para DRE/Dashboard; Caixa para Fluxo/DFC |
+| **Regime** | Competência para DRE/KPIs; caixa pela data efetiva para Dashboard e Apresentação Sócios — Resultados |
 | **Rateio** | Se houver rateio, usar itens de rateio. Se não, categoria do pai |
-| **Fonte** | RPCs `get_fin_dashboard_summary`, `get_fin_dre_summary`, `relatorio_socios_resumo` |
+| **Fonte** | RPCs `get_fin_dashboard_summary`, `get_fin_presentation_socios`, `get_fin_dre_summary` |
 | **Consumidores** | Dashboard, DRE, Relatório Sócios, KPIs, Comparativo |
 | **Selector** | `isElegivelParaReceita()` |
 
@@ -35,9 +35,9 @@
 | **Descrição** | Soma de lançamentos tipo DESPESA com status REALIZADO ou CONCILIADO |
 | **Fórmula** | `SUM(valor) WHERE tipo=DESPESA AND status IN (REALIZADO, CONCILIADO)` |
 | **Exclusões** | `tipo = TRANSFERENCIA`, `status = CANCELADO` |
-| **Regime** | Competência (data_competencia) para DRE/Dashboard; Caixa para Fluxo/DFC |
+| **Regime** | Competência para DRE/KPIs; caixa pela data efetiva para Dashboard e Apresentação Sócios — Resultados |
 | **Rateio** | Se houver rateio, usar itens de rateio. Se não, categoria do pai |
-| **Fonte** | RPCs `get_fin_dashboard_summary`, `get_fin_dre_summary`, `relatorio_socios_resumo` |
+| **Fonte** | RPCs `get_fin_dashboard_summary`, `get_fin_presentation_socios`, `get_fin_dre_summary` |
 | **Consumidores** | Dashboard, DRE, Relatório Sócios, KPIs, Comparativo |
 | **Selector** | `isElegivelParaDespesa()` |
 
@@ -91,7 +91,7 @@
 | **Regime** | Competência (data_competencia) |
 | **Rateio** | Obrigatório: se houver itens de rateio, usar rateio |
 | **Fonte** | RPC `get_fin_dre_summary` |
-| **Consumidores** | DRE, Relatório Sócios |
+| **Consumidores** | DRE |
 
 ### FIN-DFC — Demonstrativo de Fluxo de Caixa
 

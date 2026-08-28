@@ -36,8 +36,8 @@ describe('adapter canônico de Resultados', () => {
     });
     expect(availability.data.source).toMatchObject({
       rpc: 'public.get_fin_presentation_socios',
-      regime: 'competencia',
-      dateField: 'data_competencia',
+      regime: 'caixa',
+      dateField: 'COALESCE(data_pagamento, conciliado_em::date, data_competencia)',
       relations: ['public.fin_lancamentos', 'public.fin_lancamento_rateios'],
     });
     expect(availability.data.comparison.state).toBe('available');

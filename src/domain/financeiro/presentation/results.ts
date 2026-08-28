@@ -9,13 +9,13 @@ export const PRESENTATION_RESULTS_CONTRACT_VERSION = '1.0' as const;
 
 export const PRESENTATION_RESULTS_SOURCE = {
   rpc: 'public.get_fin_presentation_socios',
-  regime: 'competencia',
+  regime: 'caixa',
   relations: [
     'public.fin_lancamentos',
     'public.fin_lancamento_rateios',
   ],
-  dateField: 'data_competencia',
-  label: 'Resultado gerencial — regime de competência',
+  dateField: 'COALESCE(data_pagamento, conciliado_em::date, data_competencia)',
+  label: 'Resultado operacional — regime de caixa do Dashboard',
 } as const;
 
 export type PresentationResultEffectFavorability =

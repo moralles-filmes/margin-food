@@ -51,8 +51,8 @@ const COLOR = {
 
 const REVENUE_SOURCE_FOOTER = 'Faturamento bruto — Fechamento de Caixa · Data local do fechamento';
 const EXPENSES_SOURCE_FOOTER = 'Despesas financeiras — DFC · Regime de caixa';
-const RESULTS_SOURCE_FOOTER = 'Resultado gerencial — regime de competência · Fonte: get_fin_presentation_socios';
-const INSIGHTS_SOURCE_FOOTER = 'Insights determinísticos · Faturamento: Fechamento de Caixa · Despesas: caixa do DFC';
+const RESULTS_SOURCE_FOOTER = 'Resultado operacional — mesmo regime de caixa do Dashboard · Fonte: get_fin_presentation_socios';
+const INSIGHTS_SOURCE_FOOTER = 'Insights determinísticos · fonte canônica identificada em cada insight';
 
 function abortIfRequested(signal?: AbortSignal): void {
   if (signal?.aborted) throw new DOMException('Exportação cancelada.', 'AbortError');
@@ -151,7 +151,7 @@ function addCover(slide: PptxGenJS.Slide, pptx: PptxGenJS, periodLabel: string):
     x: 0.9, y: 4.55, w: 8.5, h: 0.42,
     fontFace: 'Aptos', fontSize: 26, color: COLOR.white, margin: 0, fit: 'shrink',
   });
-  slide.addText('Resultado operacional por competência. Transferências excluídas.', {
+  slide.addText('Resultado operacional no regime de caixa do Dashboard. Transferências excluídas.', {
     x: 0.9, y: 5.08, w: 8.5, h: 0.3,
     fontFace: 'Aptos', fontSize: 16, color: COLOR.muted, margin: 0,
   });
@@ -1308,7 +1308,7 @@ function slideSourceNotes(source: PresentationSlide): string {
     return '[Sources]\n- public.fin_lancamentos\n- public.fin_lancamento_rateios\n- DFC; regime de caixa\n- data efetiva: COALESCE(data_pagamento, conciliado_em::date, data_competencia)\n- rateio substitui categoria do lançamento\n- transferências e conciliações pendentes excluídas';
   }
   if (source.chapter === 'results') {
-    return '[Sources]\n- public.get_fin_presentation_socios\n- public.fin_lancamentos\n- public.fin_lancamento_rateios\n- data_competencia; regime de competencia\n- rateio prevalece sobre o cabecalho\n- valores nao operacionais ficam fora do resultado operacional';
+    return '[Sources]\n- public.get_fin_presentation_socios\n- public.fin_lancamentos\n- public.fin_lancamento_rateios\n- data efetiva: COALESCE(data_pagamento, conciliado_em::date, data_competencia); regime de caixa do Dashboard\n- rateio prevalece sobre o cabecalho\n- valores nao operacionais ficam fora do resultado operacional';
   }
   if (source.chapter === 'insights') {
     if (source.availability.state !== 'available' && source.availability.state !== 'empty') {

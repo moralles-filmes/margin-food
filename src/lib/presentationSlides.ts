@@ -400,7 +400,7 @@ export function buildPresentationSlides(data: PresentationSociosData): Presentat
         chapter: 'insights',
         kind: 'insights',
         title: withPageNumber('Insights', index, pages.length),
-        subtitle: 'Motor determinístico · Faturamento pelo Fechamento de Caixa e Despesas pelo caixa do DFC · sem causalidade ou recomendação automática.',
+        subtitle: 'Motor determinístico · usa cada fonte canônica disponível e identifica a origem em cada insight · sem causalidade ou recomendação automática.',
         availability: insightsSlideAvailability(
           data.insights!,
           insights => ({ type: 'insights', insights, items }),
@@ -414,7 +414,7 @@ export function buildPresentationSlides(data: PresentationSociosData): Presentat
         chapter: 'results',
         kind: 'results-summary',
         title: 'Resultados',
-        subtitle: `${data.periodLabel} · receita, despesa, resultado e margem · resultado gerencial — regime de competência.`,
+        subtitle: `${data.periodLabel} · receita, despesa, resultado e margem · mesmo regime de caixa do Dashboard.`,
         availability: resultsSlideAvailability(
           data.results,
           results => ({ type: 'results-summary', results }),
@@ -444,7 +444,7 @@ export function buildPresentationSlides(data: PresentationSociosData): Presentat
         chapter: 'results',
         kind: 'results-evolution',
         title: withPageNumber('Evolução do resultado', index, evolutionPages.length),
-        subtitle: 'Receita, despesa e resultado operacional na granularidade selecionada · regime de competência.',
+        subtitle: 'Receita, despesa e resultado operacional na granularidade selecionada · regime de caixa do Dashboard.',
         availability: resultsSlideAvailability(
           data.results!,
           results => ({ type: 'results-evolution', results, timeSeries }),
@@ -719,7 +719,7 @@ export function buildPresentationSlides(data: PresentationSociosData): Presentat
     chapter: 'insights',
     kind: 'time-series',
     title: withPageNumber('Evolução do resultado', index, timeSeriesPages.length),
-    subtitle: 'Receitas, despesas e resultado operacional por competência.',
+    subtitle: 'Receitas, despesas e resultado operacional no regime de caixa do Dashboard.',
     availability: payloadAvailability(
       data.current,
       { type: 'time-series', timeSeries },

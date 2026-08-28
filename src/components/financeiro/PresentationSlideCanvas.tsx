@@ -56,8 +56,8 @@ const TONE_CLASSES = {
 
 const REVENUE_SOURCE_FOOTER = 'Faturamento bruto — Fechamento de Caixa · Data local do fechamento';
 const EXPENSES_SOURCE_FOOTER = 'Despesas financeiras — DFC · Regime de caixa';
-const RESULTS_SOURCE_FOOTER = 'Resultado gerencial — regime de competência · Fonte: get_fin_presentation_socios';
-const INSIGHTS_SOURCE_FOOTER = 'Insights determinísticos · Faturamento: Fechamento de Caixa · Despesas: caixa do DFC';
+const RESULTS_SOURCE_FOOTER = 'Resultado operacional — mesmo regime de caixa do Dashboard · Fonte: get_fin_presentation_socios';
+const INSIGHTS_SOURCE_FOOTER = 'Insights determinísticos · fonte canônica identificada em cada insight';
 
 function formatYearMonthLabel(month: string): string {
   const year = Number(month.slice(0, 4));
@@ -1017,7 +1017,7 @@ function SlideContent({
           <p className="mb-3 text-[clamp(0.8rem,1.25cqw,1.2rem)] font-semibold uppercase tracking-[0.24em] text-ink-secondary">Visão executiva financeira</p>
           <h1 className="max-w-4xl text-[clamp(2.4rem,6cqw,5.8rem)] font-bold leading-[0.96] tracking-tight text-foreground">Apresentação<br /><span className="text-primary-ink">Sócios</span></h1>
           <p className="mt-8 text-[clamp(1.1rem,2cqw,1.9rem)] text-ink-secondary">{payload.periodLabel}</p>
-          <p className="mt-2 text-[clamp(0.75rem,1cqw,1rem)] text-muted-foreground">Resultado operacional por competência. Transferências excluídas.</p>
+          <p className="mt-2 text-[clamp(0.75rem,1cqw,1rem)] text-muted-foreground">Resultado operacional no regime de caixa do Dashboard. Transferências excluídas.</p>
         </div>
       );
     case 'executive-summary': {

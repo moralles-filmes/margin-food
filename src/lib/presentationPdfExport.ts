@@ -62,8 +62,8 @@ const COLOR = {
 
 const REVENUE_SOURCE_FOOTER = 'Faturamento bruto — Fechamento de Caixa · Data local do fechamento';
 const EXPENSES_SOURCE_FOOTER = 'Despesas financeiras — DFC · Regime de caixa';
-const RESULTS_SOURCE_FOOTER = 'Resultado gerencial — regime de competência · Fonte: get_fin_presentation_socios';
-const INSIGHTS_SOURCE_FOOTER = 'Insights determinísticos · Faturamento: Fechamento de Caixa · Despesas: caixa do DFC';
+const RESULTS_SOURCE_FOOTER = 'Resultado operacional — mesmo regime de caixa do Dashboard · Fonte: get_fin_presentation_socios';
+const INSIGHTS_SOURCE_FOOTER = 'Insights determinísticos · fonte canônica identificada em cada insight';
 
 function abortIfRequested(signal?: AbortSignal): void {
   if (signal?.aborted) throw new DOMException('Exportação cancelada.', 'AbortError');
@@ -168,7 +168,7 @@ function drawCover(doc: jsPDF, periodLabel: string): void {
   doc.text(periodLabel, 22, 130);
   setColor(doc, COLOR.muted);
   doc.setFontSize(10);
-  doc.text('Resultado operacional por competência. Transferências excluídas.', 22, 140);
+  doc.text('Resultado operacional no regime de caixa do Dashboard. Transferências excluídas.', 22, 140);
 }
 
 function drawExecutiveSummary(
