@@ -26,6 +26,12 @@
 
     --primary: 43 89% 38%;          /* #B8860B dourado (light) */
     --primary-foreground: 0 0% 9%;  /* quase-preto: texto sobre dourado */
+    --primary-strong: var(--primary);
+    --primary-strong-foreground: var(--primary-foreground);
+    --primary-ink: 40 60% 38%;
+    --primary-soft: 44 60% 90%;
+    --primary-soft-foreground: 0 0% 9%;
+    --primary-border: 44 40% 78%;
 
     --secondary: 44 30% 92%;
     --secondary-foreground: 0 0% 9%;
@@ -44,6 +50,8 @@
 
     --warning: 26 90% 37%;          /* #B45309 */
     --warning-foreground: 0 0% 100%;
+    --warning-soft: 38 90% 94%;
+    --warning-border: 38 75% 74%;
 
     --info: 215 19% 35%;            /* #475569 slate — desacoplado do primary */
     --info-foreground: 0 0% 100%;
@@ -94,6 +102,12 @@
 
     --primary: 46 65% 52%;           /* #D4AF37 dourado (dark) */
     --primary-foreground: 240 10% 4%;/* quase-preto: texto sobre dourado */
+    --primary-strong: var(--primary);
+    --primary-strong-foreground: var(--primary-foreground);
+    --primary-ink: 44 81% 71%;
+    --primary-soft: 46 30% 12%;
+    --primary-soft-foreground: 44 81% 71%;
+    --primary-border: 46 30% 25%;
 
     --secondary: 0 0% 9%;            /* #171717 elevado */
     --secondary-foreground: 60 18% 97%;
@@ -112,6 +126,8 @@
 
     --warning: 38 92% 50%;           /* #F59E0B */
     --warning-foreground: 240 10% 4%;
+    --warning-soft: 38 50% 12%;
+    --warning-border: 38 50% 28%;
 
     --info: 215 16% 47%;             /* #64748B slate — desacoplado */
     --info-foreground: 0 0% 100%;

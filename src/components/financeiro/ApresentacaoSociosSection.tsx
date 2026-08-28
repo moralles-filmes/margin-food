@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { AlertCircle, Loader2, MonitorPlay, RefreshCw, ShieldX, Star } from 'lucide-react';
+import { AlertCircle, BarChart3, Loader2, RefreshCw, ShieldX, Star } from 'lucide-react';
 import type {
   AvailablePeriodBounds,
   DataAvailability,
@@ -8,7 +8,7 @@ import type {
   PresentationPeriodFilter,
   TimeSeriesGranularity,
 } from '@/domain/financeiro/presentation';
-import { normalizePresentationPeriod } from '@/domain/financeiro/presentation';
+import { normalizePresentationPeriod, presentationRevenueMonthFromPeriod } from '@/domain/financeiro/presentation';
 import { comparePresentationDecisionSnapshot } from '@/domain/financeiro/presentation';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -16,11 +16,14 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import PresentationAnalytics from '@/components/financeiro/PresentationAnalytics';
 import PresentationDetailPage from '@/components/financeiro/PresentationDetailPage';
+import PresentationExpensesDetailPage from '@/components/financeiro/PresentationExpensesDetailPage';
 import PresentationDecisionGovernance from '@/components/financeiro/PresentationDecisionGovernance';
 import PresentationMeetingGovernance from '@/components/financeiro/PresentationMeetingGovernance';
 import PresentationPeriodFilters from '@/components/financeiro/PresentationPeriodFilters';
 import PresentationScenarioSection from '@/components/financeiro/PresentationScenarioSection';
 import { usePresentationSocios } from '@/hooks/usePresentationSocios';
+import { usePresentationRevenue } from '@/hooks/usePresentationRevenue';
+import { usePresentationExpenses } from '@/hooks/usePresentationExpenses';
 import { usePresentationCategoryMetadata } from '@/hooks/usePresentationCategoryMetadata';
 import { usePresentationPlan } from '@/hooks/usePresentationPlan';
 import { usePresentationScenario } from '@/hooks/usePresentationScenario';
@@ -30,6 +33,9 @@ import {
   attachPresentationPlan,
   attachPresentationDecision,
   attachPresentationScenario,
+  attachPresentationRevenue,
+  attachPresentationExpenses,
+  attachPresentationInsights,
   type PresentationSociosData,
 } from '@/lib/financeiroPresentationAdapter';
 import {
@@ -52,10 +58,6 @@ import { useCan } from '@/permissions/hooks';
 import { useAuth } from '@/contexts/AuthContext';
 
 const PresentationMode = lazy(() => import('@/components/financeiro/PresentationMode'));
-
-function preloadPresentationMode() {
-  void import('@/components/financeiro/PresentationMode');
-}
 
 function sameBounds(left?: AvailablePeriodBounds, right?: AvailablePeriodBounds): boolean {
   return left?.minDate === right?.minDate && left?.maxDate === right?.maxDate;
@@ -162,14 +164,30 @@ export default function ApresentacaoSociosSection({
   const [granularity, setGranularity] = useState<TimeSeriesGranularity>(initialNavigation.granularity);
   const [rankingLimit, setRankingLimit] = useState(initialNavigation.rankingLimit);
   const [comparisonMode, setComparisonMode] = useState<PresentationComparisonMode>(initialNavigation.comparisonMode);
+  const [historyYears, setHistoryYears] = useState<readonly number[]>(initialNavigation.historyYears);
   const [availableBounds, setAvailableBounds] = useState<AvailablePeriodBounds | undefined>(initialNavigation.availableBounds);
-  const [presentationOpen, setPresentationOpen] = useState(false);
+  const [workspaceView, setWorkspaceView] = useState<'presentation' | 'preparation'>(
+    detailTarget ? 'preparation' : 'presentation',
+  );
   const query = usePresentationSocios({
     companyId: profile?.company_id,
     filter,
     availableBounds,
     granularity,
     rankingLimit,
+    enabled: canView,
+  });
+  const revenueMonth = presentationRevenueMonthFromPeriod(query.definition.context.period);
+  const revenueQuery = usePresentationRevenue({
+    companyId: profile?.company_id,
+    month: revenueMonth,
+    historyYears,
+    enabled: canView,
+  });
+  const expensesQuery = usePresentationExpenses({
+    companyId: profile?.company_id,
+    month: revenueMonth,
+    historyYears,
     enabled: canView,
   });
   const categoryMetadataQuery = usePresentationCategoryMetadata(profile?.company_id, canView);
@@ -192,11 +210,21 @@ export default function ApresentacaoSociosSection({
     categoryNature: planDetailFilters.categoryNature,
     categoryGroup: planDetailFilters.categoryGroup,
     categoryId,
-    enabled: canView && Boolean(detailTarget),
+    enabled: canView && Boolean(detailTarget) && detailTarget !== 'expenses',
   });
   const presentationData = useMemo(
-    () => query.data ? attachPresentationPlan(query.data, planQuery.availability) : undefined,
-    [planQuery.availability, query.data],
+    () => query.data
+      ? attachPresentationPlan(
+          attachPresentationInsights(
+            attachPresentationExpenses(
+              attachPresentationRevenue(query.data, revenueQuery.availability),
+              expensesQuery.availability,
+            ),
+          ),
+          planQuery.availability,
+        )
+      : undefined,
+    [expensesQuery.availability, planQuery.availability, query.data, revenueQuery.availability],
   );
   const scenarioPlanAvailability = useMemo(() => (
     canSimulate
@@ -251,8 +279,20 @@ export default function ApresentacaoSociosSection({
   }, [availableBounds, query.data?.availableBounds]);
 
   useEffect(() => {
+    if (detailTarget) setWorkspaceView('preparation');
+  }, [detailTarget]);
+
+  useEffect(() => {
     if (query.error) console.error('Erro ao carregar Apresentação Sócios:', query.error);
   }, [query.error]);
+
+  useEffect(() => {
+    if (revenueQuery.error) console.error('Erro ao carregar Faturamento da Apresentação Sócios:', revenueQuery.error);
+  }, [revenueQuery.error]);
+
+  useEffect(() => {
+    if (expensesQuery.error) console.error('Erro ao carregar Despesas da Apresentação Sócios:', expensesQuery.error);
+  }, [expensesQuery.error]);
 
   useEffect(() => {
     if (categoryMetadataQuery.error) {
@@ -286,6 +326,7 @@ export default function ApresentacaoSociosSection({
     nextRankingLimit: number,
     nextComparisonMode: PresentationComparisonMode,
     detail?: { categoryId?: string; returnAnchor: PresentationReturnAnchor },
+    nextHistoryYears: readonly number[] = historyYears,
   ) => {
     const period = normalizePresentationPeriod(nextFilter, { availableBounds });
     const params = buildPresentationSearchParams(
@@ -294,6 +335,7 @@ export default function ApresentacaoSociosSection({
         granularity: nextGranularity,
         rankingLimit: nextRankingLimit,
         comparisonMode: nextComparisonMode,
+        historyYears: nextHistoryYears,
       },
       period,
       detail,
@@ -306,12 +348,17 @@ export default function ApresentacaoSociosSection({
     nextGranularity: TimeSeriesGranularity,
     nextRankingLimit: number,
     nextComparisonMode: PresentationComparisonMode,
+    nextHistoryYears: readonly number[] = historyYears,
   ) => {
     if (!location.pathname.startsWith(PRESENTATION_BASE_PATH)) return;
-    const params = buildContextParams(nextFilter, nextGranularity, nextRankingLimit, nextComparisonMode, {
-      categoryId,
-      returnAnchor: returnAnchor ?? 'executive-summary',
-    });
+    const params = buildContextParams(
+      nextFilter,
+      nextGranularity,
+      nextRankingLimit,
+      nextComparisonMode,
+      { categoryId, returnAnchor: returnAnchor ?? 'executive-summary' },
+      nextHistoryYears,
+    );
     const path = detailTarget
       ? buildPresentationDetailPath(detailTarget, params)
       : buildPresentationDashboardPath(params);
@@ -336,6 +383,11 @@ export default function ApresentacaoSociosSection({
   const handleComparisonModeChange = (nextMode: PresentationComparisonMode) => {
     setComparisonMode(nextMode);
     syncCurrentRoute(filter, granularity, rankingLimit, nextMode);
+  };
+
+  const handleHistoryYearsChange = (nextHistoryYears: readonly number[]) => {
+    setHistoryYears(nextHistoryYears);
+    syncCurrentRoute(filter, granularity, rankingLimit, comparisonMode, nextHistoryYears);
   };
 
   const openDetail = ({
@@ -376,8 +428,54 @@ export default function ApresentacaoSociosSection({
       onRetry={() => { void query.refetch(); }}
     />
   );
+  const periodFilters = (
+    <PresentationPeriodFilters
+      initialDraft={initialDraft}
+      availableBounds={availableBounds}
+      unitName={profile?.company_name}
+      granularity={granularity}
+      rankingLimit={rankingLimit}
+      historyYears={historyYears}
+      isFetching={query.isFetching || revenueQuery.isFetching || expensesQuery.isFetching}
+      onApply={handleApplyFilter}
+      onGranularityChange={handleGranularityChange}
+      onRankingLimitChange={handleRankingLimitChange}
+      onHistoryYearsChange={handleHistoryYearsChange}
+    />
+  );
 
   if (!canView) return requestState;
+
+  if (!detailTarget && workspaceView === 'presentation' && presentationDataWithDecision) {
+    return (
+      <Suspense
+        fallback={(
+          <div className="flex min-h-[32rem] items-center justify-center rounded-xl border border-border bg-card" role="status">
+            <Loader2 className="mr-2 h-5 w-5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+            Preparando apresentação...
+          </div>
+        )}
+      >
+        <PresentationMode
+          data={presentationDataWithDecision}
+          canExport={canExport}
+          displayMode="embedded"
+          unitName={profile?.company_name}
+          toolbar={periodFilters}
+          onClose={() => setWorkspaceView('preparation')}
+          onOpenExpenseCategory={(nextCategoryId) => openDetail({
+            target: 'expenses',
+            categoryId: nextCategoryId,
+            returnAnchor: 'financial-tree',
+          })}
+          onOpenResultDetail={(target) => openDetail({
+            target,
+            returnAnchor: 'executive-summary',
+          })}
+        />
+      </Suspense>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -395,31 +493,20 @@ export default function ApresentacaoSociosSection({
             </div>
           </div>
         </div>
-        {!detailTarget && presentationData ? (
+        {!detailTarget && presentationDataWithDecision ? (
           <Button
             type="button"
-            onClick={() => setPresentationOpen(true)}
-            onFocus={preloadPresentationMode}
-            onPointerEnter={preloadPresentationMode}
+            variant="outline"
+            onClick={() => setWorkspaceView('presentation')}
             className="min-h-11 px-5 font-semibold shadow-sm"
           >
-            <MonitorPlay className="mr-2 h-4 w-4" aria-hidden="true" />
-            Iniciar modo apresentação
+            <BarChart3 className="mr-2 h-4 w-4" aria-hidden="true" />
+            Voltar à apresentação
           </Button>
         ) : null}
       </header>
 
-      <PresentationPeriodFilters
-        initialDraft={initialDraft}
-        availableBounds={availableBounds}
-        unitName={profile?.company_name}
-        granularity={granularity}
-        rankingLimit={rankingLimit}
-        isFetching={query.isFetching}
-        onApply={handleApplyFilter}
-        onGranularityChange={handleGranularityChange}
-        onRankingLimitChange={handleRankingLimitChange}
-      />
+      {periodFilters}
 
       {invalidDetail ? (
         <Alert variant="destructive">
@@ -431,7 +518,16 @@ export default function ApresentacaoSociosSection({
         </Alert>
       ) : presentationData
         ? (
-            detailTarget ? (
+            detailTarget === 'expenses' ? (
+              <PresentationExpensesDetailPage
+                companyId={profile?.company_id}
+                availability={expensesQuery.availability}
+                categoryId={categoryId}
+                unitName={profile?.company_name}
+                onBack={backToDashboard}
+                onSelectCategory={nextCategoryId => selectDetailCategory(nextCategoryId, 'expenses')}
+              />
+            ) : detailTarget ? (
               <PresentationDetailPage
                 companyId={profile?.company_id}
                 target={detailTarget}
@@ -527,23 +623,6 @@ export default function ApresentacaoSociosSection({
             )
           )
         : requestState}
-
-      {presentationOpen && presentationDataWithDecision ? (
-        <Suspense
-          fallback={(
-            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black text-white" role="status">
-              <Loader2 className="mr-2 h-5 w-5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
-              Preparando modo apresentação...
-            </div>
-          )}
-        >
-          <PresentationMode
-            data={presentationDataWithDecision}
-            canExport={canExport}
-            onClose={() => setPresentationOpen(false)}
-          />
-        </Suspense>
-      ) : null}
     </div>
   );
 }

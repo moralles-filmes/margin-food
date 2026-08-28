@@ -61,7 +61,7 @@ vi.mock('@/hooks/usePresentationDecisions', async importOriginal => {
 function renderGovernance(canManage: boolean, canApprove: boolean) {
   const plan = createPresentationPlanData();
   return render(
-    <MemoryRouter initialEntries={[`/financeiro/relatorio-socios?decision=${DECISION_ID}`]}>
+    <MemoryRouter initialEntries={[`/financeiro/apresentacao-socios?decision=${DECISION_ID}`]}>
       <PresentationDecisionGovernance
         companyId="11111111-1111-4111-8111-111111111111"
         userId="22222222-2222-4222-8222-222222222222"

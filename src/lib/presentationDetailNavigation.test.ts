@@ -20,7 +20,13 @@ describe('navegação dos detalhes da Apresentação Sócios', () => {
     const period = normalizePresentationPeriod(filter);
     const categoryId = '123e4567-e89b-42d3-a456-426614174000';
     const params = buildPresentationSearchParams(
-      { filter, granularity: 'month', rankingLimit: 15, comparisonMode: 'budget' },
+      {
+        filter,
+        granularity: 'month',
+        rankingLimit: 15,
+        comparisonMode: 'budget',
+        historyYears: [2024, 2025, 2026],
+      },
       period,
       { categoryId, returnAnchor: 'financial-tree' },
     );
@@ -35,9 +41,19 @@ describe('navegação dos detalhes da Apresentação Sócios', () => {
       granularity: 'month',
       rankingLimit: 15,
       comparisonMode: 'budget',
+      historyYears: [2024, 2025, 2026],
     });
-    expect(buildPresentationDetailPath('cmv', params)).toContain('/financeiro/relatorio-socios/cmv?');
-    expect(buildPresentationDashboardPath(params)).toContain('/financeiro/relatorio-socios?');
+    expect(buildPresentationDetailPath('cmv', params)).toContain('/financeiro/apresentacao-socios/cmv?');
+    const expensePath = buildPresentationDetailPath('expenses', params);
+    expect(expensePath).toContain('/financeiro/apresentacao-socios/expenses?');
+    const expenseParams = new URL(expensePath, 'https://local.test').searchParams;
+    expect(expenseParams.get('category')).toBe(categoryId);
+    expect(expenseParams.get('from')).toBe('2026-01-01');
+    expect(expenseParams.get('to')).toBe('2026-04-01');
+    expect(expenseParams.get('granularity')).toBe('month');
+    expect(expenseParams.get('mode')).toBe('budget');
+    expect(expenseParams.get('years')).toBe('2024,2025,2026');
+    expect(buildPresentationDashboardPath(params)).toContain('/financeiro/apresentacao-socios?');
   });
 
   it('preserva o modo Total com limites explícitos no deep link', () => {
@@ -46,7 +62,13 @@ describe('navegação dos detalhes da Apresentação Sócios', () => {
       availableBounds: { minDate: '2024-02-01', maxDate: '2026-08-25' },
     });
     const params = buildPresentationSearchParams(
-      { filter, granularity: 'year', rankingLimit: 20, comparisonMode: 'projection' },
+      {
+        filter,
+        granularity: 'year',
+        rankingLimit: 20,
+        comparisonMode: 'projection',
+        historyYears: [2025, 2026],
+      },
       period,
     );
 
@@ -55,8 +77,23 @@ describe('navegação dos detalhes da Apresentação Sócios', () => {
       granularity: 'year',
       rankingLimit: 20,
       comparisonMode: 'projection',
+      historyYears: [2025, 2026],
       availableBounds: { minDate: '2024-02-01', maxDate: '2026-08-25' },
     });
+  });
+
+  it('restaura de um a três anos e rejeita um quarto ano no deep link', () => {
+    const valid = readPresentationNavigationContext(
+      new URLSearchParams('period=month&month=2026-03&years=2024,2025,2026'),
+      '2026-08-25',
+    );
+    expect(valid.historyYears).toEqual([2024, 2025, 2026]);
+
+    const invalid = readPresentationNavigationContext(
+      new URLSearchParams('period=month&month=2026-03&years=2023,2024,2025,2026'),
+      '2026-08-25',
+    );
+    expect(invalid.historyYears).toEqual([2024, 2025, 2026]);
   });
 
   it('descarta categoria e contexto inválidos sem produzir intervalo inseguro', () => {

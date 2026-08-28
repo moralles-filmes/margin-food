@@ -8,6 +8,7 @@ import type {
 } from '@/domain/financeiro/presentation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DateInput } from '@/components/ui/DateInput';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -17,6 +18,7 @@ import {
   type PresentationFilterDraft,
 } from '@/lib/presentationFilters';
 import { cn } from '@/lib/utils';
+import PresentationHistoryYearsSelector from '@/components/financeiro/PresentationHistoryYearsSelector';
 
 interface PresentationPeriodFiltersProps {
   initialDraft: PresentationFilterDraft;
@@ -24,10 +26,12 @@ interface PresentationPeriodFiltersProps {
   unitName?: string | null;
   granularity: TimeSeriesGranularity;
   rankingLimit: number;
+  historyYears: readonly number[];
   isFetching: boolean;
   onApply: (filter: PresentationPeriodFilter) => void;
   onGranularityChange: (value: TimeSeriesGranularity) => void;
   onRankingLimitChange: (value: number) => void;
+  onHistoryYearsChange: (years: readonly number[]) => void;
 }
 
 type QuickPreset = Extract<PresentationPeriodPreset, 'month' | 'month-range' | 'year' | 'all-time'>;
@@ -58,10 +62,12 @@ export default function PresentationPeriodFilters({
   unitName,
   granularity,
   rankingLimit,
+  historyYears,
   isFetching,
   onApply,
   onGranularityChange,
   onRankingLimitChange,
+  onHistoryYearsChange,
 }: PresentationPeriodFiltersProps) {
   const [draft, setDraft] = useState(initialDraft);
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -226,22 +232,31 @@ export default function PresentationPeriodFilters({
               </div>
 
               <div className="rounded-lg border border-border/70 p-3">
+                <p className="mb-1 text-xs font-semibold text-foreground">Histórico de faturamento e despesas</p>
+                <p className="mb-3 text-xs text-muted-foreground">
+                  Selecione de um a três anos distintos para os históricos mensais de Faturamento e Despesas do DFC.
+                </p>
+                <PresentationHistoryYearsSelector
+                  years={historyYears}
+                  onChange={onHistoryYearsChange}
+                />
+              </div>
+
+              <div className="rounded-lg border border-border/70 p-3">
                 <p className="mb-2 text-xs font-semibold text-foreground">Período personalizado</p>
                 <div className="grid gap-2 sm:grid-cols-2">
                   <Field id="presentation-custom-start" label="Data inicial">
-                    <Input
+                    <DateInput
                       id="presentation-custom-start"
-                      type="date"
                       value={draft.customStart}
-                      onChange={event => setDraft(current => ({ ...current, customStart: event.target.value }))}
+                      onValueChange={v => setDraft(current => ({ ...current, customStart: v }))}
                     />
                   </Field>
                   <Field id="presentation-custom-end" label="Data final">
-                    <Input
+                    <DateInput
                       id="presentation-custom-end"
-                      type="date"
                       value={draft.customEnd}
-                      onChange={event => setDraft(current => ({ ...current, customEnd: event.target.value }))}
+                      onValueChange={v => setDraft(current => ({ ...current, customEnd: v }))}
                     />
                   </Field>
                 </div>
@@ -274,11 +289,10 @@ export default function PresentationPeriodFilters({
                     />
                   </Field>
                   <Field id="presentation-through" label="Acumulado até">
-                    <Input
+                    <DateInput
                       id="presentation-through"
-                      type="date"
                       value={draft.through}
-                      onChange={event => setDraft(current => ({ ...current, through: event.target.value }))}
+                      onValueChange={v => setDraft(current => ({ ...current, through: v }))}
                     />
                   </Field>
                 </div>

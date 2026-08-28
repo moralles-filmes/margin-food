@@ -1,11 +1,12 @@
 import { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
 import { usePersistedTab } from '@/hooks/usePersistedTab';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useCan, useModuleAccess } from '@/permissions';
 import { cn } from '@/lib/utils';
 import { SubmoduleSwitcher } from '@/components/ui/SubmoduleSwitcher';
+import { isPresentationDetailTarget } from '@/lib/presentationDetailNavigation';
 import { Shield } from 'lucide-react';
 import {
   LayoutDashboard, FolderTree, Landmark, Receipt,
@@ -24,7 +25,8 @@ const ConciliacaoBancariaSection = lazy(() => import('@/components/financeiro/Co
 import AlertasSection from '@/components/financeiro/AlertasSection';
 import RecorrenciasSection from '@/components/financeiro/RecorrenciasSection';
 import CategorizacaoSection from '@/components/financeiro/CategorizacaoSection';
-const RelatorioSociosWorkspace = lazy(() => import('@/components/financeiro/RelatorioSociosWorkspace'));
+const RelatorioSociosSection = lazy(() => import('@/components/financeiro/RelatorioSociosSection'));
+const ApresentacaoSociosSection = lazy(() => import('@/components/financeiro/ApresentacaoSociosSection'));
 const ProjecaoFluxoSection = lazy(() => import('@/components/financeiro/ProjecaoFluxoSection'));
 const KPIsSection = lazy(() => import('@/components/financeiro/KPIsSection'));
 const AuditoriaFinSection = lazy(() => import('@/components/financeiro/AuditoriaFinSection'));
@@ -36,7 +38,7 @@ import LivroRazaoSection from '@/components/financeiro/LivroRazaoSection';
 import PlanoContasFinSection from '@/components/financeiro/PlanoContasFinSection';
 import CentrosCustoFinSection from '@/components/financeiro/CentrosCustoFinSection';
 
-type FinSubTab = 'dashboard' | 'cadastros' | 'contas' | 'lancamentos' | 'pagar' | 'receber' | 'fluxo' | 'dre' | 'orcamento' | 'conciliacao' | 'alertas' | 'recorrencias' | 'categorizacao' | 'relatorio_socios' | 'projecao' | 'kpis' | 'auditoria' | 'comparativo' | 'fechamento';
+type FinSubTab = 'dashboard' | 'cadastros' | 'contas' | 'lancamentos' | 'pagar' | 'receber' | 'fluxo' | 'dre' | 'orcamento' | 'conciliacao' | 'alertas' | 'recorrencias' | 'categorizacao' | 'relatorio_socios' | 'apresentacao_socios' | 'projecao' | 'kpis' | 'auditoria' | 'comparativo' | 'fechamento';
 
 // DashboardFinanceiro extracted to src/components/financeiro/DashboardFinanceiroSection.tsx
 
@@ -151,6 +153,8 @@ const TAB_REGISTRY_MAP: Record<FinSubTab, string> = {
   recorrencias: 'recorrencias',
   categorizacao: 'categorizacao',
   relatorio_socios: 'relatorio-socios',
+  // As duas entradas compartilham o mesmo contrato RBAC durante a migração.
+  apresentacao_socios: 'relatorio-socios',
   projecao: 'projecao',
   kpis: 'kpis',
   auditoria: 'auditoria',
@@ -166,17 +170,23 @@ export default function FinanceiroView() {
   const { visibleSubtabs } = useModuleAccess('financeiro');
   const location = useLocation();
   const navigate = useNavigate();
+  const { detail } = useParams<{ detail?: string }>();
+  const detailTarget = isPresentationDetailTarget(detail) ? detail : undefined;
 
   useEffect(() => {
-    if (location.pathname.startsWith('/financeiro/relatorio-socios')) {
+    if (location.pathname.startsWith('/financeiro/apresentacao-socios')) {
+      setActiveTab('apresentacao_socios');
+    } else if (location.pathname === '/financeiro/relatorio-socios') {
       setActiveTab('relatorio_socios');
     }
   }, [location.pathname, setActiveTab]);
 
   const handleTabSelect = useCallback((tab: FinSubTab) => {
-    if (tab !== 'relatorio_socios' && location.pathname.startsWith('/financeiro/relatorio-socios')) {
-      navigate('/');
-    }
+    const sociosRoute = location.pathname.startsWith('/financeiro/relatorio-socios')
+      || location.pathname.startsWith('/financeiro/apresentacao-socios');
+    if (tab === 'relatorio_socios') navigate('/financeiro/relatorio-socios');
+    else if (tab === 'apresentacao_socios') navigate('/financeiro/apresentacao-socios');
+    else if (sociosRoute) navigate('/');
     setActiveTab(tab);
   }, [location.pathname, navigate, setActiveTab]);
 
@@ -232,6 +242,7 @@ export default function FinanceiroView() {
     { id: 'projecao',         label: 'Projeção',             icon: TrendingUp,      group: 'relatorios' },
     { id: 'kpis',             label: 'KPIs',                 icon: BarChart3,       group: 'relatorios' },
     { id: 'relatorio_socios', label: 'Relatório Sócios',     icon: BarChart3,       group: 'relatorios' },
+    { id: 'apresentacao_socios', label: 'Apresentação Sócios', icon: BarChart3,     group: 'relatorios' },
     { id: 'comparativo',      label: 'Comparativo',          icon: Activity,        group: 'relatorios' },
     { id: 'auditoria',        label: 'Auditoria',            icon: Building2,       group: 'relatorios' },
   ];
@@ -330,7 +341,15 @@ export default function FinanceiroView() {
       {effectiveTab === 'alertas' && <AlertasSection onNavigate={(t) => setActiveTab(t as FinSubTab)} />}
       {effectiveTab === 'recorrencias' && <RecorrenciasSection onNavigate={(t) => setActiveTab(t as FinSubTab)} />}
       {effectiveTab === 'categorizacao' && <CategorizacaoSection />}
-      {effectiveTab === 'relatorio_socios' && <Suspense fallback={<FinSpinner />}><RelatorioSociosWorkspace /></Suspense>}
+      {effectiveTab === 'relatorio_socios' && <Suspense fallback={<FinSpinner />}><RelatorioSociosSection /></Suspense>}
+      {effectiveTab === 'apresentacao_socios' && (
+        <Suspense fallback={<FinSpinner />}>
+          <ApresentacaoSociosSection
+            detailTarget={detailTarget}
+            invalidDetail={Boolean(detail && !detailTarget)}
+          />
+        </Suspense>
+      )}
       {effectiveTab === 'projecao' && <Suspense fallback={<FinSpinner />}><ProjecaoFluxoSection /></Suspense>}
       {effectiveTab === 'kpis' && <Suspense fallback={<FinSpinner />}><KPIsSection /></Suspense>}
       {effectiveTab === 'auditoria' && <Suspense fallback={<FinSpinner />}><AuditoriaFinSection /></Suspense>}

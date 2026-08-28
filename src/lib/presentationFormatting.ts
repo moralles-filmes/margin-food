@@ -62,6 +62,8 @@ export function availabilityMessage(availability: DataAvailability<unknown>): st
         ? 'Conteúdo fora do histórico disponível.'
         : availability.reason === 'permission-denied'
           ? 'Conteúdo indisponível por permissão.'
+          : availability.reason === 'not-requested'
+            ? 'Conteúdo não solicitado nesta fase.'
           : 'Conteúdo indisponível.';
     case 'error':
       return availability.message;

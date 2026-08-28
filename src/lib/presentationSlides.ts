@@ -3,23 +3,50 @@ import type {
   CategoryCompositionSection,
   DataAvailability,
   PresentationRankings,
+  PresentationRevenueData,
+  PresentationExpensesData,
+  PresentationExpenseNode,
+  PresentationResultsData,
+  PresentationInsightsData,
+  PresentationInsight,
   PresentationSlide,
   PresentationSlidePayload,
   PresentationTimeSeries,
 } from '@/domain/financeiro/presentation';
-import { presentationPlanHasConfiguredTarget } from '@/domain/financeiro/presentation';
+import {
+  PRESENTATION_CHAPTERS,
+  PRESENTATION_INSIGHT_RULES,
+  presentationPlanHasConfiguredTarget,
+  type PresentationChapterId,
+} from '@/domain/financeiro/presentation';
 import type {
   PresentationAnalyticsSnapshot,
   PresentationSociosData,
 } from '@/lib/financeiroPresentationAdapter';
+import { hasPresentationNonOperationalValues } from '@/lib/resultsPresentationAdapter';
 
 const MAX_TIME_SERIES_POINTS_PER_SLIDE = 12;
 const MAX_CATEGORY_ROWS_PER_COLUMN = 8;
 const MAX_RANKING_ITEMS_PER_COLUMN = 6;
 const MAX_DECISION_ACTIONS_PER_SLIDE = 6;
 const MAX_DECISION_ACTION_CHARACTERS_PER_SLIDE = 900;
+const MAX_INSIGHT_LAYOUT_CHARACTERS_PER_SLIDE = 1_600;
 
 export const PRESENTATION_SLIDE_SEQUENCE = [
+  'chapter-foundation',
+  'revenue-summary',
+  'revenue-weekdays',
+  'revenue-history',
+  'expenses-summary',
+  'expenses-tree',
+  'expenses-rolling',
+  'expenses-history',
+  'results-summary',
+  'results-comparison',
+  'results-evolution',
+  'results-bridge',
+  'results-non-operational',
+  'insights',
   'cover',
   'executive-summary',
   'plan-comparison',
@@ -36,6 +63,15 @@ export const PRESENTATION_SLIDE_SEQUENCE = [
 
 type SnapshotAvailability = DataAvailability<PresentationAnalyticsSnapshot>;
 
+const FOUNDATION_SLIDES: readonly Omit<PresentationSlide, 'order'>[] = PRESENTATION_CHAPTERS.map(chapter => ({
+  id: `chapter-${chapter.id}`,
+  chapter: chapter.id,
+  kind: 'chapter-foundation',
+  title: chapter.label,
+  subtitle: 'Estrutura preparada nesta fase; os dados canônicos serão conectados nas próximas fases.',
+  availability: { state: 'unavailable', reason: 'not-requested' },
+}));
+
 function chunk<T>(items: readonly T[], size: number): T[][] {
   if (items.length === 0) return [[]];
   const chunks: T[][] = [];
@@ -43,6 +79,37 @@ function chunk<T>(items: readonly T[], size: number): T[][] {
     chunks.push(items.slice(index, index + size));
   }
   return chunks;
+}
+
+function paginateInsights(items: readonly PresentationInsight[]): PresentationInsight[][] {
+  if (items.length === 0) return [[]];
+  const pages: PresentationInsight[][] = [];
+  let current: PresentationInsight[] = [];
+  let characters = 0;
+
+  for (const insight of items) {
+    const insightCharacters = insight.title.length
+      + insight.description.length
+      + insight.period.label.length
+      + insight.source.label.length
+      + JSON.stringify(insight.evidence).length;
+    if (
+      current.length > 0
+      && (
+        current.length >= PRESENTATION_INSIGHT_RULES.selection.maximumPerSlide
+        || characters + insightCharacters > MAX_INSIGHT_LAYOUT_CHARACTERS_PER_SLIDE
+      )
+    ) {
+      pages.push(current);
+      current = [];
+      characters = 0;
+    }
+    current.push(insight);
+    characters += insightCharacters;
+  }
+
+  if (current.length > 0) pages.push(current);
+  return pages;
 }
 
 function paginateDecisionActions<T extends { description: string }>(items: readonly T[]): T[][] {
@@ -68,7 +135,7 @@ function paginateDecisionActions<T extends { description: string }>(items: reado
   return pages;
 }
 
-function copyUnavailable<T>(availability: SnapshotAvailability): DataAvailability<T> | null {
+function copyUnavailable<T>(availability: DataAvailability<unknown>): DataAvailability<T> | null {
   switch (availability.state) {
     case 'idle':
       return { state: 'idle' };
@@ -81,6 +148,66 @@ function copyUnavailable<T>(availability: SnapshotAvailability): DataAvailabilit
     default:
       return null;
   }
+}
+
+function revenueSlideAvailability<T extends PresentationSlidePayload>(
+  availability: NonNullable<PresentationSociosData['revenue']>,
+  createPayload: (revenue: PresentationRevenueData) => T,
+): DataAvailability<T> {
+  if (availability.state === 'available') {
+    return {
+      state: 'available',
+      data: createPayload(availability.data),
+      fetchedAt: availability.fetchedAt,
+    };
+  }
+  if (availability.state === 'empty') {
+    return {
+      state: 'empty',
+      data: createPayload(availability.data),
+      fetchedAt: availability.fetchedAt,
+    };
+  }
+  return copyUnavailable<T>(availability)!;
+}
+
+function expensesSlideAvailability<T extends PresentationSlidePayload>(
+  availability: NonNullable<PresentationSociosData['expenses']>,
+  createPayload: (expenses: PresentationExpensesData) => T,
+): DataAvailability<T> {
+  if (availability.state === 'available') {
+    return { state: 'available', data: createPayload(availability.data), fetchedAt: availability.fetchedAt };
+  }
+  if (availability.state === 'empty') {
+    return { state: 'empty', data: createPayload(availability.data), fetchedAt: availability.fetchedAt };
+  }
+  return copyUnavailable<T>(availability)!;
+}
+
+function resultsSlideAvailability<T extends PresentationSlidePayload>(
+  availability: NonNullable<PresentationSociosData['results']>,
+  createPayload: (results: PresentationResultsData) => T,
+): DataAvailability<T> {
+  if (availability.state === 'available') {
+    return { state: 'available', data: createPayload(availability.data), fetchedAt: availability.fetchedAt };
+  }
+  if (availability.state === 'empty') {
+    return { state: 'empty', data: createPayload(availability.data), fetchedAt: availability.fetchedAt };
+  }
+  return copyUnavailable<T>(availability)!;
+}
+
+function insightsSlideAvailability<T extends PresentationSlidePayload>(
+  availability: NonNullable<PresentationSociosData['insights']>,
+  createPayload: (insights: PresentationInsightsData) => T,
+): DataAvailability<T> {
+  if (availability.state === 'available') {
+    return { state: 'available', data: createPayload(availability.data), fetchedAt: availability.fetchedAt };
+  }
+  if (availability.state === 'empty') {
+    return { state: 'empty', data: createPayload(availability.data), fetchedAt: availability.fetchedAt };
+  }
+  return copyUnavailable<T>(availability)!;
 }
 
 function payloadAvailability<T extends PresentationSlidePayload>(
@@ -160,9 +287,56 @@ function paginateForest(
   return pages;
 }
 
-function paginateComposition(section: CategoryCompositionSection): CategoryCompositionSection[] {
-  const revenuePages = paginateForest(section.revenue, MAX_CATEGORY_ROWS_PER_COLUMN);
-  const expensePages = paginateForest(section.expense, MAX_CATEGORY_ROWS_PER_COLUMN);
+function countExpenseRows(node: PresentationExpenseNode): number {
+  return 1 + node.children.reduce((total, child) => total + countExpenseRows(child), 0);
+}
+
+function splitExpenseNode(node: PresentationExpenseNode, maxRows: number): PresentationExpenseNode[] {
+  if (countExpenseRows(node) <= maxRows || node.children.length === 0 || maxRows <= 1) return [node];
+  const childParts = node.children.flatMap(child => splitExpenseNode(child, maxRows - 1));
+  const pages: PresentationExpenseNode[] = [];
+  let children: PresentationExpenseNode[] = [];
+  let rows = 1;
+  for (const child of childParts) {
+    const childRows = countExpenseRows(child);
+    if (children.length > 0 && rows + childRows > maxRows) {
+      pages.push({ ...node, children });
+      children = [];
+      rows = 1;
+    }
+    children.push(child);
+    rows += childRows;
+  }
+  if (children.length > 0) pages.push({ ...node, children });
+  return pages;
+}
+
+function paginateExpenseTree(nodes: readonly PresentationExpenseNode[], maxRows = 7): PresentationExpenseNode[][] {
+  if (nodes.length === 0) return [[]];
+  const parts = nodes.flatMap(node => splitExpenseNode(node, maxRows));
+  const pages: PresentationExpenseNode[][] = [];
+  let current: PresentationExpenseNode[] = [];
+  let rows = 0;
+  for (const node of parts) {
+    const nodeRows = countExpenseRows(node);
+    if (current.length > 0 && rows + nodeRows > maxRows) {
+      pages.push(current);
+      current = [];
+      rows = 0;
+    }
+    current.push(node);
+    rows += nodeRows;
+  }
+  if (current.length > 0) pages.push(current);
+  return pages;
+}
+
+function paginateComposition(
+  section: CategoryCompositionSection,
+  maxRows = MAX_CATEGORY_ROWS_PER_COLUMN,
+): CategoryCompositionSection[] {
+  const revenuePages = paginateForest(section.revenue, maxRows);
+  const expensePages = paginateForest(section.expense, maxRows);
   const pageCount = Math.max(revenuePages.length, expensePages.length);
   return Array.from({ length: pageCount }, (_, index) => ({
     revenue: revenuePages[index] ?? [],
@@ -209,12 +383,200 @@ function withPageNumber(title: string, index: number, total: number): string {
 
 export function buildPresentationSlides(data: PresentationSociosData): PresentationSlide[] {
   const slides: PresentationSlide[] = [];
-  const append = (slide: Omit<PresentationSlide, 'order'>) => {
+  const append = (
+    slide: Omit<PresentationSlide, 'order' | 'chapter'> & { chapter?: PresentationChapterId },
+  ) => {
     slides.push({ ...slide, order: slides.length } as PresentationSlide);
   };
 
+  FOUNDATION_SLIDES.forEach((slide) => {
+    if (slide.chapter === 'insights' && data.insights) {
+      const pages: PresentationInsight[][] =
+        data.insights.state === 'available' || data.insights.state === 'empty'
+          ? paginateInsights(data.insights.data.insights)
+          : [[]];
+      pages.forEach((items, index) => append({
+        id: index === 0 ? 'chapter-insights' : `chapter-insights-page-${index + 1}`,
+        chapter: 'insights',
+        kind: 'insights',
+        title: withPageNumber('Insights', index, pages.length),
+        subtitle: 'Motor determinístico · Faturamento pelo Fechamento de Caixa e Despesas pelo caixa do DFC · sem causalidade ou recomendação automática.',
+        availability: insightsSlideAvailability(
+          data.insights!,
+          insights => ({ type: 'insights', insights, items }),
+        ),
+      }));
+      return;
+    }
+    if (slide.chapter === 'results' && data.results) {
+      append({
+        id: 'chapter-results',
+        chapter: 'results',
+        kind: 'results-summary',
+        title: 'Resultados',
+        subtitle: `${data.periodLabel} · receita, despesa, resultado e margem · resultado gerencial — regime de competência.`,
+        availability: resultsSlideAvailability(
+          data.results,
+          results => ({ type: 'results-summary', results }),
+        ),
+      });
+      append({
+        id: 'results-comparison',
+        chapter: 'results',
+        kind: 'results-comparison',
+        title: 'Comparação com o período anterior',
+        subtitle: 'Períodos equivalentes · bases zero e indisponibilidade permanecem explícitas.',
+        availability: resultsSlideAvailability(
+          data.results,
+          results => ({ type: 'results-comparison', results }),
+        ),
+      });
+      const fallbackGranularity: PresentationTimeSeries['granularity'] =
+        data.current.state === 'available' || data.current.state === 'empty'
+          ? data.current.data.timeSeries.granularity
+          : 'month';
+      const evolutionPages: PresentationTimeSeries[] =
+        data.results.state === 'available' || data.results.state === 'empty'
+        ? paginateTimeSeries(data.results.data.evolution)
+        : [{ granularity: fallbackGranularity, points: [] }];
+      evolutionPages.forEach((timeSeries, index) => append({
+        id: `results-evolution-${index + 1}`,
+        chapter: 'results',
+        kind: 'results-evolution',
+        title: withPageNumber('Evolução do resultado', index, evolutionPages.length),
+        subtitle: 'Receita, despesa e resultado operacional na granularidade selecionada · regime de competência.',
+        availability: resultsSlideAvailability(
+          data.results!,
+          results => ({ type: 'results-evolution', results, timeSeries }),
+        ),
+      }));
+      append({
+        id: 'results-bridge',
+        chapter: 'results',
+        kind: 'results-bridge',
+        title: 'Ponte da variação do resultado',
+        subtitle: 'Resultado anterior + efeito de receita + efeito econômico de despesa = resultado atual.',
+        availability: resultsSlideAvailability(
+          data.results,
+          results => ({ type: 'results-bridge', results }),
+        ),
+      });
+      if (data.results.state === 'available' || data.results.state === 'empty') {
+        const nonOperational = data.results.data.nonOperational;
+        if (hasPresentationNonOperationalValues(nonOperational.totals, nonOperational.composition)) {
+          const pages = paginateComposition(nonOperational.composition, 5);
+          pages.forEach((composition, index) => append({
+            id: `results-non-operational-${index + 1}`,
+            chapter: 'results',
+            kind: 'results-non-operational',
+            title: withPageNumber('Informativo não operacional', index, pages.length),
+            subtitle: 'Valores informativos e separados; não entram em receita, despesa, resultado ou margem operacional.',
+            availability: resultsSlideAvailability(
+              data.results!,
+              results => ({ type: 'results-non-operational', results, composition }),
+            ),
+          }));
+        }
+      }
+      return;
+    }
+    if (slide.chapter === 'expenses' && data.expenses) {
+      append({
+        id: 'chapter-expenses',
+        chapter: 'expenses',
+        kind: 'expenses-summary',
+        title: 'Despesas',
+        subtitle: 'Despesas realizadas — regime de caixa do DFC · mês selecionado × mês imediatamente anterior.',
+        availability: expensesSlideAvailability(
+          data.expenses,
+          expenses => ({ type: 'expenses-summary', expenses }),
+        ),
+      });
+      const tree = data.expenses.state === 'available' || data.expenses.state === 'empty'
+        ? paginateExpenseTree(data.expenses.data.tree)
+        : [[]];
+      tree.forEach((nodes, index) => append({
+        id: `expenses-tree-${index + 1}`,
+        chapter: 'expenses',
+        kind: 'expenses-tree',
+        title: withPageNumber('Árvore de despesas', index, tree.length),
+        subtitle: 'Valor próprio e acumulado por categoria · classes não operacionais identificadas separadamente.',
+        availability: expensesSlideAvailability(
+          data.expenses!,
+          expenses => ({ type: 'expenses-tree', expenses, nodes }),
+        ),
+      }));
+      append({
+        id: 'expenses-rolling',
+        chapter: 'expenses',
+        kind: 'expenses-rolling',
+        title: 'Despesas nos últimos três meses',
+        subtitle: 'Janela móvel terminando no mês selecionado · regime de caixa do DFC.',
+        availability: expensesSlideAvailability(
+          data.expenses,
+          expenses => ({ type: 'expenses-rolling', expenses }),
+        ),
+      });
+      append({
+        id: 'expenses-history',
+        chapter: 'expenses',
+        kind: 'expenses-history',
+        title: 'Histórico mensal de despesas',
+        subtitle: 'Despesas realizadas — regime de caixa do DFC · até três anos selecionados.',
+        availability: expensesSlideAvailability(
+          data.expenses,
+          expenses => ({ type: 'expenses-history', expenses }),
+        ),
+      });
+      return;
+    }
+    if (slide.chapter !== 'revenue' || !data.revenue) {
+      append(slide);
+      return;
+    }
+    append({
+      id: 'chapter-revenue',
+      chapter: 'revenue',
+      kind: 'revenue-summary',
+      title: 'Faturamento',
+      subtitle: 'Faturamento bruto — Fechamento de Caixa · mês selecionado × mês imediatamente anterior.',
+      availability: revenueSlideAvailability(
+        data.revenue,
+        revenue => ({ type: 'revenue-summary', revenue }),
+      ),
+    });
+    append({
+      id: 'revenue-weekdays',
+      chapter: 'revenue',
+      kind: 'revenue-weekdays',
+      title: 'Faturamento por dia da semana',
+      subtitle: 'Faturamento bruto — Fechamento de Caixa · total, ocorrências e média no mês selecionado.',
+      availability: revenueSlideAvailability(
+        data.revenue,
+        revenue => ({ type: 'revenue-weekdays', revenue }),
+      ),
+    });
+    append({
+      id: 'revenue-history',
+      chapter: 'revenue',
+      kind: 'revenue-history',
+      title: 'Histórico mensal de faturamento',
+      subtitle: 'Faturamento bruto — Fechamento de Caixa · até três anos selecionados.',
+      availability: revenueSlideAvailability(
+        data.revenue,
+        revenue => ({ type: 'revenue-history', revenue }),
+      ),
+    });
+  });
+
+  // A experiência nova usa somente o registry dos quatro capítulos. O
+  // gerencial legado continua preservado na área de preparação/governança e
+  // permanece abaixo apenas como fallback para payloads anteriores à Fase 4.
+  if (data.results) return slides;
+
   append({
     id: 'cover',
+    chapter: 'insights',
     kind: 'cover',
     title: 'Apresentação Sócios',
     subtitle: 'Visão executiva financeira',
@@ -244,13 +606,18 @@ export function buildPresentationSlides(data: PresentationSociosData): Presentat
       { id: 'non-operational', kind: 'non-operational', title: 'Informativo não operacional' },
     ];
     for (const slide of unavailableSlides) {
-      append({ ...slide, availability: copyUnavailable(data.current)! } as Omit<PresentationSlide, 'order'>);
+      append({
+        ...slide,
+        chapter: 'insights',
+        availability: copyUnavailable(data.current)!,
+      } as Omit<PresentationSlide, 'order'>);
     }
     return slides;
   }
 
   append({
     id: 'executive-summary',
+    chapter: 'insights',
     kind: 'executive-summary',
     title: 'Resumo executivo',
     subtitle: comparisonSubtitle(data),
@@ -267,6 +634,7 @@ export function buildPresentationSlides(data: PresentationSociosData): Presentat
   ) {
     append({
       id: 'plan-comparison',
+      chapter: 'insights',
       kind: 'plan-comparison',
       title: 'Metas mostram onde o resultado desvia do plano',
       subtitle: 'Realizado, orçamento e projeção por competência; contas em aberto permanecem fora do resultado.',
@@ -284,6 +652,7 @@ export function buildPresentationSlides(data: PresentationSociosData): Presentat
   ) {
     append({
       id: 'scenario-impact',
+      chapter: 'insights',
       kind: 'scenario-impact',
       title: 'Cenário e impacto',
       subtitle: `${data.scenario.data.scenarioName || 'Cenário local'} · SIMULAÇÃO · base ${data.scenario.data.baselineMode === 'actual' ? 'realizada' : data.scenario.data.baselineMode === 'budget' ? 'orçada' : 'projetada'}.`,
@@ -295,6 +664,7 @@ export function buildPresentationSlides(data: PresentationSociosData): Presentat
     if (data.scenario.data.sensitivity.state === 'available') {
       append({
         id: 'scenario-sensitivity',
+        chapter: 'insights',
         kind: 'scenario-sensitivity',
         title: 'Sensibilidade do cenário',
         subtitle: `${data.scenario.data.sensitivity.leverLabel} · uma variável por vez · SIMULAÇÃO.`,
@@ -313,6 +683,7 @@ export function buildPresentationSlides(data: PresentationSociosData): Presentat
       const actionPages = paginateDecisionActions(detail.actions);
       actionPages.forEach((actions, index) => append({
         id: `decision-commitments-${index + 1}`,
+        chapter: 'insights',
         kind: 'decision-commitments',
         title: withPageNumber('Decisão e compromissos', index, actionPages.length),
         subtitle: `${detail.decision.title} · ${detail.decision.referenceType === 'SCENARIO' ? 'SIMULAÇÃO' : 'base canônica'} · revisão ${currentRevision.revisionNumber}.`,
@@ -328,6 +699,7 @@ export function buildPresentationSlides(data: PresentationSociosData): Presentat
       if (comparison.state === 'available') {
         append({
           id: 'decision-follow-up',
+          chapter: 'insights',
           kind: 'decision-follow-up',
           title: 'Acompanhamento da decisão',
           subtitle: 'Snapshot aprovado × base canônica atual; sem inferência de causalidade.',
@@ -344,6 +716,7 @@ export function buildPresentationSlides(data: PresentationSociosData): Presentat
   const timeSeriesPages = paginateTimeSeries(snapshot.timeSeries);
   timeSeriesPages.forEach((timeSeries, index) => append({
     id: `time-series-${index + 1}`,
+    chapter: 'insights',
     kind: 'time-series',
     title: withPageNumber('Evolução do resultado', index, timeSeriesPages.length),
     subtitle: 'Receitas, despesas e resultado operacional por competência.',
@@ -357,6 +730,7 @@ export function buildPresentationSlides(data: PresentationSociosData): Presentat
   const operationalPages = paginateComposition(snapshot.categoryComposition.operational);
   operationalPages.forEach((composition, index) => append({
     id: `category-composition-${index + 1}`,
+    chapter: 'insights',
     kind: 'category-composition',
     title: withPageNumber('Composição operacional', index, operationalPages.length),
     subtitle: 'Valores diretos e acumulados são canônicos; pais e filhos não são somados novamente.',
@@ -370,6 +744,7 @@ export function buildPresentationSlides(data: PresentationSociosData): Presentat
   const rankingPages = paginateRankings(snapshot.rankings);
   rankingPages.forEach((rankings, index) => append({
     id: `rankings-${index + 1}`,
+    chapter: 'insights',
     kind: 'rankings',
     title: withPageNumber('Rankings do período', index, rankingPages.length),
     subtitle: 'Participação na composição operacional do período.',
@@ -384,6 +759,7 @@ export function buildPresentationSlides(data: PresentationSociosData): Presentat
   const receivable = snapshot.metrics.openItems.accountsReceivableOpen;
   append({
     id: 'open-items',
+    chapter: 'insights',
     kind: 'open-items',
     title: 'Contas em aberto',
     subtitle: 'Indicadores por vencimento; não participam do resultado gerencial.',
@@ -396,6 +772,7 @@ export function buildPresentationSlides(data: PresentationSociosData): Presentat
   const nonOperationalPages = paginateComposition(snapshot.categoryComposition.nonOperational);
   nonOperationalPages.forEach((composition, index) => append({
     id: `non-operational-${index + 1}`,
+    chapter: 'insights',
     kind: 'non-operational',
     title: withPageNumber('Informativo não operacional', index, nonOperationalPages.length),
     subtitle: 'Exibido separadamente e fora de receita, despesa, resultado e margem operacional.',
@@ -410,5 +787,7 @@ export function buildPresentationSlides(data: PresentationSociosData): Presentat
 }
 
 export function isPresentationSlideExportable(slide: PresentationSlide): boolean {
-  return slide.availability.state === 'available' || slide.availability.state === 'empty';
+  return slide.availability.state === 'available'
+    || slide.availability.state === 'empty'
+    || (slide.availability.state === 'unavailable' && slide.availability.reason === 'not-requested');
 }
