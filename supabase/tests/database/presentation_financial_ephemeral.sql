@@ -154,6 +154,9 @@ GRANT EXECUTE ON FUNCTION public.has_any_permission(uuid,text[]) TO authenticate
 \ir ../../migrations/20260826021702_presentation_socios_budget_projection.sql
 \ir ../../migrations/20260826211500_harden_presentation_dashboard_search_path.sql
 \ir ../../migrations/20260828171602_align_presentation_results_with_dashboard_cash_basis.sql
+-- Reproduz a sobrescrita tardia observada em produção antes de validar o reparo.
+\ir ../../migrations/20260820120000_dashboard_contas_vencidas.sql
+\ir ../../migrations/20260828181108_restore_dashboard_cash_basis_after_overwrite.sql
 
 INSERT INTO public.fin_categorias (
   id, company_id, parent_id, nome, tipo, ordem, excluir_dos_totais, grupo, linha_dre
