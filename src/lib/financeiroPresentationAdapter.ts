@@ -26,11 +26,17 @@ import {
   type PresentationPeriodSnapshot,
   type PresentationRankingItem,
   type PresentationRankings,
+  type PresentationRevenueData,
+  type PresentationExpensesData,
+  type PresentationResultsData,
+  type PresentationInsightsData,
   type PresentationTimeSeries,
   type PresentationTimeSeriesPoint,
   type TimeSeriesGranularity,
 } from '@/domain/financeiro/presentation';
 import { buildPresentationSlides } from '@/lib/presentationSlides';
+import { derivePresentationResultsAvailability } from '@/lib/resultsPresentationAdapter';
+import { derivePresentationInsightsAvailability } from '@/domain/financeiro/presentation';
 
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -50,6 +56,10 @@ export interface PresentationAnalyticsComparisonData extends Omit<PresentationCo
 
 export interface PresentationSociosData extends Omit<PresentationData, 'current' | 'comparisons'> {
   current: DataAvailability<PresentationAnalyticsSnapshot>;
+  revenue?: DataAvailability<PresentationRevenueData>;
+  expenses?: DataAvailability<PresentationExpensesData>;
+  results?: DataAvailability<PresentationResultsData>;
+  insights?: DataAvailability<PresentationInsightsData>;
   plan?: DataAvailability<PresentationPlanData>;
   scenario?: DataAvailability<PresentationScenarioResult>;
   decision?: DataAvailability<{
@@ -60,6 +70,43 @@ export interface PresentationSociosData extends Omit<PresentationData, 'current'
     previousPeriod: PresentationAnalyticsComparisonData;
     previousYear: PresentationAnalyticsComparisonData;
   };
+}
+
+export function attachPresentationResults(data: PresentationSociosData): PresentationSociosData {
+  const results = derivePresentationResultsAvailability({
+    generatedAt: data.generatedAt,
+    periodLabel: data.periodLabel,
+    current: data.current,
+    previousPeriod: data.comparisons.previousPeriod.snapshot,
+  });
+  const next: PresentationSociosData = { ...data, results, slides: [] };
+  return { ...next, slides: buildPresentationSlides(next) };
+}
+
+export function attachPresentationInsights(data: PresentationSociosData): PresentationSociosData {
+  const notRequested = { state: 'unavailable' as const, reason: 'not-requested' as const };
+  const insights = derivePresentationInsightsAvailability(
+    data.revenue ?? notRequested,
+    data.expenses ?? notRequested,
+  );
+  const next: PresentationSociosData = { ...data, insights, slides: [] };
+  return { ...next, slides: buildPresentationSlides(next) };
+}
+
+export function attachPresentationExpenses(
+  data: PresentationSociosData,
+  expenses: DataAvailability<PresentationExpensesData>,
+): PresentationSociosData {
+  const next: PresentationSociosData = { ...data, expenses, slides: [] };
+  return { ...next, slides: buildPresentationSlides(next) };
+}
+
+export function attachPresentationRevenue(
+  data: PresentationSociosData,
+  revenue: DataAvailability<PresentationRevenueData>,
+): PresentationSociosData {
+  const next: PresentationSociosData = { ...data, revenue, slides: [] };
+  return { ...next, slides: buildPresentationSlides(next) };
 }
 
 export function attachPresentationDecision(
@@ -724,5 +771,5 @@ export function adaptPresentationSociosPayload(
     },
     slides: [],
   };
-  return { ...adapted, slides: buildPresentationSlides(adapted) };
+  return attachPresentationResults(adapted);
 }

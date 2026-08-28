@@ -1,6 +1,9 @@
 import {
   addCalendarDays,
+  defaultPresentationHistoryYears,
   normalizePresentationPeriod,
+  normalizePresentationHistoryYears,
+  presentationRevenueMonthFromPeriod,
   type AvailablePeriodBounds,
   type NormalizedPresentationPeriod,
   type PresentationComparisonMode,
@@ -9,11 +12,12 @@ import {
 } from '@/domain/financeiro/presentation';
 import { createPresentationFilterDraft } from '@/lib/presentationFilters';
 
-export const PRESENTATION_BASE_PATH = '/financeiro/relatorio-socios';
+export const PRESENTATION_BASE_PATH = '/financeiro/apresentacao-socios';
 
 export const PRESENTATION_DETAIL_TARGETS = [
   'revenue',
   'expense',
+  'expenses',
   'result',
   'margin',
   'cmv',
@@ -37,6 +41,7 @@ export interface PresentationNavigationContext {
   granularity: TimeSeriesGranularity;
   rankingLimit: number;
   comparisonMode: PresentationComparisonMode;
+  historyYears: readonly number[];
   availableBounds?: AvailablePeriodBounds;
 }
 
@@ -101,7 +106,19 @@ function fallbackContext(today: string): PresentationNavigationContext {
     granularity: 'month',
     rankingLimit: 10,
     comparisonMode: 'actual',
+    historyYears: defaultPresentationHistoryYears(draft.month),
   };
+}
+
+function readHistoryYears(params: URLSearchParams, fallback: readonly number[]): number[] {
+  const serialized = params.get('years');
+  if (!serialized) return [...fallback];
+  try {
+    const values = serialized.split(',').map(value => Number(value));
+    return normalizePresentationHistoryYears(values);
+  } catch {
+    return [...fallback];
+  }
 }
 
 function readFilter(params: URLSearchParams, today: string): PresentationPeriodFilter {
@@ -170,22 +187,24 @@ export function readPresentationNavigationContext(
   const availableBounds = filter.kind === 'all-time' ? readBounds(params) : undefined;
 
   try {
-    normalizePresentationPeriod(filter, { availableBounds });
+    const period = normalizePresentationPeriod(filter, { availableBounds });
+    const revenueMonth = presentationRevenueMonthFromPeriod(period);
+    const historyYears = readHistoryYears(params, defaultPresentationHistoryYears(revenueMonth));
+    return {
+      filter,
+      granularity: isGranularity(params.get('granularity'))
+        ? params.get('granularity') as TimeSeriesGranularity
+        : fallback.granularity,
+      rankingLimit: readRankingLimit(params.get('rankingLimit')),
+      comparisonMode: params.get('mode') === 'budget' || params.get('mode') === 'projection'
+        ? params.get('mode') as PresentationComparisonMode
+        : 'actual',
+      historyYears,
+      availableBounds,
+    };
   } catch {
     return fallback;
   }
-
-  return {
-    filter,
-    granularity: isGranularity(params.get('granularity'))
-      ? params.get('granularity') as TimeSeriesGranularity
-      : fallback.granularity,
-    rankingLimit: readRankingLimit(params.get('rankingLimit')),
-    comparisonMode: params.get('mode') === 'budget' || params.get('mode') === 'projection'
-      ? params.get('mode') as PresentationComparisonMode
-      : 'actual',
-    availableBounds,
-  };
 }
 
 function writeFilter(params: URLSearchParams, filter: PresentationPeriodFilter): void {
@@ -214,6 +233,7 @@ export function buildPresentationSearchParams(
   params.set('granularity', context.granularity);
   params.set('rankingLimit', String(context.rankingLimit));
   params.set('mode', context.comparisonMode);
+  params.set('years', normalizePresentationHistoryYears(context.historyYears).join(','));
   if (detail?.categoryId && UUID_PATTERN.test(detail.categoryId)) {
     params.set('category', detail.categoryId);
   }

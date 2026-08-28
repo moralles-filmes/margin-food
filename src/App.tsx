@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { NotificationsProvider } from "@/contexts/NotificationsContext";
 import RequisicaoNotificationModal from "@/components/RequisicaoNotificationModal";
+import LegacyPresentationRedirect from "@/components/financeiro/LegacyPresentationRedirect";
 import { toast } from "sonner";
 import { PwaUpdatePrompt } from "@/components/PwaUpdatePrompt";
 import { emitDataEvent } from "@/lib/dataEvents";
@@ -168,7 +169,9 @@ const App = () => {
                   <Route path="/mercados-sazonais" element={<Index />} />
                   <Route path="/confirmacoes-recebimento" element={<Index />} />
                   <Route path="/financeiro/relatorio-socios" element={<Index />} />
-                  <Route path="/financeiro/relatorio-socios/:detail" element={<Index />} />
+                  <Route path="/financeiro/relatorio-socios/:detail" element={<LegacyPresentationRedirect />} />
+                  <Route path="/financeiro/apresentacao-socios" element={<Index />} />
+                  <Route path="/financeiro/apresentacao-socios/:detail" element={<Index />} />
                   <Route path="/admin" element={<AdminPanel />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>

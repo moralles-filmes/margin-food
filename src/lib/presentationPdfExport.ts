@@ -6,6 +6,11 @@ import type {
   PresentationScenarioResult,
   PresentationDecisionDetail,
   PresentationDecisionComparison,
+  PresentationRevenueData,
+  PresentationExpensesData,
+  PresentationExpenseNode,
+  PresentationResultsData,
+  PresentationInsight,
   PresentationSlide,
   PresentationTimeSeries,
 } from '@/domain/financeiro/presentation';
@@ -16,6 +21,7 @@ import {
   PRESENTATION_SOURCE_LABEL,
   availabilityMessage,
   buildExecutiveMetricDisplays,
+  formatMetricDelta,
   flattenPresentationCategories,
   formatPresentationSeriesLabel,
   presentationGeneratedLabel,
@@ -24,6 +30,10 @@ import {
 } from '@/lib/presentationFormatting';
 import { isPresentationSlideExportable } from '@/lib/presentationSlides';
 import { fmtBRL, fmtBRLCompact, formatIntegerBR, formatPercentBR } from '@/lib/formatters';
+import {
+  presentationInsightEvidenceLabel,
+  presentationInsightRegimeLabel,
+} from '@/lib/presentationInsightsFormatting';
 
 export interface PresentationExportProgress {
   completed: number;
@@ -49,6 +59,11 @@ const COLOR = {
   expense: '#fda4af',
   warning: '#fde68a',
 } as const;
+
+const REVENUE_SOURCE_FOOTER = 'Faturamento bruto — Fechamento de Caixa · Data local do fechamento';
+const EXPENSES_SOURCE_FOOTER = 'Despesas financeiras — DFC · Regime de caixa';
+const RESULTS_SOURCE_FOOTER = 'Resultado gerencial — regime de competência · Fonte: get_fin_presentation_socios';
+const INSIGHTS_SOURCE_FOOTER = 'Insights determinísticos · Faturamento: Fechamento de Caixa · Despesas: caixa do DFC';
 
 function abortIfRequested(signal?: AbortSignal): void {
   if (signal?.aborted) throw new DOMException('Exportação cancelada.', 'AbortError');
@@ -76,19 +91,28 @@ function drawHeader(doc: jsPDF, slide: PresentationSlide): void {
   doc.roundedRect(17, 13, 15, 1.6, 0.8, 0.8, 'F');
   setColor(doc, COLOR.white);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(26);
-  doc.text(slide.title, 17, 26, { maxWidth: 286 });
+  let titleFontSize = 26;
+  doc.setFontSize(titleFontSize);
+  let titleLines = doc.splitTextToSize(slide.title, 286) as string[];
+  while (titleLines.length > 2 && titleFontSize > 14) {
+    titleFontSize -= 1;
+    doc.setFontSize(titleFontSize);
+    titleLines = doc.splitTextToSize(slide.title, 286) as string[];
+  }
+  doc.text(titleLines, 17, 26);
   if (slide.subtitle) {
     setColor(doc, COLOR.muted);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(10.5);
-    doc.text(slide.subtitle, 17, 33, { maxWidth: 286 });
+    const titleLineHeight = titleFontSize * 0.3528 * 1.15;
+    doc.text(slide.subtitle, 17, 33 + Math.max(titleLines.length - 1, 0) * titleLineHeight, { maxWidth: 286 });
   }
 }
 
 function drawFooter(
   doc: jsPDF,
   data: PresentationSociosData,
+  slide: PresentationSlide,
   slideNumber: number,
   totalSlides: number,
 ): void {
@@ -99,7 +123,17 @@ function drawFooter(
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
   doc.text(
-    `${PRESENTATION_SOURCE_LABEL} · ${PRESENTATION_REGIME_LABEL} · ${presentationGeneratedLabel(data.generatedAt)} · Slide ${slideNumber} de ${totalSlides}`,
+    slide.kind === 'chapter-foundation'
+      ? `Estrutura da apresentação · Dados não solicitados nesta fase · Slide ${slideNumber} de ${totalSlides}`
+      : slide.chapter === 'revenue'
+        ? `${REVENUE_SOURCE_FOOTER} · ${presentationGeneratedLabel(data.generatedAt)} · Slide ${slideNumber} de ${totalSlides}`
+        : slide.chapter === 'expenses'
+          ? `${EXPENSES_SOURCE_FOOTER} · ${presentationGeneratedLabel(data.generatedAt)} · Slide ${slideNumber} de ${totalSlides}`
+          : slide.chapter === 'results'
+            ? `${RESULTS_SOURCE_FOOTER} · ${presentationGeneratedLabel(data.generatedAt)} · Slide ${slideNumber} de ${totalSlides}`
+            : slide.chapter === 'insights'
+              ? `${INSIGHTS_SOURCE_FOOTER} · ${presentationGeneratedLabel(data.generatedAt)} · Slide ${slideNumber} de ${totalSlides}`
+          : `${PRESENTATION_SOURCE_LABEL} · ${PRESENTATION_REGIME_LABEL} · ${presentationGeneratedLabel(data.generatedAt)} · Slide ${slideNumber} de ${totalSlides}`,
     17,
     174,
   );
@@ -168,6 +202,425 @@ function drawExecutiveSummary(
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
     doc.text(metric.comparison, x + 5, 112, { maxWidth: 64 });
+  });
+}
+
+function revenuePeriodText(period: PresentationRevenueData['current']): string {
+  if (period.state === 'available') return fmtBRL(period.total);
+  return period.state === 'empty' ? 'Sem fechamentos' : 'Sem cobertura';
+}
+
+function revenueDeltaText(
+  delta: PresentationRevenueData['delta']['absolute'],
+  percentage = false,
+): string {
+  if (delta.state === 'available') return percentage ? formatPercentBR(delta.value, 1) : fmtBRL(delta.value);
+  if (delta.reason === 'zero-baseline') return 'Base anterior zero';
+  return delta.reason === 'previous-period-absent' ? 'Mes anterior ausente' : 'Mes selecionado ausente';
+}
+
+function drawRevenueSummary(doc: jsPDF, revenue: PresentationRevenueData): void {
+  [revenue.current, revenue.previous].forEach((period, index) => {
+    const x = 22 + index * 145;
+    setColor(doc, COLOR.gold, 'fill');
+    doc.rect(x, 58, 1.4, 58, 'F');
+    setColor(doc, COLOR.muted);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.text(index === 0 ? 'MES SELECIONADO' : 'MES ANTERIOR', x + 6, 65);
+    setColor(doc, COLOR.white);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(12);
+    doc.text(period.month, x + 6, 76);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(21);
+    doc.text(revenuePeriodText(period), x + 6, 93, { maxWidth: 127 });
+    setColor(doc, COLOR.muted);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.text(
+      period.closingCount === 0 ? '0 ocorrencias · ausencia explicita' : `${period.closingCount} fechamento(s)`,
+      x + 6,
+      106,
+    );
+  });
+  setColor(doc, COLOR.subtle, 'draw');
+  doc.line(22, 128, 298, 128);
+  setColor(doc, COLOR.muted);
+  doc.setFontSize(8.5);
+  doc.text('VARIACAO ABSOLUTA', 22, 139);
+  doc.text('VARIACAO PERCENTUAL', 168, 139);
+  setColor(doc, COLOR.white);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.text(revenueDeltaText(revenue.delta.absolute), 22, 151, { maxWidth: 125 });
+  doc.text(revenueDeltaText(revenue.delta.percentage, true), 168, 151, { maxWidth: 125 });
+}
+
+function drawRevenueWeekdays(doc: jsPDF, revenue: PresentationRevenueData): void {
+  revenue.weekdays.forEach((day, index) => {
+    const width = 39;
+    const x = 18 + index * 41;
+    setColor(doc, COLOR.gold, 'fill');
+    doc.rect(x, 48, width, 1, 'F');
+    setColor(doc, COLOR.white);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.text(day.label, x, 58, { maxWidth: width });
+    setColor(doc, COLOR.muted);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.text('TOTAL', x, 76);
+    setColor(doc, COLOR.white);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.text(day.state === 'available' ? fmtBRL(day.total) : 'Sem fechamento', x, 84, { maxWidth: width });
+    setColor(doc, COLOR.muted);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.text('OCORRENCIAS', x, 102);
+    setColor(doc, COLOR.white);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.text(String(day.occurrences), x, 110);
+    setColor(doc, COLOR.muted);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.text('MEDIA', x, 128);
+    setColor(doc, COLOR.white);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.text(day.average.state === 'available' ? fmtBRL(day.average.value) : 'Nao aplicavel', x, 136, { maxWidth: width });
+  });
+}
+
+function drawRevenueHistory(doc: jsPDF, revenue: PresentationRevenueData): void {
+  const monthLabels = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  const left = 31;
+  const cellWidth = 22.5;
+  monthLabels.forEach((label, index) => {
+    setColor(doc, COLOR.muted);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7);
+    doc.text(label, left + index * cellWidth + cellWidth / 2, 54, { align: 'center' });
+  });
+  revenue.requestedYears.forEach((year, yearIndex) => {
+    const y = 66 + yearIndex * 29;
+    setColor(doc, COLOR.white);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.text(String(year), 18, y + 8);
+    revenue.history.filter(point => point.year === year).forEach((point, monthIndex) => {
+      const x = left + monthIndex * cellWidth;
+      setColor(doc, point.state === 'available' ? COLOR.gold : COLOR.subtle, 'draw');
+      doc.roundedRect(x, y, cellWidth - 1.5, 20, 1, 1, 'S');
+      setColor(doc, point.state === 'available' ? COLOR.white : COLOR.muted);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(6.5);
+      doc.text(point.state === 'available' ? fmtBRLCompact(point.total) : '-', x + (cellWidth - 1.5) / 2, y + 8, { align: 'center', maxWidth: cellWidth - 3 });
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(5.5);
+      doc.text(point.state === 'available' ? `${point.closingCount} fecha.` : point.state === 'empty' ? 'vazio' : 's/ cobertura', x + (cellWidth - 1.5) / 2, y + 15, { align: 'center', maxWidth: cellWidth - 3 });
+    });
+  });
+}
+
+function expensePeriodText(period: PresentationExpensesData['current']): string {
+  if (period.state === 'available') return fmtBRL(period.total);
+  return period.state === 'empty' ? 'Sem despesas' : 'Sem cobertura';
+}
+
+function expenseDeltaText(delta: PresentationExpensesData['delta']['absolute'], percentage = false): string {
+  if (delta.state === 'available') return percentage ? formatPercentBR(delta.value, 1) : fmtBRL(delta.value);
+  if (delta.reason === 'zero-baseline') return 'Base anterior zero';
+  return delta.reason === 'previous-period-absent' ? 'Mes anterior ausente' : 'Mes selecionado ausente';
+}
+
+function drawExpensesSummary(doc: jsPDF, expenses: PresentationExpensesData): void {
+  [expenses.current, expenses.previous].forEach((period, index) => {
+    const x = 22 + index * 145;
+    setColor(doc, COLOR.expense, 'fill'); doc.rect(x, 58, 1.4, 56, 'F');
+    setColor(doc, COLOR.muted); doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.text(index === 0 ? 'MES SELECIONADO' : 'MES ANTERIOR', x + 6, 65);
+    setColor(doc, COLOR.white); doc.setFont('helvetica', 'normal'); doc.setFontSize(12); doc.text(period.month, x + 6, 76);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(21); doc.text(expensePeriodText(period), x + 6, 93, { maxWidth: 127 });
+    setColor(doc, COLOR.muted); doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.text(`${period.quantity} lancamento(s) do razao`, x + 6, 106);
+  });
+  const reading = expenses.delta.meaning === 'increase' ? 'Aumento · desfavoravel' : expenses.delta.meaning === 'reduction' ? 'Reducao · favoravel' : expenses.delta.meaning === 'unchanged' ? 'Estavel' : 'Indisponivel';
+  setColor(doc, COLOR.subtle, 'draw'); doc.line(22, 126, 298, 126);
+  setColor(doc, COLOR.muted); doc.setFontSize(8); doc.text('VARIACAO ABSOLUTA', 22, 137); doc.text('VARIACAO PERCENTUAL', 119, 137); doc.text('LEITURA EXECUTIVA', 216, 137);
+  setColor(doc, COLOR.white); doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.text(expenseDeltaText(expenses.delta.absolute), 22, 149, { maxWidth: 86 }); doc.text(expenseDeltaText(expenses.delta.percentage, true), 119, 149, { maxWidth: 86 });
+  setColor(doc, expenses.delta.favorability === 'favorable' ? COLOR.revenue : expenses.delta.favorability === 'unfavorable' ? COLOR.expense : COLOR.white); doc.text(reading, 216, 149, { maxWidth: 82 });
+}
+
+function flattenExpenseNodes(nodes: readonly PresentationExpenseNode[], depth = 0): Array<{ node: PresentationExpenseNode; depth: number }> {
+  return nodes.flatMap(node => [{ node, depth }, ...flattenExpenseNodes(node.children, depth + 1)]);
+}
+
+function drawExpensesTree(doc: jsPDF, nodes: readonly PresentationExpenseNode[]): void {
+  const rows = flattenExpenseNodes(nodes);
+  if (rows.length === 0) { drawEmpty(doc, 'Sem despesas no mes selecionado.'); return; }
+  setColor(doc, COLOR.muted); doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.text('CATEGORIA', 22, 48); doc.text('VALOR PROPRIO', 210, 48, { align: 'right' }); doc.text('ACUMULADO', 298, 48, { align: 'right' });
+  rows.forEach(({ node, depth }, index) => {
+    const y = 59 + index * 11;
+    setColor(doc, COLOR.subtle, 'draw'); doc.line(22, y + 3, 298, y + 3);
+    setColor(doc, COLOR.white); doc.setFont('helvetica', depth === 0 ? 'bold' : 'normal'); doc.setFontSize(8.5); doc.text(`${depth > 0 ? '> ' : ''}${node.name}`, 22 + depth * 5, y, { maxWidth: 142 - depth * 5 });
+    if (node.operationalClass === 'non-operational') { setColor(doc, COLOR.warning); doc.setFontSize(6.5); doc.text('NAO OPERACIONAL', 168, y); }
+    setColor(doc, COLOR.muted); doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.text(fmtBRL(node.directAmount), 210, y, { align: 'right' });
+    setColor(doc, COLOR.white); doc.setFont('helvetica', 'bold'); doc.text(fmtBRL(node.amount), 298, y, { align: 'right' });
+  });
+}
+
+function drawExpensesRolling(doc: jsPDF, expenses: PresentationExpensesData): void {
+  const max = Math.max(1, ...expenses.rollingThreeMonths.map(point => point.total));
+  expenses.rollingThreeMonths.forEach((point, index) => {
+    const x = 42 + index * 90;
+    const height = point.state === 'available' ? Math.max((point.total / max) * 70, 3) : 3;
+    setColor(doc, COLOR.expense, 'fill'); doc.rect(x, 133 - height, 32, height, 'F');
+    setColor(doc, COLOR.white); doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.text(point.state === 'available' ? fmtBRL(point.total) : point.state === 'empty' ? 'Sem despesas' : 'Sem cobertura', x + 16, 53, { align: 'center', maxWidth: 60 });
+    setColor(doc, COLOR.muted); doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.text(point.yearMonth, x + 16, 144, { align: 'center' }); doc.text(`${point.quantity} lancamento(s)`, x + 16, 153, { align: 'center' });
+  });
+}
+
+function drawExpensesHistory(doc: jsPDF, expenses: PresentationExpensesData): void {
+  const cellWidth = 21.2;
+  ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'].forEach((label, index) => { setColor(doc, COLOR.muted); doc.setFont('helvetica', 'bold'); doc.setFontSize(6.8); doc.text(label, 45 + index * cellWidth, 50, { align: 'center' }); });
+  expenses.requestedYears.forEach((year, row) => {
+    const y = 68 + row * 34;
+    setColor(doc, COLOR.white); doc.setFontSize(9); doc.text(String(year), 20, y + 8);
+    expenses.history.filter(point => point.year === year).forEach((point, index) => {
+      const x = 34.5 + index * cellWidth;
+      setColor(doc, point.state === 'available' ? COLOR.expense : COLOR.subtle, 'draw'); doc.rect(x, y, 20, 21, 'S');
+      setColor(doc, point.state === 'available' ? COLOR.white : COLOR.muted); doc.setFontSize(6); doc.text(point.state === 'available' ? fmtBRLCompact(point.total) : '-', x + 10, y + 9, { align: 'center', maxWidth: 18 });
+      doc.setFontSize(5.5); doc.text(point.state === 'available' ? `${point.quantity} lanc.` : point.state === 'empty' ? 'vazio' : 's/ cobertura', x + 10, y + 16, { align: 'center' });
+    });
+  });
+}
+
+function drawResultsSummary(doc: jsPDF, results: PresentationResultsData): void {
+  const metrics = [
+    ['Receita operacional', fmtBRL(results.current.revenue), COLOR.revenue, 'Base operacional do periodo'],
+    ['Despesa operacional', fmtBRL(results.current.expense), COLOR.expense, 'Base operacional do periodo'],
+    ['Resultado operacional', fmtBRL(results.current.result), results.current.result < 0 ? COLOR.expense : COLOR.white, 'Receita - despesa'],
+    ['Margem operacional', formatPercentBR(results.current.marginPercent, 1), COLOR.white, 'Resultado / receita'],
+  ] as const;
+  metrics.forEach(([label, value, color, formula], index) => {
+    const x = 18 + index * 74;
+    setColor(doc, COLOR.gold, 'fill');
+    doc.rect(x, 66, 1.4, 52, 'F');
+    setColor(doc, COLOR.muted);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9.5);
+    doc.text(label, x + 5, 75, { maxWidth: 63 });
+    setColor(doc, color);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    doc.text(value, x + 5, 93, { maxWidth: 63 });
+    setColor(doc, COLOR.muted);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.text(formula, x + 5, 108, { maxWidth: 63 });
+  });
+}
+
+function drawResultsComparison(doc: jsPDF, results: PresentationResultsData): void {
+  if (results.comparison.state === 'unavailable') {
+    drawEmpty(doc, results.comparison.reason === 'outside-available-period'
+      ? 'Periodo anterior fora do historico disponivel.'
+      : 'Comparacao com o periodo anterior indisponivel.');
+    return;
+  }
+  const { previous, deltas } = results.comparison;
+  const rows = [
+    ['Receita', results.current.revenue, previous.revenue, deltas.revenue, true],
+    ['Despesa', results.current.expense, previous.expense, deltas.expense, true],
+    ['Resultado', results.current.result, previous.result, deltas.result, true],
+    ['Margem', results.current.marginPercent, previous.marginPercent, deltas.margin, false],
+  ] as const;
+  const columns = [18, 102, 164, 226, 302];
+  ['METRICA', 'ATUAL', 'ANTERIOR', 'VAR. ABSOLUTA', 'VAR. RELATIVA'].forEach((label, index) => {
+    setColor(doc, COLOR.muted);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.text(label, columns[index], 52, { align: index === 0 ? 'left' : 'right' });
+  });
+  rows.forEach(([label, current, previousValue, delta, currency], index) => {
+    const y = 70 + index * 20;
+    const format = (value: number) => currency ? fmtBRL(value) : formatPercentBR(value, 1);
+    const absolute = delta.absoluteChange === null
+      ? 'Indisponivel'
+      : currency
+        ? fmtBRL(delta.absoluteChange)
+        : `${delta.absoluteChange.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} p.p.`;
+    setColor(doc, COLOR.subtle, 'draw');
+    doc.line(18, y - 7, 302, y - 7);
+    setColor(doc, COLOR.white);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.text(label, columns[0], y);
+    doc.setFont('helvetica', 'normal');
+    doc.text(format(current), columns[1], y, { align: 'right' });
+    setColor(doc, COLOR.muted);
+    doc.text(format(previousValue), columns[2], y, { align: 'right' });
+    setColor(doc, COLOR.white);
+    doc.text(absolute, columns[3], y, { align: 'right' });
+    doc.setFont('helvetica', 'bold');
+    doc.text(formatMetricDelta(delta), columns[4], y, { align: 'right' });
+  });
+  setColor(doc, COLOR.muted);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.text('Base zero preserva a variacao absoluta sem gerar valores invalidos.', 18, 158);
+}
+
+function drawResultsBridge(doc: jsPDF, results: PresentationResultsData): void {
+  if (results.bridge.state === 'unavailable') {
+    drawEmpty(doc, results.bridge.reason === 'outside-available-period'
+      ? 'Ponte indisponivel: periodo anterior fora do historico.'
+      : 'Ponte indisponivel sem comparacao equivalente.');
+    return;
+  }
+  results.bridge.steps.forEach((step, index) => {
+    const x = 20 + index * 73;
+    setColor(doc, COLOR.gold, 'fill');
+    doc.rect(x, 62, 65, 1.2, 'F');
+    setColor(doc, COLOR.muted);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.text(step.label, x, 75, { maxWidth: 65, align: 'center' });
+    setColor(doc, step.favorability === 'favorable' ? COLOR.revenue : step.favorability === 'unfavorable' ? COLOR.expense : COLOR.white);
+    doc.setFontSize(15);
+    const signed = step.key === 'previous-result' || step.key === 'current-result'
+      ? fmtBRL(step.value)
+      : step.value > 0
+        ? `+${fmtBRL(step.value)}`
+        : step.value < 0
+          ? `-${fmtBRL(Math.abs(step.value))}`
+          : fmtBRL(step.value);
+    doc.text(signed, x + 32.5, 96, { maxWidth: 65, align: 'center' });
+    if (index > 0) {
+      setColor(doc, COLOR.muted);
+      doc.setFontSize(14);
+      doc.text('+', x - 4, 87);
+    }
+  });
+  setColor(doc, COLOR.subtle, 'draw');
+  doc.line(20, 121, 300, 121);
+  setColor(doc, COLOR.muted);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8.5);
+  doc.text('Variacao total do resultado', 20, 134);
+  setColor(doc, results.bridge.totalChange < 0 ? COLOR.expense : results.bridge.totalChange > 0 ? COLOR.revenue : COLOR.white);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.text(results.bridge.totalChange > 0
+    ? `+${fmtBRL(results.bridge.totalChange)}`
+    : results.bridge.totalChange < 0
+      ? `-${fmtBRL(Math.abs(results.bridge.totalChange))}`
+      : fmtBRL(results.bridge.totalChange), 160, 134, { align: 'center' });
+  setColor(doc, COLOR.muted);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.text('Despesa maior reduz o resultado; despesa menor aumenta o resultado.', 300, 134, { align: 'right' });
+}
+
+function drawResultsNonOperational(
+  doc: jsPDF,
+  results: PresentationResultsData,
+  composition: CategoryCompositionSection,
+): void {
+  const totals = results.nonOperational.totals;
+  [
+    ['Receitas nao operacionais', totals.revenue],
+    ['Despesas nao operacionais', totals.expense],
+    ['Saldo nao operacional', totals.result],
+  ].forEach(([label, value], index) => {
+    const x = 18 + index * 96;
+    setColor(doc, COLOR.gold, 'fill');
+    doc.rect(x, 40, 1.2, 22, 'F');
+    setColor(doc, COLOR.muted);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.2);
+    doc.text(String(label), x + 5, 47, { maxWidth: 84 });
+    setColor(doc, COLOR.warning);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text(fmtBRL(value as number), x + 5, 58, { maxWidth: 84 });
+  });
+  drawCompositionColumn(doc, 'Receitas', composition.revenue, 'revenue', 17, 73);
+  drawCompositionColumn(doc, 'Despesas', composition.expense, 'expense', 166, 73);
+}
+
+function drawInsights(
+  doc: jsPDF,
+  items: readonly PresentationInsight[],
+  rulesetVersion: string,
+): void {
+  if (items.length === 0) {
+    drawEmpty(doc, 'Nenhum insight atingiu os limiares mínimos de relevância e cobertura. Nenhuma leitura foi fabricada.');
+    return;
+  }
+  setColor(doc, COLOR.muted);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.5);
+  doc.text(`Regras ${rulesetVersion} · ordenação por relevância, domínio, prioridade da regra e ID`, 17, 40);
+  const gap = 5;
+  const width = (286 - gap * (items.length - 1)) / items.length;
+  items.forEach((insight, index) => {
+    const x = 17 + index * (width + gap);
+    const toneColor = insight.tone === 'positive'
+      ? COLOR.revenue
+      : insight.tone === 'negative' ? COLOR.expense : COLOR.gold;
+    setColor(doc, COLOR.subtle, 'draw');
+    doc.roundedRect(x, 44, width, 117, 2.5, 2.5, 'S');
+    setColor(doc, toneColor, 'fill');
+    doc.rect(x, 44, 1.5, 117, 'F');
+    setColor(doc, toneColor);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(6.5);
+    doc.text(insight.domain === 'revenue' ? 'FATURAMENTO' : 'DESPESAS', x + 5, 52);
+    setColor(doc, COLOR.muted);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(5.4);
+    doc.text(`Regra ${insight.ruleVersion} · score ${insight.relevance.score}`, x + width - 4, 52, { align: 'right' });
+    setColor(doc, COLOR.white);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9.5);
+    const titleLines = (doc.splitTextToSize(insight.title, width - 10) as string[]).slice(0, 3);
+    doc.text(titleLines, x + 5, 61, { lineHeightFactor: 1.12 });
+    const titleEnd = 61 + titleLines.length * 4;
+    setColor(doc, COLOR.muted);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6.2);
+    const descriptionLines = (doc.splitTextToSize(insight.description, width - 10) as string[]).slice(0, 4);
+    doc.text(descriptionLines, x + 5, titleEnd + 4, { lineHeightFactor: 1.15 });
+    setColor(doc, toneColor, 'draw');
+    doc.setLineWidth(0.6);
+    doc.line(x + 5, 102, x + 5, 122);
+    setColor(doc, COLOR.muted);
+    doc.setFontSize(5.2);
+    doc.text('EVIDÊNCIA', x + 8, 106);
+    setColor(doc, COLOR.white);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(6.1);
+    const evidenceLines = (doc.splitTextToSize(
+      presentationInsightEvidenceLabel(insight),
+      width - 14,
+    ) as string[]).slice(0, 4);
+    doc.text(evidenceLines, x + 8, 112, { lineHeightFactor: 1.12 });
+    setColor(doc, COLOR.muted);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(5.2);
+    const metadata = [
+      `Período: ${insight.period.label}`,
+      `Fonte: ${insight.source.label}`,
+      `Regime: ${presentationInsightRegimeLabel(insight)}`,
+    ];
+    let metadataY = 136;
+    metadata.forEach((line) => {
+      const lines = (doc.splitTextToSize(line, width - 10) as string[]).slice(0, 2);
+      doc.text(lines, x + 5, metadataY, { lineHeightFactor: 1.08 });
+      metadataY += Math.max(5, lines.length * 2.6 + 1);
+    });
   });
 }
 
@@ -715,11 +1168,59 @@ function drawSlideContent(doc: jsPDF, slide: PresentationSlide): void {
     return;
   }
   const payload = slide.availability.data;
-  if (slide.availability.state === 'empty' && payload.type !== 'cover') {
+  if (
+    slide.availability.state === 'empty'
+    && payload.type !== 'cover'
+    && !payload.type.startsWith('expenses-')
+    && !payload.type.startsWith('results-')
+    && payload.type !== 'insights'
+  ) {
     drawEmpty(doc, availabilityMessage(slide.availability));
     return;
   }
   switch (payload.type) {
+    case 'chapter-foundation':
+      drawEmpty(doc, 'Conteúdo não solicitado nesta fase.');
+      break;
+    case 'revenue-summary':
+      drawRevenueSummary(doc, payload.revenue);
+      break;
+    case 'revenue-weekdays':
+      drawRevenueWeekdays(doc, payload.revenue);
+      break;
+    case 'revenue-history':
+      drawRevenueHistory(doc, payload.revenue);
+      break;
+    case 'expenses-summary':
+      drawExpensesSummary(doc, payload.expenses);
+      break;
+    case 'expenses-tree':
+      drawExpensesTree(doc, payload.nodes);
+      break;
+    case 'expenses-rolling':
+      drawExpensesRolling(doc, payload.expenses);
+      break;
+    case 'expenses-history':
+      drawExpensesHistory(doc, payload.expenses);
+      break;
+    case 'results-summary':
+      drawResultsSummary(doc, payload.results);
+      break;
+    case 'results-comparison':
+      drawResultsComparison(doc, payload.results);
+      break;
+    case 'results-evolution':
+      drawTimeSeries(doc, payload.timeSeries);
+      break;
+    case 'results-bridge':
+      drawResultsBridge(doc, payload.results);
+      break;
+    case 'results-non-operational':
+      drawResultsNonOperational(doc, payload.results, payload.composition);
+      break;
+    case 'insights':
+      drawInsights(doc, payload.items, payload.insights.rulesetVersion);
+      break;
     case 'cover':
       drawCover(doc, payload.periodLabel);
       break;
@@ -770,6 +1271,13 @@ export async function createPresentationPdfBlob(
   const slides = data.slides.filter(isPresentationSlideExportable);
   if (slides.length === 0) throw new Error('Não há slides disponíveis para exportar.');
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [PAGE_WIDTH, PAGE_HEIGHT] });
+  doc.setProperties({
+    title: `Apresentação Sócios - ${data.periodLabel}`,
+    subject: `Faturamento, despesas, resultados e insights - ${data.periodLabel}`,
+    author: 'Moralles Food',
+    creator: 'Moralles Food',
+    keywords: 'apresentacao socios, faturamento, despesas, resultados, insights',
+  });
 
   for (let index = 0; index < slides.length; index += 1) {
     await yieldForCancellation(options.signal);
@@ -777,7 +1285,7 @@ export async function createPresentationPdfBlob(
     drawBackground(doc);
     if (slides[index].kind !== 'cover') drawHeader(doc, slides[index]);
     drawSlideContent(doc, slides[index]);
-    drawFooter(doc, data, index + 1, slides.length);
+    drawFooter(doc, data, slides[index], index + 1, slides.length);
     options.onProgress?.({
       completed: index + 1,
       total: slides.length,

@@ -7,6 +7,11 @@ import type {
   PresentationScenarioResult,
   PresentationDecisionDetail,
   PresentationDecisionComparison,
+  PresentationRevenueData,
+  PresentationExpensesData,
+  PresentationExpenseNode,
+  PresentationResultsData,
+  PresentationInsight,
   PresentationSlide,
   PresentationTimeSeries,
 } from '@/domain/financeiro/presentation';
@@ -17,6 +22,7 @@ import {
   PRESENTATION_SOURCE_LABEL,
   availabilityMessage,
   buildExecutiveMetricDisplays,
+  formatMetricDelta,
   flattenPresentationCategories,
   formatPresentationSeriesLabel,
   presentationGeneratedLabel,
@@ -26,6 +32,10 @@ import {
 import { isPresentationSlideExportable } from '@/lib/presentationSlides';
 import { fmtBRL, fmtBRLCompact, formatIntegerBR, formatPercentBR } from '@/lib/formatters';
 import type { PresentationExportOptions } from '@/lib/presentationPdfExport';
+import {
+  presentationInsightEvidenceLabel,
+  presentationInsightRegimeLabel,
+} from '@/lib/presentationInsightsFormatting';
 
 const MIME_PPTX = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
 const COLOR = {
@@ -38,6 +48,11 @@ const COLOR = {
   expense: 'FDA4AF',
   warning: 'FDE68A',
 } as const;
+
+const REVENUE_SOURCE_FOOTER = 'Faturamento bruto — Fechamento de Caixa · Data local do fechamento';
+const EXPENSES_SOURCE_FOOTER = 'Despesas financeiras — DFC · Regime de caixa';
+const RESULTS_SOURCE_FOOTER = 'Resultado gerencial — regime de competência · Fonte: get_fin_presentation_socios';
+const INSIGHTS_SOURCE_FOOTER = 'Insights determinísticos · Faturamento: Fechamento de Caixa · Despesas: caixa do DFC';
 
 function abortIfRequested(signal?: AbortSignal): void {
   if (signal?.aborted) throw new DOMException('Exportação cancelada.', 'AbortError');
@@ -73,6 +88,7 @@ function addFooter(
   slide: PptxGenJS.Slide,
   pptx: PptxGenJS,
   data: PresentationSociosData,
+  source: PresentationSlide,
   slideNumber: number,
   totalSlides: number,
 ): void {
@@ -81,7 +97,17 @@ function addFooter(
     line: { color: COLOR.subtle, width: 1 },
   });
   slide.addText(
-    `${PRESENTATION_SOURCE_LABEL} · ${PRESENTATION_REGIME_LABEL} · ${presentationGeneratedLabel(data.generatedAt)} · Slide ${slideNumber} de ${totalSlides}`,
+    source.kind === 'chapter-foundation'
+      ? `Estrutura da apresentação · Dados não solicitados nesta fase · Slide ${slideNumber} de ${totalSlides}`
+      : source.chapter === 'revenue'
+        ? `${REVENUE_SOURCE_FOOTER} · ${presentationGeneratedLabel(data.generatedAt)} · Slide ${slideNumber} de ${totalSlides}`
+        : source.chapter === 'expenses'
+          ? `${EXPENSES_SOURCE_FOOTER} · ${presentationGeneratedLabel(data.generatedAt)} · Slide ${slideNumber} de ${totalSlides}`
+          : source.chapter === 'results'
+            ? `${RESULTS_SOURCE_FOOTER} · ${presentationGeneratedLabel(data.generatedAt)} · Slide ${slideNumber} de ${totalSlides}`
+            : source.chapter === 'insights'
+              ? `${INSIGHTS_SOURCE_FOOTER} · ${presentationGeneratedLabel(data.generatedAt)} · Slide ${slideNumber} de ${totalSlides}`
+          : `${PRESENTATION_SOURCE_LABEL} · ${PRESENTATION_REGIME_LABEL} · ${presentationGeneratedLabel(data.generatedAt)} · Slide ${slideNumber} de ${totalSlides}`,
     {
       x: 0.7, y: 6.9, w: 11.9, h: 0.24,
       fontFace: 'Aptos', fontSize: 10, color: COLOR.muted, margin: 0,
@@ -166,6 +192,397 @@ function addExecutiveSummary(
       x: x + 0.18, y: 4.35, w: 2.72, h: 0.42,
       fontFace: 'Aptos', fontSize: 18, bold: true,
       color: COLOR.white, margin: 0, fit: 'shrink',
+    });
+  });
+}
+
+function revenuePeriodText(period: PresentationRevenueData['current']): string {
+  if (period.state === 'available') return fmtBRL(period.total);
+  return period.state === 'empty' ? 'Sem fechamentos' : 'Sem cobertura';
+}
+
+function revenueDeltaText(
+  delta: PresentationRevenueData['delta']['absolute'],
+  percentage = false,
+): string {
+  if (delta.state === 'available') return percentage ? formatPercentBR(delta.value, 1) : fmtBRL(delta.value);
+  if (delta.reason === 'zero-baseline') return 'Base anterior zero';
+  return delta.reason === 'previous-period-absent' ? 'Mês anterior ausente' : 'Mês selecionado ausente';
+}
+
+function addRevenueSummary(
+  slide: PptxGenJS.Slide,
+  pptx: PptxGenJS,
+  revenue: PresentationRevenueData,
+): void {
+  [revenue.current, revenue.previous].forEach((period, index) => {
+    const x = 0.9 + index * 6.15;
+    slide.addShape(pptx.ShapeType.rect, {
+      x, y: 2.05, w: 0.05, h: 2.45,
+      line: { color: COLOR.gold, transparency: 100 }, fill: { color: COLOR.gold },
+    });
+    slide.addText(index === 0 ? 'MÊS SELECIONADO' : 'MÊS ANTERIOR', {
+      x: x + 0.22, y: 2.05, w: 5.35, h: 0.25,
+      fontFace: 'Aptos', fontSize: 14, bold: true, color: COLOR.muted, margin: 0,
+    });
+    slide.addText(period.month, {
+      x: x + 0.22, y: 2.45, w: 5.35, h: 0.32,
+      fontFace: 'Aptos', fontSize: 19, color: COLOR.white, margin: 0,
+    });
+    slide.addText(revenuePeriodText(period), {
+      x: x + 0.22, y: 3.05, w: 5.4, h: 0.62,
+      fontFace: 'Aptos Display', fontSize: 31, bold: true, color: COLOR.white, margin: 0, fit: 'shrink',
+    });
+    slide.addText(period.closingCount === 0 ? '0 ocorrências · ausência explícita' : `${period.closingCount} fechamento(s)`, {
+      x: x + 0.22, y: 3.92, w: 5.3, h: 0.27,
+      fontFace: 'Aptos', fontSize: 15, color: COLOR.muted, margin: 0,
+    });
+  });
+  slide.addShape(pptx.ShapeType.line, {
+    x: 0.9, y: 5.05, w: 11.55, h: 0,
+    line: { color: COLOR.subtle, width: 1 },
+  });
+  [
+    ['Variação absoluta', revenueDeltaText(revenue.delta.absolute)],
+    ['Variação percentual', revenueDeltaText(revenue.delta.percentage, true)],
+  ].forEach(([label, value], index) => {
+    const x = 0.9 + index * 6.15;
+    slide.addText(label, {
+      x, y: 5.3, w: 5.4, h: 0.24,
+      fontFace: 'Aptos', fontSize: 14, color: COLOR.muted, margin: 0,
+    });
+    slide.addText(value, {
+      x, y: 5.67, w: 5.4, h: 0.38,
+      fontFace: 'Aptos', fontSize: 22, bold: true, color: COLOR.white, margin: 0, fit: 'shrink',
+    });
+  });
+}
+
+function addRevenueWeekdays(
+  slide: PptxGenJS.Slide,
+  pptx: PptxGenJS,
+  revenue: PresentationRevenueData,
+): void {
+  revenue.weekdays.forEach((day, index) => {
+    const x = 0.72 + index * 1.79;
+    slide.addShape(pptx.ShapeType.rect, {
+      x, y: 1.72, w: 1.57, h: 0.04,
+      line: { color: COLOR.gold, transparency: 100 }, fill: { color: COLOR.gold },
+    });
+    slide.addText(day.label, {
+      x, y: 1.9, w: 1.57, h: 0.4,
+      fontFace: 'Aptos', fontSize: 14, bold: true, color: COLOR.white, margin: 0, fit: 'shrink',
+    });
+    const values = [
+      ['TOTAL', day.state === 'available' ? fmtBRL(day.total) : 'Sem fechamento'],
+      ['OCORRÊNCIAS', String(day.occurrences)],
+      ['MÉDIA', day.average.state === 'available' ? fmtBRL(day.average.value) : 'Não aplicável'],
+    ];
+    values.forEach(([label, value], valueIndex) => {
+      const y = 2.65 + valueIndex * 1.05;
+      slide.addText(label, {
+        x, y, w: 1.57, h: 0.2,
+        fontFace: 'Aptos', fontSize: 10, color: COLOR.muted, margin: 0,
+      });
+      slide.addText(value, {
+        x, y: y + 0.28, w: 1.57, h: 0.36,
+        fontFace: 'Aptos', fontSize: 14, bold: true, color: COLOR.white, margin: 0, fit: 'shrink',
+      });
+    });
+  });
+}
+
+function addRevenueHistory(
+  slide: PptxGenJS.Slide,
+  pptx: PptxGenJS,
+  revenue: PresentationRevenueData,
+): void {
+  const monthLabels = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  const left = 1.25;
+  const cellWidth = 0.94;
+  monthLabels.forEach((label, index) => {
+    slide.addText(label, {
+      x: left + index * cellWidth, y: 1.62, w: cellWidth - 0.04, h: 0.2,
+      fontFace: 'Aptos', fontSize: 10, bold: true, color: COLOR.muted, align: 'center', margin: 0,
+    });
+  });
+  revenue.requestedYears.forEach((year, yearIndex) => {
+    const y = 2.02 + yearIndex * 1.28;
+    slide.addText(String(year), {
+      x: 0.68, y: y + 0.35, w: 0.52, h: 0.25,
+      fontFace: 'Aptos', fontSize: 14, bold: true, color: COLOR.white, margin: 0,
+    });
+    revenue.history.filter(point => point.year === year).forEach((point, monthIndex) => {
+      const x = left + monthIndex * cellWidth;
+      slide.addShape(pptx.ShapeType.roundRect, {
+        x, y, w: cellWidth - 0.06, h: 0.9,
+        line: { color: point.state === 'available' ? COLOR.gold : COLOR.subtle, width: 0.8 },
+        fill: { color: COLOR.background, transparency: 100 },
+      });
+      slide.addText(point.state === 'available' ? fmtBRLCompact(point.total) : '—', {
+        x: x + 0.03, y: y + 0.2, w: cellWidth - 0.12, h: 0.22,
+        fontFace: 'Aptos', fontSize: 10, bold: true,
+        color: point.state === 'available' ? COLOR.white : COLOR.muted,
+        align: 'center', margin: 0, fit: 'shrink',
+      });
+      slide.addText(point.state === 'available' ? `${point.closingCount} fecha.` : point.state === 'empty' ? 'vazio' : 's/ cobertura', {
+        x: x + 0.03, y: y + 0.52, w: cellWidth - 0.12, h: 0.15,
+        fontFace: 'Aptos', fontSize: 8, color: COLOR.muted, align: 'center', margin: 0, fit: 'shrink',
+      });
+    });
+  });
+}
+
+function expensePeriodText(period: PresentationExpensesData['current']): string {
+  if (period.state === 'available') return fmtBRL(period.total);
+  return period.state === 'empty' ? 'Sem despesas' : 'Sem cobertura';
+}
+
+function expenseDeltaText(delta: PresentationExpensesData['delta']['absolute'], percentage = false): string {
+  if (delta.state === 'available') return percentage ? formatPercentBR(delta.value, 1) : fmtBRL(delta.value);
+  if (delta.reason === 'zero-baseline') return 'Base anterior zero';
+  return delta.reason === 'previous-period-absent' ? 'Mês anterior ausente' : 'Mês selecionado ausente';
+}
+
+function addExpensesSummary(slide: PptxGenJS.Slide, pptx: PptxGenJS, expenses: PresentationExpensesData): void {
+  [expenses.current, expenses.previous].forEach((period, index) => {
+    const x = 0.9 + index * 6.15;
+    slide.addShape(pptx.ShapeType.rect, { x, y: 2.05, w: 0.05, h: 2.45, line: { color: COLOR.expense, transparency: 100 }, fill: { color: COLOR.expense } });
+    slide.addText(index === 0 ? 'MÊS SELECIONADO' : 'MÊS ANTERIOR', { x: x + 0.22, y: 2.05, w: 5.35, h: 0.25, fontFace: 'Aptos', fontSize: 14, bold: true, color: COLOR.muted, margin: 0 });
+    slide.addText(period.month, { x: x + 0.22, y: 2.45, w: 5.35, h: 0.32, fontFace: 'Aptos', fontSize: 19, color: COLOR.white, margin: 0 });
+    slide.addText(expensePeriodText(period), { x: x + 0.22, y: 3.05, w: 5.4, h: 0.62, fontFace: 'Aptos Display', fontSize: 31, bold: true, color: COLOR.white, margin: 0, fit: 'shrink' });
+    slide.addText(`${period.quantity} lançamento(s) do razão`, { x: x + 0.22, y: 3.92, w: 5.3, h: 0.27, fontFace: 'Aptos', fontSize: 15, color: COLOR.muted, margin: 0 });
+  });
+  const reading = expenses.delta.meaning === 'increase' ? 'Aumento · desfavorável' : expenses.delta.meaning === 'reduction' ? 'Redução · favorável' : expenses.delta.meaning === 'unchanged' ? 'Estável' : 'Indisponível';
+  [['Variação absoluta', expenseDeltaText(expenses.delta.absolute)], ['Variação percentual', expenseDeltaText(expenses.delta.percentage, true)], ['Leitura executiva', reading]].forEach(([label, value], index) => {
+    const x = 0.9 + index * 4.1;
+    slide.addText(label, { x, y: 5.3, w: 3.7, h: 0.24, fontFace: 'Aptos', fontSize: 14, color: COLOR.muted, margin: 0 });
+    slide.addText(value, { x, y: 5.67, w: 3.7, h: 0.38, fontFace: 'Aptos', fontSize: 20, bold: true, color: index === 2 && expenses.delta.favorability === 'favorable' ? COLOR.revenue : index === 2 && expenses.delta.favorability === 'unfavorable' ? COLOR.expense : COLOR.white, margin: 0, fit: 'shrink' });
+  });
+}
+
+function flattenExpenseNodes(nodes: readonly PresentationExpenseNode[], depth = 0): Array<{ node: PresentationExpenseNode; depth: number }> {
+  return nodes.flatMap(node => [{ node, depth }, ...flattenExpenseNodes(node.children, depth + 1)]);
+}
+
+function addExpensesTree(slide: PptxGenJS.Slide, pptx: PptxGenJS, nodes: readonly PresentationExpenseNode[]): void {
+  const rows = flattenExpenseNodes(nodes);
+  if (rows.length === 0) { addEmpty(slide, pptx, 'Sem despesas no mês selecionado.'); return; }
+  [['CATEGORIA', 0.8, 7], ['VALOR PRÓPRIO', 8.3, 1.8], ['ACUMULADO', 10.4, 2]].forEach(([label, x, width]) => slide.addText(String(label), { x: Number(x), y: 1.65, w: Number(width), h: 0.2, fontFace: 'Aptos', fontSize: 11, bold: true, color: COLOR.muted, margin: 0, align: Number(x) > 1 ? 'right' : 'left' }));
+  rows.forEach(({ node, depth }, index) => {
+    const y = 2.02 + index * 0.5;
+    slide.addShape(pptx.ShapeType.line, { x: 0.8, y: y + 0.32, w: 11.6, h: 0, line: { color: COLOR.subtle, width: 0.5, transparency: 35 } });
+    slide.addText(`${depth > 0 ? '↳ ' : ''}${node.name}`, { x: 0.8 + depth * 0.3, y, w: 5.9 - depth * 0.3, h: 0.22, fontFace: 'Aptos', fontSize: 13, bold: depth === 0, color: COLOR.white, margin: 0, fit: 'shrink' });
+    if (node.operationalClass === 'non-operational') slide.addText('NÃO OPERACIONAL', { x: 6.7, y, w: 1.4, h: 0.18, fontFace: 'Aptos', fontSize: 8, bold: true, color: COLOR.warning, margin: 0 });
+    slide.addText(fmtBRL(node.directAmount), { x: 8.3, y, w: 1.8, h: 0.22, fontFace: 'Aptos', fontSize: 12, color: COLOR.muted, margin: 0, align: 'right', fit: 'shrink' });
+    slide.addText(fmtBRL(node.amount), { x: 10.4, y, w: 2, h: 0.22, fontFace: 'Aptos', fontSize: 13, bold: true, color: COLOR.white, margin: 0, align: 'right', fit: 'shrink' });
+  });
+}
+
+function addExpensesRolling(slide: PptxGenJS.Slide, pptx: PptxGenJS, expenses: PresentationExpensesData): void {
+  const max = Math.max(1, ...expenses.rollingThreeMonths.map(point => point.total));
+  expenses.rollingThreeMonths.forEach((point, index) => {
+    const x = 1.35 + index * 4.05;
+    const height = point.state === 'available' ? Math.max((point.total / max) * 3.5, 0.15) : 0.15;
+    slide.addText(point.state === 'available' ? fmtBRL(point.total) : point.state === 'empty' ? 'Sem despesas' : 'Sem cobertura', { x: x - 0.7, y: 1.7, w: 2.9, h: 0.35, fontFace: 'Aptos', fontSize: 20, bold: true, color: COLOR.white, align: 'center', margin: 0, fit: 'shrink' });
+    slide.addShape(pptx.ShapeType.rect, { x, y: 5.7 - height, w: 1.5, h: height, line: { color: COLOR.expense, transparency: 100 }, fill: { color: COLOR.expense, transparency: 30 } });
+    slide.addText(point.yearMonth, { x: x - 0.5, y: 5.88, w: 2.5, h: 0.25, fontFace: 'Aptos', fontSize: 16, bold: true, color: COLOR.white, align: 'center', margin: 0 });
+    slide.addText(`${point.quantity} lançamento(s)`, { x: x - 0.5, y: 6.2, w: 2.5, h: 0.2, fontFace: 'Aptos', fontSize: 11, color: COLOR.muted, align: 'center', margin: 0 });
+  });
+}
+
+function addExpensesHistory(slide: PptxGenJS.Slide, pptx: PptxGenJS, expenses: PresentationExpensesData): void {
+  const left = 1.25; const cellWidth = 0.94;
+  ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'].forEach((label, index) => slide.addText(label, { x: left + index * cellWidth, y: 1.62, w: cellWidth - 0.04, h: 0.2, fontFace: 'Aptos', fontSize: 10, bold: true, color: COLOR.muted, align: 'center', margin: 0 }));
+  expenses.requestedYears.forEach((year, row) => {
+    const y = 2.02 + row * 1.28;
+    slide.addText(String(year), { x: 0.68, y: y + 0.35, w: 0.52, h: 0.25, fontFace: 'Aptos', fontSize: 14, bold: true, color: COLOR.white, margin: 0 });
+    expenses.history.filter(point => point.year === year).forEach((point, index) => {
+      const x = left + index * cellWidth;
+      slide.addShape(pptx.ShapeType.roundRect, { x, y, w: cellWidth - 0.06, h: 0.9, line: { color: point.state === 'available' ? COLOR.expense : COLOR.subtle, width: 0.8 }, fill: { color: COLOR.background, transparency: 100 } });
+      slide.addText(point.state === 'available' ? fmtBRLCompact(point.total) : '—', { x: x + 0.03, y: y + 0.2, w: cellWidth - 0.12, h: 0.22, fontFace: 'Aptos', fontSize: 10, bold: true, color: point.state === 'available' ? COLOR.white : COLOR.muted, align: 'center', margin: 0, fit: 'shrink' });
+      slide.addText(point.state === 'available' ? `${point.quantity} lanç.` : point.state === 'empty' ? 'vazio' : 's/ cobertura', { x: x + 0.03, y: y + 0.52, w: cellWidth - 0.12, h: 0.15, fontFace: 'Aptos', fontSize: 8, color: COLOR.muted, align: 'center', margin: 0, fit: 'shrink' });
+    });
+  });
+}
+
+function addResultsSummary(slide: PptxGenJS.Slide, pptx: PptxGenJS, results: PresentationResultsData): void {
+  const metrics = [
+    ['Receita operacional', fmtBRL(results.current.revenue), COLOR.revenue, 'Base operacional do período'],
+    ['Despesa operacional', fmtBRL(results.current.expense), COLOR.expense, 'Base operacional do período'],
+    ['Resultado operacional', fmtBRL(results.current.result), results.current.result < 0 ? COLOR.expense : COLOR.white, 'Receita − despesa'],
+    ['Margem operacional', formatPercentBR(results.current.marginPercent, 1), COLOR.white, 'Resultado ÷ receita'],
+  ] as const;
+  metrics.forEach(([label, value, color, formula], index) => {
+    const x = 0.72 + index * 3.1;
+    slide.addShape(pptx.ShapeType.rect, {
+      x, y: 2.25, w: 0.06, h: 2.35,
+      line: { color: COLOR.gold, transparency: 100 }, fill: { color: COLOR.gold },
+    });
+    slide.addText(label, { x: x + 0.22, y: 2.35, w: 2.65, h: 0.34, fontFace: 'Aptos', fontSize: 17, color: COLOR.muted, margin: 0, fit: 'shrink' });
+    slide.addText(value, { x: x + 0.22, y: 3.05, w: 2.65, h: 0.52, fontFace: 'Aptos Display', fontSize: 27, bold: true, color, margin: 0, fit: 'shrink' });
+    slide.addText(formula, { x: x + 0.22, y: 4.02, w: 2.65, h: 0.25, fontFace: 'Aptos', fontSize: 12, color: COLOR.muted, margin: 0, fit: 'shrink' });
+  });
+}
+
+function addResultsComparison(slide: PptxGenJS.Slide, pptx: PptxGenJS, results: PresentationResultsData): void {
+  if (results.comparison.state === 'unavailable') {
+    addEmpty(slide, pptx, results.comparison.reason === 'outside-available-period'
+      ? 'Período anterior fora do histórico disponível.'
+      : 'Comparação com o período anterior indisponível.');
+    return;
+  }
+  const { previous, deltas } = results.comparison;
+  const rows = [
+    ['Receita', results.current.revenue, previous.revenue, deltas.revenue, true],
+    ['Despesa', results.current.expense, previous.expense, deltas.expense, true],
+    ['Resultado', results.current.result, previous.result, deltas.result, true],
+    ['Margem', results.current.marginPercent, previous.marginPercent, deltas.margin, false],
+  ] as const;
+  const x = [0.72, 3.15, 5.45, 7.75, 10.05];
+  const widths = [2.2, 2.05, 2.05, 2.05, 2.5];
+  ['Métrica', 'Período atual', 'Período anterior', 'Variação absoluta', 'Variação relativa'].forEach((label, index) => {
+    slide.addText(label, { x: x[index], y: 1.68, w: widths[index], h: 0.25, fontFace: 'Aptos', fontSize: 12, bold: true, color: COLOR.muted, margin: 0, align: index === 0 ? 'left' : 'right', fit: 'shrink' });
+  });
+  rows.forEach(([label, current, previousValue, delta, currency], index) => {
+    const y = 2.22 + index * 0.83;
+    const format = (value: number) => currency ? fmtBRL(value) : formatPercentBR(value, 1);
+    const absolute = delta.absoluteChange === null
+      ? 'Indisponível'
+      : currency ? fmtBRL(delta.absoluteChange) : `${delta.absoluteChange.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} p.p.`;
+    slide.addShape(pptx.ShapeType.line, { x: 0.72, y: y - 0.13, w: 11.83, h: 0, line: { color: COLOR.subtle, transparency: 35, width: 0.7 } });
+    [label, format(current), format(previousValue), absolute, formatMetricDelta(delta)].forEach((value, column) => {
+      slide.addText(value, { x: x[column], y, w: widths[column], h: 0.28, fontFace: 'Aptos', fontSize: 14, bold: column === 0 || column === 4, color: column === 2 ? COLOR.muted : COLOR.white, margin: 0, align: column === 0 ? 'left' : 'right', fit: 'shrink' });
+    });
+  });
+  slide.addText('Base zero preserva a variação absoluta sem gerar valores inválidos.', { x: 0.72, y: 5.85, w: 11.83, h: 0.24, fontFace: 'Aptos', fontSize: 11, color: COLOR.muted, margin: 0 });
+}
+
+function addResultsBridge(slide: PptxGenJS.Slide, pptx: PptxGenJS, results: PresentationResultsData): void {
+  if (results.bridge.state === 'unavailable') {
+    addEmpty(slide, pptx, results.bridge.reason === 'outside-available-period'
+      ? 'Ponte indisponível: período anterior fora do histórico.'
+      : 'Ponte indisponível sem comparação equivalente.');
+    return;
+  }
+  results.bridge.steps.forEach((step, index) => {
+    const x = 0.75 + index * 3.12;
+    slide.addShape(pptx.ShapeType.rect, { x, y: 2.12, w: 2.72, h: 0.06, line: { color: COLOR.gold, transparency: 100 }, fill: { color: COLOR.gold } });
+    slide.addText(step.label, { x, y: 2.45, w: 2.72, h: 0.35, fontFace: 'Aptos', fontSize: 16, bold: true, color: COLOR.muted, margin: 0, align: 'center', fit: 'shrink' });
+    const signed = step.key === 'previous-result' || step.key === 'current-result'
+      ? fmtBRL(step.value)
+      : step.value > 0
+        ? `+${fmtBRL(step.value)}`
+        : step.value < 0
+          ? `-${fmtBRL(Math.abs(step.value))}`
+          : fmtBRL(step.value);
+    const color = step.favorability === 'favorable' ? COLOR.revenue : step.favorability === 'unfavorable' ? COLOR.expense : COLOR.white;
+    slide.addText(signed, { x, y: 3.15, w: 2.72, h: 0.48, fontFace: 'Aptos Display', fontSize: 27, bold: true, color, margin: 0, align: 'center', fit: 'shrink' });
+    if (index > 0) slide.addText('+', { x: x - 0.3, y: 3.15, w: 0.2, h: 0.3, fontFace: 'Aptos', fontSize: 22, color: COLOR.muted, margin: 0, align: 'center' });
+    if (step.key === 'expense-effect') slide.addText('Despesa maior reduz o resultado; menor aumenta.', { x, y: 3.95, w: 2.72, h: 0.38, fontFace: 'Aptos', fontSize: 11, color: COLOR.muted, margin: 0, align: 'center', fit: 'shrink' });
+  });
+  slide.addShape(pptx.ShapeType.line, { x: 0.75, y: 5.05, w: 11.78, h: 0, line: { color: COLOR.subtle, width: 1 } });
+  slide.addText('Variação total do resultado', { x: 0.75, y: 5.35, w: 3.2, h: 0.28, fontFace: 'Aptos', fontSize: 14, color: COLOR.muted, margin: 0 });
+  slide.addText(results.bridge.totalChange > 0
+    ? `+${fmtBRL(results.bridge.totalChange)}`
+    : results.bridge.totalChange < 0
+      ? `-${fmtBRL(Math.abs(results.bridge.totalChange))}`
+      : fmtBRL(results.bridge.totalChange), { x: 5.15, y: 5.28, w: 3, h: 0.38, fontFace: 'Aptos Display', fontSize: 21, bold: true, color: results.bridge.totalChange < 0 ? COLOR.expense : results.bridge.totalChange > 0 ? COLOR.revenue : COLOR.white, margin: 0, align: 'center', fit: 'shrink' });
+  slide.addText('Ponte fechada exatamente no resultado atual', { x: 9.15, y: 5.35, w: 3.38, h: 0.28, fontFace: 'Aptos', fontSize: 12, color: COLOR.muted, margin: 0, align: 'right', fit: 'shrink' });
+}
+
+function addResultsNonOperational(
+  slide: PptxGenJS.Slide,
+  pptx: PptxGenJS,
+  results: PresentationResultsData,
+  composition: CategoryCompositionSection,
+): void {
+  const totals = results.nonOperational.totals;
+  [
+    ['Receitas não operacionais', totals.revenue],
+    ['Despesas não operacionais', totals.expense],
+    ['Saldo não operacional', totals.result],
+  ].forEach(([label, value], index) => {
+    const x = 0.72 + index * 4.08;
+    slide.addShape(pptx.ShapeType.rect, { x, y: 1.5, w: 0.05, h: 0.75, line: { color: COLOR.gold, transparency: 100 }, fill: { color: COLOR.gold } });
+    slide.addText(String(label), { x: x + 0.18, y: 1.5, w: 3.55, h: 0.2, fontFace: 'Aptos', fontSize: 11, color: COLOR.muted, margin: 0, fit: 'shrink' });
+    slide.addText(fmtBRL(value as number), { x: x + 0.18, y: 1.83, w: 3.55, h: 0.3, fontFace: 'Aptos Display', fontSize: 19, bold: true, color: COLOR.warning, margin: 0, fit: 'shrink' });
+  });
+  addCompositionColumn(slide, pptx, 'Receitas', composition.revenue, 'revenue', 0.72, 2.55);
+  addCompositionColumn(slide, pptx, 'Despesas', composition.expense, 'expense', 6.92, 2.55);
+}
+
+function addInsights(
+  slide: PptxGenJS.Slide,
+  pptx: PptxGenJS,
+  items: readonly PresentationInsight[],
+  rulesetVersion: string,
+): void {
+  if (items.length === 0) {
+    addEmpty(slide, pptx, 'Nenhum insight atingiu os limiares mínimos de relevância e cobertura. Nenhuma leitura foi fabricada.');
+    return;
+  }
+  slide.addText(`Regras ${rulesetVersion} · ordenação por relevância, domínio, prioridade da regra e ID`, {
+    x: 0.72, y: 1.42, w: 11.88, h: 0.2,
+    fontFace: 'Aptos', fontSize: 9, color: COLOR.muted, margin: 0, fit: 'shrink',
+  });
+  const gap = 0.2;
+  const width = (11.88 - gap * (items.length - 1)) / items.length;
+  items.forEach((insight, index) => {
+    const x = 0.72 + index * (width + gap);
+    const toneColor = insight.tone === 'positive'
+      ? COLOR.revenue
+      : insight.tone === 'negative' ? COLOR.expense : COLOR.gold;
+    slide.addShape(pptx.ShapeType.roundRect, {
+      x, y: 1.72, w: width, h: 4.82,
+      rectRadius: 0.05,
+      line: { color: COLOR.subtle, width: 1 },
+      fill: { color: COLOR.background, transparency: 100 },
+    });
+    slide.addShape(pptx.ShapeType.rect, {
+      x, y: 1.72, w: 0.06, h: 4.82,
+      line: { color: toneColor, transparency: 100 },
+      fill: { color: toneColor },
+    });
+    slide.addText(insight.domain === 'revenue' ? 'FATURAMENTO' : 'DESPESAS', {
+      x: x + 0.18, y: 1.9, w: width * 0.48, h: 0.17,
+      fontFace: 'Aptos', fontSize: 9, bold: true, color: toneColor, margin: 0, fit: 'shrink',
+    });
+    slide.addText(`Regra ${insight.ruleVersion} · score ${insight.relevance.score}`, {
+      x: x + width * 0.48, y: 1.9, w: width * 0.46 - 0.14, h: 0.17,
+      fontFace: 'Aptos', fontSize: 7, color: COLOR.muted, margin: 0, align: 'right', fit: 'shrink',
+    });
+    slide.addText(insight.title, {
+      x: x + 0.18, y: 2.22, w: width - 0.36, h: 0.58,
+      fontFace: 'Aptos Display', fontSize: 17, bold: true, color: COLOR.white,
+      margin: 0, breakLine: false, fit: 'shrink', valign: 'top',
+    });
+    slide.addText(insight.description, {
+      x: x + 0.18, y: 2.92, w: width - 0.36, h: 0.55,
+      fontFace: 'Aptos', fontSize: 10, color: COLOR.muted,
+      margin: 0, breakLine: false, fit: 'shrink', valign: 'top',
+    });
+    slide.addShape(pptx.ShapeType.line, {
+      x: x + 0.18, y: 3.68, w: 0, h: 0.83,
+      line: { color: toneColor, width: 2 },
+    });
+    slide.addText('EVIDÊNCIA', {
+      x: x + 0.32, y: 3.7, w: width - 0.5, h: 0.15,
+      fontFace: 'Aptos', fontSize: 7, color: COLOR.muted, margin: 0,
+    });
+    slide.addText(presentationInsightEvidenceLabel(insight), {
+      x: x + 0.32, y: 3.95, w: width - 0.5, h: 0.5,
+      fontFace: 'Aptos', fontSize: 10, bold: true, color: COLOR.white,
+      margin: 0, breakLine: false, fit: 'shrink', valign: 'top',
+    });
+    slide.addText([
+      `Período: ${insight.period.label}`,
+      `Fonte: ${insight.source.label}`,
+      `Regime: ${presentationInsightRegimeLabel(insight)}`,
+    ].join('\n'), {
+      x: x + 0.18, y: 4.82, w: width - 0.36, h: 1.25,
+      fontFace: 'Aptos', fontSize: 8, color: COLOR.muted,
+      margin: 0, breakLine: false, fit: 'shrink', valign: 'bottom',
     });
   });
 }
@@ -784,11 +1201,59 @@ function addSlideContent(slide: PptxGenJS.Slide, pptx: PptxGenJS, source: Presen
     return;
   }
   const payload = source.availability.data;
-  if (source.availability.state === 'empty' && payload.type !== 'cover') {
+  if (
+    source.availability.state === 'empty'
+    && payload.type !== 'cover'
+    && !payload.type.startsWith('expenses-')
+    && !payload.type.startsWith('results-')
+    && payload.type !== 'insights'
+  ) {
     addEmpty(slide, pptx, availabilityMessage(source.availability));
     return;
   }
   switch (payload.type) {
+    case 'chapter-foundation':
+      addEmpty(slide, pptx, 'Conteúdo não solicitado nesta fase.');
+      break;
+    case 'revenue-summary':
+      addRevenueSummary(slide, pptx, payload.revenue);
+      break;
+    case 'revenue-weekdays':
+      addRevenueWeekdays(slide, pptx, payload.revenue);
+      break;
+    case 'revenue-history':
+      addRevenueHistory(slide, pptx, payload.revenue);
+      break;
+    case 'expenses-summary':
+      addExpensesSummary(slide, pptx, payload.expenses);
+      break;
+    case 'expenses-tree':
+      addExpensesTree(slide, pptx, payload.nodes);
+      break;
+    case 'expenses-rolling':
+      addExpensesRolling(slide, pptx, payload.expenses);
+      break;
+    case 'expenses-history':
+      addExpensesHistory(slide, pptx, payload.expenses);
+      break;
+    case 'results-summary':
+      addResultsSummary(slide, pptx, payload.results);
+      break;
+    case 'results-comparison':
+      addResultsComparison(slide, pptx, payload.results);
+      break;
+    case 'results-evolution':
+      addTimeSeries(slide, pptx, payload.timeSeries);
+      break;
+    case 'results-bridge':
+      addResultsBridge(slide, pptx, payload.results);
+      break;
+    case 'results-non-operational':
+      addResultsNonOperational(slide, pptx, payload.results, payload.composition);
+      break;
+    case 'insights':
+      addInsights(slide, pptx, payload.items, payload.insights.rulesetVersion);
+      break;
     case 'cover':
       addCover(slide, pptx, payload.periodLabel);
       break;
@@ -832,7 +1297,30 @@ function addSlideContent(slide: PptxGenJS.Slide, pptx: PptxGenJS, source: Presen
   }
 }
 
-function slideNotes(source: PresentationSlide): string {
+function slideSourceNotes(source: PresentationSlide): string {
+  if (source.kind === 'chapter-foundation') {
+    return '[Sources]\n- Dados financeiros não solicitados nesta fase';
+  }
+  if (source.chapter === 'revenue') {
+    return '[Sources]\n- public.financeiro_fechamento_caixa.faturamento_bruto\n- data local: public.financeiro_fechamento_caixa.data\n- detalhamento por marcas não somado novamente';
+  }
+  if (source.chapter === 'expenses') {
+    return '[Sources]\n- public.fin_lancamentos\n- public.fin_lancamento_rateios\n- DFC; regime de caixa\n- data efetiva: COALESCE(data_pagamento, conciliado_em::date, data_competencia)\n- rateio substitui categoria do lançamento\n- transferências e conciliações pendentes excluídas';
+  }
+  if (source.chapter === 'results') {
+    return '[Sources]\n- public.get_fin_presentation_socios\n- public.fin_lancamentos\n- public.fin_lancamento_rateios\n- data_competencia; regime de competencia\n- rateio prevalece sobre o cabecalho\n- valores nao operacionais ficam fora do resultado operacional';
+  }
+  if (source.chapter === 'insights') {
+    if (source.availability.state !== 'available' && source.availability.state !== 'empty') {
+      return '[Sources]\n- Insights indisponíveis; nenhuma inferência gerada';
+    }
+    const payload = source.availability.data;
+    if (payload.type !== 'insights') return '[Sources]\n- Payload de Insights indisponível';
+    const rules = payload.items.map(insight => (
+      `- ${insight.id}; regra=${insight.ruleId}@${insight.ruleVersion}; domínio=${insight.domain}; score=${insight.relevance.score}; período=${insight.period.label}`
+    )).join('\n');
+    return `[Sources]\n- public.financeiro_fechamento_caixa.faturamento_bruto; data local do fechamento\n- public.fin_lancamentos + public.fin_lancamento_rateios; regime de caixa do DFC\n[Rules]\n- rulesetVersion=${payload.insights.rulesetVersion}\n- sem causalidade, previsão ou recomendação automática\n${rules || '- nenhum insight atingiu os limiares'}`;
+  }
   const base = `[Sources]\n- ${PRESENTATION_SOURCE_LABEL}\n- ${PRESENTATION_REGIME_LABEL}`;
   if (source.availability.state !== 'available') return base;
   const payload = source.availability.data;
@@ -851,6 +1339,10 @@ function slideNotes(source: PresentationSlide): string {
   return `${base}\n- ${scenario.sources.budget}\n- ${scenario.sources.cmvTarget}\n[Simulation]\n- SIMULAÇÃO; não é previsão garantida\n- Base: ${scenario.baselineMode}\n- Corte: ${scenario.cutoffDate}\n- Fórmula: ${scenario.formulaVersion}\n- ${scenario.rules.scenarioFormula}\n- ${scenario.rules.cmvFormula}\n[Active assumptions]\n${levers}`;
 }
 
+function slideNotes(source: PresentationSlide): string {
+  return `[Presentation]\n- slideId=${source.id}\n- chapter=${source.chapter}\n- kind=${source.kind}\n- order=${source.order}\n${slideSourceNotes(source)}`;
+}
+
 export async function createPresentationPptxBlob(
   data: PresentationSociosData,
   options: PresentationExportOptions = {},
@@ -862,7 +1354,7 @@ export async function createPresentationPptxBlob(
   pptx.layout = 'LAYOUT_WIDE';
   pptx.author = 'Moralles Food';
   pptx.company = 'Moralles Food';
-  pptx.subject = `${data.periodLabel} - resultado operacional por competência`;
+  pptx.subject = `Faturamento, despesas, resultados e insights - ${data.periodLabel}`;
   pptx.title = `Apresentação Sócios - ${data.periodLabel}`;
   pptx.theme = {
     headFontFace: 'Aptos Display',
@@ -875,7 +1367,7 @@ export async function createPresentationPptxBlob(
     outputSlide.background = { color: COLOR.background };
     addSlideContent(outputSlide, pptx, slides[index]);
     if (slides[index].kind !== 'cover') addHeader(outputSlide, pptx, slides[index]);
-    addFooter(outputSlide, pptx, data, index + 1, slides.length);
+    addFooter(outputSlide, pptx, data, slides[index], index + 1, slides.length);
     outputSlide.addNotes(slideNotes(slides[index]));
     options.onProgress?.({
       completed: index + 1,

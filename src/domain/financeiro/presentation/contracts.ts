@@ -5,6 +5,11 @@ import type {
   PresentationDecisionComparison,
   PresentationDecisionDetail,
 } from './decisions';
+import type { PresentationChapterId } from './chapters';
+import type { PresentationRevenueData } from './revenue';
+import type { PresentationExpenseNode, PresentationExpensesData } from './expenses';
+import type { PresentationResultsData } from './results';
+import type { PresentationInsight, PresentationInsightsData } from './insights';
 
 /**
  * Contrato de dados da Apresentação Sócios.
@@ -307,6 +312,20 @@ export interface PresentationComparisonData {
 }
 
 export type PresentationSlideKind =
+  | 'chapter-foundation'
+  | 'revenue-summary'
+  | 'revenue-weekdays'
+  | 'revenue-history'
+  | 'expenses-summary'
+  | 'expenses-tree'
+  | 'expenses-rolling'
+  | 'expenses-history'
+  | 'results-summary'
+  | 'results-comparison'
+  | 'results-evolution'
+  | 'results-bridge'
+  | 'results-non-operational'
+  | 'insights'
   | 'cover'
   | 'executive-summary'
   | 'plan-comparison'
@@ -322,6 +341,32 @@ export type PresentationSlideKind =
   | 'non-operational';
 
 export type PresentationSlidePayload =
+  | { type: 'chapter-foundation'; chapter: PresentationChapterId }
+  | { type: 'revenue-summary'; revenue: PresentationRevenueData }
+  | { type: 'revenue-weekdays'; revenue: PresentationRevenueData }
+  | { type: 'revenue-history'; revenue: PresentationRevenueData }
+  | { type: 'expenses-summary'; expenses: PresentationExpensesData }
+  | {
+      type: 'expenses-tree';
+      expenses: PresentationExpensesData;
+      nodes: readonly PresentationExpenseNode[];
+    }
+  | { type: 'expenses-rolling'; expenses: PresentationExpensesData }
+  | { type: 'expenses-history'; expenses: PresentationExpensesData }
+  | { type: 'results-summary'; results: PresentationResultsData }
+  | { type: 'results-comparison'; results: PresentationResultsData }
+  | { type: 'results-evolution'; results: PresentationResultsData; timeSeries: PresentationTimeSeries }
+  | { type: 'results-bridge'; results: PresentationResultsData }
+  | {
+      type: 'results-non-operational';
+      results: PresentationResultsData;
+      composition: CategoryCompositionSection;
+    }
+  | {
+      type: 'insights';
+      insights: PresentationInsightsData;
+      items: readonly PresentationInsight[];
+    }
   | { type: 'cover'; periodLabel: string }
   | { type: 'executive-summary'; metrics: PresentationMetrics; deltas?: PresentationMetricDeltas }
   | { type: 'plan-comparison'; plan: PresentationPlanData }
@@ -345,6 +390,7 @@ export interface PresentationSlideBase<
   TPayload extends PresentationSlidePayload,
 > {
   id: string;
+  chapter: PresentationChapterId;
   kind: TKind;
   order: number;
   title: string;

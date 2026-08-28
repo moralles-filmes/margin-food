@@ -1,4 +1,4 @@
-import { type ComponentProps, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { type ComponentProps, type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   ChevronLeft,
@@ -8,6 +8,7 @@ import {
   Maximize2,
   Minimize2,
   Printer,
+  Settings2,
   X,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -20,11 +21,17 @@ import {
 } from '@/lib/presentationFormatting';
 import { isPresentationSlideExportable } from '@/lib/presentationSlides';
 import type { PresentationExportProgress } from '@/lib/presentationPdfExport';
+import { getPresentationChapter, PRESENTATION_CHAPTERS } from '@/domain/financeiro/presentation';
 
 interface PresentationModeProps {
   data: PresentationSociosData;
   canExport: boolean;
   onClose: () => void;
+  displayMode?: 'overlay' | 'embedded';
+  unitName?: string | null;
+  toolbar?: ReactNode;
+  onOpenExpenseCategory?: (categoryId: string) => void;
+  onOpenResultDetail?: (target: 'revenue' | 'expense' | 'result' | 'margin') => void;
 }
 
 type ExportKind = 'pdf' | 'pptx' | 'print';
@@ -62,6 +69,12 @@ function downloadBlob(blob: Blob, filename: string): void {
 
 function nextPaint(): Promise<void> {
   return new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+}
+
+function isEditableTarget(target: EventTarget | null): boolean {
+  return target instanceof HTMLElement
+    && (target.matches('input, select, textarea, [contenteditable="true"]')
+      || Boolean(target.closest('[role="listbox"], [role="menu"]')));
 }
 
 function PresentationScreenViewport(props: ComponentProps<typeof PresentationSlideCanvas>) {
@@ -106,7 +119,16 @@ function PresentationScreenViewport(props: ComponentProps<typeof PresentationSli
   );
 }
 
-export default function PresentationMode({ data, canExport, onClose }: PresentationModeProps) {
+export default function PresentationMode({
+  data,
+  canExport,
+  onClose,
+  displayMode = 'overlay',
+  unitName,
+  toolbar,
+  onOpenExpenseCategory,
+  onOpenResultDetail,
+}: PresentationModeProps) {
   const slides = useMemo(
     () => [...data.slides].sort((left, right) => left.order - right.order),
     [data.slides],
@@ -115,6 +137,12 @@ export default function PresentationMode({ data, canExport, onClose }: Presentat
     () => slides.filter(isPresentationSlideExportable),
     [slides],
   );
+  const firstSlideByChapter = useMemo(() => new Map(
+    PRESENTATION_CHAPTERS.map(chapter => [
+      chapter.id,
+      slides.findIndex(slide => slide.chapter === chapter.id),
+    ]),
+  ), [slides]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [nativeFullscreen, setNativeFullscreen] = useState(false);
   const [fullscreenSupported, setFullscreenSupported] = useState(false);
@@ -143,17 +171,25 @@ export default function PresentationMode({ data, canExport, onClose }: Presentat
     previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const previousOverflow = document.body.style.overflow;
     const scrollPosition = { x: window.scrollX, y: window.scrollY };
-    document.body.style.overflow = 'hidden';
-    closeButtonRef.current?.focus();
+    if (displayMode === 'overlay') document.body.style.overflow = 'hidden';
+    if (displayMode === 'overlay') closeButtonRef.current?.focus();
+    else rootRef.current?.focus();
 
     return () => {
-      document.body.style.overflow = previousOverflow;
-      if (window.scrollX !== scrollPosition.x || window.scrollY !== scrollPosition.y) {
+      if (displayMode === 'overlay') document.body.style.overflow = previousOverflow;
+      if (
+        displayMode === 'overlay'
+        && (window.scrollX !== scrollPosition.x || window.scrollY !== scrollPosition.y)
+      ) {
         window.scrollTo(scrollPosition.x, scrollPosition.y);
       }
       requestAnimationFrame(() => previousFocusRef.current?.focus());
     };
-  }, []);
+  }, [displayMode]);
+
+  useEffect(() => {
+    setCurrentIndex(index => Math.min(index, Math.max(slides.length - 1, 0)));
+  }, [slides.length]);
 
   useEffect(() => () => {
     exportAbortRef.current?.abort();
@@ -169,19 +205,30 @@ export default function PresentationMode({ data, canExport, onClose }: Presentat
     const handleFullscreenChange = () => {
       const isFullscreen = document.fullscreenElement === rootRef.current;
       setNativeFullscreen(isFullscreen);
-      if (!isFullscreen && nativeFullscreen) closeRef.current();
+      if (!isFullscreen && nativeFullscreen && displayMode === 'overlay') closeRef.current();
     };
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
-  }, [nativeFullscreen]);
+  }, [displayMode, nativeFullscreen]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (
+        displayMode === 'embedded'
+        && !nativeFullscreen
+        && !rootRef.current?.contains(document.activeElement)
+      ) return;
       if (event.key === 'Escape') {
         event.preventDefault();
+        if (exportJob) {
+          if (exportJob.cancellable) exportAbortRef.current?.abort();
+          return;
+        }
         close();
         return;
       }
+      if (exportJob) return;
+      if (isEditableTarget(event.target) || event.metaKey || event.ctrlKey || event.altKey) return;
       if (event.key === 'ArrowRight' || event.key === 'ArrowDown' || event.key === 'PageDown') {
         event.preventDefault();
         setCurrentIndex(index => Math.min(index + 1, slides.length - 1));
@@ -202,7 +249,7 @@ export default function PresentationMode({ data, canExport, onClose }: Presentat
         setCurrentIndex(Math.max(slides.length - 1, 0));
         return;
       }
-      if (event.key === 'Tab' && rootRef.current) {
+      if (event.key === 'Tab' && rootRef.current && (displayMode === 'overlay' || nativeFullscreen)) {
         const focusable = Array.from(rootRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
         if (focusable.length === 0) return;
         const first = focusable[0];
@@ -218,7 +265,7 @@ export default function PresentationMode({ data, canExport, onClose }: Presentat
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [close, slides.length]);
+  }, [close, displayMode, exportJob, nativeFullscreen, slides.length]);
 
   const toggleNativeFullscreen = useCallback(async () => {
     try {
@@ -229,7 +276,7 @@ export default function PresentationMode({ data, canExport, onClose }: Presentat
       }
     } catch (error) {
       console.error('Erro ao alternar tela cheia:', error);
-      toast.info('O navegador não permitiu a tela cheia; o modo apresentação continuará ocupando a janela.');
+      toast.info('O navegador não permitiu a tela cheia; a apresentação continuará neste modo.');
     }
   }, []);
 
@@ -298,62 +345,104 @@ export default function PresentationMode({ data, canExport, onClose }: Presentat
 
   if (slides.length === 0) return null;
   const currentSlide = slides[currentIndex];
+  const currentChapter = getPresentationChapter(currentSlide.chapter);
   const progressPercent = exportJob && exportJob.total > 0
     ? (exportJob.completed / exportJob.total) * 100
     : 0;
 
-  return createPortal(
+  const shell = (
     <div
       ref={rootRef}
-      className="presentation-mode fixed inset-0 z-[100] flex min-h-[100dvh] flex-col bg-black text-white"
-      role="dialog"
-      aria-modal="true"
+      className={displayMode === 'overlay'
+        ? 'presentation-mode fixed inset-0 z-[100] flex min-h-[100dvh] flex-col bg-background text-foreground'
+        : 'presentation-mode flex h-[clamp(42rem,78dvh,58rem)] min-h-0 w-full flex-col overflow-hidden rounded-xl border border-border bg-background text-foreground shadow-sm'}
+      role={displayMode === 'overlay' ? 'dialog' : 'region'}
+      aria-modal={displayMode === 'overlay' ? true : undefined}
       aria-labelledby="presentation-mode-title"
+      aria-busy={Boolean(exportJob)}
       data-testid="presentation-mode"
+      data-display-mode={displayMode}
+      tabIndex={-1}
     >
       <h1 id="presentation-mode-title" className="sr-only">Modo apresentação: {data.periodLabel}</h1>
       <div className="presentation-mode-screen flex min-h-0 flex-1 flex-col">
-        <header className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-white/10 bg-black/95 px-3 py-2 sm:px-5">
+        <header className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border bg-surface-elevated px-3 py-2 sm:px-5">
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-white">Apresentação Sócios</p>
-            <p className="truncate text-xs text-slate-400">{data.periodLabel}</p>
+            <p className="text-sm font-semibold text-foreground">Apresentação Sócios</p>
+            <p className="break-words text-xs text-muted-foreground">
+              {unitName ? `${unitName} · ` : ''}{data.periodLabel} · {currentChapter.label}
+            </p>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
             {canExport ? (
               <>
-                <Button type="button" variant="outline" size="sm" onClick={() => { void runExport('pdf'); }} disabled={Boolean(exportJob)} aria-label="Exportar apresentação em PDF" className="border-white/20 bg-black text-white hover:bg-white/10 hover:text-white">
+                <Button type="button" variant="outline" size="sm" onClick={() => { void runExport('pdf'); }} disabled={Boolean(exportJob)} aria-label="Exportar apresentação em PDF" className="border-border bg-card text-foreground hover:bg-surface-hover hover:text-foreground">
                   <FileText className="mr-1.5 h-4 w-4" aria-hidden="true" /> PDF
                 </Button>
-                <Button type="button" variant="outline" size="sm" onClick={() => { void runExport('pptx'); }} disabled={Boolean(exportJob)} aria-label="Exportar apresentação em PowerPoint" className="border-white/20 bg-black text-white hover:bg-white/10 hover:text-white">
+                <Button type="button" variant="outline" size="sm" onClick={() => { void runExport('pptx'); }} disabled={Boolean(exportJob)} aria-label="Exportar apresentação em PowerPoint" className="border-border bg-card text-foreground hover:bg-surface-hover hover:text-foreground">
                   <Download className="mr-1.5 h-4 w-4" aria-hidden="true" /> PowerPoint
                 </Button>
-                <Button type="button" variant="outline" size="sm" onClick={() => { void printPresentation(); }} disabled={Boolean(exportJob)} aria-label="Imprimir apresentação" className="border-white/20 bg-black text-white hover:bg-white/10 hover:text-white">
+                <Button type="button" variant="outline" size="sm" onClick={() => { void printPresentation(); }} disabled={Boolean(exportJob)} aria-label="Imprimir apresentação" className="border-border bg-card text-foreground hover:bg-surface-hover hover:text-foreground">
                   <Printer className="mr-1.5 h-4 w-4" aria-hidden="true" /> Imprimir
                 </Button>
               </>
             ) : null}
             {fullscreenSupported ? (
-              <Button type="button" variant="outline" size="icon" onClick={() => { void toggleNativeFullscreen(); }} aria-label={nativeFullscreen ? 'Sair da tela cheia do navegador' : 'Usar tela cheia do navegador'} className="border-white/20 bg-black text-white hover:bg-white/10 hover:text-white">
+              <Button type="button" variant="outline" size="icon" onClick={() => { void toggleNativeFullscreen(); }} disabled={Boolean(exportJob)} aria-label={nativeFullscreen ? 'Sair da tela cheia do navegador' : 'Usar tela cheia do navegador'} className="border-border bg-card text-foreground hover:bg-surface-hover hover:text-foreground">
                 {nativeFullscreen ? <Minimize2 className="h-4 w-4" aria-hidden="true" /> : <Maximize2 className="h-4 w-4" aria-hidden="true" />}
               </Button>
             ) : null}
-            <Button ref={closeButtonRef} type="button" variant="outline" size="icon" onClick={close} aria-label="Sair do modo apresentação" className="border-white/20 bg-black text-white hover:bg-white/10 hover:text-white focus-visible:ring-[#d6b85f]">
-              <X className="h-4 w-4" aria-hidden="true" />
+            <Button
+              ref={closeButtonRef}
+              type="button"
+              variant="outline"
+              size={displayMode === 'overlay' ? 'icon' : 'sm'}
+              onClick={close}
+              disabled={Boolean(exportJob)}
+              aria-label={displayMode === 'overlay' ? 'Sair do modo apresentação' : 'Abrir preparação e governança'}
+              className="border-border bg-card text-foreground hover:bg-surface-hover hover:text-foreground"
+            >
+              {displayMode === 'overlay' ? <X className="h-4 w-4" aria-hidden="true" /> : (
+                <><Settings2 className="mr-1.5 h-4 w-4" aria-hidden="true" /> Preparação</>
+              )}
             </Button>
           </div>
         </header>
 
+        {toolbar ? <div className="shrink-0 bg-background p-2 text-foreground">{toolbar}</div> : null}
+
+        <nav className="flex shrink-0 items-center gap-1 overflow-x-auto border-b border-border bg-surface-elevated px-3 py-2 sm:px-5" aria-label="Capítulos da apresentação">
+          {PRESENTATION_CHAPTERS.map(chapter => {
+            const chapterIndex = firstSlideByChapter.get(chapter.id) ?? -1;
+            const active = chapter.id === currentSlide.chapter;
+            return (
+              <button
+                key={chapter.id}
+                type="button"
+                disabled={chapterIndex < 0 || Boolean(exportJob)}
+                aria-current={active ? 'step' : undefined}
+                onClick={() => goTo(chapterIndex)}
+                className={active
+                  ? 'rounded-md border border-primary-border bg-primary-soft px-3 py-1.5 text-xs font-semibold text-primary-ink'
+                  : 'rounded-md border border-transparent px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-surface-hover hover:text-foreground disabled:opacity-40'}
+              >
+                {chapter.label}
+              </button>
+            );
+          })}
+        </nav>
+
         {exportJob ? (
-          <div className="flex shrink-0 items-center gap-3 border-b border-white/10 bg-slate-950 px-4 py-2" role="status" aria-live="polite">
+          <div className="flex shrink-0 items-center gap-3 border-b border-border bg-background-subtle px-4 py-2" role="status" aria-live="polite">
             <div className="min-w-0 flex-1">
-              <div className="mb-1 flex justify-between gap-3 text-xs text-slate-300">
+              <div className="mb-1 flex justify-between gap-3 text-xs text-ink-secondary">
                 <span>{exportJob.message}</span>
                 <span>{Math.round(progressPercent)}%</span>
               </div>
-              <Progress value={progressPercent} className="h-1.5 bg-white/10" />
+              <Progress value={progressPercent} className="h-1.5 bg-muted" />
             </div>
             {exportJob.cancellable ? (
-              <Button type="button" variant="ghost" size="sm" onClick={cancelExport} className="text-white hover:bg-white/10 hover:text-white">Cancelar</Button>
+              <Button type="button" variant="ghost" size="sm" onClick={cancelExport}>Cancelar</Button>
             ) : null}
           </div>
         ) : null}
@@ -366,18 +455,21 @@ export default function PresentationMode({ data, canExport, onClose }: Presentat
               generatedAt={data.generatedAt}
               slideNumber={currentIndex + 1}
               totalSlides={slides.length}
+              onOpenExpenseCategory={onOpenExpenseCategory}
+              onOpenResultDetail={onOpenResultDetail}
             />
           </div>
         </main>
 
-        <nav className="flex shrink-0 items-center justify-between gap-3 border-t border-white/10 bg-black/95 px-3 py-2 sm:px-5" aria-label="Navegação dos slides">
-          <Button type="button" variant="outline" size="sm" onClick={() => goTo(currentIndex - 1)} disabled={currentIndex === 0} aria-label="Slide anterior" className="border-white/20 bg-black text-white hover:bg-white/10 hover:text-white disabled:text-slate-600">
+        <nav className="flex shrink-0 items-center justify-between gap-3 border-t border-border bg-surface-elevated px-3 py-2 sm:px-5" aria-label="Navegação dos slides">
+          <Button type="button" variant="outline" size="sm" onClick={() => goTo(currentIndex - 1)} disabled={currentIndex === 0 || Boolean(exportJob)} aria-label="Slide anterior" className="border-border bg-card text-foreground hover:bg-surface-hover hover:text-foreground">
             <ChevronLeft className="mr-1 h-4 w-4" aria-hidden="true" /> Anterior
           </Button>
-          <p className="text-sm text-slate-200" aria-live="polite" aria-atomic="true">
-            <span className="font-semibold text-white">{currentIndex + 1}</span> de {slides.length}
-          </p>
-          <Button type="button" variant="outline" size="sm" onClick={() => goTo(currentIndex + 1)} disabled={currentIndex === slides.length - 1} aria-label="Próximo slide" className="border-white/20 bg-black text-white hover:bg-white/10 hover:text-white disabled:text-slate-600">
+          <div className="min-w-0 text-center text-sm text-ink-secondary" aria-live="polite" aria-atomic="true">
+            <p className="break-words text-xs text-muted-foreground">{currentChapter.label} · {currentSlide.title}</p>
+            <p><span className="font-semibold text-foreground">{currentIndex + 1}</span> de {slides.length}</p>
+          </div>
+          <Button type="button" variant="outline" size="sm" onClick={() => goTo(currentIndex + 1)} disabled={currentIndex === slides.length - 1 || Boolean(exportJob)} aria-label="Próximo slide" className="border-border bg-card text-foreground hover:bg-surface-hover hover:text-foreground">
             Próximo <ChevronRight className="ml-1 h-4 w-4" aria-hidden="true" />
           </Button>
         </nav>
@@ -397,7 +489,8 @@ export default function PresentationMode({ data, canExport, onClose }: Presentat
           ))}
         </section>
       ) : null}
-    </div>,
-    document.body,
+    </div>
   );
+
+  return displayMode === 'overlay' ? createPortal(shell, document.body) : shell;
 }
