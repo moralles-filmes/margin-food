@@ -18,10 +18,13 @@ export interface VinculoRow {
 }
 
 export function bankLineKey(linha: { data: string; valor: number; tipo: string; descricao?: string | null }) {
-  // Normalizado (sem acento/maiúsculas/espaços extras): o banco pode truncar a
-  // descrição em tamanho diferente entre dois downloads do mesmo extrato, e
-  // igualdade exata deixaria passar despercebida a mesma reimportação.
-  return `${linha.data}|${Number(linha.valor)}|${linha.tipo}|${normalizeSearchText(linha.descricao || '')}`;
+  // Normalizado (sem acento/maiúsculas/espaços extras): o banco pode variar o
+  // espaçamento interno da descrição entre dois downloads do mesmo extrato
+  // (confirmado no Santander), e normalizeSearchText() só remove acento/caixa —
+  // sem colapsar espaços aqui, a mesma linha reimportada não bate com a chave
+  // da linha já conciliada e reaparece como pendente.
+  const descricaoNormalizada = normalizeSearchText(linha.descricao || '').replace(/\s+/g, ' ');
+  return `${linha.data}|${Number(linha.valor)}|${linha.tipo}|${descricaoNormalizada}`;
 }
 
 /** Chave de vínculo/linha no mesmo formato do fast-path de FITID (`tipo|external_id`). */

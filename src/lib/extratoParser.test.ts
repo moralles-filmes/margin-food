@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseExtrato, diaAnterior } from './extratoParser';
+import { parseExtrato, diaAnterior, decodeExtratoBuffer } from './extratoParser';
 
 const OFX_COM_LEDGERBAL = `
 <OFX>
@@ -187,5 +187,155 @@ describe('diaAnterior', () => {
 
   it('cruza a virada de ano corretamente', () => {
     expect(diaAnterior('2026-01-01')).toBe('2025-12-31');
+  });
+});
+
+/* ───────── Blindagem contra variação entre bancos ───────── */
+
+describe('parseExtrato — descrição estável entre downloads', () => {
+  it('colapsa espaçamento interno variável do MEMO (Santander: 143 duplicatas em 2026-08-28)', () => {
+    // O mesmo extrato baixado duas vezes vem com espaçamento interno diferente.
+    // Normalizar na origem faz o lançamento nascer estável.
+    const download1 = OFX_COM_LEDGERBAL.replace('<MEMO>Compra cartao', '<MEMO>PIX RECEBIDO                 04740876000125');
+    const download2 = OFX_COM_LEDGERBAL.replace('<MEMO>Compra cartao', '<MEMO>PIX RECEBIDO    04740876000125');
+    expect(parseExtrato('e.ofx', download1).linhas[0].descricao).toBe('PIX RECEBIDO 04740876000125');
+    expect(parseExtrato('e.ofx', download1).linhas[0].descricao)
+      .toBe(parseExtrato('e.ofx', download2).linhas[0].descricao);
+  });
+
+  it('nunca usa o FITID como descrição (Santander regenera o FITID a cada download)', () => {
+    // Sem MEMO nem NAME, cair no FITID faria a descrição mudar a cada exportação
+    // e nenhuma reimportação seria reconhecida como já conciliada.
+    const semMemo = OFX_COM_LEDGERBAL.replace('<MEMO>Compra cartao\n', '');
+    const linha = parseExtrato('e.ofx', semMemo).linhas[0];
+    expect(linha.descricao).toBe('Sem descrição');
+    expect(linha.fitId).toBe('txn-unique-123');
+  });
+
+  it('usa <NAME> quando o banco não envia <MEMO>', () => {
+    const comName = OFX_COM_LEDGERBAL.replace('<MEMO>Compra cartao', '<NAME>Fornecedor XPTO');
+    expect(parseExtrato('e.ofx', comName).linhas[0].descricao).toBe('Fornecedor XPTO');
+  });
+});
+
+describe('parseExtrato — sinal do valor via TRNTYPE', () => {
+  const semSinal = `
+<OFX><BANKACCTFROM><BANKID>033
+<ACCTID>12345-6
+</BANKACCTFROM>
+<STMTTRN><TRNTYPE>CREDIT
+<DTPOSTED>20260805120000
+<TRNAMT>500.00
+<FITID>a1
+<MEMO>Venda
+</STMTTRN>
+<STMTTRN><TRNTYPE>DEBIT
+<DTPOSTED>20260806120000
+<TRNAMT>150.00
+<FITID>a2
+<MEMO>Tarifa
+</STMTTRN>
+</OFX>`;
+
+  it('deduz DESPESA pelo TRNTYPE quando o banco exporta tudo positivo', () => {
+    // Lido só pelo sinal, o extrato inteiro viraria receita e o saldo estouraria.
+    const linhas = parseExtrato('e.ofx', semSinal).linhas;
+    expect(linhas.map(l => l.tipo)).toEqual(['RECEITA', 'DESPESA']);
+    expect(linhas[1].valor).toBe(150);
+  });
+
+  it('avisa que o sentido foi deduzido do TRNTYPE', () => {
+    expect(parseExtrato('e.ofx', semSinal).avisos.some(a => a.includes('TRNTYPE'))).toBe(true);
+  });
+
+  it('o sinal manda quando o arquivo tem qualquer valor negativo', () => {
+    // Banco que usa sinal + TRNTYPE=DEBIT não pode ter o tipo reinterpretado.
+    const comSinal = semSinal.replace('<TRNAMT>150.00', '<TRNAMT>-150.00');
+    const result = parseExtrato('e.ofx', comSinal);
+    expect(result.linhas.map(l => l.tipo)).toEqual(['RECEITA', 'DESPESA']);
+    expect(result.avisos.some(a => a.includes('TRNTYPE'))).toBe(false);
+  });
+
+  it('não reinterpreta TRNTYPE ambíguo (XFER/PAYMENT servem aos dois sentidos)', () => {
+    const ambiguo = semSinal.replace('<TRNTYPE>DEBIT', '<TRNTYPE>XFER');
+    expect(parseExtrato('e.ofx', ambiguo).linhas.map(l => l.tipo)).toEqual(['RECEITA', 'RECEITA']);
+  });
+});
+
+describe('parseExtrato — arquivo com mais de uma conta', () => {
+  it('avisa quando o arquivo traz extratos de contas diferentes', () => {
+    // Importado em bloco, o movimento de uma conta entraria na outra.
+    const duasContas = OFX_COM_LEDGERBAL + OFX_SEM_LEDGERBAL.replace('<ACCTID>12345-6', '<ACCTID>99999-9');
+    const avisos = parseExtrato('e.ofx', duasContas).avisos;
+    expect(avisos.some(a => a.includes('contas diferentes'))).toBe(true);
+  });
+
+  it('não avisa quando o mesmo ACCTID se repete no arquivo', () => {
+    const mesmaConta = OFX_COM_LEDGERBAL + OFX_SEM_LEDGERBAL;
+    expect(parseExtrato('e.ofx', mesmaConta).avisos.some(a => a.includes('contas diferentes'))).toBe(false);
+  });
+});
+
+describe('parseExtrato — separador de milhar sem casas decimais', () => {
+  it('lê "1.234" como 1234, não como 1,234 (CSV brasileiro sem centavos)', () => {
+    expect(parseExtrato('e.csv', '05/08/2026;Venda;1.234\n').linhas[0].valor).toBe(1234);
+  });
+
+  it('lê "1,234" como 1234 (milhar em vírgula, sem centavos)', () => {
+    expect(parseExtrato('e.csv', '05/08/2026;Venda;1,234\n').linhas[0].valor).toBe(1234);
+  });
+
+  it('lê milhar repetido "1.234.567" como 1234567', () => {
+    expect(parseExtrato('e.csv', '05/08/2026;Venda;1.234.567\n').linhas[0].valor).toBe(1234567);
+  });
+
+  it('preserva 2 casas decimais como decimal, não como milhar', () => {
+    expect(parseExtrato('e.csv', '05/08/2026;Venda;1.23\n').linhas[0].valor).toBe(1.23);
+  });
+});
+
+describe('parseExtrato — CSV com coluna de saldo', () => {
+  it('não confunde o saldo acumulado com o valor do lançamento', () => {
+    // Layout dominante Data;Histórico;Valor;Saldo — varrer de trás para frente
+    // elegia o saldo como valor do lançamento.
+    const csv = 'Data;Historico;Valor;Saldo\n05/08/2026;Venda;150,00;9.850,00\n';
+    expect(parseExtrato('e.csv', csv).linhas[0].valor).toBe(150);
+  });
+
+  it('usa a primeira coluna numérica quando o CSV não tem cabeçalho', () => {
+    const csv = '05/08/2026;Venda;150,00;9.850,00\n';
+    expect(parseExtrato('e.csv', csv).linhas[0].valor).toBe(150);
+  });
+
+  it('mantém a linha quando a descrição vem vazia', () => {
+    // Descartar a linha sumia com uma transação real do extrato sem aviso.
+    const linhas = parseExtrato('e.csv', '05/08/2026;;150,00\n').linhas;
+    expect(linhas).toHaveLength(1);
+    expect(linhas[0].descricao).toBe('Sem descrição');
+  });
+});
+
+describe('decodeExtratoBuffer', () => {
+  it('decodifica Windows-1252 quando os bytes não são UTF-8 válido', () => {
+    // "TARIFA MANUTENÇÃO" em Windows-1252: Ç=0xC7, Ã=0xC3, O=0x4F
+    const bytes = new Uint8Array([0x54, 0x41, 0x52, 0x49, 0x46, 0x41, 0x20, 0xC7, 0xC3, 0x4F]);
+    expect(decodeExtratoBuffer(bytes.buffer)).toBe('TARIFA ÇÃO');
+  });
+
+  it('mantém UTF-8 quando o arquivo já é UTF-8 válido', () => {
+    const bytes = new TextEncoder().encode('TARIFA MANUTENÇÃO');
+    expect(decodeExtratoBuffer(bytes.buffer)).toBe('TARIFA MANUTENÇÃO');
+  });
+});
+
+describe('parseExtrato — ACCTID de conta destino não conta como segunda conta', () => {
+  it('ignora <BANKACCTTO> ao detectar múltiplas contas', () => {
+    // Transferência detalhada traz a conta destino no mesmo arquivo; contá-la
+    // como "segunda conta" faria o aviso disparar em todo extrato com TED.
+    const comDestino = OFX_COM_LEDGERBAL.replace(
+      '</BANKACCTFROM>',
+      '</BANKACCTFROM>\n<BANKACCTTO>\n<BANKID>237\n<ACCTID>77777-7\n</BANKACCTTO>',
+    );
+    expect(parseExtrato('e.ofx', comDestino).avisos.some(a => a.includes('contas diferentes'))).toBe(false);
   });
 });
