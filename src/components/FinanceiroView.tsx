@@ -152,7 +152,7 @@ const TAB_REGISTRY_MAP: Record<FinSubTab, string> = {
   recorrencias: 'recorrencias',
   categorizacao: 'categorizacao',
   relatorio_socios: 'relatorio-socios',
-  // As duas entradas visuais compartilham deliberadamente o contrato RBAC existente nesta migração.
+  // As duas entradas compartilham o mesmo contrato RBAC durante a migração.
   apresentacao_socios: 'relatorio-socios',
   projecao: 'projecao',
   kpis: 'kpis',

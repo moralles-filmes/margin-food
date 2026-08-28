@@ -23,13 +23,13 @@ vi.mock('@/integrations/supabase/client', () => ({
   },
 }));
 
-vi.mock('@/components/ui/ModuleNav', () => ({
-  ModuleNav: ({ items, onChange }: {
-    items: Array<{ id: string; label: string; children?: Array<{ id: string; label: string }> }>;
+vi.mock('@/components/ui/SubmoduleSwitcher', () => ({
+  SubmoduleSwitcher: ({ items, onChange }: {
+    items: Array<{ id: string; label: string }>;
     onChange: (id: string) => void;
   }) => (
     <nav aria-label="Navegação financeira">
-      {items.flatMap(item => item.children ?? [item]).map(item => (
+      {items.map(item => (
         <button key={item.id} type="button" onClick={() => onChange(item.id)}>{item.label}</button>
       ))}
     </nav>

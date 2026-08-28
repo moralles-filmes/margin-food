@@ -10344,6 +10344,10 @@ export type Database = {
         }
         Returns: Json
       }
+      get_fin_presentation_session: {
+        Args: { p_session_id: string }
+        Returns: Json
+      }
       get_fin_presentation_expense_details: {
         Args: {
           p_category_id?: string
@@ -10359,10 +10363,6 @@ export type Database = {
       }
       get_fin_presentation_revenue: {
         Args: { p_history_years: number[]; p_month: string }
-        Returns: Json
-      }
-      get_fin_presentation_session: {
-        Args: { p_session_id: string }
         Returns: Json
       }
       get_fin_presentation_socios: {
