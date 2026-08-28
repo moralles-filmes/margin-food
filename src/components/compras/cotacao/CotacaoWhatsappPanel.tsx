@@ -156,7 +156,7 @@ export default function CotacaoWhatsappPanel({ cotacao, itens, fornecedores, sto
         </div>
 
         <div className="flex justify-end">
-          <Button size="sm" className="gradient-salmon text-primary-foreground border-0 gap-1.5 h-8 text-xs"
+          <Button size="sm" className="bg-primary-strong text-primary-foreground border-0 gap-1.5 h-8 text-xs"
             onClick={handleSend} disabled={!canSend || sending}>
             <Send className="w-3.5 h-3.5" /> {sending ? 'Enviando…' : 'Enviar WhatsApp'}
           </Button>
@@ -179,7 +179,7 @@ export default function CotacaoWhatsappPanel({ cotacao, itens, fornecedores, sto
             {logs.map(l => {
               const f = fornecedores.find(x => x.id === l.cotacao_fornecedor_id);
               return (
-                <div key={l.id} className="bg-secondary/40 rounded-lg px-2.5 py-1.5">
+                <div key={l.id} className="bg-background-subtle rounded-lg px-2.5 py-1.5">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-[11px] text-foreground flex items-center gap-1.5 truncate">
                       {logIcon(l.status)} {f?.supplier_nome_snapshot ?? l.phone} <span className="text-muted-foreground">· {WHATSAPP_TIPO_LABEL[l.tipo]}</span>

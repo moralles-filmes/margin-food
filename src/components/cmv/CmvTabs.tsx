@@ -5,11 +5,10 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import CmvRankingTable from './CmvRankingTable';
 import type { CmvResult, RankingItem } from './types';
 import { fmtBRL, formatPercentBR } from '@/lib/formatters';
+import { axisProps, gridProps, tooltipProps, SERIES_COLORS } from '@/lib/chartTheme';
+import { ChartTooltip } from '@/components/ui/ChartTooltip';
 
-const COLORS = [
-  'hsl(var(--primary))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))',
-  'hsl(var(--chart-4))', 'hsl(var(--chart-5))', 'hsl(var(--accent))',
-];
+const COLORS = SERIES_COLORS;
 
 function fmt(v: number) {
   return fmtBRL(v);
@@ -48,7 +47,7 @@ export default function CmvTabs({ cmvData, visibleSubtabs, ranking, errorRanking
                     <Pie data={cmvData.cmvPorCategoria} dataKey="custo" nameKey="categoria" cx="50%" cy="50%" outerRadius={80} label={(props) => { const { categoria, percentCmv } = props as unknown as { categoria: string; percentCmv: number }; return `${categoria} ${formatPercentBR(percentCmv)}`; }}>
                       {cmvData.cmvPorCategoria.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                     </Pie>
-                    <Tooltip formatter={(v: number) => fmtBRL(v)} />
+                    <Tooltip {...tooltipProps} content={<ChartTooltip valueFormatter={v => fmtBRL(Number(v))} />} />
                   </RPieChart>
                 </ResponsiveContainer>
               ) : <p className="text-sm text-muted-foreground text-center py-8">Sem dados no período</p>}
@@ -88,11 +87,11 @@ export default function CmvTabs({ cmvData, visibleSubtabs, ranking, errorRanking
               {(cmvData.cmvPorSetor || []).length > 0 ? (
                 <ResponsiveContainer width="100%" height={250}>
                   <BarChart data={cmvData.cmvPorSetor} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                    <XAxis type="number" className="text-xs" />
-                    <YAxis dataKey="setor" type="category" className="text-xs" width={100} />
-                    <Tooltip formatter={(v: number) => fmtBRL(v)} />
-                    <Bar dataKey="custo" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+                    <CartesianGrid {...gridProps} vertical horizontal={false} />
+                    <XAxis type="number" {...axisProps} />
+                    <YAxis dataKey="setor" type="category" {...axisProps} width={100} />
+                    <Tooltip {...tooltipProps} content={<ChartTooltip valueFormatter={v => fmtBRL(Number(v))} />} />
+                    <Bar dataKey="custo" name="Custo" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               ) : <p className="text-sm text-muted-foreground text-center py-8">Sem dados de setor no período</p>}
@@ -137,11 +136,11 @@ export default function CmvTabs({ cmvData, visibleSubtabs, ranking, errorRanking
             {cmvData.cmvSemanal.length > 0 ? (
               <ResponsiveContainer width="100%" height={250}>
                 <BarChart data={cmvData.cmvSemanal}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis dataKey="semana" className="text-xs" />
-                  <YAxis className="text-xs" />
-                  <Tooltip formatter={(v: number) => fmtBRL(v)} />
-                  <Bar dataKey="custo" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                  <CartesianGrid {...gridProps} />
+                  <XAxis dataKey="semana" {...axisProps} />
+                  <YAxis {...axisProps} />
+                  <Tooltip {...tooltipProps} content={<ChartTooltip valueFormatter={v => fmtBRL(Number(v))} />} />
+                  <Bar dataKey="custo" name="Custo" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             ) : <p className="text-sm text-muted-foreground text-center py-8">Sem dados</p>}

@@ -1,11 +1,12 @@
 import { useState, useMemo } from 'react';
 import { SalmonEntry, MetaCompraMensal, Supplier } from '@/types/salmon';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { DateInput } from '@/components/ui/DateInput';
 import { Label } from '@/components/ui/label';
 import { CurrencyInput } from '@/components/ui/brl-input';
 import { DecimalInput, parseDecimal } from '@/components/ui/decimal-input';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calculator, ArrowRight, CheckCircle2, AlertTriangle, XCircle, Zap } from 'lucide-react';
 import { useMetaMensal, calcProjecao, getMetaStatus } from './MetaCompraCard';
 import { calcWeeklyIdeal, getWeekForDay } from './WeeklyBreakdown';
@@ -169,14 +170,18 @@ export default function SimuladorCompra({ open, onClose, entries, metas, activeS
             </div>
             <div>
               <Label className="text-[10px] text-muted-foreground">Data</Label>
-              <Input type="date" value={simDate} onChange={e => { setSimDate(e.target.value); setSimulated(false); }} className="bg-secondary border-border text-foreground" />
+              <DateInput value={simDate} onValueChange={(v) => { setSimDate(v); setSimulated(false); }} className="bg-secondary border-border text-foreground" />
             </div>
             <div>
               <Label className="text-[10px] text-muted-foreground">Fornecedor</Label>
-              <select value={simSupplier} onChange={e => setSimSupplier(e.target.value)} className="w-full h-10 rounded-md border border-border bg-secondary px-3 text-sm text-foreground">
-                <option value="">—</option>
-                {activeSuppliers.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
-              </select>
+              <Select value={simSupplier} onValueChange={setSimSupplier}>
+                <SelectTrigger className="h-10 bg-secondary border-border text-foreground">
+                  <SelectValue placeholder="—" />
+                </SelectTrigger>
+                <SelectContent>
+                  {activeSuppliers.map(s => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label className="text-[10px] text-muted-foreground">Kg bruto</Label>
@@ -185,7 +190,7 @@ export default function SimuladorCompra({ open, onClose, entries, metas, activeS
           </div>
 
           <div className="flex gap-2">
-            <Button onClick={handleSimulate} size="sm" className="gradient-salmon text-primary-foreground border-0 gap-1.5 flex-1" disabled={!simValor}>
+            <Button onClick={handleSimulate} size="sm" className="bg-primary-strong text-primary-foreground border-0 gap-1.5 flex-1" disabled={!simValor}>
               <Zap className="w-4 h-4" /> Simular
             </Button>
             <Button onClick={handleClear} variant="outline" size="sm">Limpar</Button>

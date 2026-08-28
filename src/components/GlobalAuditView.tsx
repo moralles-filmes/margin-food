@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DateInput } from '@/components/ui/DateInput';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import SearchableSelect from '@/components/ui/SearchableSelect';
@@ -64,19 +65,19 @@ const ACTIONS = [
 ];
 
 const ACTION_COLORS: Record<string, string> = {
-  CREATE: 'bg-success/15 text-success',
-  UPDATE: 'bg-info/15 text-info',
-  DELETE: 'bg-destructive/15 text-destructive',
-  PAY: 'bg-warning/15 text-warning',
-  RECEIVE: 'bg-success/15 text-success',
-  TRANSFER_CREATE: 'bg-info/15 text-info',
-  TRANSFER_DELETE: 'bg-destructive/15 text-destructive',
-  FERIAS_APPROVE: 'bg-success/15 text-success',
-  MIRROR: 'bg-info/15 text-info',
-  CANCEL_MIRROR: 'bg-warning/15 text-warning',
-  STORNO: 'bg-destructive/15 text-destructive',
-  JOB_RUN: 'bg-info/15 text-info',
-  SLOW_QUERY: 'bg-warning/15 text-warning',
+  CREATE: 'bg-success-soft text-success',
+  UPDATE: 'bg-info-soft text-info',
+  DELETE: 'bg-destructive-soft text-destructive',
+  PAY: 'bg-warning-soft text-warning',
+  RECEIVE: 'bg-success-soft text-success',
+  TRANSFER_CREATE: 'bg-info-soft text-info',
+  TRANSFER_DELETE: 'bg-destructive-soft text-destructive',
+  FERIAS_APPROVE: 'bg-success-soft text-success',
+  MIRROR: 'bg-info-soft text-info',
+  CANCEL_MIRROR: 'bg-warning-soft text-warning',
+  STORNO: 'bg-destructive-soft text-destructive',
+  JOB_RUN: 'bg-info-soft text-info',
+  SLOW_QUERY: 'bg-warning-soft text-warning',
 };
 
 export default function GlobalAuditView() {
@@ -212,11 +213,11 @@ export default function GlobalAuditView() {
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
             <div>
               <Label className="text-[10px] text-muted-foreground">De</Label>
-              <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="h-8 text-xs" />
+              <DateInput value={dateFrom} onValueChange={setDateFrom} className="h-8 text-xs" />
             </div>
             <div>
               <Label className="text-[10px] text-muted-foreground">Até</Label>
-              <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="h-8 text-xs" />
+              <DateInput value={dateTo} onValueChange={setDateTo} className="h-8 text-xs" />
             </div>
             <div>
               <Label className="text-[10px] text-muted-foreground">Módulo</Label>
@@ -279,7 +280,7 @@ export default function GlobalAuditView() {
                   </TableHeader>
                   <TableBody>
                     {logs.map(log => (
-                      <TableRow key={log.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setDetail(log)}>
+                      <TableRow key={log.id} className="cursor-pointer" onClick={() => setDetail(log)}>
                         <TableCell className="text-[11px] text-muted-foreground font-mono">
                           {format(new Date(log.created_at), 'dd/MM HH:mm:ss')}
                         </TableCell>

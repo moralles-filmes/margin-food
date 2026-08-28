@@ -4,25 +4,18 @@
 import { Loader2, ShieldAlert, Clock, Users, TrendingDown, TrendingUp, Flame, BarChart3, ArrowLeft, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import KpiCard from '@/components/ui/KpiCard';
+import StatusBadge from '@/components/ui/StatusBadge';
 import { formatDisplayBR } from '@/lib/datetime';
 import { parseLocalDate } from '@/lib/dateUtils';
 import { formatInBR } from '@/lib/datetime';
 import { fmtBRL, formatPercentBR } from '@/lib/formatters';
 import type { Inventario, DashboardData } from '@/hooks/useInventarioStore';
 
-function KPICard({ label, value, color, large }: { label: string; value: string; color?: string; large?: boolean }) {
-  return (
-    <div className="bg-card border border-border rounded-xl p-3">
-      <p className="text-[10px] text-muted-foreground uppercase">{label}</p>
-      <p className={`${large ? 'text-2xl' : 'text-lg'} font-display font-bold ${color || 'text-foreground'}`}>{value}</p>
-    </div>
-  );
-}
-
 function riskBadge(score: number) {
-  if (score > 60) return <Badge className="bg-destructive/10 text-destructive text-[9px] gap-1"><Flame className="w-3 h-3" />Alto Risco</Badge>;
-  if (score > 30) return <Badge className="bg-warning/10 text-warning text-[9px] gap-1"><AlertTriangle className="w-3 h-3" />Atenção</Badge>;
-  return <Badge className="bg-success/10 text-success text-[9px] gap-1">Seguro</Badge>;
+  if (score > 60) return <Badge className="bg-destructive-soft text-destructive border-destructive-border text-[9px] gap-1"><Flame className="w-3 h-3" />Alto Risco</Badge>;
+  if (score > 30) return <Badge className="bg-warning-soft text-warning border-warning-border text-[9px] gap-1"><AlertTriangle className="w-3 h-3" />Atenção</Badge>;
+  return <Badge className="bg-success-soft text-success border-success-border text-[9px] gap-1">Seguro</Badge>;
 }
 
 interface Props {
@@ -47,33 +40,47 @@ export default function InventarioDashboardView({ dashboard: d, onBack, onOpenDe
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {d.finalizados.length > 0 && (
               <>
-                <KPICard label="Última Acurácia" value={formatPercentBR(Number(d.finalizados[0].acuracia_percent))} color="text-success" large />
-                <KPICard label="Drift Total" value={fmtBRL(Number(d.finalizados[0].drift_total_valor))}
-                  color={Number(d.finalizados[0].drift_total_valor) < 0 ? 'text-destructive' : 'text-success'} large />
+                <KpiCard
+                  label="Última Acurácia"
+                  value={formatPercentBR(Number(d.finalizados[0].acuracia_percent))}
+                  icon={TrendingUp}
+                  variant="success"
+                />
+                <KpiCard
+                  label="Drift Total"
+                  value={fmtBRL(Number(d.finalizados[0].drift_total_valor))}
+                  icon={Number(d.finalizados[0].drift_total_valor) < 0 ? TrendingDown : TrendingUp}
+                  variant={Number(d.finalizados[0].drift_total_valor) < 0 ? 'danger' : 'success'}
+                />
               </>
             )}
-            <div className="bg-card border border-border rounded-xl p-4">
-              <p className="text-[10px] text-muted-foreground uppercase">Score Médio Risco</p>
-              <p className={`text-2xl font-display font-bold ${d.avgScore > 60 ? 'text-destructive' : d.avgScore > 30 ? 'text-warning' : 'text-success'}`}>
-                {d.avgScore}
-              </p>
-              {riskBadge(d.avgScore)}
-            </div>
-            <KPICard label="Sob Análise" value={String(d.sobAnalise.length)} color={d.sobAnalise.length > 0 ? 'text-destructive' : 'text-muted-foreground'} large />
+            <KpiCard
+              label="Score Médio Risco"
+              value={String(d.avgScore)}
+              sub={d.avgScore > 60 ? 'Alto Risco' : d.avgScore > 30 ? 'Atenção' : 'Seguro'}
+              icon={Flame}
+              variant={d.avgScore > 60 ? 'danger' : d.avgScore > 30 ? 'warning' : 'success'}
+            />
+            <KpiCard
+              label="Sob Análise"
+              value={String(d.sobAnalise.length)}
+              icon={ShieldAlert}
+              variant={d.sobAnalise.length > 0 ? 'danger' : 'default'}
+            />
           </div>
 
           {/* Inventários sob análise */}
           {d.sobAnalise.length > 0 && (
-            <div className="bg-destructive/5 border border-destructive/20 rounded-xl p-4 space-y-2">
+            <div className="bg-destructive-soft border border-destructive-border rounded-xl p-4 space-y-2">
               <p className="text-xs font-semibold text-destructive flex items-center gap-1.5"><ShieldAlert className="w-4 h-4" /> Inventários Sob Análise</p>
               {d.sobAnalise.map(inv => (
                 <button key={inv.id} onClick={() => onOpenDetail(inv)}
-                  className="w-full flex items-center justify-between bg-card/50 rounded-lg p-2.5 text-left hover:bg-card transition-colors">
+                  className="w-full flex items-center justify-between bg-card rounded-lg p-2.5 text-left hover:bg-card-hover transition-colors">
                   <div>
                     <span className="text-xs font-medium text-foreground capitalize">{inv.tipo}</span>
                     <span className="text-[10px] text-muted-foreground ml-2">{formatDisplayBR(parseLocalDate(inv.data))}</span>
                   </div>
-                  <Badge className="text-[9px] bg-destructive/10 text-destructive">Requer Aprovação</Badge>
+                  <StatusBadge status="danger" label="Requer Aprovação" size="xs" />
                 </button>
               ))}
             </div>
@@ -137,7 +144,7 @@ export default function InventarioDashboardView({ dashboard: d, onBack, onOpenDe
               <div className="flex items-end gap-2 h-24">
                 {[...d.finalizados].reverse().slice(-8).map(h => (
                   <div key={h.id} className="flex-1 flex flex-col items-center gap-1">
-                    <div className="w-full bg-primary/20 rounded-t relative" style={{ height: `${Math.max(5, Number(h.acuracia_percent))}%` }}>
+                    <div className="w-full bg-primary-soft rounded-t relative" style={{ height: `${Math.max(5, Number(h.acuracia_percent))}%` }}>
                       <div className="w-full bg-primary rounded-t absolute bottom-0" style={{ height: `${Number(h.acuracia_percent)}%` }} />
                     </div>
                     <span className="text-[9px] text-muted-foreground">{formatInBR(parseLocalDate(h.data), 'dd/MM')}</span>
@@ -153,7 +160,7 @@ export default function InventarioDashboardView({ dashboard: d, onBack, onOpenDe
               <p className="text-xs font-semibold text-foreground mb-3">🚨 Top Itens Críticos</p>
               <div className="space-y-2">
                 {d.topCriticos.map(item => (
-                  <div key={item.id} className="flex items-center justify-between bg-destructive/5 rounded-lg p-2.5">
+                  <div key={item.id} className="flex items-center justify-between bg-destructive-soft rounded-lg p-2.5">
                     <span className="text-xs text-foreground font-medium">{item.produtos?.nome_produto || 'Item'}</span>
                     <span className="text-xs text-destructive font-bold">{fmtBRL(item.impacto_financeiro)}</span>
                   </div>

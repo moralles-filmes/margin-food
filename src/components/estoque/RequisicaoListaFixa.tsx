@@ -253,7 +253,7 @@ export default function RequisicaoListaFixa({ produtos, saldos, onSuccess, onCan
             )}
 
             {!loading && listaExists === false && (
-              <div className="bg-secondary/50 border border-border rounded-lg p-6 text-center">
+              <div className="bg-background-subtle border border-border rounded-lg p-6 text-center">
                 <Inbox className="w-10 h-10 mx-auto text-muted-foreground/40 mb-2" />
                 <p className="text-sm font-medium text-foreground mb-1">Nenhuma lista fixa para {setor}</p>
                 <p className="text-xs text-muted-foreground">
@@ -279,7 +279,7 @@ export default function RequisicaoListaFixa({ produtos, saldos, onSuccess, onCan
                     return (
                       <div
                         key={item.id}
-                        className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs ${purchaseUnitMissing ? 'bg-warning/10 border border-warning/20' : exceedsSaldo ? 'bg-destructive/5 border border-destructive/20' : 'bg-secondary/40'}`}
+                        className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs ${purchaseUnitMissing ? 'bg-warning-soft border border-warning-border' : exceedsSaldo ? 'bg-destructive-soft border border-destructive-border' : 'bg-background-subtle'}`}
                       >
                         <div className="flex-1 min-w-0">
                           <p className="text-foreground font-medium truncate">{prod.nomeProduto}</p>
@@ -316,14 +316,14 @@ export default function RequisicaoListaFixa({ produtos, saldos, onSuccess, onCan
                 </div>
 
                 {invalidUnitItemsCount > 0 && (
-                  <div className="flex items-center gap-2 p-2 bg-warning/10 border border-warning/20 rounded-lg text-[10px] text-warning">
+                  <div className="flex items-center gap-2 p-2 bg-warning-soft border border-warning-border rounded-lg text-[10px] text-warning">
                     <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
                     <span>{invalidUnitItemsCount} item(ns) bloqueado(s) por falta de unidade de compra no cadastro.</span>
                   </div>
                 )}
 
                 {filledItems.some(item => item.quantidade > getSaldo(item.produto_id)) && (
-                  <div className="flex items-center gap-2 p-2 bg-warning/10 border border-warning/20 rounded-lg text-[10px] text-warning">
+                  <div className="flex items-center gap-2 p-2 bg-warning-soft border border-warning-border rounded-lg text-[10px] text-warning">
                     <ShoppingCart className="w-3.5 h-3.5 shrink-0" />
                     <span>Itens sem estoque serão enviados como Solicitação de Compra.</span>
                   </div>
@@ -332,7 +332,7 @@ export default function RequisicaoListaFixa({ produtos, saldos, onSuccess, onCan
             )}
 
             {!loading && listaExists && activeItems.length === 0 && (
-              <div className="bg-secondary/50 border border-border rounded-lg p-6 text-center">
+              <div className="bg-background-subtle border border-border rounded-lg p-6 text-center">
                 <p className="text-sm text-muted-foreground">A lista está vazia. Solicite ao administrador que adicione produtos.</p>
               </div>
             )}
@@ -341,7 +341,7 @@ export default function RequisicaoListaFixa({ produtos, saldos, onSuccess, onCan
               <Button type="button" variant="ghost" size="sm" onClick={onCancel}>Cancelar</Button>
               <Button
                 size="sm"
-                className="gradient-salmon text-primary-foreground border-0 gap-1.5 text-xs"
+                className="bg-primary-strong text-primary-foreground border-0 gap-1.5 text-xs"
                 onClick={handleGoToPreview}
                 disabled={filledItems.length === 0}
               >
@@ -353,7 +353,7 @@ export default function RequisicaoListaFixa({ produtos, saldos, onSuccess, onCan
 
         {step === 'preview' && (
           <div className="space-y-3">
-            <div className="bg-primary/5 border border-primary/20 rounded-lg p-3">
+            <div className="bg-primary-soft border border-primary-border rounded-lg p-3">
               <p className="text-xs font-medium text-foreground mb-1">📋 Resumo da Requisição</p>
               <div className="flex gap-4 text-[11px] text-muted-foreground">
                 <span>Setor: <strong className="text-foreground">{setor}</strong></span>
@@ -367,7 +367,7 @@ export default function RequisicaoListaFixa({ produtos, saldos, onSuccess, onCan
                 const saldo = getSaldo(item.produto_id);
                 const exceedsSaldo = item.quantidade > saldo;
                 return (
-                  <div key={item.id} className={`flex items-center justify-between rounded-lg px-3 py-2 text-xs ${exceedsSaldo ? 'bg-destructive/10 border border-destructive/20' : 'bg-secondary/50'}`}>
+                  <div key={item.id} className={`flex items-center justify-between rounded-lg px-3 py-2 text-xs ${exceedsSaldo ? 'bg-destructive-soft border border-destructive-border' : 'bg-background-subtle'}`}>
                     <div className="flex items-center gap-2">
                       <span className="text-foreground font-medium">{item.prod?.nomeProduto}</span>
                       {exceedsSaldo && (
@@ -386,7 +386,7 @@ export default function RequisicaoListaFixa({ produtos, saldos, onSuccess, onCan
             </div>
 
             {filledItems.some(item => item.quantidade > getSaldo(item.produto_id)) && (
-              <div className="flex items-center gap-2 p-2 bg-warning/10 border border-warning/20 rounded-lg text-[10px] text-warning">
+              <div className="flex items-center gap-2 p-2 bg-warning-soft border border-warning-border rounded-lg text-[10px] text-warning">
                 <ShoppingCart className="w-3.5 h-3.5 shrink-0" />
                 <span>Itens sem estoque serão encaminhados como solicitação de compra.</span>
               </div>
@@ -398,7 +398,7 @@ export default function RequisicaoListaFixa({ produtos, saldos, onSuccess, onCan
               </Button>
               <Button
                 size="sm"
-                className="gradient-salmon text-primary-foreground border-0 gap-1.5 text-xs"
+                className="bg-primary-strong text-primary-foreground border-0 gap-1.5 text-xs"
                 onClick={handleSubmit}
                 disabled={submitting}
               >

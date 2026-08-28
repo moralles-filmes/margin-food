@@ -3,6 +3,7 @@ import { useCan } from '@/permissions/hooks';
 import { useSalmonStore } from '@/hooks/useSalmonStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DateInput } from '@/components/ui/DateInput';
 import { CurrencyInput } from '@/components/ui/brl-input';
 import { Label } from '@/components/ui/label';
 import { Plus, Copy, ChevronDown, ChevronUp, Pencil, Trash2, X, Check, Calculator } from 'lucide-react';
@@ -251,7 +252,7 @@ export default function EntriesView({ store }: EntriesViewProps) {
         </div>
         <div className="flex gap-2">
           {canCreate && (
-            <Button onClick={() => { resetForm(); setShowForm(!showForm); }} size="sm" className="gradient-salmon text-primary-foreground border-0 gap-1.5">
+            <Button onClick={() => { resetForm(); setShowForm(!showForm); }} size="sm" className="bg-primary-strong text-primary-foreground border-0 gap-1.5">
               <Plus className="w-4 h-4" /> Nova
             </Button>
           )}
@@ -288,7 +289,7 @@ export default function EntriesView({ store }: EntriesViewProps) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className="text-[11px] text-muted-foreground">Data</Label>
-              <Input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} className="bg-secondary border-border text-foreground" />
+              <DateInput value={form.date} onValueChange={v => setForm(f => ({ ...f, date: v }))} className="bg-secondary border-border text-foreground" />
             </div>
             <div>
               <Label className="text-[11px] text-muted-foreground">Lote</Label>
@@ -340,7 +341,7 @@ export default function EntriesView({ store }: EntriesViewProps) {
             <span className="text-xs text-muted-foreground">Custo/kg: <strong className="text-primary">{calcPricePerKg()}</strong></span>
             <div className="flex gap-2">
               <Button type="button" variant="ghost" size="sm" onClick={resetForm}>Cancelar</Button>
-              <Button type="submit" size="sm" className="gradient-salmon text-primary-foreground border-0 gap-1">
+              <Button type="submit" size="sm" className="bg-primary-strong text-primary-foreground border-0 gap-1">
                 {editingId ? <><Check className="w-3.5 h-3.5" /> Atualizar</> : 'Salvar'}
               </Button>
             </div>

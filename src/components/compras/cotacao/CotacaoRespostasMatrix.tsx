@@ -120,8 +120,8 @@ export default function CotacaoRespostasMatrix({ cotacaoId, itens, fornecedores,
       <div className="overflow-x-auto border border-border rounded-lg">
         <table className="w-full text-xs">
           <thead>
-            <tr className="bg-secondary/60">
-              <th className="text-left font-medium text-muted-foreground px-2 py-1.5 sticky left-0 bg-secondary/60 min-w-[140px]">Item</th>
+            <tr className="bg-muted">
+              <th className="text-left font-medium text-muted-foreground px-2 py-1.5 sticky left-0 bg-muted min-w-[140px]">Item</th>
               {fornecedores.map(f => (
                 <th key={f.id} className="text-center font-medium text-foreground px-2 py-1.5 truncate" style={{ minWidth: colWidth }}>
                   {f.supplier_nome_snapshot}
@@ -148,11 +148,11 @@ export default function CotacaoRespostasMatrix({ cotacaoId, itens, fornecedores,
                           min={0}
                           showPrefix
                           placeholder={c.disp ? `R$/${it.purchase_unit_snapshot || it.unidade_snapshot || 'un'}` : '—'}
-                          className={`h-7 text-xs bg-secondary border-border text-right ${!c.disp ? 'opacity-50' : ''}`}
+                          className="h-7 text-xs bg-secondary border-border text-right"
                         />
                         <button type="button" onClick={() => canEdit && toggleDisp(f.id, it.id)} disabled={!canEdit}
                           title={c.disp ? 'Marcar indisponível' : 'Marcar disponível'}
-                          className={`p-1 rounded shrink-0 ${!c.disp ? 'text-destructive bg-destructive/10' : 'text-muted-foreground hover:bg-secondary'}`}>
+                          className={`p-1 rounded shrink-0 ${!c.disp ? 'text-destructive bg-destructive-soft' : 'text-muted-foreground hover:bg-secondary'}`}>
                           <Ban className="w-3 h-3" />
                         </button>
                       </div>
@@ -167,7 +167,7 @@ export default function CotacaoRespostasMatrix({ cotacaoId, itens, fornecedores,
 
       {canEdit && (
         <div className="flex justify-end">
-          <Button size="sm" className="gradient-salmon text-primary-foreground border-0 gap-1.5" onClick={handleSave} disabled={saving}>
+          <Button size="sm" className="bg-primary-strong text-primary-foreground border-0 gap-1.5" onClick={handleSave} disabled={saving}>
             <Save className="w-3.5 h-3.5" /> {saving ? 'Salvando…' : 'Salvar respostas'}
           </Button>
         </div>

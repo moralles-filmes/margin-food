@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DateInput } from '@/components/ui/DateInput';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -19,6 +20,7 @@ import {
 import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 import type { Database } from '@/integrations/supabase/types';
+import KpiCard from '@/components/ui/KpiCard';
 
 type OcorrenciaRow = Database['public']['Tables']['rh_ocorrencias_disciplinares']['Row'];
 
@@ -167,10 +169,10 @@ export default function GestaoDisciplinarSection({ colaboradores, canManage }: P
     <div className="space-y-4">
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard label="Ocorrências Ativas" value={ativos.length} icon={ShieldAlert} />
-        <StatCard label="Advertências" value={advertencias} icon={AlertTriangle} className="text-warning" />
-        <StatCard label="Suspensões" value={suspensoes} icon={Ban} className="text-destructive" />
-        <StatCard label="Elogios" value={elogios} icon={Award} className="text-success" />
+        <KpiCard label="Ocorrências Ativas" value={ativos.length} icon={ShieldAlert} />
+        <KpiCard label="Advertências" value={advertencias} icon={AlertTriangle} variant="warning" />
+        <KpiCard label="Suspensões" value={suspensoes} icon={Ban} variant="danger" />
+        <KpiCard label="Elogios" value={elogios} icon={Award} variant="success" />
       </div>
 
       {/* Filters + Add */}
@@ -233,7 +235,7 @@ export default function GestaoDisciplinarSection({ colaboradores, canManage }: P
                 </div>
                 <div>
                   <Label className="text-xs">Data da Ocorrência</Label>
-                  <Input type="date" className="h-8 text-xs" value={form.data_ocorrencia} onChange={e => setForm(p => ({ ...p, data_ocorrencia: e.target.value }))} />
+                  <DateInput className="h-8 text-xs" value={form.data_ocorrencia} onValueChange={v => setForm(p => ({ ...p, data_ocorrencia: v }))} />
                 </div>
                 <div>
                   <Label className="text-xs">Motivo *</Label>
@@ -384,16 +386,4 @@ export default function GestaoDisciplinarSection({ colaboradores, canManage }: P
   );
 }
 
-function StatCard({ label, value, icon: Icon, className }: { label: string; value: number; icon: typeof ShieldAlert; className?: string }) {
-  return (
-    <Card>
-      <CardContent className="py-3 flex items-center gap-3">
-        <Icon className={cn("w-5 h-5", className || "text-muted-foreground")} />
-        <div>
-          <p className="text-[10px] text-muted-foreground">{label}</p>
-          <p className="text-lg font-bold">{value}</p>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
+// local StatCard removed — using global KpiCard from @/components/ui/KpiCard

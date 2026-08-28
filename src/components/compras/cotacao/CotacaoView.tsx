@@ -5,6 +5,8 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import KpiCard from '@/components/ui/KpiCard';
+import StatusBadge, { type StatusType } from '@/components/ui/StatusBadge';
 import { useCan } from '@/permissions/hooks';
 import { useCotacoesStore } from '@/hooks/useCotacoesStore';
 import { includesNormalized } from '@/lib/utils';
@@ -13,15 +15,15 @@ import type { Cotacao, CotacaoStatus, CotacaoItem, CotacaoFornecedor } from '@/t
 import CotacaoFormDialog from './CotacaoFormDialog';
 import CotacaoDetailDrawer from './CotacaoDetailDrawer';
 
-const STATUS_META: Record<CotacaoStatus, { label: string; className: string }> = {
-  RASCUNHO:    { label: 'Rascunho',     className: 'bg-secondary text-muted-foreground' },
-  EM_COTACAO:  { label: 'Em cotação',   className: 'bg-warning/15 text-warning' },
-  RESPONDIDA:  { label: 'Respondida',   className: 'bg-info/15 text-info' },
-  EM_ANALISE:  { label: 'Em análise',   className: 'bg-info/15 text-info' },
-  NEGOCIANDO:  { label: 'Negociando',   className: 'bg-info/15 text-info' },
-  ENCERRADA:   { label: 'Encerrada',    className: 'bg-secondary text-muted-foreground' },
-  CONVERTIDA:  { label: 'Convertida',   className: 'bg-success/15 text-success' },
-  CANCELADA:   { label: 'Cancelada',    className: 'bg-destructive/15 text-destructive' },
+const STATUS_META: Record<CotacaoStatus, { label: string; variant: StatusType }> = {
+  RASCUNHO:    { label: 'Rascunho',     variant: 'neutral' },
+  EM_COTACAO:  { label: 'Em cotação',   variant: 'warning' },
+  RESPONDIDA:  { label: 'Respondida',   variant: 'info' },
+  EM_ANALISE:  { label: 'Em análise',   variant: 'info' },
+  NEGOCIANDO:  { label: 'Negociando',   variant: 'info' },
+  ENCERRADA:   { label: 'Encerrada',    variant: 'neutral' },
+  CONVERTIDA:  { label: 'Convertida',   variant: 'success' },
+  CANCELADA:   { label: 'Cancelada',    variant: 'danger' },
 };
 
 /** yyyy-MM-dd → dd/MM/yyyy (sem shift de fuso — só rearranja a string). */
@@ -29,22 +31,6 @@ function fmtDateBR(iso: string | null): string {
   if (!iso) return '—';
   const [y, m, d] = iso.slice(0, 10).split('-');
   return y && m && d ? `${d}/${m}/${y}` : '—';
-}
-
-function SummaryCard({ icon: Icon, label, value, tint }: {
-  icon: typeof FileText; label: string; value: string; tint: string;
-}) {
-  return (
-    <div className="bg-card border border-border rounded-xl p-3 flex items-center gap-3">
-      <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${tint}`}>
-        <Icon className="w-4 h-4" />
-      </div>
-      <div className="min-w-0">
-        <p className="text-[10px] uppercase tracking-wide text-muted-foreground truncate">{label}</p>
-        <p className="text-base font-bold text-foreground leading-tight">{value}</p>
-      </div>
-    </div>
-  );
 }
 
 interface CotacaoViewProps {
@@ -79,7 +65,7 @@ export default function CotacaoView({ store }: CotacaoViewProps) {
   if (!canView) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
-        <ShieldAlert className="w-12 h-12 text-muted-foreground/40 mb-3" />
+        <ShieldAlert className="w-12 h-12 text-muted-foreground mb-3" />
         <h3 className="text-lg font-semibold text-foreground">Acesso Negado</h3>
         <p className="text-sm text-muted-foreground mt-1">Sem permissão (compras:cotacao:view)</p>
       </div>
@@ -96,7 +82,7 @@ export default function CotacaoView({ store }: CotacaoViewProps) {
         {canCreate && (
           <Button
             size="sm"
-            className="gradient-salmon text-primary-foreground border-0 gap-1.5"
+            className="bg-primary-strong text-primary-foreground border-0 gap-1.5"
             onClick={openCreate}
           >
             <Plus className="w-4 h-4" /> Nova Cotação
@@ -106,11 +92,11 @@ export default function CotacaoView({ store }: CotacaoViewProps) {
 
       {/* Cards de resumo */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-2.5">
-        <SummaryCard icon={FileText}      label="Em aberto"      value={String(counts.emAberto)}          tint="bg-primary/15 text-primary" />
-        <SummaryCard icon={Send}          label="Aguardando"     value={String(counts.aguardandoResposta)} tint="bg-warning/15 text-warning" />
-        <SummaryCard icon={ClipboardCheck} label="Em análise"    value={String(counts.emAnalise)}          tint="bg-info/15 text-info" />
-        <SummaryCard icon={CheckCircle2}  label="Convertidas"    value={String(counts.convertidas)}        tint="bg-success/15 text-success" />
-        <SummaryCard icon={TrendingDown}  label="Economia (mês)" value={formatMoneyBR(counts.economiaMes)} tint="bg-success/15 text-success" />
+        <KpiCard label="Em aberto"      value={String(counts.emAberto)}           icon={FileText}       variant="primary" />
+        <KpiCard label="Aguardando"     value={String(counts.aguardandoResposta)} icon={Send}            variant="warning" />
+        <KpiCard label="Em análise"     value={String(counts.emAnalise)}          icon={ClipboardCheck} variant="default" />
+        <KpiCard label="Convertidas"    value={String(counts.convertidas)}        icon={CheckCircle2}   variant="success" />
+        <KpiCard label="Economia (mês)" value={formatMoneyBR(counts.economiaMes)} icon={TrendingDown}   variant="success" />
       </div>
 
       {/* Busca */}
@@ -131,7 +117,7 @@ export default function CotacaoView({ store }: CotacaoViewProps) {
         </div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-12">
-          <Inbox className="w-12 h-12 mx-auto text-muted-foreground/30 mb-3" />
+          <Inbox className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
           <p className="text-sm font-medium text-foreground">
             {cotacoes.length === 0 ? 'Nenhuma cotação ainda' : 'Nenhuma cotação encontrada'}
           </p>
@@ -154,8 +140,8 @@ export default function CotacaoView({ store }: CotacaoViewProps) {
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-8 h-8 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
-                      <FileText className="w-4 h-4 text-primary" />
+                    <div className="w-8 h-8 rounded-lg bg-primary-soft flex items-center justify-center shrink-0">
+                      <FileText className="w-4 h-4 text-primary-ink" />
                     </div>
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-foreground truncate">{c.titulo}</p>
@@ -170,7 +156,7 @@ export default function CotacaoView({ store }: CotacaoViewProps) {
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-1 shrink-0">
-                    <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${st.className}`}>{st.label}</span>
+                    <StatusBadge status={st.variant} label={st.label} size="xs" />
                     {c.total_estimado > 0 && (
                       <span className="text-[11px] font-semibold text-foreground">{formatMoneyBR(c.total_estimado)}</span>
                     )}

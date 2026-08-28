@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { DateInput } from '@/components/ui/DateInput';
 import { Calendar } from 'lucide-react';
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
 import { todayBR, formatInBR, formatDateBR, parseLocalDate } from '@/lib/formatters';
@@ -89,8 +89,8 @@ export default function PeriodFilter({ onChange, current }: PeriodFilterProps) {
             size="sm"
             variant={current.label === getRange(p.type).label || (p.type === 'custom' && showCustom) ? 'default' : 'outline'}
             className={`text-[11px] h-7 px-2.5 whitespace-nowrap ${
-              current.label === getRange(p.type).label || (p.type === 'custom' && showCustom) 
-                ? 'gradient-salmon text-primary-foreground border-0' 
+              current.label === getRange(p.type).label || (p.type === 'custom' && showCustom)
+                ? 'bg-primary-strong text-primary-strong-foreground border-0 hover:bg-primary-hover'
                 : 'border-border text-muted-foreground'
             }`}
             onClick={() => handleSelect(p.type)}
@@ -102,20 +102,18 @@ export default function PeriodFilter({ onChange, current }: PeriodFilterProps) {
       
       {showCustom && (
         <div className="flex items-center gap-2 animate-scale-in">
-          <Input
-            type="date"
+          <DateInput
             value={customStart}
-            onChange={e => setCustomStart(e.target.value)}
-            className="h-8 text-xs bg-secondary border-border text-foreground"
+            onValueChange={setCustomStart}
+            className="h-8 text-xs"
           />
           <span className="text-xs text-muted-foreground">a</span>
-          <Input
-            type="date"
+          <DateInput
             value={customEnd}
-            onChange={e => setCustomEnd(e.target.value)}
-            className="h-8 text-xs bg-secondary border-border text-foreground"
+            onValueChange={setCustomEnd}
+            className="h-8 text-xs"
           />
-          <Button size="sm" className="h-8 text-xs gradient-salmon text-primary-foreground border-0" onClick={handleCustomApply}>OK</Button>
+          <Button size="sm" className="h-8 text-xs" onClick={handleCustomApply}>OK</Button>
         </div>
       )}
 

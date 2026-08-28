@@ -12,155 +12,286 @@
   overflow: auto !important;
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   DESIGN SYSTEM — Azul / Branco / Preto
+   Fonte única da verdade de cor, raio, sombra e elevação.
+   Regras: (1) nunca escrever hex em componente — consumir hsl(var(--token));
+           (2) todo token existe nos DOIS temas;
+           (3) contraste alvo WCAG AA (4.5:1 texto normal, 3:1 UI/texto grande).
+   Referência completa: docs/redesign/01-DESIGN-SYSTEM.md
+   ══════════════════════════════════════════════════════════════════════════ */
+
 @layer base {
   :root {
-    /* Premium Black / White / Gold — LIGHT */
-    --background: 44 41% 95%;        /* #F7F4EC off-white quente */
-    --foreground: 0 0% 9%;          /* #171717 */
+    /* ── Superfícies ──────────────────────────────────────────────── */
+    --background: 210 40% 98%;          /* #F8FAFC — fundo da área de conteúdo */
+    --background-subtle: 214 32% 95%;   /* #EEF2F7 — faixas/zebra/wells */
+    --foreground: 222 47% 11%;          /* #0F172A — texto primário */
 
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 9%;
+    --card: 0 0% 100%;                  /* #FFFFFF */
+    --card-foreground: 222 47% 11%;
+    --card-hover: 210 40% 99%;
+
+    --surface: 0 0% 100%;               /* superfície neutra (= card) */
+    --surface-hover: 210 40% 97%;       /* #F5F8FB */
+    --surface-active: 214 32% 94%;      /* #EBF0F6 */
+    --surface-elevated: 0 0% 100%;      /* popovers/menus acima do card */
 
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 9%;
+    --popover-foreground: 222 47% 11%;
 
-    --primary: 43 89% 38%;          /* #B8860B dourado (light) */
-    --primary-foreground: 0 0% 9%;  /* quase-preto: texto sobre dourado */
-    --primary-strong: var(--primary);
-    --primary-strong-foreground: var(--primary-foreground);
-    --primary-ink: 40 60% 38%;
-    --primary-soft: 44 60% 90%;
-    --primary-soft-foreground: 0 0% 9%;
-    --primary-border: 44 40% 78%;
+    /* ── Texto ────────────────────────────────────────────────────── */
+    --text-primary: 222 47% 11%;        /* #0F172A */
+    --text-secondary: 215 25% 27%;      /* #334155 */
+    --text-muted: 215 16% 42%;          /* #5A6B84 — AA (4.9:1) sobre #F8FAFC */
+    --text-onbrand: 0 0% 100%;
 
-    --secondary: 44 30% 92%;
-    --secondary-foreground: 0 0% 9%;
+    /* ── Marca / Azul ─────────────────────────────────────────────── */
+    /* --primary  : azul de identidade — legível COMO TEXTO no tema (AA)
+       --primary-strong : superfície de botão preenchido (label branco, AA nos 2 temas)
+       --primary-ink    : azul enfático para texto pequeno sobre fundo do tema
+       --primary-soft   : tint de fundo (estado ativo suave, badges)             */
+    --primary: 221 83% 53%;             /* #2563EB — texto 5.2:1 / branco 5.2:1 */
+    --primary-foreground: 0 0% 100%;
+    --primary-strong: 221 83% 53%;      /* #2563EB — idêntico nos 2 temas */
+    --primary-strong-foreground: 0 0% 100%;
+    --primary-hover: 224 76% 48%;       /* #1D4ED8 */
+    --primary-active: 226 71% 40%;      /* #1E40AF */
+    --primary-ink: 224 76% 45%;         /* #1B48D0 — 6.7:1 sobre branco */
+    --primary-soft: 214 100% 97%;       /* #EFF6FF */
+    --primary-soft-foreground: 224 76% 45%;
+    --primary-border: 213 94% 87%;      /* #BFDBFE */
 
-    --muted: 44 30% 92%;
-    --muted-foreground: 0 0% 32%;   /* #525252 */
+    --secondary: 214 32% 95%;           /* #EEF2F7 */
+    --secondary-foreground: 215 25% 27%;
 
-    --accent: 44 60% 90%;
-    --accent-foreground: 0 0% 9%;
+    --muted: 214 32% 95%;
+    --muted-foreground: 215 16% 42%;    /* AA sobre background e card */
 
-    --destructive: 0 74% 42%;       /* #B91C1C */
-    --destructive-foreground: 0 0% 100%;
+    --accent: 214 100% 97%;             /* tint azul — hover de item de menu */
+    --accent-foreground: 224 76% 45%;
 
-    --success: 142 72% 29%;         /* #15803D */
+    /* ── Semânticas ───────────────────────────────────────────────── */
+    /* `-soft` = fundo tint · `-border` = borda do tint · DEFAULT = texto/ícone (AA) */
+    --success: 142 71% 29%;             /* #15803D — 4.9:1 sobre branco */
     --success-foreground: 0 0% 100%;
+    --success-soft: 141 79% 95%;        /* #ECFDF3 */
+    --success-border: 142 61% 82%;
 
-    --warning: 26 90% 37%;          /* #B45309 */
+    --warning: 26 90% 33%;              /* #9A4A0A — 5.6:1 sobre branco */
     --warning-foreground: 0 0% 100%;
-    --warning-soft: 38 90% 94%;
-    --warning-border: 38 75% 74%;
+    --warning-soft: 48 96% 94%;         /* #FEF9E7 */
+    --warning-border: 45 93% 77%;
 
-    --info: 215 19% 35%;            /* #475569 slate — desacoplado do primary */
+    --destructive: 0 72% 42%;           /* #B91C1C — 5.9:1 sobre branco */
+    --destructive-foreground: 0 0% 100%;
+    --destructive-soft: 0 86% 97%;      /* #FEF2F2 */
+    --destructive-border: 0 91% 87%;
+
+    --danger: 0 72% 42%;                /* alias semântico de --destructive */
+    --danger-foreground: 0 0% 100%;
+
+    --info: 200 92% 34%;                /* #0369A1 — ciano-azulado, não colide com --primary */
     --info-foreground: 0 0% 100%;
+    --info-soft: 204 94% 96%;
+    --info-border: 201 94% 82%;
 
-    --border: 44 20% 86%;
-    --input: 44 20% 84%;
-    --ring: 43 89% 38%;             /* foco dourado */
+    --neutral: 215 16% 42%;
+    --neutral-soft: 214 32% 95%;
+    --neutral-border: 214 32% 88%;
 
-    --radius: 1rem;
+    /* ── Bordas / foco ────────────────────────────────────────────── */
+    --border: 214 32% 91%;              /* #E2E8F0 */
+    --border-strong: 213 27% 84%;       /* #CBD5E1 */
+    --input: 214 30% 88%;
+    --ring: 221 83% 53%;
 
-    --sidebar-background: 44 52% 96%;   /* #FAF7EF */
-    --sidebar-foreground: 0 0% 9%;
-    --sidebar-primary: 43 89% 38%;
-    --sidebar-primary-foreground: 0 0% 9%;
-    --sidebar-accent: 44 60% 90%;
-    --sidebar-accent-foreground: 0 0% 9%;
-    --sidebar-border: transparent;
-    --sidebar-ring: 43 89% 38%;
+    --radius: 0.75rem;                  /* 12px — cards/painéis */
 
-    /* Premium tokens */
-    --surface-elevated: 43 100% 99%;        /* #FFFDF8 */
-    --sidebar-hover: 40 60% 38%;            /* gold-dark — usado via /[0.08] */
-    --sidebar-active: 46 65% 52%;           /* gold — usado via /[0.14] */
-    --sidebar-active-foreground: 0 0% 9%;   /* quase-preto: dourado como texto reprova AA no claro */
-    --gold: 43 89% 38%;
-    --gold-light: 44 81% 71%;               /* #F1D27A */
-    --gold-dark: 40 60% 38%;                /* #9A7426 */
-    --gold-foreground: 0 0% 9%;
+    /* ── Sidebar ──────────────────────────────────────────────────── */
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 215 25% 27%;
+    --sidebar-primary: 221 83% 53%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 214 100% 97%;
+    --sidebar-accent-foreground: 224 76% 45%;
+    --sidebar-border: 214 32% 91%;
+    --sidebar-ring: 221 83% 53%;
+    --sidebar-hover: 214 32% 95%;              /* fundo do hover (cor cheia) */
+    --sidebar-hover-foreground: 222 47% 11%;
+    --sidebar-active: 214 100% 97%;            /* fundo do item ativo (cor cheia) */
+    --sidebar-active-foreground: 224 76% 45%;  /* azul AA sobre o tint */
+    --sidebar-active-marker: 221 83% 53%;
+    --sidebar-section: 215 16% 47%;            /* rótulo de grupo */
 
-    --gradient-salmon: linear-gradient(135deg, hsl(43 89% 38%), hsl(40 60% 38%));
-    --gradient-gold: linear-gradient(135deg, hsl(44 81% 71%), hsl(43 89% 38%));
-    --gradient-card: linear-gradient(145deg, hsl(0 0% 100%), hsl(43 100% 99%));
-    --gradient-surface: linear-gradient(180deg, hsl(44 41% 95%), hsl(44 41% 93%));
-    --shadow-glow: 0 0 30px -5px hsl(43 89% 38% / 0.12);
-    --shadow-card: 0 10px 15px -3px rgb(0 0 0 / 0.04), 0 4px 6px -4px rgb(0 0 0 / 0.04);
+    /* ── Gráficos ─────────────────────────────────────────────────── */
+    /* 8 séries com matizes distintos — nunca 5 tons do mesmo azul. */
+    --chart-1: 221 83% 53%;   /* azul     #2563EB */
+    --chart-2: 160 84% 39%;   /* esmeralda #10B981 */
+    --chart-3: 38 92% 45%;    /* âmbar    #DC9A0B */
+    --chart-4: 258 90% 61%;   /* violeta  #8B5CF6 */
+    --chart-5: 189 94% 38%;   /* ciano    #0BA5BC */
+    --chart-6: 330 81% 55%;   /* rosa     #EC4899 */
+    --chart-7: 215 19% 45%;   /* slate    #5B6B85 */
+    --chart-8: 350 89% 55%;   /* carmim   #F2364E */
+
+    --chart-positive: 142 71% 33%;
+    --chart-negative: 0 72% 47%;
+    --chart-neutral: 215 19% 45%;
+    --chart-projected: 221 83% 62%;   /* série "ideal/projetado" (tracejada) */
+
+    --chart-grid: 214 32% 89%;        /* grade — sutil porém visível */
+    --chart-axis: 214 25% 78%;        /* linha do eixo */
+    --chart-label: 215 20% 38%;       /* texto de eixo/legenda — AA */
+    --chart-cursor: 214 32% 88%;      /* faixa de hover */
+    --chart-tooltip: 0 0% 100%;
+    --chart-tooltip-foreground: 222 47% 11%;
+    --chart-tooltip-border: 214 32% 88%;
+
+    /* ── Elevação ─────────────────────────────────────────────────── */
+    --shadow-xs: 0 1px 2px 0 hsl(222 47% 11% / 0.04);
+    --shadow-sm: 0 1px 3px 0 hsl(222 47% 11% / 0.06), 0 1px 2px -1px hsl(222 47% 11% / 0.04);
+    --shadow-md: 0 4px 12px -2px hsl(222 47% 11% / 0.08), 0 2px 4px -2px hsl(222 47% 11% / 0.04);
+    --shadow-lg: 0 12px 28px -6px hsl(222 47% 11% / 0.12), 0 4px 10px -4px hsl(222 47% 11% / 0.06);
+    --shadow-card: var(--shadow-sm);
+    --shadow-glow: 0 0 0 3px hsl(221 83% 53% / 0.12);
+    --shadow-focus: 0 0 0 3px hsl(221 83% 53% / 0.22);
+
+    /* ── Gradientes ───────────────────────────────────────────────── */
+    --gradient-card: linear-gradient(145deg, hsl(0 0% 100%), hsl(210 40% 99%));
+    --gradient-surface: linear-gradient(180deg, hsl(210 40% 98%), hsl(214 32% 96%));
   }
 
   .dark {
-    /* Premium Black / White / Gold — DARK */
-    --background: 240 10% 4%;        /* #09090B */
-    --foreground: 60 18% 97%;        /* #F8F8F5 branco quente */
+    /* ── Superfícies ──────────────────────────────────────────────── */
+    --background: 222 33% 6%;           /* #0A0D14 */
+    --background-subtle: 220 28% 8%;    /* #0E121A */
+    --foreground: 210 40% 98%;          /* #F8FAFC */
 
-    --card: 240 6% 7%;               /* #111113 */
-    --card-foreground: 60 18% 97%;
+    --card: 220 28% 10%;                /* #131822 */
+    --card-foreground: 210 40% 98%;
+    --card-hover: 219 25% 13%;
 
-    --popover: 240 6% 7%;
-    --popover-foreground: 60 18% 97%;
+    --surface: 220 28% 10%;
+    --surface-hover: 219 24% 14%;       /* #1A2130 */
+    --surface-active: 218 23% 17%;      /* #212938 */
+    --surface-elevated: 219 25% 13%;    /* #181E29 — popovers acima do card */
 
-    --primary: 46 65% 52%;           /* #D4AF37 dourado (dark) */
-    --primary-foreground: 240 10% 4%;/* quase-preto: texto sobre dourado */
-    --primary-strong: var(--primary);
-    --primary-strong-foreground: var(--primary-foreground);
-    --primary-ink: 44 81% 71%;
-    --primary-soft: 46 30% 12%;
-    --primary-soft-foreground: 44 81% 71%;
-    --primary-border: 46 30% 25%;
+    --popover: 219 25% 13%;
+    --popover-foreground: 210 40% 98%;
 
-    --secondary: 0 0% 9%;            /* #171717 elevado */
-    --secondary-foreground: 60 18% 97%;
+    /* ── Texto ────────────────────────────────────────────────────── */
+    --text-primary: 210 40% 98%;
+    --text-secondary: 213 27% 84%;      /* #CBD5E1 */
+    --text-muted: 215 20% 68%;          /* #98A6BC — 6.4:1 sobre o card */
+    --text-onbrand: 0 0% 100%;
 
-    --muted: 0 0% 9%;
-    --muted-foreground: 60 8% 69%;   /* #B6B6AA */
+    /* ── Marca / Azul ─────────────────────────────────────────────── */
+    --primary: 217 91% 60%;             /* #3B82F6 — 5.2:1 como texto no escuro */
+    --primary-foreground: 0 0% 100%;
+    --primary-strong: 221 83% 53%;      /* #2563EB — label branco 5.2:1 */
+    --primary-strong-foreground: 0 0% 100%;
+    --primary-hover: 217 91% 66%;       /* #60A5FA */
+    --primary-active: 213 94% 72%;
+    --primary-ink: 213 94% 68%;         /* #60A5FA — 7.6:1 sobre o fundo */
+    --primary-soft: 222 47% 16%;        /* #14203A — tint azul escuro */
+    --primary-soft-foreground: 213 94% 78%;
+    --primary-border: 220 45% 28%;
 
-    --accent: 0 0% 11%;
-    --accent-foreground: 60 18% 97%;
+    --secondary: 219 24% 14%;
+    --secondary-foreground: 213 27% 84%;
 
-    --destructive: 0 84% 60%;        /* #EF4444 */
+    --muted: 219 24% 14%;
+    --muted-foreground: 215 20% 68%;
+
+    --accent: 222 47% 16%;
+    --accent-foreground: 213 94% 78%;
+
+    /* ── Semânticas ───────────────────────────────────────────────── */
+    --success: 142 69% 49%;             /* #22C55E — 7.4:1 sobre o card */
+    --success-foreground: 222 33% 6%;
+    --success-soft: 145 45% 13%;
+    --success-border: 142 40% 28%;
+
+    --warning: 38 92% 55%;              /* #F5A524 */
+    --warning-foreground: 222 33% 6%;
+    --warning-soft: 33 45% 14%;
+    --warning-border: 36 45% 30%;
+
+    --destructive: 0 84% 66%;           /* #F45A5A — 5.0:1 sobre o card */
     --destructive-foreground: 0 0% 100%;
+    --destructive-soft: 0 45% 15%;
+    --destructive-border: 0 45% 32%;
 
-    --success: 142 71% 45%;          /* #22C55E */
-    --success-foreground: 240 10% 4%;
+    --danger: 0 84% 66%;
+    --danger-foreground: 0 0% 100%;
 
-    --warning: 38 92% 50%;           /* #F59E0B */
-    --warning-foreground: 240 10% 4%;
-    --warning-soft: 38 50% 12%;
-    --warning-border: 38 50% 28%;
+    --info: 199 89% 60%;                /* #38BDF8 */
+    --info-foreground: 222 33% 6%;
+    --info-soft: 202 50% 14%;
+    --info-border: 200 45% 30%;
 
-    --info: 215 16% 47%;             /* #64748B slate — desacoplado */
-    --info-foreground: 0 0% 100%;
+    --neutral: 215 20% 68%;
+    --neutral-soft: 219 24% 14%;
+    --neutral-border: 218 21% 22%;
 
-    --border: 240 5% 14%;            /* hairline escuro sutil — nunca branco puro */
-    --input: 240 5% 17%;
-    --ring: 46 65% 52%;              /* foco dourado */
+    /* ── Bordas / foco ────────────────────────────────────────────── */
+    --border: 218 21% 18%;              /* #252C3A — hairline perceptível */
+    --border-strong: 218 22% 26%;       /* #333D50 */
+    --input: 218 21% 22%;
+    --ring: 217 91% 60%;
 
-    --sidebar-background: 240 9% 2%; /* #050506 */
-    --sidebar-foreground: 60 18% 97%;
-    --sidebar-primary: 46 65% 52%;
-    --sidebar-primary-foreground: 240 10% 4%;
-    --sidebar-accent: 0 0% 9%;
-    --sidebar-accent-foreground: 60 18% 97%;
-    --sidebar-border: transparent;
-    --sidebar-ring: 46 65% 52%;
+    /* ── Sidebar ──────────────────────────────────────────────────── */
+    --sidebar-background: 224 33% 4%;   /* #070911 — mais escura que o conteúdo */
+    --sidebar-foreground: 213 27% 84%;
+    --sidebar-primary: 217 91% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 222 47% 16%;
+    --sidebar-accent-foreground: 213 94% 78%;
+    --sidebar-border: 218 21% 15%;
+    --sidebar-ring: 217 91% 60%;
+    --sidebar-hover: 219 24% 13%;
+    --sidebar-hover-foreground: 210 40% 98%;
+    --sidebar-active: 222 47% 18%;
+    --sidebar-active-foreground: 213 94% 78%;
+    --sidebar-active-marker: 217 91% 60%;
+    --sidebar-section: 215 20% 60%;
 
-    /* Premium tokens */
-    --surface-elevated: 0 0% 9%;     /* #171717 */
-    --sidebar-hover: 46 65% 52%;     /* gold — usado via /[0.08] */
-    --sidebar-active: 46 65% 52%;    /* gold — usado via /[0.14] */
-    --sidebar-active-foreground: 44 81% 71%; /* gold-light: contraste no escuro */
-    --gold: 46 65% 52%;
-    --gold-light: 44 81% 71%;
-    --gold-dark: 40 60% 38%;
-    --gold-foreground: 240 10% 4%;
+    /* ── Gráficos ─────────────────────────────────────────────────── */
+    --chart-1: 213 94% 68%;   /* azul     #60A5FA */
+    --chart-2: 158 64% 52%;   /* esmeralda #34D399 */
+    --chart-3: 43 96% 58%;    /* âmbar    #FBBF24 */
+    --chart-4: 255 92% 76%;   /* violeta  #A78BFA */
+    --chart-5: 187 85% 53%;   /* ciano    #22D3EE */
+    --chart-6: 330 81% 70%;   /* rosa     #F472B6 */
+    --chart-7: 215 20% 72%;   /* slate    #A3B0C4 */
+    --chart-8: 351 95% 71%;   /* carmim   #FB7185 */
 
-    --gradient-salmon: linear-gradient(135deg, hsl(46 65% 52%), hsl(40 60% 38%));
-    --gradient-gold: linear-gradient(135deg, hsl(44 81% 71%), hsl(46 65% 52%));
-    --gradient-card: linear-gradient(145deg, hsl(0 0% 9%), hsl(240 6% 7%));
-    --gradient-surface: linear-gradient(180deg, hsl(240 10% 4%), hsl(240 9% 2%));
-    --shadow-glow: 0 0 30px -5px hsl(46 65% 52% / 0.18);
-    --shadow-card: 0 10px 25px -5px rgb(0 0 0 / 0.4), 0 8px 10px -6px rgb(0 0 0 / 0.35);
+    --chart-positive: 142 69% 55%;
+    --chart-negative: 0 84% 68%;
+    --chart-neutral: 215 20% 72%;
+    --chart-projected: 213 94% 78%;
+
+    --chart-grid: 218 21% 22%;        /* visível sobre o card escuro */
+    --chart-axis: 218 20% 30%;
+    --chart-label: 215 20% 72%;       /* 6.9:1 sobre o card */
+    --chart-cursor: 218 21% 24%;
+    --chart-tooltip: 219 25% 15%;     /* superfície diferenciada do card */
+    --chart-tooltip-foreground: 210 40% 98%;
+    --chart-tooltip-border: 218 22% 28%;
+
+    /* ── Elevação ─────────────────────────────────────────────────── */
+    --shadow-xs: 0 1px 2px 0 hsl(0 0% 0% / 0.4);
+    --shadow-sm: 0 1px 3px 0 hsl(0 0% 0% / 0.5), 0 1px 2px -1px hsl(0 0% 0% / 0.4);
+    --shadow-md: 0 4px 14px -2px hsl(0 0% 0% / 0.55), 0 2px 6px -2px hsl(0 0% 0% / 0.4);
+    --shadow-lg: 0 16px 36px -8px hsl(0 0% 0% / 0.65), 0 6px 12px -6px hsl(0 0% 0% / 0.45);
+    --shadow-card: var(--shadow-sm);
+    --shadow-glow: 0 0 0 3px hsl(217 91% 60% / 0.18);
+    --shadow-focus: 0 0 0 3px hsl(217 91% 60% / 0.35);
+
+    /* ── Gradientes ───────────────────────────────────────────────── */
+    --gradient-card: linear-gradient(145deg, hsl(220 28% 11%), hsl(220 28% 9%));
+    --gradient-surface: linear-gradient(180deg, hsl(222 33% 6%), hsl(224 33% 4%));
   }
 }
 
@@ -177,76 +308,79 @@
     -moz-osx-font-smoothing: grayscale;
     overscroll-behavior: none;
     line-height: 1.5;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.011em;
   }
 
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Inter', sans-serif;
     line-height: 1.2;
-    letter-spacing: -0.03em;
+    letter-spacing: -0.022em;
   }
 
-  h1 { @apply text-3xl font-extrabold text-foreground; }
-  h2 { @apply text-xl font-bold text-foreground; }
-  h3 { @apply text-lg font-semibold text-foreground; }
+  h1 { @apply text-[26px] font-bold text-foreground; }
+  h2 { @apply text-xl font-semibold text-foreground; }
+  h3 { @apply text-base font-semibold text-foreground; }
 
-  /* Table improvements */
+  /* Numerais tabulares em qualquer contexto financeiro/tabular */
+  th, td, .tabular-nums {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1;
+  }
+
   th {
-    @apply font-semibold text-foreground;
+    @apply font-semibold text-muted-foreground;
   }
   td {
     @apply font-medium text-foreground;
   }
   tr:hover td {
-    background-color: hsl(var(--primary) / 0.06);
+    background-color: hsl(var(--surface-hover));
   }
   .dark tr:hover td {
-    background-color: hsl(var(--primary) / 0.08);
+    background-color: hsl(var(--surface-hover));
+  }
+
+  /* Foco visível e consistente em qualquer controle */
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
   }
 
   ::-webkit-scrollbar {
-    width: 4px;
+    width: 8px;
+    height: 8px;
   }
   ::-webkit-scrollbar-track {
-    background: hsl(var(--background));
+    background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: hsl(var(--muted-foreground) / 0.3);
-    border-radius: 4px;
+    background: hsl(var(--border-strong));
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.6);
   }
 }
 
 @layer utilities {
   .glass {
-    background: hsl(var(--card) / 0.8);
+    background: hsl(var(--background) / 0.85);
     backdrop-filter: blur(12px);
     border-bottom: 1px solid hsl(var(--border));
   }
 
+  /* Nome legado (`salmon`) preservado — o valor é azul (var(--shadow-glow)).
+     Ver docs/redesign/01-DESIGN-SYSTEM.md § Aliases legados. */
   .glow-salmon {
     box-shadow: var(--shadow-glow);
   }
 
-  .gradient-salmon {
-    background: var(--gradient-salmon);
-  }
-
-  .gradient-gold {
-    background: var(--gradient-gold);
-  }
-
-  .text-gradient-salmon {
-    background: var(--gradient-salmon);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-  }
-
   .animate-fade-up {
-    animation: fadeUp 0.4s ease-out forwards;
+    animation: fadeUp 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
 
   .animate-scale-in {
-    animation: scaleIn 0.2s ease-out forwards;
+    animation: scaleIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
 
   .animate-pulse-soft {
@@ -254,7 +388,7 @@
   }
 
   @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(12px); }
+    from { opacity: 0; transform: translateY(8px); }
     to { opacity: 1; transform: translateY(0); }
   }
 
@@ -269,19 +403,19 @@
   }
 }
 
-.presentation-print-root {
-  display: none;
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .presentation-mode *,
-  .presentation-mode *::before,
-  .presentation-mode *::after {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
-    scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
+}
+
+.presentation-print-root {
+  display: none;
 }
 
 @media print {
@@ -293,7 +427,7 @@
   html,
   body {
     margin: 0 !important;
-    background: #090909 !important;
+    background: hsl(var(--card)) !important;
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
   }
@@ -306,15 +440,11 @@
     position: static !important;
     display: block !important;
     min-height: 0 !important;
-    background: #090909 !important;
+    background: hsl(var(--card)) !important;
   }
 
   .presentation-mode-screen {
     display: none !important;
-  }
-
-  .presentation-print-root {
-    display: block !important;
   }
 
   .presentation-print-slide {

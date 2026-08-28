@@ -255,7 +255,7 @@ export default function OnboardingSection({
             </div>
           ))}
           {avaliacao ? (
-            <div className="mt-2 p-2 rounded bg-muted/50 text-xs space-y-1">
+            <div className="mt-2 p-2 rounded bg-background-subtle text-xs space-y-1">
               <div className="flex items-center gap-1">
                 <Star className="w-3 h-3 text-warning" />
                 <span className="font-medium">Nota: {avaliacao.nota}/5</span>

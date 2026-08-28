@@ -26,7 +26,7 @@ export default function SmartSuggestionCard({ suggestion, onUseSuggestion }: Pro
         {onUseSuggestion && (
           <Button
             size="sm"
-            className="gradient-salmon text-primary-foreground border-0 text-xs gap-1"
+            className="bg-primary-strong text-primary-foreground border-0 text-xs gap-1"
             onClick={() => onUseSuggestion(suggestion.kgBrutoSugerido, suggestion.kgLimpoSugerido, suggestion.peixesSugeridos)}
           >
             <Zap className="w-3 h-3" /> Usar

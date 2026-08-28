@@ -21,6 +21,18 @@ import {
   YAxis,
 } from 'recharts';
 import {
+  axisProps,
+  gridProps,
+  tooltipProps,
+  legendProps,
+  SEMANTIC_CHART_COLORS,
+  PROJECTED_DASH_ARRAY,
+  chartValueFormatters,
+  makeActiveDot,
+} from '@/lib/chartTheme';
+import { ChartTooltip } from '@/components/ui/ChartTooltip';
+import { ChartLegend } from '@/components/ui/ChartLegend';
+import {
   buildPresentationPlanIndicators,
   presentationPlanActualMatches,
   presentationPlanHasConfiguredTarget,
@@ -39,7 +51,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
   fmtBRL,
-  fmtBRLCompact,
   formatDateBR,
   formatPercentBR,
   parseLocalDate,
@@ -151,7 +162,7 @@ function IndicatorCard({
             <p className="text-xs text-muted-foreground">{indicator.label}</p>
             <p className="mt-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{MODE_LABELS[mode]}</p>
           </div>
-          <Target className="h-4 w-4 text-gold-dark dark:text-primary" aria-hidden="true" />
+          <Target className="h-4 w-4 text-primary-ink" aria-hidden="true" />
         </div>
         <p className="text-xl font-bold text-foreground">{formatIndicatorValue(indicator, selected)}</p>
         <StatusBadge status={indicator.status} label={indicator.statusLabel} />
@@ -202,15 +213,18 @@ function ComparativeCharts({ plan }: { plan: PresentationPlanData }) {
           <div className="h-72" role="img" aria-label="Gráfico comparativo de receitas e despesas realizadas e orçadas">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 2 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                <XAxis dataKey="label" tick={{ fontSize: 10 }} minTickGap={20} axisLine={false} tickLine={false} />
-                <YAxis tickFormatter={fmtBRLCompact} tick={{ fontSize: 10 }} width={64} axisLine={false} tickLine={false} />
-                <Tooltip formatter={(value: number) => fmtBRL(value)} />
-                <Legend iconType="circle" iconSize={7} wrapperStyle={{ fontSize: 11 }} />
-                <Line type="monotone" dataKey="receitaRealizada" name="Receita realizada" stroke="hsl(var(--success))" strokeWidth={2.5} dot={{ r: 2 }} connectNulls={false} />
-                <Line type="monotone" dataKey="receitaOrcada" name="Receita orçada" stroke="hsl(var(--success))" strokeDasharray="6 4" strokeWidth={2} dot={false} connectNulls={false} />
-                <Line type="monotone" dataKey="despesaRealizada" name="Despesa realizada" stroke="hsl(var(--destructive))" strokeWidth={2.5} dot={{ r: 2 }} connectNulls={false} />
-                <Line type="monotone" dataKey="despesaOrcada" name="Despesa orçada" stroke="hsl(var(--destructive))" strokeDasharray="6 4" strokeWidth={2} dot={false} connectNulls={false} />
+                <CartesianGrid {...gridProps} />
+                <XAxis dataKey="label" {...axisProps} minTickGap={20} />
+                <YAxis {...axisProps} tickFormatter={chartValueFormatters.moneyCompact} width={64} />
+                <Tooltip
+                  {...tooltipProps}
+                  content={<ChartTooltip valueFormatter={value => fmtBRL(Number(value))} dashedKeys={['receitaOrcada', 'despesaOrcada']} />}
+                />
+                <Legend {...legendProps} content={<ChartLegend dashedKeys={['receitaOrcada', 'despesaOrcada']} />} />
+                <Line type="monotone" dataKey="receitaRealizada" name="Receita realizada" stroke={SEMANTIC_CHART_COLORS.positive} strokeWidth={2.5} dot={{ r: 2 }} connectNulls={false} activeDot={makeActiveDot(SEMANTIC_CHART_COLORS.positive)} />
+                <Line type="monotone" dataKey="receitaOrcada" name="Receita orçada" stroke={SEMANTIC_CHART_COLORS.positive} strokeDasharray={PROJECTED_DASH_ARRAY} strokeWidth={2} dot={false} connectNulls={false} />
+                <Line type="monotone" dataKey="despesaRealizada" name="Despesa realizada" stroke={SEMANTIC_CHART_COLORS.negative} strokeWidth={2.5} dot={{ r: 2 }} connectNulls={false} activeDot={makeActiveDot(SEMANTIC_CHART_COLORS.negative)} />
+                <Line type="monotone" dataKey="despesaOrcada" name="Despesa orçada" stroke={SEMANTIC_CHART_COLORS.negative} strokeDasharray={PROJECTED_DASH_ARRAY} strokeWidth={2} dot={false} connectNulls={false} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -226,12 +240,12 @@ function ComparativeCharts({ plan }: { plan: PresentationPlanData }) {
           <div className="h-72" role="img" aria-label="Gráfico de participação do CMV na receita com linha de meta configurada">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={chartData} margin={{ top: 10, right: 14, left: 0, bottom: 2 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                <XAxis dataKey="label" tick={{ fontSize: 10 }} minTickGap={20} axisLine={false} tickLine={false} />
-                <YAxis tickFormatter={value => `${value}%`} tick={{ fontSize: 10 }} width={46} axisLine={false} tickLine={false} />
-                <Tooltip formatter={(value: number) => formatPercentBR(value, 1)} />
-                <Legend iconType="circle" iconSize={7} wrapperStyle={{ fontSize: 11 }} />
-                <Line type="monotone" dataKey="cmvPercent" name="CMV realizado" stroke="hsl(var(--destructive))" strokeWidth={2.5} dot={{ r: 2 }} connectNulls={false} />
+                <CartesianGrid {...gridProps} />
+                <XAxis dataKey="label" {...axisProps} minTickGap={20} />
+                <YAxis {...axisProps} tickFormatter={value => `${value}%`} width={46} />
+                <Tooltip {...tooltipProps} content={<ChartTooltip valueFormatter={value => formatPercentBR(Number(value), 1)} />} />
+                <Legend {...legendProps} content={<ChartLegend />} />
+                <Line type="monotone" dataKey="cmvPercent" name="CMV realizado" stroke={SEMANTIC_CHART_COLORS.negative} strokeWidth={2.5} dot={{ r: 2 }} connectNulls={false} activeDot={makeActiveDot(SEMANTIC_CHART_COLORS.negative)} />
                 {hasCmvTarget ? (
                   <ReferenceLine
                     y={plan.budget.cmvTargetPercent ?? undefined}

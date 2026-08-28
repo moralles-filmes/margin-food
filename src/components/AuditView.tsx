@@ -107,17 +107,17 @@ export default function AuditView({ store }: AuditViewProps) {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="bg-card border border-warning/30 rounded-xl p-3">
+        <div className="bg-card border border-warning-border rounded-xl p-3">
           <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Atenção</p>
           <p className="text-lg font-display font-bold text-warning">{kpis.atencaoQtd}</p>
           <p className="text-[11px] text-muted-foreground">{fmtR(kpis.atencaoVal)}</p>
         </div>
-        <div className="bg-card border border-destructive/30 rounded-xl p-3">
+        <div className="bg-card border border-destructive-border rounded-xl p-3">
           <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Estourado</p>
           <p className="text-lg font-display font-bold text-destructive">{kpis.estouradoQtd}</p>
           <p className="text-[11px] text-muted-foreground">{fmtR(kpis.estouradoVal)}</p>
         </div>
-        <div className="bg-card border border-primary/30 rounded-xl p-3">
+        <div className="bg-card border border-primary-border rounded-xl p-3">
           <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Overrides</p>
           <p className="text-lg font-display font-bold text-primary">{kpis.overrideQtd}</p>
           <p className="text-[11px] text-muted-foreground">{fmtR(kpis.overrideVal)}</p>
@@ -168,7 +168,7 @@ export default function AuditView({ store }: AuditViewProps) {
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-semibold text-foreground">{a.fornecedor || '—'}</span>
                     {a.overrideAlerta && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-destructive/15 text-destructive font-medium">OVERRIDE</span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-destructive-soft text-destructive font-medium">OVERRIDE</span>
                     )}
                   </div>
                   <div className="flex items-center gap-3 mt-1 text-[11px]">

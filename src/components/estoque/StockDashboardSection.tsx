@@ -11,6 +11,7 @@ import StockInactivityAlert from './StockInactivityAlert';
 import { fmtBRL, fmtBRLCompact, formatDecimalBR, parseUTCToBR } from '@/lib/formatters';
 import KpiCard from '@/components/ui/KpiCard';
 import type { StockHealthStatus } from '@/domain/estoque/rules';
+import { SEMANTIC_CHART_COLORS, SERIES_COLORS } from '@/lib/chartTheme';
 
 import { useCan } from '@/permissions/hooks';
 interface DashboardCategory {
@@ -58,27 +59,19 @@ const PIE_NAME_TO_STATUS: Record<string, StockHealthStatus> = {
   'Sem Estoque': 'sem_estoque',
 };
 
+/** 4 status de saúde de estoque — mesma paleta usada por KpiCard/Badge (não `--chart-*`, ver PROGRESSO.md § Fase 8). */
 const STATUS_COLORS = [
-  'hsl(var(--success, 142 71% 45%))',
-  'hsl(var(--warning, 38 92% 50%))',
-  'hsl(var(--destructive))',
-  'hsl(var(--muted-foreground))',
+  SEMANTIC_CHART_COLORS.positive,
+  'hsl(var(--warning))',
+  SEMANTIC_CHART_COLORS.negative,
+  SEMANTIC_CHART_COLORS.neutral,
 ];
 
-const PIE_COLORS = [
-  'hsl(221, 83%, 53%)',
-  'hsl(38, 92%, 50%)',
-  'hsl(142, 71%, 45%)',
-  'hsl(280, 65%, 60%)',
-  'hsl(190, 80%, 42%)',
-  'hsl(350, 80%, 55%)',
-  'hsl(60, 70%, 50%)',
-  'hsl(160, 60%, 40%)',
-];
+const PIE_COLORS = SERIES_COLORS;
 
 const formatCurrency = fmtBRL;
 
-const chartConfigCat: ChartConfig = { valor: { label: 'Valor', color: 'hsl(221, 83%, 53%)' } };
+const chartConfigCat: ChartConfig = { valor: { label: 'Valor', color: SERIES_COLORS[0] } };
 const chartConfigStatus: ChartConfig = {
   ok: { label: 'OK', color: STATUS_COLORS[0] },
   atencao: { label: 'Atenção', color: STATUS_COLORS[1] },

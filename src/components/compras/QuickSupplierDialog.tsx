@@ -118,7 +118,7 @@ export default function QuickSupplierDialog({
             </Button>
             <Button
               type="submit"
-              className="gradient-salmon text-primary-foreground border-0"
+              className="bg-primary-strong text-primary-foreground border-0"
               disabled={loading}
             >
               {loading ? (

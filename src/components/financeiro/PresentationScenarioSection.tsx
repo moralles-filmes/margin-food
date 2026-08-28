@@ -58,7 +58,9 @@ import { Input } from '@/components/ui/input';
 import { NumericInput } from '@/components/ui/numeric-input';
 import SearchableSelect from '@/components/ui/SearchableSelect';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { fmtBRL, fmtBRLCompact, formatDateBR, formatPercentBR, parseLocalDate } from '@/lib/formatters';
+import { fmtBRL, formatDateBR, formatPercentBR, parseLocalDate } from '@/lib/formatters';
+import { axisProps, gridProps, tooltipProps, chartValueFormatters, makeActiveDot } from '@/lib/chartTheme';
+import { ChartTooltip, type ChartTooltipPayloadItem } from '@/components/ui/ChartTooltip';
 import { cn } from '@/lib/utils';
 
 interface PresentationScenarioSectionProps {
@@ -376,7 +378,7 @@ function ActiveAssumptions({ result }: { result: PresentationScenarioResult }) {
             <ol className="space-y-2">
               {ranked.map((lever, index) => (
                 <li key={lever.id} className="grid grid-cols-[1.5rem_minmax(0,1fr)_auto] items-center gap-2 border-b border-border/60 pb-2 text-xs">
-                  <span className="font-bold text-gold-dark dark:text-primary">{index + 1}</span>
+                  <span className="font-bold text-primary-ink">{index + 1}</span>
                   <span className="truncate text-foreground">{lever.label}</span>
                   <span className={lever.resultImpact >= 0 ? 'text-success' : 'text-destructive'}>{fmtBRL(lever.resultImpact)}</span>
                 </li>
@@ -386,6 +388,31 @@ function ActiveAssumptions({ result }: { result: PresentationScenarioResult }) {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function SensitivityChartTooltip({
+  active,
+  label,
+  payload,
+  unit,
+}: {
+  active?: boolean;
+  label?: ReactNode;
+  payload?: ChartTooltipPayloadItem[];
+  unit: 'currency' | 'percentage';
+}) {
+  const title = label == null
+    ? undefined
+    : unit === 'currency' ? fmtBRL(Number(label)) : formatPercentBR(Number(label), 2);
+  return (
+    <ChartTooltip
+      active={active}
+      label={label}
+      payload={payload}
+      title={title}
+      valueFormatter={(value, item) => (item.name === 'Resultado' ? fmtBRL(Number(value)) : formatPercentBR(Number(value), 1))}
+    />
   );
 }
 
@@ -490,17 +517,14 @@ function SensitivityEditor({
                 >
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={sensitivityResult.points} margin={{ top: 12, right: 16, bottom: 8, left: 8 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis dataKey="inputValue" tickFormatter={value => sensitivityResult.unit === 'currency' ? fmtBRLCompact(value) : `${value}%`} tick={{ fontSize: 11 }} />
-                      <YAxis yAxisId="result" tickFormatter={fmtBRLCompact} tick={{ fontSize: 11 }} width={74} />
-                      <YAxis yAxisId="margin" orientation="right" tickFormatter={value => `${value.toFixed(1)}%`} tick={{ fontSize: 11 }} width={52} />
-                      <Tooltip
-                        formatter={(value: number, name: string) => name === 'Resultado' ? fmtBRL(value) : formatPercentBR(value, 1)}
-                        labelFormatter={value => sensitivityResult.unit === 'currency' ? fmtBRL(Number(value)) : formatPercentBR(Number(value), 2)}
-                      />
+                      <CartesianGrid {...gridProps} vertical />
+                      <XAxis dataKey="inputValue" {...axisProps} tickFormatter={value => sensitivityResult.unit === 'currency' ? chartValueFormatters.moneyCompact(value) : `${value}%`} />
+                      <YAxis yAxisId="result" {...axisProps} tickFormatter={chartValueFormatters.moneyCompact} width={74} />
+                      <YAxis yAxisId="margin" orientation="right" {...axisProps} tickFormatter={value => `${value.toFixed(1)}%`} width={52} />
+                      <Tooltip {...tooltipProps} content={<SensitivityChartTooltip unit={sensitivityResult.unit} />} />
                       <ReferenceLine x={sensitivityResult.points.find(point => point.isBase)?.inputValue} stroke="hsl(var(--primary))" strokeDasharray="4 4" label="Atual" />
-                      <Line yAxisId="result" type="linear" dataKey="result" name="Resultado" stroke="hsl(var(--primary))" strokeWidth={2.5} dot />
-                      <Line yAxisId="margin" type="linear" dataKey="marginPercent" name="Margem" stroke="hsl(var(--info))" strokeWidth={2} dot />
+                      <Line yAxisId="result" type="linear" dataKey="result" name="Resultado" stroke="hsl(var(--primary))" strokeWidth={2.5} dot activeDot={makeActiveDot('hsl(var(--primary))')} />
+                      <Line yAxisId="margin" type="linear" dataKey="marginPercent" name="Margem" stroke="hsl(var(--info))" strokeWidth={2} dot activeDot={makeActiveDot('hsl(var(--info))')} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>

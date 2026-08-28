@@ -8,7 +8,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { RefreshCw, TrendingUp, TrendingDown, Clock, AlertTriangle, DollarSign, BarChart3, Users, Calendar, FileDown, Ban } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { fmtBRL, fmtBRLCompact, formatPercentBR, formatIntegerBR } from '@/lib/formatters';
+import { fmtBRL, formatPercentBR, formatIntegerBR } from '@/lib/formatters';
+import { axisProps, gridProps, tooltipProps, SEMANTIC_CHART_COLORS, chartValueFormatters } from '@/lib/chartTheme';
+import { ChartTooltip } from '@/components/ui/ChartTooltip';
 import KpiCard from '@/components/ui/KpiCard';
 import { useCan } from '@/permissions/hooks';
 import { useDataEvent } from '@/lib/dataEvents';
@@ -140,7 +142,6 @@ export default function KPIsSection() {
   if (!canView) return <NoAccess />;
 
   const fmt = fmtBRL;
-  const fmtShort = fmtBRLCompact;
 
   const exportExcel = async () => {
     if (exportingExcel || !kpis) return;
@@ -313,13 +314,13 @@ export default function KPIsSection() {
               <CardContent className="p-4">
                 <h3 className="font-semibold mb-3">Receita vs Despesa por Mês</h3>
                 <ResponsiveContainer width="100%" height={250}>
-                  <BarChart data={kpis.receitaPorMes}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                    <XAxis dataKey="mes" tick={{ fontSize: 10 }} tickFormatter={formatMesLabel} />
-                    <YAxis tick={{ fontSize: 10 }} tickFormatter={fmtShort} />
-                    <Tooltip formatter={(v: number) => fmt(v)} labelFormatter={formatMesLabel} />
-                    <Bar dataKey="receita" fill="hsl(var(--primary))" name="Receita" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="despesa" fill="hsl(var(--destructive))" name="Despesa" radius={[4, 4, 0, 0]} />
+                  <BarChart data={kpis.receitaPorMes.map(m => ({ ...m, mesLabel: formatMesLabel(m.mes) }))}>
+                    <CartesianGrid {...gridProps} />
+                    <XAxis dataKey="mesLabel" {...axisProps} />
+                    <YAxis {...axisProps} tickFormatter={chartValueFormatters.moneyCompact} />
+                    <Tooltip {...tooltipProps} content={<ChartTooltip valueFormatter={v => fmt(Number(v))} />} />
+                    <Bar dataKey="receita" fill={SEMANTIC_CHART_COLORS.positive} name="Receita" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="despesa" fill={SEMANTIC_CHART_COLORS.negative} name="Despesa" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>

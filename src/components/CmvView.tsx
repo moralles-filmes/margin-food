@@ -7,15 +7,6 @@ import { startOfMonth, endOfMonth } from 'date-fns';
 import { formatInBR, fmtBRL, parseLocalDate, formatPercentBR } from '@/lib/formatters';
 import { formatDateBR } from '@/lib/datetime';
 
-const COLORS = [
-  'hsl(var(--primary))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))',
-  'hsl(var(--chart-4))', 'hsl(var(--chart-5))', 'hsl(var(--accent))',
-];
-
-function fmt(v: number) {
-  return fmtBRL(v);
-}
-
 import { AlertTriangle, Calculator, Lightbulb } from 'lucide-react';
 import { DecimalInput } from '@/components/ui/decimal-input';
 import { toast } from 'sonner';
@@ -217,8 +208,6 @@ export default function CmvView() {
     return msgs;
   }, [cmvData, meta]);
 
-  const fmt = (v: number) => fmtBRL(v);
-
   return (
     <div className="space-y-6">
       <CmvFiltersBar
@@ -309,7 +298,7 @@ export default function CmvView() {
               <DecimalInput value={simCustoReduce} onValueChange={(raw) => setSimCustoReduce(raw)} maxDecimals={1} placeholder="Ex: 5" />
             </div>
             {simResult && (
-              <div className="bg-muted/50 rounded-lg p-3 space-y-1">
+              <div className="bg-background-subtle rounded-lg p-3 space-y-1">
                 <p className="text-sm"><strong>Novo CMV:</strong> {formatPercentBR(simResult.newCmv)}</p>
                 <p className="text-sm"><strong>Economia:</strong> {fmtBRL(simResult.economia)}</p>
                 <p className="text-sm"><strong>Nova Margem:</strong> {formatPercentBR(simResult.newMargem)}</p>

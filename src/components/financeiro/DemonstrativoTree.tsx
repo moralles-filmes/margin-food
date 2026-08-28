@@ -262,7 +262,7 @@ export default function DemonstrativoTree({
                   className={cn(
                     row.isTotalRow && 'bg-primary/5 font-bold border-t-2 border-primary/20',
                     row.isSectionHeader && 'bg-muted/50 border-t border-border',
-                    row.isInformational && 'bg-amber-50/50 dark:bg-amber-950/10',
+                    row.isInformational && 'bg-warning-soft',
                   )}
                 >
                   <TableCell

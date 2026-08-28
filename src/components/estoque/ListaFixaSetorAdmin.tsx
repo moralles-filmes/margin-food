@@ -280,7 +280,7 @@ export default function ListaFixaSetorAdmin({ produtos }: Props) {
               <div className="space-y-1">
                 <p className="text-[11px] text-muted-foreground font-medium">{items.length} itens na lista</p>
                 {items.map((item, idx) => (
-                  <div key={item.id} className="flex items-center gap-2 bg-secondary/50 rounded-lg px-3 py-1.5 text-xs">
+                  <div key={item.id} className="flex items-center gap-2 bg-background-subtle rounded-lg px-3 py-1.5 text-xs">
                     <span className="text-muted-foreground w-5 text-center text-[10px]">{idx + 1}</span>
                     <span className="flex-1 text-foreground">{getProdNome(item.produto_id)}</span>
                     <Badge variant="outline" className="text-[9px]">{getProdDisplayUnit(item.produto_id)}</Badge>
@@ -329,7 +329,7 @@ export default function ListaFixaSetorAdmin({ produtos }: Props) {
                         key={p.id}
                         type="button"
                         onClick={() => { handleAddProduct(p.id); setProductSearch(''); }}
-                        className="w-full flex items-center justify-between text-xs px-2 py-1.5 rounded hover:bg-primary/10 text-foreground"
+                        className="w-full flex items-center justify-between text-xs px-2 py-1.5 rounded hover:bg-primary-soft text-foreground"
                       >
                         <span>{p.nomeProduto}</span>
                         <Badge variant="outline" className="text-[9px]">{toRequisitionDisplayProduct(p).displayUnitForRequisition || p.unidadeMedida}</Badge>

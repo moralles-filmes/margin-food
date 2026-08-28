@@ -9,7 +9,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { RefreshCw, TrendingUp, TrendingDown, Wallet, FileDown, Ban, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
-import { fmtBRL, fmtBRLCompact, formatDateBR, parseLocalDate } from '@/lib/formatters';
+import { fmtBRL, formatDateBR, parseLocalDate } from '@/lib/formatters';
+import { axisProps, gridProps, tooltipProps, chartValueFormatters, makeActiveDot } from '@/lib/chartTheme';
+import { ChartTooltip } from '@/components/ui/ChartTooltip';
 import { useCan } from '@/permissions/hooks';
 import { useDataEvent } from '@/lib/dataEvents';
 import * as XLSX from '@/lib/safeXlsx';
@@ -114,7 +116,6 @@ export default function ProjecaoFluxoSection() {
   if (!canView) return <NoAccess />;
 
   const fmt = fmtBRL;
-  const fmtShort = fmtBRLCompact;
 
   const timeline = result?.timeline ?? [];
   const saldoInicial = result?.saldo_inicial ?? 0;
@@ -280,16 +281,13 @@ export default function ProjecaoFluxoSection() {
           <Card>
             <CardContent className="p-4">
               <ResponsiveContainer width="100%" height={300}>
-                <AreaChart data={timeline}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis dataKey="data" tick={{ fontSize: 10 }} tickFormatter={v => v.slice(5)} className="text-muted-foreground" />
-                  <YAxis tick={{ fontSize: 10 }} tickFormatter={fmtShort} className="text-muted-foreground" />
-                  <Tooltip
-                    formatter={(value: number, name: string) => [fmt(value), name === 'saldo' ? 'Saldo' : name === 'entradas' ? 'Entradas' : 'Saídas']}
-                    labelFormatter={l => `Data: ${formatDateBR(parseLocalDate(String(l)))}`}
-                  />
+                <AreaChart data={timeline.map(d => ({ ...d, dataLabel: formatDateBR(parseLocalDate(d.data)) }))}>
+                  <CartesianGrid {...gridProps} />
+                  <XAxis dataKey="dataLabel" {...axisProps} tickFormatter={v => v.slice(0, 5)} />
+                  <YAxis {...axisProps} tickFormatter={chartValueFormatters.moneyCompact} />
+                  <Tooltip {...tooltipProps} content={<ChartTooltip valueFormatter={v => fmt(Number(v))} />} />
                   <ReferenceLine y={0} stroke="hsl(var(--destructive))" strokeDasharray="3 3" />
-                  <Area type="monotone" dataKey="saldo" stroke="hsl(var(--primary))" fill="hsl(var(--primary) / 0.2)" strokeWidth={2} />
+                  <Area type="monotone" dataKey="saldo" name="Saldo" stroke="hsl(var(--primary))" fill="hsl(var(--primary) / 0.2)" strokeWidth={2} activeDot={makeActiveDot('hsl(var(--primary))')} />
                 </AreaChart>
               </ResponsiveContainer>
             </CardContent>

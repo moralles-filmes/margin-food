@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { todayBR } from '@/lib/datetime';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import KpiCard from '@/components/ui/KpiCard';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { DateInput } from '@/components/ui/DateInput';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import SearchableSelect from '@/components/ui/SearchableSelect';
@@ -12,6 +13,7 @@ import { Trash2, RefreshCw, DollarSign, AlertTriangle, Package, Calendar } from 
 import { supabase } from '@/integrations/supabase/client';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, LineChart, Line, Cell } from 'recharts';
 import { fmtBRL, fmtBRLCompact, formatFixedBR, formatDateBR, formatInBR } from '@/lib/formatters';
+import { SEMANTIC_CHART_COLORS, SERIES_COLORS } from '@/lib/chartTheme';
 
 import { useCan } from '@/permissions/hooks';
 interface LossData {
@@ -32,16 +34,14 @@ interface LossData {
   top10: { nome_produto: string; quantidade_perdida: number; valor_perdido: number; unidade_medida: string }[];
 }
 
-const CHART_COLORS = [
-  'hsl(350, 80%, 55%)', 'hsl(38, 92%, 50%)', 'hsl(280, 65%, 60%)', 'hsl(221, 83%, 53%)',
-  'hsl(190, 80%, 42%)', 'hsl(142, 71%, 45%)', 'hsl(60, 70%, 50%)', 'hsl(160, 60%, 40%)',
-];
+const CHART_COLORS = SERIES_COLORS;
 
 const formatCurrency = fmtBRL;
 const formatQty = (v: number) => formatFixedBR(v, 2);
 
-const chartConfigTimeline: ChartConfig = { total_cost: { label: 'Valor Perdido', color: 'hsl(350, 80%, 55%)' } };
-const chartConfigTop: ChartConfig = { valor_perdido: { label: 'Valor', color: 'hsl(350, 80%, 55%)' } };
+/** Perda/prejuízo é semanticamente negativa — não uma série categórica genérica. */
+const chartConfigTimeline: ChartConfig = { total_cost: { label: 'Valor Perdido', color: SEMANTIC_CHART_COLORS.negative } };
+const chartConfigTop: ChartConfig = { valor_perdido: { label: 'Valor', color: SEMANTIC_CHART_COLORS.negative } };
 
 type PeriodPreset = '7' | '30' | '90' | 'custom';
 type GroupBy = 'daily' | 'weekly' | 'monthly';
@@ -132,11 +132,11 @@ export default function StockLossesSection({
           <>
             <div>
               <label className="text-[10px] text-muted-foreground font-medium mb-1 block">De</label>
-              <Input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className="h-7 text-xs w-32" />
+              <DateInput value={customStart} onValueChange={setCustomStart} className="h-7 text-xs w-32" />
             </div>
             <div>
               <label className="text-[10px] text-muted-foreground font-medium mb-1 block">Até</label>
-              <Input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="h-7 text-xs w-32" />
+              <DateInput value={customEnd} onValueChange={setCustomEnd} className="h-7 text-xs w-32" />
             </div>
           </>
         )}
@@ -188,51 +188,11 @@ export default function StockLossesSection({
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <Card className="bg-card border-border">
-          <CardContent className="p-3">
-            <div className="flex items-center gap-2 mb-1">
-              <DollarSign className="w-4 h-4 text-destructive" />
-              <span className="text-[10px] text-muted-foreground font-medium">Valor Perdido</span>
-            </div>
-            <p className="text-lg font-bold text-destructive">{data ? formatCurrency(data.valor_total) : '—'}</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-card border-border">
-          <CardContent className="p-3">
-            <div className="flex items-center gap-2 mb-1">
-              <Trash2 className="w-4 h-4 text-destructive" />
-              <span className="text-[10px] text-muted-foreground font-medium">Qtd Perdida</span>
-            </div>
-            <p className="text-lg font-bold text-foreground">{data ? formatQty(data.quantidade_total) : '—'}</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-card border-border">
-          <CardContent className="p-3">
-            <div className="flex items-center gap-2 mb-1">
-              <Package className="w-4 h-4 text-primary" />
-              <span className="text-[10px] text-muted-foreground font-medium">Itens Afetados</span>
-            </div>
-            <p className="text-lg font-bold text-foreground">{data?.itens_distintos ?? '—'}</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-card border-border">
-          <CardContent className="p-3">
-            <div className="flex items-center gap-2 mb-1">
-              <Calendar className="w-4 h-4 text-muted-foreground" />
-              <span className="text-[10px] text-muted-foreground font-medium">Registros</span>
-            </div>
-            <p className="text-lg font-bold text-foreground">{data?.total_registros ?? '—'}</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-card border-border">
-          <CardContent className="p-3">
-            <div className="flex items-center gap-2 mb-1">
-              <AlertTriangle className="w-4 h-4 text-warning" />
-              <span className="text-[10px] text-muted-foreground font-medium">Sem Custo</span>
-            </div>
-            <p className="text-lg font-bold text-warning">{data?.registros_sem_custo ?? '—'}</p>
-          </CardContent>
-        </Card>
+        <KpiCard label="Valor Perdido" value={data ? formatCurrency(data.valor_total) : '—'} icon={DollarSign} variant="danger" />
+        <KpiCard label="Qtd Perdida" value={data ? formatQty(data.quantidade_total) : '—'} icon={Trash2} variant="danger" />
+        <KpiCard label="Itens Afetados" value={data?.itens_distintos ?? '—'} icon={Package} variant="primary" />
+        <KpiCard label="Registros" value={data?.total_registros ?? '—'} icon={Calendar} />
+        <KpiCard label="Sem Custo" value={data?.registros_sem_custo ?? '—'} icon={AlertTriangle} variant="warning" />
       </div>
 
       {/* Charts */}
@@ -250,7 +210,7 @@ export default function StockLossesSection({
                   <XAxis dataKey="label" className="text-[9px]" tick={{ fontSize: 9 }} />
                   <YAxis className="text-[9px]" tick={{ fontSize: 9 }} tickFormatter={(v) => fmtBRLCompact(v)} />
                   <ChartTooltip content={<ChartTooltipContent formatter={(v) => formatCurrency(Number(v))} />} />
-                  <Line type="monotone" dataKey="total_cost" stroke="hsl(350, 80%, 55%)" strokeWidth={2} dot={{ r: 2 }} />
+                  <Line type="monotone" dataKey="total_cost" stroke={SEMANTIC_CHART_COLORS.negative} strokeWidth={2} dot={{ r: 2 }} />
                 </LineChart>
               </ChartContainer>
             ) : (
@@ -296,7 +256,7 @@ export default function StockLossesSection({
             <CardContent className="p-4 pt-0">
               <div className="space-y-2">
                 {data.tipos_perda.map((t, i) => (
-                  <div key={t.tipo} className="flex items-center justify-between p-2 rounded-lg bg-secondary/50 border border-border">
+                  <div key={t.tipo} className="flex items-center justify-between p-2 rounded-lg bg-background-subtle border border-border">
                     <div className="flex items-center gap-2">
                       <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }} />
                       <span className="text-xs font-medium">{t.tipo}</span>
@@ -319,7 +279,7 @@ export default function StockLossesSection({
             <CardContent className="p-4 pt-0">
               <div className="space-y-2">
                 {data.categorias.map((c, i) => (
-                  <div key={c.categoria} className="flex items-center justify-between p-2 rounded-lg bg-secondary/50 border border-border">
+                  <div key={c.categoria} className="flex items-center justify-between p-2 rounded-lg bg-background-subtle border border-border">
                     <div>
                       <p className="text-xs font-medium">{c.categoria}</p>
                       <p className="text-[10px] text-muted-foreground">{c.qtd_itens} itens</p>

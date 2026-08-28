@@ -485,7 +485,7 @@ export default function ApresentacaoSociosSection({
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-2xl font-bold tracking-tight text-foreground">Apresentação Sócios</h1>
-                <Star className="h-5 w-5 text-gold-dark dark:text-primary" aria-hidden="true" />
+                <Star className="h-5 w-5 text-primary-ink" aria-hidden="true" />
               </div>
               <p className="text-sm text-muted-foreground">
                 Visão gerencial do resultado da loja

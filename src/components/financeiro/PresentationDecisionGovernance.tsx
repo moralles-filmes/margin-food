@@ -427,7 +427,7 @@ export default function PresentationDecisionGovernance({
         <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <CardTitle id="presentation-governance-title" className="flex items-center gap-2 text-lg">
-              <ShieldCheck className="h-5 w-5 text-gold-dark dark:text-primary" aria-hidden="true" />
+              <ShieldCheck className="h-5 w-5 text-primary-ink" aria-hidden="true" />
               Decisões e compromissos
             </CardTitle>
             <CardDescription>

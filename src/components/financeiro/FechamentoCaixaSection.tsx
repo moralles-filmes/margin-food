@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { emitDataEvent, useDataEvent } from '@/lib/dataEvents';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { DateInput } from '@/components/ui/DateInput';
 import { Label } from '@/components/ui/label';
 import { CurrencyInput } from '@/components/ui/brl-input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -18,7 +18,7 @@ import { useFormDirtyGuard } from '@/hooks/useFormDirtyGuard';
 import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
 import { startOfMonth, endOfMonth } from 'date-fns';
 import { formatDateBR, todayBR } from '@/lib/datetime';
-import { fmtBRL, normalizeBRLMoneyToNumber, formatFixedBR, parseLocalDate } from '@/lib/formatters';
+import { fmtBRL, normalizeBRLMoneyToNumber, parseLocalDate } from '@/lib/formatters';
 import { useCan } from '@/permissions/hooks';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { APP_NAME } from '@/lib/brand';
@@ -38,6 +38,8 @@ import {
   Tooltip as RTooltip,
   CartesianGrid,
 } from 'recharts';
+import { axisProps, gridProps, tooltipProps, chartValueFormatters, makeActiveDot } from '@/lib/chartTheme';
+import { ChartTooltip } from '@/components/ui/ChartTooltip';
 
 // ── Types ──
 
@@ -459,9 +461,9 @@ export default function FechamentoCaixaSection() {
         </div>
         {activeTab === 'diario' && <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-1">
-            <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-36 h-9 text-xs" />
+            <DateInput value={startDate} onValueChange={setStartDate} className="w-36 h-9 text-xs" />
             <span className="text-muted-foreground text-xs">—</span>
-            <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-36 h-9 text-xs" />
+            <DateInput value={endDate} onValueChange={setEndDate} className="w-36 h-9 text-xs" />
           </div>
           <Button variant="outline" size="sm" onClick={load} disabled={loading}>
             <RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} /> Atualizar
@@ -494,7 +496,7 @@ export default function FechamentoCaixaSection() {
                 <div className="space-y-3">
                   <div>
                     <Label>Data</Label>
-                    <Input type="date" value={formData} onChange={e => setFormData(e.target.value)} />
+                    <DateInput value={formData} onValueChange={setFormData} />
                   </div>
                   {brandsForForm.length > 0 ? (
                     <div className="space-y-3">
@@ -643,11 +645,11 @@ export default function FechamentoCaixaSection() {
             <p className="text-xs text-muted-foreground mb-2">Tendência — Faturamento Líquido Diário</p>
             <ResponsiveContainer width="100%" height={180}>
               <AreaChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                <XAxis dataKey="data" tick={{ fontSize: 10 }} className="text-muted-foreground" />
-                <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `${formatFixedBR(v / 1000, 0)}k`} className="text-muted-foreground" />
-                <RTooltip formatter={(v: number) => fmtBRL(v)} />
-                <Area type="monotone" dataKey="liquido" className="fill-primary/20 stroke-primary" strokeWidth={2} />
+                <CartesianGrid {...gridProps} />
+                <XAxis dataKey="data" {...axisProps} />
+                <YAxis {...axisProps} tickFormatter={chartValueFormatters.moneyCompact} />
+                <RTooltip {...tooltipProps} content={<ChartTooltip valueFormatter={v => fmtBRL(Number(v))} />} />
+                <Area type="monotone" dataKey="liquido" name="Líquido" className="fill-primary/20 stroke-primary" strokeWidth={2} activeDot={makeActiveDot('hsl(var(--primary))')} />
               </AreaChart>
             </ResponsiveContainer>
           </CardContent>

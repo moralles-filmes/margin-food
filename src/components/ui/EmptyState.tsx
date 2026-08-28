@@ -31,7 +31,7 @@ export default function EmptyState({
         'mx-auto rounded-full bg-muted flex items-center justify-center',
         compact ? 'w-10 h-10' : 'w-14 h-14',
       )}>
-        <Icon className={cn('text-muted-foreground/50', compact ? 'w-5 h-5' : 'w-7 h-7')} />
+        <Icon className={cn('text-muted-foreground', compact ? 'w-5 h-5' : 'w-7 h-7')} />
       </div>
       <p className={cn('font-medium text-foreground', compact ? 'text-sm' : 'text-base')}>{title}</p>
       {description && (

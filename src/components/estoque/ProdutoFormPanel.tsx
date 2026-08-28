@@ -263,7 +263,7 @@ export default function ProdutoFormPanel({
         </div>
 
         {/* Smart Conversion Section */}
-        <div className="col-span-2 border border-border rounded-lg p-3 space-y-2 bg-muted/30">
+        <div className="col-span-2 border border-border rounded-lg p-3 space-y-2 bg-background-subtle">
           <div className="flex items-center justify-between">
             <Label className="text-[11px] font-semibold text-foreground">Fator de Conversão</Label>
             <div className="flex items-center gap-1.5 text-[10px]">
@@ -315,7 +315,7 @@ export default function ProdutoFormPanel({
                 const auto = calcAutoFactor(prodForm.packageQuantity, prodForm.packageMeasureUnit, prodForm.unidadeMedida);
                 if (auto.isAuto && auto.factor !== null) {
                   return (
-                    <div className="flex items-center gap-2 text-[11px] text-primary bg-primary/5 border border-primary/20 rounded-md px-3 py-1.5">
+                    <div className="flex items-center gap-2 text-[11px] text-primary-ink bg-primary-soft border border-primary-border rounded-md px-3 py-1.5">
                       <span>✓ Fator calculado: <strong>{auto.factor}</strong></span>
                       <span className="text-muted-foreground">
                         ({formatConversionLabel(prodForm.unidadeCompra, prodForm.packageQuantity, prodForm.packageMeasureUnit, auto.factor!, prodForm.unidadeMedida)})
@@ -325,7 +325,7 @@ export default function ProdutoFormPanel({
                 }
                 if (prodForm.packageQuantity && prodForm.packageMeasureUnit) {
                   return (
-                    <div className="text-[11px] text-warning bg-warning/5 border border-warning/20 rounded-md px-3 py-1.5">
+                    <div className="text-[11px] text-warning bg-warning-soft border border-warning-border rounded-md px-3 py-1.5">
                       ⚠ Conversão automática não disponível para {prodForm.packageMeasureUnit} → {prodForm.unidadeMedida}. Use modo manual ou ajuste as unidades.
                     </div>
                   );
@@ -462,15 +462,15 @@ export default function ProdutoFormPanel({
           <Input value={prodForm.observacoes} onChange={e => setProdForm(f => ({ ...f, observacoes: e.target.value }))} maxLength={500} className="bg-secondary border-border text-foreground" />
         </div>
         {(prodForm.defaultCostPurchaseUnit > 0 || prodForm.custoPadrao > 0) && prodForm.fatorConversaoPadrao > 0 && (
-          <div className="col-span-2 bg-primary/5 border border-primary/20 rounded-lg p-3 space-y-1.5">
-            <p className="text-[10px] font-semibold text-primary">📌 Custo Atual — Origem: Padrão Inicial</p>
+          <div className="col-span-2 bg-primary-soft border border-primary-border rounded-lg p-3 space-y-1.5">
+            <p className="text-[10px] font-semibold text-primary-ink">📌 Custo Atual — Origem: Padrão Inicial</p>
             <div className="flex items-center justify-between">
               <span className="text-[10px] text-muted-foreground">R$ / {prodForm.unidadeCompra}</span>
               <span className="text-xs font-bold text-foreground">{fmtBRL(prodForm.defaultCostPurchaseUnit || prodForm.custoPadrao)}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-[10px] text-muted-foreground">R$ / {prodForm.unidadeMedida}</span>
-              <span className="text-xs font-bold text-primary">{fmtBRL(precoBaseProduto)}</span>
+              <span className="text-xs font-bold text-primary-ink">{fmtBRL(precoBaseProduto)}</span>
             </div>
             {prodForm.fatorConversaoPadrao >= 1 && prodForm.unidadeCompra !== prodForm.unidadeMedida && (
               <p className="text-[9px] text-muted-foreground">📦 1 {prodForm.unidadeCompra} = {prodForm.fatorConversaoPadrao} {prodForm.unidadeMedida}</p>
@@ -496,7 +496,7 @@ export default function ProdutoFormPanel({
               {saving ? 'Salvando...' : 'Salvar e novo'}
             </Button>
           )}
-          <Button type="submit" size="sm" className="gradient-salmon text-primary-foreground border-0" disabled={saving}>
+          <Button type="submit" size="sm" className="bg-primary-strong text-primary-foreground border-0" disabled={saving}>
             {saving ? 'Salvando...' : editProdId ? 'Atualizar' : batchMode ? 'Salvar e novo' : 'Salvar'}
           </Button>
         </div>

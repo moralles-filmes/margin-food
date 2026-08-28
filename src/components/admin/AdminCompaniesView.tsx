@@ -232,7 +232,7 @@ export default function AdminCompaniesView() {
 
       {/* Error */}
       {error && (
-        <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
+        <div className="p-3 rounded-lg bg-destructive-soft text-destructive text-sm">
           {error}
         </div>
       )}
@@ -339,7 +339,7 @@ export default function AdminCompaniesView() {
                 disabled={creating}
               />
             </div>
-            <div className="p-3 rounded-lg bg-muted/50 text-xs text-muted-foreground space-y-1">
+            <div className="p-3 rounded-lg bg-background-subtle text-xs text-muted-foreground space-y-1">
               <p>Ao criar a empresa:</p>
               <ul className="list-disc ml-4 space-y-0.5">
                 <li>Cargos padrão serão criados automaticamente</li>
@@ -417,7 +417,7 @@ export default function AdminCompaniesView() {
             </DialogTitle>
           </DialogHeader>
           {adminTarget && (
-            <div className="p-2 rounded-lg bg-primary/5 text-xs text-primary font-medium flex items-center gap-2">
+            <div className="p-2 rounded-lg bg-primary-soft text-xs text-primary-ink font-medium flex items-center gap-2">
               <Building2 className="w-3.5 h-3.5" />
               {adminTarget.nome}
             </div>
@@ -461,7 +461,7 @@ export default function AdminCompaniesView() {
                 </p>
               )}
             </div>
-            <div className="p-3 rounded-lg bg-muted/50 text-xs text-muted-foreground space-y-1">
+            <div className="p-3 rounded-lg bg-background-subtle text-xs text-muted-foreground space-y-1">
               <p>Este usuário será criado como <strong>admin</strong> da empresa e poderá:</p>
               <ul className="list-disc ml-4 space-y-0.5">
                 <li>Acessar todos os módulos da empresa</li>

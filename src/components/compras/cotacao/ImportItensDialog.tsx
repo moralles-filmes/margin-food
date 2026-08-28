@@ -154,7 +154,7 @@ export default function ImportItensDialog({ open, onOpenChange, onImport }: Impo
 
         <DialogFooter>
           <Button type="button" variant="ghost" size="sm" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button type="button" size="sm" className="gradient-salmon text-primary-foreground border-0" onClick={handleAdd} disabled={loading || selected.size === 0}>
+          <Button type="button" size="sm" className="bg-primary-strong text-primary-foreground border-0" onClick={handleAdd} disabled={loading || selected.size === 0}>
             Adicionar {selected.size > 0 ? `(${selected.size})` : ''}
           </Button>
         </DialogFooter>

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,13 +11,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { DatePicker } from '@/components/ui/DatePicker';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, FileText, Download, AlertTriangle, CheckCircle2, Clock, Shield, CalendarIcon, Trash2, FileWarning, Search } from 'lucide-react';
+import TableActions from '@/components/ui/TableActions';
+import KpiCard from '@/components/ui/KpiCard';
+import { Plus, FileText, Download, AlertTriangle, CheckCircle2, Clock, Shield, FileWarning, Search } from 'lucide-react';
 import { format, parseISO, differenceInDays } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-import { cn } from '@/lib/utils';
+import { cn, includesNormalized } from '@/lib/utils';
 
 import { useCan } from '@/permissions/hooks';
 interface Colaborador {
@@ -204,7 +204,6 @@ export default function DocumentosComplianceSection({
   };
 
   const handleDelete = async (id: string, path: string | null) => {
-    if (!window.confirm('Tem certeza que deseja excluir este documento?')) return;
     try {
       if (path) {
         await supabase.storage.from('rh-documentos').remove([path]);
@@ -237,10 +236,9 @@ export default function DocumentosComplianceSection({
     if (filterTipo && filterTipo !== 'all' && d.tipo !== filterTipo) return false;
     if (filterStatus && filterStatus !== 'all' && d.status !== filterStatus) return false;
     if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      const nome = d.nome.toLowerCase();
-      const colab = getColabNome(d.colaborador_id).toLowerCase();
-      if (!nome.includes(term) && !colab.includes(term)) return false;
+      const nomeMatch = includesNormalized(d.nome, searchTerm);
+      const colabMatch = includesNormalized(getColabNome(d.colaborador_id), searchTerm);
+      if (!nomeMatch && !colabMatch) return false;
     }
     return true;
   });
@@ -284,37 +282,15 @@ export default function DocumentosComplianceSection({
     <div className="space-y-4">
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="text-xs">Total Documentos</CardDescription>
-            <CardTitle className="text-lg">{documentos.length}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="text-xs flex items-center gap-1">
-              {vencidos > 0 && <AlertTriangle className="w-3 h-3 text-destructive" />} Vencidos
-            </CardDescription>
-            <CardTitle className="text-lg text-destructive">{vencidos}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="text-xs">Vencendo (30d)</CardDescription>
-            <CardTitle className="text-lg text-warning">{vencendo}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="text-xs flex items-center gap-1"><Shield className="w-3 h-3" /> Compliance</CardDescription>
-            <CardTitle className={cn("text-lg", complianceRate >= 80 ? "text-success" : "text-destructive")}>{complianceRate}%</CardTitle>
-          </CardHeader>
-        </Card>
+        <KpiCard label="Total Documentos" value={documentos.length} icon={FileText} />
+        <KpiCard label="Vencidos" value={vencidos} icon={AlertTriangle} variant={vencidos > 0 ? 'danger' : 'default'} />
+        <KpiCard label="Vencendo (30d)" value={vencendo} icon={Clock} variant={vencendo > 0 ? 'warning' : 'default'} />
+        <KpiCard label="Compliance" value={`${complianceRate}%`} icon={Shield} variant={complianceRate >= 80 ? 'success' : 'danger'} />
       </div>
 
       {/* Compliance alerts */}
       {complianceData.filter(c => !c.compliant).length > 0 && canManage && (
-        <Card className="border-warning/30">
+        <Card className="border-warning-border">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2 text-warning">
               <FileWarning className="w-4 h-4" /> Documentos Obrigatórios Faltando
@@ -322,7 +298,7 @@ export default function DocumentosComplianceSection({
           </CardHeader>
           <CardContent className="space-y-1">
             {complianceData.filter(c => !c.compliant).map(c => (
-              <div key={c.colab.id} className="flex items-center justify-between text-xs p-1.5 rounded bg-muted/30">
+              <div key={c.colab.id} className="flex items-center justify-between text-xs p-1.5 rounded bg-background-subtle">
                 <span className="font-medium">{c.colab.nome}</span>
                 <Badge variant="destructive" className="text-[10px]">{c.faltando} doc(s) faltando</Badge>
               </div>
@@ -381,31 +357,11 @@ export default function DocumentosComplianceSection({
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label>Data Emissão</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" className={cn("w-full justify-start text-left font-normal h-10", !dateEmissao && "text-muted-foreground")}>
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {dateEmissao ? format(dateEmissao, 'dd/MM/yyyy') : 'Selecione'}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar mode="single" selected={dateEmissao} onSelect={setDateEmissao} locale={ptBR} className="p-3 pointer-events-auto" />
-                      </PopoverContent>
-                    </Popover>
+                    <DatePicker date={dateEmissao} onDateChange={setDateEmissao} className="h-10" />
                   </div>
                   <div>
                     <Label>Data Vencimento</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" className={cn("w-full justify-start text-left font-normal h-10", !dateVencimento && "text-muted-foreground")}>
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {dateVencimento ? format(dateVencimento, 'dd/MM/yyyy') : 'Selecione'}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar mode="single" selected={dateVencimento} onSelect={setDateVencimento} locale={ptBR} className="p-3 pointer-events-auto" />
-                      </PopoverContent>
-                    </Popover>
+                    <DatePicker date={dateVencimento} onDateChange={setDateVencimento} className="h-10" />
                   </div>
                 </div>
 
@@ -516,11 +472,12 @@ export default function DocumentosComplianceSection({
                                 <Download className="w-3 h-3" />
                               </Button>
                             )}
-                            {canManage && (
-                              <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-destructive" onClick={() => handleDelete(doc.id, doc.arquivo_path)}>
-                                <Trash2 className="w-3 h-3" />
-                              </Button>
-                            )}
+                            <TableActions
+                              onDelete={() => handleDelete(doc.id, doc.arquivo_path)}
+                              canDeleteOverride={canManage}
+                              deleteConfirmTitle="Excluir documento"
+                              deleteConfirmDescription="Tem certeza que deseja excluir este documento? Esta ação não pode ser desfeita."
+                            />
                           </div>
                         </TableCell>
                       </TableRow>

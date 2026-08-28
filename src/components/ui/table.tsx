@@ -13,7 +13,7 @@ Table.displayName = "Table";
 
 const TableHeader = React.forwardRef<HTMLTableSectionElement, React.HTMLAttributes<HTMLTableSectionElement>>(
   ({ className, ...props }, ref) => (
-    <thead ref={ref} className={cn("[&_tr]:border-b bg-muted/30", className)} {...props} />
+    <thead ref={ref} className={cn("[&_tr]:border-b bg-muted", className)} {...props} />
   ),
 );
 TableHeader.displayName = "TableHeader";
@@ -27,17 +27,23 @@ TableBody.displayName = "TableBody";
 
 const TableFooter = React.forwardRef<HTMLTableSectionElement, React.HTMLAttributes<HTMLTableSectionElement>>(
   ({ className, ...props }, ref) => (
-    <tfoot ref={ref} className={cn("border-t bg-muted/50 font-medium [&>tr]:last:border-b-0", className)} {...props} />
+    <tfoot ref={ref} className={cn("border-t bg-muted font-medium [&>tr]:last:border-b-0", className)} {...props} />
   ),
 );
 TableFooter.displayName = "TableFooter";
 
+/**
+ * Zebra, empty e loading state não são responsabilidade deste primitivo — não há um
+ * padrão informal repetido nos consumidores para extrair. Cada tela usa `EmptyState`
+ * (dentro de um `<TableCell colSpan>`) para o vazio e o próprio esqueleto do consumidor
+ * para loading; zebra fica a critério do consumidor via `[&_tr:nth-child(even)]:bg-background-subtle`.
+ */
 const TableRow = React.forwardRef<HTMLTableRowElement, React.HTMLAttributes<HTMLTableRowElement>>(
   ({ className, ...props }, ref) => (
     <tr
       ref={ref}
       className={cn(
-        "border-b transition-colors data-[state=selected]:bg-muted hover:bg-muted/40",
+        "border-b transition-colors hover:bg-surface-hover data-[state=selected]:bg-primary-soft",
         className,
       )}
       {...props}

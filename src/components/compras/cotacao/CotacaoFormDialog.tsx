@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DateInput } from '@/components/ui/DateInput';
 import { Label } from '@/components/ui/label';
 import ProductSearchCombobox, { type ProductOption } from '@/components/ui/ProductSearchCombobox';
 import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
@@ -189,7 +190,7 @@ export default function CotacaoFormDialog({ open, onOpenChange, store, editing, 
               </div>
               <div>
                 <Label className="text-[11px] text-muted-foreground">Validade</Label>
-                <Input type="date" value={header.dataValidade} onChange={e => setHeader(h => ({ ...h, dataValidade: e.target.value }))}
+                <DateInput value={header.dataValidade} onValueChange={v => setHeader(h => ({ ...h, dataValidade: v }))}
                   className="bg-secondary border-border text-foreground" />
               </div>
               <div>
@@ -200,7 +201,7 @@ export default function CotacaoFormDialog({ open, onOpenChange, store, editing, 
             </div>
 
             {/* Itens */}
-            <div className="border-t border-border/60 pt-3">
+            <div className="border-t border-border pt-3">
               <div className="flex items-center justify-between mb-2">
                 <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                   <Package className="w-3.5 h-3.5" /> Itens ({itens.length})
@@ -225,7 +226,7 @@ export default function CotacaoFormDialog({ open, onOpenChange, store, editing, 
                   </div>
                   <Input type="number" min={0} step="0.01" value={qty} onChange={e => setQty(e.target.value)}
                     placeholder="Qtd" className="w-20 bg-secondary border-border text-foreground" />
-                  <Button type="button" size="sm" className="h-9 gradient-salmon text-primary-foreground border-0" onClick={addCatalogItem}>
+                  <Button type="button" size="sm" className="h-9 bg-primary-strong text-primary-foreground border-0" onClick={addCatalogItem}>
                     <Plus className="w-4 h-4" />
                   </Button>
                 </div>
@@ -239,7 +240,7 @@ export default function CotacaoFormDialog({ open, onOpenChange, store, editing, 
                     className="w-16 bg-secondary border-border text-foreground" />
                   <Input type="number" min={0} step="0.01" value={qty} onChange={e => setQty(e.target.value)}
                     placeholder="Qtd" className="w-20 bg-secondary border-border text-foreground" />
-                  <Button type="button" size="sm" className="h-9 gradient-salmon text-primary-foreground border-0" onClick={addAvulsoItem}>
+                  <Button type="button" size="sm" className="h-9 bg-primary-strong text-primary-foreground border-0" onClick={addAvulsoItem}>
                     <Plus className="w-4 h-4" />
                   </Button>
                 </div>
@@ -247,7 +248,7 @@ export default function CotacaoFormDialog({ open, onOpenChange, store, editing, 
 
               <div className="space-y-1.5 mt-2">
                 {itens.map((it, idx) => (
-                  <div key={idx} className="flex items-start gap-2 bg-secondary/40 rounded-lg px-2.5 py-1.5">
+                  <div key={idx} className="flex items-start gap-2 bg-background-subtle rounded-lg px-2.5 py-1.5">
                     <span className="flex-1 min-w-0 text-xs text-foreground break-words pt-1">
                       {it.produto_nome_snapshot}
                       {!it.produto_id && <span className="ml-1 text-[9px] text-muted-foreground">(avulso)</span>}
@@ -265,7 +266,7 @@ export default function CotacaoFormDialog({ open, onOpenChange, store, editing, 
             </div>
 
             {/* Fornecedores */}
-            <div className="border-t border-border/60 pt-3">
+            <div className="border-t border-border pt-3">
               <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5 mb-2">
                 <Building2 className="w-3.5 h-3.5" /> Fornecedores ({selectedSupplierIds.length})
               </Label>
@@ -294,7 +295,7 @@ export default function CotacaoFormDialog({ open, onOpenChange, store, editing, 
 
           <DialogFooter>
             <Button type="button" variant="ghost" size="sm" onClick={guardedClose} disabled={saving}>Cancelar</Button>
-            <Button type="button" size="sm" className="gradient-salmon text-primary-foreground border-0" onClick={handleSubmit} disabled={saving}>
+            <Button type="button" size="sm" className="bg-primary-strong text-primary-foreground border-0" onClick={handleSubmit} disabled={saving}>
               {saving ? 'Salvando…' : editing ? 'Atualizar' : 'Criar cotação'}
             </Button>
           </DialogFooter>

@@ -42,18 +42,18 @@ export default function MonthNavigator({ value, onChange, monthsBack = 12, month
   if (!options.includes(value)) options.unshift(value);
 
   return (
-    <div className={`inline-flex items-center rounded-lg border border-border bg-muted/40 ${className ?? ''}`}>
+    <div className={`inline-flex items-center rounded-lg border border-border bg-background-subtle ${className ?? ''}`}>
       <Button
         type="button"
         variant="ghost"
         size="icon"
-        className="h-9 w-9 shrink-0 hover:bg-muted"
+        className="h-9 w-9 shrink-0 hover:bg-surface-hover"
         onClick={() => onChange(shiftMonth(value, -1))}
       >
         <ChevronLeft className="w-4 h-4" />
       </Button>
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger className="h-9 w-[168px] border-0 border-x border-border rounded-none justify-center gap-1.5 bg-transparent shadow-none focus:ring-0 font-medium">
+        <SelectTrigger className="h-9 w-[168px] border-0 border-x border-border rounded-none justify-center gap-1.5 bg-transparent shadow-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset font-medium">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -64,7 +64,7 @@ export default function MonthNavigator({ value, onChange, monthsBack = 12, month
         type="button"
         variant="ghost"
         size="icon"
-        className="h-9 w-9 shrink-0 hover:bg-muted"
+        className="h-9 w-9 shrink-0 hover:bg-surface-hover"
         onClick={() => onChange(shiftMonth(value, 1))}
       >
         <ChevronRight className="w-4 h-4" />

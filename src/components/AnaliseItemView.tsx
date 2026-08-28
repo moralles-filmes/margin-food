@@ -5,17 +5,18 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line } from 'recharts';
-import { ArrowUpDown, Package, Loader2, AlertTriangle, Search } from 'lucide-react';
+import { ArrowUpDown, Package, Loader2, AlertTriangle, Search, TrendingUp, TrendingDown } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 
 import { fmtBRL, formatPercentBR, formatFixedBR } from '@/lib/formatters';
 import { useCan } from '@/permissions/hooks';
+import { axisProps, gridProps, tooltipProps, makeActiveDot } from '@/lib/chartTheme';
+import { ChartTooltip } from '@/components/ui/ChartTooltip';
+import KpiCard from '@/components/ui/KpiCard';
 function fmtR$(n: number) { return fmtBRL(n); }
 function fmtPct(n: number) { return formatPercentBR(n); }
 function fmtQty(n: number, d = 1) { return formatFixedBR(n, d); }
-
-const chartTooltipStyle = { background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '11px', color: 'hsl(var(--foreground))' };
 
 interface ReportItem {
   produto_id: string;
@@ -248,32 +249,40 @@ export default function AnaliseItemView({
       {!summaryLoading && summary && (
         <div className="grid grid-cols-2 gap-2">
           {summary.maior_cmv && (
-            <div className="bg-card border border-destructive/20 rounded-xl p-3 animate-fade-up">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Maior Impacto CMV</p>
-              <p className="text-sm font-bold text-destructive truncate">{summary.maior_cmv.nome}</p>
-              <p className="text-xs text-muted-foreground">{fmtPct(summary.maior_cmv.valor)} do CMV</p>
-            </div>
+            <KpiCard
+              label="Maior Impacto CMV"
+              value={summary.maior_cmv.nome}
+              sub={`${fmtPct(summary.maior_cmv.valor)} do CMV`}
+              icon={AlertTriangle}
+              variant="danger"
+            />
           )}
           {summary.maior_aumento && (
-            <div className="bg-card border border-destructive/20 rounded-xl p-3 animate-fade-up">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Maior Aumento Preço</p>
-              <p className="text-sm font-bold text-destructive truncate">{summary.maior_aumento.nome}</p>
-              <p className="text-xs text-muted-foreground">↑ {fmtPct(summary.maior_aumento.valor)}</p>
-            </div>
+            <KpiCard
+              label="Maior Aumento Preço"
+              value={summary.maior_aumento.nome}
+              sub={`↑ ${fmtPct(summary.maior_aumento.valor)}`}
+              icon={TrendingUp}
+              variant="danger"
+            />
           )}
           {summary.menor_giro && (
-            <div className="bg-card border border-warning/20 rounded-xl p-3 animate-fade-up">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Menor Giro</p>
-              <p className="text-sm font-bold text-warning truncate">{summary.menor_giro.nome}</p>
-              <p className="text-xs text-muted-foreground">Giro: {fmtQty(summary.menor_giro.valor ?? 0, 2)}</p>
-            </div>
+            <KpiCard
+              label="Menor Giro"
+              value={summary.menor_giro.nome}
+              sub={`Giro: ${fmtQty(summary.menor_giro.valor ?? 0, 2)}`}
+              icon={TrendingDown}
+              variant="warning"
+            />
           )}
           {summary.maior_desperdicio && summary.maior_desperdicio.valor > 0 && (
-            <div className="bg-card border border-destructive/20 rounded-xl p-3 animate-fade-up">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Maior Desperdício</p>
-              <p className="text-sm font-bold text-destructive truncate">{summary.maior_desperdicio.nome}</p>
-              <p className="text-xs text-muted-foreground">{fmtPct(summary.maior_desperdicio.valor)}</p>
-            </div>
+            <KpiCard
+              label="Maior Desperdício"
+              value={summary.maior_desperdicio.nome}
+              sub={fmtPct(summary.maior_desperdicio.valor)}
+              icon={AlertTriangle}
+              variant="danger"
+            />
           )}
         </div>
       )}
@@ -410,11 +419,11 @@ export default function AnaliseItemView({
                     <p className="text-[10px] font-semibold text-foreground uppercase tracking-wider">📊 Histórico de Preço</p>
                     <ResponsiveContainer width="100%" height={120}>
                       <LineChart data={[...detail.preco_historico].reverse()}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                        <XAxis dataKey="data" tick={{ fontSize: 8, fill: 'hsl(var(--muted-foreground))' }} />
-                        <YAxis tick={{ fontSize: 8, fill: 'hsl(var(--muted-foreground))' }} />
-                        <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => [fmtR$(v), 'Preço']} />
-                        <Line type="monotone" dataKey="preco" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ fill: 'hsl(var(--primary))', r: 3 }} />
+                        <CartesianGrid {...gridProps} />
+                        <XAxis dataKey="data" {...axisProps} tick={{ fill: 'hsl(var(--chart-label))', fontSize: 8 }} />
+                        <YAxis {...axisProps} tick={{ fill: 'hsl(var(--chart-label))', fontSize: 8 }} />
+                        <Tooltip {...tooltipProps} content={<ChartTooltip valueFormatter={v => fmtR$(Number(v))} />} />
+                        <Line type="monotone" dataKey="preco" name="Preço" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ fill: 'hsl(var(--primary))', r: 3 }} activeDot={makeActiveDot('hsl(var(--primary))')} />
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
@@ -426,11 +435,11 @@ export default function AnaliseItemView({
                     <p className="text-[10px] font-semibold text-foreground uppercase tracking-wider">📦 Consumo Semanal</p>
                     <ResponsiveContainer width="100%" height={120}>
                       <BarChart data={detail.consumo_semanal}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                        <XAxis dataKey="semana" tick={{ fontSize: 9, fill: 'hsl(var(--muted-foreground))' }} />
-                        <YAxis tick={{ fontSize: 9, fill: 'hsl(var(--muted-foreground))' }} />
-                        <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => [fmtQty(v), 'Consumo']} />
-                        <Bar dataKey="consumo" fill="hsl(var(--accent))" radius={[4, 4, 0, 0]} />
+                        <CartesianGrid {...gridProps} />
+                        <XAxis dataKey="semana" {...axisProps} tick={{ fill: 'hsl(var(--chart-label))', fontSize: 9 }} />
+                        <YAxis {...axisProps} tick={{ fill: 'hsl(var(--chart-label))', fontSize: 9 }} />
+                        <Tooltip {...tooltipProps} content={<ChartTooltip valueFormatter={v => fmtQty(Number(v))} />} />
+                        <Bar dataKey="consumo" name="Consumo" fill="hsl(var(--accent))" radius={[4, 4, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>

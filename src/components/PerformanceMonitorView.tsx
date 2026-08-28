@@ -105,7 +105,7 @@ export default function PerformanceMonitorView() {
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
               {lastRefresh.map((mv, i) => (
-                <div key={i} className="bg-muted/50 rounded-lg p-3 text-center">
+                <div key={i} className="bg-background-subtle rounded-lg p-3 text-center">
                   <p className="text-[10px] font-mono text-muted-foreground truncate">{mv.view?.replace('mv_', '')}</p>
                   <p className={`text-sm font-bold ${mv.ms > 800 ? 'text-destructive' : mv.ms > 300 ? 'text-warning' : 'text-success'}`}>
                     {mv.ms?.toFixed(0)}ms

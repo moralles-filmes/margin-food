@@ -77,7 +77,7 @@ export default function PlanningProjecaoCard({ entries, metasCompra, targetMonth
                   {fmtR(projecao.mediaSemanal)}/sem {projecao.mediaSemanal <= projecao.ritmoIdealSemanal ? '✅' : '⚠️'}
                 </span>
               </div>
-              <p className="text-[9px] text-success/80 italic">
+              <p className="text-[9px] text-success italic">
                 Gaste até {fmtR(projecao.ritmoIdealSemanal)} por semana nas próximas {projecao.semanasRestantes} semana(s) para fechar dentro da meta.
               </p>
             </>

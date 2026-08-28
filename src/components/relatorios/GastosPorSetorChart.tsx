@@ -6,6 +6,8 @@ import { Switch } from '@/components/ui/switch';
 import { Loader2, PieChart as PieIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { fmtBRL } from '@/lib/money';
+import { SERIES_COLORS, tooltipProps } from '@/lib/chartTheme';
+import { ChartTooltip } from '@/components/ui/ChartTooltip';
 
 import { useCan } from '@/permissions/hooks';
 interface SectorBreakdown {
@@ -20,27 +22,10 @@ interface SpendBySectorData {
   breakdown: SectorBreakdown[];
 }
 
-const SECTOR_COLORS = [
-  'hsl(var(--primary))',
-  'hsl(var(--accent))',
-  'hsl(210, 70%, 55%)',
-  'hsl(150, 60%, 45%)',
-  'hsl(30, 80%, 55%)',
-  'hsl(280, 60%, 55%)',
-  'hsl(0, 70%, 55%)',
-  'hsl(180, 50%, 45%)',
-  'hsl(60, 60%, 45%)',
-];
+// Paleta categórica centralizada — ver src/lib/chartTheme.ts
+const SECTOR_COLORS = SERIES_COLORS;
 
 const fmtR$ = fmtBRL;
-
-const chartTooltipStyle = {
-  background: 'hsl(var(--card))',
-  border: '1px solid hsl(var(--border))',
-  borderRadius: '8px',
-  fontSize: '11px',
-  color: 'hsl(var(--foreground))',
-};
 
 export default function GastosPorSetorChart({
  period }: { period: PeriodRange }) {
@@ -117,10 +102,7 @@ export default function GastosPorSetorChart({
                     <Cell key={i} fill={SECTOR_COLORS[i % SECTOR_COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip
-                  contentStyle={chartTooltipStyle}
-                  formatter={(v: number, name: string) => [fmtR$(v), name]}
-                />
+                <Tooltip {...tooltipProps} content={<ChartTooltip valueFormatter={v => fmtR$(Number(v))} />} />
               </PieChart>
             </ResponsiveContainer>
             {/* Center total */}

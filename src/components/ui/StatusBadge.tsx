@@ -40,11 +40,11 @@ const STATUS_MAP: Record<StatusType, 'success' | 'warning' | 'danger' | 'info' |
 };
 
 const VARIANT_STYLES: Record<string, string> = {
-  success: 'bg-success/15 text-success border-success/25',
-  warning: 'bg-warning/15 text-warning border-warning/25',
-  danger: 'bg-destructive/15 text-destructive border-destructive/25',
-  info: 'bg-info/15 text-info border-info/25',
-  neutral: 'bg-muted text-muted-foreground border-border',
+  success: 'bg-success-soft text-success border-success-border',
+  warning: 'bg-warning-soft text-warning border-warning-border',
+  danger: 'bg-destructive-soft text-destructive border-destructive-border',
+  info: 'bg-info-soft text-info border-info-border',
+  neutral: 'bg-neutral-soft text-neutral border-neutral-border',
 };
 
 interface StatusBadgeProps {
@@ -76,7 +76,7 @@ export default function StatusBadge({
     warning: 'bg-warning',
     danger: 'bg-destructive',
     info: 'bg-info',
-    neutral: 'bg-muted-foreground',
+    neutral: 'bg-neutral',
   }[mapped];
 
   const displayLabel = label ?? status.replace(/_/g, ' ').replace(/^\w/, c => c.toUpperCase());

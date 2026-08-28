@@ -30,6 +30,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import KpiCard from '@/components/ui/KpiCard';
+import SearchableSelect from '@/components/ui/SearchableSelect';
 import { useEstoqueGeralStoreContext } from '@/contexts/EstoqueGeralStoreContext';
 import { useSalmonStoreContext } from '@/contexts/SalmonStoreContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -558,31 +560,46 @@ export default function EstoqueGeralView() {
         <div className="space-y-3">
           <StockInactivityAlert categorias={allCategorias} />
           <div className="grid grid-cols-4 gap-2">
-            <button onClick={() => setFilterStatus(filterStatus === 'ok' ? '' : 'ok')} className={`bg-card border rounded-xl p-3 text-center transition-all ${filterStatus === 'ok' ? 'border-success ring-1 ring-success/30' : 'border-border'}`}>
-              <CheckCircle className="w-5 h-5 text-success mx-auto mb-1" />
-              <p className="text-lg font-display font-bold text-foreground">{counts.ok}</p>
-              <p className="text-[10px] text-muted-foreground">OK</p>
-            </button>
-            <button onClick={() => setFilterStatus(filterStatus === 'atencao' ? '' : 'atencao')} className={`bg-card border rounded-xl p-3 text-center transition-all ${filterStatus === 'atencao' ? 'border-warning ring-1 ring-warning/30' : 'border-border'}`}>
-              <TrendingDown className="w-5 h-5 text-warning mx-auto mb-1" />
-              <p className="text-lg font-display font-bold text-foreground">{counts.atencao}</p>
-              <p className="text-[10px] text-muted-foreground">Estoque Baixo</p>
-            </button>
-            <button onClick={() => setFilterStatus(filterStatus === 'critico' ? '' : 'critico')} className={`bg-card border rounded-xl p-3 text-center transition-all ${filterStatus === 'critico' ? 'border-destructive ring-1 ring-destructive/30' : 'border-border'}`}>
-              <AlertTriangle className="w-5 h-5 text-destructive mx-auto mb-1" />
-              <p className="text-lg font-display font-bold text-foreground">{counts.critico}</p>
-              <p className="text-[10px] text-muted-foreground">Crítico</p>
-            </button>
-            <button onClick={() => setFilterStatus(filterStatus === 'sem_estoque' ? '' : 'sem_estoque')} className={`bg-card border rounded-xl p-3 text-center transition-all ${filterStatus === 'sem_estoque' ? 'border-destructive ring-1 ring-destructive/30' : 'border-border'}`}>
-              <Inbox className="w-5 h-5 text-muted-foreground mx-auto mb-1" />
-              <p className="text-lg font-display font-bold text-foreground">{counts.sem_estoque}</p>
-              <p className="text-[10px] text-muted-foreground">Sem Estoque</p>
-            </button>
+            <KpiCard
+              label="OK"
+              value={counts.ok}
+              icon={CheckCircle}
+              variant="success"
+              onClick={() => setFilterStatus(filterStatus === 'ok' ? '' : 'ok')}
+              ariaLabel="Filtrar por estoque OK"
+              className={filterStatus === 'ok' ? 'border-success ring-1 ring-success/30' : ''}
+            />
+            <KpiCard
+              label="Estoque Baixo"
+              value={counts.atencao}
+              icon={TrendingDown}
+              variant="warning"
+              onClick={() => setFilterStatus(filterStatus === 'atencao' ? '' : 'atencao')}
+              ariaLabel="Filtrar por estoque baixo"
+              className={filterStatus === 'atencao' ? 'border-warning ring-1 ring-warning/30' : ''}
+            />
+            <KpiCard
+              label="Crítico"
+              value={counts.critico}
+              icon={AlertTriangle}
+              variant="danger"
+              onClick={() => setFilterStatus(filterStatus === 'critico' ? '' : 'critico')}
+              ariaLabel="Filtrar por estoque crítico"
+              className={filterStatus === 'critico' ? 'border-destructive ring-1 ring-destructive/30' : ''}
+            />
+            <KpiCard
+              label="Sem Estoque"
+              value={counts.sem_estoque}
+              icon={Inbox}
+              onClick={() => setFilterStatus(filterStatus === 'sem_estoque' ? '' : 'sem_estoque')}
+              ariaLabel="Filtrar por sem estoque"
+              className={filterStatus === 'sem_estoque' ? 'border-destructive ring-1 ring-destructive/30' : ''}
+            />
           </div>
 
           {/* Active filter indicator */}
           {filterStatus && (
-            <div className="flex items-center gap-2 px-3 py-2 bg-accent/30 border border-border rounded-lg">
+            <div className="flex items-center gap-2 px-3 py-2 bg-background-subtle border border-border rounded-lg">
               <span className="text-xs text-muted-foreground">Filtro ativo:</span>
               <Badge variant="secondary" className="text-xs gap-1">
                 {STOCK_HEALTH_CONFIG[filterStatus as keyof typeof STOCK_HEALTH_CONFIG]?.emoji}{' '}
@@ -599,13 +616,15 @@ export default function EstoqueGeralView() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
               <Input value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Buscar produto..." className="pl-9 h-9 text-xs bg-secondary border-border" />
             </div>
-            <Select value={filterCat} onValueChange={v => setFilterCat(v === 'all' ? '' : v)}>
-              <SelectTrigger className="w-28 h-9 text-xs bg-secondary border-border"><SelectValue placeholder="Categoria" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas</SelectItem>
-                {allCategorias.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              value={filterCat || 'all'}
+              onValueChange={v => setFilterCat(v === 'all' ? '' : v)}
+              options={[{ value: 'all', label: 'Todas' }, ...allCategorias.map(c => ({ value: c, label: c }))]}
+              placeholder="Categoria"
+              searchPlaceholder="Buscar categoria..."
+              ariaLabel="Filtrar por categoria"
+              className="w-28 h-9 text-xs bg-secondary border-border"
+            />
           </div>
 
           {filtered.length > 0 ? (
@@ -630,8 +649,8 @@ export default function EstoqueGeralView() {
                         <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${STOCK_HEALTH_CONFIG[p.status].bgClass} ${STOCK_HEALTH_CONFIG[p.status].colorClass}`}>
                           {STOCK_HEALTH_CONFIG[p.status].emoji} {STOCK_HEALTH_CONFIG[p.status].shortLabel}
                         </span>
-                        <span className="text-[8px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium">{getCostLabel(origin)}</span>
-                        {p.needsCostReview && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-warning/15 text-warning font-medium">⚠️ Revisar custo</span>}
+                        <span className="text-[8px] px-1.5 py-0.5 rounded bg-primary-soft text-primary-soft-foreground font-medium">{getCostLabel(origin)}</span>
+                        {p.needsCostReview && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-warning-soft text-warning font-medium">⚠️ Revisar custo</span>}
                       </div>
                       <div className="flex items-center gap-3 text-[10px] text-muted-foreground mt-0.5">
                         <span>{p.categoria}</span>
@@ -701,7 +720,7 @@ export default function EstoqueGeralView() {
               <p className="text-sm font-medium text-foreground mb-1">{produtos.length === 0 ? 'Nenhum produto cadastrado' : 'Nenhum resultado'}</p>
               <p className="text-xs text-muted-foreground mb-4">{produtos.length === 0 ? 'Cadastre produtos no Catálogo para controlar o estoque.' : 'Ajuste os filtros.'}</p>
               {produtos.length === 0 && (
-                <Button size="sm" className="gradient-salmon text-primary-foreground border-0 gap-1.5" onClick={() => setActiveView('produtos')}>
+                <Button size="sm" className="bg-primary-strong text-primary-foreground border-0 gap-1.5" onClick={() => setActiveView('produtos')}>
                   <Plus className="w-4 h-4" /> Cadastrar Produto
                 </Button>
               )}
@@ -755,7 +774,7 @@ export default function EstoqueGeralView() {
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold text-foreground">Catálogo de Produtos</p>
-            {canCreateCatalogo && <Button size="sm" className="gradient-salmon text-primary-foreground border-0 gap-1.5 text-xs" onClick={() => { setShowProdForm(!showProdForm); setEditProdId(null); setProdForm(emptyProdForm); }}>
+            {canCreateCatalogo && <Button size="sm" className="bg-primary-strong text-primary-foreground border-0 gap-1.5 text-xs" onClick={() => { setShowProdForm(!showProdForm); setEditProdId(null); setProdForm(emptyProdForm); }}>
               <Plus className="w-3.5 h-3.5" /> Novo Produto
             </Button>}
           </div>
@@ -766,13 +785,15 @@ export default function EstoqueGeralView() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
               <Input value={catalogSearchInput} onChange={e => handleCatalogSearchChange(e.target.value)} placeholder="🔎 Buscar item..." className="pl-9 h-9 text-xs bg-secondary border-border" />
             </div>
-            <Select value={catalogCatFilter || 'all'} onValueChange={handleCatalogCatChange}>
-              <SelectTrigger className="w-32 h-9 text-xs bg-secondary border-border"><SelectValue placeholder="Categoria" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas categorias</SelectItem>
-                {allCategorias.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              value={catalogCatFilter || 'all'}
+              onValueChange={handleCatalogCatChange}
+              options={[{ value: 'all', label: 'Todas categorias' }, ...allCategorias.map(c => ({ value: c, label: c }))]}
+              placeholder="Categoria"
+              searchPlaceholder="Buscar categoria..."
+              ariaLabel="Filtrar por categoria"
+              className="w-36 h-9 text-xs bg-secondary border-border"
+            />
             <Select value={catalogStatusFilter} onValueChange={handleCatalogStatusChange}>
               <SelectTrigger className="w-28 h-9 text-xs bg-secondary border-border"><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -878,7 +899,7 @@ export default function EstoqueGeralView() {
           )}
 
           {prodCatalogError && (
-            <div className="bg-destructive/10 border border-destructive/30 rounded-xl p-4 text-xs text-destructive">
+            <div className="bg-destructive-soft border border-destructive-border rounded-xl p-4 text-xs text-destructive">
               Erro ao carregar catálogo: {prodCatalogError}
             </div>
           )}
@@ -899,17 +920,17 @@ export default function EstoqueGeralView() {
                 const saldo = saldos[p.id]?.saldo ?? 0;
                 const isLowStock = p.ativo && saldo > 0 && saldo <= p.estoqueMinimo;
                 const isNoStock = p.ativo && saldo <= 0;
-                const stockBorderClass = isNoStock ? 'border-destructive/40' : isLowStock ? 'border-warning/40' : 'border-border';
+                const stockBorderClass = isNoStock ? 'border-destructive-border' : isLowStock ? 'border-warning-border' : 'border-border';
                 return (
-                <div key={p.id} className={`bg-card border rounded-xl p-3 animate-fade-up ${p.ativo ? stockBorderClass : 'border-border/50 opacity-60'}`} style={{ animationDelay: `${i * 30}ms` }}>
+                <div key={p.id} className={`bg-card border rounded-xl p-3 animate-fade-up ${p.ativo ? stockBorderClass : 'border-border opacity-60'}`} style={{ animationDelay: `${i * 30}ms` }}>
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <p className="text-sm font-semibold text-foreground truncate">{p.nomeProduto}</p>
                         {p.sku && <Badge variant="outline" className="text-[9px] px-1.5 py-0">{p.sku}</Badge>}
                         {!p.ativo && <Badge variant="secondary" className="text-[9px] px-1.5 py-0 bg-muted text-muted-foreground">Inativo</Badge>}
-                        {isNoStock && <Badge className="text-[9px] px-1.5 py-0 bg-destructive/15 text-destructive border-0">Sem estoque</Badge>}
-                        {isLowStock && <Badge className="text-[9px] px-1.5 py-0 bg-warning/15 text-warning border-0">Estoque baixo</Badge>}
+                        {isNoStock && <Badge className="text-[9px] px-1.5 py-0 bg-destructive-soft text-destructive border-0">Sem estoque</Badge>}
+                        {isLowStock && <Badge className="text-[9px] px-1.5 py-0 bg-warning-soft text-warning border-0">Estoque baixo</Badge>}
                       </div>
                       <div className="flex items-center gap-2 text-[10px] text-muted-foreground mt-0.5">
                         <span>{p.categoria}</span>
@@ -930,7 +951,7 @@ export default function EstoqueGeralView() {
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
                       {p.isSalmonRawLinked && (
-                        <Badge variant="outline" className="text-[8px] px-1 py-0 h-3.5 border-primary/30 text-primary mr-1">🐟 Salmão</Badge>
+                        <Badge variant="outline" className="text-[8px] px-1 py-0 h-3.5 border-primary-border text-primary-ink mr-1">🐟 Salmão</Badge>
                       )}
                       {!p.isSalmonRawLinked && (
                         <>
@@ -1010,7 +1031,7 @@ export default function EstoqueGeralView() {
                       const showDual = unCompra !== p.unidadeMedida;
                       return costBase > 0 ? (
                         <>
-                          <span className="px-1 py-0 rounded bg-primary/10 text-primary font-medium">{getCostLabel(origin)}</span>
+                          <span className="px-1 py-0 rounded bg-primary-soft text-primary-soft-foreground font-medium">{getCostLabel(origin)}</span>
                           <span>
                             {fmtBRL(costBase)}/{p.unidadeMedida}
                             {showDual && ` • ${fmtBRL(costPurchase)}/${unCompra}`}

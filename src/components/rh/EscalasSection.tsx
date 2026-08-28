@@ -324,7 +324,7 @@ export default function EscalasSection({
             {/* Rows per colaborador */}
             {colabsSetor.map(colab => (
               <div key={colab.id} className="grid grid-cols-8 gap-1 mb-1">
-                <div className="flex items-center text-xs font-medium p-2 truncate bg-muted/50 rounded">
+                <div className="flex items-center text-xs font-medium p-2 truncate bg-background-subtle rounded">
                   {colab.nome}
                 </div>
                 {weekDays.map((day, i) => {
@@ -336,21 +336,21 @@ export default function EscalasSection({
                         <div
                           key={slot.id}
                           className={`text-[10px] rounded px-1 py-0.5 mb-0.5 ${
-                            slot.tipo === 'TRABALHO' ? 'bg-primary/10 text-primary border border-primary/20' :
+                            slot.tipo === 'TRABALHO' ? 'bg-primary-soft text-primary-ink border border-primary-border' :
                             slot.tipo === 'FOLGA' ? 'bg-muted text-muted-foreground' :
-                            'bg-warning/10 text-warning border border-warning/20'
+                            'bg-warning-soft text-warning border border-warning-border'
                           }`}
                         >
                           {slot.tipo === 'TRABALHO' ? `${slot.hora_inicio.slice(0,5)}–${slot.hora_fim.slice(0,5)}` : slot.tipo}
                           {canManage && escala.status === 'RASCUNHO' && (
-                            <button onClick={() => handleDeleteSlot(slot.id)} className="ml-1 text-destructive hover:text-destructive/80">×</button>
+                            <button onClick={() => handleDeleteSlot(slot.id)} className="ml-1 text-destructive hover:text-destructive">×</button>
                           )}
                         </div>
                       ))}
                       {canManage && escala.status === 'RASCUNHO' && (
                         <button
                           onClick={() => { setSelectedDay(dayStr); setSlotForm(p => ({ ...p, colaborador_id: colab.id })); setShowAddSlot(true); }}
-                          className="absolute inset-0 opacity-0 group-hover:opacity-100 flex items-center justify-center bg-primary/5 rounded transition-opacity"
+                          className="absolute inset-0 opacity-0 group-hover:opacity-100 flex items-center justify-center bg-primary-soft rounded transition-opacity"
                         >
                           <Plus className="w-3.5 h-3.5 text-primary" />
                         </button>

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { DateInput } from '@/components/ui/DateInput';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RefreshCw } from 'lucide-react';
@@ -41,11 +41,11 @@ export default function CmvFiltersBar({
         <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
           <div>
             <Label className="text-xs text-muted-foreground">Data Início</Label>
-            <Input type="date" value={dataInicio} onChange={e => onDataInicioChange(e.target.value)} />
+            <DateInput value={dataInicio} onValueChange={onDataInicioChange} />
           </div>
           <div>
             <Label className="text-xs text-muted-foreground">Data Fim</Label>
-            <Input type="date" value={dataFim} onChange={e => onDataFimChange(e.target.value)} />
+            <DateInput value={dataFim} onValueChange={onDataFimChange} />
           </div>
           <div>
             <Label className="text-xs text-muted-foreground">Método</Label>

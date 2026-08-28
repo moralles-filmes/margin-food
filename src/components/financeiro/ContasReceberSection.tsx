@@ -5,6 +5,7 @@ import { fmtBRL, formatDateBR, parseLocalDate } from '@/lib/formatters';
 import { useCan } from '@/permissions/hooks';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DateInput } from '@/components/ui/DateInput';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -621,7 +622,7 @@ export default function ContasReceberSection() {
           </DialogHeader>
           <div className="space-y-2">
             <label className="text-sm font-medium">Data do recebimento</label>
-            <Input type="date" value={recDate} max={todayBR()} onChange={e => setRecDate(e.target.value)} />
+            <DateInput value={recDate} max={todayBR()} onValueChange={setRecDate} />
             <p className="text-xs text-muted-foreground">
               A competência da conta é preservada no DRE; o fluxo de caixa (DFC) usa esta data.
             </p>

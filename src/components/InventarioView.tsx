@@ -5,6 +5,7 @@ import { useInventarioStore, Inventario, InventarioItem } from '@/hooks/useInven
 import { useCan, useModuleAccess } from '@/permissions/hooks';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DateInput } from '@/components/ui/DateInput';
 import { DecimalInput } from '@/components/ui/decimal-input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -13,7 +14,10 @@ import SearchableSelect from '@/components/ui/SearchableSelect';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { ClipboardCheck, Plus, ArrowLeft, Search, AlertTriangle, CheckCircle, BarChart3, Lock, Loader2, ShieldAlert, Users, FileText, Flame, Shield, Eye, MoreVertical, Trash2, RotateCcw, UserPlus, UserMinus, Settings, Zap, Printer } from 'lucide-react';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
+import KpiCard from '@/components/ui/KpiCard';
+import StatusBadge from '@/components/ui/StatusBadge';
+import { ClipboardCheck, Plus, ArrowLeft, Search, AlertTriangle, CheckCircle, BarChart3, Lock, Loader2, ShieldAlert, Users, FileText, Flame, Shield, Eye, MoreVertical, Trash2, RotateCcw, UserPlus, UserMinus, Settings, Zap, Printer, TrendingUp, TrendingDown } from 'lucide-react';
 import { todayBR, formatDisplayBR, formatInBR, parseUTCToBR } from '@/lib/datetime';
 import { parseLocalDate } from '@/lib/dateUtils';
 import { fmtBRL, formatPercentBR } from '@/lib/formatters';
@@ -202,24 +206,21 @@ export default function InventarioView() {
   };
 
   const statusBadge = (status: string) => {
-    const colors: Record<string, string> = {
-      RASCUNHO: 'bg-muted text-muted-foreground',
-      EM_CONTAGEM: 'bg-primary/10 text-primary',
-      EM_REVISAO: 'bg-warning/10 text-warning',
-      SOB_ANALISE: 'bg-destructive/10 text-destructive',
-      FINALIZADO: 'bg-success/10 text-success',
+    const variants: Record<string, 'neutral' | 'info' | 'warning' | 'danger' | 'success'> = {
+      RASCUNHO: 'neutral', EM_CONTAGEM: 'info', EM_REVISAO: 'warning',
+      SOB_ANALISE: 'danger', FINALIZADO: 'success',
     };
     const labels: Record<string, string> = {
       RASCUNHO: 'Rascunho', EM_CONTAGEM: 'Em Contagem', EM_REVISAO: 'Em Revisão',
       SOB_ANALISE: '🔒 Sob Análise', FINALIZADO: 'Finalizado',
     };
-    return <Badge className={`${colors[status] || ''} text-[10px]`}>{labels[status] || status}</Badge>;
+    return <StatusBadge status={variants[status] || 'neutral'} label={labels[status] || status} size="sm" />;
   };
 
   const riskBadge = (score: number) => {
-    if (score > 60) return <Badge className="bg-destructive/10 text-destructive text-[9px] gap-1"><Flame className="w-3 h-3" />Alto Risco</Badge>;
-    if (score > 30) return <Badge className="bg-warning/10 text-warning text-[9px] gap-1"><AlertTriangle className="w-3 h-3" />Atenção</Badge>;
-    return <Badge className="bg-success/10 text-success text-[9px] gap-1"><Shield className="w-3 h-3" />Seguro</Badge>;
+    if (score > 60) return <Badge className="bg-destructive-soft text-destructive border-destructive-border text-[9px] gap-1"><Flame className="w-3 h-3" />Alto Risco</Badge>;
+    if (score > 30) return <Badge className="bg-warning-soft text-warning border-warning-border text-[9px] gap-1"><AlertTriangle className="w-3 h-3" />Atenção</Badge>;
+    return <Badge className="bg-success-soft text-success border-success-border text-[9px] gap-1"><Shield className="w-3 h-3" />Seguro</Badge>;
   };
 
   const classColor = (c: string) => c === 'CRITICO' ? 'text-destructive' : c === 'ALERTA' ? 'text-warning' : 'text-success';
@@ -312,13 +313,13 @@ export default function InventarioView() {
             {filtered.map(inv => (
               <div
                 key={inv.id}
-                className="w-full bg-card border border-border rounded-xl p-4 text-left hover:border-primary/30 transition-colors"
+                className="w-full bg-card border border-border rounded-xl p-4 text-left hover:border-primary-border transition-colors"
               >
                 <div className="flex items-center justify-between">
                   <button onClick={() => handleOpenDetail(inv)} className="flex items-center gap-3 flex-1 text-left">
                     <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${
-                      inv.status === 'SOB_ANALISE' ? 'bg-destructive/10' :
-                      inv.status === 'FINALIZADO' ? 'bg-success/10' : 'bg-primary/10'
+                      inv.status === 'SOB_ANALISE' ? 'bg-destructive-soft' :
+                      inv.status === 'FINALIZADO' ? 'bg-success-soft' : 'bg-primary-soft'
                     }`}>
                       {inv.status === 'SOB_ANALISE' ? <ShieldAlert className="w-4 h-4 text-destructive" /> :
                        inv.status === 'FINALIZADO' ? <Lock className="w-4 h-4 text-success" /> :
@@ -485,7 +486,7 @@ export default function InventarioView() {
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div><Label className="text-xs text-muted-foreground">Data</Label><Input type="date" value={formData} onChange={e => setFormData(e.target.value)} className="bg-secondary border-border" /></div>
+            <div><Label className="text-xs text-muted-foreground">Data</Label><DateInput value={formData} onValueChange={setFormData} className="bg-secondary border-border" /></div>
             <div><Label className="text-xs text-muted-foreground">Hora</Label><Input type="time" value={formHora} onChange={e => setFormHora(e.target.value)} className="bg-secondary border-border" /></div>
           </div>
           {/* Categories field removed — parcial type no longer available for creation */}
@@ -573,11 +574,11 @@ export default function InventarioView() {
 
         {/* SOB_ANALISE Alert */}
         {isSobAnalise && (
-          <div className="bg-destructive/10 border border-destructive/30 rounded-xl p-4 space-y-3">
+          <div className="bg-destructive-soft border border-destructive-border rounded-xl p-4 space-y-3">
             <p className="text-xs font-semibold text-destructive flex items-center gap-1.5">
               <ShieldAlert className="w-4 h-4" /> 🔒 Inventário Bloqueado — Análise Obrigatória
             </p>
-            <p className="text-[11px] text-destructive/80">{inv.sob_analise_motivo}</p>
+            <p className="text-[11px] text-destructive">{inv.sob_analise_motivo}</p>
             {canApproveAudit && (
               <div className="space-y-2">
                 <Label className="text-xs text-destructive">Justificativa para aprovação (mín. 10 chars)</Label>
@@ -585,7 +586,7 @@ export default function InventarioView() {
                   value={justificativa}
                   onChange={e => setJustificativa(e.target.value)}
                   placeholder="Descreva o motivo da aprovação..."
-                  className="bg-card border-destructive/30 text-foreground text-xs"
+                  className="bg-card border-destructive-border text-foreground text-xs"
                   rows={2}
                   maxLength={500}
                 />
@@ -603,27 +604,27 @@ export default function InventarioView() {
               </div>
             )}
             {!canApproveAudit && (
-              <p className="text-[11px] text-destructive/70">Aguardando aprovação de um administrador.</p>
+              <p className="text-[11px] text-destructive">Aguardando aprovação de um administrador.</p>
             )}
           </div>
         )}
 
         {/* KPIs */}
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-          <KPICard label="Itens" value={`${contados}/${totalItens}`} />
+          <KpiCard label="Itens" value={`${contados}/${totalItens}`} icon={ClipboardCheck} />
           {(isFinalizado || isSobAnalise) && (
             <>
-              <KPICard label="Acurácia" value={formatPercentBR(Number(inv.acuracia_percent))} color="text-success" />
-              <KPICard label="Drift Total" value={fmtBRL(driftTotal)} color={driftTotal < 0 ? 'text-destructive' : 'text-success'} />
+              <KpiCard label="Acurácia" value={formatPercentBR(Number(inv.acuracia_percent))} icon={CheckCircle} variant="success" />
+              <KpiCard label="Drift Total" value={fmtBRL(driftTotal)} icon={driftTotal < 0 ? TrendingDown : TrendingUp} variant={driftTotal < 0 ? 'danger' : 'success'} />
             </>
           )}
-          <KPICard label="Críticos" value={String(criticos)} color="text-destructive" />
-          <KPICard label="Alertas" value={String(alertas)} color="text-warning" />
+          <KpiCard label="Críticos" value={String(criticos)} icon={Flame} variant="danger" />
+          <KpiCard label="Alertas" value={String(alertas)} icon={AlertTriangle} variant="warning" />
         </div>
 
         {/* Score de Risco */}
         {isFinalizado && inv.score_risco > 0 && (
-          <div className={`rounded-xl p-4 border ${inv.score_risco > 60 ? 'bg-destructive/5 border-destructive/20' : inv.score_risco > 30 ? 'bg-accent/5 border-accent/20' : 'bg-success/5 border-success/20'}`}>
+          <div className={`rounded-xl p-4 border ${inv.score_risco > 60 ? 'bg-destructive-soft border-destructive-border' : inv.score_risco > 30 ? 'bg-warning-soft border-warning-border' : 'bg-success-soft border-success-border'}`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Flame className={`w-5 h-5 ${inv.score_risco > 60 ? 'text-destructive' : inv.score_risco > 30 ? 'text-warning' : 'text-success'}`} />
@@ -770,28 +771,26 @@ export default function InventarioView() {
 
         {/* Items table */}
         <div className="bg-card border border-border rounded-xl overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-border bg-muted/30">
-                  <th className="text-left p-3 text-muted-foreground font-medium">Produto</th>
-                  <th className="text-right p-3 text-muted-foreground font-medium">Teórico</th>
-                  <th className="text-right p-3 text-muted-foreground font-medium">Físico</th>
-                  <th className="text-right p-3 text-muted-foreground font-medium">Dif</th>
-                  <th className="text-right p-3 text-muted-foreground font-medium">%</th>
-                  <th className="text-right p-3 text-muted-foreground font-medium">R$</th>
-                  <th className="text-center p-3 text-muted-foreground font-medium">Class.</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredItems.map(item => (
-                  <ItemRow key={item.id} item={item}
-                    canCount={canEditDetail && !isFinalizado && !isSobAnalise && inv.status !== 'RASCUNHO'}
-                    onSave={(val) => store.updateContagem(item.id, val)} classColor={classColor} />
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <Table className="text-xs">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Produto</TableHead>
+                <TableHead className="text-right">Teórico</TableHead>
+                <TableHead className="text-right">Físico</TableHead>
+                <TableHead className="text-right">Dif</TableHead>
+                <TableHead className="text-right">%</TableHead>
+                <TableHead className="text-right">R$</TableHead>
+                <TableHead className="text-center">Class.</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredItems.map(item => (
+                <ItemRow key={item.id} item={item}
+                  canCount={canEditDetail && !isFinalizado && !isSobAnalise && inv.status !== 'RASCUNHO'}
+                  onSave={(val) => store.updateContagem(item.id, val)} classColor={classColor} />
+              ))}
+            </TableBody>
+          </Table>
         </div>
 
         {/* Deviation Analysis */}
@@ -802,7 +801,7 @@ export default function InventarioView() {
             </p>
             <div className="space-y-2">
               {itens.filter(i => i.classificacao === 'CRITICO').map(i => (
-                <div key={i.id} className="flex items-center justify-between bg-destructive/5 rounded-lg p-2.5">
+                <div key={i.id} className="flex items-center justify-between bg-destructive-soft rounded-lg p-2.5">
                   <span className="text-xs text-foreground font-medium">{i.produtos?.nome_produto || 'Item'}</span>
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-destructive font-bold">{formatPercentBR(Number(i.diferenca_percent))}</span>
@@ -811,7 +810,7 @@ export default function InventarioView() {
                 </div>
               ))}
               {itens.filter(i => i.classificacao === 'ALERTA').map(i => (
-                <div key={i.id} className="flex items-center justify-between bg-accent/5 rounded-lg p-2.5">
+                <div key={i.id} className="flex items-center justify-between bg-warning-soft rounded-lg p-2.5">
                   <span className="text-xs text-foreground font-medium">{i.produtos?.nome_produto || 'Item'}</span>
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-warning font-bold">{formatPercentBR(Number(i.diferenca_percent))}</span>
@@ -819,7 +818,7 @@ export default function InventarioView() {
                   </div>
                 </div>
               ))}
-              <div className="mt-3 pt-3 border-t border-border/30 space-y-1.5">
+              <div className="mt-3 pt-3 border-t border-border space-y-1.5">
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Recomendações</p>
                 {itens.filter(i => Number(i.diferenca_qtd) < 0 && i.classificacao !== 'NORMAL').slice(0, 5).map(i => (
                   <p key={i.id} className="text-[11px] text-muted-foreground">
@@ -941,15 +940,6 @@ export default function InventarioView() {
 
 // ===== Helper Components =====
 
-function KPICard({ label, value, color, large }: { label: string; value: string; color?: string; large?: boolean }) {
-  return (
-    <div className="bg-card border border-border rounded-xl p-3">
-      <p className="text-[10px] text-muted-foreground uppercase">{label}</p>
-      <p className={`${large ? 'text-2xl' : 'text-lg'} font-display font-bold ${color || 'text-foreground'}`}>{value}</p>
-    </div>
-  );
-}
-
 function ItemRow({ item, canCount, onSave, classColor }: {
   item: InventarioItem;
   canCount: boolean;
@@ -995,12 +985,12 @@ function ItemRow({ item, canCount, onSave, classColor }: {
   const difPurchase = hasDual ? Number(item.diferenca_qtd) / fator : Number(item.diferenca_qtd);
 
   return (
-    <tr className="border-b border-border/30 hover:bg-muted/20">
-      <td className="p-3">
+    <TableRow>
+      <TableCell>
         <div>
           <div className="flex items-center gap-1.5">
             <span className="text-foreground font-medium">{nome}</span>
-            <Badge className="text-[9px] bg-primary/10 text-primary font-mono px-1 py-0">
+            <Badge className="text-[9px] bg-primary-soft text-primary-ink border-primary-border font-mono px-1 py-0">
               {unidadeCompra}
             </Badge>
           </div>
@@ -1010,11 +1000,11 @@ function ItemRow({ item, canCount, onSave, classColor }: {
             </p>
           )}
         </div>
-      </td>
-      <td className="p-3 text-right text-muted-foreground">
+      </TableCell>
+      <TableCell className="text-right text-muted-foreground">
         {teoricoLayers.hasLayers ? formatStockLayers(teoricoLayers) : `${teoricoBase.toFixed(1)} ${unidade}`}
-      </td>
-      <td className="p-3 text-right">
+      </TableCell>
+      <TableCell className="text-right">
         {canCount && !editing ? (
           <button onClick={() => setEditing(true)} className="text-primary underline cursor-pointer">
             {fisicaLayers !== null
@@ -1031,24 +1021,26 @@ function ItemRow({ item, canCount, onSave, classColor }: {
               : '—'}
           </span>
         )}
-      </td>
-      <td className={`p-3 text-right font-bold ${difPurchase < 0 ? 'text-destructive' : difPurchase > 0 ? 'text-success' : 'text-muted-foreground'}`}>
+      </TableCell>
+      <TableCell className={`text-right font-bold ${difPurchase < 0 ? 'text-destructive' : difPurchase > 0 ? 'text-success' : 'text-muted-foreground'}`}>
         {item.contagem_fisica !== null ? `${difPurchase >= 0 ? '+' : ''}${parseFloat(difPurchase.toFixed(2))} ${unidadeCompra}` : '—'}
-      </td>
-      <td className={`p-3 text-right ${classColor(item.classificacao)}`}>
+      </TableCell>
+      <TableCell className={`text-right ${classColor(item.classificacao)}`}>
         {item.contagem_fisica !== null ? formatPercentBR(Number(item.diferenca_percent)) : '—'}
-      </td>
-      <td className={`p-3 text-right font-bold ${Number(item.impacto_financeiro) < 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
+      </TableCell>
+      <TableCell className={`text-right font-bold ${Number(item.impacto_financeiro) < 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
         {item.contagem_fisica !== null ? fmtBRL(Number(item.impacto_financeiro)) : '—'}
-      </td>
-      <td className="p-3 text-center">
+      </TableCell>
+      <TableCell className="text-center">
         {item.contagem_fisica !== null && (
-          <Badge className={`text-[9px] ${item.classificacao === 'CRITICO' ? 'bg-destructive/10 text-destructive' : item.classificacao === 'ALERTA' ? 'bg-warning/10 text-warning' : 'bg-success/10 text-success'}`}>
-            {item.classificacao}
-          </Badge>
+          <StatusBadge
+            status={item.classificacao === 'CRITICO' ? 'danger' : item.classificacao === 'ALERTA' ? 'warning' : 'success'}
+            label={item.classificacao}
+            size="xs"
+          />
         )}
-      </td>
-    </tr>
+      </TableCell>
+    </TableRow>
   );
 }
 
@@ -1130,9 +1122,9 @@ function ConferentesManagementView({ conferentes, loading, canManage, onAdd, onR
         ) : (
           <div className="space-y-2">
             {conferentes.map(c => (
-              <div key={c.id} className="flex items-center justify-between bg-muted/30 rounded-lg p-3">
+              <div key={c.id} className="flex items-center justify-between bg-background-subtle rounded-lg p-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-full bg-primary-soft flex items-center justify-center">
                     <Users className="w-4 h-4 text-primary" />
                   </div>
                   <div>
@@ -1184,12 +1176,12 @@ function AssignConferenteSection({ conferentes, currentConferenteId, onAssign, o
         <Users className="w-4 h-4 text-primary" /> Conferente Responsável
       </p>
       {currentConferenteId && currentConferente ? (
-        <div className="flex items-center gap-2 bg-primary/5 rounded-lg p-2.5">
-          <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center">
+        <div className="flex items-center gap-2 bg-primary-soft rounded-lg p-2.5">
+          <div className="w-7 h-7 rounded-full bg-card flex items-center justify-center">
             <Users className="w-3.5 h-3.5 text-primary" />
           </div>
           <span className="text-xs font-medium text-foreground">{currentConferente.nome}</span>
-          <Badge className="text-[9px] bg-primary/10 text-primary">Atribuído</Badge>
+          <Badge className="text-[9px] bg-primary-soft text-primary-ink border-primary-border">Atribuído</Badge>
         </div>
       ) : (
         <div className="flex gap-2">

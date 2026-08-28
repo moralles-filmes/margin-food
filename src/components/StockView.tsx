@@ -73,7 +73,7 @@ export default function StockView({ store, onStartManipulation }: StockViewProps
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="ghost" size="sm" onClick={() => setShowConfig(false)}>Cancelar</Button>
-            <Button size="sm" className="gradient-salmon text-primary-foreground border-0 gap-1" onClick={handleSaveConfig}><Check className="w-3.5 h-3.5" /> Salvar</Button>
+            <Button size="sm" className="bg-primary-strong text-primary-foreground border-0 gap-1" onClick={handleSaveConfig}><Check className="w-3.5 h-3.5" /> Salvar</Button>
           </div>
         </div>
       )}

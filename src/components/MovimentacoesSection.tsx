@@ -3,6 +3,7 @@ import { ArrowDown, ArrowUp, ArrowUpDown, TrendingDown, TrendingUp, DollarSign, 
 import { emitDataEvent } from '@/lib/dataEvents';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DateInput } from '@/components/ui/DateInput';
 import { CurrencyInput } from '@/components/ui/brl-input';
 import { DecimalInput } from '@/components/ui/decimal-input';
 import { fmtBRL, formatFixedBR, normalizeBRLMoneyToNumber } from '@/lib/formatters';
@@ -277,13 +278,13 @@ export default function MovimentacoesSection({
           </Button>
           {canCreateMov && (
             <>
-              <Button size="sm" variant="outline" className="gap-1.5 text-xs border-success/40 text-success hover:bg-success/10" onClick={() => onOpenMovModal('entrada')}>
+              <Button size="sm" variant="outline" className="gap-1.5 text-xs border-success-border text-success hover:bg-success-soft" onClick={() => onOpenMovModal('entrada')}>
                 <ArrowDown className="w-3.5 h-3.5" /> Entrada
               </Button>
-              <Button size="sm" variant="outline" className="gap-1.5 text-xs border-destructive/40 text-destructive hover:bg-destructive/10" onClick={() => onOpenMovModal('saida')}>
+              <Button size="sm" variant="outline" className="gap-1.5 text-xs border-destructive-border text-destructive hover:bg-destructive-soft" onClick={() => onOpenMovModal('saida')}>
                 <ArrowUp className="w-3.5 h-3.5" /> Saída
               </Button>
-              <Button size="sm" variant="outline" className="gap-1.5 text-xs border-primary/40 text-primary hover:bg-primary/10" onClick={() => onOpenMovModal('ajuste')}>
+              <Button size="sm" variant="outline" className="gap-1.5 text-xs border-primary-border text-primary-ink hover:bg-primary-soft" onClick={() => onOpenMovModal('ajuste')}>
                 <Settings2 className="w-3.5 h-3.5" /> Ajuste
               </Button>
             </>
@@ -292,12 +293,12 @@ export default function MovimentacoesSection({
       </div>
 
       {/* Direction tabs */}
-      <div className="flex gap-1 bg-secondary/50 rounded-lg p-1">
+      <div className="flex gap-1 bg-background-subtle rounded-lg p-1">
         <button
           onClick={() => handleDirectionChange('entradas')}
           className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-xs font-medium transition-all ${
             direction === 'entradas'
-              ? 'bg-success/15 text-success shadow-sm'
+              ? 'bg-success-soft text-success shadow-sm'
               : 'text-muted-foreground hover:text-foreground'
           }`}
         >
@@ -308,7 +309,7 @@ export default function MovimentacoesSection({
           onClick={() => handleDirectionChange('saidas')}
           className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-xs font-medium transition-all ${
             direction === 'saidas'
-              ? 'bg-destructive/15 text-destructive shadow-sm'
+              ? 'bg-destructive-soft text-destructive shadow-sm'
               : 'text-muted-foreground hover:text-foreground'
           }`}
         >
@@ -365,11 +366,11 @@ export default function MovimentacoesSection({
             )}
             <div>
               <Label className="text-[10px] text-muted-foreground">De</Label>
-              <Input type="date" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)} className="h-8 text-xs bg-secondary border-border" />
+              <DateInput value={filterDateFrom} onValueChange={setFilterDateFrom} className="h-8 text-xs bg-secondary border-border" />
             </div>
             <div>
               <Label className="text-[10px] text-muted-foreground">Até</Label>
-              <Input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} className="h-8 text-xs bg-secondary border-border" />
+              <DateInput value={filterDateTo} onValueChange={setFilterDateTo} className="h-8 text-xs bg-secondary border-border" />
             </div>
           </div>
           {cancelledCount > 0 && (
@@ -459,7 +460,7 @@ export default function MovimentacoesSection({
             const isCancelled = m.status === 'CANCELADO';
             const isEstorno = m.origem === 'ESTORNO' || !!m.estorno_de_id;
             return (
-              <div key={m.id} className={`bg-card border rounded-lg p-2.5 animate-fade-up ${isCancelled ? 'opacity-50 border-muted' : isEstorno ? 'border-warning/30' : 'border-border'}`} style={{ animationDelay: `${i * 20}ms` }}>
+              <div key={m.id} className={`bg-card border rounded-lg p-2.5 animate-fade-up ${isCancelled ? 'opacity-50 border-muted' : isEstorno ? 'border-warning-border' : 'border-border'}`} style={{ animationDelay: `${i * 20}ms` }}>
                 <div className="flex items-center gap-3">
                   {isEstorno ? (
                     <RotateCcw className="w-3.5 h-3.5 text-warning shrink-0" />
@@ -471,11 +472,11 @@ export default function MovimentacoesSection({
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
                       <p className={`text-xs font-medium truncate ${isCancelled ? 'line-through text-muted-foreground' : 'text-foreground'}`}>{getProdNome(m.produtoId)}</p>
-                      {isCancelled && <Badge variant="outline" className="text-[8px] px-1 py-0 h-3.5 border-destructive/30 text-destructive">Cancelado</Badge>}
-                      {isEstorno && <Badge variant="outline" className="text-[8px] px-1 py-0 h-3.5 border-warning/30 text-warning">Estorno</Badge>}
-                      {m.justificativa_edicao && <Badge variant="outline" className="text-[8px] px-1 py-0 h-3.5 border-primary/30 text-primary">Editado</Badge>}
-                      {m.source_module === 'salmon' && <Badge variant="outline" className="text-[8px] px-1 py-0 h-3.5 border-info/30 text-info">🐟 Salmão</Badge>}
-                      {m.internal_transfer && <Badge variant="outline" className="text-[8px] px-1 py-0 h-3.5 border-info/30 text-info">Transf. Interna</Badge>}
+                      {isCancelled && <Badge variant="outline" className="text-[8px] px-1 py-0 h-3.5 border-destructive-border text-destructive">Cancelado</Badge>}
+                      {isEstorno && <Badge variant="outline" className="text-[8px] px-1 py-0 h-3.5 border-warning-border text-warning">Estorno</Badge>}
+                      {m.justificativa_edicao && <Badge variant="outline" className="text-[8px] px-1 py-0 h-3.5 border-primary-border text-primary-ink">Editado</Badge>}
+                      {m.source_module === 'salmon' && <Badge variant="outline" className="text-[8px] px-1 py-0 h-3.5 border-info-border text-info">🐟 Salmão</Badge>}
+                      {m.internal_transfer && <Badge variant="outline" className="text-[8px] px-1 py-0 h-3.5 border-info-border text-info">Transf. Interna</Badge>}
                     </div>
                     <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
                       <span>{m.data}</span>
@@ -533,7 +534,7 @@ export default function MovimentacoesSection({
                           </button>
                         )}
                         {canCancel && (
-                          <button onClick={(e) => { e.stopPropagation(); setCancelMov(m); setCancelJustificativa(''); }} className="p-1 rounded hover:bg-destructive/10" title="Cancelar">
+                          <button onClick={(e) => { e.stopPropagation(); setCancelMov(m); setCancelJustificativa(''); }} className="p-1 rounded hover:bg-destructive-soft" title="Cancelar">
                             <Trash2 className="w-3 h-3 text-destructive" />
                           </button>
                         )}
@@ -594,13 +595,13 @@ export default function MovimentacoesSection({
                 <div><span className="text-muted-foreground">Observação:</span><p className="font-medium text-foreground">{detailMov.observacao}</p></div>
               )}
               {detailMov.justificativa_edicao && (
-                <div className="bg-primary/5 border border-primary/20 rounded-lg p-2">
+                <div className="bg-primary-soft border border-primary-border rounded-lg p-2">
                   <span className="text-muted-foreground">Última edição:</span>
                   <p className="font-medium text-foreground">{detailMov.justificativa_edicao}</p>
                 </div>
               )}
               {detailMov.justificativa_cancelamento && (
-                <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-2">
+                <div className="bg-destructive-soft border border-destructive-border rounded-lg p-2">
                   <span className="text-muted-foreground">Justificativa cancelamento:</span>
                   <p className="font-medium text-foreground">{detailMov.justificativa_cancelamento}</p>
                 </div>
@@ -618,7 +619,7 @@ export default function MovimentacoesSection({
           </DialogHeader>
           {editMov && (
             <div className="space-y-3">
-              <div className="bg-secondary/50 rounded-lg p-2 text-[11px] text-muted-foreground">
+              <div className="bg-background-subtle rounded-lg p-2 text-[11px] text-muted-foreground">
                 {getProdNome(editMov.produtoId)} • {editMov.tipo} • {editMov.data}
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -632,7 +633,7 @@ export default function MovimentacoesSection({
                 </div>
                 <div>
                   <Label className="text-[11px] text-muted-foreground">Data</Label>
-                  <Input type="date" value={editForm.data} onChange={e => setEditForm(f => ({ ...f, data: e.target.value }))} className="bg-secondary border-border text-foreground" />
+                  <DateInput value={editForm.data} onValueChange={v => setEditForm(f => ({ ...f, data: v }))} className="bg-secondary border-border text-foreground" />
                 </div>
                 <div>
                   <Label className="text-[11px] text-muted-foreground">Observação</Label>
@@ -647,7 +648,7 @@ export default function MovimentacoesSection({
           )}
           <DialogFooter>
             <Button variant="ghost" size="sm" onClick={() => setEditMov(null)} disabled={processing}>Cancelar</Button>
-            <Button size="sm" className="gradient-salmon text-primary-foreground border-0" onClick={handleSaveEdit} disabled={processing || !editJustificativa.trim()}>
+            <Button size="sm" className="bg-primary-strong text-primary-foreground border-0" onClick={handleSaveEdit} disabled={processing || !editJustificativa.trim()}>
               {processing ? 'Salvando...' : 'Salvar Edição'}
             </Button>
           </DialogFooter>
@@ -664,7 +665,7 @@ export default function MovimentacoesSection({
           </DialogHeader>
           {cancelMov && (
             <div className="space-y-3">
-              <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-3 text-xs space-y-1">
+              <div className="bg-destructive-soft border border-destructive-border rounded-lg p-3 text-xs space-y-1">
                 <p className="font-medium text-foreground">{getProdNome(cancelMov.produtoId)}</p>
                 <p className="text-muted-foreground">{cancelMov.tipo} • {formatFixedBR(cancelMov.quantidade, 2)} • {fmtBRL(cancelMov.custoTotal)}</p>
                 <p className="text-destructive text-[10px]">⚠️ Será criado um lançamento de estorno inverso. O saldo retornará ao estado anterior.</p>

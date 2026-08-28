@@ -3,7 +3,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import SearchableSelect from '@/components/ui/SearchableSelect';
 import { Badge } from '@/components/ui/badge';
+import KpiCard from '@/components/ui/KpiCard';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -181,38 +183,24 @@ export default function StockPredictiveSection({
       {/* KPI Cards */}
       {kpis && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          <div className="bg-card border border-destructive/30 rounded-xl p-3 text-center">
-            <ShieldAlert className="w-5 h-5 text-destructive mx-auto mb-1" />
-            <p className="text-xl font-display font-bold text-foreground">{kpis.ruptura_3d}</p>
-            <p className="text-[10px] text-muted-foreground">Ruptura em até 3 dias</p>
-          </div>
-          <div className="bg-card border border-warning/30 rounded-xl p-3 text-center">
-            <CalendarDays className="w-5 h-5 text-warning mx-auto mb-1" />
-            <p className="text-xl font-display font-bold text-foreground">{kpis.pico_fds}</p>
-            <p className="text-[10px] text-muted-foreground">Pico previsto no FDS</p>
-          </div>
-          <div className="bg-card border border-primary/30 rounded-xl p-3 text-center">
-            <TrendingUp className="w-5 h-5 text-primary mx-auto mb-1" />
-            <p className="text-xl font-display font-bold text-foreground">{kpis.com_sazonalidade}</p>
-            <p className="text-[10px] text-muted-foreground">Com sazonalidade</p>
-          </div>
-          <div className="bg-card border border-border rounded-xl p-3 text-center">
-            <ShoppingCart className="w-5 h-5 text-muted-foreground mx-auto mb-1" />
-            <p className="text-lg font-display font-bold text-foreground">{fmtBRL(kpis.valor_compras_sugeridas)}</p>
-            <p className="text-[10px] text-muted-foreground">Compras sugeridas ({targetDays}d)</p>
-          </div>
+          <KpiCard label="Ruptura em até 3 dias" value={kpis.ruptura_3d} icon={ShieldAlert} variant="danger" />
+          <KpiCard label="Pico previsto no FDS" value={kpis.pico_fds} icon={CalendarDays} variant="warning" />
+          <KpiCard label="Com sazonalidade" value={kpis.com_sazonalidade} icon={TrendingUp} variant="primary" />
+          <KpiCard label={`Compras sugeridas (${targetDays}d)`} value={fmtBRL(kpis.valor_compras_sugeridas)} icon={ShoppingCart} />
         </div>
       )}
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-2">
-        <Select value={filterCat || 'all'} onValueChange={v => setFilterCat(v === 'all' ? '' : v)}>
-          <SelectTrigger className="w-32 h-8 text-xs bg-secondary border-border"><SelectValue placeholder="Categoria" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas</SelectItem>
-            {categorias.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        <SearchableSelect
+          value={filterCat || 'all'}
+          onValueChange={v => setFilterCat(v === 'all' ? '' : v)}
+          options={[{ value: 'all', label: 'Todas' }, ...categorias.map(c => ({ value: c, label: c }))]}
+          placeholder="Categoria"
+          searchPlaceholder="Buscar categoria..."
+          ariaLabel="Filtrar por categoria"
+          className="w-32 h-8 text-xs bg-secondary border-border"
+        />
         <Select value={String(targetDays)} onValueChange={v => setTargetDays(Number(v))}>
           <SelectTrigger className="w-36 h-8 text-xs bg-secondary border-border"><SelectValue /></SelectTrigger>
           <SelectContent>
@@ -250,7 +238,7 @@ export default function StockPredictiveSection({
 
       {/* Projection chart for expanded item */}
       {expandedId && projectionData.length > 0 && (
-        <div className="bg-card border border-primary/20 rounded-xl p-4">
+        <div className="bg-card border border-primary-border rounded-xl p-4">
           <h4 className="text-xs font-semibold text-foreground mb-1">
             Projeção: {items.find(i => i.produto_id === expandedId)?.nome_produto}
           </h4>
@@ -357,7 +345,7 @@ export default function StockPredictiveSection({
                   {/* Expanded detail row */}
                   {isExpanded && (
                     <TableRow key={`${item.produto_id}-detail`}>
-                      <TableCell colSpan={10} className="bg-muted/30 py-3">
+                      <TableCell colSpan={10} className="bg-background-subtle py-3">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           {/* Prediction basis */}
                           <div className="space-y-2">

@@ -4,8 +4,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useCan, useModuleAccess } from '@/permissions';
-import { cn } from '@/lib/utils';
-import { SubmoduleSwitcher } from '@/components/ui/SubmoduleSwitcher';
+import { ModuleNav, type ModuleNavItem } from '@/components/ui/ModuleNav';
 import { isPresentationDetailTarget } from '@/lib/presentationDetailNavigation';
 import { Shield } from 'lucide-react';
 import {
@@ -222,7 +221,7 @@ export default function FinanceiroView() {
     }
   }, [activeTab]);
 
-  const allTabs: FinTab[] = [
+  const allTabs = useMemo<FinTab[]>(() => [
     { id: 'dashboard',        label: 'Dashboard',           icon: LayoutDashboard, group: 'dashboard'  },
     // Operações
     { id: 'fechamento',       label: 'Fechamento de Caixa', icon: DollarSign,      group: 'operacoes'  },
@@ -245,7 +244,7 @@ export default function FinanceiroView() {
     { id: 'apresentacao_socios', label: 'Apresentação Sócios', icon: BarChart3,     group: 'relatorios' },
     { id: 'comparativo',      label: 'Comparativo',          icon: Activity,        group: 'relatorios' },
     { id: 'auditoria',        label: 'Auditoria',            icon: Building2,       group: 'relatorios' },
-  ];
+  ], [pagarPendingCount]);
 
   // Filter tabs by permission
   const tabs = useMemo(() => {
@@ -253,7 +252,7 @@ export default function FinanceiroView() {
       const registryKey = TAB_REGISTRY_MAP[tab.id];
       return visibleSubtabs.includes(registryKey);
     });
-  }, [visibleSubtabs, pagarPendingCount]);
+  }, [allTabs, visibleSubtabs]);
 
   // Group the RBAC-filtered tabs for rendering
   const groupedTabs = useMemo(() => {
@@ -275,6 +274,26 @@ export default function FinanceiroView() {
     return tabs[0]?.id || 'dashboard';
   }, [tabs, activeTab]);
 
+  // Módulo nav: item simples para Dashboard, um item com dropdown por grupo
+  const moduleNavItems = useMemo<ModuleNavItem<FinSubTab>[]>(() => {
+    const items: ModuleNavItem<FinSubTab>[] = [];
+    const dashboardTab = groupedTabs.find(g => g.group === 'dashboard')?.tabs[0];
+    if (dashboardTab) {
+      items.push({ id: dashboardTab.id, label: dashboardTab.label, icon: dashboardTab.icon });
+    }
+    groupedTabs
+      .filter(g => g.group !== 'dashboard')
+      .forEach(({ group, meta, tabs: groupTabs }) => {
+        items.push({
+          id: group,
+          label: meta.label ?? group,
+          icon: GROUP_ICONS[group] ?? LayoutGrid,
+          children: groupTabs,
+        });
+      });
+    return items;
+  }, [groupedTabs]);
+
   if (tabs.length === 0) {
     return (
       <div className="bg-card border border-border rounded-xl p-8 text-center">
@@ -292,39 +311,8 @@ export default function FinanceiroView() {
         <h1 className="text-lg font-bold text-foreground">Financeiro</h1>
       </div>
 
-      {/* ── Navegação por grupo ── */}
-      <div className="rounded-2xl bg-card border border-border px-4 py-3 flex flex-wrap items-center justify-center gap-2">
-        {/* Dashboard */}
-        {groupedTabs.some(g => g.group === 'dashboard') && (
-          <button
-            type="button"
-            onClick={() => handleTabSelect('dashboard')}
-            className={cn(
-              'flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium',
-              effectiveTab === 'dashboard'
-                ? 'gradient-salmon text-primary-foreground shadow-md'
-                : 'bg-secondary text-foreground hover:bg-secondary/80 transition-colors',
-            )}
-          >
-            <LayoutDashboard className="w-4 h-4" />
-            Dashboard
-          </button>
-        )}
-
-        {/* Operações, Configurações, Relatórios */}
-        {groupedTabs
-          .filter(g => g.group !== 'dashboard')
-          .map(({ group, meta, tabs: groupTabs }) => (
-            <SubmoduleSwitcher
-              key={group}
-              items={groupTabs}
-              value={effectiveTab}
-              onChange={v => handleTabSelect(v as FinSubTab)}
-              groupLabel={meta.label ?? undefined}
-              groupIcon={GROUP_ICONS[group]}
-            />
-          ))}
-      </div>
+      {/* ── Navegação do módulo ── */}
+      <ModuleNav items={moduleNavItems} value={effectiveTab} onChange={handleTabSelect} />
 
       {/* ── Conteúdo ── */}
       {effectiveTab === 'dashboard' && <DashboardFinanceiroSection onNavigate={setActiveTab} />}

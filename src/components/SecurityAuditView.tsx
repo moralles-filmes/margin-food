@@ -21,11 +21,11 @@ interface AuditEntry {
 }
 
 const ACTION_LABELS: Record<string, { label: string; color: string }> = {
-  'user.created': { label: 'Usuário criado', color: 'bg-success/10 text-success' },
-  'user.disabled': { label: 'Usuário desativado', color: 'bg-destructive/10 text-destructive' },
-  'role.changed': { label: 'Role alterado', color: 'bg-warning/10 text-warning' },
-  'compras.approval': { label: 'Compra aprovada', color: 'bg-primary/10 text-primary' },
-  'compras.rejected': { label: 'Compra reprovada', color: 'bg-destructive/10 text-destructive' },
+  'user.created': { label: 'Usuário criado', color: 'bg-success-soft text-success' },
+  'user.disabled': { label: 'Usuário desativado', color: 'bg-destructive-soft text-destructive' },
+  'role.changed': { label: 'Role alterado', color: 'bg-warning-soft text-warning' },
+  'compras.approval': { label: 'Compra aprovada', color: 'bg-primary-soft text-primary-soft-foreground' },
+  'compras.rejected': { label: 'Compra reprovada', color: 'bg-destructive-soft text-destructive' },
 };
 
 export default function SecurityAuditView() {

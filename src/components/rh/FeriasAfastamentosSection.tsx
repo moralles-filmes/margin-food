@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,16 +10,16 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { DatePicker } from '@/components/ui/DatePicker';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
-  Plus, CalendarIcon, Palmtree, Stethoscope, FileWarning,
+  Plus, Palmtree, Stethoscope, FileWarning,
   CheckCircle2, XCircle, Clock, CalendarDays, AlertTriangle
 } from 'lucide-react';
 import { format, parseISO, differenceInBusinessDays, isWithinInterval, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import KpiCard from '@/components/ui/KpiCard';
 
 import { useCan } from '@/permissions/hooks';
 interface Colaborador {
@@ -260,33 +260,10 @@ export default function FeriasAfastamentosSection({
     <div className="space-y-4">
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="text-xs">Pendentes</CardDescription>
-            <CardTitle className="text-lg text-warning">{pendentes}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="text-xs">Aprovados</CardDescription>
-            <CardTitle className="text-lg text-success">{aprovados}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="text-xs">Ausentes Hoje</CardDescription>
-            <CardTitle className="text-lg text-primary">{emAndamento}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="text-xs flex items-center gap-1">
-              {saldoVencendo > 0 && <AlertTriangle className="w-3 h-3 text-warning" />}
-              Férias Vencendo
-            </CardDescription>
-            <CardTitle className="text-lg text-destructive">{saldoVencendo}</CardTitle>
-          </CardHeader>
-        </Card>
+        <KpiCard label="Pendentes" value={pendentes} icon={Clock} variant={pendentes > 0 ? 'warning' : 'default'} />
+        <KpiCard label="Aprovados" value={aprovados} icon={CheckCircle2} variant="success" />
+        <KpiCard label="Ausentes Hoje" value={emAndamento} icon={CalendarDays} variant="primary" />
+        <KpiCard label="Férias Vencendo" value={saldoVencendo} icon={AlertTriangle} variant={saldoVencendo > 0 ? 'danger' : 'default'} />
       </div>
 
       {/* Controls */}
@@ -324,31 +301,11 @@ export default function FeriasAfastamentosSection({
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label>Data Início *</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" className={cn("w-full justify-start text-left font-normal h-10", !dateInicio && "text-muted-foreground")}>
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {dateInicio ? format(dateInicio, 'dd/MM/yyyy') : 'Selecione'}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar mode="single" selected={dateInicio} onSelect={setDateInicio} locale={ptBR} className="p-3 pointer-events-auto" />
-                      </PopoverContent>
-                    </Popover>
+                    <DatePicker date={dateInicio} onDateChange={setDateInicio} className="h-10" />
                   </div>
                   <div>
                     <Label>Data Fim *</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" className={cn("w-full justify-start text-left font-normal h-10", !dateFim && "text-muted-foreground")}>
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {dateFim ? format(dateFim, 'dd/MM/yyyy') : 'Selecione'}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar mode="single" selected={dateFim} onSelect={setDateFim} locale={ptBR} className="p-3 pointer-events-auto" />
-                      </PopoverContent>
-                    </Popover>
+                    <DatePicker date={dateFim} onDateChange={setDateFim} className="h-10" />
                   </div>
                 </div>
                 {dateInicio && dateFim && dateFim >= dateInicio && (
@@ -390,8 +347,8 @@ export default function FeriasAfastamentosSection({
                 return (
                   <div key={day.toISOString()} className={cn(
                     "p-1 min-h-[48px] rounded text-xs border border-transparent",
-                    isToday && "bg-primary/10 border-primary/30",
-                    dayRegs.length > 0 && "bg-muted/50"
+                    isToday && "bg-primary-soft border-primary-border",
+                    dayRegs.length > 0 && "bg-background-subtle"
                   )}>
                     <div className="font-medium text-[10px]">{format(day, 'd')}</div>
                     {dayRegs.slice(0, 2).map(r => {
@@ -416,7 +373,7 @@ export default function FeriasAfastamentosSection({
         <>
           {/* Pending approvals */}
           {canManage && pendentes > 0 && (
-            <Card className="border-warning/30">
+            <Card className="border-warning-border">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2 text-warning">
                   <Clock className="w-4 h-4" /> Aguardando Aprovação ({pendentes})
@@ -427,7 +384,7 @@ export default function FeriasAfastamentosSection({
                   const tipo = getTipoConfig(r.tipo);
                   const TipoIcon = tipo.icon;
                   return (
-                    <div key={r.id} className="flex items-center gap-3 p-2 rounded bg-muted/30">
+                    <div key={r.id} className="flex items-center gap-3 p-2 rounded bg-background-subtle">
                       <TipoIcon className={cn("w-4 h-4 shrink-0", tipo.color)} />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium">{getColabNome(r.colaborador_id)}</p>
@@ -436,6 +393,7 @@ export default function FeriasAfastamentosSection({
                         </p>
                         {r.motivo && <p className="text-xs text-muted-foreground truncate">{r.motivo}</p>}
                       </div>
+                      {/* Aprovar/Rejeitar é um fluxo de decisão, não o par edit/delete — TableActions não se aplica. */}
                       <div className="flex gap-1 shrink-0">
                         <Button size="sm" variant="outline" className="h-7 text-xs gap-1 text-success" onClick={() => handleAprovar(r.id)}>
                           <CheckCircle2 className="w-3 h-3" /> Aprovar

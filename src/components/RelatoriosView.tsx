@@ -10,25 +10,15 @@ import { DecimalInput, parseDecimal } from '@/components/ui/decimal-input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useModuleAccess } from '@/permissions/hooks';
 import { useCan } from '@/permissions/hooks';
-import { fmtBRL, formatPercentBR, formatFixedBR, formatIntegerBR } from '@/lib/formatters';
+import { fmtBRL, formatPercentBR, formatFixedBR } from '@/lib/formatters';
+import { axisProps, gridProps, tooltipProps, chartValueFormatters, makeActiveDot } from '@/lib/chartTheme';
+import { ChartTooltip } from '@/components/ui/ChartTooltip';
+import KpiCard from '@/components/ui/KpiCard';
 
-function fmt(n: number) { return formatIntegerBR(n); }
 const fmtR$ = fmtBRL;
 function fmtPct(n: number) { return formatPercentBR(n); }
 function fmtPctNullable(v: number | null | undefined): string { return v == null ? '—' : formatPercentBR(v); }
 function safeFmt(v: unknown, fn: (n: number) => string): string { return v == null || Number.isNaN(Number(v)) ? '—' : fn(Number(v)); }
-
-function KPICard({ label, value, sub, variant = 'default' }: { label: string; value: string; sub?: string; variant?: 'default' | 'salmon' | 'gold' | 'success' | 'destructive' }) {
-  const borderColor = { default: 'border-border', salmon: 'border-primary/30', gold: 'border-warning/30', success: 'border-success/30', destructive: 'border-destructive/30' }[variant];
-  const textColor = { default: 'text-foreground', salmon: 'text-primary', gold: 'text-warning', success: 'text-success', destructive: 'text-destructive' }[variant];
-  return (
-    <div className={`bg-card rounded-xl p-3 border ${borderColor} animate-fade-up`}>
-      <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider mb-1">{label}</p>
-      <p className={`text-lg font-display font-bold ${textColor}`}>{value}</p>
-      {sub && <p className="text-[10px] text-muted-foreground mt-0.5">{sub}</p>}
-    </div>
-  );
-}
 
 function ScoreBadge({ score }: { score: number }) {
   if (score >= 80) return <span className="text-[10px] font-bold text-success bg-success/15 px-1.5 py-0.5 rounded-full">🟢 {score}</span>;
@@ -51,8 +41,6 @@ function NoAccess({ perm }: { perm: string }) {
     </div>
   );
 }
-
-const chartTooltipStyle = { background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '11px', color: 'hsl(var(--foreground))' };
 
 const TAB_META: { key: string; label: string }[] = [
   { key: 'cmv', label: 'CMV' },
@@ -138,7 +126,7 @@ export default function RelatoriosView() {
       <Tabs defaultValue={defaultTab} className="w-full">
         <TabsList className={`w-full grid h-8 bg-secondary/50`} style={{ gridTemplateColumns: `repeat(${visibleTabs.length}, 1fr)` }}>
           {visibleTabs.map(t => (
-            <TabsTrigger key={t.key} value={t.key} className="text-[9px] data-[state=active]:gradient-salmon data-[state=active]:text-primary-foreground">
+            <TabsTrigger key={t.key} value={t.key} className="text-[9px] data-[state=active]:bg-primary-strong data-[state=active]:text-primary-foreground">
               {t.label}
             </TabsTrigger>
           ))}
@@ -148,12 +136,12 @@ export default function RelatoriosView() {
         {visibleSubtabs.includes('cmv') && (
           <TabsContent value="cmv" className="space-y-4 mt-3">
             <div className="grid grid-cols-2 gap-2">
-              <KPICard label="🔥 CMV Geral" value={fmtPctNullable(data.cmvGeral)} sub={`Meta: ${formatPercentBR(data.metaCMV)}`} variant={data.cmvGeral != null && data.cmvGeral > data.metaCMV ? 'destructive' : 'success'} />
-              <KPICard label="CMV Salmão" value={fmtPctNullable(data.cmvSalmao)} variant="salmon" />
-              <KPICard label="Margem Bruta" value={fmtPctNullable(data.margemBruta)} variant="success" />
-              <KPICard label="Impacto Salmão" value={fmtPctNullable(data.impactoSalmao)} sub="no CMV total" variant="gold" />
-              <KPICard label="Custo Consumido" value={fmtR$(data.custoConsumido)} variant="default" />
-              <KPICard label="Faturamento" value={fmtR$(data.faturamento)} variant="success" />
+              <KpiCard label="🔥 CMV Geral" value={fmtPctNullable(data.cmvGeral)} sub={`Meta: ${formatPercentBR(data.metaCMV)}`} variant={data.cmvGeral != null && data.cmvGeral > data.metaCMV ? 'danger' : 'success'} />
+              <KpiCard label="CMV Salmão" value={fmtPctNullable(data.cmvSalmao)} variant="primary" />
+              <KpiCard label="Margem Bruta" value={fmtPctNullable(data.margemBruta)} variant="success" />
+              <KpiCard label="Impacto Salmão" value={fmtPctNullable(data.impactoSalmao)} sub="no CMV total" variant="primary" />
+              <KpiCard label="Custo Consumido" value={fmtR$(data.custoConsumido)} variant="default" />
+              <KpiCard label="Faturamento" value={fmtR$(data.faturamento)} variant="success" />
             </div>
 
             {data.cmvPorCategoria.length > 0 && (
@@ -180,11 +168,11 @@ export default function RelatoriosView() {
                 </p>
                 <ResponsiveContainer width="100%" height={140}>
                   <LineChart data={data.tendenciaCMV}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis dataKey="mes" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} />
-                    <YAxis tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} />
-                    <Tooltip contentStyle={chartTooltipStyle} formatter={(v: unknown) => [safeFmt(v, n => formatPercentBR(n)), 'CMV']} />
-                    <Line type="monotone" dataKey="cmv" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ fill: 'hsl(var(--primary))', r: 4 }} />
+                    <CartesianGrid {...gridProps} />
+                    <XAxis dataKey="mes" {...axisProps} />
+                    <YAxis {...axisProps} tickFormatter={chartValueFormatters.percent} />
+                    <Tooltip {...tooltipProps} content={<ChartTooltip valueFormatter={v => safeFmt(v, n => formatPercentBR(n))} />} />
+                    <Line type="monotone" dataKey="cmv" name="CMV" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ fill: 'hsl(var(--primary))', r: 4 }} activeDot={makeActiveDot('hsl(var(--primary))')} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -196,12 +184,12 @@ export default function RelatoriosView() {
         {visibleSubtabs.includes('estoque') && (
           <TabsContent value="estoque" className="space-y-4 mt-3">
             <div className="grid grid-cols-2 gap-2">
-              <KPICard label="Giro de Estoque" value={formatFixedBR(data.giroEstoque, 2)} sub="consumo/estoque" variant="default" />
-              <KPICard label="Cobertura" value={`${formatFixedBR(data.coberturaSemanas, 1)} sem`} variant="gold" />
-              <KPICard label="Ruptura" value={fmtPct(data.rupturaPercent)} sub={`${data.itensAbaixoMinimo.length} itens`} variant={data.rupturaPercent > 0 ? 'destructive' : 'success'} />
-              <KPICard label="Perdas (R$)" value={fmtR$(data['perdasR$'])} sub={`${formatFixedBR(data.perdasKg, 1)} kg`} variant="destructive" />
-              <KPICard label="Valor em Estoque" value={fmtR$(data.valorTotalEstoque)} variant="gold" />
-              <KPICard label="Parado" value={fmtPct(data.estoqueParadoPercent)} sub="> 4 sem" variant={data.estoqueParadoPercent > 20 ? 'destructive' : 'default'} />
+              <KpiCard label="Giro de Estoque" value={formatFixedBR(data.giroEstoque, 2)} sub="consumo/estoque" variant="default" />
+              <KpiCard label="Cobertura" value={`${formatFixedBR(data.coberturaSemanas, 1)} sem`} variant="primary" />
+              <KpiCard label="Ruptura" value={fmtPct(data.rupturaPercent)} sub={`${data.itensAbaixoMinimo.length} itens`} variant={data.rupturaPercent > 0 ? 'danger' : 'success'} />
+              <KpiCard label="Perdas (R$)" value={fmtR$(data['perdasR$'])} sub={`${formatFixedBR(data.perdasKg, 1)} kg`} variant="danger" />
+              <KpiCard label="Valor em Estoque" value={fmtR$(data.valorTotalEstoque)} variant="primary" />
+              <KpiCard label="Parado" value={fmtPct(data.estoqueParadoPercent)} sub="> 4 sem" variant={data.estoqueParadoPercent > 20 ? 'danger' : 'default'} />
             </div>
 
             {/* Salmon stock breakdown */}
@@ -211,10 +199,10 @@ export default function RelatoriosView() {
                   🐟 Salmão — Estoque &amp; Compras
                 </p>
                 <div className="grid grid-cols-2 gap-2">
-                  <KPICard label="Bruto em Estoque" value={`${formatFixedBR(data.salmonBrutoKg, 1)} kg`} variant="salmon" />
-                  <KPICard label="Limpo Disponível" value={`${formatFixedBR(data.salmonLimpoKg, 1)} kg`} variant="salmon" />
-                  <KPICard label="Valor Estoque Salmão" value={fmtR$(data.salmonValorEstoque)} variant="gold" />
-                  <KPICard label="Compras no Período" value={fmtR$(data.salmonComprasValor)} sub={`${formatFixedBR(data.salmonComprasKg, 1)} kg`} variant="salmon" />
+                  <KpiCard label="Bruto em Estoque" value={`${formatFixedBR(data.salmonBrutoKg, 1)} kg`} variant="primary" />
+                  <KpiCard label="Limpo Disponível" value={`${formatFixedBR(data.salmonLimpoKg, 1)} kg`} variant="primary" />
+                  <KpiCard label="Valor Estoque Salmão" value={fmtR$(data.salmonValorEstoque)} variant="primary" />
+                  <KpiCard label="Compras no Período" value={fmtR$(data.salmonComprasValor)} sub={`${formatFixedBR(data.salmonComprasKg, 1)} kg`} variant="primary" />
                 </div>
               </div>
             )}
@@ -328,11 +316,11 @@ export default function RelatoriosView() {
                   <p className="text-xs font-semibold text-foreground uppercase tracking-wider">💰 Custo por Semana (W1–W5)</p>
                   <ResponsiveContainer width="100%" height={160}>
                     <BarChart data={data.custoSemanal}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis dataKey="semana" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} />
-                      <YAxis tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} />
-                      <Tooltip contentStyle={chartTooltipStyle} formatter={(v: unknown) => [safeFmt(v, fmtR$), 'Custo']} />
-                      <Bar dataKey="custo" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                      <CartesianGrid {...gridProps} />
+                      <XAxis dataKey="semana" {...axisProps} />
+                      <YAxis {...axisProps} tickFormatter={chartValueFormatters.moneyCompact} />
+                      <Tooltip {...tooltipProps} content={<ChartTooltip valueFormatter={v => safeFmt(v, fmtR$)} />} />
+                      <Bar dataKey="custo" name="Custo" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -341,11 +329,11 @@ export default function RelatoriosView() {
                   <p className="text-xs font-semibold text-foreground uppercase tracking-wider">📊 CMV por Semana</p>
                   <ResponsiveContainer width="100%" height={160}>
                     <LineChart data={data.cmvSemanal}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis dataKey="semana" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} />
-                      <YAxis tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} unit="%" />
-                      <Tooltip contentStyle={chartTooltipStyle} formatter={(v: unknown) => [safeFmt(v, n => formatPercentBR(n)), 'CMV']} />
-                      <Line type="monotone" dataKey="cmv" stroke="hsl(var(--accent))" strokeWidth={2} dot={{ fill: 'hsl(var(--accent))', r: 4 }} />
+                      <CartesianGrid {...gridProps} />
+                      <XAxis dataKey="semana" {...axisProps} />
+                      <YAxis {...axisProps} unit="%" />
+                      <Tooltip {...tooltipProps} content={<ChartTooltip valueFormatter={v => safeFmt(v, n => formatPercentBR(n))} />} />
+                      <Line type="monotone" dataKey="cmv" name="CMV" stroke="hsl(var(--accent))" strokeWidth={2} dot={{ fill: 'hsl(var(--accent))', r: 4 }} activeDot={makeActiveDot('hsl(var(--accent))')} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
@@ -370,7 +358,7 @@ export default function RelatoriosView() {
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
-                  <KPICard label="Volatilidade" value={fmtBRL(data.volatilidade)} sub="Desvio padrão custo/kg" variant={data.volatilidade > 5 ? 'destructive' : 'default'} />
+                  <KpiCard label="Volatilidade" value={fmtBRL(data.volatilidade)} sub="Desvio padrão custo/kg" variant={data.volatilidade > 5 ? 'danger' : 'default'} />
                 </div>
 
                 <div className="bg-card border border-border rounded-xl p-4 space-y-2">
@@ -499,8 +487,8 @@ export default function RelatoriosView() {
                     <Brain className="w-3.5 h-3.5 text-warning" /> 🔥 Projeção 4 Semanas
                   </p>
                   <div className="grid grid-cols-2 gap-2">
-                    <KPICard label="Projeção Custo" value={fmtR$(data.projecao4Semanas)} variant={data.projecaoAlerta ? 'destructive' : 'gold'} />
-                    <KPICard label="Status" value={data.projecaoAlerta ? '⚠️ Acima meta' : '✅ Dentro'} variant={data.projecaoAlerta ? 'destructive' : 'success'} />
+                    <KpiCard label="Projeção Custo" value={fmtR$(data.projecao4Semanas)} variant={data.projecaoAlerta ? 'danger' : 'primary'} />
+                    <KpiCard label="Status" value={data.projecaoAlerta ? '⚠️ Acima meta' : '✅ Dentro'} variant={data.projecaoAlerta ? 'danger' : 'success'} />
                   </div>
                   {data.projecaoAlerta && (
                     <div className="bg-destructive/10 border border-destructive/30 rounded-lg px-3 py-2 mt-1">

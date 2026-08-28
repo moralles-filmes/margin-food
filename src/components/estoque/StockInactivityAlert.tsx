@@ -79,7 +79,7 @@ export default function StockInactivityAlert({
   if (!canViewRbac) return null;
 
   return (
-    <Card className={`border-border transition-all ${count > 0 ? 'border-warning/30' : ''}`}>
+    <Card className={`border-border transition-all ${count > 0 ? 'border-warning-border' : ''}`}>
       <CardContent className="p-0">
         {/* Summary header */}
         <button
@@ -87,7 +87,7 @@ export default function StockInactivityAlert({
           className="w-full p-3 flex items-center gap-3 text-left"
           disabled={count === 0}
         >
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${count > 0 ? 'bg-warning/15' : 'bg-secondary'}`}>
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${count > 0 ? 'bg-warning-soft' : 'bg-secondary'}`}>
             {count > 0 ? <AlertTriangle className="w-5 h-5 text-warning" /> : <Clock className="w-5 h-5 text-muted-foreground" />}
           </div>
           <div className="flex-1 min-w-0">
@@ -124,7 +124,7 @@ export default function StockInactivityAlert({
             {/* Items table */}
             <div className="space-y-1.5 max-h-64 overflow-y-auto">
               {filtered.map(item => (
-                <div key={item.item_id} className="bg-secondary/50 border border-border rounded-lg p-2.5 flex items-center gap-3">
+                <div key={item.item_id} className="bg-background-subtle border border-border rounded-lg p-2.5 flex items-center gap-3">
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-semibold text-foreground truncate">{item.item_name}</p>
                     <div className="flex items-center gap-2 text-[9px] text-muted-foreground mt-0.5 flex-wrap">

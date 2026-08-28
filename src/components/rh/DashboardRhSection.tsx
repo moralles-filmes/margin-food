@@ -5,12 +5,11 @@ import { Users, Clock, DollarSign, AlertTriangle, CalendarOff, Award, Heart } fr
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, CartesianGrid } from 'recharts';
 import { formatFixedBR, fmtBRL, formatPercentBR } from '@/lib/formatters';
 import GlobalKpiCard from '@/components/ui/KpiCard';
+import { axisProps, gridProps, tooltipProps, SERIES_COLORS } from '@/lib/chartTheme';
+import { ChartTooltip } from '@/components/ui/ChartTooltip';
 
 import { useCan } from '@/permissions/hooks';
-const COLORS = [
-  'hsl(var(--primary))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))',
-  'hsl(var(--chart-4))', 'hsl(var(--chart-5))', 'hsl(var(--accent))',
-];
+const COLORS = SERIES_COLORS;
 
 function fmtCurrency(v: number) {
   return fmtBRL(v);
@@ -209,7 +208,7 @@ export default function DashboardRhSection({
                       <Cell key={i} fill={COLORS[i % COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip />
+                  <Tooltip {...tooltipProps} content={<ChartTooltip />} />
                 </PieChart>
               </ResponsiveContainer>
             ) : <EmptyChart />}
@@ -225,11 +224,11 @@ export default function DashboardRhSection({
             {custoPorSetor.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={custoPorSetor}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="name" tick={{ fontSize: 10 }} className="fill-muted-foreground" />
-                  <YAxis tick={{ fontSize: 10 }} className="fill-muted-foreground" />
-                  <Tooltip formatter={(v: number) => fmtBRL(v)} />
-                  <Bar dataKey="custo" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                  <CartesianGrid {...gridProps} />
+                  <XAxis dataKey="name" {...axisProps} />
+                  <YAxis {...axisProps} />
+                  <Tooltip {...tooltipProps} content={<ChartTooltip valueFormatter={v => fmtBRL(Number(v))} />} />
+                  <Bar dataKey="custo" name="Custo" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             ) : <EmptyChart />}
@@ -251,7 +250,7 @@ export default function DashboardRhSection({
                       <Cell key={i} fill={COLORS[(i + 2) % COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip />
+                  <Tooltip {...tooltipProps} content={<ChartTooltip />} />
                 </PieChart>
               </ResponsiveContainer>
             ) : <EmptyChart />}
@@ -267,11 +266,11 @@ export default function DashboardRhSection({
             {heByColab.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={heByColab} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis type="number" tick={{ fontSize: 10 }} className="fill-muted-foreground" />
-                  <YAxis dataKey="nome" type="category" width={60} tick={{ fontSize: 10 }} className="fill-muted-foreground" />
-                  <Tooltip formatter={(v: number) => `${formatFixedBR(v, 1)}h`} />
-                  <Bar dataKey="horas" fill="hsl(var(--chart-2))" radius={[0, 4, 4, 0]} />
+                  <CartesianGrid {...gridProps} vertical horizontal={false} />
+                  <XAxis type="number" {...axisProps} />
+                  <YAxis dataKey="nome" type="category" width={60} {...axisProps} />
+                  <Tooltip {...tooltipProps} content={<ChartTooltip valueFormatter={v => `${formatFixedBR(Number(v), 1)}h`} />} />
+                  <Bar dataKey="horas" name="Horas Extras" fill="hsl(var(--chart-2))" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             ) : <EmptyChart />}
