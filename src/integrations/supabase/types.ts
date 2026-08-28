@@ -10348,6 +10348,10 @@ export type Database = {
         Args: { p_session_id: string }
         Returns: Json
       }
+      get_fin_presentation_revenue: {
+        Args: { p_history_years: number[]; p_month: string }
+        Returns: Json
+      }
       get_fin_presentation_socios: {
         Args: {
           p_end_exclusive: string
