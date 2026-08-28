@@ -3,6 +3,7 @@ export * from './chapters';
 export * from './revenue';
 export * from './expenses';
 export * from './results';
+export * from './insights';
 export * from './metrics';
 export * from './periods';
 export * from './categories';
