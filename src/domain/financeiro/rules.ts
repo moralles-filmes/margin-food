@@ -34,7 +34,7 @@ export const RULES: Record<string, DomainRule> = {
     statusIncluded: ['REALIZADO', 'CONCILIADO'],
     statusExcluded: ['CANCELADO'],
     tipoExcluded: ['TRANSFERENCIA'],
-    sourceOfTruth: 'RPC get_fin_dashboard_summary / get_fin_dre_summary / relatorio_socios_resumo',
+    sourceOfTruth: 'RPC get_fin_dashboard_summary / get_fin_presentation_socios / get_fin_dre_summary',
     consumers: ['Dashboard', 'DRE', 'Relatório Sócios', 'KPIs', 'Comparativo'],
   },
   'FIN-DESPESA': {
@@ -45,7 +45,7 @@ export const RULES: Record<string, DomainRule> = {
     statusIncluded: ['REALIZADO', 'CONCILIADO'],
     statusExcluded: ['CANCELADO'],
     tipoExcluded: ['TRANSFERENCIA'],
-    sourceOfTruth: 'RPC get_fin_dashboard_summary / get_fin_dre_summary / relatorio_socios_resumo',
+    sourceOfTruth: 'RPC get_fin_dashboard_summary / get_fin_presentation_socios / get_fin_dre_summary',
     consumers: ['Dashboard', 'DRE', 'Relatório Sócios', 'KPIs', 'Comparativo'],
   },
   'FIN-RESULTADO': {
@@ -86,7 +86,7 @@ export const RULES: Record<string, DomainRule> = {
     statusIncluded: ['REALIZADO', 'CONCILIADO'],
     tipoExcluded: ['TRANSFERENCIA'],
     sourceOfTruth: 'RPC get_fin_dre_summary',
-    consumers: ['DRE', 'Relatório Sócios'],
+    consumers: ['DRE'],
   },
   'FIN-DFC': {
     id: 'FIN-DFC',

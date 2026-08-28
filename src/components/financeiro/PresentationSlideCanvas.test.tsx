@@ -93,7 +93,7 @@ describe('estados e comparações dos slides', () => {
     expect(screen.getByText(/período anterior fora do histórico disponível/i)).toBeInTheDocument();
   });
 
-  it('abre o detalhe por competência a partir dos cartões do resumo', () => {
+  it('abre o detalhe do resultado em caixa a partir dos cartões do resumo', () => {
     const data = createPresentationSociosData();
     const summary = data.slides.find(slide => slide.kind === 'results-summary');
     if (!summary) throw new Error('Resumo de Resultados ausente');

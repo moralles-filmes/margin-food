@@ -186,7 +186,7 @@ describe('motor determinístico de Insights executivos', () => {
     expect(reducedInsight?.tone).toBe('positive');
   });
 
-  it('mantém Faturamento separado do razão e Despesas separadas de Resultados por competência', () => {
+  it('mantém Faturamento separado do razão e identifica as fontes canônicas dos insights', () => {
     const data = generatePresentationInsights(
       createInsightRichRevenueData(),
       createInsightRichExpensesData(),
@@ -214,12 +214,31 @@ describe('motor determinístico de Insights executivos', () => {
 
   it.each([
     ['loading', { state: 'loading' as const }, { state: 'loading' }],
-    ['unavailable', { state: 'unavailable' as const, reason: 'missing-canonical-source' as const }, { state: 'unavailable', reason: 'missing-canonical-source' }],
-    ['error', { state: 'error' as const, message: 'Falha controlada.' }, { state: 'error' }],
-  ])('propaga o estado %s sem fabricar conteúdo', (_label, revenue, expected) => {
+  ])('aguarda o estado %s sem fabricar conteúdo', (_label, revenue, expected) => {
     expect(derivePresentationInsightsAvailability(
       revenue,
       available(quietExpenses()),
     )).toMatchObject(expected);
+  });
+
+  it.each([
+    ['indisponível', { state: 'unavailable' as const, reason: 'missing-canonical-source' as const }],
+    ['com erro', { state: 'error' as const, message: 'Falha controlada.' }],
+  ])('gera Insights parciais de despesas quando Faturamento está %s', (_label, revenue) => {
+    const availability = derivePresentationInsightsAvailability(
+      revenue,
+      available(createInsightRichExpensesData()),
+    );
+    expect(availability.state).toBe('available');
+    if (availability.state !== 'available') return;
+    expect(availability.data.insights.length).toBeGreaterThan(0);
+    expect(availability.data.insights.every(insight => insight.domain === 'expenses')).toBe(true);
+  });
+
+  it('continua indisponível quando nenhuma fonte canônica pode ser materializada', () => {
+    expect(derivePresentationInsightsAvailability(
+      { state: 'unavailable', reason: 'missing-canonical-source' },
+      { state: 'unavailable', reason: 'missing-canonical-source' },
+    )).toEqual({ state: 'unavailable', reason: 'missing-canonical-source' });
   });
 });

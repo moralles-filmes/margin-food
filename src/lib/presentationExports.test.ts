@@ -75,7 +75,7 @@ describe('exportações da Apresentação Sócios', () => {
     expect(slideXml).toContain('Informativo não operacional');
     expect(notesXml).toContain('public.get_fin_presentation_socios');
     expect(notesXml).toContain('public.fin_lancamento_rateios');
-    expect(notesXml).toContain('data_competencia; regime de competencia');
+    expect(notesXml).toContain('COALESCE(data_pagamento, conciliado_em::date, data_competencia); regime de caixa do Dashboard');
     expect(notesXml).toContain('valores nao operacionais ficam fora do resultado operacional');
     exportable.forEach((slide, index) => {
       expect(noteXmls[index]).toContain(`slideId=${slide.id}`);

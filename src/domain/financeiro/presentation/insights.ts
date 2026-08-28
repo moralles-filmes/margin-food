@@ -203,13 +203,16 @@ function compareText(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;
 }
 
-function latestTimestamp(left: string, right: string): string {
-  const leftTime = Date.parse(left);
-  const rightTime = Date.parse(right);
-  if (Number.isFinite(leftTime) && Number.isFinite(rightTime) && leftTime !== rightTime) {
-    return leftTime > rightTime ? left : right;
-  }
-  return compareText(left, right) >= 0 ? left : right;
+function latestTimestamp(values: readonly string[]): string {
+  if (values.length === 0) throw new RangeError('Insights exigem ao menos uma fonte canônica.');
+  return values.reduce((latest, candidate) => {
+    const latestTime = Date.parse(latest);
+    const candidateTime = Date.parse(candidate);
+    if (Number.isFinite(latestTime) && Number.isFinite(candidateTime) && latestTime !== candidateTime) {
+      return candidateTime > latestTime ? candidate : latest;
+    }
+    return compareText(candidate, latest) >= 0 ? candidate : latest;
+  });
 }
 
 function percentageChange(current: number, baseline: number): PresentationInsightPercentage {
@@ -599,23 +602,30 @@ export function comparePresentationInsights(
 }
 
 export function generatePresentationInsights(
-  revenue: PresentationRevenueData,
-  expenses: PresentationExpensesData,
+  revenue: PresentationRevenueData | undefined,
+  expenses: PresentationExpensesData | undefined,
 ): PresentationInsightsData {
   const candidates = [
-    revenueMonthChangeCandidate(revenue),
-    revenueWeekdayCandidate(revenue),
-    revenueHistoryCandidate(revenue),
-    expensesMonthChangeCandidate(expenses),
-    expensesCategoryCandidate(expenses),
-    expensesRollingCandidate(expenses),
+    ...(revenue ? [
+      revenueMonthChangeCandidate(revenue),
+      revenueWeekdayCandidate(revenue),
+      revenueHistoryCandidate(revenue),
+    ] : []),
+    ...(expenses ? [
+      expensesMonthChangeCandidate(expenses),
+      expensesCategoryCandidate(expenses),
+      expensesRollingCandidate(expenses),
+    ] : []),
   ].filter((candidate): candidate is PresentationInsight => candidate !== null)
     .sort(comparePresentationInsights);
   const insights = candidates.slice(0, PRESENTATION_INSIGHT_RULES.selection.maximum);
   return {
     contractVersion: PRESENTATION_INSIGHTS_CONTRACT_VERSION,
     rulesetVersion: PRESENTATION_INSIGHTS_RULESET_VERSION,
-    generatedAt: latestTimestamp(revenue.generatedAt, expenses.generatedAt),
+    generatedAt: latestTimestamp([
+      ...(revenue ? [revenue.generatedAt] : []),
+      ...(expenses ? [expenses.generatedAt] : []),
+    ]),
     candidateCount: candidates.length,
     preferredMinimum: PRESENTATION_INSIGHT_RULES.selection.preferredMinimum,
     maximum: PRESENTATION_INSIGHT_RULES.selection.maximum,
@@ -634,20 +644,19 @@ export function derivePresentationInsightsAvailability(
   expenses: DataAvailability<PresentationExpensesData>,
 ): DataAvailability<PresentationInsightsData> {
   const inputs = [revenue, expenses] as const;
-  if (inputs.some(input => input.state === 'error')) {
-    return { state: 'error', message: 'Não foi possível gerar Insights porque um contrato canônico falhou.' };
-  }
   if (inputs.some(input => input.state === 'loading')) return { state: 'loading' };
   if (inputs.some(input => input.state === 'idle')) return { state: 'idle' };
-  const unavailable = inputs.find(input => input.state === 'unavailable');
-  if (unavailable?.state === 'unavailable') {
-    return { state: 'unavailable', reason: unavailable.reason };
-  }
 
   const revenueData = readMaterialized(revenue);
   const expensesData = readMaterialized(expenses);
-  if (!revenueData || !expensesData) {
-    return { state: 'unavailable', reason: 'missing-canonical-source' };
+  if (!revenueData && !expensesData) {
+    if (inputs.some(input => input.state === 'error')) {
+      return { state: 'error', message: 'Não foi possível gerar Insights porque as fontes canônicas falharam.' };
+    }
+    const unavailable = inputs.find(input => input.state === 'unavailable');
+    return unavailable?.state === 'unavailable'
+      ? { state: 'unavailable', reason: unavailable.reason }
+      : { state: 'unavailable', reason: 'missing-canonical-source' };
   }
   const data = generatePresentationInsights(revenueData, expensesData);
   return data.insights.length > 0

@@ -153,6 +153,7 @@ GRANT EXECUTE ON FUNCTION public.has_any_permission(uuid,text[]) TO authenticate
 \ir ../../migrations/20260826005756_presentation_detail_drilldown.sql
 \ir ../../migrations/20260826021702_presentation_socios_budget_projection.sql
 \ir ../../migrations/20260826211500_harden_presentation_dashboard_search_path.sql
+\ir ../../migrations/20260828171602_align_presentation_results_with_dashboard_cash_basis.sql
 
 INSERT INTO public.fin_categorias (
   id, company_id, parent_id, nome, tipo, ordem, excluir_dos_totais, grupo, linha_dre
@@ -205,9 +206,9 @@ BEGIN
     DATE '2026-03-01', DATE '2026-04-01', DATE '2026-02-01', DATE '2026-03-01',
     DATE '2025-03-01', DATE '2025-04-01', 'month', 10
   );
-  IF (v_payload#>>'{current,metrics,managerialResult,revenue}')::numeric <> 1200
+  IF (v_payload#>>'{current,metrics,managerialResult,revenue}')::numeric <> 0
      OR (v_payload#>>'{current,metrics,managerialResult,expense}')::numeric <> 300 THEN
-    RAISE EXCEPTION 'TEST_FAILED: presentation managerial totals';
+    RAISE EXCEPTION 'TEST_FAILED: presentation must match dashboard cash-basis totals';
   END IF;
   IF (v_payload#>>'{current,metrics,openItems,accountsPayableOpen,amount}')::numeric <> 250 THEN
     RAISE EXCEPTION 'TEST_FAILED: open payable separation';
@@ -222,9 +223,23 @@ BEGIN
   v_payload := public.get_fin_presentation_detail_rows(
     DATE '2026-03-01', DATE '2026-04-01', 'ledger', 'RECEITA', NULL, NULL, 1, 25
   );
+  IF jsonb_array_length(v_payload->'items') <> 0 THEN
+    RAISE EXCEPTION 'TEST_FAILED: detail rows must follow dashboard cash period';
+  END IF;
+  v_payload := public.get_fin_presentation_detail_rows(
+    DATE '2026-04-01', DATE '2026-05-01', 'ledger', 'RECEITA', NULL, NULL, 1, 25
+  );
   IF jsonb_array_length(v_payload->'items') <> 1
-     OR v_payload#>>'{items,0,id}' <> '30000000-0000-4000-8000-000000000001' THEN
-    RAISE EXCEPTION 'TEST_FAILED: detail rows canonical filtering';
+     OR v_payload#>>'{items,0,id}' <> '30000000-0000-4000-8000-000000000001'
+     OR v_payload#>>'{items,0,effectiveDate}' <> '2026-04-02' THEN
+    RAISE EXCEPTION 'TEST_FAILED: detail rows effective date';
+  END IF;
+  v_payload := public.get_fin_presentation_detail_series(
+    DATE '2026-03-01', DATE '2026-05-01', 'month', 'RECEITA', NULL, NULL
+  );
+  IF (v_payload#>>'{0,amount}')::numeric <> 0
+     OR (v_payload#>>'{1,amount}')::numeric <> 1200 THEN
+    RAISE EXCEPTION 'TEST_FAILED: detail series must follow dashboard cash period';
   END IF;
   BEGIN
     PERFORM public.get_fin_presentation_detail_rows(
