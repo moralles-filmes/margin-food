@@ -477,6 +477,9 @@ Deno.serve(async (req) => {
         created_by: callerUserId,
         company_id: callerCompanyId,
       });
+      if (error?.code === '23505') {
+        return json({ error: `Já existe um cargo chamado "${nome.trim()}" nesta empresa` }, 409);
+      }
       if (error) return json({ error: error.message }, 400);
       await audit('job_role.created', 'job_roles', { valor_novo: JSON.stringify({ nome }) });
       return json({ success: true });

@@ -367,7 +367,10 @@ export default function AdminUsersView() {
       setShowCreateJobRole(false);
       setNewJrNome(''); setNewJrDescricao('');
       fetchJobRoles();
-    } catch (err: any) { toast.error(err.message); }
+    } catch (err: any) {
+      console.error('[handleCreateJobRole]', err);
+      toast.error(err.message);
+    }
     finally { setCreatingJr(false); }
   };
 
