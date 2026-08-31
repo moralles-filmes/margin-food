@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   buildPresentationComparisons,
   normalizePresentationPeriod,
@@ -177,6 +177,12 @@ export function usePresentationSocios(options: PresentationQueryOptions) {
     queryKey: definition.queryKey,
     queryFn: ({ signal }) => fetchPresentationSocios(definition, signal),
     enabled: options.enabled && Boolean(options.companyId),
+    // Mantém os dados do período anterior visíveis enquanto o novo período
+    // carrega — sem isso, `query.data` fica undefined por um instante a cada
+    // troca de filtro, o que derruba a condição de render em
+    // ApresentacaoSociosSection (linha ~449) e desmonta o toolbar de filtros,
+    // fazendo o rascunho do mês voltar ao valor original.
+    placeholderData: keepPreviousData,
     retry: (failureCount, error) => (
       failureCount < 1
       && !isPresentationPermissionError(error)

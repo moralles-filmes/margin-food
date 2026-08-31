@@ -99,9 +99,9 @@ describe('modo apresentação', () => {
         onClose={() => {}}
       />,
     );
-    expect(screen.getByText((_, element) => element?.tagName === 'P' && element.textContent === '1 de 10')).toBeInTheDocument();
+    expect(screen.getByText((_, element) => element?.tagName === 'P' && element.textContent === '1 de 12')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Despesas' }));
-    expect(screen.getByText((_, element) => element?.tagName === 'P' && element.textContent === '4 de 10')).toBeInTheDocument();
+    expect(screen.getByText((_, element) => element?.tagName === 'P' && element.textContent === '6 de 12')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Faturamento' }));
     expect(screen.getByRole('textbox', { name: /anos persistentes/i })).toHaveValue('2024,2025,2026');
   });
@@ -161,13 +161,13 @@ describe('modo apresentação', () => {
     ));
 
     fireEvent.click(screen.getByRole('button', { name: 'Insights' }));
-    expect(position('13 de 14')).toBeInTheDocument();
+    expect(position('15 de 16')).toBeInTheDocument();
     expect(screen.getByText('Pessoas concentrou despesas no mês')).toBeInTheDocument();
     fireEvent.keyDown(window, { key: 'ArrowRight' });
-    expect(position('14 de 14')).toBeInTheDocument();
+    expect(position('16 de 16')).toBeInTheDocument();
     expect(screen.getByText('Despesas aumentaram no mês')).toBeInTheDocument();
     fireEvent.keyDown(window, { key: 'ArrowLeft' });
-    expect(position('13 de 14')).toBeInTheDocument();
+    expect(position('15 de 16')).toBeInTheDocument();
   });
 
   it('oferece controles de exportação somente com a permissão export', () => {
@@ -273,7 +273,7 @@ describe('modo apresentação', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /imprimir apresentação/i }));
     await waitFor(() => expect(print).toHaveBeenCalledOnce());
-    expect(printedSlideCount).toBe(14);
+    expect(printedSlideCount).toBe(16);
     expect(printedText).toContain('Pessoas concentrou despesas no mês');
     expect(printedText).toContain('Faturamento bruto — Fechamento de Caixa');
     expect(printedText).toContain('Despesas financeiras — regime de caixa do DFC');

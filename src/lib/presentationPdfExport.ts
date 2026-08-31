@@ -7,6 +7,8 @@ import type {
   PresentationDecisionDetail,
   PresentationDecisionComparison,
   PresentationRevenueData,
+  PresentationRevenueBrandPoint,
+  PresentationRevenueGrossToNetPeriod,
   PresentationExpensesData,
   PresentationExpenseNode,
   PresentationResultsData,
@@ -257,6 +259,54 @@ function drawRevenueSummary(doc: jsPDF, revenue: PresentationRevenueData): void 
   doc.text(revenueDeltaText(revenue.delta.percentage, true), 168, 151, { maxWidth: 125 });
 }
 
+function grossToNetDifferenceText(period: PresentationRevenueGrossToNetPeriod, percentage = false): string {
+  if (percentage) {
+    return period.differencePercent.state === 'available'
+      ? formatPercentBR(period.differencePercent.value, 1)
+      : 'Bruto zero ou negativo';
+  }
+  return fmtBRL(period.difference);
+}
+
+function drawRevenueGrossNet(doc: jsPDF, revenue: PresentationRevenueData): void {
+  const rows = [
+    { label: 'MES SELECIONADO', gross: revenue.current, net: revenue.netRevenue.current },
+    { label: 'MES ANTERIOR', gross: revenue.previous, net: revenue.netRevenue.previous },
+  ];
+  rows.forEach((row, index) => {
+    const x = 22 + index * 145;
+    setColor(doc, COLOR.gold, 'fill'); doc.rect(x, 58, 1.4, 58, 'F');
+    setColor(doc, COLOR.muted); doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.text(row.label, x + 6, 65);
+    setColor(doc, COLOR.white); doc.setFont('helvetica', 'normal'); doc.setFontSize(12); doc.text(row.gross.month, x + 6, 76);
+    setColor(doc, COLOR.muted); doc.setFontSize(8); doc.text('BRUTO (FECHAMENTO DE CAIXA)', x + 6, 90);
+    setColor(doc, COLOR.white); doc.setFont('helvetica', 'bold'); doc.setFontSize(15); doc.text(fmtBRL(row.gross.total), x + 6, 100, { maxWidth: 127 });
+    setColor(doc, COLOR.muted); doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.text('LIQUIDO (LIVRO RAZAO)', x + 6, 113);
+    setColor(doc, COLOR.white); doc.setFont('helvetica', 'bold'); doc.setFontSize(15); doc.text(fmtBRL(row.net.total), x + 6, 123, { maxWidth: 127 });
+  });
+  setColor(doc, COLOR.subtle, 'draw'); doc.line(22, 137, 298, 137);
+  setColor(doc, COLOR.muted); doc.setFontSize(8.5); doc.text('DIFERENCA (MES SELECIONADO)', 22, 148); doc.text('% DA DIFERENCA SOBRE O BRUTO', 168, 148);
+  setColor(doc, COLOR.white); doc.setFont('helvetica', 'bold'); doc.setFontSize(14);
+  doc.text(grossToNetDifferenceText(revenue.grossToNet.current), 22, 160, { maxWidth: 125 });
+  doc.text(grossToNetDifferenceText(revenue.grossToNet.current, true), 168, 160, { maxWidth: 125 });
+  setColor(doc, COLOR.muted); doc.setFont('helvetica', 'normal'); doc.setFontSize(7);
+  doc.text('Liquido = receita operacional do livro razao (regime de caixa) — mesma base do KPI Receita operacional de Resultados.', 22, 172, { maxWidth: 276 });
+}
+
+function drawRevenueByBrand(doc: jsPDF, revenue: PresentationRevenueData): void {
+  const total = revenue.current.total;
+  const items = [...revenue.byBrand].sort((left, right) => right.total - left.total);
+  if (items.length === 0) { drawEmpty(doc, 'Sem faturamento no mes selecionado.'); return; }
+  items.forEach((item: PresentationRevenueBrandPoint, index) => {
+    const y = 55 + index * 13;
+    setColor(doc, COLOR.gold); doc.setFontSize(14); doc.text(String(index + 1), 22, y);
+    setColor(doc, COLOR.white); doc.setFontSize(9.5); doc.text(item.nome, 33, y - 1, { maxWidth: 170 });
+    setColor(doc, COLOR.muted); doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
+    doc.text(`${total > 0 ? formatPercentBR((item.total / total) * 100, 1) : '-'} do bruto do mes · ${item.closingCount} fechamento(s)`, 33, y + 4);
+    setColor(doc, COLOR.revenue); doc.setFont('courier', 'bold'); doc.setFontSize(9); doc.text(fmtBRL(item.total), 298, y, { align: 'right' });
+    setColor(doc, COLOR.subtle, 'draw'); doc.line(22, y + 7, 298, y + 7);
+  });
+}
+
 function drawRevenueWeekdays(doc: jsPDF, revenue: PresentationRevenueData): void {
   revenue.weekdays.forEach((day, index) => {
     const width = 39;
@@ -336,6 +386,17 @@ function expenseDeltaText(delta: PresentationExpensesData['delta']['absolute'], 
   return delta.reason === 'previous-period-absent' ? 'Mes anterior ausente' : 'Mes selecionado ausente';
 }
 
+/** Soma o `amount` dos nós de topo da árvore, separando operacional × não operacional (mesma regra do slide: excluir_dos_totais é herdado pela subárvore inteira). */
+function operationalExpenseSplit(
+  tree: readonly PresentationExpenseNode[],
+): { operational: number; nonOperational: number } {
+  return tree.reduce((totals, node) => (
+    node.operationalClass === 'non-operational'
+      ? { ...totals, nonOperational: totals.nonOperational + node.amount }
+      : { ...totals, operational: totals.operational + node.amount }
+  ), { operational: 0, nonOperational: 0 });
+}
+
 function drawExpensesSummary(doc: jsPDF, expenses: PresentationExpensesData): void {
   [expenses.current, expenses.previous].forEach((period, index) => {
     const x = 22 + index * 145;
@@ -345,28 +406,43 @@ function drawExpensesSummary(doc: jsPDF, expenses: PresentationExpensesData): vo
     doc.setFont('helvetica', 'bold'); doc.setFontSize(21); doc.text(expensePeriodText(period), x + 6, 93, { maxWidth: 127 });
     setColor(doc, COLOR.muted); doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.text(`${period.quantity} lancamento(s) do razao`, x + 6, 106);
   });
+  if (expenses.current.state === 'available') {
+    const split = operationalExpenseSplit(expenses.tree);
+    setColor(doc, COLOR.subtle, 'draw'); doc.line(22, 114, 298, 114);
+    setColor(doc, COLOR.muted); doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.text('DESPESAS OPERACIONAIS (MES SELECIONADO)', 22, 121);
+    setColor(doc, COLOR.warning); doc.text('DESPESAS NAO OPERACIONAIS (MES SELECIONADO)', 160, 121);
+    setColor(doc, COLOR.white); doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.text(fmtBRL(split.operational), 22, 130, { maxWidth: 130 });
+    setColor(doc, COLOR.warning); doc.text(fmtBRL(split.nonOperational), 160, 130, { maxWidth: 130 });
+  }
   const reading = expenses.delta.meaning === 'increase' ? 'Aumento · desfavoravel' : expenses.delta.meaning === 'reduction' ? 'Reducao · favoravel' : expenses.delta.meaning === 'unchanged' ? 'Estavel' : 'Indisponivel';
-  setColor(doc, COLOR.subtle, 'draw'); doc.line(22, 126, 298, 126);
-  setColor(doc, COLOR.muted); doc.setFontSize(8); doc.text('VARIACAO ABSOLUTA', 22, 137); doc.text('VARIACAO PERCENTUAL', 119, 137); doc.text('LEITURA EXECUTIVA', 216, 137);
-  setColor(doc, COLOR.white); doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.text(expenseDeltaText(expenses.delta.absolute), 22, 149, { maxWidth: 86 }); doc.text(expenseDeltaText(expenses.delta.percentage, true), 119, 149, { maxWidth: 86 });
-  setColor(doc, expenses.delta.favorability === 'favorable' ? COLOR.revenue : expenses.delta.favorability === 'unfavorable' ? COLOR.expense : COLOR.white); doc.text(reading, 216, 149, { maxWidth: 82 });
+  setColor(doc, COLOR.subtle, 'draw'); doc.line(22, 140, 298, 140);
+  setColor(doc, COLOR.muted); doc.setFontSize(8); doc.text('VARIACAO ABSOLUTA', 22, 151); doc.text('VARIACAO PERCENTUAL', 119, 151); doc.text('LEITURA EXECUTIVA', 216, 151);
+  setColor(doc, COLOR.white); doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.text(expenseDeltaText(expenses.delta.absolute), 22, 163, { maxWidth: 86 }); doc.text(expenseDeltaText(expenses.delta.percentage, true), 119, 163, { maxWidth: 86 });
+  setColor(doc, expenses.delta.favorability === 'favorable' ? COLOR.revenue : expenses.delta.favorability === 'unfavorable' ? COLOR.expense : COLOR.white); doc.text(reading, 216, 163, { maxWidth: 82 });
 }
 
 function flattenExpenseNodes(nodes: readonly PresentationExpenseNode[], depth = 0): Array<{ node: PresentationExpenseNode; depth: number }> {
   return nodes.flatMap(node => [{ node, depth }, ...flattenExpenseNodes(node.children, depth + 1)]);
 }
 
-function drawExpensesTree(doc: jsPDF, nodes: readonly PresentationExpenseNode[]): void {
+/** % que `amount` representa da receita operacional líquida do período; sem base disponível → traço. */
+function expenseShareOfNetRevenueText(amount: number, netRevenue: number | null): string {
+  if (netRevenue === null || netRevenue <= 0) return '-';
+  return formatPercentBR((amount / netRevenue) * 100, 1);
+}
+
+function drawExpensesTree(doc: jsPDF, nodes: readonly PresentationExpenseNode[], netRevenue: number | null): void {
   const rows = flattenExpenseNodes(nodes);
   if (rows.length === 0) { drawEmpty(doc, 'Sem despesas no mes selecionado.'); return; }
-  setColor(doc, COLOR.muted); doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.text('CATEGORIA', 22, 48); doc.text('VALOR PROPRIO', 210, 48, { align: 'right' }); doc.text('ACUMULADO', 298, 48, { align: 'right' });
+  setColor(doc, COLOR.muted); doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.text('CATEGORIA', 22, 48); doc.text('VALOR PROPRIO', 200, 48, { align: 'right' }); doc.text('ACUMULADO', 250, 48, { align: 'right' }); doc.text('% RECEITA LIQ.', 298, 48, { align: 'right' });
   rows.forEach(({ node, depth }, index) => {
     const y = 59 + index * 11;
     setColor(doc, COLOR.subtle, 'draw'); doc.line(22, y + 3, 298, y + 3);
-    setColor(doc, COLOR.white); doc.setFont('helvetica', depth === 0 ? 'bold' : 'normal'); doc.setFontSize(8.5); doc.text(`${depth > 0 ? '> ' : ''}${node.name}`, 22 + depth * 5, y, { maxWidth: 142 - depth * 5 });
-    if (node.operationalClass === 'non-operational') { setColor(doc, COLOR.warning); doc.setFontSize(6.5); doc.text('NAO OPERACIONAL', 168, y); }
-    setColor(doc, COLOR.muted); doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.text(fmtBRL(node.directAmount), 210, y, { align: 'right' });
-    setColor(doc, COLOR.white); doc.setFont('helvetica', 'bold'); doc.text(fmtBRL(node.amount), 298, y, { align: 'right' });
+    setColor(doc, COLOR.white); doc.setFont('helvetica', depth === 0 ? 'bold' : 'normal'); doc.setFontSize(8.5); doc.text(`${depth > 0 ? '> ' : ''}${node.name}`, 22 + depth * 5, y, { maxWidth: 132 - depth * 5 });
+    if (node.operationalClass === 'non-operational') { setColor(doc, COLOR.warning); doc.setFontSize(6.5); doc.text('NAO OPERACIONAL', 158, y); }
+    setColor(doc, COLOR.muted); doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.text(fmtBRL(node.directAmount), 200, y, { align: 'right' });
+    setColor(doc, COLOR.white); doc.setFont('helvetica', 'bold'); doc.text(fmtBRL(node.amount), 250, y, { align: 'right' });
+    setColor(doc, COLOR.muted); doc.setFont('helvetica', 'normal'); doc.text(expenseShareOfNetRevenueText(node.amount, netRevenue), 298, y, { align: 'right' });
   });
 }
 
@@ -1185,6 +1261,12 @@ function drawSlideContent(doc: jsPDF, slide: PresentationSlide): void {
     case 'revenue-summary':
       drawRevenueSummary(doc, payload.revenue);
       break;
+    case 'revenue-gross-net':
+      drawRevenueGrossNet(doc, payload.revenue);
+      break;
+    case 'revenue-by-brand':
+      drawRevenueByBrand(doc, payload.revenue);
+      break;
     case 'revenue-weekdays':
       drawRevenueWeekdays(doc, payload.revenue);
       break;
@@ -1195,7 +1277,7 @@ function drawSlideContent(doc: jsPDF, slide: PresentationSlide): void {
       drawExpensesSummary(doc, payload.expenses);
       break;
     case 'expenses-tree':
-      drawExpensesTree(doc, payload.nodes);
+      drawExpensesTree(doc, payload.nodes, payload.netRevenue);
       break;
     case 'expenses-rolling':
       drawExpensesRolling(doc, payload.expenses);

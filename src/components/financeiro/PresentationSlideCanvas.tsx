@@ -9,6 +9,8 @@ import type {
   PresentationDecisionComparison,
   PresentationRevenueData,
   PresentationRevenuePeriodSummary,
+  PresentationRevenueBrandPoint,
+  PresentationRevenueGrossToNetPeriod,
   PresentationExpensesData,
   PresentationExpensesPeriodSummary,
   PresentationExpenseNode,
@@ -126,6 +128,79 @@ function RevenueSummaryLayout({ revenue }: { revenue: PresentationRevenueData })
   );
 }
 
+function grossToNetDifferenceText(period: PresentationRevenueGrossToNetPeriod, percentage = false): string {
+  if (percentage) {
+    return period.differencePercent.state === 'available'
+      ? formatPercentBR(period.differencePercent.value, 1)
+      : 'Bruto zero ou negativo';
+  }
+  return fmtBRL(period.difference);
+}
+
+function RevenueGrossNetLayout({ revenue }: { revenue: PresentationRevenueData }) {
+  const rows = [
+    { label: 'Mês selecionado', gross: revenue.current, net: revenue.netRevenue.current, diff: revenue.grossToNet.current, strong: true },
+    { label: 'Mês anterior', gross: revenue.previous, net: revenue.netRevenue.previous, diff: revenue.grossToNet.previous, strong: false },
+  ];
+  return (
+    <div className="flex min-h-0 flex-1 flex-col justify-center gap-8">
+      <div className="grid grid-cols-2 gap-10">
+        {rows.map(({ label, gross, net, diff, strong }) => (
+          <section key={gross.month} className="border-l-2 border-primary pl-5">
+            <p className="text-[clamp(0.72rem,1cqw,1rem)] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+            <p className="mt-2 capitalize text-[clamp(0.82rem,1.2cqw,1.2rem)] text-ink-secondary">{formatYearMonthLabel(gross.month)}</p>
+            <div className="mt-4 grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-[clamp(0.6rem,0.78cqw,0.78rem)] text-muted-foreground">Bruto (Fechamento de Caixa)</p>
+                <p className={cn('mt-1 break-words text-[clamp(1.1rem,2cqw,2rem)] font-bold tracking-tight', strong ? 'text-foreground' : 'text-ink-secondary')}>{fmtBRL(diff.gross)}</p>
+              </div>
+              <div>
+                <p className="text-[clamp(0.6rem,0.78cqw,0.78rem)] text-muted-foreground">Líquido (Livro Razão)</p>
+                <p className={cn('mt-1 break-words text-[clamp(1.1rem,2cqw,2rem)] font-bold tracking-tight', strong ? 'text-foreground' : 'text-ink-secondary')}>{fmtBRL(net.total)}</p>
+              </div>
+            </div>
+          </section>
+        ))}
+      </div>
+      <div className="grid grid-cols-2 gap-8 border-t border-border pt-5">
+        <div>
+          <p className="text-[clamp(0.65rem,0.85cqw,0.85rem)] text-muted-foreground">Diferença (mês selecionado)</p>
+          <p className="mt-1 text-[clamp(1rem,1.55cqw,1.5rem)] font-semibold text-foreground">{grossToNetDifferenceText(revenue.grossToNet.current)}</p>
+        </div>
+        <div>
+          <p className="text-[clamp(0.65rem,0.85cqw,0.85rem)] text-muted-foreground">% da diferença sobre o bruto</p>
+          <p className="mt-1 text-[clamp(1rem,1.55cqw,1.5rem)] font-semibold text-foreground">{grossToNetDifferenceText(revenue.grossToNet.current, true)}</p>
+        </div>
+      </div>
+      <p className="text-[clamp(0.58rem,0.75cqw,0.75rem)] text-muted-foreground">Bruto: financeiro_fechamento_caixa.faturamento_bruto · Líquido: receita operacional do livro razão (regime de caixa, exclui não operacionais e excluídos de relatório) — mesma base do KPI &quot;Receita operacional&quot; de Resultados.</p>
+    </div>
+  );
+}
+
+function RevenueByBrandLayout({ revenue }: { revenue: PresentationRevenueData }) {
+  const total = revenue.current.total;
+  const items = [...revenue.byBrand].sort((left, right) => right.total - left.total);
+  if (items.length === 0) return <EmptyState message="Sem faturamento no mês selecionado." />;
+  return (
+    <div className="min-h-0 flex-1">
+      <ol className="space-y-2.5">
+        {items.map((item: PresentationRevenueBrandPoint, index) => (
+          <li key={item.marcaId ?? 'sem-marca'} className="grid grid-cols-[2.2rem_minmax(0,1fr)_auto] items-center gap-3 border-b border-border pb-2.5">
+            <span className="text-center text-[clamp(1rem,1.5cqw,1.45rem)] font-bold text-primary-ink">{index + 1}</span>
+            <div className="min-w-0">
+              <p className="break-words text-[clamp(0.78rem,1.15cqw,1.1rem)] font-medium leading-tight text-foreground">{item.nome}</p>
+              <p className="text-[clamp(0.65rem,0.8cqw,0.82rem)] text-muted-foreground">
+                {total > 0 ? formatPercentBR((item.total / total) * 100, 1) : '—'} do bruto do mês · {formatIntegerBR(item.closingCount)} fechamento(s)
+              </p>
+            </div>
+            <strong className="whitespace-nowrap font-mono text-[clamp(0.76rem,1.05cqw,1rem)] text-success">{fmtBRL(item.total)}</strong>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
 function RevenueWeekdaysLayout({ revenue }: { revenue: PresentationRevenueData }) {
   return (
     <div className="grid min-h-0 flex-1 grid-cols-7 items-stretch gap-3">
@@ -201,6 +276,23 @@ function expenseDeltaValue(
   return delta.reason === 'previous-period-absent' ? 'Mês anterior ausente' : 'Mês selecionado ausente';
 }
 
+/**
+ * Soma o `amount` (já acumulado) dos nós de topo da árvore de despesas do mês
+ * selecionado, separando operacional × não operacional. `excluir_dos_totais`
+ * é herdado por toda a subárvore, então uma categoria não operacional nunca
+ * tem pai operacional — somar só os nós de topo evita contar a mesma despesa
+ * duas vezes (o `amount` do nó de topo já inclui os filhos).
+ */
+function operationalExpenseSplit(
+  tree: readonly PresentationExpenseNode[],
+): { operational: number; nonOperational: number } {
+  return tree.reduce((totals, node) => (
+    node.operationalClass === 'non-operational'
+      ? { ...totals, nonOperational: totals.nonOperational + node.amount }
+      : { ...totals, operational: totals.operational + node.amount }
+  ), { operational: 0, nonOperational: 0 });
+}
+
 function ExpensesSummaryLayout({ expenses }: { expenses: PresentationExpensesData }) {
   const semantic = expenses.delta.meaning === 'increase'
     ? { label: 'Aumento de despesas', tone: 'text-destructive' }
@@ -209,6 +301,9 @@ function ExpensesSummaryLayout({ expenses }: { expenses: PresentationExpensesDat
       : expenses.delta.meaning === 'unchanged'
         ? { label: 'Despesas estáveis', tone: 'text-foreground' }
         : { label: 'Comparação indisponível', tone: 'text-muted-foreground' };
+  const split = expenses.current.state === 'available'
+    ? operationalExpenseSplit(expenses.tree)
+    : null;
   return (
     <div className="flex min-h-0 flex-1 flex-col justify-center gap-8">
       <div className="grid grid-cols-2 gap-10">
@@ -221,6 +316,19 @@ function ExpensesSummaryLayout({ expenses }: { expenses: PresentationExpensesDat
           </section>
         ))}
       </div>
+      {split ? (
+        <div className="grid grid-cols-2 gap-10 border-t border-border pt-5">
+          <div>
+            <p className="text-[clamp(0.65rem,0.85cqw,0.85rem)] text-muted-foreground">Despesas operacionais (mês selecionado)</p>
+            <p className="mt-1 text-[clamp(1rem,1.55cqw,1.5rem)] font-semibold text-foreground">{fmtBRL(split.operational)}</p>
+          </div>
+          <div>
+            <p className="text-[clamp(0.65rem,0.85cqw,0.85rem)] text-warning">Despesas não operacionais (mês selecionado)</p>
+            <p className="mt-1 text-[clamp(1rem,1.55cqw,1.5rem)] font-semibold text-warning">{fmtBRL(split.nonOperational)}</p>
+            <p className="mt-1 text-[clamp(0.58rem,0.75cqw,0.75rem)] text-muted-foreground">Incluídas no total acima; fora do resultado operacional.</p>
+          </div>
+        </div>
+      ) : null}
       <div className="grid grid-cols-[1fr_1fr_1.2fr] gap-8 border-t border-border pt-5">
         <div><p className="text-[clamp(0.65rem,0.85cqw,0.85rem)] text-muted-foreground">Variação absoluta</p><p className="mt-1 text-[clamp(1rem,1.55cqw,1.5rem)] font-semibold text-foreground">{expenseDeltaValue(expenses.delta.absolute)}</p></div>
         <div><p className="text-[clamp(0.65rem,0.85cqw,0.85rem)] text-muted-foreground">Variação percentual</p><p className="mt-1 text-[clamp(1rem,1.55cqw,1.5rem)] font-semibold text-foreground">{expenseDeltaValue(expenses.delta.percentage, true)}</p></div>
@@ -234,25 +342,33 @@ function flattenExpenseNodes(nodes: readonly PresentationExpenseNode[], depth = 
   return nodes.flatMap(node => [{ node, depth }, ...flattenExpenseNodes(node.children, depth + 1)]);
 }
 
+/** % que `amount` representa da receita operacional líquida do período; `null`/negativa/zero → sem base para dividir. */
+function expenseShareOfNetRevenue(amount: number, netRevenue: number | null): string {
+  if (netRevenue === null || netRevenue <= 0) return '—';
+  return formatPercentBR((amount / netRevenue) * 100, 1);
+}
+
 function ExpensesTreeLayout({
   nodes,
+  netRevenue,
   onOpenExpenseCategory,
 }: {
   nodes: readonly PresentationExpenseNode[];
+  netRevenue: number | null;
   onOpenExpenseCategory?: (categoryId: string) => void;
 }) {
   const rows = flattenExpenseNodes(nodes);
   if (rows.length === 0) return <EmptyState message="Sem despesas no mês selecionado." />;
   return (
     <div className="min-h-0 flex-1">
-      <div className="mb-2 grid grid-cols-[minmax(0,1fr)_auto_auto] gap-6 border-b border-border pb-2 text-[clamp(0.58rem,0.75cqw,0.75rem)] uppercase tracking-wide text-muted-foreground">
-        <span>Categoria</span><span>Valor próprio</span><span>Acumulado</span>
+      <div className="mb-2 grid grid-cols-[minmax(0,1fr)_auto_auto_auto] gap-6 border-b border-border pb-2 text-[clamp(0.58rem,0.75cqw,0.75rem)] uppercase tracking-wide text-muted-foreground">
+        <span>Categoria</span><span>Valor próprio</span><span>Acumulado</span><span>% da receita líquida</span>
       </div>
       <div className="space-y-1">
         {rows.map(({ node, depth }, index) => {
           const label = <>{depth > 0 ? '↳ ' : ''}{node.name}</>;
           return (
-            <div key={`${node.categoryId ?? node.name}-${index}`} className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-6 border-b border-border py-2">
+            <div key={`${node.categoryId ?? node.name}-${index}`} className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-6 border-b border-border py-2">
               <div className="min-w-0" style={{ paddingLeft: `${depth * 1.1}rem` }}>
                 {node.categoryId && onOpenExpenseCategory ? (
                   <button type="button" className="max-w-full break-words text-left text-[clamp(0.72rem,1cqw,1rem)] font-semibold leading-tight text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => onOpenExpenseCategory(node.categoryId!)}>{label}</button>
@@ -261,6 +377,7 @@ function ExpensesTreeLayout({
               </div>
               <span className="whitespace-nowrap font-mono text-[clamp(0.68rem,0.9cqw,0.9rem)] text-ink-secondary">{fmtBRL(node.directAmount)}</span>
               <strong className="whitespace-nowrap font-mono text-[clamp(0.72rem,1cqw,1rem)] text-foreground">{fmtBRL(node.amount)}</strong>
+              <span className="whitespace-nowrap font-mono text-[clamp(0.68rem,0.9cqw,0.9rem)] text-ink-secondary">{expenseShareOfNetRevenue(node.amount, netRevenue)}</span>
             </div>
           );
         })}
@@ -980,6 +1097,10 @@ function SlideContent({
       return <EmptyState message="Conteúdo não solicitado nesta fase." />;
     case 'revenue-summary':
       return <RevenueSummaryLayout revenue={payload.revenue} />;
+    case 'revenue-gross-net':
+      return <RevenueGrossNetLayout revenue={payload.revenue} />;
+    case 'revenue-by-brand':
+      return <RevenueByBrandLayout revenue={payload.revenue} />;
     case 'revenue-weekdays':
       return <RevenueWeekdaysLayout revenue={payload.revenue} />;
     case 'revenue-history':
@@ -987,7 +1108,7 @@ function SlideContent({
     case 'expenses-summary':
       return <ExpensesSummaryLayout expenses={payload.expenses} />;
     case 'expenses-tree':
-      return <ExpensesTreeLayout nodes={payload.nodes} onOpenExpenseCategory={onOpenExpenseCategory} />;
+      return <ExpensesTreeLayout nodes={payload.nodes} netRevenue={payload.netRevenue} onOpenExpenseCategory={onOpenExpenseCategory} />;
     case 'expenses-rolling':
       return <ExpensesRollingLayout expenses={payload.expenses} />;
     case 'expenses-history':

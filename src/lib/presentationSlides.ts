@@ -35,6 +35,8 @@ const MAX_INSIGHT_LAYOUT_CHARACTERS_PER_SLIDE = 1_600;
 export const PRESENTATION_SLIDE_SEQUENCE = [
   'chapter-foundation',
   'revenue-summary',
+  'revenue-gross-net',
+  'revenue-by-brand',
   'revenue-weekdays',
   'revenue-history',
   'expenses-summary',
@@ -486,7 +488,7 @@ export function buildPresentationSlides(data: PresentationSociosData): Presentat
         chapter: 'expenses',
         kind: 'expenses-summary',
         title: 'Despesas',
-        subtitle: 'Despesas realizadas — regime de caixa do DFC · mês selecionado × mês imediatamente anterior.',
+        subtitle: 'Despesas realizadas — regime de caixa do DFC · mês selecionado × mês imediatamente anterior · total inclui não operacionais, discriminados abaixo.',
         availability: expensesSlideAvailability(
           data.expenses,
           expenses => ({ type: 'expenses-summary', expenses }),
@@ -495,15 +497,21 @@ export function buildPresentationSlides(data: PresentationSociosData): Presentat
       const tree = data.expenses.state === 'available' || data.expenses.state === 'empty'
         ? paginateExpenseTree(data.expenses.data.tree)
         : [[]];
+      // Receita operacional do mesmo capítulo Resultados (get_fin_presentation_socios),
+      // usada como base da coluna de % da árvore de despesas.
+      const netRevenue = data.results
+        && (data.results.state === 'available' || data.results.state === 'empty')
+        ? data.results.data.current.revenue
+        : null;
       tree.forEach((nodes, index) => append({
         id: `expenses-tree-${index + 1}`,
         chapter: 'expenses',
         kind: 'expenses-tree',
         title: withPageNumber('Árvore de despesas', index, tree.length),
-        subtitle: 'Valor próprio e acumulado por categoria · classes não operacionais identificadas separadamente.',
+        subtitle: 'Valor próprio, acumulado e % da receita operacional líquida por categoria · classes não operacionais identificadas separadamente.',
         availability: expensesSlideAvailability(
           data.expenses!,
-          expenses => ({ type: 'expenses-tree', expenses, nodes }),
+          expenses => ({ type: 'expenses-tree', expenses, nodes, netRevenue }),
         ),
       }));
       append({
@@ -543,6 +551,28 @@ export function buildPresentationSlides(data: PresentationSociosData): Presentat
       availability: revenueSlideAvailability(
         data.revenue,
         revenue => ({ type: 'revenue-summary', revenue }),
+      ),
+    });
+    append({
+      id: 'revenue-gross-net',
+      chapter: 'revenue',
+      kind: 'revenue-gross-net',
+      title: 'Faturamento bruto × líquido',
+      subtitle: 'Bruto — Fechamento de Caixa × Líquido — receita operacional do livro razão (regime de caixa) · mês selecionado.',
+      availability: revenueSlideAvailability(
+        data.revenue,
+        revenue => ({ type: 'revenue-gross-net', revenue }),
+      ),
+    });
+    append({
+      id: 'revenue-by-brand',
+      chapter: 'revenue',
+      kind: 'revenue-by-brand',
+      title: 'Faturamento por loja',
+      subtitle: 'Faturamento bruto do mês selecionado por marca/loja cadastrada em Fechamento de Caixa.',
+      availability: revenueSlideAvailability(
+        data.revenue,
+        revenue => ({ type: 'revenue-by-brand', revenue }),
       ),
     });
     append({

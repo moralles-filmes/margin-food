@@ -314,6 +314,8 @@ export interface PresentationComparisonData {
 export type PresentationSlideKind =
   | 'chapter-foundation'
   | 'revenue-summary'
+  | 'revenue-gross-net'
+  | 'revenue-by-brand'
   | 'revenue-weekdays'
   | 'revenue-history'
   | 'expenses-summary'
@@ -343,6 +345,8 @@ export type PresentationSlideKind =
 export type PresentationSlidePayload =
   | { type: 'chapter-foundation'; chapter: PresentationChapterId }
   | { type: 'revenue-summary'; revenue: PresentationRevenueData }
+  | { type: 'revenue-gross-net'; revenue: PresentationRevenueData }
+  | { type: 'revenue-by-brand'; revenue: PresentationRevenueData }
   | { type: 'revenue-weekdays'; revenue: PresentationRevenueData }
   | { type: 'revenue-history'; revenue: PresentationRevenueData }
   | { type: 'expenses-summary'; expenses: PresentationExpensesData }
@@ -350,6 +354,8 @@ export type PresentationSlidePayload =
       type: 'expenses-tree';
       expenses: PresentationExpensesData;
       nodes: readonly PresentationExpenseNode[];
+      /** Receita operacional do mês selecionado (get_fin_presentation_socios), para a coluna de % da árvore. `null` quando Resultados está indisponível. */
+      netRevenue: number | null;
     }
   | { type: 'expenses-rolling'; expenses: PresentationExpensesData }
   | { type: 'expenses-history'; expenses: PresentationExpensesData }

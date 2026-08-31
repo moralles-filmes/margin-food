@@ -5,11 +5,17 @@ import {
   normalizePresentationHistoryYears,
   type IsoDate,
   type PresentationRevenueAvailability,
+  type PresentationRevenueBrandPoint,
   type PresentationRevenueCoverage,
   type PresentationRevenueData,
   type PresentationRevenueDeltaReason,
   type PresentationRevenueDeltaValue,
+  type PresentationRevenueGrossToNet,
+  type PresentationRevenueGrossToNetPercent,
+  type PresentationRevenueGrossToNetPeriod,
+  type PresentationRevenueGrossToNetReason,
   type PresentationRevenueHistoryPoint,
+  type PresentationRevenueNetSummary,
   type PresentationRevenuePeriodCoverage,
   type PresentationRevenuePeriodSummary,
   type PresentationRevenueWeekday,
@@ -17,6 +23,7 @@ import {
 } from '@/domain/financeiro/presentation';
 
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const WEEKDAY_LABELS = [
   'Segunda-feira',
   'Terça-feira',
@@ -204,6 +211,92 @@ function readHistoryPoint(value: unknown, path: string): PresentationRevenueHist
   return { year, month, yearMonth, state, total, closingCount };
 }
 
+function readNullableUuid(value: unknown, path: string): string | null {
+  if (value === null) return null;
+  const id = readString(value, path);
+  if (!UUID_PATTERN.test(id)) return fail(path, 'um UUID ou null');
+  return id;
+}
+
+function readBrandPoint(value: unknown, path: string): PresentationRevenueBrandPoint {
+  const record = readRecord(value, path);
+  return {
+    marcaId: readNullableUuid(record.marcaId, `${path}.marcaId`),
+    nome: readString(record.nome, `${path}.nome`),
+    total: readFiniteNumber(record.total, `${path}.total`),
+    closingCount: readInteger(record.closingCount, `${path}.closingCount`),
+  };
+}
+
+function readByBrand(
+  value: unknown,
+  path: string,
+  currentTotal: number,
+): readonly PresentationRevenueBrandPoint[] {
+  const items = readArray(value, path).map((item, index) => readBrandPoint(item, `${path}[${index}]`));
+  const sum = items.reduce((total, item) => total + item.total, 0);
+  if (Math.abs(sum - currentTotal) > 0.011) {
+    return fail(path, 'a soma exata do faturamento bruto do mês selecionado');
+  }
+  return items;
+}
+
+function readNetSummary(value: unknown, path: string, expectedMonth: YearMonth): PresentationRevenueNetSummary {
+  const record = readRecord(value, path);
+  const month = readYearMonth(record.month, `${path}.month`);
+  if (month !== expectedMonth) return fail(`${path}.month`, 'o mês correspondente do resumo bruto');
+  return { month, total: readFiniteNumber(record.total, `${path}.total`) };
+}
+
+function readGrossToNetPercent(value: unknown, path: string): PresentationRevenueGrossToNetPercent {
+  const record = readRecord(value, path);
+  if (record.state === 'available') {
+    return { state: 'available', value: readFiniteNumber(record.value, `${path}.value`) };
+  }
+  if (record.state !== 'unavailable') return fail(`${path}.state`, 'available ou unavailable');
+  const reason = readString(record.reason, `${path}.reason`) as PresentationRevenueGrossToNetReason;
+  if (reason !== 'zero-baseline') return fail(`${path}.reason`, 'zero-baseline');
+  return { state: 'unavailable', reason };
+}
+
+function readGrossToNetPeriod(
+  value: unknown,
+  path: string,
+  expectedGross: number,
+): PresentationRevenueGrossToNetPeriod {
+  const record = readRecord(value, path);
+  const gross = readFiniteNumber(record.gross, `${path}.gross`);
+  if (Math.abs(gross - expectedGross) > 0.011) return fail(`${path}.gross`, 'o mesmo total bruto do período');
+  const net = readFiniteNumber(record.net, `${path}.net`);
+  const difference = readFiniteNumber(record.difference, `${path}.difference`);
+  if (Math.abs(difference - (gross - net)) > 0.011) return fail(`${path}.difference`, 'bruto menos líquido');
+  const differencePercent = readGrossToNetPercent(record.differencePercent, `${path}.differencePercent`);
+  if (gross <= 0) {
+    if (differencePercent.state !== 'unavailable' || differencePercent.reason !== 'zero-baseline') {
+      return fail(`${path}.differencePercent`, 'zero-baseline quando o bruto é zero ou negativo');
+    }
+  } else {
+    const expectedPercent = (difference / gross) * 100;
+    if (differencePercent.state !== 'available' || Math.abs(differencePercent.value - expectedPercent) > 0.011) {
+      return fail(`${path}.differencePercent`, 'a diferença percentual calculada no banco');
+    }
+  }
+  return { gross, net, difference, differencePercent };
+}
+
+function readGrossToNet(
+  value: unknown,
+  path: string,
+  currentGross: number,
+  previousGross: number,
+): PresentationRevenueGrossToNet {
+  const record = readRecord(value, path);
+  return {
+    current: readGrossToNetPeriod(record.current, `${path}.current`, currentGross),
+    previous: readGrossToNetPeriod(record.previous, `${path}.previous`, previousGross),
+  };
+}
+
 export function adaptPresentationRevenuePayload(payload: unknown): PresentationRevenueData {
   const record = readRecord(payload, 'payload');
   if (record.contractVersion !== PRESENTATION_REVENUE_CONTRACT_VERSION) {
@@ -238,6 +331,13 @@ export function adaptPresentationRevenuePayload(payload: unknown): PresentationR
       fail(`payload.history[${index}]`, 'ordenado por ano e mês');
     }
   });
+  const byBrand = readByBrand(record.byBrand, 'payload.byBrand', current.total);
+  const netRevenueRecord = readRecord(record.netRevenue, 'payload.netRevenue');
+  const netRevenue = {
+    current: readNetSummary(netRevenueRecord.current, 'payload.netRevenue.current', selectedMonth),
+    previous: readNetSummary(netRevenueRecord.previous, 'payload.netRevenue.previous', previousMonth),
+  };
+  const grossToNet = readGrossToNet(record.grossToNet, 'payload.grossToNet', current.total, previous.total);
   return {
     contractVersion: PRESENTATION_REVENUE_CONTRACT_VERSION,
     source: PRESENTATION_REVENUE_SOURCE,
@@ -255,6 +355,9 @@ export function adaptPresentationRevenuePayload(payload: unknown): PresentationR
     },
     weekdays: parsedWeekdays,
     history,
+    byBrand,
+    netRevenue,
+    grossToNet,
   };
 }
 

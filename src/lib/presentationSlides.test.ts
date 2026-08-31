@@ -65,7 +65,7 @@ describe('composição determinística da Apresentação Sócios', () => {
     );
 
     expect(data.slides.filter(slide => slide.chapter === 'revenue').map(slide => slide.kind)).toEqual([
-      'revenue-summary', 'revenue-weekdays', 'revenue-history',
+      'revenue-summary', 'revenue-gross-net', 'revenue-by-brand', 'revenue-weekdays', 'revenue-history',
     ]);
     expect(data.slides.filter(slide => slide.chapter === 'expenses').map(slide => slide.kind)).toEqual([
       'expenses-summary', 'expenses-tree', 'expenses-rolling', 'expenses-history',
