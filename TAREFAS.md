@@ -18,6 +18,11 @@ Este arquivo serve para sincronizar o progresso do desenvolvimento entre os dife
 (Nenhuma tarefa em progresso)
 
 ## ✅ Concluído (Done)
+- [x] **Conciliação Santander GM — ContaMax e OFX mutável (2026-08-31)**
+    - Aplicações/resgates ContaMax agora são transferências atômicas para a conta de investimento e não podem mais ser ignorados; reprocessamento por FITID é idempotente
+    - A importação alerta quando uma linha conciliada de um extrato anterior desaparece da nova exportação, com comparação por conteúdo, ocorrência e período
+    - Dados da Santander GM reparados: 20 transferências, quatro rendimentos obsoletos cancelados, rendimento consolidado movido à aplicação e saldo inicial compensatório removido
+    - Migration `20260831160605_santander_contamax_reconciliation_hardening.sql` aplicada e saldo validado em R$0,00 até 28/08; o líquido pendente de 31/08 fecha nos -R$898,69 do OFX
 - [x] **Fechamento operacional das Fases 7 a 12 da Apresentação Sócios (2026-08-26)**
     - Nove migrations da apresentação reconciliadas no histórico remoto, incluindo decisões, reuniões/atas e o hardening de `search_path`; nenhuma migration antiga alheia foi reaplicada
     - Smoke tests transacionais no Supabase real cobriram RLS, RBAC, isolamento entre empresas, RPCs financeiras, lifecycle, revisões imutáveis, auditoria, notificações, exportação e optimistic locking, com rollback e zero resíduo

@@ -32,7 +32,8 @@ import { runOptionalAutoBind } from '@/lib/conciliacaoAutoBind';
 import { extractSupabaseErrorMessage } from '@/lib/supabaseErrors';
 import { computeScore } from '@/lib/conciliacaoScore';
 import { matchTransferCandidate, findTransferWarnings, type TransferCandidate, type TransferWarning } from '@/lib/conciliacaoTransferMatch';
-import { bankLineKey, buildConciliadosCounts, fitidKey, type ConciliadoRow, type VinculoRow } from '@/lib/conciliacaoConciliados';
+import { bankLineKey, buildConciliadosCounts, findStaleImportedRows, fitidKey, type ConciliadoRow, type VinculoRow } from '@/lib/conciliacaoConciliados';
+import { findSuggestedInvestmentAccountId, getAutomaticInvestmentDirection, isAutomaticInvestmentLine } from '@/lib/conciliacaoInvestimentoAutomatico';
 import type { ContaBancariaRef, CategoriaFinRef, CentroCustoRef, LancamentoConciliacao, LancamentoCandidate, ContaPagarCandidate, ContaReceberCandidate, ContaPagarAberta } from '@/types/financeiro';
 import { mapPagamentoError } from '@/lib/financeiroErrorMap';
 import DateRangePresets from './DateRangePresets';
@@ -261,6 +262,9 @@ export default function ConciliacaoBancariaSection() {
 
   const [transferDialog, setTransferDialog] = useState<{ open: boolean; linhaIndex: number }>({ open: false, linhaIndex: -1 });
   const [transferContaDestino, setTransferContaDestino] = useState('');
+  const [automaticInvestmentDialogOpen, setAutomaticInvestmentDialogOpen] = useState(false);
+  const [automaticInvestmentAccountId, setAutomaticInvestmentAccountId] = useState('');
+  const [linhasAntigasAusentes, setLinhasAntigasAusentes] = useState<ConciliadoRow[]>([]);
 
   const [criarDialog, setCriarDialog] = useState<{ open: boolean; linhaIndex: number }>({ open: false, linhaIndex: -1 });
 
@@ -346,6 +350,21 @@ export default function ConciliacaoBancariaSection() {
     });
   };
 
+  const automaticInvestmentLines = useMemo(
+    () => linhas.filter(linha =>
+      !linha.jaConciliada
+      && !linha.ignorada
+      && !linha.matchId
+      && !linha.transferReconhecida
+      && isAutomaticInvestmentLine(linha),
+    ),
+    [linhas],
+  );
+  const suggestedInvestmentAccountId = useMemo(
+    () => findSuggestedInvestmentAccountId(contas, contaSel),
+    [contas, contaSel],
+  );
+
   useEffect(() => {
     supabase.from('fin_contas').select('id, nome, numero_conta, agencia, banco').eq('ativo', true).order('nome')
       .then(({ data }) => {
@@ -360,6 +379,12 @@ export default function ConciliacaoBancariaSection() {
       setCentrosCusto(ccRes.data || []);
     });
   }, []);
+
+  useEffect(() => {
+    setLinhasAntigasAusentes([]);
+    setAutomaticInvestmentDialogOpen(false);
+    setAutomaticInvestmentAccountId('');
+  }, [contaSel]);
 
   // Restaura linhas do sessionStorage quando a conta é selecionada
   useEffect(() => {
@@ -830,6 +855,7 @@ export default function ConciliacaoBancariaSection() {
      *  baixa e uma despesa real sumiria da conciliação. */
     lancamentosVinculados: Set<string>;
     transferCandidates: TransferCandidate[];
+    staleImportedRows: ConciliadoRow[];
   }
 
   const fetchVinculosExtrato = async () => {
@@ -862,7 +888,7 @@ export default function ConciliacaoBancariaSection() {
     const data: ConciliadoRow[] = [];
     for (let from = 0; ; from += pageSize) {
       const { data: page, error } = await supabase.from('fin_lancamentos')
-        .select('id, data_competencia, data_pagamento, valor, tipo, descricao')
+        .select('id, data_competencia, data_pagamento, valor, tipo, descricao, origem')
         .eq('conta_id', contaSel).eq('conciliado', true).eq('status', 'REALIZADO')
         .order('id', { ascending: true })
         .range(from, from + pageSize - 1);
@@ -903,7 +929,10 @@ export default function ConciliacaoBancariaSection() {
    * `fitidsNoArquivo` (chaves `tipo|fitId` das linhas do arquivo sendo importado) decide quais
    * lançamentos vinculados saem do reconhecimento por conteúdo — ver buildConciliadosCounts.
    */
-  const fetchMatchContext = async (fitidsNoArquivo: ReadonlySet<string>): Promise<MatchContext> => {
+  const fetchMatchContext = async (
+    fitidsNoArquivo: ReadonlySet<string>,
+    linhasArquivo: ReadonlyArray<LinhaExtrato>,
+  ): Promise<MatchContext> => {
     // Busca dados para match + entradas já conciliadas + entradas ignoradas
     const [lancRes, lancAllRes, cpRes, crRes, conciliadosRes, ignoradasRes, vinculosRes, transferRes, espelhosRes] = await Promise.all([
       fetchLancamentosPendentesConta(),
@@ -948,10 +977,17 @@ export default function ConciliacaoBancariaSection() {
     // Já conciliadas — mostrar com badge em vez de filtrar silenciosamente.
     // Regras de exclusão (vínculo de FITID presente no arquivo) e de data
     // (data_pagamento antes de data_competencia) documentadas em buildConciliadosCounts.
+    const conciliados = (conciliadosRes.data || []) as ConciliadoRow[];
     const conciliadosCounts = buildConciliadosCounts(
-      (conciliadosRes.data || []) as ConciliadoRow[],
+      conciliados,
       vinculos,
       fitidsNoArquivo,
+    );
+    const staleImportedRows = findStaleImportedRows(
+      conciliados,
+      vinculos,
+      fitidsNoArquivo,
+      linhasArquivo,
     );
 
     // Ignoradas — mostrar com badge "Ignorado"
@@ -975,7 +1011,7 @@ export default function ConciliacaoBancariaSection() {
 
     const transferCandidates = (transferRes.data || []) as TransferCandidate[];
 
-    return { allLancamentos, contasPagar, contasReceber, conciliadosCounts, ignoradasIds, externalIdsProcessados, lancamentosVinculados, transferCandidates };
+    return { allLancamentos, contasPagar, contasReceber, conciliadosCounts, ignoradasIds, externalIdsProcessados, lancamentosVinculados, transferCandidates, staleImportedRows };
   };
 
   /** Recalcula o estado de match de UMA linha (já conciliada/ignorada/sugestão) contra o contexto atual do banco. */
@@ -1172,9 +1208,10 @@ export default function ConciliacaoBancariaSection() {
   const processarLinhas = async (parsed: LinhaExtrato[]) => {
     try {
       await autoBindTransferCounterparts(parsed);
-      const ctx = await fetchMatchContext(fitidsDasLinhas(parsed));
+      const ctx = await fetchMatchContext(fitidsDasLinhas(parsed), parsed);
       const usedIds = new Set<string>();
       const final = parsed.map(linha => matchLinha(linha, ctx, usedIds));
+      setLinhasAntigasAusentes(ctx.staleImportedRows);
 
       const matchedLanc = final.filter(l => l.matchOrigin === 'lancamento').length;
       const matchedCP = final.filter(l => l.matchOrigin === 'conta_pagar').length;
@@ -1219,7 +1256,8 @@ export default function ConciliacaoBancariaSection() {
       // O set de FITIDs vem do arquivo INTEIRO (base), não só das linhas travadas:
       // a exclusão em buildConciliadosCounts depende de qualquer linha do arquivo
       // poder reivindicar o vínculo, mesmo que ela não esteja sendo re-matchada aqui.
-      const ctx = await fetchMatchContext(fitidsDasLinhas(base));
+      const ctx = await fetchMatchContext(fitidsDasLinhas(base), base);
+      setLinhasAntigasAusentes(ctx.staleImportedRows);
       const usedIds = new Set<string>();
       for (const l of base) {
         if (!l.jaConciliada && !l.ignorada && l.matchId && l.matchOrigin) {
@@ -1335,6 +1373,7 @@ export default function ConciliacaoBancariaSection() {
     setNomeArquivo('');
     setSaldoExtrato(null);
     setConferenciaSaldo(null);
+    setLinhasAntigasAusentes([]);
     if (contaSel) clearSaldoExtrato(contaSel);
     if (contaSel) clearLinhas(contaSel);
   };
@@ -1343,6 +1382,12 @@ export default function ConciliacaoBancariaSection() {
   const ignorarLinha = async (i: number) => {
     const linha = linhas[i];
     if (!linha || !contaSel) return;
+    if (isAutomaticInvestmentLine(linha)) {
+      setAutomaticInvestmentAccountId(suggestedInvestmentAccountId || '');
+      setAutomaticInvestmentDialogOpen(true);
+      toast.error('Aplicações e resgates ContaMax alteram o saldo bancário e devem ser registrados como transferência.');
+      return;
+    }
     try {
       const { error } = await supabase.rpc('reconcile_ignorar_lancamento', {
         p_conta_id: contaSel,
@@ -1551,6 +1596,67 @@ export default function ConciliacaoBancariaSection() {
       p_lancamento_id: lancamentoId,
     });
     if (error) throw error;
+  };
+
+  const createTransferForExtratoLine = async (linha: LinhaExtrato, otherAccountId: string) => {
+    if (!contaSel) throw new Error('Selecione uma conta bancária');
+    if (otherAccountId === contaSel) throw new Error('Contas devem ser diferentes');
+
+    const isOutgoing = linha.tipo === 'DESPESA';
+    const contaOrigemId = isOutgoing ? contaSel : otherAccountId;
+    const contaDestinoId = isOutgoing ? otherAccountId : contaSel;
+    const { data, error } = await supabase.rpc('reconcile_create_transfer_from_extrato', {
+      p_data: linha.data,
+      p_valor: linha.valor,
+      p_descricao: linha.descricao,
+      p_conta_origem_id: contaOrigemId,
+      p_conta_destino_id: contaDestinoId,
+      p_external_id: linha.fitId || '',
+      p_external_tipo: linha.tipo,
+    });
+    if (error) throw error;
+    const result = data as { status?: string; lancamento_id?: string } | null;
+    return result;
+  };
+
+  const processAutomaticInvestmentLines = async () => {
+    if (!automaticInvestmentAccountId || !contaSel) {
+      toast.error('Selecione a conta de aplicação');
+      return;
+    }
+
+    const targets = automaticInvestmentLines.filter(line => getAutomaticInvestmentDirection(line) !== null);
+    if (targets.length === 0) {
+      setAutomaticInvestmentDialogOpen(false);
+      return;
+    }
+
+    const processed = new Set<LinhaExtrato>();
+    setProcessando(true);
+    try {
+      for (const line of targets) {
+        await createTransferForExtratoLine(line, automaticInvestmentAccountId);
+        processed.add(line);
+      }
+      toast.success(`${processed.size} movimentação(ões) ContaMax registrada(s) como transferência.`);
+      setAutomaticInvestmentDialogOpen(false);
+    } catch (error) {
+      console.error('[ConciliacaoBancariaSection.processAutomaticInvestmentLines]', error);
+      toast.error(extractSupabaseErrorMessage(
+        error,
+        processed.size > 0
+          ? `${processed.size} transferência(s) concluída(s); a próxima falhou. Tente novamente para continuar.`
+          : 'Erro ao registrar movimentações ContaMax',
+      ));
+    } finally {
+      if (processed.size > 0) {
+        setLinhas(prev => prev.filter(line => !processed.has(line)));
+        emitDataEvent('financeiro:lancamentos');
+        emitDataEvent('financeiro:conciliacao');
+        loadLancamentos();
+      }
+      setProcessando(false);
+    }
   };
 
   /** Rateio (ou categoria única) da linha, no formato que a RPC de importação espera. */
@@ -2000,18 +2106,10 @@ export default function ConciliacaoBancariaSection() {
       const nomeOrigem = getContaNome(contaSel);
       const nomeDestino = getContaNome(transferContaDestino);
       const isOutgoing = linha.tipo === 'DESPESA';
-      const contaOrigemId = isOutgoing ? contaSel : transferContaDestino;
-      const contaDestinoId = isOutgoing ? transferContaDestino : contaSel;
       const nOrigem = isOutgoing ? nomeOrigem : nomeDestino;
       const nDestino = isOutgoing ? nomeDestino : nomeOrigem;
 
-      const { data, error } = await supabase.rpc('reconcile_create_transfer', {
-        p_data: linha.data, p_valor: linha.valor, p_descricao: linha.descricao,
-        p_conta_origem_id: contaOrigemId, p_conta_destino_id: contaDestinoId, p_user_id: user?.id,
-      });
-      if (error) throw error;
-      const result = data as { status?: string; lancamento_id?: string } | null;
-      await bindExtratoLine(linha, result?.lancamento_id);
+      const result = await createTransferForExtratoLine(linha, transferContaDestino);
 
       setLinhas(prev => prev.filter((_, i) => i !== transferDialog.linhaIndex));
 
@@ -2147,6 +2245,69 @@ export default function ConciliacaoBancariaSection() {
                 </CardContent>
               </Card>
             )
+          )}
+
+          {linhasAntigasAusentes.length > 0 && (
+            <Card className="border-warning/30 bg-warning/5">
+              <CardContent className="p-3 space-y-2 text-sm">
+                <div className="flex items-center gap-2 font-medium text-warning">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  {linhasAntigasAusentes.length} lançamento(ões) de um extrato anterior não existem no arquivo atual
+                </div>
+                <p className="text-muted-foreground">
+                  O banco alterou o conteúdo do extrato entre downloads. Esses lançamentos continuam afetando o saldo
+                  e precisam ser revisados — o FITID sozinho não detecta esta mudança.
+                </p>
+                <div className="space-y-1 text-xs text-muted-foreground">
+                  {linhasAntigasAusentes.slice(0, 3).map(row => (
+                    <p key={row.id}>
+                      {formatDateBR(parseLocalDate(row.data_pagamento || row.data_competencia))}
+                      {' · '}{row.descricao || 'Sem descrição'}{' · '}{fmtBRL(Number(row.valor))}
+                    </p>
+                  ))}
+                  {linhasAntigasAusentes.length > 3 && <p>+ {linhasAntigasAusentes.length - 3} outro(s)</p>}
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    const dates = linhasAntigasAusentes.map(row => row.data_pagamento || row.data_competencia).sort();
+                    setFiltroDataDe(dates[0]);
+                    setFiltroDataAte(dates[dates.length - 1]);
+                    setFiltro('conciliados');
+                    setView('conciliar');
+                  }}
+                >
+                  Revisar lançamentos antigos
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {automaticInvestmentLines.length > 0 && (
+            <Card className="border-info-border bg-info-soft">
+              <CardContent className="p-3 flex items-center justify-between gap-3 flex-wrap text-sm">
+                <div>
+                  <p className="font-medium text-foreground">
+                    {automaticInvestmentLines.length} movimentação(ões) ContaMax detectada(s)
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Aplicação e resgate são transferências entre a conta corrente e a conta de investimento; ignorá-los quebra o saldo.
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setAutomaticInvestmentAccountId(suggestedInvestmentAccountId || '');
+                    setAutomaticInvestmentDialogOpen(true);
+                  }}
+                >
+                  <ArrowRightLeft className="w-3.5 h-3.5 mr-1" />
+                  Registrar ContaMax em lote
+                </Button>
+              </CardContent>
+            </Card>
           )}
 
           {linhas.length > 0 && (
@@ -2353,12 +2514,24 @@ export default function ConciliacaoBancariaSection() {
                                   </Button>
                                 </>
                               )}
-                              {/* Botão Ignorar — disponível para qualquer entrada ainda não processada */}
-                              {!isDone && (
+                              {!isDone && (isAutomaticInvestmentLine(linha) ? (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 text-xs"
+                                  title="Registrar como transferência para/de uma conta de investimento"
+                                  onClick={() => {
+                                    setAutomaticInvestmentAccountId(suggestedInvestmentAccountId || '');
+                                    setAutomaticInvestmentDialogOpen(true);
+                                  }}
+                                >
+                                  <ArrowRightLeft className="w-3 h-3 mr-1" /> ContaMax
+                                </Button>
+                              ) : (
                                 <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground hover:text-destructive" title="Ignorar esta entrada — não criará lançamento" onClick={() => ignorarLinha(i)}>
                                   <EyeOff className="w-3 h-3" />
                                 </Button>
-                              )}
+                              ))}
                             </div>
                           )}
                         </TableCell>
@@ -3317,6 +3490,47 @@ export default function ConciliacaoBancariaSection() {
           }}
         />
       )}
+
+      <Dialog
+        open={automaticInvestmentDialogOpen}
+        onOpenChange={open => {
+          if (!processando) setAutomaticInvestmentDialogOpen(open);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Registrar movimentações ContaMax</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 text-sm">
+            <p className="text-muted-foreground">
+              As aplicações sairão de <strong className="text-foreground">{getContaNome(contaSel)}</strong> para a conta
+              de investimento; os resgates farão o caminho inverso. Isso preserva o saldo bancário sem virar receita ou despesa operacional.
+            </p>
+            <div>
+              <Label>Conta de aplicação</Label>
+              <Select value={automaticInvestmentAccountId} onValueChange={setAutomaticInvestmentAccountId}>
+                <SelectTrigger className="mt-1"><SelectValue placeholder="Selecione a conta de investimento" /></SelectTrigger>
+                <SelectContent>
+                  {contas.filter(account => account.id !== contaSel).map(account => (
+                    <SelectItem key={account.id} value={account.id}>{account.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {automaticInvestmentLines.length} linha(s) serão processadas. A operação é idempotente: se uma transferência já existir, ela será vinculada em vez de duplicada.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAutomaticInvestmentDialogOpen(false)} disabled={processando}>
+              Cancelar
+            </Button>
+            <Button onClick={processAutomaticInvestmentLines} disabled={processando || !automaticInvestmentAccountId}>
+              {processando ? 'Processando...' : `Registrar ${automaticInvestmentLines.length} transferência(s)`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ========== EDITAR LANÇAMENTO (aba Lançamentos) ========== */}
       {showEditForm && (

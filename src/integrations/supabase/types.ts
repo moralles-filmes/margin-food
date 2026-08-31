@@ -10923,6 +10923,18 @@ export type Database = {
         }
         Returns: Json
       }
+      reconcile_create_transfer_from_extrato: {
+        Args: {
+          p_conta_destino_id: string
+          p_conta_origem_id: string
+          p_data: string
+          p_descricao: string
+          p_external_id: string
+          p_external_tipo: string
+          p_valor: number
+        }
+        Returns: Json
+      }
       reconcile_ignorar_lancamento: {
         Args: {
           p_conta_id: string

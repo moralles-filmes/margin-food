@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { bankLineKey, buildConciliadosCounts, fitidKey, type ConciliadoRow, type VinculoRow } from './conciliacaoConciliados';
+import {
+  bankLineKey,
+  buildConciliadosCounts,
+  findStaleImportedRows,
+  fitidKey,
+  type ConciliadoRow,
+  type VinculoRow,
+} from './conciliacaoConciliados';
 
 function conciliado(overrides: Partial<ConciliadoRow> = {}): ConciliadoRow {
   return {
@@ -116,5 +123,61 @@ describe('buildConciliadosCounts', () => {
 
     const counts = buildConciliadosCounts([conciliado()], [], new Set());
     expect(counts.get(linhaComEspacamentoDiferente)).toBe(1);
+  });
+});
+
+describe('findStaleImportedRows', () => {
+  const linkedRow = (overrides: Partial<ConciliadoRow> = {}): ConciliadoRow => ({
+    id: 'ledger-1',
+    data_competencia: '2026-08-05',
+    data_pagamento: '2026-08-05',
+    valor: 0.13,
+    tipo: 'RECEITA',
+    descricao: 'RENDIMENTO LIQUIDO DE CONTAMAX',
+    origem: 'conciliacao',
+    ...overrides,
+  });
+  const oldLink: VinculoRow = {
+    lancamento_id: 'ledger-1',
+    external_id: 'old-fitid',
+    tipo: 'RECEITA',
+  };
+
+  it('flags a previously imported row that disappeared from the new statement', () => {
+    const anotherFileLine = {
+      data: '2026-08-05', valor: 10, tipo: 'DESPESA', descricao: 'OUTRA LINHA',
+    };
+    expect(findStaleImportedRows([linkedRow()], [oldLink], new Set(), [anotherFileLine])).toEqual([linkedRow()]);
+  });
+
+  it('accepts the same content when only the bank FITID changed', () => {
+    const fileLine = {
+      data: '2026-08-05', valor: 0.13, tipo: 'RECEITA',
+      descricao: 'RENDIMENTO LIQUIDO DE CONTAMAX', fitId: 'new-fitid',
+    };
+    expect(findStaleImportedRows([linkedRow()], [oldLink], new Set(['RECEITA|new-fitid']), [fileLine])).toEqual([]);
+  });
+
+  it('is occurrence-sensitive when one of two repeated rows disappeared', () => {
+    const second = linkedRow({ id: 'ledger-2' });
+    const links = [oldLink, { ...oldLink, lancamento_id: 'ledger-2', external_id: 'old-fitid-2' }];
+    const fileLine = {
+      data: '2026-08-05', valor: 0.13, tipo: 'RECEITA', descricao: 'RENDIMENTO LIQUIDO DE CONTAMAX',
+    };
+    expect(findStaleImportedRows([linkedRow(), second], links, new Set(), [fileLine])).toEqual([second]);
+  });
+
+  it('does not flag transfers or manually-created entries', () => {
+    const fileLine = { data: '2026-08-05', valor: 10, tipo: 'DESPESA', descricao: 'OUTRA LINHA' };
+    expect(findStaleImportedRows([
+      linkedRow({ tipo: 'TRANSFERENCIA' }),
+      linkedRow({ id: 'manual', origem: 'manual' }),
+    ], [oldLink, { ...oldLink, lancamento_id: 'manual' }], new Set(), [fileLine])).toEqual([]);
+  });
+
+  it('does not compare imported entries outside the period covered by the file', () => {
+    const julyRow = linkedRow({ data_competencia: '2026-07-05', data_pagamento: '2026-07-05' });
+    const augustLine = { data: '2026-08-05', valor: 10, tipo: 'DESPESA', descricao: 'OUTRA LINHA' };
+    expect(findStaleImportedRows([julyRow], [oldLink], new Set(), [augustLine])).toEqual([]);
   });
 });
