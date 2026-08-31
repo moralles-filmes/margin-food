@@ -65,7 +65,7 @@ describe('contrato SQL do ritual executivo da Apresentação Sócios', () => {
 
   it('valida tenant, referências, estados, justificativa e locks otimistas', () => {
     expect(migration.match(/public\.assert_tenant\(\)/g)?.length).toBeGreaterThanOrEqual(8);
-    const mutationSignatures = migration.match(/CREATE OR REPLACE FUNCTION public\._guarded_[^(]+\([\s\S]*?\)\nRETURNS/g) ?? [];
+    const mutationSignatures = migration.match(/CREATE OR REPLACE FUNCTION public\._guarded_[^(]+\([\s\S]*?\)\r?\nRETURNS/g) ?? [];
     expect(mutationSignatures).toHaveLength(5);
     expect(mutationSignatures.join('\n')).not.toMatch(/p_company_id/);
     expect(migration).toContain('PARTICIPANT_OUT_OF_TENANT');
