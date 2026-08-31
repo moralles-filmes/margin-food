@@ -66,6 +66,38 @@ export interface PresentationRevenueHistoryPoint {
   closingCount: number;
 }
 
+/** Faturamento bruto do mês selecionado quebrado por marca cadastrada em Fechamento de Caixa. `marcaId: null` = fechamentos legados sem detalhamento por marca. */
+export interface PresentationRevenueBrandPoint {
+  marcaId: string | null;
+  nome: string;
+  total: number;
+  closingCount: number;
+}
+
+/** Receita operacional líquida do livro razão para um mês — mesma regra de caixa/exclusões de PresentationResultsData.current. */
+export interface PresentationRevenueNetSummary {
+  month: YearMonth;
+  total: number;
+}
+
+export type PresentationRevenueGrossToNetReason = 'zero-baseline';
+
+export type PresentationRevenueGrossToNetPercent =
+  | { state: 'available'; value: number }
+  | { state: 'unavailable'; reason: PresentationRevenueGrossToNetReason };
+
+export interface PresentationRevenueGrossToNetPeriod {
+  gross: number;
+  net: number;
+  difference: number;
+  differencePercent: PresentationRevenueGrossToNetPercent;
+}
+
+export interface PresentationRevenueGrossToNet {
+  current: PresentationRevenueGrossToNetPeriod;
+  previous: PresentationRevenueGrossToNetPeriod;
+}
+
 export interface PresentationRevenueData {
   contractVersion: typeof PRESENTATION_REVENUE_CONTRACT_VERSION;
   source: typeof PRESENTATION_REVENUE_SOURCE;
@@ -80,6 +112,9 @@ export interface PresentationRevenueData {
   delta: PresentationRevenueDelta;
   weekdays: readonly PresentationRevenueWeekday[];
   history: readonly PresentationRevenueHistoryPoint[];
+  byBrand: readonly PresentationRevenueBrandPoint[];
+  netRevenue: { current: PresentationRevenueNetSummary; previous: PresentationRevenueNetSummary };
+  grossToNet: PresentationRevenueGrossToNet;
 }
 
 const YEAR_MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;

@@ -8,6 +8,8 @@ import type {
   PresentationDecisionDetail,
   PresentationDecisionComparison,
   PresentationRevenueData,
+  PresentationRevenueBrandPoint,
+  PresentationRevenueGrossToNetPeriod,
   PresentationExpensesData,
   PresentationExpenseNode,
   PresentationResultsData,
@@ -258,6 +260,64 @@ function addRevenueSummary(
   });
 }
 
+function grossToNetDifferenceText(period: PresentationRevenueGrossToNetPeriod, percentage = false): string {
+  if (percentage) {
+    return period.differencePercent.state === 'available'
+      ? formatPercentBR(period.differencePercent.value, 1)
+      : 'Bruto zero ou negativo';
+  }
+  return fmtBRL(period.difference);
+}
+
+function addRevenueGrossNet(
+  slide: PptxGenJS.Slide,
+  pptx: PptxGenJS,
+  revenue: PresentationRevenueData,
+): void {
+  const rows = [
+    { label: 'MÊS SELECIONADO', gross: revenue.current, net: revenue.netRevenue.current },
+    { label: 'MÊS ANTERIOR', gross: revenue.previous, net: revenue.netRevenue.previous },
+  ];
+  rows.forEach((row, index) => {
+    const x = 0.9 + index * 6.15;
+    slide.addShape(pptx.ShapeType.rect, { x, y: 2.05, w: 0.05, h: 2.45, line: { color: COLOR.gold, transparency: 100 }, fill: { color: COLOR.gold } });
+    slide.addText(row.label, { x: x + 0.22, y: 2.05, w: 5.35, h: 0.25, fontFace: 'Aptos', fontSize: 14, bold: true, color: COLOR.muted, margin: 0 });
+    slide.addText(row.gross.month, { x: x + 0.22, y: 2.45, w: 5.35, h: 0.32, fontFace: 'Aptos', fontSize: 19, color: COLOR.white, margin: 0 });
+    slide.addText('BRUTO (FECHAMENTO DE CAIXA)', { x: x + 0.22, y: 2.9, w: 5.35, h: 0.2, fontFace: 'Aptos', fontSize: 11, color: COLOR.muted, margin: 0 });
+    slide.addText(fmtBRL(row.gross.total), { x: x + 0.22, y: 3.12, w: 5.4, h: 0.4, fontFace: 'Aptos Display', fontSize: 22, bold: true, color: COLOR.white, margin: 0, fit: 'shrink' });
+    slide.addText('LÍQUIDO (LIVRO RAZÃO)', { x: x + 0.22, y: 3.58, w: 5.35, h: 0.2, fontFace: 'Aptos', fontSize: 11, color: COLOR.muted, margin: 0 });
+    slide.addText(fmtBRL(row.net.total), { x: x + 0.22, y: 3.8, w: 5.4, h: 0.4, fontFace: 'Aptos Display', fontSize: 22, bold: true, color: COLOR.white, margin: 0, fit: 'shrink' });
+  });
+  slide.addShape(pptx.ShapeType.line, { x: 0.9, y: 5.05, w: 11.55, h: 0, line: { color: COLOR.subtle, width: 1 } });
+  [
+    ['Diferença (mês selecionado)', grossToNetDifferenceText(revenue.grossToNet.current)],
+    ['% da diferença sobre o bruto', grossToNetDifferenceText(revenue.grossToNet.current, true)],
+  ].forEach(([label, value], index) => {
+    const x = 0.9 + index * 6.15;
+    slide.addText(label, { x, y: 5.3, w: 5.4, h: 0.24, fontFace: 'Aptos', fontSize: 14, color: COLOR.muted, margin: 0 });
+    slide.addText(value, { x, y: 5.67, w: 5.4, h: 0.38, fontFace: 'Aptos', fontSize: 22, bold: true, color: COLOR.white, margin: 0, fit: 'shrink' });
+  });
+  slide.addText('Líquido = receita operacional do livro razão (regime de caixa) — mesma base do KPI "Receita operacional" de Resultados.', { x: 0.9, y: 6.2, w: 11.55, h: 0.3, fontFace: 'Aptos', fontSize: 11, color: COLOR.muted, margin: 0 });
+}
+
+function addRevenueByBrand(
+  slide: PptxGenJS.Slide,
+  pptx: PptxGenJS,
+  revenue: PresentationRevenueData,
+): void {
+  const total = revenue.current.total;
+  const items = [...revenue.byBrand].sort((left, right) => right.total - left.total);
+  if (items.length === 0) { addEmpty(slide, pptx, 'Sem faturamento no mês selecionado.'); return; }
+  items.forEach((item: PresentationRevenueBrandPoint, index) => {
+    const y = 1.85 + index * 0.6;
+    slide.addText(String(index + 1), { x: 0.9, y, w: 0.4, h: 0.3, fontFace: 'Aptos Display', fontSize: 18, bold: true, color: COLOR.gold, align: 'center', margin: 0 });
+    slide.addText(item.nome, { x: 1.4, y, w: 7.2, h: 0.25, fontFace: 'Aptos', fontSize: 15, bold: true, color: COLOR.white, margin: 0, fit: 'shrink', breakLine: false });
+    slide.addText(`${total > 0 ? formatPercentBR((item.total / total) * 100, 1) : '—'} do bruto do mês · ${item.closingCount} fechamento(s)`, { x: 1.4, y: y + 0.27, w: 7.2, h: 0.2, fontFace: 'Aptos', fontSize: 11, color: COLOR.muted, margin: 0 });
+    slide.addText(fmtBRL(item.total), { x: 9.4, y, w: 2.05, h: 0.3, fontFace: 'Aptos Mono', fontSize: 15, bold: true, color: COLOR.revenue, align: 'right', margin: 0, fit: 'shrink' });
+    slide.addShape(pptx.ShapeType.line, { x: 0.9, y: y + 0.52, w: 10.55, h: 0, line: { color: COLOR.subtle, width: 0.5, transparency: 35 } });
+  });
+}
+
 function addRevenueWeekdays(
   slide: PptxGenJS.Slide,
   pptx: PptxGenJS,
@@ -344,6 +404,17 @@ function expenseDeltaText(delta: PresentationExpensesData['delta']['absolute'], 
   return delta.reason === 'previous-period-absent' ? 'Mês anterior ausente' : 'Mês selecionado ausente';
 }
 
+/** Soma o `amount` dos nós de topo da árvore, separando operacional × não operacional (mesma regra do slide: excluir_dos_totais é herdado pela subárvore inteira). */
+function operationalExpenseSplit(
+  tree: readonly PresentationExpenseNode[],
+): { operational: number; nonOperational: number } {
+  return tree.reduce((totals, node) => (
+    node.operationalClass === 'non-operational'
+      ? { ...totals, nonOperational: totals.nonOperational + node.amount }
+      : { ...totals, operational: totals.operational + node.amount }
+  ), { operational: 0, nonOperational: 0 });
+}
+
 function addExpensesSummary(slide: PptxGenJS.Slide, pptx: PptxGenJS, expenses: PresentationExpensesData): void {
   [expenses.current, expenses.previous].forEach((period, index) => {
     const x = 0.9 + index * 6.15;
@@ -353,6 +424,13 @@ function addExpensesSummary(slide: PptxGenJS.Slide, pptx: PptxGenJS, expenses: P
     slide.addText(expensePeriodText(period), { x: x + 0.22, y: 3.05, w: 5.4, h: 0.62, fontFace: 'Aptos Display', fontSize: 31, bold: true, color: COLOR.white, margin: 0, fit: 'shrink' });
     slide.addText(`${period.quantity} lançamento(s) do razão`, { x: x + 0.22, y: 3.92, w: 5.3, h: 0.27, fontFace: 'Aptos', fontSize: 15, color: COLOR.muted, margin: 0 });
   });
+  if (expenses.current.state === 'available') {
+    const split = operationalExpenseSplit(expenses.tree);
+    slide.addText('DESPESAS OPERACIONAIS (MÊS SELECIONADO)', { x: 0.9, y: 4.35, w: 5.8, h: 0.22, fontFace: 'Aptos', fontSize: 12, bold: true, color: COLOR.muted, margin: 0 });
+    slide.addText('DESPESAS NÃO OPERACIONAIS (MÊS SELECIONADO)', { x: 7.0, y: 4.35, w: 5.8, h: 0.22, fontFace: 'Aptos', fontSize: 12, bold: true, color: COLOR.warning, margin: 0 });
+    slide.addText(fmtBRL(split.operational), { x: 0.9, y: 4.6, w: 5.8, h: 0.32, fontFace: 'Aptos', fontSize: 17, bold: true, color: COLOR.white, margin: 0, fit: 'shrink' });
+    slide.addText(fmtBRL(split.nonOperational), { x: 7.0, y: 4.6, w: 5.8, h: 0.32, fontFace: 'Aptos', fontSize: 17, bold: true, color: COLOR.warning, margin: 0, fit: 'shrink' });
+  }
   const reading = expenses.delta.meaning === 'increase' ? 'Aumento · desfavorável' : expenses.delta.meaning === 'reduction' ? 'Redução · favorável' : expenses.delta.meaning === 'unchanged' ? 'Estável' : 'Indisponível';
   [['Variação absoluta', expenseDeltaText(expenses.delta.absolute)], ['Variação percentual', expenseDeltaText(expenses.delta.percentage, true)], ['Leitura executiva', reading]].forEach(([label, value], index) => {
     const x = 0.9 + index * 4.1;
@@ -365,17 +443,29 @@ function flattenExpenseNodes(nodes: readonly PresentationExpenseNode[], depth = 
   return nodes.flatMap(node => [{ node, depth }, ...flattenExpenseNodes(node.children, depth + 1)]);
 }
 
-function addExpensesTree(slide: PptxGenJS.Slide, pptx: PptxGenJS, nodes: readonly PresentationExpenseNode[]): void {
+/** % que `amount` representa da receita operacional líquida do período; sem base disponível → traço. */
+function expenseShareOfNetRevenueText(amount: number, netRevenue: number | null): string {
+  if (netRevenue === null || netRevenue <= 0) return '—';
+  return formatPercentBR((amount / netRevenue) * 100, 1);
+}
+
+function addExpensesTree(
+  slide: PptxGenJS.Slide,
+  pptx: PptxGenJS,
+  nodes: readonly PresentationExpenseNode[],
+  netRevenue: number | null,
+): void {
   const rows = flattenExpenseNodes(nodes);
   if (rows.length === 0) { addEmpty(slide, pptx, 'Sem despesas no mês selecionado.'); return; }
-  [['CATEGORIA', 0.8, 7], ['VALOR PRÓPRIO', 8.3, 1.8], ['ACUMULADO', 10.4, 2]].forEach(([label, x, width]) => slide.addText(String(label), { x: Number(x), y: 1.65, w: Number(width), h: 0.2, fontFace: 'Aptos', fontSize: 11, bold: true, color: COLOR.muted, margin: 0, align: Number(x) > 1 ? 'right' : 'left' }));
+  [['CATEGORIA', 0.8, 5.8], ['VALOR PRÓPRIO', 7.0, 1.6], ['ACUMULADO', 8.7, 1.7], ['% RECEITA LÍQ.', 10.5, 1.9]].forEach(([label, x, width]) => slide.addText(String(label), { x: Number(x), y: 1.65, w: Number(width), h: 0.2, fontFace: 'Aptos', fontSize: 11, bold: true, color: COLOR.muted, margin: 0, align: Number(x) > 1 ? 'right' : 'left' }));
   rows.forEach(({ node, depth }, index) => {
     const y = 2.02 + index * 0.5;
     slide.addShape(pptx.ShapeType.line, { x: 0.8, y: y + 0.32, w: 11.6, h: 0, line: { color: COLOR.subtle, width: 0.5, transparency: 35 } });
-    slide.addText(`${depth > 0 ? '↳ ' : ''}${node.name}`, { x: 0.8 + depth * 0.3, y, w: 5.9 - depth * 0.3, h: 0.22, fontFace: 'Aptos', fontSize: 13, bold: depth === 0, color: COLOR.white, margin: 0, fit: 'shrink' });
-    if (node.operationalClass === 'non-operational') slide.addText('NÃO OPERACIONAL', { x: 6.7, y, w: 1.4, h: 0.18, fontFace: 'Aptos', fontSize: 8, bold: true, color: COLOR.warning, margin: 0 });
-    slide.addText(fmtBRL(node.directAmount), { x: 8.3, y, w: 1.8, h: 0.22, fontFace: 'Aptos', fontSize: 12, color: COLOR.muted, margin: 0, align: 'right', fit: 'shrink' });
-    slide.addText(fmtBRL(node.amount), { x: 10.4, y, w: 2, h: 0.22, fontFace: 'Aptos', fontSize: 13, bold: true, color: COLOR.white, margin: 0, align: 'right', fit: 'shrink' });
+    slide.addText(`${depth > 0 ? '↳ ' : ''}${node.name}`, { x: 0.8 + depth * 0.3, y, w: 5.0 - depth * 0.3, h: 0.22, fontFace: 'Aptos', fontSize: 13, bold: depth === 0, color: COLOR.white, margin: 0, fit: 'shrink' });
+    if (node.operationalClass === 'non-operational') slide.addText('NÃO OPERACIONAL', { x: 5.9, y, w: 1.0, h: 0.18, fontFace: 'Aptos', fontSize: 8, bold: true, color: COLOR.warning, margin: 0 });
+    slide.addText(fmtBRL(node.directAmount), { x: 7.0, y, w: 1.6, h: 0.22, fontFace: 'Aptos', fontSize: 12, color: COLOR.muted, margin: 0, align: 'right', fit: 'shrink' });
+    slide.addText(fmtBRL(node.amount), { x: 8.7, y, w: 1.7, h: 0.22, fontFace: 'Aptos', fontSize: 13, bold: true, color: COLOR.white, margin: 0, align: 'right', fit: 'shrink' });
+    slide.addText(expenseShareOfNetRevenueText(node.amount, netRevenue), { x: 10.5, y, w: 1.9, h: 0.22, fontFace: 'Aptos', fontSize: 12, color: COLOR.muted, margin: 0, align: 'right', fit: 'shrink' });
   });
 }
 
@@ -1218,6 +1308,12 @@ function addSlideContent(slide: PptxGenJS.Slide, pptx: PptxGenJS, source: Presen
     case 'revenue-summary':
       addRevenueSummary(slide, pptx, payload.revenue);
       break;
+    case 'revenue-gross-net':
+      addRevenueGrossNet(slide, pptx, payload.revenue);
+      break;
+    case 'revenue-by-brand':
+      addRevenueByBrand(slide, pptx, payload.revenue);
+      break;
     case 'revenue-weekdays':
       addRevenueWeekdays(slide, pptx, payload.revenue);
       break;
@@ -1228,7 +1324,7 @@ function addSlideContent(slide: PptxGenJS.Slide, pptx: PptxGenJS, source: Presen
       addExpensesSummary(slide, pptx, payload.expenses);
       break;
     case 'expenses-tree':
-      addExpensesTree(slide, pptx, payload.nodes);
+      addExpensesTree(slide, pptx, payload.nodes, payload.netRevenue);
       break;
     case 'expenses-rolling':
       addExpensesRolling(slide, pptx, payload.expenses);

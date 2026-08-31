@@ -50,6 +50,18 @@ export function createPresentationRevenueData(): PresentationRevenueData {
       { isoWeekday: 6, label: 'Sábado', state: 'empty', total: 0, occurrences: 0, average: { state: 'unavailable', reason: 'no-occurrences' } },
       { isoWeekday: 7, label: 'Domingo', state: 'empty', total: 0, occurrences: 0, average: { state: 'unavailable', reason: 'no-occurrences' } },
     ],
+    byBrand: [
+      { marcaId: '11111111-1111-4111-8111-111111111111', nome: 'Loja Centro', total: 1_800, closingCount: 2 },
+      { marcaId: '22222222-2222-4222-8222-222222222222', nome: 'Loja Norte', total: 1_200, closingCount: 1 },
+    ],
+    netRevenue: {
+      current: { month: '2026-03', total: 2_700 },
+      previous: { month: '2026-02', total: 1_350 },
+    },
+    grossToNet: {
+      current: { gross: 3_000, net: 2_700, difference: 300, differencePercent: { state: 'available', value: 10 } },
+      previous: { gross: 1_500, net: 1_350, difference: 150, differencePercent: { state: 'available', value: 10 } },
+    },
     history: requestedYears.flatMap(year => Array.from({ length: 12 }, (_, monthIndex) => {
       const month = monthIndex + 1;
       const yearMonth = `${year}-${String(month).padStart(2, '0')}`;
