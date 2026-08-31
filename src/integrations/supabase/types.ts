@@ -1740,10 +1740,15 @@ export type Database = {
           conta_id: string | null
           data: string
           descricao: string | null
+          descricao_unaccent: string | null
+          external_id: string | null
           id: string
           ignorado_em: string | null
           ignorado_por: string | null
+          lancamento_origem_id: string | null
+          occurrence_index: number | null
           tipo: string
+          tratamento: string
           valor: number
         }
         Insert: {
@@ -1751,10 +1756,15 @@ export type Database = {
           conta_id?: string | null
           data: string
           descricao?: string | null
+          descricao_unaccent?: string | null
+          external_id?: string | null
           id?: string
           ignorado_em?: string | null
           ignorado_por?: string | null
+          lancamento_origem_id?: string | null
+          occurrence_index?: number | null
           tipo: string
+          tratamento?: string
           valor: number
         }
         Update: {
@@ -1762,10 +1772,15 @@ export type Database = {
           conta_id?: string | null
           data?: string
           descricao?: string | null
+          descricao_unaccent?: string | null
+          external_id?: string | null
           id?: string
           ignorado_em?: string | null
           ignorado_por?: string | null
+          lancamento_origem_id?: string | null
+          occurrence_index?: number | null
           tipo?: string
+          tratamento?: string
           valor?: number
         }
         Relationships: [
@@ -1781,6 +1796,13 @@ export type Database = {
             columns: ["conta_id"]
             isOneToOne: false
             referencedRelation: "fin_contas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fin_conciliacao_ignoradas_lancamento_origem_id_fkey"
+            columns: ["lancamento_origem_id"]
+            isOneToOne: false
+            referencedRelation: "fin_lancamentos"
             referencedColumns: ["id"]
           },
         ]
@@ -10969,6 +10991,10 @@ export type Database = {
           p_lancamento_id: string
           p_tipo?: string
         }
+        Returns: Json
+      }
+      reconcile_neutralize_contamax: {
+        Args: { p_conta_id: string; p_linhas: Json }
         Returns: Json
       }
       reconcile_pay_conta_pagar: {

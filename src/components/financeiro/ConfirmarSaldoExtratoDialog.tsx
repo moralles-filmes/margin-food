@@ -18,6 +18,8 @@ interface ConfirmarSaldoExtratoDialogProps {
   periodoFim: string;
   deltaExtrato: number;
   saldoSugerido?: { valor: number; data: string };
+  /** Quantidade de aplicações/resgates ContaMax neutralizados no arquivo. */
+  internalMovementCount?: number;
   contaId: string;
   onCancel: () => void;
   /** Recebe o saldo final confirmado pelo usuário — o pai o usa como referência
@@ -34,7 +36,8 @@ interface Divergencia {
 const TOLERANCIA = 0.01;
 
 export default function ConfirmarSaldoExtratoDialog({
-  open, nomeArquivo, periodoInicio, periodoFim, deltaExtrato, saldoSugerido, contaId,
+  open, nomeArquivo, periodoInicio, periodoFim, deltaExtrato, saldoSugerido,
+  internalMovementCount = 0, contaId,
   onCancel, onConfirmed,
 }: ConfirmarSaldoExtratoDialogProps) {
   const [valorInput, setValorInput] = useState(() =>
@@ -52,6 +55,16 @@ export default function ConfirmarSaldoExtratoDialog({
     const informado = normalizeBRLMoneyToNumber(valorInput);
     if (informado == null) {
       toast.error('Informe o saldo final do extrato.');
+      return;
+    }
+
+    // O OFX do Santander pode trazer as linhas da conta corrente enquanto o
+    // saldo confirmado pelo usuário já soma corrente + ContaMax. Nesse caso as
+    // bases não são comparáveis antes do matching. Guardamos a âncora total e a
+    // conferência pós-processamento faz a validação definitiva contra o razão.
+    if (internalMovementCount > 0) {
+      toast.success('Saldo Santander consolidado registrado para a conferência final.');
+      onConfirmed({ valor: informado, data: periodoFim });
       return;
     }
 
@@ -98,6 +111,22 @@ export default function ConfirmarSaldoExtratoDialog({
                   {formatDateBR(parseLocalDate(periodoInicio))} a {formatDateBR(parseLocalDate(periodoFim))}
                 </span>
               </p>
+              {internalMovementCount > 0 && (
+                <div
+                  role="alert"
+                  className="rounded-lg border border-warning/30 bg-warning/5 p-3 text-xs"
+                >
+                  <p className="flex items-center gap-2 font-medium text-foreground">
+                    <AlertTriangle className="h-4 w-4 shrink-0 text-warning" />
+                    {internalMovementCount} movimentação(ões) interna(s) ContaMax detectada(s)
+                  </p>
+                  <p className="mt-1 text-muted-foreground">
+                    Confirme o <strong className="text-foreground">saldo total exibido pelo Santander</strong>,
+                    somando conta corrente + ContaMax. O saldo sugerido pelo arquivo pode representar apenas a
+                    conta corrente.
+                  </p>
+                </div>
+              )}
               <div>
                 <Label>Saldo final em {formatDateBR(parseLocalDate(periodoFim))}</Label>
                 <CurrencyInput

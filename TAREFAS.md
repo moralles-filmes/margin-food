@@ -19,10 +19,11 @@ Este arquivo serve para sincronizar o progresso do desenvolvimento entre os dife
 
 ## ✅ Concluído (Done)
 - [x] **Conciliação Santander GM — ContaMax e OFX mutável (2026-08-31)**
-    - Aplicações/resgates ContaMax agora são transferências atômicas para a conta de investimento e não podem mais ser ignorados; reprocessamento por FITID é idempotente
-    - A importação alerta quando uma linha conciliada de um extrato anterior desaparece da nova exportação, com comparação por conteúdo, ocorrência e período
-    - Dados da Santander GM reparados: 20 transferências, quatro rendimentos obsoletos cancelados, rendimento consolidado movido à aplicação e saldo inicial compensatório removido
-    - Migration `20260831160605_santander_contamax_reconciliation_hardening.sql` aplicada e saldo validado em R$0,00 até 28/08; o líquido pendente de 31/08 fecha nos -R$898,69 do OFX
+    - Solução definitiva multi-tenant: aplicações/resgates ContaMax são evidências de movimento interno com efeito zero, sensíveis à ocorrência e independentes do FITID; não criam receita, despesa, transferência nem conta técnica
+    - RPC em lote, RLS forçada e trigger no razão protegem clientes atuais e antigos; rendimento ContaMax continua sendo receita real e a conferência usa o saldo Santander consolidado (corrente + ContaMax)
+    - Santander GM reparada: 20 transferências canceladas e convertidas em evidências neutras, rendimento de R$0,34 movido para a conta real, abertura consolidada de R$10.202,41 e `CONTA APLICAÇÃO` zerada/inativa
+    - Produção validada: conta em R$0,00 até 28/08, cinco linhas de 31/08 projetam -R$898,69; Dashboard em R$87.434,39 antes dessas linhas e R$86.535,70 depois
+    - Migrations `20260831225448_santander_contamax_consolidated_balance.sql` e `20260831232225_fix_contamax_rls_initplan.sql`; suíte com 627 testes, TypeScript, build, lint, RBAC e segurança aprovados
 - [x] **Fechamento operacional das Fases 7 a 12 da Apresentação Sócios (2026-08-26)**
     - Nove migrations da apresentação reconciliadas no histórico remoto, incluindo decisões, reuniões/atas e o hardening de `search_path`; nenhuma migration antiga alheia foi reaplicada
     - Smoke tests transacionais no Supabase real cobriram RLS, RBAC, isolamento entre empresas, RPCs financeiras, lifecycle, revisões imutáveis, auditoria, notificações, exportação e optimistic locking, com rollback e zero resíduo

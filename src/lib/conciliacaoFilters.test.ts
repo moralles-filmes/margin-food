@@ -7,6 +7,7 @@ const rows = {
   criar: { selecionada: true },
   conciliados: { selecionada: false, jaConciliada: true },
   ignorados: { selecionada: false, ignorada: true },
+  internos: { selecionada: false, movimentacaoInterna: true },
 };
 
 describe('matchesImportFilter', () => {
@@ -27,5 +28,21 @@ describe('matchesImportFilter', () => {
 
   it('não inclui linhas concluídas no filtro para conciliar', () => {
     expect(matchesImportFilter({ selecionada: false, matchId: 'lancamento-1-done' }, 'conciliar')).toBe(false);
+  });
+
+  it('mantém movimentos internos separados de ignorados e conciliados legados', () => {
+    const internalLegacyRow = {
+      selecionada: true,
+      movimentacaoInterna: true,
+      ignorada: true,
+      jaConciliada: true,
+      matchId: 'lancamento-legado',
+    };
+
+    expect(matchesImportFilter(internalLegacyRow, 'internos')).toBe(true);
+    expect(matchesImportFilter(internalLegacyRow, 'ignorados')).toBe(false);
+    expect(matchesImportFilter(internalLegacyRow, 'conciliados')).toBe(false);
+    expect(matchesImportFilter(internalLegacyRow, 'conciliar')).toBe(false);
+    expect(matchesImportFilter(internalLegacyRow, 'criar')).toBe(false);
   });
 });

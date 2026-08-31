@@ -1,7 +1,5 @@
 import { normalizeSearchText } from '@/lib/utils';
 
-export type AutomaticInvestmentDirection = 'to_investment' | 'from_investment';
-
 interface AutomaticInvestmentLine {
   descricao?: string | null;
   tipo: string;
@@ -12,36 +10,24 @@ interface AutomaticInvestmentLineState extends AutomaticInvestmentLine {
   ignorada?: boolean;
   matchId?: string;
   transferReconhecida?: boolean;
-}
-
-interface AccountOption {
-  id: string;
-  nome: string;
+  movimentacaoInterna?: boolean;
 }
 
 /**
- * Santander ContaMax aparece no OFX da conta corrente como aplicação/resgate,
- * mas economicamente é uma transferência para/de uma conta de investimento.
- * Ignorar essas linhas remove a contrapartida que fecha o saldo bancário diário.
+ * Santander ContaMax aparece no OFX como aplicação/resgate, mas o saldo exibido
+ * ao cliente já consolida conta corrente + investimento automático. Portanto,
+ * essas linhas são evidência de movimentação interna com efeito financeiro zero.
  */
-export function getAutomaticInvestmentDirection(
-  line: AutomaticInvestmentLine,
-): AutomaticInvestmentDirection | null {
-  const description = normalizeSearchText(line.descricao || '');
-  if (line.tipo === 'DESPESA' && description.includes('aplicacao contamax')) {
-    return 'to_investment';
-  }
-  if (line.tipo === 'RECEITA' && description.includes('resgate contamax')) {
-    return 'from_investment';
-  }
-  return null;
-}
-
 export function isAutomaticInvestmentLine(line: AutomaticInvestmentLine): boolean {
-  return getAutomaticInvestmentDirection(line) !== null;
+  const description = normalizeSearchText(line.descricao || '').replace(/\s+/g, ' ');
+  return (
+    line.tipo === 'DESPESA' && /aplicacao.*contamax/.test(description)
+  ) || (
+    line.tipo === 'RECEITA' && /resgate.*contamax/.test(description)
+  );
 }
 
-/** Linha ContaMax que ainda precisa virar transferência neste extrato. */
+/** Linha ContaMax que ainda precisa ser persistida como movimentação interna. */
 export function isPendingAutomaticInvestmentLine(
   line: AutomaticInvestmentLineState,
 ): boolean {
@@ -49,18 +35,16 @@ export function isPendingAutomaticInvestmentLine(
     && !line.ignorada
     && !line.matchId
     && !line.transferReconhecida
+    && !line.movimentacaoInterna
     && isAutomaticInvestmentLine(line);
 }
 
-/** Sugere somente uma conta inequívoca; em caso de ambiguidade a UI exige escolha. */
-export function findSuggestedInvestmentAccountId(
-  accounts: AccountOption[],
-  currentAccountId: string,
-): string | undefined {
-  const candidates = accounts.filter(account => {
-    if (account.id === currentAccountId) return false;
-    const name = normalizeSearchText(account.nome);
-    return name === 'conta aplicacao' || name.includes('contamax');
-  });
-  return candidates.length === 1 ? candidates[0].id : undefined;
+/** Soma somente movimentos externos; aplicação/resgate ContaMax vale zero. */
+export function getConsolidatedBankDelta(
+  lines: ReadonlyArray<AutomaticInvestmentLine & { valor: number }>,
+): number {
+  return lines.reduce((sum, line) => {
+    if (isAutomaticInvestmentLine(line)) return sum;
+    return sum + (line.tipo === 'RECEITA' ? line.valor : -line.valor);
+  }, 0);
 }
