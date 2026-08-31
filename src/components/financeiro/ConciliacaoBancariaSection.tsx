@@ -33,7 +33,8 @@ import { extractSupabaseErrorMessage } from '@/lib/supabaseErrors';
 import { computeScore } from '@/lib/conciliacaoScore';
 import { matchTransferCandidate, findTransferWarnings, type TransferCandidate, type TransferWarning } from '@/lib/conciliacaoTransferMatch';
 import { bankLineKey, buildConciliadosCounts, findStaleImportedRows, fitidKey, type ConciliadoRow, type VinculoRow } from '@/lib/conciliacaoConciliados';
-import { findSuggestedInvestmentAccountId, getAutomaticInvestmentDirection, isAutomaticInvestmentLine } from '@/lib/conciliacaoInvestimentoAutomatico';
+import { findSuggestedInvestmentAccountId, getAutomaticInvestmentDirection, isAutomaticInvestmentLine, isPendingAutomaticInvestmentLine } from '@/lib/conciliacaoInvestimentoAutomatico';
+import { clearSaldoExtrato, loadSaldoExtrato, saveSaldoExtrato, type SaldoExtratoRef } from '@/lib/conciliacaoSaldoExtrato';
 import type { ContaBancariaRef, CategoriaFinRef, CentroCustoRef, LancamentoConciliacao, LancamentoCandidate, ContaPagarCandidate, ContaReceberCandidate, ContaPagarAberta } from '@/types/financeiro';
 import { mapPagamentoError } from '@/lib/financeiroErrorMap';
 import DateRangePresets from './DateRangePresets';
@@ -118,26 +119,6 @@ function loadLinhas(contaId: string): LinhaExtrato[] | null {
 
 function clearLinhas(contaId: string) {
   try { sessionStorage.removeItem(SESSION_KEY(contaId)); } catch (_) { /* sessionStorage indisponível */ }
-}
-
-/** Saldo final do extrato confirmado pelo usuário — referência da conferência pós-processamento. */
-const SALDO_EXTRATO_KEY = (contaId: string) => `conciliacao_saldo_extrato_${contaId}`;
-
-interface SaldoExtratoRef { valor: number; data: string }
-
-function saveSaldoExtrato(contaId: string, saldo: SaldoExtratoRef) {
-  try { sessionStorage.setItem(SALDO_EXTRATO_KEY(contaId), JSON.stringify(saldo)); } catch (_) { /* sessionStorage indisponível */ }
-}
-
-function loadSaldoExtrato(contaId: string): SaldoExtratoRef | null {
-  try {
-    const raw = sessionStorage.getItem(SALDO_EXTRATO_KEY(contaId));
-    return raw ? JSON.parse(raw) : null;
-  } catch (_) { return null; }
-}
-
-function clearSaldoExtrato(contaId: string) {
-  try { sessionStorage.removeItem(SALDO_EXTRATO_KEY(contaId)); } catch (_) { /* sessionStorage indisponível */ }
 }
 
 /**
@@ -351,13 +332,7 @@ export default function ConciliacaoBancariaSection() {
   };
 
   const automaticInvestmentLines = useMemo(
-    () => linhas.filter(linha =>
-      !linha.jaConciliada
-      && !linha.ignorada
-      && !linha.matchId
-      && !linha.transferReconhecida
-      && isAutomaticInvestmentLine(linha),
-    ),
+    () => linhas.filter(isPendingAutomaticInvestmentLine),
     [linhas],
   );
   const suggestedInvestmentAccountId = useMemo(
@@ -1213,16 +1188,35 @@ export default function ConciliacaoBancariaSection() {
       const final = parsed.map(linha => matchLinha(linha, ctx, usedIds));
       setLinhasAntigasAusentes(ctx.staleImportedRows);
 
-      const matchedLanc = final.filter(l => l.matchOrigin === 'lancamento').length;
-      const matchedCP = final.filter(l => l.matchOrigin === 'conta_pagar').length;
-      const matchedCR = final.filter(l => l.matchOrigin === 'conta_receber').length;
-      const jaConciliadas = final.filter(l => l.jaConciliada).length;
-      const ignoradas = final.filter(l => l.ignorada).length;
-      const withSuggestions = final.filter(l => !l.matchId && !l.jaConciliada && !l.ignorada && l.suggestions && l.suggestions.length > 0).length;
-      const unmatched = final.length - matchedLanc - matchedCP - matchedCR - jaConciliadas - ignoradas;
+      // Quando há uma única conta de aplicação inequívoca, ContaMax deixa de
+      // exigir a mesma ação manual a cada extrato. A RPC é idempotente, então
+      // uma reimportação vincula a transferência existente em vez de duplicá-la.
+      const autoProcessed = new Set<LinhaExtrato>();
+      let autoProcessError: unknown = null;
+      if (suggestedInvestmentAccountId) {
+        for (const linha of final.filter(isPendingAutomaticInvestmentLine)) {
+          try {
+            await createTransferForExtratoLine(linha, suggestedInvestmentAccountId);
+            autoProcessed.add(linha);
+          } catch (error) {
+            autoProcessError = error;
+            break;
+          }
+        }
+      }
+      const visibleLines = final.filter(linha => !autoProcessed.has(linha));
+
+      const matchedLanc = visibleLines.filter(l => l.matchOrigin === 'lancamento').length;
+      const matchedCP = visibleLines.filter(l => l.matchOrigin === 'conta_pagar').length;
+      const matchedCR = visibleLines.filter(l => l.matchOrigin === 'conta_receber').length;
+      const jaConciliadas = visibleLines.filter(l => l.jaConciliada).length;
+      const ignoradas = visibleLines.filter(l => l.ignorada).length;
+      const withSuggestions = visibleLines.filter(l => !l.matchId && !l.jaConciliada && !l.ignorada && l.suggestions && l.suggestions.length > 0).length;
+      const unmatched = visibleLines.length - matchedLanc - matchedCP - matchedCR - jaConciliadas - ignoradas;
 
       const msg = `${final.length} transações: `;
       const msgParts: string[] = [];
+      if (autoProcessed.size > 0) msgParts.push(`${autoProcessed.size} ContaMax automática(s)`);
       if (matchedLanc > 0) msgParts.push(`${matchedLanc} match lançamento`);
       if (matchedCP > 0) msgParts.push(`${matchedCP} match contas a pagar`);
       if (matchedCR > 0) msgParts.push(`${matchedCR} match contas a receber`);
@@ -1232,8 +1226,21 @@ export default function ConciliacaoBancariaSection() {
       msgParts.push(`${unmatched - withSuggestions} nova(s)`);
       toast.success(msg + msgParts.join(', '));
 
-      setLinhas(final);
+      if (autoProcessError) {
+        console.error('[ConciliacaoBancariaSection.processarLinhas.contaMax]', autoProcessError);
+        toast.warning(extractSupabaseErrorMessage(
+          autoProcessError,
+          `${autoProcessed.size} transferência(s) ContaMax concluída(s); revise as restantes.`,
+        ));
+      }
+
+      setLinhas(visibleLines);
       setImportFilter('todos');
+      if (autoProcessed.size > 0) {
+        emitDataEvent('financeiro:lancamentos');
+        emitDataEvent('financeiro:conciliacao');
+        loadLancamentos();
+      }
     } catch (err) {
       console.error('[ConciliacaoBancariaSection.processarLinhas]', err);
       toast.error(extractSupabaseErrorMessage(err, 'Erro ao processar arquivo'));
@@ -3483,7 +3490,10 @@ export default function ConciliacaoBancariaSection() {
             // Guarda o saldo oficial do extrato: é a referência da conferência
             // pós-processamento (banner verde/vermelho acima da lista).
             setSaldoExtrato(saldoConfirmado);
-            if (contaSel) saveSaldoExtrato(contaSel, saldoConfirmado);
+            if (contaSel) {
+              saveSaldoExtrato(contaSel, saldoConfirmado);
+              emitDataEvent('financeiro:conciliacao');
+            }
             setLoading(true);
             await processarLinhas(pending);
             setLoading(false);

@@ -7,6 +7,13 @@ interface AutomaticInvestmentLine {
   tipo: string;
 }
 
+interface AutomaticInvestmentLineState extends AutomaticInvestmentLine {
+  jaConciliada?: boolean;
+  ignorada?: boolean;
+  matchId?: string;
+  transferReconhecida?: boolean;
+}
+
 interface AccountOption {
   id: string;
   nome: string;
@@ -32,6 +39,17 @@ export function getAutomaticInvestmentDirection(
 
 export function isAutomaticInvestmentLine(line: AutomaticInvestmentLine): boolean {
   return getAutomaticInvestmentDirection(line) !== null;
+}
+
+/** Linha ContaMax que ainda precisa virar transferência neste extrato. */
+export function isPendingAutomaticInvestmentLine(
+  line: AutomaticInvestmentLineState,
+): boolean {
+  return !line.jaConciliada
+    && !line.ignorada
+    && !line.matchId
+    && !line.transferReconhecida
+    && isAutomaticInvestmentLine(line);
 }
 
 /** Sugere somente uma conta inequívoca; em caso de ambiguidade a UI exige escolha. */

@@ -3,6 +3,7 @@ import {
   findSuggestedInvestmentAccountId,
   getAutomaticInvestmentDirection,
   isAutomaticInvestmentLine,
+  isPendingAutomaticInvestmentLine,
 } from './conciliacaoInvestimentoAutomatico';
 
 describe('ContaMax automatic investment recognition', () => {
@@ -34,5 +35,13 @@ describe('ContaMax automatic investment recognition', () => {
       ...accounts,
       { id: 'other', nome: 'ContaMax Reserva' },
     ], 'bank')).toBeUndefined();
+  });
+
+  it('only auto-processes an unresolved ContaMax line', () => {
+    const pending = { tipo: 'DESPESA', descricao: 'APLICACAO CONTAMAX' };
+    expect(isPendingAutomaticInvestmentLine(pending)).toBe(true);
+    expect(isPendingAutomaticInvestmentLine({ ...pending, jaConciliada: true })).toBe(false);
+    expect(isPendingAutomaticInvestmentLine({ ...pending, matchId: 'existing' })).toBe(false);
+    expect(isPendingAutomaticInvestmentLine({ ...pending, transferReconhecida: true })).toBe(false);
   });
 });

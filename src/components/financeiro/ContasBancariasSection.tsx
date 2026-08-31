@@ -6,6 +6,8 @@ import { emitDataEvent, useDataEvent } from '@/lib/dataEvents';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { toast } from 'sonner';
 import { fmtBRL } from '@/lib/money';
+import { formatDateBR, parseLocalDate } from '@/lib/formatters';
+import { loadSaldoExtrato } from '@/lib/conciliacaoSaldoExtrato';
 import { BRLInput } from '@/components/ui/brl-input';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -354,6 +356,9 @@ export default function ContasBancariasSection({ onNavigateExtrato }: ContasBanc
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filtered.map(item => {
               const saldo = saldos[item.id] || 0;
+              const saldoBanco = loadSaldoExtrato(item.id);
+              const saldoDivergente = saldoBanco && Math.abs(saldoBanco.valor - saldo) >= 0.01;
+              const saldoExibido = saldoBanco?.valor ?? saldo;
               return (
                 <Card key={item.id} className="border-border/50">
                   <CardHeader className="pb-2">
@@ -380,12 +385,24 @@ export default function ContasBancariasSection({ onNavigateExtrato }: ContasBanc
                     )}
                   </CardHeader>
                   <CardContent>
-                    <p className={`text-2xl font-bold ${saldo >= 0 ? 'text-success' : 'text-destructive'}`}>
-                      {fmtBRL(saldo)}
+                    <p className={`text-2xl font-bold ${saldoExibido >= 0 ? 'text-success' : 'text-destructive'}`}>
+                      {fmtBRL(saldoExibido)}
                     </p>
                     <p className="text-[11px] text-muted-foreground">
-                      Saldo atual (inicial: {fmtBRL(item.saldo_inicial)})
+                      {saldoBanco
+                        ? `Saldo confirmado no banco em ${formatDateBR(parseLocalDate(saldoBanco.data))}`
+                        : `Saldo contabilizado (inicial: ${fmtBRL(item.saldo_inicial)})`}
                     </p>
+                    {saldoDivergente && (
+                      <div className="mt-2 rounded-md border border-warning/30 bg-warning/5 p-2 text-xs">
+                        <p className="font-medium text-foreground">
+                          Contabilizado: {fmtBRL(saldo)}
+                        </p>
+                        <p className="text-muted-foreground">
+                          Diferença pendente no extrato: {fmtBRL(saldoBanco.valor - saldo)}.
+                        </p>
+                      </div>
+                    )}
                     <Button variant="link" size="sm" className="px-0 mt-1 h-auto text-xs" onClick={() => {
                       if (onNavigateExtrato) {
                         onNavigateExtrato(item.id);
