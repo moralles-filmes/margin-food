@@ -317,15 +317,27 @@ function addRevenueByBrand(
     y += 0.4;
   }
   items.forEach((item: PresentationRevenueBrandPoint) => {
-    slide.addText(item.nome, { x: 0.9, y, w: 6.6, h: 0.25, fontFace: 'Aptos', fontSize: 15, bold: true, color: COLOR.white, margin: 0, fit: 'shrink', breakLine: false });
-    slide.addText(`${total > 0 ? formatPercentBR((item.total / total) * 100, 1) : '—'} do bruto do mês · ${item.closingCount} fechamento(s)`, { x: 0.9, y: y + 0.27, w: 6.6, h: 0.2, fontFace: 'Aptos', fontSize: 11, color: COLOR.muted, margin: 0 });
-    slide.addText('BRUTO', { x: 7.6, y, w: 2.15, h: 0.18, fontFace: 'Aptos', fontSize: 9, color: COLOR.muted, align: 'right', margin: 0 });
-    slide.addText(fmtBRL(item.total), { x: 7.6, y: y + 0.18, w: 2.15, h: 0.3, fontFace: 'Aptos Mono', fontSize: 14, bold: true, color: COLOR.revenue, align: 'right', margin: 0, fit: 'shrink' });
-    slide.addText('LÍQUIDO', { x: 9.9, y, w: 2.15, h: 0.18, fontFace: 'Aptos', fontSize: 9, color: COLOR.muted, align: 'right', margin: 0 });
-    slide.addText(item.net === null ? '—' : fmtBRL(item.net), { x: 9.9, y: y + 0.18, w: 2.15, h: 0.3, fontFace: 'Aptos Mono', fontSize: 14, bold: true, color: COLOR.white, align: 'right', margin: 0, fit: 'shrink' });
+    slide.addText(item.nome, { x: 0.9, y, w: 4.0, h: 0.25, fontFace: 'Aptos', fontSize: 15, bold: true, color: COLOR.white, margin: 0, fit: 'shrink', breakLine: false });
+    slide.addText(`${total > 0 ? formatPercentBR((item.total / total) * 100, 1) : '—'} do bruto do mês · ${item.closingCount} fechamento(s)`, { x: 0.9, y: y + 0.27, w: 4.0, h: 0.2, fontFace: 'Aptos', fontSize: 11, color: COLOR.muted, margin: 0, fit: 'shrink' });
+    slide.addText('BRUTO', { x: 5.0, y, w: 1.65, h: 0.18, fontFace: 'Aptos', fontSize: 9, color: COLOR.muted, align: 'right', margin: 0 });
+    slide.addText(fmtBRL(item.total), { x: 5.0, y: y + 0.18, w: 1.65, h: 0.3, fontFace: 'Aptos Mono', fontSize: 12, bold: true, color: COLOR.revenue, align: 'right', margin: 0, fit: 'shrink' });
+    slide.addText('LÍQUIDO', { x: 6.8, y, w: 1.65, h: 0.18, fontFace: 'Aptos', fontSize: 9, color: COLOR.muted, align: 'right', margin: 0 });
+    slide.addText(item.net === null ? '—' : fmtBRL(item.net), { x: 6.8, y: y + 0.18, w: 1.65, h: 0.3, fontFace: 'Aptos Mono', fontSize: 12, bold: true, color: COLOR.white, align: 'right', margin: 0, fit: 'shrink' });
+    slide.addText('DIFERENÇA', { x: 8.6, y, w: 1.65, h: 0.18, fontFace: 'Aptos', fontSize: 9, color: COLOR.muted, align: 'right', margin: 0 });
+    slide.addText(brandDifferenceText(item), { x: 8.6, y: y + 0.18, w: 1.65, h: 0.3, fontFace: 'Aptos Mono', fontSize: 12, bold: true, color: COLOR.warning, align: 'right', margin: 0, fit: 'shrink' });
+    slide.addText('% DESCONTO', { x: 10.4, y, w: 1.65, h: 0.18, fontFace: 'Aptos', fontSize: 9, color: COLOR.muted, align: 'right', margin: 0 });
+    slide.addText(brandDifferenceText(item, true), { x: 10.4, y: y + 0.18, w: 1.65, h: 0.3, fontFace: 'Aptos Mono', fontSize: 12, bold: true, color: COLOR.warning, align: 'right', margin: 0, fit: 'shrink' });
     slide.addShape(pptx.ShapeType.line, { x: 0.9, y: y + 0.52, w: 11.15, h: 0, line: { color: COLOR.subtle, width: 0.5, transparency: 35 } });
     y += 0.62;
   });
+}
+
+/** Diferença bruto − líquido por loja/marca, e sua % sobre o bruto; líquido nulo (marca sem categoria vinculada) → sem base para calcular. */
+function brandDifferenceText(item: PresentationRevenueBrandPoint, percentage = false): string {
+  if (item.net === null) return '—';
+  const difference = item.total - item.net;
+  if (percentage) return item.total > 0 ? formatPercentBR((difference / item.total) * 100, 1) : '—';
+  return fmtBRL(difference);
 }
 
 function addRevenueWeekdays(
@@ -467,13 +479,12 @@ function addExpensesTree(
 ): void {
   const rows = flattenExpenseNodes(nodes);
   if (rows.length === 0) { addEmpty(slide, pptx, 'Sem despesas no mês selecionado.'); return; }
-  [['CATEGORIA', 0.8, 5.8], ['VALOR PRÓPRIO', 7.0, 1.6], ['ACUMULADO', 8.7, 1.7], ['% RECEITA LÍQ.', 10.5, 1.9]].forEach(([label, x, width]) => slide.addText(String(label), { x: Number(x), y: 1.65, w: Number(width), h: 0.2, fontFace: 'Aptos', fontSize: 11, bold: true, color: COLOR.muted, margin: 0, align: Number(x) > 1 ? 'right' : 'left' }));
+  [['CATEGORIA', 0.8, 5.8], ['VALOR', 8.7, 1.7], ['% RECEITA LÍQ.', 10.5, 1.9]].forEach(([label, x, width]) => slide.addText(String(label), { x: Number(x), y: 1.65, w: Number(width), h: 0.2, fontFace: 'Aptos', fontSize: 11, bold: true, color: COLOR.muted, margin: 0, align: Number(x) > 1 ? 'right' : 'left' }));
   rows.forEach(({ node, depth }, index) => {
     const y = 2.02 + index * 0.5;
     slide.addShape(pptx.ShapeType.line, { x: 0.8, y: y + 0.32, w: 11.6, h: 0, line: { color: COLOR.subtle, width: 0.5, transparency: 35 } });
     slide.addText(`${depth > 0 ? '↳ ' : ''}${node.name}`, { x: 0.8 + depth * 0.3, y, w: 5.0 - depth * 0.3, h: 0.22, fontFace: 'Aptos', fontSize: 13, bold: depth === 0, color: COLOR.white, margin: 0, fit: 'shrink' });
     if (node.operationalClass === 'non-operational') slide.addText('NÃO OPERACIONAL', { x: 5.9, y, w: 1.0, h: 0.18, fontFace: 'Aptos', fontSize: 8, bold: true, color: COLOR.warning, margin: 0 });
-    slide.addText(fmtBRL(node.directAmount), { x: 7.0, y, w: 1.6, h: 0.22, fontFace: 'Aptos', fontSize: 12, color: COLOR.muted, margin: 0, align: 'right', fit: 'shrink' });
     slide.addText(fmtBRL(node.amount), { x: 8.7, y, w: 1.7, h: 0.22, fontFace: 'Aptos', fontSize: 13, bold: true, color: COLOR.white, margin: 0, align: 'right', fit: 'shrink' });
     slide.addText(expenseShareOfNetRevenueText(node.amount, netRevenue), { x: 10.5, y, w: 1.9, h: 0.22, fontFace: 'Aptos', fontSize: 12, color: COLOR.muted, margin: 0, align: 'right', fit: 'shrink' });
   });
