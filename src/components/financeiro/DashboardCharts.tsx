@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from 'recharts';
-import { subMonths, startOfMonth, endOfMonth } from 'date-fns';
+import { subMonths, startOfMonth, endOfMonth, subDays } from 'date-fns';
 import { formatDateBR, formatInBR } from '@/lib/datetime';
 import { fmtBRL, formatDecimalBR } from '@/lib/formatters';
 import { toast } from 'sonner';
@@ -47,7 +47,14 @@ interface ChartsData {
 // Paleta categórica centralizada — ver src/lib/chartTheme.ts
 const PIE_COLORS = SERIES_COLORS;
 
-export default function DashboardCharts() {
+interface DashboardChartsProps {
+  /** Início do período selecionado no filtro do Dashboard Financeiro (yyyy-MM-dd, inclusivo) */
+  periodStart: string;
+  /** Fim exclusivo do período selecionado no filtro (yyyy-MM-dd) — mesma semântica de get_fin_dashboard_summary */
+  periodEndExclusive: string;
+}
+
+export default function DashboardCharts({ periodStart, periodEndExclusive }: DashboardChartsProps) {
   const canViewRbac = useCan('financeiro:dashboard:view');
   const [chartData, setChartData] = useState<ChartsData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -61,23 +68,26 @@ export default function DashboardCharts() {
     setError(false);
     const inicio = formatDateBR(startOfMonth(subMonths(new Date(), meses - 1)));
     const fim = formatDateBR(endOfMonth(new Date()));
+    // get_fin_dashboard_charts trata p_end como inclusivo; o filtro do topo usa fim exclusivo.
+    const categoriaFimInclusivo = formatDateBR(subDays(new Date(periodEndExclusive + 'T12:00:00'), 1));
 
-    const { data, error: rpcError } = await supabase.rpc('get_fin_dashboard_charts', {
-      p_start: inicio,
-      p_end: fim,
-    });
+    const [evolucaoRes, categoriaRes] = await Promise.all([
+      supabase.rpc('get_fin_dashboard_charts', { p_start: inicio, p_end: fim }),
+      supabase.rpc('get_fin_dashboard_charts', { p_start: periodStart, p_end: categoriaFimInclusivo }),
+    ]);
 
-    if (rpcError) {
-      console.error(rpcError);
+    if (evolucaoRes.error || categoriaRes.error) {
+      console.error(evolucaoRes.error || categoriaRes.error);
       toast.error('Erro ao carregar gráficos do dashboard');
       setError(true);
       setLoading(false);
       return;
     }
 
-    const d = data as Record<string, unknown> | null;
+    const evolucaoData = evolucaoRes.data as Record<string, unknown> | null;
+    const categoriaData = categoriaRes.data as Record<string, unknown> | null;
 
-    const evolucao = ((d?.evolucao_mensal as Array<Record<string, unknown>>) || []).map((m) => {
+    const evolucao = ((evolucaoData?.evolucao_mensal as Array<Record<string, unknown>>) || []).map((m) => {
       const [year, month] = String(m.mes).split('-');
       const date = new Date(Number(year), Number(month) - 1);
       return {
@@ -91,13 +101,13 @@ export default function DashboardCharts() {
 
     setChartData({
       evolucao_mensal: evolucao,
-      despesas_por_categoria: ((d?.despesas_por_categoria as Array<Record<string, unknown>>) || []).map((c) => ({
+      despesas_por_categoria: ((categoriaData?.despesas_por_categoria as Array<Record<string, unknown>>) || []).map((c) => ({
         nome: String(c.nome),
         valor: Number(c.valor) || 0,
       })),
     });
     setLoading(false);
-  }, [meses]);
+  }, [meses, periodStart, periodEndExclusive]);
 
   loadRef.current = load;
 
