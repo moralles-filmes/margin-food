@@ -167,7 +167,7 @@ describe('migração do saldo Santander ContaMax consolidado', () => {
     expect(repair).not.toContain('DELETE FROM public.fin_lancamentos');
   });
 
-  it('consolida rendimento e abertura, desativa a conta técnica e prova os saldos finais', () => {
+  it('documenta a âncora histórica substituída pelo repair posterior', () => {
     const repair = section('DO $repair$', 'DO $validation$');
 
     expect(repair).toContain('l.valor = 0.34');
