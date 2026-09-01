@@ -6,7 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from 'recharts';
 import { subMonths, startOfMonth, endOfMonth, subDays } from 'date-fns';
-import { formatDateBR, formatInBR } from '@/lib/datetime';
+import { formatDateISO, formatInBR } from '@/lib/datetime';
 import { fmtBRL, formatDecimalBR } from '@/lib/formatters';
 import { toast } from 'sonner';
 import { AlertTriangle } from 'lucide-react';
@@ -66,10 +66,10 @@ export default function DashboardCharts({ periodStart, periodEndExclusive }: Das
   const load = useCallback(async () => {
     setLoading(true);
     setError(false);
-    const inicio = formatDateBR(startOfMonth(subMonths(new Date(), meses - 1)));
-    const fim = formatDateBR(endOfMonth(new Date()));
+    const inicio = formatDateISO(startOfMonth(subMonths(new Date(), meses - 1)));
+    const fim = formatDateISO(endOfMonth(new Date()));
     // get_fin_dashboard_charts trata p_end como inclusivo; o filtro do topo usa fim exclusivo.
-    const categoriaFimInclusivo = formatDateBR(subDays(new Date(periodEndExclusive + 'T12:00:00'), 1));
+    const categoriaFimInclusivo = formatDateISO(subDays(new Date(periodEndExclusive + 'T12:00:00'), 1));
 
     const [evolucaoRes, categoriaRes] = await Promise.all([
       supabase.rpc('get_fin_dashboard_charts', { p_start: inicio, p_end: fim }),

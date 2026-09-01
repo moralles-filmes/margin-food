@@ -32,7 +32,7 @@ import {
   presentationDecisionStatusLabel,
 } from '@/lib/presentationFormatting';
 import { isPresentationSlideExportable } from '@/lib/presentationSlides';
-import { fmtBRL, fmtBRLCompact, formatIntegerBR, formatPercentBR } from '@/lib/formatters';
+import { fmtBRL, fmtBRLCompact, formatDateValueBR, formatIntegerBR, formatPercentBR } from '@/lib/formatters';
 import type { PresentationExportOptions } from '@/lib/presentationPdfExport';
 import {
   presentationInsightEvidenceLabel,
@@ -1271,7 +1271,7 @@ function addDecisionCommitments(
     const estimatedLines = Math.max(1, Math.ceil(action.description.length / 85));
     const height = Math.min(0.6, 0.18 + estimatedLines * 0.13);
     slide.addText(action.description, { x, y, w: 4.9, h: height, fontFace: 'Aptos', fontSize: 11, color: COLOR.white, margin: 0, fit: 'shrink', valign: 'top' });
-    slide.addText(`${action.responsibleName} · ${action.dueDate ?? 'sem prazo'} · ${presentationActionStatusLabel(action.status)}`, { x, y: y + height + 0.03, w: 5.45, h: 0.16, fontFace: 'Aptos', fontSize: 9, color: COLOR.muted, margin: 0, fit: 'shrink' });
+    slide.addText(`${action.responsibleName} · ${action.dueDate ? formatDateValueBR(action.dueDate) : 'sem prazo'} · ${presentationActionStatusLabel(action.status)}`, { x, y: y + height + 0.03, w: 5.45, h: 0.16, fontFace: 'Aptos', fontSize: 9, color: COLOR.muted, margin: 0, fit: 'shrink' });
     slide.addShape(pptx.ShapeType.line, { x, y: y + height + 0.24, w: 5.45, h: 0, line: { color: COLOR.subtle, width: 0.7, transparency: 35 } });
     if (index % 2 === 0) leftY = y + height + 0.34;
     else rightY = y + height + 0.34;

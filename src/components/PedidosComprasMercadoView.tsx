@@ -16,7 +16,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandInput, CommandList, CommandEmpty, CommandItem } from '@/components/ui/command';
 import { toast } from 'sonner';
-import { fmtBRL, formatDateBR, formatDateTimeBR } from '@/lib/formatters';
+import { fmtBRL, formatDateBR, formatDateTimeBR, formatDateValueBR } from '@/lib/formatters';
 import UserMentionSelect from '@/components/UserMentionSelect';
 import ProductSearchCombobox, { type ProductOption } from '@/components/ui/ProductSearchCombobox';
 import { SubmoduleSwitcher } from '@/components/ui/SubmoduleSwitcher';
@@ -590,7 +590,7 @@ export default function PedidosComprasMercadoView() {
               {renderActionMenu(selectedOrder)}
               <div className="text-right text-xs text-muted-foreground">
                 <p>Criado: {formatDateBR(new Date(selectedOrder.created_at))}</p>
-                {selectedOrder.need_by_date && <p>Necessidade: {selectedOrder.need_by_date}</p>}
+                {selectedOrder.need_by_date && <p>Necessidade: {formatDateValueBR(selectedOrder.need_by_date)}</p>}
                 {selectedOrder.supplier_name && <p>Forn: {selectedOrder.supplier_name}</p>}
               </div>
             </div>

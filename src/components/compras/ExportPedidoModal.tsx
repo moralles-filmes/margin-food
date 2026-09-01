@@ -8,7 +8,7 @@ import { FileDown, Copy, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import { PurchaseOrder, PurchaseOrderItem } from '@/hooks/usePurchaseOrdersStore';
 import { gerarPDFPedidoFornecedor } from '@/lib/pdfPedidoFornecedor';
-import { fmtBRL, formatDateBR, formatFixedBR } from '@/lib/formatters';
+import { fmtBRL, formatDateBR, formatDateValueBR, formatFixedBR } from '@/lib/formatters';
 
 interface Props {
   open: boolean;
@@ -29,8 +29,8 @@ export default function ExportPedidoModal({ open, onOpenChange, order, items }: 
     text += `Nº ${orderCode} — ${orderDate}\n`;
     text += `Prioridade: ${order.priority}\n`;
     if (order.supplier_name) text += `Fornecedor: ${order.supplier_name}\n`;
-    if (order.need_by_date) text += `Data necessidade: ${order.need_by_date}\n`;
-    if (order.delivery_forecast_date) text += `Previsão entrega: ${order.delivery_forecast_date}\n`;
+    if (order.need_by_date) text += `Data necessidade: ${formatDateValueBR(order.need_by_date)}\n`;
+    if (order.delivery_forecast_date) text += `Previsão entrega: ${formatDateValueBR(order.delivery_forecast_date)}\n`;
     if (order.payment_type) text += `Pagamento: ${order.payment_type}\n`;
     text += `\n*ITENS:*\n`;
     items.forEach((item, idx) => {

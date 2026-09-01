@@ -9,7 +9,7 @@ import { DollarSign, Settings2, CheckCircle2, AlertTriangle, XCircle } from 'luc
 import { startOfMonth, endOfMonth, getDaysInMonth } from 'date-fns';
 import { getWeeksOfMonth } from './WeeklyBreakdown';
 import { formatInBR, fmtBRL, formatPercentBR, normalizeBRLMoneyToNumber, parseLocalDate } from '@/lib/formatters';
-import { formatDateBR as formatDateISO } from '@/lib/datetime';
+import { formatDateISO } from '@/lib/datetime';
 
 export function getMetaStatus(percent: number, amarelo: number, vermelho: number) {
   if (percent >= vermelho) return 'estourado';

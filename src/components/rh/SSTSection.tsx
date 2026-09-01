@@ -247,11 +247,11 @@ function EpisTab({ epis, colaboradores, canManage, user, getColabNome, onRefresh
                         <TableCell className="text-xs">{e.nome}</TableCell>
                         <TableCell className="text-xs">{e.tipo}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{e.ca_numero || '—'}</TableCell>
-                        <TableCell className="text-xs">{format(parseISO(e.data_entrega), 'dd/MM/yy')}</TableCell>
+                        <TableCell className="text-xs">{format(parseISO(e.data_entrega), 'dd/MM/yyyy')}</TableCell>
                         <TableCell className="text-xs">
                           {e.data_validade ? (
                             <span className={cn(vencido && "text-destructive font-semibold", aVencer && "text-warning font-semibold")}>
-                              {format(parseISO(e.data_validade), 'dd/MM/yy')}
+                              {format(parseISO(e.data_validade), 'dd/MM/yyyy')}
                             </span>
                           ) : '—'}
                         </TableCell>
@@ -388,9 +388,9 @@ function ExamesTab({ exames, colaboradores, canManage, user, getColabNome, onRef
                       <TableRow key={e.id}>
                         <TableCell className="text-xs font-medium">{getColabNome(e.colaborador_id)}</TableCell>
                         <TableCell className="text-xs">{tipoLabel}</TableCell>
-                        <TableCell className="text-xs">{e.data_realizacao ? format(parseISO(e.data_realizacao), 'dd/MM/yy') : '—'}</TableCell>
+                        <TableCell className="text-xs">{e.data_realizacao ? format(parseISO(e.data_realizacao), 'dd/MM/yyyy') : '—'}</TableCell>
                         <TableCell className={cn("text-xs", vencido && "text-destructive font-semibold")}>
-                          {e.data_vencimento ? format(parseISO(e.data_vencimento), 'dd/MM/yy') : '—'}
+                          {e.data_vencimento ? format(parseISO(e.data_vencimento), 'dd/MM/yyyy') : '—'}
                         </TableCell>
                         <TableCell>
                           <Badge variant={e.resultado === 'INAPTO' ? 'destructive' : e.resultado === 'APTO_RESTRICOES' ? 'secondary' : 'default'} className="text-[10px]">

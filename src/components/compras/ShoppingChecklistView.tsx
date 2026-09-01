@@ -10,6 +10,7 @@ import { useCan } from '@/permissions/hooks';
 import { PurchaseOrderItem } from '@/hooks/usePurchaseOrdersStore';
 import { usePurchaseOrdersStoreContext } from '@/contexts/PurchaseOrdersStoreContext';
 import { supabase } from '@/integrations/supabase/client';
+import { formatDateValueBR } from '@/lib/formatters';
 
 interface Props {
   onNavigateToOrder?: (orderId: string) => void;
@@ -97,7 +98,7 @@ export default function ShoppingChecklistView({ onNavigateToOrder }: Props) {
             </div>
             <div className="text-right text-xs text-muted-foreground">
               <p>{fmtBRL(selectedOrder.total_estimated)}</p>
-              {selectedOrder.need_by_date && <p>Até: {selectedOrder.need_by_date}</p>}
+              {selectedOrder.need_by_date && <p>Até: {formatDateValueBR(selectedOrder.need_by_date)}</p>}
             </div>
           </div>
 
@@ -245,7 +246,7 @@ export default function ShoppingChecklistView({ onNavigateToOrder }: Props) {
                     <span className="text-[9px] text-muted-foreground">{order.type}</span>
                     {order.category && <span className="text-[9px] text-muted-foreground">• {order.category}</span>}
                     <span className="text-[9px] text-muted-foreground">{fmtBRL(order.total_estimated)}</span>
-                    {order.need_by_date && <span className="text-[9px] text-muted-foreground">• Até: {order.need_by_date}</span>}
+                    {order.need_by_date && <span className="text-[9px] text-muted-foreground">• Até: {formatDateValueBR(order.need_by_date)}</span>}
                   </div>
                 </div>
                 <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />

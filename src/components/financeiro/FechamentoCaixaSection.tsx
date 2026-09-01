@@ -17,8 +17,8 @@ import { Plus, Edit, Trash2, RefreshCw, DollarSign, Calendar, FileDown, FileSpre
 import { useFormDirtyGuard } from '@/hooks/useFormDirtyGuard';
 import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
 import { startOfMonth, endOfMonth } from 'date-fns';
-import { formatDateBR, todayBR } from '@/lib/datetime';
-import { fmtBRL, normalizeBRLMoneyToNumber, parseLocalDate } from '@/lib/formatters';
+import { formatDateISO, todayBR } from '@/lib/datetime';
+import { fmtBRL, formatDateBR, normalizeBRLMoneyToNumber, parseLocalDate } from '@/lib/formatters';
 import { useCan } from '@/permissions/hooks';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { APP_NAME } from '@/lib/brand';
@@ -108,8 +108,8 @@ export default function FechamentoCaixaSection() {
   const [activeTab, setActiveTab] = useState<FechamentoTab>('diario');
 
   // Filters
-  const [startDate, setStartDate] = useState(() => formatDateBR(startOfMonth(new Date())));
-  const [endDate, setEndDate] = useState(() => formatDateBR(endOfMonth(new Date())));
+  const [startDate, setStartDate] = useState(() => formatDateISO(startOfMonth(new Date())));
+  const [endDate, setEndDate] = useState(() => formatDateISO(endOfMonth(new Date())));
 
   // Form (string-based for CurrencyInput)
   const [formData, setFormData] = useState('');

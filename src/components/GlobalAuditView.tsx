@@ -282,7 +282,7 @@ export default function GlobalAuditView() {
                     {logs.map(log => (
                       <TableRow key={log.id} className="cursor-pointer" onClick={() => setDetail(log)}>
                         <TableCell className="text-[11px] text-muted-foreground font-mono">
-                          {format(new Date(log.created_at), 'dd/MM HH:mm:ss')}
+                          {format(new Date(log.created_at), 'dd/MM/yyyy HH:mm:ss')}
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline" className="text-[9px] font-normal">{log.module}</Badge>

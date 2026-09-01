@@ -1,12 +1,6 @@
 import { Clock, ShieldAlert } from 'lucide-react';
 import { LoteSalmaoLimpo } from '@/types/salmon';
-import { format } from 'date-fns';
-import { fmtBRL, formatFixedBR } from '@/lib/formatters';
-
-function parseLocalDate(d: string) {
-  const [y, m, dd] = d.split('-').map(Number);
-  return new Date(y, m - 1, dd);
-}
+import { fmtBRL, formatDateValueBR, formatFixedBR } from '@/lib/formatters';
 
 interface Props {
   lotesLimpos: LoteSalmaoLimpo[];
@@ -58,7 +52,7 @@ export default function ValidadeAlertCard({ lotesLimpos, onPrioritize }: Props) 
                 <div className="text-[11px]">
                   <span className="font-medium text-foreground">{l.lote || '—'}</span>
                   <span className="text-muted-foreground ml-2">{formatFixedBR(l.kgRestante, 1)} kg</span>
-                  <span className="text-destructive ml-2">Val: {format(parseLocalDate(l.dataValidade), 'dd/MM')}</span>
+                  <span className="text-destructive ml-2">Val: {formatDateValueBR(l.dataValidade)}</span>
                 </div>
               </div>
             ))}
@@ -75,7 +69,7 @@ export default function ValidadeAlertCard({ lotesLimpos, onPrioritize }: Props) 
                 <div className="text-[11px]">
                   <span className="font-medium text-foreground">{l.lote || '—'}</span>
                   <span className="text-muted-foreground ml-2">{formatFixedBR(l.kgRestante, 1)} kg</span>
-                  <span className="text-warning ml-2">Val: {format(parseLocalDate(l.dataValidade), 'dd/MM')}</span>
+                  <span className="text-warning ml-2">Val: {formatDateValueBR(l.dataValidade)}</span>
                 </div>
                 {onPrioritize && (
                   <button

@@ -342,7 +342,7 @@ export default function TarefasSection({
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-muted-foreground">Prazo</span>
                       <span className={isAtrasada ? 'text-destructive font-medium' : ''}>
-                        {format(parseISO(t.prazo), "dd/MM HH:mm")}
+                        {format(parseISO(t.prazo), "dd/MM/yyyy HH:mm")}
                         {isAtrasada && <AlertTriangle className="w-3 h-3 inline ml-1 text-destructive" />}
                       </span>
                     </div>

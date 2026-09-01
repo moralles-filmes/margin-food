@@ -389,7 +389,7 @@ export default function FeriasAfastamentosSection({
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium">{getColabNome(r.colaborador_id)}</p>
                         <p className="text-xs text-muted-foreground">
-                          {tipo.label} · {format(parseISO(r.data_inicio), 'dd/MM')} a {format(parseISO(r.data_fim), 'dd/MM')} · {r.dias_uteis} dias
+                          {tipo.label} · {format(parseISO(r.data_inicio), 'dd/MM/yyyy')} a {format(parseISO(r.data_fim), 'dd/MM/yyyy')} · {r.dias_uteis} dias
                         </p>
                         {r.motivo && <p className="text-xs text-muted-foreground truncate">{r.motivo}</p>}
                       </div>
@@ -445,7 +445,7 @@ export default function FeriasAfastamentosSection({
                               </span>
                             </TableCell>
                             <TableCell className="text-xs">
-                              {format(parseISO(r.data_inicio), 'dd/MM/yy')} — {format(parseISO(r.data_fim), 'dd/MM/yy')}
+                              {format(parseISO(r.data_inicio), 'dd/MM/yyyy')} — {format(parseISO(r.data_fim), 'dd/MM/yyyy')}
                             </TableCell>
                             <TableCell className="text-xs">{r.dias_uteis}</TableCell>
                             <TableCell>

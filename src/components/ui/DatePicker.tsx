@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import { formatDateBR, formatDisplayBR } from '@/lib/datetime';
+import { formatDateISO, formatDisplayBR } from '@/lib/datetime';
 import { parseLocalDate } from '@/lib/dateUtils';
 
 interface PopoverPositioning {
@@ -146,8 +146,8 @@ export function DateRangePicker({
           mode="range"
           selected={selected}
           onSelect={(range) => {
-            const nextFrom = range?.from ? formatDateBR(range.from) : '';
-            const nextTo = range?.to ? formatDateBR(range.to) : '';
+            const nextFrom = range?.from ? formatDateISO(range.from) : '';
+            const nextTo = range?.to ? formatDateISO(range.to) : '';
             onChange(nextFrom, nextTo);
             if (nextFrom && nextTo) setOpen(false);
           }}

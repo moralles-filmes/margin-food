@@ -9,6 +9,7 @@ import { useCan } from '@/permissions';
 import { buildTemplateContext, renderTemplate, WHATSAPP_TIPO_LABEL } from '@/lib/cotacaoTemplates';
 import type { useCotacoesStore } from '@/hooks/useCotacoesStore';
 import type { Cotacao, CotacaoItem, CotacaoFornecedor, CotacaoWhatsappLog, CotacaoWhatsappTipo } from '@/types/cotacao';
+import { parseUTCToBR } from '@/lib/datetime';
 
 const TIPOS: CotacaoWhatsappTipo[] = ['SOLICITACAO_COTACAO', 'COBRANCA_RESPOSTA', 'NEGOCIACAO', 'FECHAMENTO_PEDIDO', 'CONFIRMACAO_PRAZO'];
 
@@ -185,7 +186,7 @@ export default function CotacaoWhatsappPanel({ cotacao, itens, fornecedores, sto
                       {logIcon(l.status)} {f?.supplier_nome_snapshot ?? l.phone} <span className="text-muted-foreground">· {WHATSAPP_TIPO_LABEL[l.tipo]}</span>
                     </span>
                     <span className="text-[9px] text-muted-foreground shrink-0">
-                      {(l.sent_at ?? l.created_at)?.slice(8, 10)}/{(l.sent_at ?? l.created_at)?.slice(5, 7)} {(l.sent_at ?? l.created_at)?.slice(11, 16)}
+                      {parseUTCToBR(l.sent_at ?? l.created_at)}
                     </span>
                   </div>
                   {l.message && <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-2 whitespace-pre-wrap">{l.message}</p>}

@@ -321,7 +321,7 @@ function ComunicadoCard({ comunicado: c, canManage, onEdit, onDelete, onTogglePi
               {c.autor_nome && <span>por {c.autor_nome}</span>}
               {c.data_expiracao && (
                 <span className={cn(expirado && "text-destructive")}>
-                  {expirado ? 'Expirado' : `Expira ${format(parseISO(c.data_expiracao), 'dd/MM/yy')}`}
+                  {expirado ? 'Expirado' : `Expira ${format(parseISO(c.data_expiracao), 'dd/MM/yyyy')}`}
                 </span>
               )}
             </div>

@@ -14,6 +14,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { emitDataEvent } from '@/lib/dataEvents';
 import { fmtBRL } from '@/lib/money';
+import { formatDateValueBR } from '@/lib/datetime';
 import { toast } from 'sonner';
 import CategoryCombobox from '@/components/financeiro/CategoryCombobox';
 import { buildCategoryOptions } from '@/lib/categoriaOptions';
@@ -405,7 +406,7 @@ export default function CriarLancamentoExtratoDialog({
                 <div>
                   <p className="text-[10px] text-muted-foreground font-medium uppercase">Linha do Extrato</p>
                   <p className="text-sm font-medium">{linha.descricao}</p>
-                  <p className="text-xs text-muted-foreground">{linha.data}</p>
+                  <p className="text-xs text-muted-foreground">{formatDateValueBR(linha.data)}</p>
                 </div>
                 <div className="text-right">
                   <p className="text-lg font-bold">{fmtBRL(linha.valor)}</p>

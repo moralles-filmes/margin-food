@@ -145,7 +145,7 @@ export default function PerformanceMonitorView() {
                 {slowEvents.map(ev => (
                   <TableRow key={ev.id}>
                     <TableCell className="text-[11px] font-mono text-muted-foreground">
-                      {format(new Date(ev.created_at), 'dd/MM HH:mm:ss')}
+                      {format(new Date(ev.created_at), 'dd/MM/yyyy HH:mm:ss')}
                     </TableCell>
                     <TableCell className="text-[11px]">{ev.entity}</TableCell>
                     <TableCell className="text-[11px]">

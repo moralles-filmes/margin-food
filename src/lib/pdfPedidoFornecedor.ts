@@ -3,6 +3,7 @@ import autoTable from 'jspdf-autotable';
 import { APP_NAME } from '@/lib/brand';
 import { fmtBRL } from '@/lib/money';
 import type { PurchaseOrder, PurchaseOrderItem } from '@/hooks/usePurchaseOrdersStore';
+import { formatDateValueBR } from '@/lib/datetime';
 
 interface Params {
   order: PurchaseOrder;
@@ -15,7 +16,7 @@ interface Params {
 export function gerarPDFPedidoFornecedor({ order, items, includePrice, extraNotes, orderCode }: Params) {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
-  const orderDate = new Date(order.created_at).toLocaleDateString('pt-BR');
+  const orderDate = formatDateValueBR(order.created_at);
   let y = 15;
 
   // ===== HEADER =====
@@ -64,8 +65,8 @@ export function gerarPDFPedidoFornecedor({ order, items, includePrice, extraNote
   doc.setFontSize(9);
 
   const infoLines: string[] = [];
-  if (order.need_by_date) infoLines.push(`Data necessidade: ${order.need_by_date}`);
-  if (order.delivery_forecast_date) infoLines.push(`Previsão entrega: ${order.delivery_forecast_date}`);
+  if (order.need_by_date) infoLines.push(`Data necessidade: ${formatDateValueBR(order.need_by_date)}`);
+  if (order.delivery_forecast_date) infoLines.push(`Previsão entrega: ${formatDateValueBR(order.delivery_forecast_date)}`);
   if (order.payment_type) infoLines.push(`Pagamento: ${order.payment_type}`);
   if (infoLines.length === 0) infoLines.push('Não informado');
 

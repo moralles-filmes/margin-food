@@ -24,6 +24,8 @@ export {
 // ─── Re-export date helpers ───
 export {
   formatDisplayBR as formatDateBR,
+  formatDateISO,
+  formatDateValueBR,
   formatDateTimeBR,
   parseUTCToBR,
   todayBR,

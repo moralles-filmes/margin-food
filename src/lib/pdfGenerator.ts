@@ -2,6 +2,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { APP_NAME } from '@/lib/brand';
 import { fmtBRL } from '@/lib/money';
+import { formatDateValueBR } from '@/lib/datetime';
 
 interface PDFPedido {
   fornecedor: string;
@@ -20,8 +21,8 @@ export function gerarPDFPedido(pedido: PDFPedido) {
   doc.text('Pedido de Compra', 14, 23);
   doc.setFontSize(9);
   doc.text(`Fornecedor: ${pedido.fornecedor}`, 14, 32);
-  doc.text(`Data: ${pedido.data}`, 14, 38);
-  doc.text(`Previsão entrega: ${pedido.dataPrevista}`, 14, 44);
+  doc.text(`Data: ${formatDateValueBR(pedido.data, '-')}`, 14, 38);
+  doc.text(`Previsão entrega: ${formatDateValueBR(pedido.dataPrevista, '-')}`, 14, 44);
   doc.text(`Pagamento: ${pedido.formaPagamento}`, 14, 50);
 
   const total = pedido.itens.reduce((s, i) => s + i.total, 0);

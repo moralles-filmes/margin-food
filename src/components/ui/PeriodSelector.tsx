@@ -6,7 +6,7 @@ import type { DateRange } from 'react-day-picker';
 import { Calendar } from '@/components/ui/calendar';
 import { FilterField } from '@/components/ui/FilterBar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { formatDateBR } from '@/lib/datetime';
+import { formatDateISO } from '@/lib/datetime';
 import { parseLocalDate } from '@/lib/dateUtils';
 
 interface PeriodSelectorProps {
@@ -46,8 +46,8 @@ export function PeriodSelector({ label = 'Período', value, from, to, onChange, 
           mode="range"
           selected={selected}
           onSelect={(range) => {
-            const nextFrom = range?.from ? formatDateBR(range.from) : '';
-            const nextTo = range?.to ? formatDateBR(range.to) : '';
+            const nextFrom = range?.from ? formatDateISO(range.from) : '';
+            const nextTo = range?.to ? formatDateISO(range.to) : '';
             onChange(nextFrom, nextTo);
             if (nextFrom && nextTo) setOpen(false);
           }}
