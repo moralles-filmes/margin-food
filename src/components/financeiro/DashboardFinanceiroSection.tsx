@@ -91,6 +91,7 @@ export default function DashboardFinanceiroSection({ onNavigate }: { onNavigate?
     return todayBR().substring(0, 7);
   });
   const [selectedDate, setSelectedDate] = useState<Date>(now);
+  const [appliedRange, setAppliedRange] = useState<{ start: string; endExclusive: string } | null>(null);
 
   const monthOptions = Array.from({ length: 12 }, (_, i) => {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
@@ -126,6 +127,8 @@ export default function DashboardFinanceiroSection({ onNavigate }: { onNavigate?
         startDate = `${mesAno}-01`;
         endDateFinal = month === 12 ? `${year + 1}-01-01` : `${year}-${String(month + 1).padStart(2, '0')}-01`;
       }
+
+      setAppliedRange({ start: startDate, endExclusive: endDateFinal });
 
       const { data, error } = await supabase.rpc('get_fin_dashboard_summary', {
         p_start: startDate,
@@ -333,7 +336,9 @@ export default function DashboardFinanceiroSection({ onNavigate }: { onNavigate?
         </div>
       )}
 
-      <DashboardCharts />
+      {appliedRange && (
+        <DashboardCharts periodStart={appliedRange.start} periodEndExclusive={appliedRange.endExclusive} />
+      )}
     </div>
   );
 }
