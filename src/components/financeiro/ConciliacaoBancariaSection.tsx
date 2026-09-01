@@ -34,7 +34,15 @@ import { computeScore } from '@/lib/conciliacaoScore';
 import { matchTransferCandidate, findTransferWarnings, type TransferCandidate, type TransferWarning } from '@/lib/conciliacaoTransferMatch';
 import { bankLineKey, buildConciliadosCounts, findStaleImportedRows, fitidKey, type ConciliadoRow, type VinculoRow } from '@/lib/conciliacaoConciliados';
 import { getConsolidatedBankDelta, isAutomaticInvestmentLine, isPendingAutomaticInvestmentLine } from '@/lib/conciliacaoInvestimentoAutomatico';
-import { clearSaldoExtrato, loadSaldoExtrato, saveSaldoExtrato, type SaldoExtratoRef } from '@/lib/conciliacaoSaldoExtrato';
+import {
+  classifySaldoArquivo,
+  clearSaldoExtrato,
+  getBankBalanceAtDate,
+  getPendingDeltaAtReference,
+  loadSaldoExtrato,
+  saveSaldoExtrato,
+  type SaldoExtratoRef,
+} from '@/lib/conciliacaoSaldoExtrato';
 import type { ContaBancariaRef, CategoriaFinRef, CentroCustoRef, LancamentoConciliacao, LancamentoCandidate, ContaPagarCandidate, ContaReceberCandidate, ContaPagarAberta } from '@/types/financeiro';
 import { mapPagamentoError } from '@/lib/financeiroErrorMap';
 import DateRangePresets from './DateRangePresets';
@@ -140,12 +148,8 @@ async function localizarDiaDivergencia(
   dateSet.add(saldoExtrato.data);
   const dates = Array.from(dateSet).sort();
 
-  const bancoAt = (date: string) =>
-    saldoExtrato.valor - getConsolidatedBankDelta(linhas.filter(l => l.data > date));
-  const pendingUpTo = (date: string) =>
-    getConsolidatedBankDelta(
-      linhas.filter(l => !l.jaConciliada && !l.ignorada && l.data <= date),
-    );
+  const bancoAt = (date: string) => getBankBalanceAtDate(saldoExtrato, linhas, date);
+  const pendingUpTo = (date: string) => getPendingDeltaAtReference(linhas, date);
 
   const sistemaCache = new Map<string, number>();
   const sistemaAt = async (date: string) => {
@@ -319,8 +323,8 @@ export default function ConciliacaoBancariaSection() {
     nomeArquivo: string;
     periodoInicio: string;
     periodoFim: string;
-    deltaExtrato: number;
     saldoSugerido?: { valor: number; data: string };
+    saldoContaCorrenteArquivo?: { valor: number; data: string };
   } | null>(null);
 
   // Wrapper: atualiza state e persiste no sessionStorage
@@ -397,9 +401,7 @@ export default function ConciliacaoBancariaSection() {
       const sistema = Number(data) || 0;
       // Linhas ainda não resolvidas entram como projeção: quando tudo for
       // processado, projetado === sistema e a comparação vira definitiva.
-      const pendentesDelta = getConsolidatedBankDelta(
-        linhas.filter(l => !l.jaConciliada && !l.ignorada),
-      );
+      const pendentesDelta = getPendingDeltaAtReference(linhas, saldoExtrato.data);
       const projetado = sistema + pendentesDelta;
       const diferenca = saldoExtrato.valor - projetado;
       setConferenciaSaldo({ sistema, projetado, pendentesDelta, diferenca });
@@ -1358,14 +1360,14 @@ export default function ConciliacaoBancariaSection() {
     fileName: string,
   ) => {
     const datas = parsed.map(l => l.data).sort();
+    const saldoClassificado = classifySaldoArquivo(saldoFinalArquivo, parsed);
     setConfirmSaldoDialog({
       open: true,
       parsed,
       nomeArquivo: fileName,
       periodoInicio: datas[0],
       periodoFim: datas[datas.length - 1],
-      deltaExtrato: getConsolidatedBankDelta(parsed),
-      saldoSugerido: saldoFinalArquivo,
+      ...saldoClassificado,
     });
   };
 
@@ -3572,8 +3574,9 @@ export default function ConciliacaoBancariaSection() {
           nomeArquivo={confirmSaldoDialog.nomeArquivo}
           periodoInicio={confirmSaldoDialog.periodoInicio}
           periodoFim={confirmSaldoDialog.periodoFim}
-          deltaExtrato={confirmSaldoDialog.deltaExtrato}
+          linhasExtrato={confirmSaldoDialog.parsed}
           saldoSugerido={confirmSaldoDialog.saldoSugerido}
+          saldoContaCorrenteArquivo={confirmSaldoDialog.saldoContaCorrenteArquivo}
           internalMovementCount={confirmSaldoDialog.parsed.filter(isAutomaticInvestmentLine).length}
           contaId={contaSel}
           onCancel={() => setConfirmSaldoDialog(null)}

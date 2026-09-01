@@ -3,8 +3,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { CurrencyInput } from '@/components/ui/brl-input';
+import { DateInput } from '@/components/ui/DateInput';
 import { supabase } from '@/integrations/supabase/client';
 import { diaAnterior } from '@/lib/extratoParser';
+import { getConsolidatedBankDelta, isAutomaticInvestmentLine } from '@/lib/conciliacaoInvestimentoAutomatico';
 import { fmtBRL, formatDateBR, parseLocalDate } from '@/lib/formatters';
 import { normalizeBRLMoneyToNumber, formatNumberToBRL } from '@/lib/money';
 import { toast } from 'sonner';
@@ -16,8 +18,15 @@ interface ConfirmarSaldoExtratoDialogProps {
   nomeArquivo: string;
   periodoInicio: string;
   periodoFim: string;
-  deltaExtrato: number;
+  linhasExtrato: Array<{
+    data: string;
+    descricao?: string | null;
+    tipo: string;
+    valor: number;
+  }>;
   saldoSugerido?: { valor: number; data: string };
+  /** LEDGERBAL da conta corrente quando o OFX omite o investimento ContaMax. */
+  saldoContaCorrenteArquivo?: { valor: number; data: string };
   /** Quantidade de aplicações/resgates ContaMax neutralizados no arquivo. */
   internalMovementCount?: number;
   contaId: string;
@@ -35,14 +44,48 @@ interface Divergencia {
 
 const TOLERANCIA = 0.01;
 
+function getInitialReferenceDate(
+  periodoInicio: string,
+  periodoFim: string,
+  linhasExtrato: ConfirmarSaldoExtratoDialogProps['linhasExtrato'],
+  saldoSugerido: ConfirmarSaldoExtratoDialogProps['saldoSugerido'],
+  saldoContaCorrenteArquivo: ConfirmarSaldoExtratoDialogProps['saldoContaCorrenteArquivo'],
+): string {
+  // Quando o Santander baixa o OFX durante um dia ainda aberto, o LEDGERBAL
+  // cobre só a conta corrente daquele instante. A última varredura ContaMax é
+  // a melhor data inicial para o saldo consolidado do último dia fechado.
+  if (saldoContaCorrenteArquivo) {
+    const latestContaMaxDate = linhasExtrato
+      .filter(isAutomaticInvestmentLine)
+      .map(linha => linha.data)
+      .filter(data => data >= periodoInicio && data <= periodoFim && data <= saldoContaCorrenteArquivo.data)
+      .sort()
+      .at(-1);
+    if (latestContaMaxDate) return latestContaMaxDate;
+  }
+
+  if (saldoSugerido?.data >= periodoInicio && saldoSugerido.data <= periodoFim) {
+    return saldoSugerido.data;
+  }
+
+  return periodoFim;
+}
+
 export default function ConfirmarSaldoExtratoDialog({
-  open, nomeArquivo, periodoInicio, periodoFim, deltaExtrato, saldoSugerido,
-  internalMovementCount = 0, contaId,
+  open, nomeArquivo, periodoInicio, periodoFim, linhasExtrato, saldoSugerido,
+  saldoContaCorrenteArquivo, internalMovementCount = 0, contaId,
   onCancel, onConfirmed,
 }: ConfirmarSaldoExtratoDialogProps) {
   const [valorInput, setValorInput] = useState(() =>
-    saldoSugerido ? formatNumberToBRL(saldoSugerido.valor) : ''
+    internalMovementCount === 0 && saldoSugerido ? formatNumberToBRL(saldoSugerido.valor) : ''
   );
+  const [dataSaldo, setDataSaldo] = useState(() => getInitialReferenceDate(
+    periodoInicio,
+    periodoFim,
+    linhasExtrato,
+    saldoSugerido,
+    saldoContaCorrenteArquivo,
+  ));
   const [loading, setLoading] = useState(false);
   const [divergencia, setDivergencia] = useState<Divergencia | null>(null);
   const canViewConciliacao = useCan('financeiro:conciliacao:view');
@@ -57,6 +100,10 @@ export default function ConfirmarSaldoExtratoDialog({
       toast.error('Informe o saldo final do extrato.');
       return;
     }
+    if (!dataSaldo || dataSaldo < periodoInicio || dataSaldo > periodoFim) {
+      toast.error('Informe uma data do saldo dentro do período importado.');
+      return;
+    }
 
     // O OFX do Santander pode trazer as linhas da conta corrente enquanto o
     // saldo confirmado pelo usuário já soma corrente + ContaMax. Nesse caso as
@@ -64,7 +111,7 @@ export default function ConfirmarSaldoExtratoDialog({
     // conferência pós-processamento faz a validação definitiva contra o razão.
     if (internalMovementCount > 0) {
       toast.success('Saldo Santander consolidado registrado para a conferência final.');
-      onConfirmed({ valor: informado, data: periodoFim });
+      onConfirmed({ valor: informado, data: dataSaldo });
       return;
     }
 
@@ -80,12 +127,15 @@ export default function ConfirmarSaldoExtratoDialog({
         return;
       }
       const saldoBase = Number(data) || 0;
-      const calculado = saldoBase + deltaExtrato;
+      const deltaAteData = getConsolidatedBankDelta(
+        linhasExtrato.filter(linha => linha.data <= dataSaldo),
+      );
+      const calculado = saldoBase + deltaAteData;
       const diferenca = informado - calculado;
 
       if (Math.abs(diferenca) < TOLERANCIA) {
         toast.success('Saldo confere!');
-        onConfirmed({ valor: informado, data: periodoFim });
+        onConfirmed({ valor: informado, data: dataSaldo });
       } else {
         setDivergencia({ informado, calculado, diferenca });
       }
@@ -122,14 +172,39 @@ export default function ConfirmarSaldoExtratoDialog({
                   </p>
                   <p className="mt-1 text-muted-foreground">
                     Confirme o <strong className="text-foreground">saldo total exibido pelo Santander</strong>,
-                    somando conta corrente + ContaMax. O saldo sugerido pelo arquivo pode representar apenas a
-                    conta corrente.
+                    somando conta corrente + ContaMax.
+                    {saldoContaCorrenteArquivo ? (
+                      <>
+                        {' '}O OFX informa apenas <strong className="text-foreground">
+                          {fmtBRL(saldoContaCorrenteArquivo.valor)} da conta corrente em{' '}
+                          {formatDateBR(parseLocalDate(saldoContaCorrenteArquivo.data))}
+                        </strong>; por segurança, esse valor não preenche o total consolidado.
+                      </>
+                    ) : (
+                      ' O saldo da conta corrente no arquivo não representa o total consolidado.'
+                    )}
                   </p>
                 </div>
               )}
-              <div>
-                <Label>Saldo final em {formatDateBR(parseLocalDate(periodoFim))}</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="data-saldo-extrato">Data do saldo informado</Label>
+                <DateInput
+                  id="data-saldo-extrato"
+                  value={dataSaldo}
+                  min={periodoInicio}
+                  max={periodoFim}
+                  onValueChange={setDataSaldo}
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Linhas posteriores a essa data não entram na conferência.
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="saldo-final-extrato">
+                  {internalMovementCount > 0 ? 'Saldo consolidado nessa data' : 'Saldo final nessa data'}
+                </Label>
                 <CurrencyInput
+                  id="saldo-final-extrato"
                   value={valorInput}
                   onValueChange={(raw) => setValorInput(raw)}
                   showPrefix
@@ -179,7 +254,7 @@ export default function ConfirmarSaldoExtratoDialog({
               <Button variant="outline" onClick={onCancel}>Cancelar importação</Button>
               <Button
                 variant="destructive"
-                onClick={() => onConfirmed({ valor: divergencia.informado, data: periodoFim })}
+                onClick={() => onConfirmed({ valor: divergencia.informado, data: dataSaldo })}
               >
                 Continuar mesmo assim
               </Button>

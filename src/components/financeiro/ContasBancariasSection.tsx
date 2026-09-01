@@ -104,9 +104,15 @@ export default function ContasBancariasSection({ onNavigateExtrato }: ContasBanc
   const canEdit = useCan('financeiro:contas:edit');
   const canDelete = useCan('financeiro:contas:delete');
   const canExport = useCan('financeiro:contas:export');
+  const canViewConciliacao = useCan('financeiro:conciliacao:view');
+  const canManageConciliacao = useCan('financeiro:conciliacao:manage');
+  const canCheckSaldoNaReferencia = canViewConciliacao || canManageConciliacao;
 
   const [items, setItems] = useState<ContaBancaria[]>([]);
   const [saldos, setSaldos] = useState<Record<string, number>>({});
+  const [saldosNaReferencia, setSaldosNaReferencia] = useState<
+    Record<string, { data: string; valor: number }>
+  >({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -143,6 +149,47 @@ export default function ContasBancariasSection({ onNavigateExtrato }: ContasBanc
   useEffect(() => {
     load().then(() => loadSaldos());
   }, [load, loadSaldos]);
+
+  // O checkpoint bancário pode ser histórico (ex.: 31/08) enquanto o card já
+  // mostra movimentos de 01/09. Compara banco e razão sempre na mesma data.
+  useEffect(() => {
+    let cancelled = false;
+    if (!canCheckSaldoNaReferencia) {
+      setSaldosNaReferencia({});
+      return () => { cancelled = true; };
+    }
+
+    const checkpoints = items.flatMap(item => {
+      const saldoBanco = loadSaldoExtrato(item.id);
+      return saldoBanco ? [{ contaId: item.id, saldoBanco }] : [];
+    });
+
+    if (checkpoints.length === 0) {
+      setSaldosNaReferencia({});
+      return () => { cancelled = true; };
+    }
+
+    void Promise.all(checkpoints.map(async ({ contaId, saldoBanco }) => {
+      const { data, error } = await supabase.rpc('get_fin_saldo_conta_em', {
+        p_conta_id: contaId,
+        p_data: saldoBanco.data,
+      });
+      if (error) {
+        console.error('[ContasBancariasSection.saldoNaReferencia]', error);
+        return null;
+      }
+      return { contaId, data: saldoBanco.data, valor: Number(data) || 0 };
+    })).then(results => {
+      if (cancelled) return;
+      const next: Record<string, { data: string; valor: number }> = {};
+      for (const result of results) {
+        if (result) next[result.contaId] = { data: result.data, valor: result.valor };
+      }
+      setSaldosNaReferencia(next);
+    });
+
+    return () => { cancelled = true; };
+  }, [canCheckSaldoNaReferencia, items, saldos]);
 
   // Reactive events
   useDataEvent('financeiro:contas', load);
@@ -357,8 +404,10 @@ export default function ContasBancariasSection({ onNavigateExtrato }: ContasBanc
             {filtered.map(item => {
               const saldo = saldos[item.id] || 0;
               const saldoBanco = loadSaldoExtrato(item.id);
-              const saldoDivergente = saldoBanco && Math.abs(saldoBanco.valor - saldo) >= 0.01;
-              const saldoExibido = saldoBanco?.valor ?? saldo;
+              const saldoSistemaNaData = saldosNaReferencia[item.id];
+              const saldoDivergente = saldoBanco
+                && saldoSistemaNaData?.data === saldoBanco.data
+                && Math.abs(saldoBanco.valor - saldoSistemaNaData.valor) >= 0.01;
               return (
                 <Card key={item.id} className="border-border/50">
                   <CardHeader className="pb-2">
@@ -385,21 +434,24 @@ export default function ContasBancariasSection({ onNavigateExtrato }: ContasBanc
                     )}
                   </CardHeader>
                   <CardContent>
-                    <p className={`text-2xl font-bold ${saldoExibido >= 0 ? 'text-success' : 'text-destructive'}`}>
-                      {fmtBRL(saldoExibido)}
+                    <p className={`text-2xl font-bold ${saldo >= 0 ? 'text-success' : 'text-destructive'}`}>
+                      {fmtBRL(saldo)}
                     </p>
                     <p className="text-[11px] text-muted-foreground">
-                      {saldoBanco
-                        ? `Saldo confirmado no banco em ${formatDateBR(parseLocalDate(saldoBanco.data))}`
-                        : `Saldo contabilizado (inicial: ${fmtBRL(item.saldo_inicial)})`}
+                      Saldo contabilizado atual (inicial: {fmtBRL(item.saldo_inicial)})
                     </p>
+                    {saldoBanco && (
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        Banco confirmado em {formatDateBR(parseLocalDate(saldoBanco.data))}: {fmtBRL(saldoBanco.valor)}
+                      </p>
+                    )}
                     {saldoDivergente && (
                       <div className="mt-2 rounded-md border border-warning/30 bg-warning/5 p-2 text-xs">
                         <p className="font-medium text-foreground">
-                          Contabilizado: {fmtBRL(saldo)}
+                          Contabilizado na mesma data: {fmtBRL(saldoSistemaNaData.valor)}
                         </p>
                         <p className="text-muted-foreground">
-                          Diferença pendente no extrato: {fmtBRL(saldoBanco.valor - saldo)}.
+                          Diferença pendente no extrato: {fmtBRL(saldoBanco.valor - saldoSistemaNaData.valor)}.
                         </p>
                       </div>
                     )}

@@ -38,7 +38,7 @@ export interface ExtratoConta {
 export interface ExtratoParseResult {
   linhas: ExtratoLinha[];
   conta: ExtratoConta;
-  /** Saldo final informado no arquivo (OFX: LEDGERBAL; OFC: LEDGER). Ausente em CSV. */
+  /** Saldo de razão informado no arquivo (OFX: LEDGERBAL; OFC: LEDGER). Pode cobrir só a conta corrente; ausente em CSV. */
   saldoFinalArquivo?: { valor: number; data: string };
   /**
    * Anomalias detectadas no arquivo que exigem conferência humana antes de
@@ -207,7 +207,8 @@ function parseOFX(text: string): ExtratoParseResult {
     avisos.push('O arquivo tem caracteres ilegíveis (problema de codificação) — confira as descrições antes de conciliar.');
   }
 
-  // Saldo final do extrato (<LEDGERBAL><BALAMT>/<DTASOF>) — usado na conferência de saldo ao importar
+  // Saldo de razão do extrato (<LEDGERBAL><BALAMT>/<DTASOF>). O chamador
+  // classifica o escopo: Santander com ContaMax informa apenas a conta corrente.
   let saldoFinalArquivo: { valor: number; data: string } | undefined;
   const ledgerBlock =
     text.match(/<LEDGERBAL>([\s\S]*?)<\/LEDGERBAL>/i)?.[1] ||
