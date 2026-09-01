@@ -10,32 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.17"
-  }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -3663,105 +3638,6 @@ export type Database = {
           },
         ]
       }
-      financeiro_fechamento_marca_valores: {
-        Row: {
-          company_id: string
-          created_at: string
-          created_by: string | null
-          fechamento_id: string
-          id: string
-          marca_id: string
-          updated_at: string
-          valor_bruto: number
-        }
-        Insert: {
-          company_id: string
-          created_at?: string
-          created_by?: string | null
-          fechamento_id: string
-          id?: string
-          marca_id: string
-          updated_at?: string
-          valor_bruto?: number
-        }
-        Update: {
-          company_id?: string
-          created_at?: string
-          created_by?: string | null
-          fechamento_id?: string
-          id?: string
-          marca_id?: string
-          updated_at?: string
-          valor_bruto?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "financeiro_fechamento_marca_valores_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "financeiro_fechamento_marca_valores_fechamento_fk"
-            columns: ["company_id", "fechamento_id"]
-            isOneToOne: false
-            referencedRelation: "financeiro_fechamento_caixa"
-            referencedColumns: ["company_id", "id"]
-          },
-          {
-            foreignKeyName: "financeiro_fechamento_marca_valores_marca_fk"
-            columns: ["company_id", "marca_id"]
-            isOneToOne: false
-            referencedRelation: "financeiro_fechamento_marcas"
-            referencedColumns: ["company_id", "id"]
-          },
-        ]
-      }
-      financeiro_fechamento_marcas: {
-        Row: {
-          ativo: boolean
-          company_id: string
-          created_at: string
-          created_by: string | null
-          id: string
-          nome: string
-          nome_unaccent: string | null
-          ordem: number
-          updated_at: string
-        }
-        Insert: {
-          ativo?: boolean
-          company_id: string
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          nome: string
-          nome_unaccent?: string | null
-          ordem?: number
-          updated_at?: string
-        }
-        Update: {
-          ativo?: boolean
-          company_id?: string
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          nome?: string
-          nome_unaccent?: string | null
-          ordem?: number
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "financeiro_fechamento_marcas_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       financeiro_fechamento_caixa: {
         Row: {
           company_id: string
@@ -3853,6 +3729,115 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      financeiro_fechamento_marca_valores: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          fechamento_id: string
+          id: string
+          marca_id: string
+          updated_at: string
+          valor_bruto: number
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          fechamento_id: string
+          id?: string
+          marca_id: string
+          updated_at?: string
+          valor_bruto?: number
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          fechamento_id?: string
+          id?: string
+          marca_id?: string
+          updated_at?: string
+          valor_bruto?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "financeiro_fechamento_marca_valores_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "financeiro_fechamento_marca_valores_fechamento_fk"
+            columns: ["company_id", "fechamento_id"]
+            isOneToOne: false
+            referencedRelation: "financeiro_fechamento_caixa"
+            referencedColumns: ["company_id", "id"]
+          },
+          {
+            foreignKeyName: "financeiro_fechamento_marca_valores_marca_fk"
+            columns: ["company_id", "marca_id"]
+            isOneToOne: false
+            referencedRelation: "financeiro_fechamento_marcas"
+            referencedColumns: ["company_id", "id"]
+          },
+        ]
+      }
+      financeiro_fechamento_marcas: {
+        Row: {
+          ativo: boolean
+          categoria_id: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          nome: string
+          nome_unaccent: string | null
+          ordem: number
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          categoria_id?: string | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          nome: string
+          nome_unaccent?: string | null
+          ordem?: number
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          categoria_id?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          nome?: string
+          nome_unaccent?: string | null
+          ordem?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "financeiro_fechamento_marcas_categoria_fk"
+            columns: ["company_id", "categoria_id"]
+            isOneToOne: false
+            referencedRelation: "fin_categorias"
+            referencedColumns: ["company_id", "id"]
+          },
+          {
+            foreignKeyName: "financeiro_fechamento_marcas_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       integration_logs: {
         Row: {
@@ -9516,6 +9501,22 @@ export type Database = {
       }
     }
     Functions: {
+      _fin_dfc_effective_allocations: {
+        Args: { p_company_id: string; p_end_inclusive: string; p_start: string }
+        Returns: {
+          allocation_id: string
+          allocation_source: string
+          categoria_id: string
+          descricao: string
+          effective_date: string
+          entry_excluded_from_reports: boolean
+          lancamento_id: string
+          origem: string
+          status: string
+          tipo: string
+          valor: number
+        }[]
+      }
       _guarded_add_presentation_decision_revision: {
         Args: {
           p_decision_id: string
@@ -10349,6 +10350,19 @@ export type Database = {
         }
         Returns: Json
       }
+      get_fin_presentation_expense_details: {
+        Args: {
+          p_category_id?: string
+          p_cursor?: Json
+          p_limit?: number
+          p_month: string
+        }
+        Returns: Json
+      }
+      get_fin_presentation_expenses: {
+        Args: { p_history_years: number[]; p_month: string }
+        Returns: Json
+      }
       get_fin_presentation_minutes_export: {
         Args: { p_session_id: string }
         Returns: Json
@@ -10366,25 +10380,12 @@ export type Database = {
         }
         Returns: Json
       }
-      get_fin_presentation_session: {
-        Args: { p_session_id: string }
-        Returns: Json
-      }
-      get_fin_presentation_expense_details: {
-        Args: {
-          p_category_id?: string
-          p_cursor?: Json
-          p_limit?: number
-          p_month: string
-        }
-        Returns: Json
-      }
-      get_fin_presentation_expenses: {
-        Args: { p_history_years: number[]; p_month: string }
-        Returns: Json
-      }
       get_fin_presentation_revenue: {
         Args: { p_history_years: number[]; p_month: string }
+        Returns: Json
+      }
+      get_fin_presentation_session: {
+        Args: { p_session_id: string }
         Returns: Json
       }
       get_fin_presentation_socios: {
@@ -11049,18 +11050,6 @@ export type Database = {
         Returns: Json
       }
       rpc_delete_fechamento_caixa: { Args: { p_id: string }; Returns: Json }
-      rpc_upsert_fechamento_caixa_com_marcas: {
-        Args: {
-          p_data: string
-          p_descontos?: number
-          p_expected_updated_at?: string
-          p_faturamento_bruto: number
-          p_marcas?: Json
-          p_observacao?: string
-          p_taxas?: number
-        }
-        Returns: Json
-      }
       rpc_recebimentos_close: {
         Args: {
           p_enviar_ao_estoque?: boolean
@@ -11095,6 +11084,18 @@ export type Database = {
             }
             Returns: Json
           }
+      rpc_upsert_fechamento_caixa_com_marcas: {
+        Args: {
+          p_data: string
+          p_descontos?: number
+          p_expected_updated_at?: string
+          p_faturamento_bruto: number
+          p_marcas?: Json
+          p_observacao?: string
+          p_taxas?: number
+        }
+        Returns: Json
+      }
       save_cotacao_ia_config: {
         Args: {
           p_api_key?: string
@@ -11371,9 +11372,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       app_role: [

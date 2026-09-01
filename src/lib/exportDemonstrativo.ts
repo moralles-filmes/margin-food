@@ -4,7 +4,7 @@
  * then generates PDF (jsPDF + autoTable) or Excel (xlsx).
  */
 import { buildTree, type CatNode } from '@/components/financeiro/CadastroBaseTree';
-import { fmtBRL } from '@/lib/formatters';
+import { fmtBRL, formatPercentBR } from '@/lib/formatters';
 import { APP_NAME } from '@/lib/brand';
 
 // ── Row builder (mirrors DemonstrativoTree logic, fully expanded) ──
@@ -126,14 +126,15 @@ export async function exportDemonstrativoPDF(opts: BuildOptions & { titulo: stri
   doc.setTextColor(0);
 
   const showPct = opts.showPctReceita && receitaTotal > 0;
+  const pctLabel = opts.isDFC ? '% Recebimentos' : '% Receita Líq.';
 
   const head = showPct
-    ? [['Cód.', 'Descrição', 'Valor (R$)', '% Receita']]
+    ? [['Cód.', 'Descrição', 'Valor (R$)', pctLabel]]
     : [['Cód.', 'Descrição', 'Valor (R$)']];
 
   const body = rows.map(r => {
     const indent = '  '.repeat(r.depth);
-    const pct = showPct && r.style !== 'informational' ? `${((Math.abs(r.valor) / receitaTotal) * 100).toFixed(1)}%` : '—';
+    const pct = showPct && r.style !== 'informational' ? formatPercentBR((Math.abs(r.valor) / receitaTotal) * 100) : '—';
     const row = [r.codigo, `${indent}${r.nome}`, r.hideValue ? '—' : fmtBRL(r.valor)];
     if (showPct) row.push(pct!);
     return row;
@@ -176,18 +177,19 @@ export async function exportDemonstrativoExcel(opts: BuildOptions & { titulo: st
   const XLSX = await import('@/lib/safeXlsx');
   const { rows, receitaTotal } = buildExportRows(opts);
   const showPct = opts.showPctReceita && receitaTotal > 0;
+  const pctLabel = opts.isDFC ? '% Recebimentos' : '% Receita Líq.';
 
   const wsData: (string | number)[][] = [
     [opts.titulo],
     [`Período: ${opts.periodo}`],
     [],
-    showPct ? ['Código', 'Descrição', 'Valor (R$)', '% Receita'] : ['Código', 'Descrição', 'Valor (R$)'],
+    showPct ? ['Código', 'Descrição', 'Valor (R$)', pctLabel] : ['Código', 'Descrição', 'Valor (R$)'],
   ];
 
   for (const r of rows) {
     const indent = '  '.repeat(r.depth);
     const row: (string | number)[] = [r.codigo, `${indent}${r.nome}`, r.hideValue ? '—' : r.valor];
-    if (showPct) row.push(r.style === 'informational' ? '—' : `${((Math.abs(r.valor) / receitaTotal) * 100).toFixed(1)}%`);
+    if (showPct) row.push(r.style === 'informational' ? '—' : formatPercentBR((Math.abs(r.valor) / receitaTotal) * 100));
     wsData.push(row);
   }
 

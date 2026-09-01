@@ -1,6 +1,6 @@
 import type { IsoDate, NormalizedPresentationPeriod, YearMonth } from './contracts';
 
-export const PRESENTATION_REVENUE_CONTRACT_VERSION = '1.0' as const;
+export const PRESENTATION_REVENUE_CONTRACT_VERSION = '1.1' as const;
 
 export const PRESENTATION_REVENUE_SOURCE = {
   relation: 'public.financeiro_fechamento_caixa',
@@ -66,12 +66,30 @@ export interface PresentationRevenueHistoryPoint {
   closingCount: number;
 }
 
-/** Faturamento bruto do mês selecionado quebrado por marca cadastrada em Fechamento de Caixa. `marcaId: null` = fechamentos legados sem detalhamento por marca. */
+/**
+ * Faturamento bruto (e, quando a(s) marca(s) do grupo estiverem vinculadas a
+ * uma categoria, líquido do livro razão) do mês selecionado, agrupado por
+ * marca/loja do Fechamento de Caixa.
+ *
+ * Marcas sem categoria vinculada aparecem individualmente (`marcaId` único,
+ * `net: null` — o líquido dessa loja ainda não pode ser calculado). Marcas
+ * vinculadas à MESMA categoria (ex.: "Salão" e "Jantar" caindo na mesma linha
+ * do extrato) aparecem somadas em uma única linha (`marcaId: null`,
+ * `marcaIds` com todas, `nome` concatenado). `categoriaId: null` e
+ * `marcaIds: []` identificam os dois grupos residuais que fecham os totais:
+ * "Sem detalhamento por marca" (bruto de fechamentos legados sem nenhuma
+ * marca informada — `net: null`) e "Sem marca vinculada" (líquido do razão em
+ * categorias sem nenhuma marca apontando pra elas — `total: 0`, já que não há
+ * bruto de fechamento correspondente).
+ */
 export interface PresentationRevenueBrandPoint {
   marcaId: string | null;
   nome: string;
   total: number;
   closingCount: number;
+  net: number | null;
+  categoriaId: string | null;
+  marcaIds: readonly string[];
 }
 
 /** Receita operacional líquida do livro razão para um mês — mesma regra de caixa/exclusões de PresentationResultsData.current. */

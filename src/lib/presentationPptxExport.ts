@@ -304,17 +304,27 @@ function addRevenueByBrand(
   slide: PptxGenJS.Slide,
   pptx: PptxGenJS,
   revenue: PresentationRevenueData,
+  items: readonly PresentationRevenueBrandPoint[],
 ): void {
   const total = revenue.current.total;
-  const items = [...revenue.byBrand].sort((left, right) => right.total - left.total);
   if (items.length === 0) { addEmpty(slide, pptx, 'Sem faturamento no mês selecionado.'); return; }
-  items.forEach((item: PresentationRevenueBrandPoint, index) => {
-    const y = 1.85 + index * 0.6;
-    slide.addText(String(index + 1), { x: 0.9, y, w: 0.4, h: 0.3, fontFace: 'Aptos Display', fontSize: 18, bold: true, color: COLOR.gold, align: 'center', margin: 0 });
-    slide.addText(item.nome, { x: 1.4, y, w: 7.2, h: 0.25, fontFace: 'Aptos', fontSize: 15, bold: true, color: COLOR.white, margin: 0, fit: 'shrink', breakLine: false });
-    slide.addText(`${total > 0 ? formatPercentBR((item.total / total) * 100, 1) : '—'} do bruto do mês · ${item.closingCount} fechamento(s)`, { x: 1.4, y: y + 0.27, w: 7.2, h: 0.2, fontFace: 'Aptos', fontSize: 11, color: COLOR.muted, margin: 0 });
-    slide.addText(fmtBRL(item.total), { x: 9.4, y, w: 2.05, h: 0.3, fontFace: 'Aptos Mono', fontSize: 15, bold: true, color: COLOR.revenue, align: 'right', margin: 0, fit: 'shrink' });
-    slide.addShape(pptx.ShapeType.line, { x: 0.9, y: y + 0.52, w: 10.55, h: 0, line: { color: COLOR.subtle, width: 0.5, transparency: 35 } });
+  const hasSemCategoria = revenue.byBrand.some(item => item.marcaId !== null && item.categoriaId === null);
+  let y = 1.85;
+  if (hasSemCategoria) {
+    slide.addText('Marcas sem categoria vinculada não têm líquido calculado.', {
+      x: 0.9, y, w: 10.55, h: 0.3, fontFace: 'Aptos', fontSize: 11, color: COLOR.warning, margin: 0,
+    });
+    y += 0.4;
+  }
+  items.forEach((item: PresentationRevenueBrandPoint) => {
+    slide.addText(item.nome, { x: 0.9, y, w: 6.6, h: 0.25, fontFace: 'Aptos', fontSize: 15, bold: true, color: COLOR.white, margin: 0, fit: 'shrink', breakLine: false });
+    slide.addText(`${total > 0 ? formatPercentBR((item.total / total) * 100, 1) : '—'} do bruto do mês · ${item.closingCount} fechamento(s)`, { x: 0.9, y: y + 0.27, w: 6.6, h: 0.2, fontFace: 'Aptos', fontSize: 11, color: COLOR.muted, margin: 0 });
+    slide.addText('BRUTO', { x: 7.6, y, w: 2.15, h: 0.18, fontFace: 'Aptos', fontSize: 9, color: COLOR.muted, align: 'right', margin: 0 });
+    slide.addText(fmtBRL(item.total), { x: 7.6, y: y + 0.18, w: 2.15, h: 0.3, fontFace: 'Aptos Mono', fontSize: 14, bold: true, color: COLOR.revenue, align: 'right', margin: 0, fit: 'shrink' });
+    slide.addText('LÍQUIDO', { x: 9.9, y, w: 2.15, h: 0.18, fontFace: 'Aptos', fontSize: 9, color: COLOR.muted, align: 'right', margin: 0 });
+    slide.addText(item.net === null ? '—' : fmtBRL(item.net), { x: 9.9, y: y + 0.18, w: 2.15, h: 0.3, fontFace: 'Aptos Mono', fontSize: 14, bold: true, color: COLOR.white, align: 'right', margin: 0, fit: 'shrink' });
+    slide.addShape(pptx.ShapeType.line, { x: 0.9, y: y + 0.52, w: 11.15, h: 0, line: { color: COLOR.subtle, width: 0.5, transparency: 35 } });
+    y += 0.62;
   });
 }
 
@@ -1312,7 +1322,7 @@ function addSlideContent(slide: PptxGenJS.Slide, pptx: PptxGenJS, source: Presen
       addRevenueGrossNet(slide, pptx, payload.revenue);
       break;
     case 'revenue-by-brand':
-      addRevenueByBrand(slide, pptx, payload.revenue);
+      addRevenueByBrand(slide, pptx, payload.revenue, payload.items);
       break;
     case 'revenue-weekdays':
       addRevenueWeekdays(slide, pptx, payload.revenue);
@@ -1398,7 +1408,7 @@ function slideSourceNotes(source: PresentationSlide): string {
     return '[Sources]\n- Dados financeiros não solicitados nesta fase';
   }
   if (source.chapter === 'revenue') {
-    return '[Sources]\n- public.financeiro_fechamento_caixa.faturamento_bruto\n- data local: public.financeiro_fechamento_caixa.data\n- detalhamento por marcas não somado novamente';
+    return '[Sources]\n- public.financeiro_fechamento_caixa.faturamento_bruto\n- data local: public.financeiro_fechamento_caixa.data\n- líquido por loja: livro razão, categoria vinculada em financeiro_fechamento_marcas.categoria_id\n- detalhamento por marcas não somado novamente';
   }
   if (source.chapter === 'expenses') {
     return '[Sources]\n- public.fin_lancamentos\n- public.fin_lancamento_rateios\n- DFC; regime de caixa\n- data efetiva: COALESCE(data_pagamento, conciliado_em::date, data_competencia)\n- rateio substitui categoria do lançamento\n- transferências e conciliações pendentes excluídas';

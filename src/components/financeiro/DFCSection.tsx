@@ -101,6 +101,7 @@ export default function DFCSection() {
     periodo,
     isDFC: true,
     saldoInicial,
+    showPctReceita: true,
   };
 
   return (
@@ -143,6 +144,7 @@ export default function DFCSection() {
           loading={false}
           isDFC
           saldoInicial={saldoInicial}
+          showPctReceita
         />
       )}
 

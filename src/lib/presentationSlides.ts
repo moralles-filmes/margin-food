@@ -27,6 +27,7 @@ import { hasPresentationNonOperationalValues } from '@/lib/resultsPresentationAd
 
 const MAX_TIME_SERIES_POINTS_PER_SLIDE = 12;
 const MAX_CATEGORY_ROWS_PER_COLUMN = 8;
+const MAX_REVENUE_BRAND_ROWS_PER_SLIDE = 7;
 const MAX_RANKING_ITEMS_PER_COLUMN = 6;
 const MAX_DECISION_ACTIONS_PER_SLIDE = 6;
 const MAX_DECISION_ACTION_CHARACTERS_PER_SLIDE = 900;
@@ -564,17 +565,23 @@ export function buildPresentationSlides(data: PresentationSociosData): Presentat
         revenue => ({ type: 'revenue-gross-net', revenue }),
       ),
     });
-    append({
-      id: 'revenue-by-brand',
-      chapter: 'revenue',
-      kind: 'revenue-by-brand',
-      title: 'Faturamento por loja',
-      subtitle: 'Faturamento bruto do mês selecionado por marca/loja cadastrada em Fechamento de Caixa.',
-      availability: revenueSlideAvailability(
-        data.revenue,
-        revenue => ({ type: 'revenue-by-brand', revenue }),
-      ),
-    });
+    {
+      const byBrand = data.revenue.state === 'available' || data.revenue.state === 'empty'
+        ? data.revenue.data.byBrand
+        : [];
+      const pages = chunk(byBrand, MAX_REVENUE_BRAND_ROWS_PER_SLIDE);
+      pages.forEach((items, index) => append({
+        id: `revenue-by-brand-${index + 1}`,
+        chapter: 'revenue',
+        kind: 'revenue-by-brand',
+        title: withPageNumber('Faturamento por loja', index, pages.length),
+        subtitle: 'Bruto do mês selecionado (Fechamento de Caixa) e líquido do livro razão por loja — marcas na mesma categoria somam em uma linha só.',
+        availability: revenueSlideAvailability(
+          data.revenue,
+          revenue => ({ type: 'revenue-by-brand', revenue, items }),
+        ),
+      }));
+    }
     append({
       id: 'revenue-weekdays',
       chapter: 'revenue',
