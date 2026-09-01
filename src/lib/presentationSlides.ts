@@ -509,7 +509,7 @@ export function buildPresentationSlides(data: PresentationSociosData): Presentat
         chapter: 'expenses',
         kind: 'expenses-tree',
         title: withPageNumber('Árvore de despesas', index, tree.length),
-        subtitle: 'Valor próprio, acumulado e % da receita operacional líquida por categoria · classes não operacionais identificadas separadamente.',
+        subtitle: 'Valor acumulado e % da receita operacional líquida por categoria · classes não operacionais identificadas separadamente.',
         availability: expensesSlideAvailability(
           data.expenses!,
           expenses => ({ type: 'expenses-tree', expenses, nodes, netRevenue }),

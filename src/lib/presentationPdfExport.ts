@@ -307,17 +307,29 @@ function drawRevenueByBrand(
     y += 9;
   }
   items.forEach((item: PresentationRevenueBrandPoint) => {
-    setColor(doc, COLOR.white); doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.text(item.nome, 22, y, { maxWidth: 150 });
+    setColor(doc, COLOR.white); doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.text(item.nome, 22, y, { maxWidth: 110 });
     setColor(doc, COLOR.muted); doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
-    doc.text(`${total > 0 ? formatPercentBR((item.total / total) * 100, 1) : '-'} do bruto do mes · ${item.closingCount} fechamento(s)`, 22, y + 5);
-    setColor(doc, COLOR.muted); doc.setFontSize(6.5); doc.text('BRUTO', 210, y - 3, { align: 'right' });
-    setColor(doc, COLOR.revenue); doc.setFont('courier', 'bold'); doc.setFontSize(9); doc.text(fmtBRL(item.total), 210, y + 3, { align: 'right' });
-    setColor(doc, COLOR.muted); doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); doc.text('LIQUIDO', 298, y - 3, { align: 'right' });
-    setColor(doc, COLOR.white); doc.setFont('courier', 'bold'); doc.setFontSize(9);
-    doc.text(item.net === null ? '-' : fmtBRL(item.net), 298, y + 3, { align: 'right' });
+    doc.text(`${total > 0 ? formatPercentBR((item.total / total) * 100, 1) : '-'} do bruto do mes · ${item.closingCount} fechamento(s)`, 22, y + 5, { maxWidth: 110 });
+    setColor(doc, COLOR.muted); doc.setFontSize(6.5); doc.text('BRUTO', 170, y - 3, { align: 'right' });
+    setColor(doc, COLOR.revenue); doc.setFont('courier', 'bold'); doc.setFontSize(8.5); doc.text(fmtBRL(item.total), 170, y + 3, { align: 'right' });
+    setColor(doc, COLOR.muted); doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); doc.text('LIQUIDO', 222, y - 3, { align: 'right' });
+    setColor(doc, COLOR.white); doc.setFont('courier', 'bold'); doc.setFontSize(8.5);
+    doc.text(item.net === null ? '-' : fmtBRL(item.net), 222, y + 3, { align: 'right' });
+    setColor(doc, COLOR.muted); doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); doc.text('DIFERENCA', 260, y - 3, { align: 'right' });
+    setColor(doc, COLOR.warning); doc.setFont('courier', 'bold'); doc.setFontSize(8.5); doc.text(brandDifferenceText(item), 260, y + 3, { align: 'right' });
+    setColor(doc, COLOR.muted); doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); doc.text('% DESCONTO', 298, y - 3, { align: 'right' });
+    setColor(doc, COLOR.warning); doc.setFont('courier', 'bold'); doc.setFontSize(8.5); doc.text(brandDifferenceText(item, true), 298, y + 3, { align: 'right' });
     setColor(doc, COLOR.subtle, 'draw'); doc.line(22, y + 8, 298, y + 8);
     y += 15;
   });
+}
+
+/** Diferenca bruto - liquido por loja/marca, e sua % sobre o bruto; liquido nulo (marca sem categoria vinculada) -> sem base para calcular. */
+function brandDifferenceText(item: PresentationRevenueBrandPoint, percentage = false): string {
+  if (item.net === null) return '-';
+  const difference = item.total - item.net;
+  if (percentage) return item.total > 0 ? formatPercentBR((difference / item.total) * 100, 1) : '-';
+  return fmtBRL(difference);
 }
 
 function drawRevenueWeekdays(doc: jsPDF, revenue: PresentationRevenueData): void {
@@ -447,14 +459,13 @@ function expenseShareOfNetRevenueText(amount: number, netRevenue: number | null)
 function drawExpensesTree(doc: jsPDF, nodes: readonly PresentationExpenseNode[], netRevenue: number | null): void {
   const rows = flattenExpenseNodes(nodes);
   if (rows.length === 0) { drawEmpty(doc, 'Sem despesas no mes selecionado.'); return; }
-  setColor(doc, COLOR.muted); doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.text('CATEGORIA', 22, 48); doc.text('VALOR PROPRIO', 200, 48, { align: 'right' }); doc.text('ACUMULADO', 250, 48, { align: 'right' }); doc.text('% RECEITA LIQ.', 298, 48, { align: 'right' });
+  setColor(doc, COLOR.muted); doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.text('CATEGORIA', 22, 48); doc.text('VALOR', 250, 48, { align: 'right' }); doc.text('% RECEITA LIQ.', 298, 48, { align: 'right' });
   rows.forEach(({ node, depth }, index) => {
     const y = 59 + index * 11;
     setColor(doc, COLOR.subtle, 'draw'); doc.line(22, y + 3, 298, y + 3);
     setColor(doc, COLOR.white); doc.setFont('helvetica', depth === 0 ? 'bold' : 'normal'); doc.setFontSize(8.5); doc.text(`${depth > 0 ? '> ' : ''}${node.name}`, 22 + depth * 5, y, { maxWidth: 132 - depth * 5 });
     if (node.operationalClass === 'non-operational') { setColor(doc, COLOR.warning); doc.setFontSize(6.5); doc.text('NAO OPERACIONAL', 158, y); }
-    setColor(doc, COLOR.muted); doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.text(fmtBRL(node.directAmount), 200, y, { align: 'right' });
-    setColor(doc, COLOR.white); doc.setFont('helvetica', 'bold'); doc.text(fmtBRL(node.amount), 250, y, { align: 'right' });
+    setColor(doc, COLOR.white); doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.text(fmtBRL(node.amount), 250, y, { align: 'right' });
     setColor(doc, COLOR.muted); doc.setFont('helvetica', 'normal'); doc.text(expenseShareOfNetRevenueText(node.amount, netRevenue), 298, y, { align: 'right' });
   });
 }

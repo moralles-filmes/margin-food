@@ -177,6 +177,14 @@ function RevenueGrossNetLayout({ revenue }: { revenue: PresentationRevenueData }
   );
 }
 
+/** Diferença bruto − líquido por loja/marca, e sua % sobre o bruto; `null` de líquido (marca sem categoria vinculada) → sem base para calcular. */
+function brandDifferenceText(item: PresentationRevenueBrandPoint, percentage = false): string {
+  if (item.net === null) return '—';
+  const difference = item.total - item.net;
+  if (percentage) return item.total > 0 ? formatPercentBR((difference / item.total) * 100, 1) : '—';
+  return fmtBRL(difference);
+}
+
 function RevenueByBrandLayout({ revenue, items }: { revenue: PresentationRevenueData; items: readonly PresentationRevenueBrandPoint[] }) {
   const total = revenue.current.total;
   const hasSemCategoria = revenue.byBrand.some(item => item.marcaId !== null && item.categoriaId === null);
@@ -190,7 +198,7 @@ function RevenueByBrandLayout({ revenue, items }: { revenue: PresentationRevenue
       )}
       <ol className="space-y-2.5">
         {items.map((item: PresentationRevenueBrandPoint) => (
-          <li key={item.categoriaId ?? item.marcaId ?? item.nome} className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 border-b border-border pb-2.5">
+          <li key={item.categoriaId ?? item.marcaId ?? item.nome} className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto_auto] items-center gap-3 border-b border-border pb-2.5">
             <div className="min-w-0">
               <p className="break-words text-[clamp(0.78rem,1.15cqw,1.1rem)] font-medium leading-tight text-foreground">{item.nome}</p>
               <p className="text-[clamp(0.65rem,0.8cqw,0.82rem)] text-muted-foreground">
@@ -206,6 +214,14 @@ function RevenueByBrandLayout({ revenue, items }: { revenue: PresentationRevenue
               <strong className="whitespace-nowrap font-mono text-[clamp(0.76rem,1.05cqw,1rem)] text-primary-ink">
                 {item.net === null ? '—' : fmtBRL(item.net)}
               </strong>
+            </div>
+            <div className="text-right">
+              <p className="text-[clamp(0.6rem,0.75cqw,0.72rem)] uppercase tracking-wide text-muted-foreground">Diferença</p>
+              <strong className="whitespace-nowrap font-mono text-[clamp(0.76rem,1.05cqw,1rem)] text-warning">{brandDifferenceText(item)}</strong>
+            </div>
+            <div className="text-right">
+              <p className="text-[clamp(0.6rem,0.75cqw,0.72rem)] uppercase tracking-wide text-muted-foreground">% desconto</p>
+              <strong className="whitespace-nowrap font-mono text-[clamp(0.76rem,1.05cqw,1rem)] text-warning">{brandDifferenceText(item, true)}</strong>
             </div>
           </li>
         ))}
@@ -374,21 +390,20 @@ function ExpensesTreeLayout({
   if (rows.length === 0) return <EmptyState message="Sem despesas no mês selecionado." />;
   return (
     <div className="min-h-0 flex-1">
-      <div className="mb-2 grid grid-cols-[minmax(0,1fr)_auto_auto_auto] gap-6 border-b border-border pb-2 text-[clamp(0.58rem,0.75cqw,0.75rem)] uppercase tracking-wide text-muted-foreground">
-        <span>Categoria</span><span>Valor próprio</span><span>Acumulado</span><span>% da receita líquida</span>
+      <div className="mb-2 grid grid-cols-[minmax(0,1fr)_auto_auto] gap-6 border-b border-border pb-2 text-[clamp(0.58rem,0.75cqw,0.75rem)] uppercase tracking-wide text-muted-foreground">
+        <span>Categoria</span><span>Valor</span><span>% da receita líquida</span>
       </div>
       <div className="space-y-1">
         {rows.map(({ node, depth }, index) => {
           const label = <>{depth > 0 ? '↳ ' : ''}{node.name}</>;
           return (
-            <div key={`${node.categoryId ?? node.name}-${index}`} className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-6 border-b border-border py-2">
+            <div key={`${node.categoryId ?? node.name}-${index}`} className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-6 border-b border-border py-2">
               <div className="min-w-0" style={{ paddingLeft: `${depth * 1.1}rem` }}>
                 {node.categoryId && onOpenExpenseCategory ? (
                   <button type="button" className="max-w-full break-words text-left text-[clamp(0.72rem,1cqw,1rem)] font-semibold leading-tight text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => onOpenExpenseCategory(node.categoryId!)}>{label}</button>
                 ) : <p className="break-words text-[clamp(0.72rem,1cqw,1rem)] font-semibold leading-tight text-foreground">{label}</p>}
                 <p className={cn('mt-0.5 text-[clamp(0.52rem,0.68cqw,0.68rem)]', node.operationalClass === 'non-operational' ? 'text-warning' : 'text-muted-foreground')}>{node.operationalClass === 'non-operational' ? 'Não operacional · fora do resultado' : 'Operacional'}</p>
               </div>
-              <span className="whitespace-nowrap font-mono text-[clamp(0.68rem,0.9cqw,0.9rem)] text-ink-secondary">{fmtBRL(node.directAmount)}</span>
               <strong className="whitespace-nowrap font-mono text-[clamp(0.72rem,1cqw,1rem)] text-foreground">{fmtBRL(node.amount)}</strong>
               <span className="whitespace-nowrap font-mono text-[clamp(0.68rem,0.9cqw,0.9rem)] text-ink-secondary">{expenseShareOfNetRevenue(node.amount, netRevenue)}</span>
             </div>
