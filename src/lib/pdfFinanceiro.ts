@@ -1,7 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { APP_NAME } from '@/lib/brand';
-import { todayBR } from '@/lib/datetime';
+import { formatDateValueBR, todayBR } from '@/lib/datetime';
 import { fmtBRL as fmtBRLMoney } from '@/lib/money';
 
 const HEADER_COLOR: [number, number, number] = [30, 41, 59]; // slate-800
@@ -45,7 +45,7 @@ export function gerarPDFFluxoCaixa(dados: {
     startY: y + 8,
     head: [['Data', 'Entradas', 'Saídas', 'Prev. Entradas', 'Prev. Saídas', 'Saldo Dia']],
     body: dados.linhas.map(l => [
-      l.data,
+      formatDateValueBR(l.data),
       l.entradas > 0 ? fmtBRL(l.entradas) : '—',
       l.saidas > 0 ? fmtBRL(l.saidas) : '—',
       l.previstoEntradas > 0 ? fmtBRL(l.previstoEntradas) : '—',
@@ -70,7 +70,7 @@ export function gerarPDFContasPagar(dados: { items: { data_vencimento: string; d
   autoTable(doc, {
     startY: 36,
     head: [['Vencimento', 'Descrição', 'Fornecedor', 'Valor', 'Status']],
-    body: dados.items.map(i => [i.data_vencimento, i.descricao, i.fornecedor || '—', fmtBRL(i.valor), i.status]),
+    body: dados.items.map(i => [formatDateValueBR(i.data_vencimento), i.descricao, i.fornecedor || '—', fmtBRL(i.valor), i.status]),
     foot: [['', '', 'TOTAL', fmtBRL(total), '']],
     styles: { fontSize: 8, cellPadding: 2.5 },
     headStyles: { fillColor: HEADER_COLOR, textColor: 255 },
@@ -90,7 +90,7 @@ export function gerarPDFContasReceber(dados: { items: { data_vencimento: string;
   autoTable(doc, {
     startY: 36,
     head: [['Vencimento', 'Descrição', 'Cliente', 'Valor', 'Status']],
-    body: dados.items.map(i => [i.data_vencimento, i.descricao, i.cliente || '—', fmtBRL(i.valor), i.status]),
+    body: dados.items.map(i => [formatDateValueBR(i.data_vencimento), i.descricao, i.cliente || '—', fmtBRL(i.valor), i.status]),
     foot: [['', '', 'TOTAL', fmtBRL(total), '']],
     styles: { fontSize: 8, cellPadding: 2.5 },
     headStyles: { fillColor: HEADER_COLOR, textColor: 255 },

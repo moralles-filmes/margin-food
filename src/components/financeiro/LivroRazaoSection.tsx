@@ -5,8 +5,8 @@ import { useCan } from '@/permissions';
 import { emitDataEvent, useDataEvent } from '@/lib/dataEvents';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { toast } from 'sonner';
-import { fmtBRL, todayBR, parseLocalDate } from '@/lib/formatters';
-import { formatDateBR, formatInBR } from '@/lib/datetime';
+import { fmtBRL, formatDateBR, formatDateValueBR, todayBR, parseLocalDate } from '@/lib/formatters';
+import { formatDateISO, formatInBR } from '@/lib/datetime';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
 import { DateInput } from '@/components/ui/DateInput';
@@ -141,7 +141,7 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
   const [filtroDataDe, setFiltroDataDe] = useState(() => {
     if (initialDateFrom) return initialDateFrom;
     const d = new Date(); d.setDate(d.getDate() - 30);
-    return formatDateBR(d);
+    return formatDateISO(d);
   });
   const [filtroDataAte, setFiltroDataAte] = useState(() => initialDateTo || todayBR());
   const [mesFiltro, setMesFiltro] = useState(() => formatInBR(new Date(), 'yyyy-MM'));
@@ -577,7 +577,7 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
 
       if (possibleDups && possibleDups.length > 0) {
         const dupDescriptions = possibleDups.map((d: { descricao: string; valor: number; data_vencimento: string }) =>
-          `- ${d.descricao} — ${fmt(d.valor)} (venc: ${d.data_vencimento})`
+          `- ${d.descricao} — ${fmt(d.valor)} (venc: ${formatDateValueBR(d.data_vencimento)})`
         ).join('\n');
         const proceed = await confirm({
           title: 'Possivel duplicidade detectada',

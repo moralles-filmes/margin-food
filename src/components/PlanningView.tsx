@@ -4,7 +4,7 @@ import { useEstoqueGeralStore } from '@/hooks/useEstoqueGeralStore';
 import { usePlanningStore } from '@/hooks/usePlanningStore';
 import { useModuleAccess, useCan } from '@/permissions/hooks';
 import { SalmonEntry } from '@/types/salmon';
-import { formatDateBR } from '@/lib/datetime';
+import { formatDateISO } from '@/lib/datetime';
 import { ChevronDown, ChevronUp, Expand, Shrink, Filter, Loader2, AlertTriangle, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -66,7 +66,7 @@ export default function PlanningView({ store, estoqueStore }: PlanningViewProps)
   const { visibleSubtabs, canView } = useModuleAccess('planning');
   const canEditMeta = useCan('planning:meta-compras:edit');
 
-  const nowStr = formatDateBR(); // yyyy-MM-dd BR timezone
+  const nowStr = formatDateISO(); // yyyy-MM-dd BR timezone
   const [targetMonth, setTargetMonth] = useState(nowStr.slice(0, 7));
   const [showSimulador, setShowSimulador] = useState(false);
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>('tudo');

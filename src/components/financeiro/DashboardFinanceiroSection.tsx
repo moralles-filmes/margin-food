@@ -12,7 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useCan } from '@/permissions/hooks';
 import { toast } from 'sonner';
 import { todayBR, fmtBRL, formatPercentBR } from '@/lib/formatters';
-import { formatDateBR as formatDateISO } from '@/lib/datetime';
+import { formatDateISO } from '@/lib/datetime';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { APP_NAME } from '@/lib/brand';

@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ShieldAlert, Download, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { formatDateBR } from '@/lib/datetime';
+import { formatDateBR } from '@/lib/formatters';
 import { exportTableToExcel } from '@/lib/exportHelpers';
 import { includesNormalized } from '@/lib/utils';
 

@@ -300,7 +300,7 @@ export default function GestaoDisciplinarSection({ colaboradores, canManage }: P
                   const gravConf = GRAVIDADES[o.gravidade] || GRAVIDADES.leve;
                   return (
                     <TableRow key={o.id} className={cn(o.status === 'revogado' && 'opacity-50')}>
-                      <TableCell className="text-xs">{format(parseISO(o.data_ocorrencia), 'dd/MM/yy')}</TableCell>
+                      <TableCell className="text-xs">{format(parseISO(o.data_ocorrencia), 'dd/MM/yyyy')}</TableCell>
                       <TableCell className="text-xs font-medium">{colabName(o.colaborador_id)}</TableCell>
                       <TableCell className="text-xs">
                         <span className={cn("flex items-center gap-1", tipoConf.color)}>
@@ -363,7 +363,7 @@ export default function GestaoDisciplinarSection({ colaboradores, canManage }: P
                   <span className="flex items-center gap-1">{detailItem.assinatura_colaborador ? <CheckCircle2 className="w-3 h-3 text-success" /> : <XCircle className="w-3 h-3 text-muted-foreground" />} Assinatura Colab.</span>
                   <span className="flex items-center gap-1">{detailItem.assinatura_gestor ? <CheckCircle2 className="w-3 h-3 text-success" /> : <XCircle className="w-3 h-3 text-muted-foreground" />} Assinatura Gestor</span>
                 </div>
-                <div><span className="text-muted-foreground">Aplicado por:</span> {detailItem.aplicado_por_nome} em {format(parseISO(detailItem.created_at), "dd/MM/yy 'às' HH:mm")}</div>
+                <div><span className="text-muted-foreground">Aplicado por:</span> {detailItem.aplicado_por_nome} em {format(parseISO(detailItem.created_at), "dd/MM/yyyy 'às' HH:mm")}</div>
                 {detailItem.observacoes && <div><span className="text-muted-foreground">Obs:</span> {detailItem.observacoes}</div>}
                 {detailItem.status === 'revogado' && (
                   <div className="p-2 bg-muted rounded text-[10px]">

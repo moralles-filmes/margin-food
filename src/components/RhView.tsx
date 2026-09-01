@@ -8,7 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useCan, useModuleAccess } from '@/permissions/hooks';
 import { toast } from 'sonner';
 import { fmtBRL, formatDateBR, formatInBR, normalizeBRLMoneyToNumber, todayBR } from '@/lib/formatters';
-import { formatDateBR as formatDateISO } from '@/lib/datetime';
+import { formatDateISO } from '@/lib/datetime';
 
 const COLORS = [
   'hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))',

@@ -336,7 +336,7 @@ export default function StockTransfersSection({
                 {transfers.map((t, i) => (
                   <tr key={t.transfer_group_id || i} className="border-b border-border hover:bg-surface-hover transition-colors">
                     <td className="p-2 whitespace-nowrap">
-                      {t.data ? format(new Date(t.data + 'T12:00:00'), 'dd/MM/yy') : '-'}
+                      {t.data ? format(new Date(t.data + 'T12:00:00'), 'dd/MM/yyyy') : '-'}
                     </td>
                     <td className="p-2">
                       <div className="flex items-center gap-1.5">

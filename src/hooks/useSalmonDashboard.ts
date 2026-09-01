@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { formatDateBR } from '@/lib/datetime';
+import { formatDateISO } from '@/lib/datetime';
 import { PeriodRange } from '@/components/PeriodFilter';
 
 export interface SalmonDashboardData {
@@ -61,8 +61,8 @@ export function useSalmonDashboard(period: PeriodRange): SalmonDashboardData {
     let cancelled = false;
     setData(prev => ({ ...prev, loading: true, error: null }));
 
-    const pStart = formatDateBR(period.start);
-    const pEnd = formatDateBR(period.end);
+    const pStart = formatDateISO(period.start);
+    const pEnd = formatDateISO(period.end);
 
     supabase.rpc('_salmon_dashboard_guarded' as any, { p_start: pStart, p_end: pEnd })
       .then(({ data: result, error }) => {

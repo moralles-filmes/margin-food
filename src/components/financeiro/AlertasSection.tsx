@@ -10,6 +10,7 @@ import { useCan } from '@/permissions/hooks';
 import { AlertTriangle, Bell, Clock, RefreshCw, ExternalLink, ShieldX, Download } from 'lucide-react';
 import { fmtBRL } from '@/lib/money';
 import * as XLSX from '@/lib/safeXlsx';
+import { formatDateValueBR } from '@/lib/formatters';
 
 // ─── Types ───
 interface AlertaFinanceiro {
@@ -124,7 +125,7 @@ export default function AlertasSection({ onNavigate }: Props) {
         list.push({
           tipo: 'cp_vencida', grupo: 'contas_pagar', severidade: 'critical', navigateTo: 'pagar',
           titulo: `⚠️ VENCIDA: ${cp.descricao}`,
-          descricao: `Venceu em ${cp.data_vencimento} — ${fmtBRL(Number(cp.valor))}`,
+          descricao: `Venceu em ${formatDateValueBR(cp.data_vencimento)} — ${fmtBRL(Number(cp.valor))}`,
         });
       });
 
@@ -138,7 +139,7 @@ export default function AlertasSection({ onNavigate }: Props) {
         list.push({
           tipo: 'cp_vencer', grupo: 'contas_pagar', severidade: 'warning', navigateTo: 'pagar',
           titulo: `Conta a pagar: ${cp.descricao}`,
-          descricao: `Vence em ${cp.data_vencimento} — ${fmtBRL(Number(cp.valor))}`,
+          descricao: `Vence em ${formatDateValueBR(cp.data_vencimento)} — ${fmtBRL(Number(cp.valor))}`,
         });
       });
 
@@ -152,7 +153,7 @@ export default function AlertasSection({ onNavigate }: Props) {
         list.push({
           tipo: 'cr_atrasada', grupo: 'contas_receber', severidade: 'warning', navigateTo: 'receber',
           titulo: `Recebimento atrasado: ${cr.descricao}`,
-          descricao: `Cliente: ${cr.cliente} — Venceu em ${cr.data_vencimento} — ${fmtBRL(Number(cr.valor))}`,
+          descricao: `Cliente: ${cr.cliente} — Venceu em ${formatDateValueBR(cr.data_vencimento)} — ${fmtBRL(Number(cr.valor))}`,
         });
       });
 
@@ -166,7 +167,7 @@ export default function AlertasSection({ onNavigate }: Props) {
         list.push({
           tipo: 'cr_vencer', grupo: 'contas_receber', severidade: 'info', navigateTo: 'receber',
           titulo: `A receber: ${cr.descricao}`,
-          descricao: `Cliente: ${cr.cliente} — Vence em ${cr.data_vencimento}`,
+          descricao: `Cliente: ${cr.cliente} — Vence em ${formatDateValueBR(cr.data_vencimento)}`,
         });
       });
 

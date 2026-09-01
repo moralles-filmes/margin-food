@@ -8,7 +8,6 @@ import KpiCard from '@/components/ui/KpiCard';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { formatDisplayBR } from '@/lib/datetime';
 import { parseLocalDate } from '@/lib/dateUtils';
-import { formatInBR } from '@/lib/datetime';
 import { fmtBRL, formatPercentBR } from '@/lib/formatters';
 import type { Inventario, DashboardData } from '@/hooks/useInventarioStore';
 
@@ -147,7 +146,7 @@ export default function InventarioDashboardView({ dashboard: d, onBack, onOpenDe
                     <div className="w-full bg-primary-soft rounded-t relative" style={{ height: `${Math.max(5, Number(h.acuracia_percent))}%` }}>
                       <div className="w-full bg-primary rounded-t absolute bottom-0" style={{ height: `${Number(h.acuracia_percent)}%` }} />
                     </div>
-                    <span className="text-[9px] text-muted-foreground">{formatInBR(parseLocalDate(h.data), 'dd/MM')}</span>
+                    <span className="text-[9px] text-muted-foreground">{formatDisplayBR(parseLocalDate(h.data))}</span>
                   </div>
                 ))}
               </div>

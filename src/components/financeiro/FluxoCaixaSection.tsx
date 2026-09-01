@@ -10,7 +10,7 @@ import { DollarSign, TrendingUp, TrendingDown, Activity, FileDown, Ban, External
 import { Button } from '@/components/ui/button';
 import { gerarPDFFluxoCaixa } from '@/lib/pdfFinanceiro';
 import { fmtBRL, formatDateBR, parseLocalDate } from '@/lib/formatters';
-import { formatDateBR as formatDateISO } from '@/lib/datetime';
+import { formatDateISO } from '@/lib/datetime';
 import { toast } from 'sonner';
 import * as XLSX from '@/lib/safeXlsx';
 

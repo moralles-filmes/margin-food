@@ -8,6 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Users, ShieldCheck, ShieldOff, History, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
+import { parseUTCToBR } from '@/lib/datetime';
 
 interface UserItem {
   id: string;
@@ -249,7 +250,7 @@ export default function AccessManagementCard() {
                 {auditLogs.map(log => (
                   <div key={log.id} className="flex items-center gap-2 text-[11px] font-mono border-b border-border py-1">
                     <span className="text-muted-foreground whitespace-nowrap">
-                      {new Date(log.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                      {parseUTCToBR(log.created_at)}
                     </span>
                     <span className={`font-semibold ${log.action === 'SET_SUPER_ADMIN' ? 'text-success' : log.action.includes('CREATED') || log.action.includes('INVITED') ? 'text-info' : 'text-destructive'}`}>
                       {log.action}

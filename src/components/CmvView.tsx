@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useCan, useModuleAccess } from '@/permissions/hooks';
 import { startOfMonth, endOfMonth } from 'date-fns';
 import { formatInBR, fmtBRL, parseLocalDate, formatPercentBR } from '@/lib/formatters';
-import { formatDateBR } from '@/lib/datetime';
+import { formatDateISO } from '@/lib/datetime';
 
 import { AlertTriangle, Calculator, Lightbulb } from 'lucide-react';
 import { DecimalInput } from '@/components/ui/decimal-input';
@@ -23,8 +23,8 @@ export default function CmvView() {
   const canEditSemanal = useCan('cmv:semanal:edit');
 
   // Filters
-  const [dataInicio, setDataInicio] = useState(formatDateBR(startOfMonth(new Date())));
-  const [dataFim, setDataFim] = useState(formatDateBR(endOfMonth(new Date())));
+  const [dataInicio, setDataInicio] = useState(formatDateISO(startOfMonth(new Date())));
+  const [dataFim, setDataFim] = useState(formatDateISO(endOfMonth(new Date())));
   const [metodo, setMetodo] = useState<'ledger' | 'inventario'>('ledger');
   const [escopo, setEscopo] = useState<'geral' | 'salmao' | 'tudo'>('tudo');
   const [filterSetor, setFilterSetor] = useState('all');

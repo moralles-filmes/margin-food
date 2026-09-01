@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays } from 'date-fns';
-import { formatDateBR, todayBR } from '@/lib/datetime'; // CRÍTICO: @/lib/datetime → yyyy-MM-dd (NÃO @/lib/formatters)
+import { formatDateISO, todayBR } from '@/lib/datetime';
 import { parseLocalDate } from '@/lib/dateUtils';
 
 interface DateRangePresetsProps {
@@ -28,29 +28,29 @@ function buildPresets(): Preset[] {
     },
     {
       label: 'Esta semana',
-      from: () => formatDateBR(startOfWeek(parseLocalDate(todayBR()), { weekStartsOn: 1 })),
-      to: () => formatDateBR(endOfWeek(parseLocalDate(todayBR()), { weekStartsOn: 1 })),
+      from: () => formatDateISO(startOfWeek(parseLocalDate(todayBR()), { weekStartsOn: 1 })),
+      to: () => formatDateISO(endOfWeek(parseLocalDate(todayBR()), { weekStartsOn: 1 })),
     },
     {
       label: 'Este mês',
-      from: () => formatDateBR(startOfMonth(parseLocalDate(todayBR()))),
-      to: () => formatDateBR(endOfMonth(parseLocalDate(todayBR()))),
+      from: () => formatDateISO(startOfMonth(parseLocalDate(todayBR()))),
+      to: () => formatDateISO(endOfMonth(parseLocalDate(todayBR()))),
     },
     {
       label: 'Últimos 7d',
-      from: () => formatDateBR(subDays(parseLocalDate(todayBR()), 7)),
+      from: () => formatDateISO(subDays(parseLocalDate(todayBR()), 7)),
       to: () => todayBR(),
       lastNDays: true,
     },
     {
       label: 'Últimos 30d',
-      from: () => formatDateBR(subDays(parseLocalDate(todayBR()), 30)),
+      from: () => formatDateISO(subDays(parseLocalDate(todayBR()), 30)),
       to: () => todayBR(),
       lastNDays: true,
     },
     {
       label: 'Últimos 90d',
-      from: () => formatDateBR(subDays(parseLocalDate(todayBR()), 90)),
+      from: () => formatDateISO(subDays(parseLocalDate(todayBR()), 90)),
       to: () => todayBR(),
       lastNDays: true,
     },

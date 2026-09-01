@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { DateInput } from '@/components/ui/DateInput';
 import { CurrencyInput } from '@/components/ui/brl-input';
 import { DecimalInput } from '@/components/ui/decimal-input';
-import { fmtBRL, formatFixedBR, normalizeBRLMoneyToNumber } from '@/lib/formatters';
+import { fmtBRL, formatDateValueBR, formatFixedBR, normalizeBRLMoneyToNumber } from '@/lib/formatters';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import SearchableSelect from '@/components/ui/SearchableSelect';
@@ -479,7 +479,7 @@ export default function MovimentacoesSection({
                       {m.internal_transfer && <Badge variant="outline" className="text-[8px] px-1 py-0 h-3.5 border-info-border text-info">Transf. Interna</Badge>}
                     </div>
                     <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                      <span>{m.data}</span>
+                      <span>{formatDateValueBR(m.data)}</span>
                       <span>•</span>
                       <span>{isEstorno
                         ? (m.tipo.includes('ENTRADA') ? '🔁 Entrada — Estorno' : '🔁 Saída — Estorno')
@@ -581,7 +581,7 @@ export default function MovimentacoesSection({
                 <div><span className="text-muted-foreground">Quantidade:</span><p className="font-medium text-foreground">{detailMov.quantidade}</p></div>
                 <div><span className="text-muted-foreground">Custo Unit.:</span><p className="font-medium text-foreground">{fmtBRL(detailMov.custoUnitario)}</p></div>
                 <div><span className="text-muted-foreground">Custo Total:</span><p className="font-medium text-foreground">{fmtBRL(detailMov.custoTotal)}</p></div>
-                <div><span className="text-muted-foreground">Data:</span><p className="font-medium text-foreground">{detailMov.data}</p></div>
+                <div><span className="text-muted-foreground">Data:</span><p className="font-medium text-foreground">{formatDateValueBR(detailMov.data)}</p></div>
                 <div><span className="text-muted-foreground">Origem:</span><p className="font-medium text-foreground">{detailMov.origem || '—'}</p></div>
                 <div><span className="text-muted-foreground">Status:</span>
                   <Badge variant={detailMov.status === 'CANCELADO' ? 'destructive' : 'default'} className="text-[9px]">
@@ -620,7 +620,7 @@ export default function MovimentacoesSection({
           {editMov && (
             <div className="space-y-3">
               <div className="bg-background-subtle rounded-lg p-2 text-[11px] text-muted-foreground">
-                {getProdNome(editMov.produtoId)} • {editMov.tipo} • {editMov.data}
+                {getProdNome(editMov.produtoId)} • {editMov.tipo} • {formatDateValueBR(editMov.data)}
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>

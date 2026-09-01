@@ -33,7 +33,7 @@ import {
   presentationActionStatusLabel,
   presentationDecisionStatusLabel,
 } from '@/lib/presentationFormatting';
-import { fmtBRL, fmtBRLCompact, formatIntegerBR, formatPercentBR } from '@/lib/formatters';
+import { fmtBRL, fmtBRLCompact, formatDateValueBR, formatIntegerBR, formatPercentBR } from '@/lib/formatters';
 import {
   presentationInsightEvidenceLabel,
   presentationInsightRegimeLabel,
@@ -1049,7 +1049,7 @@ function DecisionCommitmentsLayout({ decision }: { decision: PresentationDecisio
               <div key={action.id} className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 border-b border-border pb-2">
                 <div>
                   <p className="break-words text-[clamp(0.64rem,0.8cqw,0.8rem)] leading-snug text-foreground">{action.description}</p>
-                  <p className="mt-1 text-[clamp(0.55rem,0.66cqw,0.66rem)] text-muted-foreground">{action.responsibleName} · {action.dueDate ?? 'sem prazo'}</p>
+                  <p className="mt-1 text-[clamp(0.55rem,0.66cqw,0.66rem)] text-muted-foreground">{action.responsibleName} · {action.dueDate ? formatDateValueBR(action.dueDate) : 'sem prazo'}</p>
                 </div>
                 <span className="text-[clamp(0.54rem,0.66cqw,0.66rem)] font-semibold text-primary-ink">{presentationActionStatusLabel(action.status)}</span>
               </div>

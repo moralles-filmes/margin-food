@@ -23,7 +23,7 @@ import { CurrencyInput } from '@/components/ui/brl-input';
 import { Plus, Trash2, Save, RefreshCw, Search, ChefHat, Layers, ShoppingBag, DollarSign, TrendingUp, Calculator, BarChart3, Settings2, ArrowRight, X, Fish } from 'lucide-react';
 import { SubmoduleSwitcher } from '@/components/ui/SubmoduleSwitcher';
 
-import { fmtBRL, formatPercentBR, formatFixedBR, normalizeBRLMoneyToNumber } from '@/lib/formatters';
+import { fmtBRL, formatDateValueBR, formatPercentBR, formatFixedBR, normalizeBRLMoneyToNumber } from '@/lib/formatters';
 const R$ = (v: number) => fmtBRL(v);
 const pct = (v: number) => formatPercentBR(v);
 const qty = (v: number, d = 1) => formatFixedBR(v, d);
@@ -295,7 +295,7 @@ export default function FichaTecnicaView({ lotesLimpos = [] }: { lotesLimpos?: L
       const latestLot = lotesLimpos
         .filter(l => l.kgRestante > 0 && l.status !== 'VENCIDO')
         .sort((a, b) => b.dataManipulacao.localeCompare(a.dataManipulacao))[0];
-      const info = latestLot ? `Lote de ${latestLot.dataManipulacao} — ${R$(localSalmonCost)}/kg limpo` : '';
+      const info = latestLot ? `Lote de ${formatDateValueBR(latestLot.dataManipulacao)} — ${R$(localSalmonCost)}/kg limpo` : '';
       invokeApi('sync_preco_salmao_auto', { preco_kg_limpo: localSalmonCost, lote_info: info })
         .then(() => setSalmonRef(prev => ({ ...prev, preco: localSalmonCost, preco_auto: localSalmonCost, origem: 'lote_recente', info })))
         .catch((e) => console.warn('[salmon-price-sync] falha ao sincronizar preço do salmão com o backend:', e));

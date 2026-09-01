@@ -31,7 +31,7 @@ import {
   presentationDecisionStatusLabel,
 } from '@/lib/presentationFormatting';
 import { isPresentationSlideExportable } from '@/lib/presentationSlides';
-import { fmtBRL, fmtBRLCompact, formatIntegerBR, formatPercentBR } from '@/lib/formatters';
+import { fmtBRL, fmtBRLCompact, formatDateValueBR, formatIntegerBR, formatPercentBR } from '@/lib/formatters';
 import {
   presentationInsightEvidenceLabel,
   presentationInsightRegimeLabel,
@@ -1218,7 +1218,7 @@ function drawDecisionCommitments(doc: jsPDF, detail: PresentationDecisionDetail)
     const nextY = currentY + lines.length * 3 + 4;
     setColor(doc, COLOR.muted);
     doc.setFontSize(5.8);
-    doc.text(`${action.responsibleName} · ${action.dueDate ?? 'sem prazo'} · ${presentationActionStatusLabel(action.status)}`, x, nextY);
+    doc.text(`${action.responsibleName} · ${action.dueDate ? formatDateValueBR(action.dueDate) : 'sem prazo'} · ${presentationActionStatusLabel(action.status)}`, x, nextY);
     setColor(doc, COLOR.subtle, 'draw');
     doc.line(x, nextY + 2, x + 128, nextY + 2);
     if (index % 2 === 0) leftY = nextY + 6;
