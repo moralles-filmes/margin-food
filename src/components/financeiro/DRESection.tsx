@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { subMonths } from 'date-fns';
 import { formatInBR } from '@/lib/formatters';
 import { FileDown, FileSpreadsheet, ShieldAlert } from 'lucide-react';
 import { exportDemonstrativoPDF, exportDemonstrativoExcel } from '@/lib/exportDemonstrativo';
@@ -11,6 +10,7 @@ import { useCan } from '@/permissions';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
 import DemonstrativoTree from './DemonstrativoTree';
+import MonthNavigator, { shiftMonth, monthBounds } from './MonthNavigator';
 
 function NoAccess() {
   return (
@@ -43,18 +43,36 @@ function valoresMapToLancamentos(valoresMap: Record<string, number>) {
   }));
 }
 
+// Parse "yyyy-MM" como data LOCAL (não UTC) — `new Date("2026-06-01")` é UTC e
+// o Intl formata em BRT (UTC-3), recuando o rótulo um mês (junho vira "maio").
+function formatMonthLabelShort(value: string): string {
+  const [y, m] = value.split('-').map(Number);
+  return formatInBR(new Date(y, m - 1, 1), 'MMM/yy');
+}
+
 export default function DRESection() {
   const [categorias, setCategorias] = useState<any[]>([]);
   const [lancamentos, setLancamentos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [mesAtual, setMesAtual] = useState(formatInBR(new Date(), 'yyyy-MM'));
+  const [mesAncora, setMesAncora] = useState(() => formatInBR(new Date(), 'yyyy-MM'));
+  const [meses, setMeses] = useState('1');
+  const [periodo, setPeriodo] = useState('');
 
   const canView = useCan('financeiro:dre:view');
   const canExport = useCan('financeiro:dre:export');
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase.rpc('get_fin_dre_summary', { p_mes: mesAtual });
+    const m = Number(meses);
+    const mesInicio = shiftMonth(mesAncora, -(m - 1));
+    const inicio = monthBounds(mesInicio).start;
+    const fim = monthBounds(mesAncora).end;
+
+    const startLabel = formatMonthLabelShort(mesInicio);
+    const endLabel = formatMonthLabelShort(mesAncora);
+    setPeriodo(m === 1 ? endLabel : `${startLabel} — ${endLabel}`);
+
+    const { data, error } = await supabase.rpc('get_fin_dre_summary', { p_inicio: inicio, p_fim: fim });
 
     if (error) {
       toast.error('Erro ao carregar DRE');
@@ -67,7 +85,7 @@ export default function DRESection() {
     setCategorias(result?.categorias || []);
     setLancamentos(valoresMapToLancamentos(result?.valores_por_categoria || {}));
     setLoading(false);
-  }, [mesAtual]);
+  }, [mesAncora, meses]);
 
   useEffect(() => { load(); }, [load]);
   useDataEvent('financeiro:lancamentos', load);
@@ -75,23 +93,12 @@ export default function DRESection() {
 
   if (!canView) return <NoAccess />;
 
-  const meses = Array.from({ length: 12 }, (_, i) => formatInBR(subMonths(new Date(), i), 'yyyy-MM'));
-
-  const formatMonthLabel = (value: string) => {
-    // Parse "yyyy-MM" como data LOCAL (não UTC) — `new Date("2026-06-01")` é UTC e
-    // o Intl formata em BRT (UTC-3), recuando o rótulo um mês (junho vira "maio").
-    const [y, m] = value.split('-').map(Number);
-    const d = new Date(y, m - 1, 1);
-    const label = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(d);
-    return label.charAt(0).toUpperCase() + label.slice(1);
-  };
-
   const exportOpts = {
     categorias,
     lancamentos,
     rateios: [] as { categoria_id: string; valor: number }[],
     titulo: 'DRE — Demonstrativo de Resultado',
-    periodo: mesAtual,
+    periodo,
     showPctReceita: true,
   };
 
@@ -100,7 +107,7 @@ export default function DRESection() {
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <h2 className="text-xl font-bold text-foreground">DRE — Demonstrativo de Resultado do Exercício</h2>
-          <p className="text-sm text-muted-foreground">Apuração por competência • Estrutura do Cadastro Base</p>
+          <p className="text-sm text-muted-foreground">Apuração por competência • Estrutura do Cadastro Base • {periodo}</p>
         </div>
         <div className="flex gap-2">
           {canExport && (
@@ -113,14 +120,16 @@ export default function DRESection() {
               </Button>
             </>
           )}
-          <Select value={mesAtual} onValueChange={setMesAtual}>
-            <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
+          <Select value={meses} onValueChange={setMeses}>
+            <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
             <SelectContent>
-              {meses.map(m => (
-                <SelectItem key={m} value={m}>{formatMonthLabel(m)}</SelectItem>
-              ))}
+              <SelectItem value="1">1 mês</SelectItem>
+              <SelectItem value="3">3 meses</SelectItem>
+              <SelectItem value="6">6 meses</SelectItem>
+              <SelectItem value="12">12 meses</SelectItem>
             </SelectContent>
           </Select>
+          <MonthNavigator value={mesAncora} onChange={setMesAncora} />
         </div>
       </div>
 

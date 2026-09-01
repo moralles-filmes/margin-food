@@ -13,7 +13,7 @@ interface MonthNavigatorProps {
 
 // Aritmetica pura em inteiros — evita o bug documentado de `new Date('yyyy-MM-01')`
 // (interpretado como UTC, recuando o rotulo um mes no fuso BR).
-function shiftMonth(value: string, delta: number): string {
+export function shiftMonth(value: string, delta: number): string {
   const [y, m] = value.split('-').map(Number);
   const total = y * 12 + (m - 1) + delta;
   const newY = Math.floor(total / 12);
