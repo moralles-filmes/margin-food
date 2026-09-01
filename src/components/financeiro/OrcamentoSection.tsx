@@ -1,18 +1,20 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { fmtBRL, formatInBR } from '@/lib/formatters';
+import { fmtBRL, formatInBR, formatPercentBR } from '@/lib/formatters';
 import { BRLInput } from '@/components/ui/brl-input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Progress } from '@/components/ui/progress';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import StatusBadge from '@/components/ui/StatusBadge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { subMonths } from 'date-fns';
-import { Plus, Target, AlertTriangle, Pencil, Trash2, FileDown, FileSpreadsheet, Copy, Loader2, ShieldAlert } from 'lucide-react';
-import { useFormDirtyGuard } from '@/hooks/useFormDirtyGuard';
-import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
+import {
+  Target, ChevronRight, ChevronDown, Trash2, FileDown, FileSpreadsheet,
+  Copy, Loader2, ShieldAlert, Lock, Save,
+} from 'lucide-react';
 import { useDataEvent, emitDataEvent } from '@/lib/dataEvents';
 import { useCan } from '@/permissions/hooks';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
@@ -20,26 +22,44 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from '@/lib/safeXlsx';
 import { mapFinanceiroDeleteError } from '@/lib/financeiroErrorMap';
+import { cn } from '@/lib/utils';
 
 // ─── Types ───
 
-interface OrcamentoItem {
+interface CatNode {
+  id: string;
+  nome: string;
+  codigo: string;
+  tipo: 'receita' | 'despesa';
+  parent_id: string | null;
+  ordem: number;
+  children: CatNode[];
+}
+
+interface OrcamentoRow {
   id: string;
   categoria_id: string;
-  categoriaNome: string;
-  categoriaTipo: string;
-  valorOrcado: number;
-  valorRealizado: number;
-  pctExecucao: number;
-  statusExecucao: 'ok' | 'alerta' | 'estourado';
-  valorExcedido: number;
+  valor_orcado: number;
   updated_at: string;
 }
 
-interface Categoria {
-  id: string;
+type StatusExecucao = 'ok' | 'alerta' | 'estourado';
+
+interface FlatRow {
+  key: string;
+  categoriaId: string | null;
+  codigo: string;
   nome: string;
-  tipo: string;
+  tipo: 'receita' | 'despesa';
+  depth: number;
+  hasChildren: boolean;
+  isLeaf: boolean;
+  isSectionHeader?: boolean;
+  isTotalRow?: boolean;
+  orcado: number;
+  realizado: number;
+  ownBudget: OrcamentoRow | null;
+  locked: boolean;
 }
 
 // ─── Helpers ───
@@ -51,6 +71,43 @@ function formatMonthBR(value: string): string {
   const label = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(d);
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
+
+function buildOrcamentoTree(items: Omit<CatNode, 'children'>[]): CatNode[] {
+  const map = new Map<string, CatNode>();
+  const roots: CatNode[] = [];
+  for (const item of items) map.set(item.id, { ...item, children: [] });
+  for (const node of map.values()) {
+    if (node.parent_id && map.has(node.parent_id)) {
+      map.get(node.parent_id)!.children.push(node);
+    } else {
+      roots.push(node);
+    }
+  }
+  const sortNodes = (nodes: CatNode[]) => {
+    nodes.sort((a, b) => a.ordem - b.ordem || a.codigo.localeCompare(b.codigo));
+    nodes.forEach(n => sortNodes(n.children));
+  };
+  sortNodes(roots);
+  return roots;
+}
+
+function computeStatus(tipo: 'receita' | 'despesa', orcado: number, realizado: number): StatusExecucao | null {
+  if (!orcado) return null;
+  if (tipo === 'despesa') {
+    if (realizado > orcado) return 'estourado';
+    if (realizado > orcado * 0.8) return 'alerta';
+    return 'ok';
+  }
+  if (realizado < orcado * 0.8) return 'estourado';
+  if (realizado < orcado) return 'alerta';
+  return 'ok';
+}
+
+const STATUS_LABEL: Record<'receita' | 'despesa', Record<StatusExecucao, string>> = {
+  despesa: { ok: 'Em linha', alerta: 'Atenção', estourado: 'Estourado' },
+  receita: { ok: 'Em linha', alerta: 'Atenção', estourado: 'Abaixo da meta' },
+};
+const STATUS_VARIANT: Record<StatusExecucao, string> = { ok: 'ok', alerta: 'atencao', estourado: 'critico' };
 
 function NoAccess() {
   return (
@@ -65,18 +122,14 @@ function NoAccess() {
 // ─── Component ───
 
 export default function OrcamentoSection() {
-  const [items, setItems] = useState<OrcamentoItem[]>([]);
-  const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [categorias, setCategorias] = useState<Omit<CatNode, 'children'>[]>([]);
+  const [orcamentos, setOrcamentos] = useState<OrcamentoRow[]>([]);
+  const [realizadoMap, setRealizadoMap] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [mesAtual, setMesAtual] = useState(formatInBR(new Date(), 'yyyy-MM'));
-
-  // Dialog state
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState({ categoria_id: '', valor_orcado: 0 });
-  const handleCloseOrcDialog = () => { setDialogOpen(false); setEditingId(null); setForm({ categoria_id: '', valor_orcado: 0 }); };
-  const { showConfirm: showOrcConfirm, guardedClose: guardedOrcClose, confirmClose: confirmOrcClose, cancelClose: cancelOrcClose } = useFormDirtyGuard({ current: form, onClose: handleCloseOrcDialog });
+  const [expanded, setExpanded] = useState<Set<string>>(new Set(['_receitas', '_despesas']));
+  const [edits, setEdits] = useState<Record<string, number>>({});
 
   // Copy month dialog
   const [copyDialogOpen, setCopyDialogOpen] = useState(false);
@@ -96,38 +149,27 @@ export default function OrcamentoSection() {
     [],
   );
 
+  const orcamentosByCategoria = useMemo(() => {
+    const map: Record<string, OrcamentoRow> = {};
+    orcamentos.forEach(o => { map[o.categoria_id] = o; });
+    return map;
+  }, [orcamentos]);
+
   // ── Load data via RPC ──
   const load = useCallback(async () => {
     setLoading(true);
+    setEdits({});
     try {
-      const [execRes, catRes] = await Promise.all([
-        supabase.rpc('orcamento_execucao_mensal', { p_mes: mesAtual }),
-        supabase
-          .from('fin_categorias')
-          .select('id, nome, tipo')
-          .eq('ativo', true)
-          .eq('excluir_dos_totais', false)
-          .in('tipo', ['despesa', 'receita'])
-          .order('tipo')
-          .order('nome'),
-      ]);
-
-      if (execRes.error) throw execRes.error;
-
-      const data = (execRes.data as unknown as OrcamentoItem[] | null) || [];
-      setItems(data.map((d) => ({
-        id: d.id,
-        categoria_id: d.categoria_id,
-        categoriaNome: d.categoriaNome,
-        categoriaTipo: d.categoriaTipo,
-        valorOrcado: Number(d.valorOrcado),
-        valorRealizado: Number(d.valorRealizado),
-        pctExecucao: Number(d.pctExecucao),
-        statusExecucao: d.statusExecucao as 'ok' | 'alerta' | 'estourado',
-        valorExcedido: Number(d.valorExcedido),
-        updated_at: d.updated_at || '',
-      })));
-      setCategorias((catRes.data || []) as Categoria[]);
+      const { data, error } = await supabase.rpc('get_fin_orcamento_arvore', { p_mes: mesAtual });
+      if (error) throw error;
+      const result = data as {
+        categorias?: Omit<CatNode, 'children'>[];
+        orcamentos?: OrcamentoRow[];
+        valores_realizado?: Record<string, number>;
+      } | null;
+      setCategorias(result?.categorias || []);
+      setOrcamentos((result?.orcamentos || []).map(o => ({ ...o, valor_orcado: Number(o.valor_orcado) })));
+      setRealizadoMap(result?.valores_realizado || {});
     } catch (err) {
       console.error(err);
       toast.error('Erro ao carregar orçamento');
@@ -137,89 +179,179 @@ export default function OrcamentoSection() {
 
   useEffect(() => { load(); }, [load]);
 
-  // Auto-refresh
   useDataEvent('financeiro:lancamentos', load);
   useDataEvent('financeiro:cadastros', load);
   useDataEvent('financeiro:orcamento', load);
 
-  // ── Save (create or update) via RPC ──
-  const save = async () => {
-    if (saving) return;
-    const catId = editingId ? items.find(i => i.id === editingId)?.categoria_id : form.categoria_id;
-    if (!catId || form.valor_orcado <= 0) {
-      toast.error('Categoria e valor obrigatórios');
-      return;
+  // Auto-expand top-level categories
+  useEffect(() => {
+    if (categorias.length > 0) {
+      setExpanded(prev => {
+        const next = new Set(prev);
+        next.add('_receitas');
+        next.add('_despesas');
+        categorias.filter(c => !c.parent_id).forEach(c => next.add(c.id));
+        return next;
+      });
     }
+  }, [categorias]);
+
+  const tree = useMemo(() => buildOrcamentoTree(categorias), [categorias]);
+
+  // ── Rollups (aware of unsaved edits) ──
+  const calcOrcado = useCallback((node: CatNode): number => {
+    if (node.children.length === 0) {
+      if (node.id in edits) return edits[node.id];
+      return orcamentosByCategoria[node.id]?.valor_orcado ?? 0;
+    }
+    const ownBudget = orcamentosByCategoria[node.id];
+    if (ownBudget) return ownBudget.valor_orcado;
+    return node.children.reduce((sum, child) => sum + calcOrcado(child), 0);
+  }, [edits, orcamentosByCategoria]);
+
+  const calcRealizado = useCallback((node: CatNode): number => {
+    let total = realizadoMap[node.id] || 0;
+    for (const child of node.children) total += calcRealizado(child);
+    return total;
+  }, [realizadoMap]);
+
+  // ── Flatten tree into rows (DFC/DRE-style: seções Receitas/Despesas) ──
+  const rows = useMemo<FlatRow[]>(() => {
+    const result: FlatRow[] = [];
+
+    const flatten = (nodes: CatNode[], depth: number, ancestorLocked: boolean) => {
+      for (const node of nodes) {
+        const hasChildren = node.children.length > 0;
+        const ownBudget = orcamentosByCategoria[node.id] || null;
+        const locked = ancestorLocked;
+        result.push({
+          key: node.id,
+          categoriaId: node.id,
+          codigo: node.codigo,
+          nome: node.nome,
+          tipo: node.tipo,
+          depth,
+          hasChildren,
+          isLeaf: !hasChildren,
+          orcado: calcOrcado(node),
+          realizado: calcRealizado(node),
+          ownBudget: hasChildren ? ownBudget : null,
+          locked,
+        });
+        if (expanded.has(node.id) && hasChildren) {
+          // Legado no pai bloqueia edição de TODAS as folhas descendentes.
+          flatten(node.children, depth + 1, ancestorLocked || !!ownBudget);
+        }
+      }
+    };
+
+    const receitaNodes = tree.filter(n => n.tipo === 'receita');
+    const despesaNodes = tree.filter(n => n.tipo === 'despesa');
+    const totalReceitas = receitaNodes.reduce((s, n) => s + calcOrcado(n), 0);
+    const totalReceitasReal = receitaNodes.reduce((s, n) => s + calcRealizado(n), 0);
+    const totalDespesas = despesaNodes.reduce((s, n) => s + calcOrcado(n), 0);
+    const totalDespesasReal = despesaNodes.reduce((s, n) => s + calcRealizado(n), 0);
+
+    result.push({
+      key: '_receitas', categoriaId: null, codigo: '', nome: 'TOTAL DE RECEITAS', tipo: 'receita',
+      depth: 0, hasChildren: receitaNodes.length > 0, isLeaf: false, isSectionHeader: true,
+      orcado: totalReceitas, realizado: totalReceitasReal, ownBudget: null, locked: false,
+    });
+    if (expanded.has('_receitas')) flatten(receitaNodes, 1, false);
+
+    result.push({
+      key: '_despesas', categoriaId: null, codigo: '', nome: 'TOTAL DE DESPESAS', tipo: 'despesa',
+      depth: 0, hasChildren: despesaNodes.length > 0, isLeaf: false, isSectionHeader: true,
+      orcado: totalDespesas, realizado: totalDespesasReal, ownBudget: null, locked: false,
+    });
+    if (expanded.has('_despesas')) flatten(despesaNodes, 1, false);
+
+    result.push({
+      key: '_resultado', categoriaId: null, codigo: '', nome: 'RESULTADO PROJETADO', tipo: 'receita',
+      depth: 0, hasChildren: false, isLeaf: false, isTotalRow: true,
+      orcado: totalReceitas - totalDespesas, realizado: totalReceitasReal - totalDespesasReal,
+      ownBudget: null, locked: false,
+    });
+
+    return result;
+  }, [tree, expanded, calcOrcado, calcRealizado, orcamentosByCategoria]);
+
+  const toggleExpand = (id: string) => {
+    setExpanded(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  // ── Pending edits ──
+  const dirtyItems = useMemo(() => {
+    return Object.entries(edits)
+      .filter(([categoriaId, valor]) => valor !== (orcamentosByCategoria[categoriaId]?.valor_orcado ?? 0))
+      .map(([categoriaId, valor]) => ({
+        categoria_id: categoriaId,
+        valor_orcado: valor > 0 ? valor : null,
+        orcamento_id: orcamentosByCategoria[categoriaId]?.id ?? null,
+        expected_updated_at: orcamentosByCategoria[categoriaId]?.updated_at ?? null,
+      }));
+  }, [edits, orcamentosByCategoria]);
+
+  const handleEditLeaf = (categoriaId: string, value: number) => {
+    setEdits(prev => ({ ...prev, [categoriaId]: value }));
+  };
+
+  // ── Save all pending leaf edits in one transaction ──
+  const handleSaveAll = async () => {
+    if (saving || dirtyItems.length === 0) return;
     setSaving(true);
     try {
-      const { error } = await supabase.rpc('_guarded_upsert_orcamento', {
-        p_categoria_id: catId,
+      const { error } = await supabase.rpc('_guarded_bulk_upsert_orcamento', {
         p_mes_ano: mesAtual,
-        p_valor: form.valor_orcado,
-        p_expected_updated_at: editingId
-          ? items.find(item => item.id === editingId)?.updated_at
-          : undefined,
+        p_items: dirtyItems,
       });
       if (error) throw error;
-      toast.success(editingId ? 'Orçamento atualizado' : 'Orçamento criado');
-      setDialogOpen(false);
-      setEditingId(null);
-      setForm({ categoria_id: '', valor_orcado: 0 });
+      toast.success(`${dirtyItems.length} meta(s) salva(s)`);
+      setEdits({});
       emitDataEvent('financeiro:orcamento');
     } catch (err: unknown) {
       console.error(err);
-      const errorShape = typeof err === 'object' && err !== null
-        ? err as { code?: unknown; message?: unknown }
-        : {};
+      const errorShape = typeof err === 'object' && err !== null ? err as { message?: unknown } : {};
       const message = typeof errorShape.message === 'string' ? errorShape.message : '';
       if (message.includes('OPTIMISTIC_LOCK')) {
-        toast.error('Este orçamento foi alterado por outra pessoa. Recarregue e tente novamente.');
+        toast.error('Algum item foi alterado por outra pessoa. Recarregue e tente novamente.');
       } else if (message.includes('ORCAMENTO_HIERARQUIA_CONFLITANTE')) {
         toast.error('Defina o orçamento no pai ou nos filhos, nunca nos dois no mesmo mês.');
-      } else if (message.includes('23505') || errorShape.code === '23505') {
-        toast.error('Já existe orçamento para esta categoria neste mês');
+      } else if (message.includes('PERMISSION_DENIED')) {
+        toast.error('Você não tem permissão para esta alteração.');
       } else {
-        toast.error('Erro ao salvar orçamento');
+        toast.error('Erro ao salvar orçamento. Nada foi alterado.');
       }
     }
     setSaving(false);
   };
 
-  // ── Delete via RPC ──
-  const handleDelete = async (item: OrcamentoItem) => {
+  // ── Delete legacy budget saved directly on a parent category ──
+  const handleDeleteOwnBudget = async (row: FlatRow) => {
+    if (!row.ownBudget) return;
     const ok = await confirm({
       title: 'Excluir Orçamento',
-      description: `Deseja excluir o orçamento da categoria "${item.categoriaNome}"?`,
+      description: `Deseja excluir o orçamento de "${row.nome}"? As sub-categorias poderão ser orçadas individualmente depois.`,
       confirmLabel: 'Excluir',
       variant: 'destructive',
     });
     if (!ok) return;
     try {
       const { error } = await supabase.rpc('_guarded_delete_orcamento', {
-        p_id: item.id,
-        p_expected_updated_at: item.updated_at,
+        p_id: row.ownBudget.id,
+        p_expected_updated_at: row.ownBudget.updated_at,
       });
       if (error) throw error;
       toast.success('Orçamento excluído');
       emitDataEvent('financeiro:orcamento');
     } catch (err: unknown) {
-      console.error('[OrcamentoSection.handleDelete]', err);
+      console.error('[OrcamentoSection.handleDeleteOwnBudget]', err);
       toast.error(mapFinanceiroDeleteError(err));
     }
-  };
-
-  // ── Open edit dialog ──
-  const openEdit = (item: OrcamentoItem) => {
-    setEditingId(item.id);
-    setForm({ categoria_id: item.categoria_id, valor_orcado: item.valorOrcado });
-    setDialogOpen(true);
-  };
-
-  // ── Open create dialog ──
-  const openCreate = () => {
-    setEditingId(null);
-    setForm({ categoria_id: '', valor_orcado: 0 });
-    setDialogOpen(true);
   };
 
   // ── Copy from another month (single RPC call, no N+1) ──
@@ -247,47 +379,40 @@ export default function OrcamentoSection() {
     setCopying(false);
   };
 
-  // ── Totals ──
-  const revenueItems = items.filter(item => item.categoriaTipo === 'receita');
-  const expenseItems = items.filter(item => item.categoriaTipo === 'despesa');
-  const totalRevenueBudget = revenueItems.reduce((sum, item) => sum + item.valorOrcado, 0);
-  const totalRevenueActual = revenueItems.reduce((sum, item) => sum + item.valorRealizado, 0);
-  const totalExpenseBudget = expenseItems.reduce((sum, item) => sum + item.valorOrcado, 0);
-  const totalExpenseActual = expenseItems.reduce((sum, item) => sum + item.valorRealizado, 0);
-
+  // ── Totals for header ──
+  const totalReceitaRow = rows.find(r => r.key === '_receitas');
+  const totalDespesaRow = rows.find(r => r.key === '_despesas');
   const fmt = fmtBRL;
-
-  // ── Available categories for creation (exclude already budgeted) ──
-  const categoriasDisponiveis = useMemo(() => {
-    const usadas = new Set(items.map(i => i.categoria_id));
-    return categorias.filter(c => !usadas.has(c.id));
-  }, [categorias, items]);
 
   // ── PDF Export ──
   const gerarPDF = () => {
-    if (items.length === 0) return;
+    const exportRows = rows.filter(r => !r.isSectionHeader && !r.isTotalRow && r.categoriaId);
+    if (exportRows.length === 0) return;
     const doc = new jsPDF();
     const w = doc.internal.pageSize.getWidth();
     doc.setFontSize(16);
     doc.text('Orçamento vs Realizado', w / 2, 18, { align: 'center' });
     doc.setFontSize(10);
     doc.text(`Período: ${formatMonthBR(mesAtual)}  |  Regime de competência`, w / 2, 26, { align: 'center' });
-    doc.text(`Receita: ${fmt(totalRevenueActual)} / ${fmt(totalRevenueBudget)}  |  Despesa: ${fmt(totalExpenseActual)} / ${fmt(totalExpenseBudget)} (realizado / orçado)`, w / 2, 31, { align: 'center' });
+    doc.text(
+      `Receita: ${fmt(totalReceitaRow?.realizado ?? 0)} / ${fmt(totalReceitaRow?.orcado ?? 0)}  |  Despesa: ${fmt(totalDespesaRow?.realizado ?? 0)} / ${fmt(totalDespesaRow?.orcado ?? 0)} (realizado / orçado)`,
+      w / 2, 31, { align: 'center' },
+    );
 
     autoTable(doc, {
       startY: 38,
-      head: [['Tipo', 'Categoria', 'Orçado', 'Realizado', '% Exec.', 'Status', 'Desvio']],
-      body: items.map(i => [
-        i.categoriaTipo === 'receita' ? 'Receita' : 'Despesa',
-        i.categoriaNome,
-        fmt(i.valorOrcado),
-        fmt(i.valorRealizado),
-        `${i.pctExecucao}%`,
-        i.statusExecucao === 'estourado'
-          ? i.categoriaTipo === 'receita' ? 'ABAIXO DA META' : 'ESTOURADO'
-          : i.statusExecucao === 'alerta' ? 'ATENÇÃO' : 'EM LINHA',
-        i.valorExcedido > 0 ? fmt(i.valorExcedido) : '—',
-      ]),
+      head: [['Tipo', 'Categoria', 'Orçado', 'Realizado', '% Exec.', 'Status']],
+      body: exportRows.map(r => {
+        const status = computeStatus(r.tipo, r.orcado, r.realizado);
+        return [
+          r.tipo === 'receita' ? 'Receita' : 'Despesa',
+          `${'  '.repeat(r.depth)}${r.nome}`,
+          fmt(r.orcado),
+          fmt(r.realizado),
+          r.orcado > 0 ? `${formatPercentBR((r.realizado / r.orcado) * 100, 1)}` : '—',
+          status ? STATUS_LABEL[r.tipo][status] : '—',
+        ];
+      }),
       theme: 'striped',
       headStyles: { fillColor: [30, 41, 59] },
     });
@@ -298,27 +423,28 @@ export default function OrcamentoSection() {
 
   // ── Excel Export ──
   const gerarExcel = () => {
-    if (items.length === 0) return;
+    const exportRows = rows.filter(r => !r.isSectionHeader && !r.isTotalRow && r.categoriaId);
+    if (exportRows.length === 0) return;
     const wb = XLSX.utils.book_new();
-    const rows = [
-      ['Tipo', 'Categoria', 'Orçado', 'Realizado', '% Execução', 'Status', 'Desvio desfavorável'],
-      ...items.map(i => [
-        i.categoriaTipo === 'receita' ? 'Receita' : 'Despesa',
-        i.categoriaNome,
-        i.valorOrcado,
-        i.valorRealizado,
-        `${i.pctExecucao}%`,
-        i.statusExecucao === 'estourado'
-          ? i.categoriaTipo === 'receita' ? 'ABAIXO DA META' : 'ESTOURADO'
-          : i.statusExecucao === 'alerta' ? 'ATENÇÃO' : 'EM LINHA',
-        i.valorExcedido > 0 ? i.valorExcedido : 0,
-      ]),
+    const dataRows = [
+      ['Tipo', 'Categoria', 'Orçado', 'Realizado', '% Execução', 'Status'],
+      ...exportRows.map(r => {
+        const status = computeStatus(r.tipo, r.orcado, r.realizado);
+        return [
+          r.tipo === 'receita' ? 'Receita' : 'Despesa',
+          `${'  '.repeat(r.depth)}${r.nome}`,
+          r.orcado,
+          r.realizado,
+          r.orcado > 0 ? `${formatPercentBR((r.realizado / r.orcado) * 100, 1)}` : '',
+          status ? STATUS_LABEL[r.tipo][status] : '',
+        ];
+      }),
       [],
-      ['Receita operacional', '', totalRevenueBudget, totalRevenueActual, '', '', ''],
-      ['Despesa operacional', '', totalExpenseBudget, totalExpenseActual, '', '', ''],
+      ['Total Receitas', '', totalReceitaRow?.orcado ?? 0, totalReceitaRow?.realizado ?? 0, '', ''],
+      ['Total Despesas', '', totalDespesaRow?.orcado ?? 0, totalDespesaRow?.realizado ?? 0, '', ''],
     ];
-    const ws = XLSX.utils.aoa_to_sheet(rows);
-    ws['!cols'] = [{ wch: 12 }, { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 12 }, { wch: 18 }, { wch: 18 }];
+    const ws = XLSX.utils.aoa_to_sheet(dataRows);
+    ws['!cols'] = [{ wch: 12 }, { wch: 32 }, { wch: 15 }, { wch: 15 }, { wch: 12 }, { wch: 16 }];
     XLSX.utils.book_append_sheet(wb, ws, 'Orçamento');
     XLSX.writeFile(wb, `orcamento-${mesAtual}.xlsx`);
     toast.success('Excel gerado');
@@ -336,7 +462,7 @@ export default function OrcamentoSection() {
         <div>
           <h2 className="text-xl font-bold text-foreground">Orçamento vs Realizado</h2>
           <p className="text-sm text-muted-foreground">
-            Competência • Receita {fmt(totalRevenueActual)} / {fmt(totalRevenueBudget)} • Despesa {fmt(totalExpenseActual)} / {fmt(totalExpenseBudget)} (realizado / orçado)
+            Competência • Receita {fmt(totalReceitaRow?.realizado ?? 0)} / {fmt(totalReceitaRow?.orcado ?? 0)} • Despesa {fmt(totalDespesaRow?.realizado ?? 0)} / {fmt(totalDespesaRow?.orcado ?? 0)} (realizado / orçado)
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -347,8 +473,9 @@ export default function OrcamentoSection() {
 
           {canEdit && (
             <>
-              <Button size="sm" onClick={openCreate}>
-                <Plus className="w-4 h-4 mr-1" /> Novo
+              <Button size="sm" onClick={handleSaveAll} disabled={saving || dirtyItems.length === 0}>
+                {saving ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Save className="w-4 h-4 mr-1" />}
+                {saving ? 'Salvando...' : dirtyItems.length > 0 ? `Salvar (${dirtyItems.length})` : 'Salvar'}
               </Button>
               <Button variant="outline" size="sm" onClick={() => setCopyDialogOpen(true)}>
                 <Copy className="w-4 h-4 mr-1" /> Copiar Mês
@@ -356,12 +483,12 @@ export default function OrcamentoSection() {
             </>
           )}
 
-          {canExport && items.length > 0 && (
+          {canExport && (
             <>
-              <Button variant="outline" size="sm" onClick={gerarPDF}>
+              <Button variant="outline" size="sm" onClick={gerarPDF} disabled={loading}>
                 <FileDown className="w-4 h-4 mr-1" /> PDF
               </Button>
-              <Button variant="outline" size="sm" onClick={gerarExcel}>
+              <Button variant="outline" size="sm" onClick={gerarExcel} disabled={loading}>
                 <FileSpreadsheet className="w-4 h-4 mr-1" /> Excel
               </Button>
             </>
@@ -374,97 +501,123 @@ export default function OrcamentoSection() {
         <Card><CardContent className="p-8 text-center text-muted-foreground flex items-center justify-center gap-2">
           <Loader2 className="w-5 h-5 animate-spin" /> Carregando...
         </CardContent></Card>
-      ) : items.length === 0 ? (
+      ) : categorias.length === 0 ? (
         <Card><CardContent className="p-8 text-center text-muted-foreground">
           <Target className="w-10 h-10 mx-auto mb-3 opacity-30" />
-          <p className="font-medium">Nenhum orçamento definido para {formatMonthBR(mesAtual)}.</p>
-          <p className="text-sm">Clique em "Novo" para definir metas por categoria operacional.</p>
+          <p className="font-medium">Nenhuma categoria operacional cadastrada.</p>
+          <p className="text-sm">Configure a estrutura em Cadastros Base primeiro.</p>
         </CardContent></Card>
       ) : (
-        <div className="space-y-3">
-          {items.map(item => (
-            <Card key={item.id} className={
-              item.statusExecucao === 'estourado' ? 'border-destructive/50' :
-              item.statusExecucao === 'alerta' ? 'border-warning/50' : ''
-            }>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    {item.statusExecucao === 'estourado' && <AlertTriangle className="w-4 h-4 text-destructive" />}
-                    {item.statusExecucao === 'alerta' && <AlertTriangle className="w-4 h-4 text-warning" />}
-                    <span className="font-medium">{item.categoriaNome}</span>
-                    <span className="text-xs text-muted-foreground">{item.categoriaTipo === 'receita' ? 'Receita' : 'Despesa'}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className={`text-sm font-bold ${
-                      item.statusExecucao === 'estourado' ? 'text-destructive' :
-                      item.statusExecucao === 'alerta' ? 'text-warning' : 'text-success'
-                    }`}>
-                      {item.pctExecucao}%
-                    </span>
-                    {canEdit && (
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(item)}>
-                        <Pencil className="w-3.5 h-3.5" />
-                      </Button>
-                    )}
-                    {canDelete && (
-                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDelete(item)}>
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
-                    )}
-                  </div>
-                </div>
-                <Progress value={Math.min(item.pctExecucao, 100)} className="h-2 mb-2" />
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>Realizado: {fmt(item.valorRealizado)}</span>
-                  <span>Orçado: {fmt(item.valorOrcado)}</span>
-                  {item.statusExecucao === 'estourado' && (
-                    <span className="text-destructive font-medium">
-                      {item.categoriaTipo === 'receita' ? 'Abaixo da meta em ' : 'Excedido em '}{fmt(item.valorExcedido)}
-                    </span>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+        <Card>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Categoria</TableHead>
+                  <TableHead className="text-right w-[180px]">Orçado (R$)</TableHead>
+                  <TableHead className="text-right w-[160px]">Realizado (R$)</TableHead>
+                  <TableHead className="text-right w-[100px]">% Exec.</TableHead>
+                  <TableHead className="w-[130px]">Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.map(row => {
+                  const status = computeStatus(row.tipo, row.orcado, row.realizado);
+                  const pct = row.orcado > 0 ? formatPercentBR((row.realizado / row.orcado) * 100, 1) : '—';
+                  const canEditThisLeaf = canEdit && row.isLeaf && !row.locked && !row.isSectionHeader && !row.isTotalRow;
+                  const currentEditValue = row.categoriaId && row.categoriaId in edits
+                    ? edits[row.categoriaId]
+                    : row.orcado;
 
-      {/* Create / Edit Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={(open) => { if (!open) guardedOrcClose(); else setDialogOpen(true); }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editingId ? 'Editar Orçamento' : 'Novo Orçamento'}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div>
-              <Label>Categoria operacional</Label>
-              {editingId ? (
-                <p className="text-sm font-medium mt-1">{items.find(i => i.id === editingId)?.categoriaNome}</p>
-              ) : (
-                <Select value={form.categoria_id} onValueChange={v => setForm({ ...form, categoria_id: v })}>
-                  <SelectTrigger><SelectValue placeholder="Selecione uma categoria" /></SelectTrigger>
-                  <SelectContent>
-                    {categoriasDisponiveis.map(c => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.tipo === 'receita' ? 'Receita' : 'Despesa'} — {c.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
-            <div>
-              <Label>Valor Orçado (R$)</Label>
-              <BRLInput numericValue={form.valor_orcado} onNumericChange={v => setForm({ ...form, valor_orcado: v })} showPrefix />
-            </div>
-            <Button onClick={save} className="w-full" disabled={saving}>
-              {saving ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : null}
-              {saving ? 'Salvando...' : editingId ? 'Atualizar' : 'Criar'}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+                  return (
+                    <TableRow
+                      key={row.key}
+                      className={cn(
+                        row.isTotalRow && 'bg-primary/5 font-bold border-t-2 border-primary/20',
+                        row.isSectionHeader && 'bg-muted/50 border-t border-border',
+                      )}
+                    >
+                      <TableCell
+                        className={cn(
+                          'flex items-center gap-1',
+                          row.isSectionHeader && 'font-bold text-sm uppercase tracking-wider',
+                          row.isTotalRow && 'font-bold text-base',
+                          row.depth === 1 && !row.isSectionHeader && 'font-semibold text-xs uppercase tracking-wider',
+                          row.depth > 1 && 'font-medium',
+                        )}
+                        style={{ paddingLeft: `${row.depth * 20 + 12}px` }}
+                      >
+                        {row.hasChildren ? (
+                          <button
+                            onClick={() => toggleExpand(row.key)}
+                            className="w-5 h-5 flex items-center justify-center rounded hover:bg-muted shrink-0"
+                          >
+                            {expanded.has(row.key) ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                          </button>
+                        ) : (
+                          <span className="w-5 shrink-0" />
+                        )}
+                        {row.codigo && <span className="font-mono text-xs text-muted-foreground mr-1">{row.codigo}</span>}
+                        <span className="truncate">{row.nome}</span>
+                        {row.locked && (
+                          <Lock className="w-3 h-3 text-muted-foreground shrink-0" aria-label="Orçamento definido em categoria superior" />
+                        )}
+                      </TableCell>
+
+                      <TableCell className="text-right">
+                        {canEditThisLeaf ? (
+                          <BRLInput
+                            numericValue={currentEditValue}
+                            onNumericChange={v => row.categoriaId && handleEditLeaf(row.categoriaId, v)}
+                            showPrefix
+                            className="h-8 text-right ml-auto max-w-[160px]"
+                          />
+                        ) : row.ownBudget ? (
+                          <div className="flex items-center justify-end gap-1">
+                            <span className="font-mono font-semibold">{fmt(row.ownBudget.valor_orcado)}</span>
+                            {canDelete && (
+                              <Button
+                                variant="ghost" size="icon" className="h-6 w-6 text-destructive"
+                                title="Excluir orçamento deste nível"
+                                onClick={() => handleDeleteOwnBudget(row)}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
+                            )}
+                          </div>
+                        ) : (
+                          <span className={cn(
+                            'font-mono',
+                            (row.isTotalRow || row.isSectionHeader) && 'font-bold text-base',
+                            row.depth === 1 && !row.isSectionHeader && 'font-semibold',
+                            row.locked && 'text-muted-foreground',
+                          )}>
+                            {row.locked ? '—' : fmt(row.orcado)}
+                          </span>
+                        )}
+                      </TableCell>
+
+                      <TableCell className={cn(
+                        'text-right font-mono',
+                        (row.isTotalRow || row.isSectionHeader) && 'font-bold text-base',
+                        row.depth === 1 && !row.isSectionHeader && 'font-semibold',
+                      )}>
+                        {fmt(row.realizado)}
+                      </TableCell>
+
+                      <TableCell className="text-right text-muted-foreground text-sm">{pct}</TableCell>
+
+                      <TableCell>
+                        {status && <StatusBadge status={STATUS_VARIANT[status]} label={STATUS_LABEL[row.tipo][status]} />}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Copy Month Dialog */}
       <Dialog open={copyDialogOpen} onOpenChange={setCopyDialogOpen}>
@@ -494,7 +647,6 @@ export default function OrcamentoSection() {
           </div>
         </DialogContent>
       </Dialog>
-      <FormCloseConfirmDialog open={showOrcConfirm} onConfirmLeave={confirmOrcClose} onCancelLeave={cancelOrcClose} />
     </div>
   );
 }
