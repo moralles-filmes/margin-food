@@ -240,7 +240,9 @@ export default function DemonstrativoTree({
             <TableRow>
               <TableHead>Descrição</TableHead>
               <TableHead className="text-right w-[180px]">Valor (R$)</TableHead>
-              {showPctReceita && <TableHead className="text-right w-[100px]">% Receita</TableHead>}
+              {showPctReceita && (
+                <TableHead className="text-right w-[100px]">{isDFC ? '% Recebimentos' : '% Receita Líq.'}</TableHead>
+              )}
             </TableRow>
           </TableHeader>
           <TableBody>

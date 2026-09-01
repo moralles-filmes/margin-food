@@ -11,7 +11,7 @@ import { createPresentationSociosData } from '@/test/fixtures/presentationSocios
 export function createPresentationRevenueData(): PresentationRevenueData {
   const requestedYears = [2024, 2025, 2026];
   return {
-    contractVersion: '1.0',
+    contractVersion: '1.1',
     source: PRESENTATION_REVENUE_SOURCE,
     availability: 'available',
     selectedMonth: '2026-03',
@@ -51,8 +51,33 @@ export function createPresentationRevenueData(): PresentationRevenueData {
       { isoWeekday: 7, label: 'Domingo', state: 'empty', total: 0, occurrences: 0, average: { state: 'unavailable', reason: 'no-occurrences' } },
     ],
     byBrand: [
-      { marcaId: '11111111-1111-4111-8111-111111111111', nome: 'Loja Centro', total: 1_800, closingCount: 2 },
-      { marcaId: '22222222-2222-4222-8222-222222222222', nome: 'Loja Norte', total: 1_200, closingCount: 1 },
+      {
+        marcaId: null,
+        nome: 'Salão + Jantar',
+        total: 1_800,
+        closingCount: 2,
+        net: 1_600,
+        categoriaId: '33333333-3333-4333-8333-333333333333',
+        marcaIds: ['11111111-1111-4111-8111-111111111111', '44444444-4444-4444-8444-444444444444'],
+      },
+      {
+        marcaId: '22222222-2222-4222-8222-222222222222',
+        nome: 'Loja Norte',
+        total: 1_200,
+        closingCount: 1,
+        net: null,
+        categoriaId: null,
+        marcaIds: ['22222222-2222-4222-8222-222222222222'],
+      },
+      {
+        marcaId: null,
+        nome: 'Sem marca vinculada',
+        total: 0,
+        closingCount: 0,
+        net: 1_100,
+        categoriaId: null,
+        marcaIds: [],
+      },
     ],
     netRevenue: {
       current: { month: '2026-03', total: 2_700 },

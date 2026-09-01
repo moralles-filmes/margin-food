@@ -177,23 +177,36 @@ function RevenueGrossNetLayout({ revenue }: { revenue: PresentationRevenueData }
   );
 }
 
-function RevenueByBrandLayout({ revenue }: { revenue: PresentationRevenueData }) {
+function RevenueByBrandLayout({ revenue, items }: { revenue: PresentationRevenueData; items: readonly PresentationRevenueBrandPoint[] }) {
   const total = revenue.current.total;
-  const items = [...revenue.byBrand].sort((left, right) => right.total - left.total);
+  const hasSemCategoria = revenue.byBrand.some(item => item.marcaId !== null && item.categoriaId === null);
   if (items.length === 0) return <EmptyState message="Sem faturamento no mês selecionado." />;
   return (
-    <div className="min-h-0 flex-1">
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
+      {hasSemCategoria && (
+        <p className="rounded-md border border-warning-border bg-warning-soft px-3 py-2 text-[clamp(0.62rem,0.8cqw,0.78rem)] text-warning">
+          Marcas sem categoria vinculada não têm líquido calculado — vincule em Fechamento de Caixa › Marcas e dark kitchens.
+        </p>
+      )}
       <ol className="space-y-2.5">
-        {items.map((item: PresentationRevenueBrandPoint, index) => (
-          <li key={item.marcaId ?? 'sem-marca'} className="grid grid-cols-[2.2rem_minmax(0,1fr)_auto] items-center gap-3 border-b border-border pb-2.5">
-            <span className="text-center text-[clamp(1rem,1.5cqw,1.45rem)] font-bold text-primary-ink">{index + 1}</span>
+        {items.map((item: PresentationRevenueBrandPoint) => (
+          <li key={item.categoriaId ?? item.marcaId ?? item.nome} className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 border-b border-border pb-2.5">
             <div className="min-w-0">
               <p className="break-words text-[clamp(0.78rem,1.15cqw,1.1rem)] font-medium leading-tight text-foreground">{item.nome}</p>
               <p className="text-[clamp(0.65rem,0.8cqw,0.82rem)] text-muted-foreground">
                 {total > 0 ? formatPercentBR((item.total / total) * 100, 1) : '—'} do bruto do mês · {formatIntegerBR(item.closingCount)} fechamento(s)
               </p>
             </div>
-            <strong className="whitespace-nowrap font-mono text-[clamp(0.76rem,1.05cqw,1rem)] text-success">{fmtBRL(item.total)}</strong>
+            <div className="text-right">
+              <p className="text-[clamp(0.6rem,0.75cqw,0.72rem)] uppercase tracking-wide text-muted-foreground">Bruto</p>
+              <strong className="whitespace-nowrap font-mono text-[clamp(0.76rem,1.05cqw,1rem)] text-success">{fmtBRL(item.total)}</strong>
+            </div>
+            <div className="text-right">
+              <p className="text-[clamp(0.6rem,0.75cqw,0.72rem)] uppercase tracking-wide text-muted-foreground">Líquido</p>
+              <strong className="whitespace-nowrap font-mono text-[clamp(0.76rem,1.05cqw,1rem)] text-primary-ink">
+                {item.net === null ? '—' : fmtBRL(item.net)}
+              </strong>
+            </div>
           </li>
         ))}
       </ol>
@@ -1100,7 +1113,7 @@ function SlideContent({
     case 'revenue-gross-net':
       return <RevenueGrossNetLayout revenue={payload.revenue} />;
     case 'revenue-by-brand':
-      return <RevenueByBrandLayout revenue={payload.revenue} />;
+      return <RevenueByBrandLayout revenue={payload.revenue} items={payload.items} />;
     case 'revenue-weekdays':
       return <RevenueWeekdaysLayout revenue={payload.revenue} />;
     case 'revenue-history':

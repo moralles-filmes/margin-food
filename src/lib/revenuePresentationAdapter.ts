@@ -218,6 +218,15 @@ function readNullableUuid(value: unknown, path: string): string | null {
   return id;
 }
 
+function readNullableFiniteNumber(value: unknown, path: string): number | null {
+  if (value === null) return null;
+  return readFiniteNumber(value, path);
+}
+
+function readMarcaIds(value: unknown, path: string): readonly string[] {
+  return readArray(value, path).map((id, index) => readNullableUuid(id, `${path}[${index}]`) ?? fail(`${path}[${index}]`, 'um UUID'));
+}
+
 function readBrandPoint(value: unknown, path: string): PresentationRevenueBrandPoint {
   const record = readRecord(value, path);
   return {
@@ -225,18 +234,26 @@ function readBrandPoint(value: unknown, path: string): PresentationRevenueBrandP
     nome: readString(record.nome, `${path}.nome`),
     total: readFiniteNumber(record.total, `${path}.total`),
     closingCount: readInteger(record.closingCount, `${path}.closingCount`),
+    net: readNullableFiniteNumber(record.net, `${path}.net`),
+    categoriaId: readNullableUuid(record.categoriaId, `${path}.categoriaId`),
+    marcaIds: readMarcaIds(record.marcaIds, `${path}.marcaIds`),
   };
 }
 
 function readByBrand(
   value: unknown,
   path: string,
-  currentTotal: number,
+  currentGrossTotal: number,
+  currentNetTotal: number,
 ): readonly PresentationRevenueBrandPoint[] {
   const items = readArray(value, path).map((item, index) => readBrandPoint(item, `${path}[${index}]`));
-  const sum = items.reduce((total, item) => total + item.total, 0);
-  if (Math.abs(sum - currentTotal) > 0.011) {
+  const grossSum = items.reduce((total, item) => total + item.total, 0);
+  if (Math.abs(grossSum - currentGrossTotal) > 0.011) {
     return fail(path, 'a soma exata do faturamento bruto do mês selecionado');
+  }
+  const netSum = items.reduce((total, item) => total + (item.net ?? 0), 0);
+  if (Math.abs(netSum - currentNetTotal) > 0.011) {
+    return fail(path, 'a soma exata da receita líquida do mês selecionado, para os grupos com categoria vinculada');
   }
   return items;
 }
@@ -331,12 +348,12 @@ export function adaptPresentationRevenuePayload(payload: unknown): PresentationR
       fail(`payload.history[${index}]`, 'ordenado por ano e mês');
     }
   });
-  const byBrand = readByBrand(record.byBrand, 'payload.byBrand', current.total);
   const netRevenueRecord = readRecord(record.netRevenue, 'payload.netRevenue');
   const netRevenue = {
     current: readNetSummary(netRevenueRecord.current, 'payload.netRevenue.current', selectedMonth),
     previous: readNetSummary(netRevenueRecord.previous, 'payload.netRevenue.previous', previousMonth),
   };
+  const byBrand = readByBrand(record.byBrand, 'payload.byBrand', current.total, netRevenue.current.total);
   const grossToNet = readGrossToNet(record.grossToNet, 'payload.grossToNet', current.total, previous.total);
   return {
     contractVersion: PRESENTATION_REVENUE_CONTRACT_VERSION,

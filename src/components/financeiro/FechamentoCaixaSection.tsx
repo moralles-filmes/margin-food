@@ -126,7 +126,7 @@ export default function FechamentoCaixaSection() {
     setBrandsLoading(true);
     const { data, error } = await supabase
       .from('financeiro_fechamento_marcas')
-      .select('id, nome, ativo, ordem')
+      .select('id, nome, ativo, ordem, categoria_id')
       .order('ativo', { ascending: false })
       .order('ordem')
       .order('nome');
@@ -226,6 +226,11 @@ export default function FechamentoCaixaSection() {
   const brandsForForm = useMemo(() => brands.filter(
     brand => brand.ativo || Object.prototype.hasOwnProperty.call(formBrandValues, brand.id)
   ), [brands, formBrandValues]);
+
+  const brandsForFormSemCategoria = useMemo(
+    () => brandsForForm.filter(brand => !brand.categoria_id),
+    [brandsForForm],
+  );
 
   const brandBreakdownPayload = useMemo(
     () => buildFechamentoMarcaPayload(brandsForForm, formBrandValues),
@@ -510,6 +515,13 @@ export default function FechamentoCaixaSection() {
                         <div className="rounded-lg border border-warning-border bg-warning-soft p-3 text-xs text-warning">
                           Este fechamento antigo ainda não foi dividido. O total atual é {fmtBRL(parseMoney(formBruto))};
                           ao preencher uma marca, a nova soma substituirá esse total.
+                        </div>
+                      )}
+                      {brandsForFormSemCategoria.length > 0 && (
+                        <div className="rounded-lg border border-warning-border bg-warning-soft p-3 text-xs text-warning">
+                          Sem categoria vinculada: {brandsForFormSemCategoria.map(b => b.nome).join(', ')}. O faturamento
+                          líquido dessa(s) loja(s) não aparece na Apresentação Sócios até vincular em “Marcas e dark
+                          kitchens”.
                         </div>
                       )}
                       <div className="grid gap-3 sm:grid-cols-2">

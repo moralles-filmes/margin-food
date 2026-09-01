@@ -6,7 +6,7 @@ import type {
   PresentationDecisionDetail,
 } from './decisions';
 import type { PresentationChapterId } from './chapters';
-import type { PresentationRevenueData } from './revenue';
+import type { PresentationRevenueBrandPoint, PresentationRevenueData } from './revenue';
 import type { PresentationExpenseNode, PresentationExpensesData } from './expenses';
 import type { PresentationResultsData } from './results';
 import type { PresentationInsight, PresentationInsightsData } from './insights';
@@ -346,7 +346,7 @@ export type PresentationSlidePayload =
   | { type: 'chapter-foundation'; chapter: PresentationChapterId }
   | { type: 'revenue-summary'; revenue: PresentationRevenueData }
   | { type: 'revenue-gross-net'; revenue: PresentationRevenueData }
-  | { type: 'revenue-by-brand'; revenue: PresentationRevenueData }
+  | { type: 'revenue-by-brand'; revenue: PresentationRevenueData; items: readonly PresentationRevenueBrandPoint[] }
   | { type: 'revenue-weekdays'; revenue: PresentationRevenueData }
   | { type: 'revenue-history'; revenue: PresentationRevenueData }
   | { type: 'expenses-summary'; expenses: PresentationExpensesData }

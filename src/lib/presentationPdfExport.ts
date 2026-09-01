@@ -292,18 +292,31 @@ function drawRevenueGrossNet(doc: jsPDF, revenue: PresentationRevenueData): void
   doc.text('Liquido = receita operacional do livro razao (regime de caixa) — mesma base do KPI Receita operacional de Resultados.', 22, 172, { maxWidth: 276 });
 }
 
-function drawRevenueByBrand(doc: jsPDF, revenue: PresentationRevenueData): void {
+function drawRevenueByBrand(
+  doc: jsPDF,
+  revenue: PresentationRevenueData,
+  items: readonly PresentationRevenueBrandPoint[],
+): void {
   const total = revenue.current.total;
-  const items = [...revenue.byBrand].sort((left, right) => right.total - left.total);
   if (items.length === 0) { drawEmpty(doc, 'Sem faturamento no mes selecionado.'); return; }
-  items.forEach((item: PresentationRevenueBrandPoint, index) => {
-    const y = 55 + index * 13;
-    setColor(doc, COLOR.gold); doc.setFontSize(14); doc.text(String(index + 1), 22, y);
-    setColor(doc, COLOR.white); doc.setFontSize(9.5); doc.text(item.nome, 33, y - 1, { maxWidth: 170 });
+  const hasSemCategoria = revenue.byBrand.some(item => item.marcaId !== null && item.categoriaId === null);
+  let y = 55;
+  if (hasSemCategoria) {
+    setColor(doc, COLOR.warning); doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
+    doc.text('Marcas sem categoria vinculada nao tem liquido calculado.', 22, y, { maxWidth: 276 });
+    y += 9;
+  }
+  items.forEach((item: PresentationRevenueBrandPoint) => {
+    setColor(doc, COLOR.white); doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.text(item.nome, 22, y, { maxWidth: 150 });
     setColor(doc, COLOR.muted); doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
-    doc.text(`${total > 0 ? formatPercentBR((item.total / total) * 100, 1) : '-'} do bruto do mes · ${item.closingCount} fechamento(s)`, 33, y + 4);
-    setColor(doc, COLOR.revenue); doc.setFont('courier', 'bold'); doc.setFontSize(9); doc.text(fmtBRL(item.total), 298, y, { align: 'right' });
-    setColor(doc, COLOR.subtle, 'draw'); doc.line(22, y + 7, 298, y + 7);
+    doc.text(`${total > 0 ? formatPercentBR((item.total / total) * 100, 1) : '-'} do bruto do mes · ${item.closingCount} fechamento(s)`, 22, y + 5);
+    setColor(doc, COLOR.muted); doc.setFontSize(6.5); doc.text('BRUTO', 210, y - 3, { align: 'right' });
+    setColor(doc, COLOR.revenue); doc.setFont('courier', 'bold'); doc.setFontSize(9); doc.text(fmtBRL(item.total), 210, y + 3, { align: 'right' });
+    setColor(doc, COLOR.muted); doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); doc.text('LIQUIDO', 298, y - 3, { align: 'right' });
+    setColor(doc, COLOR.white); doc.setFont('courier', 'bold'); doc.setFontSize(9);
+    doc.text(item.net === null ? '-' : fmtBRL(item.net), 298, y + 3, { align: 'right' });
+    setColor(doc, COLOR.subtle, 'draw'); doc.line(22, y + 8, 298, y + 8);
+    y += 15;
   });
 }
 
@@ -1265,7 +1278,7 @@ function drawSlideContent(doc: jsPDF, slide: PresentationSlide): void {
       drawRevenueGrossNet(doc, payload.revenue);
       break;
     case 'revenue-by-brand':
-      drawRevenueByBrand(doc, payload.revenue);
+      drawRevenueByBrand(doc, payload.revenue, payload.items);
       break;
     case 'revenue-weekdays':
       drawRevenueWeekdays(doc, payload.revenue);
