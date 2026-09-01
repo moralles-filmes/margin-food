@@ -10301,7 +10301,10 @@ export type Database = {
         Args: { p_fim: string; p_inicio: string }
         Returns: Json
       }
-      get_fin_dre_summary: { Args: { p_mes: string }; Returns: Json }
+      get_fin_dre_summary: {
+        Args: { p_fim: string; p_inicio: string }
+        Returns: Json
+      }
       get_fin_fluxo_projecao: {
         Args: { p_dias?: number; p_saldo_manual?: number }
         Returns: Json

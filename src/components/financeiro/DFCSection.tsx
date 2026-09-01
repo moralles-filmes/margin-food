@@ -2,9 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { subMonths, startOfMonth, endOfMonth } from 'date-fns';
 import { formatInBR } from '@/lib/formatters';
-import { formatDateBR as formatDateISO } from '@/lib/datetime';
 import { FileDown, FileSpreadsheet, ShieldAlert } from 'lucide-react';
 import { exportDemonstrativoPDF, exportDemonstrativoExcel } from '@/lib/exportDemonstrativo';
 import { useDataEvent } from '@/lib/dataEvents';
@@ -13,6 +11,7 @@ import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { DfcSummary, DfcCategoria } from '@/types/financeiro';
 import DemonstrativoTree from './DemonstrativoTree';
+import MonthNavigator, { shiftMonth, monthBounds } from './MonthNavigator';
 
 function NoAccess() {
   return (
@@ -34,6 +33,12 @@ function SkeletonTree() {
   );
 }
 
+// Parse "yyyy-MM" como data LOCAL (não UTC) — ver nota em DRESection/MonthNavigator.
+function formatMonthLabelShort(value: string): string {
+  const [y, m] = value.split('-').map(Number);
+  return formatInBR(new Date(y, m - 1, 1), 'MMM/yy');
+}
+
 function valoresMapToLancamentos(valoresMap: Record<string, number>) {
   return Object.entries(valoresMap).map(([catId, total]) => ({
     id: catId,
@@ -45,6 +50,7 @@ function valoresMapToLancamentos(valoresMap: Record<string, number>) {
 }
 
 export default function DFCSection() {
+  const [mesAncora, setMesAncora] = useState(() => formatInBR(new Date(), 'yyyy-MM'));
   const [meses, setMeses] = useState('3');
   const [loading, setLoading] = useState(true);
   const [categorias, setCategorias] = useState<DfcCategoria[]>([]);
@@ -58,13 +64,13 @@ export default function DFCSection() {
   const load = useCallback(async () => {
     setLoading(true);
     const m = Number(meses);
-    const periodoInicio = startOfMonth(subMonths(new Date(), m - 1));
-    const inicio = formatDateISO(periodoInicio);
-    const fim = formatDateISO(endOfMonth(new Date()));
+    const mesInicio = shiftMonth(mesAncora, -(m - 1));
+    const inicio = monthBounds(mesInicio).start;
+    const fim = monthBounds(mesAncora).end;
 
-    const startLabel = formatInBR(periodoInicio, 'MMM/yy');
-    const endLabel = formatInBR(new Date(), 'MMM/yy');
-    setPeriodo(`${startLabel} — ${endLabel}`);
+    const startLabel = formatMonthLabelShort(mesInicio);
+    const endLabel = formatMonthLabelShort(mesAncora);
+    setPeriodo(m === 1 ? endLabel : `${startLabel} — ${endLabel}`);
 
     const { data, error } = await supabase.rpc('get_fin_dfc_summary', {
       p_inicio: inicio,
@@ -83,7 +89,7 @@ export default function DFCSection() {
     setLancamentos(valoresMapToLancamentos(result?.valores_por_categoria || {}));
     setSaldoInicial(Number(result?.saldo_inicial || 0));
     setLoading(false);
-  }, [meses]);
+  }, [mesAncora, meses]);
 
   useEffect(() => { load(); }, [load]);
   useDataEvent('financeiro:lancamentos', load);
@@ -131,6 +137,7 @@ export default function DFCSection() {
               <SelectItem value="12">12 meses</SelectItem>
             </SelectContent>
           </Select>
+          <MonthNavigator value={mesAncora} onChange={setMesAncora} />
         </div>
       </div>
 
