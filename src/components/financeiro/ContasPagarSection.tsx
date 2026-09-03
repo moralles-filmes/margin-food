@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Plus, AlertTriangle, CheckCircle, Clock, Ban, FileDown, RefreshCw, Undo2, Search } from 'lucide-react';
+import { Plus, AlertTriangle, CheckCircle, Clock, Ban, FileDown, RefreshCw, Undo2, Search, X } from 'lucide-react';
 import { useFormDirtyGuard } from '@/hooks/useFormDirtyGuard';
 import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
 import { gerarPDFContasPagar } from '@/lib/pdfFinanceiro';
@@ -24,9 +24,9 @@ import ContaFormDialog, { type ContaFormData, type RateioLine } from './ContaFor
 import * as XLSX from '@/lib/safeXlsx';
 import { mapFinanceiroDeleteError, mapPagamentoError } from '@/lib/financeiroErrorMap';
 import { buildCategoryOptions } from '@/lib/categoriaOptions';
-import MonthNavigator from './MonthNavigator';
+import MonthNavigator, { monthBounds } from './MonthNavigator';
+import DateRangePresets from './DateRangePresets';
 import SearchableSelect from '@/components/ui/SearchableSelect';
-import { type FiltroPeriodo, computePeriodoRange } from './periodoFiltro';
 import { buildCategoriaFilterOptions, categoriaFiltroToParams, CATEGORIA_FILTRO_TODOS } from './categoriaFiltro';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { getRecurrenceValidationMessage } from '@/domain/financeiro/recurrence';
@@ -94,7 +94,8 @@ export default function ContasPagarSection() {
   const [saving, setSaving] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [filtroStatus, setFiltroStatus] = useState('todos');
-  const [filtroPeriodo, setFiltroPeriodo] = useState<FiltroPeriodo>('todos');
+  const [filtroDataDe, setFiltroDataDe] = useState('');
+  const [filtroDataAte, setFiltroDataAte] = useState('');
   const [mesFiltro, setMesFiltro] = useState(() => formatInBR(new Date(), 'yyyy-MM'));
   const [filtroConta, setFiltroConta] = useState('todos');
   const [filtroCategoria, setFiltroCategoria] = useState(CATEGORIA_FILTRO_TODOS);
@@ -141,11 +142,10 @@ export default function ContasPagarSection() {
 
   const loadPage = useCallback(async (cDate: string | null, cId: string | null) => {
     setLoading(true);
-    const { de, ate } = computePeriodoRange(filtroPeriodo, mesFiltro);
     const { data, error } = await supabase.rpc('list_fin_contas_pagar_cursor', {
       p_status: filtroStatus !== 'todos' ? filtroStatus : null,
       p_limit: PAGE_SIZE, p_cursor_date: cDate, p_cursor_id: cId,
-      p_data_de: de, p_data_ate: ate,
+      p_data_de: filtroDataDe || null, p_data_ate: filtroDataAte || null,
       p_conta_id: filtroConta !== 'todos' ? filtroConta : null,
       p_search: buscaAplicada || null,
       ...categoriaFiltroToParams(filtroCategoria),
@@ -163,7 +163,23 @@ export default function ContasPagarSection() {
     } else setItems(prev => [...prev, ...newItems]);
     if (newItems.length > 0) { const last = newItems[newItems.length - 1]; setCursorDate(last.data_vencimento); setCursorId(last.id); }
     setLoading(false);
-  }, [buscaAplicada, filtroCategoria, filtroConta, filtroPeriodo, filtroStatus, mesFiltro]);
+  }, [buscaAplicada, filtroCategoria, filtroConta, filtroDataDe, filtroDataAte, filtroStatus]);
+
+  const handleMesChange = (mes: string) => {
+    setMesFiltro(mes);
+    const { start, end } = monthBounds(mes);
+    setFiltroDataDe(start);
+    setFiltroDataAte(end);
+  };
+
+  const limparFiltros = () => {
+    setFiltroStatus('todos');
+    setFiltroDataDe('');
+    setFiltroDataAte('');
+    setFiltroConta('todos');
+    setFiltroCategoria(CATEGORIA_FILTRO_TODOS);
+    setBusca('');
+  };
 
   const loadTotals = useCallback(async () => {
     const { data } = await supabase.rpc('get_fin_counts_by_status');
@@ -536,7 +552,7 @@ export default function ContasPagarSection() {
 
   const fmt = fmtBRL;
   const today = todayBR();
-  const hasActiveFilters = filtroPeriodo !== 'todos'
+  const hasActiveFilters = filtroDataDe !== '' || filtroDataAte !== ''
     || filtroStatus !== 'todos'
     || filtroConta !== 'todos'
     || filtroCategoria !== CATEGORIA_FILTRO_TODOS
@@ -586,18 +602,9 @@ export default function ContasPagarSection() {
       </div>
 
       <div className="flex items-center gap-2 flex-wrap">
-        <Select value={filtroPeriodo} onValueChange={v => setFiltroPeriodo(v as FiltroPeriodo)}>
-          <SelectTrigger className="w-32 h-9"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todos">Todos</SelectItem>
-            <SelectItem value="dia">Dia</SelectItem>
-            <SelectItem value="semana">Semana</SelectItem>
-            <SelectItem value="mes">Mês</SelectItem>
-          </SelectContent>
-        </Select>
-        {filtroPeriodo === 'mes' && (
-          <MonthNavigator value={mesFiltro} onChange={setMesFiltro} />
-        )}
+        <DateInput value={filtroDataDe} onValueChange={setFiltroDataDe} className="w-36 h-9 text-xs" />
+        <span className="text-muted-foreground text-xs">até</span>
+        <DateInput value={filtroDataAte} onValueChange={setFiltroDataAte} className="w-36 h-9 text-xs" />
         <Select value={filtroStatus} onValueChange={setFiltroStatus}>
           <SelectTrigger className="w-44 h-9"><SelectValue /></SelectTrigger>
           <SelectContent>
@@ -637,16 +644,37 @@ export default function ContasPagarSection() {
           />
         </div>
         {hasActiveFilters && (
-          <div className="flex h-9 items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3" aria-live="polite">
-            <span className="text-xs text-muted-foreground">Total filtrado</span>
-            <strong className="whitespace-nowrap text-sm text-foreground">
-              {loading && items.length === 0 ? 'Calculando...' : fmt(filteredSummary.total)}
-            </strong>
-            {!loading || items.length > 0 ? (
-              <span className="whitespace-nowrap text-xs text-muted-foreground">• {filteredSummary.count} lançamento(s)</span>
-            ) : null}
-          </div>
+          <>
+            <div className="flex h-9 items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3" aria-live="polite">
+              <span className="text-xs text-muted-foreground">Total filtrado</span>
+              <strong className="whitespace-nowrap text-sm text-foreground">
+                {loading && items.length === 0 ? 'Calculando...' : fmt(filteredSummary.total)}
+              </strong>
+              {!loading || items.length > 0 ? (
+                <span className="whitespace-nowrap text-xs text-muted-foreground">• {filteredSummary.count} lançamento(s)</span>
+              ) : null}
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={limparFiltros}
+              className="h-9 px-2 text-muted-foreground hover:text-foreground"
+              aria-label="Limpar todos os filtros"
+              title="Limpar todos os filtros"
+            >
+              <X className="w-4 h-4 mr-1" /> Limpar filtros
+            </Button>
+          </>
         )}
+      </div>
+
+      <div className="flex items-center gap-2 flex-wrap">
+        <MonthNavigator value={mesFiltro} onChange={handleMesChange} />
+        <DateRangePresets
+          from={filtroDataDe}
+          to={filtroDataAte}
+          onChange={(de, ate) => { setFiltroDataDe(de); setFiltroDataAte(ate); }}
+        />
       </div>
 
       <Table>
