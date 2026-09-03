@@ -11,7 +11,7 @@ import { createPresentationSociosData } from '@/test/fixtures/presentationSocios
 export function createPresentationRevenueData(): PresentationRevenueData {
   const requestedYears = [2024, 2025, 2026];
   return {
-    contractVersion: '1.1',
+    contractVersion: '1.2',
     source: PRESENTATION_REVENUE_SOURCE,
     availability: 'available',
     selectedMonth: '2026-03',
@@ -106,6 +106,31 @@ export function createPresentationRevenueData(): PresentationRevenueData {
         state: year === 2026 && month > 3 ? 'unavailable' as const : 'empty' as const,
         total: 0,
         closingCount: 0,
+      };
+    })),
+    // Receita operacional líquida do razão por mês — estado independente de
+    // `history` (entryCount, não closingCount). O mês selecionado precisa
+    // bater com `netRevenue.current.total` (2_700), invariante checada pelo
+    // adapter.
+    netHistory: requestedYears.flatMap(year => Array.from({ length: 12 }, (_, monthIndex) => {
+      const month = monthIndex + 1;
+      const yearMonth = `${year}-${String(month).padStart(2, '0')}`;
+      if (yearMonth === '2026-03') {
+        return { year, month, yearMonth, state: 'available' as const, total: 2_700, entryCount: 4 };
+      }
+      if (yearMonth === '2026-02') {
+        return { year, month, yearMonth, state: 'available' as const, total: 1_350, entryCount: 3 };
+      }
+      if (yearMonth === '2025-03') {
+        return { year, month, yearMonth, state: 'available' as const, total: 700, entryCount: 2 };
+      }
+      return {
+        year,
+        month,
+        yearMonth,
+        state: year === 2026 && month > 3 ? 'unavailable' as const : 'empty' as const,
+        total: 0,
+        entryCount: 0,
       };
     })),
   };

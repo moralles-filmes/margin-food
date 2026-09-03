@@ -6,8 +6,8 @@ import type {
   PresentationDecisionDetail,
 } from './decisions';
 import type { PresentationChapterId } from './chapters';
-import type { PresentationRevenueBrandPoint, PresentationRevenueData } from './revenue';
-import type { PresentationExpenseNode, PresentationExpensesData } from './expenses';
+import type { PresentationRevenueAvailability, PresentationRevenueBrandPoint, PresentationRevenueData } from './revenue';
+import type { PresentationExpenseNode, PresentationExpensesAvailability, PresentationExpensesData } from './expenses';
 import type { PresentationResultsData } from './results';
 import type { PresentationInsight, PresentationInsightsData } from './insights';
 
@@ -322,6 +322,7 @@ export type PresentationSlideKind =
   | 'expenses-tree'
   | 'expenses-rolling'
   | 'expenses-history'
+  | 'revenue-expenses-monthly'
   | 'results-summary'
   | 'results-comparison'
   | 'results-evolution'
@@ -342,6 +343,18 @@ export type PresentationSlideKind =
   | 'open-items'
   | 'non-operational';
 
+/**
+ * Um mês (Jan..Dez) do gráfico "Receita líquida × Despesa", cruzando
+ * `PresentationRevenueData.netHistory` e `PresentationExpensesData.history`
+ * pelo `yearMonth` — sempre 12 posições, na ordem Jan..Dez do ano do slide.
+ */
+export interface PresentationRevenueExpenseMonthPoint {
+  month: number;
+  yearMonth: string;
+  netRevenue: { state: PresentationRevenueAvailability; total: number };
+  expense: { state: PresentationExpensesAvailability; total: number };
+}
+
 export type PresentationSlidePayload =
   | { type: 'chapter-foundation'; chapter: PresentationChapterId }
   | { type: 'revenue-summary'; revenue: PresentationRevenueData }
@@ -359,6 +372,15 @@ export type PresentationSlidePayload =
     }
   | { type: 'expenses-rolling'; expenses: PresentationExpensesData }
   | { type: 'expenses-history'; expenses: PresentationExpensesData }
+  | {
+      type: 'revenue-expenses-monthly';
+      /** Ano do mês selecionado — o slide mostra somente Jan..Dez desse ano. */
+      year: number;
+      /** 12 posições Jan..Dez; vazio quando `year` não está nos anos solicitados de faturamento E despesas. */
+      points: readonly PresentationRevenueExpenseMonthPoint[];
+      revenue: PresentationRevenueData;
+      expenses: PresentationExpensesData;
+    }
   | { type: 'results-summary'; results: PresentationResultsData }
   | { type: 'results-comparison'; results: PresentationResultsData }
   | { type: 'results-evolution'; results: PresentationResultsData; timeSeries: PresentationTimeSeries }

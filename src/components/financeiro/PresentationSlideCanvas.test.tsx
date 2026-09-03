@@ -3,12 +3,14 @@ import { describe, expect, it, vi } from 'vitest';
 import PresentationSlideCanvas from '@/components/financeiro/PresentationSlideCanvas';
 import type { DataAvailability, PresentationSlide } from '@/domain/financeiro/presentation';
 import {
+  attachPresentationExpenses,
   attachPresentationResults,
+  attachPresentationRevenue,
   type PresentationAnalyticsSnapshot,
 } from '@/lib/financeiroPresentationAdapter';
 import { createPresentationSociosData } from '@/test/fixtures/presentationSocios';
-import { createPresentationWithRevenue } from '@/test/fixtures/presentationRevenue';
-import { createPresentationWithExpenses } from '@/test/fixtures/presentationExpenses';
+import { createPresentationRevenueData, createPresentationWithRevenue } from '@/test/fixtures/presentationRevenue';
+import { createPresentationExpensesData, createPresentationWithExpenses } from '@/test/fixtures/presentationExpenses';
 import { createPresentationWithInsights } from '@/test/fixtures/presentationInsights';
 
 function resultSlideFor(
@@ -143,6 +145,10 @@ describe('estados e comparações dos slides', () => {
     expect(screen.getByText('2024')).toBeInTheDocument();
     expect(screen.getByText('2025')).toBeInTheDocument();
     expect(screen.getByText('2026')).toBeInTheDocument();
+    expect(historyView.container.querySelectorAll('path').length).toBeGreaterThan(0);
+    // 3 meses "available" na fixture (2025-03, 2026-02, 2026-03) — meses vazios/sem
+    // cobertura NUNCA viram ponto nem cápsula, senão a ausência mentiria como zero.
+    expect(historyView.container.querySelectorAll('circle').length).toBe(3);
     expect(historyView.container.textContent).not.toMatch(/Infinity|NaN/);
   });
 
@@ -171,7 +177,48 @@ describe('estados e comparações dos slides', () => {
     rollingView.unmount();
     const historyView = renderSlide(history);
     expect(historyView.container).toHaveTextContent('2024');
+    // 3 meses "available" na fixture (2026-01, 2026-02, 2026-03).
+    expect(historyView.container.querySelectorAll('circle').length).toBe(3);
     expect(historyView.container.textContent).not.toMatch(/Infinity|NaN/);
+  });
+
+  it('renderiza Receita líquida × Despesa por mês com buracos, sem inventar zero para meses ausentes', () => {
+    const revenue = createPresentationRevenueData();
+    const expenses = createPresentationExpensesData();
+    const withRevenue = attachPresentationRevenue(createPresentationSociosData(), {
+      state: 'available', data: revenue, fetchedAt: revenue.generatedAt,
+    });
+    const data = attachPresentationExpenses(withRevenue, {
+      state: 'available', data: expenses, fetchedAt: expenses.generatedAt,
+    });
+    const slide = data.slides.find(candidate => candidate.kind === 'revenue-expenses-monthly');
+    if (!slide) throw new Error('Slide Receita líquida × Despesa ausente');
+
+    const view = renderSlide(slide);
+    expect(screen.getByText('Receita líquida')).toBeInTheDocument();
+    expect(screen.getByText('Despesa')).toBeInTheDocument();
+    // Receita líquida disponível em fev e mar (2 pontos); despesa disponível em
+    // jan, fev e mar (3 pontos) — total 5 círculos, nenhum para os meses restantes.
+    expect(view.container.querySelectorAll('circle').length).toBe(5);
+    expect(view.container.textContent).not.toMatch(/Infinity|NaN/);
+    view.unmount();
+  });
+
+  it('esvazia Receita líquida × Despesa por mês com mensagem explícita quando o ano não está no seletor de uma das fontes', () => {
+    const revenue = createPresentationRevenueData();
+    const expenses = structuredClone(createPresentationExpensesData());
+    expenses.requestedYears = [2024, 2025];
+    const withRevenue = attachPresentationRevenue(createPresentationSociosData(), {
+      state: 'available', data: revenue, fetchedAt: revenue.generatedAt,
+    });
+    const data = attachPresentationExpenses(withRevenue, {
+      state: 'available', data: expenses, fetchedAt: expenses.generatedAt,
+    });
+    const slide = data.slides.find(candidate => candidate.kind === 'revenue-expenses-monthly');
+    if (!slide) throw new Error('Slide Receita líquida × Despesa ausente');
+
+    const view = renderSlide(slide);
+    expect(view.container).toHaveTextContent('Inclua 2026 no seletor de anos do histórico');
   });
 
   it('renderiza Insights com evidência, origem, regime e drill-down DFC existente', () => {

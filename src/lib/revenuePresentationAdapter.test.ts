@@ -36,6 +36,27 @@ describe('contrato defensivo de Faturamento da Apresentação Sócios', () => {
     const reversedHistory = [history.history[1], history.history[0], ...history.history.slice(2)];
     expect(() => adaptPresentationRevenuePayload({ ...history, history: reversedHistory }))
       .toThrow(/ordenado por ano e mês/);
+
+    const netHistory = structuredClone(createPresentationRevenueData());
+    const reversedNetHistory = [netHistory.netHistory[1], netHistory.netHistory[0], ...netHistory.netHistory.slice(2)];
+    expect(() => adaptPresentationRevenuePayload({ ...netHistory, netHistory: reversedNetHistory }))
+      .toThrow(/ordenado por ano e mês/);
+  });
+
+  it('recusa netHistory cujo total do mês selecionado diverge de netRevenue.current.total', () => {
+    const payload = structuredClone(createPresentationRevenueData());
+    const selected = payload.netHistory.find(point => point.yearMonth === '2026-03')!;
+    (selected as { total: number }).total = 999_999;
+    expect(() => adaptPresentationRevenuePayload(payload))
+      .toThrow(/coerente com netRevenue.current.total/);
+  });
+
+  it('recusa netHistory com state disponível e entryCount zero', () => {
+    const payload = structuredClone(createPresentationRevenueData());
+    const point = payload.netHistory.find(item => item.yearMonth === '2025-03')!;
+    (point as { entryCount: number }).entryCount = 0;
+    expect(() => adaptPresentationRevenuePayload(payload))
+      .toThrow(/estado coerente com entryCount/);
   });
 
   it('aceita byBrand agrupado por categoria (várias marcas, uma linha) reconciliando bruto e líquido', () => {
@@ -85,6 +106,7 @@ describe('contrato defensivo de Faturamento da Apresentação Sócios', () => {
         contractVersionType: 'string',
         weekdayCount: 7,
         historyCount: 36,
+        netHistoryCount: 36,
       },
     });
   });

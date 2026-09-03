@@ -161,13 +161,13 @@ describe('modo apresentação', () => {
     ));
 
     fireEvent.click(screen.getByRole('button', { name: 'Insights' }));
-    expect(position('15 de 16')).toBeInTheDocument();
+    expect(position('16 de 17')).toBeInTheDocument();
     expect(screen.getByText('Pessoas concentrou despesas no mês')).toBeInTheDocument();
     fireEvent.keyDown(window, { key: 'ArrowRight' });
-    expect(position('16 de 16')).toBeInTheDocument();
+    expect(position('17 de 17')).toBeInTheDocument();
     expect(screen.getByText('Despesas aumentaram no mês')).toBeInTheDocument();
     fireEvent.keyDown(window, { key: 'ArrowLeft' });
-    expect(position('15 de 16')).toBeInTheDocument();
+    expect(position('16 de 17')).toBeInTheDocument();
   });
 
   it('oferece controles de exportação somente com a permissão export', () => {
@@ -273,7 +273,7 @@ describe('modo apresentação', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /imprimir apresentação/i }));
     await waitFor(() => expect(print).toHaveBeenCalledOnce());
-    expect(printedSlideCount).toBe(16);
+    expect(printedSlideCount).toBe(17);
     expect(printedText).toContain('Pessoas concentrou despesas no mês');
     expect(printedText).toContain('Faturamento bruto — Fechamento de Caixa');
     expect(printedText).toContain('Despesas financeiras — regime de caixa do DFC');

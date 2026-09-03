@@ -17,6 +17,7 @@ import type {
   PresentationResultsData,
   PresentationResultBridgeStep,
   PresentationInsight,
+  PresentationRevenueExpenseMonthPoint,
   PresentationTimeSeries,
 } from '@/domain/financeiro/presentation';
 import { buildPresentationPlanIndicators } from '@/domain/financeiro/presentation';
@@ -32,6 +33,7 @@ import {
   presentationGeneratedLabel,
   presentationActionStatusLabel,
   presentationDecisionStatusLabel,
+  revenueExpensesYearMissingMessage,
 } from '@/lib/presentationFormatting';
 import { fmtBRL, fmtBRLCompact, formatDateValueBR, formatIntegerBR, formatPercentBR } from '@/lib/formatters';
 import {
@@ -59,6 +61,7 @@ const TONE_CLASSES = {
 const REVENUE_SOURCE_FOOTER = 'Faturamento bruto — Fechamento de Caixa · Data local do fechamento';
 const EXPENSES_SOURCE_FOOTER = 'Despesas financeiras — DFC · Regime de caixa';
 const RESULTS_SOURCE_FOOTER = 'Resultado operacional — mesmo regime de caixa do Dashboard · Fonte: get_fin_presentation_socios';
+const REVENUE_EXPENSES_MONTHLY_SOURCE_FOOTER = 'Receita líquida — livro razão · Despesas — DFC · ambos em regime de caixa';
 const INSIGHTS_SOURCE_FOOTER = 'Insights determinísticos · fonte canônica identificada em cada insight';
 
 function formatYearMonthLabel(month: string): string {
@@ -98,15 +101,15 @@ function RevenueSummaryLayout({ revenue }: { revenue: PresentationRevenueData })
       <div className="grid grid-cols-2 gap-10">
         {periods.map(({ label, period, strong }) => (
           <section key={period.month} className="border-l-2 border-primary pl-5">
-            <p className="text-[clamp(0.72rem,1cqw,1rem)] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
-            <p className="mt-2 capitalize text-[clamp(0.82rem,1.2cqw,1.2rem)] text-ink-secondary">{formatYearMonthLabel(period.month)}</p>
+            <p className="text-[clamp(0.9rem,1.25cqw,1.25rem)] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+            <p className="mt-2 capitalize text-[clamp(1.02rem,1.5cqw,1.5rem)] text-ink-secondary">{formatYearMonthLabel(period.month)}</p>
             <p className={cn(
-              'mt-4 break-words text-[clamp(1.6rem,3.2cqw,3.1rem)] font-bold tracking-tight',
+              'mt-4 break-words text-[clamp(1.84rem,3.68cqw,3.56rem)] font-bold tracking-tight',
               strong ? 'text-foreground' : 'text-ink-secondary',
             )}>
               {revenuePeriodValue(period)}
             </p>
-            <p className="mt-3 text-[clamp(0.68rem,0.9cqw,0.9rem)] text-muted-foreground">
+            <p className="mt-3 text-[clamp(0.92rem,1.22cqw,1.22rem)] text-muted-foreground">
               {period.closingCount === 0
                 ? '0 ocorrências · ausência não convertida em faturamento zero'
                 : `${formatIntegerBR(period.closingCount)} fechamento(s)`}
@@ -116,12 +119,12 @@ function RevenueSummaryLayout({ revenue }: { revenue: PresentationRevenueData })
       </div>
       <div className="grid grid-cols-2 gap-8 border-t border-border pt-5">
         <div>
-          <p className="text-[clamp(0.65rem,0.85cqw,0.85rem)] text-muted-foreground">Variação absoluta</p>
-          <p className="mt-1 text-[clamp(1rem,1.55cqw,1.5rem)] font-semibold text-foreground">{revenueDeltaValue(revenue.delta.absolute)}</p>
+          <p className="text-[clamp(0.88rem,1.15cqw,1.15rem)] text-muted-foreground">Variação absoluta</p>
+          <p className="mt-1 text-[clamp(1.25rem,1.94cqw,1.88rem)] font-semibold text-foreground">{revenueDeltaValue(revenue.delta.absolute)}</p>
         </div>
         <div>
-          <p className="text-[clamp(0.65rem,0.85cqw,0.85rem)] text-muted-foreground">Variação percentual</p>
-          <p className="mt-1 text-[clamp(1rem,1.55cqw,1.5rem)] font-semibold text-foreground">{revenueDeltaValue(revenue.delta.percentage, true)}</p>
+          <p className="text-[clamp(0.88rem,1.15cqw,1.15rem)] text-muted-foreground">Variação percentual</p>
+          <p className="mt-1 text-[clamp(1.25rem,1.94cqw,1.88rem)] font-semibold text-foreground">{revenueDeltaValue(revenue.delta.percentage, true)}</p>
         </div>
       </div>
     </div>
@@ -147,16 +150,16 @@ function RevenueGrossNetLayout({ revenue }: { revenue: PresentationRevenueData }
       <div className="grid grid-cols-2 gap-10">
         {rows.map(({ label, gross, net, diff, strong }) => (
           <section key={gross.month} className="border-l-2 border-primary pl-5">
-            <p className="text-[clamp(0.72rem,1cqw,1rem)] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
-            <p className="mt-2 capitalize text-[clamp(0.82rem,1.2cqw,1.2rem)] text-ink-secondary">{formatYearMonthLabel(gross.month)}</p>
+            <p className="text-[clamp(0.9rem,1.25cqw,1.25rem)] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+            <p className="mt-2 capitalize text-[clamp(1.02rem,1.5cqw,1.5rem)] text-ink-secondary">{formatYearMonthLabel(gross.month)}</p>
             <div className="mt-4 grid grid-cols-2 gap-4">
               <div>
-                <p className="text-[clamp(0.6rem,0.78cqw,0.78rem)] text-muted-foreground">Bruto (Fechamento de Caixa)</p>
-                <p className={cn('mt-1 break-words text-[clamp(1.1rem,2cqw,2rem)] font-bold tracking-tight', strong ? 'text-foreground' : 'text-ink-secondary')}>{fmtBRL(diff.gross)}</p>
+                <p className="text-[clamp(0.81rem,1.05cqw,1.05rem)] text-muted-foreground">Bruto (Fechamento de Caixa)</p>
+                <p className={cn('mt-1 break-words text-[clamp(1.26rem,2.3cqw,2.3rem)] font-bold tracking-tight', strong ? 'text-foreground' : 'text-ink-secondary')}>{fmtBRL(diff.gross)}</p>
               </div>
               <div>
-                <p className="text-[clamp(0.6rem,0.78cqw,0.78rem)] text-muted-foreground">Líquido (Livro Razão)</p>
-                <p className={cn('mt-1 break-words text-[clamp(1.1rem,2cqw,2rem)] font-bold tracking-tight', strong ? 'text-foreground' : 'text-ink-secondary')}>{fmtBRL(net.total)}</p>
+                <p className="text-[clamp(0.81rem,1.05cqw,1.05rem)] text-muted-foreground">Líquido (Livro Razão)</p>
+                <p className={cn('mt-1 break-words text-[clamp(1.26rem,2.3cqw,2.3rem)] font-bold tracking-tight', strong ? 'text-foreground' : 'text-ink-secondary')}>{fmtBRL(net.total)}</p>
               </div>
             </div>
           </section>
@@ -164,15 +167,15 @@ function RevenueGrossNetLayout({ revenue }: { revenue: PresentationRevenueData }
       </div>
       <div className="grid grid-cols-2 gap-8 border-t border-border pt-5">
         <div>
-          <p className="text-[clamp(0.65rem,0.85cqw,0.85rem)] text-muted-foreground">Diferença (mês selecionado)</p>
-          <p className="mt-1 text-[clamp(1rem,1.55cqw,1.5rem)] font-semibold text-foreground">{grossToNetDifferenceText(revenue.grossToNet.current)}</p>
+          <p className="text-[clamp(0.88rem,1.15cqw,1.15rem)] text-muted-foreground">Diferença (mês selecionado)</p>
+          <p className="mt-1 text-[clamp(1.25rem,1.94cqw,1.88rem)] font-semibold text-foreground">{grossToNetDifferenceText(revenue.grossToNet.current)}</p>
         </div>
         <div>
-          <p className="text-[clamp(0.65rem,0.85cqw,0.85rem)] text-muted-foreground">% da diferença sobre o bruto</p>
-          <p className="mt-1 text-[clamp(1rem,1.55cqw,1.5rem)] font-semibold text-foreground">{grossToNetDifferenceText(revenue.grossToNet.current, true)}</p>
+          <p className="text-[clamp(0.88rem,1.15cqw,1.15rem)] text-muted-foreground">% da diferença sobre o bruto</p>
+          <p className="mt-1 text-[clamp(1.25rem,1.94cqw,1.88rem)] font-semibold text-foreground">{grossToNetDifferenceText(revenue.grossToNet.current, true)}</p>
         </div>
       </div>
-      <p className="text-[clamp(0.58rem,0.75cqw,0.75rem)] text-muted-foreground">Bruto: financeiro_fechamento_caixa.faturamento_bruto · Líquido: receita operacional do livro razão (regime de caixa, exclui não operacionais e excluídos de relatório) — mesma base do KPI &quot;Receita operacional&quot; de Resultados.</p>
+      <p className="text-[clamp(0.78rem,1.01cqw,1.01rem)] text-muted-foreground">Bruto: financeiro_fechamento_caixa.faturamento_bruto · Líquido: receita operacional do livro razão (regime de caixa, exclui não operacionais e excluídos de relatório) — mesma base do KPI &quot;Receita operacional&quot; de Resultados.</p>
     </div>
   );
 }
@@ -190,38 +193,38 @@ function RevenueByBrandLayout({ revenue, items }: { revenue: PresentationRevenue
   const hasSemCategoria = revenue.byBrand.some(item => item.marcaId !== null && item.categoriaId === null);
   if (items.length === 0) return <EmptyState message="Sem faturamento no mês selecionado." />;
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3">
+    <div className="flex min-h-0 flex-1 flex-col justify-center gap-3">
       {hasSemCategoria && (
-        <p className="rounded-md border border-warning-border bg-warning-soft px-3 py-2 text-[clamp(0.62rem,0.8cqw,0.78rem)] text-warning">
+        <p className="rounded-md border border-warning-border bg-warning-soft px-3 py-2 text-[clamp(0.84rem,1.08cqw,1.05rem)] text-warning">
           Marcas sem categoria vinculada não têm líquido calculado — vincule em Fechamento de Caixa › Marcas e dark kitchens.
         </p>
       )}
-      <ol className="space-y-2.5">
+      <ol className="space-y-3.5">
         {items.map((item: PresentationRevenueBrandPoint) => (
           <li key={item.categoriaId ?? item.marcaId ?? item.nome} className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto_auto] items-center gap-3 border-b border-border pb-2.5">
             <div className="min-w-0">
-              <p className="break-words text-[clamp(0.78rem,1.15cqw,1.1rem)] font-medium leading-tight text-foreground">{item.nome}</p>
-              <p className="text-[clamp(0.65rem,0.8cqw,0.82rem)] text-muted-foreground">
+              <p className="break-words text-[clamp(0.98rem,1.44cqw,1.38rem)] font-medium leading-tight text-foreground">{item.nome}</p>
+              <p className="text-[clamp(0.88rem,1.08cqw,1.11rem)] text-muted-foreground">
                 {total > 0 ? formatPercentBR((item.total / total) * 100, 1) : '—'} do bruto do mês · {formatIntegerBR(item.closingCount)} fechamento(s)
               </p>
             </div>
             <div className="text-right">
-              <p className="text-[clamp(0.6rem,0.75cqw,0.72rem)] uppercase tracking-wide text-muted-foreground">Bruto</p>
-              <strong className="whitespace-nowrap font-mono text-[clamp(0.76rem,1.05cqw,1rem)] text-success">{fmtBRL(item.total)}</strong>
+              <p className="text-[clamp(0.81rem,1.01cqw,0.97rem)] uppercase tracking-wide text-muted-foreground">Bruto</p>
+              <strong className="whitespace-nowrap font-mono text-[clamp(0.95rem,1.31cqw,1.25rem)] text-success">{fmtBRL(item.total)}</strong>
             </div>
             <div className="text-right">
-              <p className="text-[clamp(0.6rem,0.75cqw,0.72rem)] uppercase tracking-wide text-muted-foreground">Líquido</p>
-              <strong className="whitespace-nowrap font-mono text-[clamp(0.76rem,1.05cqw,1rem)] text-primary-ink">
+              <p className="text-[clamp(0.81rem,1.01cqw,0.97rem)] uppercase tracking-wide text-muted-foreground">Líquido</p>
+              <strong className="whitespace-nowrap font-mono text-[clamp(0.95rem,1.31cqw,1.25rem)] text-primary-ink">
                 {item.net === null ? '—' : fmtBRL(item.net)}
               </strong>
             </div>
             <div className="text-right">
-              <p className="text-[clamp(0.6rem,0.75cqw,0.72rem)] uppercase tracking-wide text-muted-foreground">Diferença</p>
-              <strong className="whitespace-nowrap font-mono text-[clamp(0.76rem,1.05cqw,1rem)] text-warning">{brandDifferenceText(item)}</strong>
+              <p className="text-[clamp(0.81rem,1.01cqw,0.97rem)] uppercase tracking-wide text-muted-foreground">Diferença</p>
+              <strong className="whitespace-nowrap font-mono text-[clamp(0.95rem,1.31cqw,1.25rem)] text-warning">{brandDifferenceText(item)}</strong>
             </div>
             <div className="text-right">
-              <p className="text-[clamp(0.6rem,0.75cqw,0.72rem)] uppercase tracking-wide text-muted-foreground">% desconto</p>
-              <strong className="whitespace-nowrap font-mono text-[clamp(0.76rem,1.05cqw,1rem)] text-warning">{brandDifferenceText(item, true)}</strong>
+              <p className="text-[clamp(0.81rem,1.01cqw,0.97rem)] uppercase tracking-wide text-muted-foreground">% desconto</p>
+              <strong className="whitespace-nowrap font-mono text-[clamp(0.95rem,1.31cqw,1.25rem)] text-warning">{brandDifferenceText(item, true)}</strong>
             </div>
           </li>
         ))}
@@ -231,62 +234,189 @@ function RevenueByBrandLayout({ revenue, items }: { revenue: PresentationRevenue
 }
 
 function RevenueWeekdaysLayout({ revenue }: { revenue: PresentationRevenueData }) {
+  const max = Math.max(1, ...revenue.weekdays.map(day => (day.state === 'available' ? day.total : 0)));
   return (
-    <div className="grid min-h-0 flex-1 grid-cols-7 items-stretch gap-3">
+    <div className="grid min-h-0 flex-1 grid-cols-7 gap-4">
       {revenue.weekdays.map(day => (
-        <section key={day.isoWeekday} className="flex min-w-0 flex-col border-t-2 border-primary pt-3">
-          <h3 className="min-h-9 text-[clamp(0.62rem,0.86cqw,0.86rem)] font-semibold leading-tight text-foreground">{day.label}</h3>
-          <p className="mt-3 text-[clamp(0.54rem,0.68cqw,0.68rem)] uppercase tracking-wide text-muted-foreground">Total</p>
-          <p className="mt-1 break-words text-[clamp(0.7rem,1cqw,1rem)] font-bold text-foreground">
+        <section key={day.isoWeekday} className="flex min-w-0 flex-col border-t-2 border-primary pt-4">
+          <h3 className="min-h-11 text-[clamp(0.98rem,1.38cqw,1.38rem)] font-semibold leading-tight text-foreground">{day.label}</h3>
+          <p className="mt-2 break-words text-[clamp(1.12rem,1.75cqw,1.75rem)] font-bold text-foreground">
             {day.state === 'available' ? fmtBRL(day.total) : 'Sem fechamento'}
           </p>
-          <p className="mt-4 text-[clamp(0.54rem,0.68cqw,0.68rem)] uppercase tracking-wide text-muted-foreground">Ocorrências</p>
-          <p className="mt-1 text-[clamp(0.72rem,1cqw,1rem)] font-semibold text-ink-secondary">{formatIntegerBR(day.occurrences)}</p>
-          <p className="mt-4 text-[clamp(0.54rem,0.68cqw,0.68rem)] uppercase tracking-wide text-muted-foreground">Média</p>
-          <p className="mt-1 break-words text-[clamp(0.66rem,0.92cqw,0.92rem)] font-semibold text-ink-secondary">
-            {day.average.state === 'available' ? fmtBRL(day.average.value) : 'Não aplicável'}
-          </p>
+          <div className="mt-3 flex flex-1 items-end" role="img" aria-label={`Faturamento de ${day.label} em relação ao dia de maior faturamento da semana`}>
+            <div
+              className="w-full rounded-t border border-primary-border bg-primary-soft"
+              style={{ height: `${day.state === 'available' ? Math.max((day.total / max) * 100, 4) : 4}%` }}
+              aria-hidden="true"
+            />
+          </div>
+          <div className="mt-4 border-t border-border pt-3">
+            <p className="text-[clamp(0.81rem,1.03cqw,1.03rem)] uppercase tracking-wide text-muted-foreground">Ocorrências</p>
+            <p className="mt-1 text-[clamp(1.02rem,1.44cqw,1.44rem)] font-semibold text-ink-secondary">{formatIntegerBR(day.occurrences)}</p>
+            <p className="mt-3 text-[clamp(0.81rem,1.03cqw,1.03rem)] uppercase tracking-wide text-muted-foreground">Média</p>
+            <p className="mt-1 break-words text-[clamp(0.95rem,1.31cqw,1.31rem)] font-semibold text-ink-secondary">
+              {day.average.state === 'available' ? fmtBRL(day.average.value) : 'Não aplicável'}
+            </p>
+          </div>
         </section>
       ))}
     </div>
   );
 }
 
-function RevenueHistoryLayout({ revenue }: { revenue: PresentationRevenueData }) {
-  const pointsByYear = new Map(revenue.requestedYears.map(year => [
-    year,
-    revenue.history.filter(point => point.year === year),
-  ]));
-  const monthLabels = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+const MONTHLY_LINE_CHART_MONTH_LABELS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+const MONTHLY_LINE_CHART_PLOT = { left: 88, right: 976, top: 56, bottom: 344 } as const;
+/** Cores por ano (não semânticas de receita/despesa) — evita `--chart-2`/`--chart-8`, usadas com sentido próprio em outros slides do deck. */
+const MONTHLY_LINE_CHART_YEAR_COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-4))', 'hsl(var(--chart-3))'];
+
+interface MonthlyLinePoint {
+  month: number;
+  state: 'available' | 'empty' | 'unavailable';
+  value: number;
+}
+
+interface MonthlyLineSeries {
+  key: string;
+  label: string;
+  color: string;
+  points: readonly MonthlyLinePoint[];
+}
+
+/**
+ * Gráfico de linha mensal (Jan..Dez) determinístico em SVG puro — o deck
+ * roda sob `transform: scale()` em viewport fixo e é reimpresso via
+ * `window.print()`, então nada de Recharts nem medição de texto em runtime
+ * (largura de cápsula é estimada por fórmula). Meses `empty`/`unavailable`
+ * interrompem a linha (nunca viram zero) e não recebem ponto nem cápsula.
+ */
+function MonthlyLineChart({
+  series,
+  ariaLabel,
+  emptyMessage,
+  formatValue = fmtBRLCompact,
+}: {
+  series: readonly MonthlyLineSeries[];
+  ariaLabel: string;
+  emptyMessage: string;
+  formatValue?: (value: number) => string;
+}) {
+  const { left, right, top, bottom } = MONTHLY_LINE_CHART_PLOT;
+  const slot = (right - left) / 12;
+  const x = (month: number) => left + slot * (month - 1) + slot / 2;
+
+  const availableValues = series.flatMap(item => item.points.filter(point => point.state === 'available').map(point => point.value));
+  if (availableValues.length === 0) return <EmptyState message={emptyMessage} />;
+
+  const rawMax = Math.max(0, ...availableValues);
+  const rawMin = Math.min(0, ...availableValues);
+  const spread = rawMax - rawMin;
+  const max = rawMax + Math.max(spread * 0.18, 1);
+  const min = rawMin - (rawMin < 0 ? Math.max(spread * 0.08, 1) : 0);
+  const range = Math.max(max - min, 1);
+  const y = (value: number) => bottom - ((value - min) / range) * (bottom - top);
+
+  const seriesPaths = series.map(item => {
+    let path = '';
+    item.points.forEach((point, index) => {
+      if (point.state !== 'available') return;
+      const previous = item.points[index - 1];
+      const command = index === 0 || !previous || previous.state !== 'available' ? 'M' : 'L';
+      path += `${command} ${x(point.month)} ${y(point.value)} `;
+    });
+    return { key: item.key, color: item.color, path: path.trim() };
+  });
+
+  const labelsByMonth = new Map<number, Array<{ seriesKey: string; color: string; value: number; y: number }>>();
+  series.forEach(item => {
+    item.points.forEach(point => {
+      if (point.state !== 'available') return;
+      const entries = labelsByMonth.get(point.month) ?? [];
+      entries.push({ seriesKey: item.key, color: item.color, value: point.value, y: y(point.value) });
+      labelsByMonth.set(point.month, entries);
+    });
+  });
+
+  const LABEL_VERTICAL_STEP = 24;
+  const labels: Array<{ key: string; x: number; y: number; text: string; color: string }> = [];
+  labelsByMonth.forEach((entries, month) => {
+    [...entries].sort((left0, right0) => left0.y - right0.y).forEach((entry, index) => {
+      labels.push({
+        key: `${entry.seriesKey}-${month}`,
+        x: x(month),
+        y: Math.max(entry.y - 16 - index * LABEL_VERTICAL_STEP, top + 12),
+        text: formatValue(entry.value),
+        color: entry.color,
+      });
+    });
+  });
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col justify-center">
-      <div className="grid grid-cols-[3.5rem_repeat(12,minmax(0,1fr))] gap-x-1 gap-y-3 text-center">
-        <span aria-hidden="true" />
-        {monthLabels.map(label => <span key={label} className="text-[clamp(0.54rem,0.7cqw,0.7rem)] font-semibold text-muted-foreground">{label}</span>)}
-        {revenue.requestedYears.flatMap(year => [
-          <strong key={`${year}-label`} className="self-center text-left text-[clamp(0.68rem,0.9cqw,0.9rem)] text-foreground">{year}</strong>,
-          ...(pointsByYear.get(year) ?? []).map(point => (
-            <div
-              key={point.yearMonth}
-              className={cn(
-                'flex min-h-12 flex-col items-center justify-center rounded border px-0.5',
-                point.state === 'available'
-                  ? 'border-primary-border bg-primary-soft text-primary-soft-foreground'
-                  : 'border-border bg-background-subtle text-muted-foreground',
-              )}
-              title={`${formatYearMonthLabel(point.yearMonth)}: ${point.state === 'available' ? `${fmtBRL(point.total)} em ${point.closingCount} fechamento(s)` : point.state === 'empty' ? 'sem fechamentos' : 'sem cobertura'}`}
-            >
-              <span className="text-[clamp(0.5rem,0.62cqw,0.62rem)] font-semibold leading-tight">
-                {point.state === 'available' ? fmtBRLCompact(point.total) : '—'}
-              </span>
-              <span className="mt-1 text-[clamp(0.43rem,0.52cqw,0.52rem)] text-muted-foreground">
-                {point.state === 'available' ? `${point.closingCount} fecha.` : point.state === 'empty' ? 'vazio' : 's/ cobertura'}
-              </span>
-            </div>
-          )),
-        ])}
-      </div>
+    <div className="min-h-0 flex-1" role="img" aria-label={ariaLabel}>
+      <svg viewBox="0 0 1000 400" className="h-full w-full" aria-hidden="true">
+        {[0, 1, 2, 3].map(index => {
+          const value = max - ((max - min) * index) / 3;
+          const gridY = y(value);
+          return (
+            <g key={index}>
+              <line x1={left} x2={right} y1={gridY} y2={gridY} stroke="hsl(var(--chart-grid))" strokeWidth="1" />
+              <text x={left - 8} y={gridY + 5} textAnchor="end" fill="hsl(var(--chart-label))" fontSize="13">{formatValue(value)}</text>
+            </g>
+          );
+        })}
+        {min < 0 ? <line x1={left} x2={right} y1={y(0)} y2={y(0)} stroke="hsl(var(--chart-axis))" strokeWidth="1.5" /> : null}
+        {MONTHLY_LINE_CHART_MONTH_LABELS.map((label, index) => (
+          <text key={label} x={x(index + 1)} y={372} textAnchor="middle" fill="hsl(var(--chart-label))" fontSize="13">{label}</text>
+        ))}
+        {seriesPaths.map(item => (
+          item.path ? <path key={item.key} d={item.path} fill="none" stroke={item.color} strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" /> : null
+        ))}
+        {series.flatMap(item => item.points
+          .filter(point => point.state === 'available')
+          .map(point => (
+            <circle key={`${item.key}-${point.month}`} cx={x(point.month)} cy={y(point.value)} r="4.5" fill={item.color} />
+          )))}
+        {labels.map(label => {
+          const width = Math.max(label.text.length * 7.1 + 14, 34);
+          return (
+            <g key={label.key}>
+              <rect x={label.x - width / 2} y={label.y - 12} width={width} height={20} rx="9" fill="hsl(var(--card))" stroke={label.color} strokeWidth="1.2" />
+              <text x={label.x} y={label.y + 3} textAnchor="middle" fill={label.color} fontSize="12" fontWeight="600">{label.text}</text>
+            </g>
+          );
+        })}
+        <g transform={`translate(${left} 20)`} fontSize="14">
+          {series.map((item, index) => (
+            <g key={item.key} transform={`translate(${index * 150} 0)`}>
+              <line x1="0" x2="16" y1="6" y2="6" stroke={item.color} strokeWidth="4" />
+              <text x="22" y="11" fill="hsl(var(--foreground))">{item.label}</text>
+            </g>
+          ))}
+        </g>
+      </svg>
     </div>
+  );
+}
+
+function RevenueHistoryLayout({ revenue }: { revenue: PresentationRevenueData }) {
+  const series: MonthlyLineSeries[] = revenue.requestedYears.map((year, index) => {
+    const pointsByMonth = new Map(revenue.history.filter(point => point.year === year).map(point => [point.month, point]));
+    return {
+      key: String(year),
+      label: String(year),
+      color: MONTHLY_LINE_CHART_YEAR_COLORS[index % MONTHLY_LINE_CHART_YEAR_COLORS.length],
+      points: Array.from({ length: 12 }, (_, monthIndex) => {
+        const month = monthIndex + 1;
+        const point = pointsByMonth.get(month);
+        return { month, state: point?.state ?? 'unavailable', value: point?.total ?? 0 };
+      }),
+    };
+  });
+  return (
+    <MonthlyLineChart
+      series={series}
+      ariaLabel="Faturamento bruto mensal por ano selecionado"
+      emptyMessage="Sem meses com fechamento de caixa nos anos selecionados."
+    />
   );
 }
 
@@ -338,30 +468,30 @@ function ExpensesSummaryLayout({ expenses }: { expenses: PresentationExpensesDat
       <div className="grid grid-cols-2 gap-10">
         {[expenses.current, expenses.previous].map((period, index) => (
           <section key={period.month} className="border-l-2 border-destructive pl-5">
-            <p className="text-[clamp(0.72rem,1cqw,1rem)] font-semibold uppercase tracking-wide text-muted-foreground">{index === 0 ? 'Mês selecionado' : 'Mês anterior'}</p>
-            <p className="mt-2 capitalize text-[clamp(0.82rem,1.2cqw,1.2rem)] text-ink-secondary">{formatYearMonthLabel(period.month)}</p>
-            <p className={cn('mt-4 break-words text-[clamp(1.6rem,3.2cqw,3.1rem)] font-bold tracking-tight', index === 0 ? 'text-foreground' : 'text-ink-secondary')}>{expensePeriodValue(period)}</p>
-            <p className="mt-3 text-[clamp(0.68rem,0.9cqw,0.9rem)] text-muted-foreground">{formatIntegerBR(period.quantity)} lançamento(s) do razão</p>
+            <p className="text-[clamp(0.9rem,1.25cqw,1.25rem)] font-semibold uppercase tracking-wide text-muted-foreground">{index === 0 ? 'Mês selecionado' : 'Mês anterior'}</p>
+            <p className="mt-2 capitalize text-[clamp(1.02rem,1.5cqw,1.5rem)] text-ink-secondary">{formatYearMonthLabel(period.month)}</p>
+            <p className={cn('mt-4 break-words text-[clamp(1.84rem,3.68cqw,3.56rem)] font-bold tracking-tight', index === 0 ? 'text-foreground' : 'text-ink-secondary')}>{expensePeriodValue(period)}</p>
+            <p className="mt-3 text-[clamp(0.92rem,1.22cqw,1.22rem)] text-muted-foreground">{formatIntegerBR(period.quantity)} lançamento(s) do razão</p>
           </section>
         ))}
       </div>
       {split ? (
         <div className="grid grid-cols-2 gap-10 border-t border-border pt-5">
           <div>
-            <p className="text-[clamp(0.65rem,0.85cqw,0.85rem)] text-muted-foreground">Despesas operacionais (mês selecionado)</p>
-            <p className="mt-1 text-[clamp(1rem,1.55cqw,1.5rem)] font-semibold text-foreground">{fmtBRL(split.operational)}</p>
+            <p className="text-[clamp(0.88rem,1.15cqw,1.15rem)] text-muted-foreground">Despesas operacionais (mês selecionado)</p>
+            <p className="mt-1 text-[clamp(1.25rem,1.94cqw,1.88rem)] font-semibold text-foreground">{fmtBRL(split.operational)}</p>
           </div>
           <div>
-            <p className="text-[clamp(0.65rem,0.85cqw,0.85rem)] text-warning">Despesas não operacionais (mês selecionado)</p>
-            <p className="mt-1 text-[clamp(1rem,1.55cqw,1.5rem)] font-semibold text-warning">{fmtBRL(split.nonOperational)}</p>
-            <p className="mt-1 text-[clamp(0.58rem,0.75cqw,0.75rem)] text-muted-foreground">Incluídas no total acima; fora do resultado operacional.</p>
+            <p className="text-[clamp(0.88rem,1.15cqw,1.15rem)] text-warning">Despesas não operacionais (mês selecionado)</p>
+            <p className="mt-1 text-[clamp(1.25rem,1.94cqw,1.88rem)] font-semibold text-warning">{fmtBRL(split.nonOperational)}</p>
+            <p className="mt-1 text-[clamp(0.78rem,1.01cqw,1.01rem)] text-muted-foreground">Incluídas no total acima; fora do resultado operacional.</p>
           </div>
         </div>
       ) : null}
       <div className="grid grid-cols-[1fr_1fr_1.2fr] gap-8 border-t border-border pt-5">
-        <div><p className="text-[clamp(0.65rem,0.85cqw,0.85rem)] text-muted-foreground">Variação absoluta</p><p className="mt-1 text-[clamp(1rem,1.55cqw,1.5rem)] font-semibold text-foreground">{expenseDeltaValue(expenses.delta.absolute)}</p></div>
-        <div><p className="text-[clamp(0.65rem,0.85cqw,0.85rem)] text-muted-foreground">Variação percentual</p><p className="mt-1 text-[clamp(1rem,1.55cqw,1.5rem)] font-semibold text-foreground">{expenseDeltaValue(expenses.delta.percentage, true)}</p></div>
-        <div><p className="text-[clamp(0.65rem,0.85cqw,0.85rem)] text-muted-foreground">Leitura executiva</p><p className={cn('mt-1 text-[clamp(1rem,1.55cqw,1.5rem)] font-bold', semantic.tone)}>{semantic.label}</p></div>
+        <div><p className="text-[clamp(0.88rem,1.15cqw,1.15rem)] text-muted-foreground">Variação absoluta</p><p className="mt-1 text-[clamp(1.25rem,1.94cqw,1.88rem)] font-semibold text-foreground">{expenseDeltaValue(expenses.delta.absolute)}</p></div>
+        <div><p className="text-[clamp(0.88rem,1.15cqw,1.15rem)] text-muted-foreground">Variação percentual</p><p className="mt-1 text-[clamp(1.25rem,1.94cqw,1.88rem)] font-semibold text-foreground">{expenseDeltaValue(expenses.delta.percentage, true)}</p></div>
+        <div><p className="text-[clamp(0.88rem,1.15cqw,1.15rem)] text-muted-foreground">Leitura executiva</p><p className={cn('mt-1 text-[clamp(1.25rem,1.94cqw,1.88rem)] font-bold', semantic.tone)}>{semantic.label}</p></div>
       </div>
     </div>
   );
@@ -389,23 +519,23 @@ function ExpensesTreeLayout({
   const rows = flattenExpenseNodes(nodes);
   if (rows.length === 0) return <EmptyState message="Sem despesas no mês selecionado." />;
   return (
-    <div className="min-h-0 flex-1">
-      <div className="mb-2 grid grid-cols-[minmax(0,1fr)_auto_auto] gap-6 border-b border-border pb-2 text-[clamp(0.58rem,0.75cqw,0.75rem)] uppercase tracking-wide text-muted-foreground">
+    <div className="min-h-0 flex-1 overflow-hidden">
+      <div className="mb-3 grid grid-cols-[minmax(0,1fr)_auto_auto] gap-6 border-b border-border pb-3 text-[clamp(0.78rem,1.01cqw,1.01rem)] uppercase tracking-wide text-muted-foreground">
         <span>Categoria</span><span>Valor</span><span>% da receita líquida</span>
       </div>
-      <div className="space-y-1">
+      <div className="space-y-2.5">
         {rows.map(({ node, depth }, index) => {
           const label = <>{depth > 0 ? '↳ ' : ''}{node.name}</>;
           return (
-            <div key={`${node.categoryId ?? node.name}-${index}`} className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-6 border-b border-border py-2">
+            <div key={`${node.categoryId ?? node.name}-${index}`} className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-6 border-b border-border py-3.5">
               <div className="min-w-0" style={{ paddingLeft: `${depth * 1.1}rem` }}>
                 {node.categoryId && onOpenExpenseCategory ? (
-                  <button type="button" className="max-w-full break-words text-left text-[clamp(0.72rem,1cqw,1rem)] font-semibold leading-tight text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => onOpenExpenseCategory(node.categoryId!)}>{label}</button>
-                ) : <p className="break-words text-[clamp(0.72rem,1cqw,1rem)] font-semibold leading-tight text-foreground">{label}</p>}
-                <p className={cn('mt-0.5 text-[clamp(0.52rem,0.68cqw,0.68rem)]', node.operationalClass === 'non-operational' ? 'text-warning' : 'text-muted-foreground')}>{node.operationalClass === 'non-operational' ? 'Não operacional · fora do resultado' : 'Operacional'}</p>
+                  <button type="button" className="max-w-full break-words text-left text-[clamp(0.9rem,1.25cqw,1.25rem)] font-semibold leading-tight text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => onOpenExpenseCategory(node.categoryId!)}>{label}</button>
+                ) : <p className="break-words text-[clamp(0.9rem,1.25cqw,1.25rem)] font-semibold leading-tight text-foreground">{label}</p>}
+                <p className={cn('mt-0.5 text-[clamp(0.7rem,0.92cqw,0.92rem)]', node.operationalClass === 'non-operational' ? 'text-warning' : 'text-muted-foreground')}>{node.operationalClass === 'non-operational' ? 'Não operacional · fora do resultado' : 'Operacional'}</p>
               </div>
-              <strong className="whitespace-nowrap font-mono text-[clamp(0.72rem,1cqw,1rem)] text-foreground">{fmtBRL(node.amount)}</strong>
-              <span className="whitespace-nowrap font-mono text-[clamp(0.68rem,0.9cqw,0.9rem)] text-ink-secondary">{expenseShareOfNetRevenue(node.amount, netRevenue)}</span>
+              <strong className="whitespace-nowrap font-mono text-[clamp(0.9rem,1.25cqw,1.25rem)] text-foreground">{fmtBRL(node.amount)}</strong>
+              <span className="whitespace-nowrap font-mono text-[clamp(0.92rem,1.22cqw,1.22rem)] text-ink-secondary">{expenseShareOfNetRevenue(node.amount, netRevenue)}</span>
             </div>
           );
         })}
@@ -420,10 +550,10 @@ function ExpensesRollingLayout({ expenses }: { expenses: PresentationExpensesDat
     <div className="grid min-h-0 flex-1 grid-cols-3 items-end gap-10 px-10 pb-6 pt-4">
       {expenses.rollingThreeMonths.map(point => (
         <section key={point.yearMonth} className="flex h-full flex-col justify-end text-center">
-          <p className="mb-3 text-[clamp(0.8rem,1.25cqw,1.2rem)] font-bold text-foreground">{point.state === 'available' ? fmtBRL(point.total) : point.state === 'empty' ? 'Sem despesas' : 'Sem cobertura'}</p>
+          <p className="mb-3 text-[clamp(1rem,1.56cqw,1.5rem)] font-bold text-foreground">{point.state === 'available' ? fmtBRL(point.total) : point.state === 'empty' ? 'Sem despesas' : 'Sem cobertura'}</p>
           <div className="mx-auto w-24 border border-destructive-border bg-destructive-soft" style={{ height: `${Math.max(point.state === 'available' ? (point.total / max) * 68 : 4, 4)}%` }} aria-hidden="true" />
-          <p className="mt-4 capitalize text-[clamp(0.72rem,1cqw,1rem)] font-semibold text-ink-secondary">{formatYearMonthLabel(point.yearMonth)}</p>
-          <p className="mt-1 text-[clamp(0.58rem,0.75cqw,0.75rem)] text-muted-foreground">{formatIntegerBR(point.quantity)} lançamento(s)</p>
+          <p className="mt-4 capitalize text-[clamp(0.9rem,1.25cqw,1.25rem)] font-semibold text-ink-secondary">{formatYearMonthLabel(point.yearMonth)}</p>
+          <p className="mt-1 text-[clamp(0.78rem,1.01cqw,1.01rem)] text-muted-foreground">{formatIntegerBR(point.quantity)} lançamento(s)</p>
         </section>
       ))}
     </div>
@@ -431,24 +561,56 @@ function ExpensesRollingLayout({ expenses }: { expenses: PresentationExpensesDat
 }
 
 function ExpensesHistoryLayout({ expenses }: { expenses: PresentationExpensesData }) {
-  const pointsByYear = new Map(expenses.requestedYears.map(year => [year, expenses.history.filter(point => point.year === year)]));
-  const labels = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  const series: MonthlyLineSeries[] = expenses.requestedYears.map((year, index) => {
+    const pointsByMonth = new Map(expenses.history.filter(point => point.year === year).map(point => [point.month, point]));
+    return {
+      key: String(year),
+      label: String(year),
+      color: MONTHLY_LINE_CHART_YEAR_COLORS[index % MONTHLY_LINE_CHART_YEAR_COLORS.length],
+      points: Array.from({ length: 12 }, (_, monthIndex) => {
+        const month = monthIndex + 1;
+        const point = pointsByMonth.get(month);
+        return { month, state: point?.state ?? 'unavailable', value: point?.total ?? 0 };
+      }),
+    };
+  });
   return (
-    <div className="flex min-h-0 flex-1 flex-col justify-center">
-      <div className="grid grid-cols-[3.5rem_repeat(12,minmax(0,1fr))] gap-x-1 gap-y-3 text-center">
-        <span aria-hidden="true" />
-        {labels.map(label => <span key={label} className="text-[clamp(0.54rem,0.7cqw,0.7rem)] font-semibold text-muted-foreground">{label}</span>)}
-        {expenses.requestedYears.flatMap(year => [
-          <strong key={`${year}-label`} className="self-center text-left text-[clamp(0.68rem,0.9cqw,0.9rem)] text-foreground">{year}</strong>,
-          ...(pointsByYear.get(year) ?? []).map(point => (
-            <div key={point.yearMonth} className={cn('flex min-h-12 flex-col items-center justify-center rounded border px-0.5', point.state === 'available' ? 'border-destructive-border bg-destructive-soft text-destructive' : 'border-border bg-background-subtle text-muted-foreground')} title={`${formatYearMonthLabel(point.yearMonth)}: ${point.state === 'available' ? fmtBRL(point.total) : 'sem valor disponível'}`}>
-              <span className="text-[clamp(0.5rem,0.62cqw,0.62rem)] font-semibold leading-tight">{point.state === 'available' ? fmtBRLCompact(point.total) : '—'}</span>
-              <span className="mt-1 text-[clamp(0.43rem,0.52cqw,0.52rem)] text-muted-foreground">{point.state === 'available' ? `${point.quantity} lanç.` : point.state === 'empty' ? 'vazio' : 's/ cobertura'}</span>
-            </div>
-          )),
-        ])}
-      </div>
-    </div>
+    <MonthlyLineChart
+      series={series}
+      ariaLabel="Despesas realizadas mensais por ano selecionado"
+      emptyMessage="Sem despesas realizadas nos anos selecionados."
+    />
+  );
+}
+
+function RevenueExpensesMonthlyLayout({
+  year,
+  points,
+}: {
+  year: number;
+  points: readonly PresentationRevenueExpenseMonthPoint[];
+}) {
+  if (points.length === 0) return <EmptyState message={revenueExpensesYearMissingMessage(year)} />;
+  const series: MonthlyLineSeries[] = [
+    {
+      key: 'net-revenue',
+      label: 'Receita líquida',
+      color: 'hsl(var(--success))',
+      points: points.map(point => ({ month: point.month, state: point.netRevenue.state, value: point.netRevenue.total })),
+    },
+    {
+      key: 'expense',
+      label: 'Despesa',
+      color: 'hsl(var(--destructive))',
+      points: points.map(point => ({ month: point.month, state: point.expense.state, value: point.expense.total })),
+    },
+  ];
+  return (
+    <MonthlyLineChart
+      series={series}
+      ariaLabel={`Receita líquida e despesa mensal de ${year}`}
+      emptyMessage="Sem receita líquida ou despesa disponível nos meses deste ano."
+    />
   );
 }
 
@@ -468,7 +630,7 @@ function InsightsLayout({
   }
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <p className="text-[clamp(0.54rem,0.7cqw,0.7rem)] text-muted-foreground">
+      <p className="text-[clamp(0.73rem,0.94cqw,0.94rem)] text-muted-foreground">
         Regras {rulesetVersion} · ordenação por relevância, domínio, prioridade da regra e ID.
       </p>
       <ol className={cn(
@@ -483,19 +645,19 @@ function InsightsLayout({
             : undefined;
           return (
             <li key={insight.id} className="flex min-w-0 flex-col rounded-lg border border-border bg-background-subtle p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2 text-[clamp(0.48rem,0.62cqw,0.62rem)] uppercase tracking-wide">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-[clamp(0.65rem,0.84cqw,0.84rem)] uppercase tracking-wide">
                 <span className={cn('font-bold', toneClass)}>
                   {insight.domain === 'revenue' ? 'Faturamento' : 'Despesas'}
                 </span>
                 <span className="text-muted-foreground">Regra {insight.ruleVersion} · score {insight.relevance.score}</span>
               </div>
-              <h3 className="mt-3 break-words text-[clamp(0.8rem,1.12cqw,1.08rem)] font-bold leading-snug text-foreground">{insight.title}</h3>
-              <p className="mt-2 break-words text-[clamp(0.6rem,0.78cqw,0.76rem)] leading-relaxed text-ink-secondary">{insight.description}</p>
+              <h3 className="mt-3 break-words text-[clamp(1rem,1.4cqw,1.35rem)] font-bold leading-snug text-foreground">{insight.title}</h3>
+              <p className="mt-2 break-words text-[clamp(0.81rem,1.05cqw,1.03rem)] leading-relaxed text-ink-secondary">{insight.description}</p>
               <div className="mt-3 border-l-2 border-primary pl-3">
-                <p className="text-[clamp(0.48rem,0.6cqw,0.6rem)] uppercase tracking-wide text-muted-foreground">Evidência</p>
-                <p className="mt-1 break-words text-[clamp(0.6rem,0.78cqw,0.76rem)] font-semibold leading-snug text-foreground">{presentationInsightEvidenceLabel(insight)}</p>
+                <p className="text-[clamp(0.65rem,0.81cqw,0.81rem)] uppercase tracking-wide text-muted-foreground">Evidência</p>
+                <p className="mt-1 break-words text-[clamp(0.81rem,1.05cqw,1.03rem)] font-semibold leading-snug text-foreground">{presentationInsightEvidenceLabel(insight)}</p>
               </div>
-              <dl className="mt-auto space-y-1 pt-3 text-[clamp(0.48rem,0.6cqw,0.6rem)] leading-snug text-muted-foreground">
+              <dl className="mt-auto space-y-1 pt-3 text-[clamp(0.65rem,0.81cqw,0.81rem)] leading-snug text-muted-foreground">
                 <div><dt className="inline font-semibold text-ink-secondary">Período: </dt><dd className="inline">{insight.period.label}</dd></div>
                 <div><dt className="inline font-semibold text-ink-secondary">Fonte: </dt><dd className="inline">{insight.source.label}</dd></div>
                 <div><dt className="inline font-semibold text-ink-secondary">Regime: </dt><dd className="inline">{regimeLabel}</dd></div>
@@ -503,7 +665,7 @@ function InsightsLayout({
               {expenseCategoryId && onOpenExpenseCategory ? (
                 <button
                   type="button"
-                  className="mt-3 self-start text-[clamp(0.54rem,0.68cqw,0.68rem)] font-semibold text-primary-ink underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="mt-3 self-start text-[clamp(0.73rem,0.92cqw,0.92rem)] font-semibold text-primary-ink underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   onClick={() => onOpenExpenseCategory(expenseCategoryId)}
                   aria-label={`Abrir detalhe de ${insight.title}`}
                 >
@@ -536,9 +698,9 @@ function ResultsSummaryLayout({
       {metrics.map((metric) => {
         const content = (
           <>
-            <p className="text-[clamp(0.78rem,1.05cqw,1rem)] font-medium text-ink-secondary">{metric.label}</p>
-            <p className={cn('mt-3 break-words text-[clamp(1.45rem,2.5cqw,2.45rem)] font-bold tracking-tight', metric.tone)}>{metric.formatted}</p>
-            <p className="mt-4 text-[clamp(0.66rem,0.86cqw,0.86rem)] text-muted-foreground">
+            <p className="text-[clamp(0.98rem,1.31cqw,1.25rem)] font-medium text-ink-secondary">{metric.label}</p>
+            <p className={cn('mt-3 break-words text-[clamp(1.67rem,2.88cqw,2.82rem)] font-bold tracking-tight', metric.tone)}>{metric.formatted}</p>
+            <p className="mt-4 text-[clamp(0.89rem,1.16cqw,1.16rem)] text-muted-foreground">
               {metric.key === 'margin' ? 'Resultado ÷ receita' : metric.key === 'result' ? 'Receita − despesa' : 'Base operacional do período'}
             </p>
           </>
@@ -574,7 +736,7 @@ function ResultsComparisonLayout({ results }: { results: PresentationResultsData
   ];
   return (
     <div className="flex min-h-0 flex-1 flex-col justify-center">
-      <div className="grid grid-cols-[1.1fr_repeat(4,1fr)] border-y border-border text-[clamp(0.68rem,0.92cqw,0.92rem)]">
+      <div className="grid grid-cols-[1.1fr_repeat(4,1fr)] border-y border-border text-[clamp(0.92rem,1.24cqw,1.24rem)]">
         {['Métrica', 'Período atual', 'Período anterior', 'Variação absoluta', 'Variação relativa'].map((label, index) => (
           <div key={label} className={cn('p-3 font-semibold text-ink-secondary', index > 0 && 'text-right')}>{label}</div>
         ))}
@@ -595,7 +757,7 @@ function ResultsComparisonLayout({ results }: { results: PresentationResultsData
           );
         })}
       </div>
-      <p className="mt-4 text-[clamp(0.62rem,0.82cqw,0.82rem)] text-muted-foreground">Base zero mantém a mudança absoluta sem gerar valores inválidos.</p>
+      <p className="mt-4 text-[clamp(0.84rem,1.11cqw,1.11rem)] text-muted-foreground">Base zero mantém a mudança absoluta sem gerar valores inválidos.</p>
     </div>
   );
 }
@@ -623,15 +785,15 @@ function ResultsBridgeLayout({ results }: { results: PresentationResultsData }) 
         {bridge.steps.map((step, index) => (
           <section key={step.key} className="relative border-t-2 border-primary pt-5 text-center">
             {index > 0 ? <span className="absolute -left-5 top-8 text-2xl text-muted-foreground" aria-hidden="true">+</span> : null}
-            <p className="min-h-10 text-[clamp(0.68rem,0.94cqw,0.94rem)] font-semibold text-ink-secondary">{step.label}</p>
-            <p className={cn('mt-4 text-[clamp(1.2rem,2.1cqw,2rem)] font-bold', bridgeTone(step))}>
+            <p className="min-h-10 text-[clamp(0.92rem,1.27cqw,1.27rem)] font-semibold text-ink-secondary">{step.label}</p>
+            <p className={cn('mt-4 text-[clamp(1.38rem,2.42cqw,2.3rem)] font-bold', bridgeTone(step))}>
               {step.key === 'previous-result' || step.key === 'current-result' ? fmtBRL(step.value) : formatSignedCurrency(step.value)}
             </p>
-            {step.key === 'expense-effect' ? <p className="mt-3 text-[clamp(0.58rem,0.76cqw,0.76rem)] text-muted-foreground">Despesa maior gera efeito negativo; menor, positivo.</p> : null}
+            {step.key === 'expense-effect' ? <p className="mt-3 text-[clamp(0.78rem,1.03cqw,1.03rem)] text-muted-foreground">Despesa maior gera efeito negativo; menor, positivo.</p> : null}
           </section>
         ))}
       </div>
-      <div className="flex items-center justify-between border-t border-border pt-5 text-[clamp(0.72rem,1cqw,1rem)]">
+      <div className="flex items-center justify-between border-t border-border pt-5 text-[clamp(0.9rem,1.25cqw,1.25rem)]">
         <span className="text-muted-foreground">Variação total do resultado</span>
         <strong className={bridge.totalChange < 0 ? 'text-destructive' : bridge.totalChange > 0 ? 'text-success' : 'text-foreground'}>{formatSignedCurrency(bridge.totalChange)}</strong>
         <span className="text-muted-foreground">Ponte fechada exatamente no resultado atual</span>
@@ -657,8 +819,8 @@ function ResultsNonOperationalLayout({
           ['Saldo não operacional', totals.result],
         ].map(([label, value]) => (
           <section key={String(label)} className="border-l-2 border-warning-border pl-4">
-            <p className="text-[clamp(0.58rem,0.76cqw,0.76rem)] text-muted-foreground">{label}</p>
-            <p className="mt-1 text-[clamp(0.9rem,1.4cqw,1.35rem)] font-bold text-warning">{fmtBRL(value as number)}</p>
+            <p className="text-[clamp(0.78rem,1.03cqw,1.03rem)] text-muted-foreground">{label}</p>
+            <p className="mt-1 text-[clamp(1.12rem,1.75cqw,1.69rem)] font-bold text-warning">{fmtBRL(value as number)}</p>
           </section>
         ))}
       </div>
@@ -669,7 +831,7 @@ function ResultsNonOperationalLayout({
 
 function EmptyState({ message }: { message: string }) {
   return (
-    <div className="flex flex-1 items-center justify-center rounded-xl border border-dashed border-strong bg-background-subtle px-8 text-center text-[clamp(0.85rem,1.4cqw,1.35rem)] text-ink-secondary">
+    <div className="flex flex-1 items-center justify-center rounded-xl border border-dashed border-strong bg-background-subtle px-8 text-center text-[clamp(1.06rem,1.75cqw,1.69rem)] text-ink-secondary">
       {message}
     </div>
   );
@@ -695,24 +857,24 @@ function PlanComparisonLayout({ plan }: { plan: PresentationPlanData }) {
       <div className="grid grid-cols-5 gap-6">
         {indicators.map(indicator => (
           <section key={indicator.key} className="min-w-0 border-l-2 border-primary-border pl-4">
-            <h3 className="min-h-12 text-[clamp(0.72rem,1cqw,1rem)] font-semibold leading-tight text-ink-secondary">{indicator.label}</h3>
-            <p className="mt-3 text-[clamp(0.58rem,0.75cqw,0.75rem)] uppercase tracking-wide text-muted-foreground">Realizado</p>
-            <p className="mt-1 break-words text-[clamp(0.9rem,1.45cqw,1.4rem)] font-bold text-foreground">{formatValue(indicator.unit, indicator.actual)}</p>
-            <p className="mt-3 text-[clamp(0.58rem,0.75cqw,0.75rem)] uppercase tracking-wide text-muted-foreground">Orçado</p>
-            <p className="mt-1 break-words text-[clamp(0.82rem,1.2cqw,1.15rem)] font-semibold text-primary-ink">{formatValue(indicator.unit, indicator.budget)}</p>
-            <p className="mt-3 text-[clamp(0.58rem,0.75cqw,0.75rem)] uppercase tracking-wide text-muted-foreground">Projeção</p>
-            <p className="mt-1 break-words text-[clamp(0.78rem,1.05cqw,1rem)] text-ink-secondary">{formatValue(indicator.unit, indicator.projection)}</p>
-            <p className={cn('mt-4 text-[clamp(0.62rem,0.82cqw,0.82rem)] font-semibold', statusColor[indicator.status])}>{indicator.statusLabel}</p>
+            <h3 className="min-h-12 text-[clamp(0.9rem,1.25cqw,1.25rem)] font-semibold leading-tight text-ink-secondary">{indicator.label}</h3>
+            <p className="mt-3 text-[clamp(0.78rem,1.01cqw,1.01rem)] uppercase tracking-wide text-muted-foreground">Realizado</p>
+            <p className="mt-1 break-words text-[clamp(1.12rem,1.81cqw,1.75rem)] font-bold text-foreground">{formatValue(indicator.unit, indicator.actual)}</p>
+            <p className="mt-3 text-[clamp(0.78rem,1.01cqw,1.01rem)] uppercase tracking-wide text-muted-foreground">Orçado</p>
+            <p className="mt-1 break-words text-[clamp(1.02rem,1.5cqw,1.44rem)] font-semibold text-primary-ink">{formatValue(indicator.unit, indicator.budget)}</p>
+            <p className="mt-3 text-[clamp(0.78rem,1.01cqw,1.01rem)] uppercase tracking-wide text-muted-foreground">Projeção</p>
+            <p className="mt-1 break-words text-[clamp(0.98rem,1.31cqw,1.25rem)] text-ink-secondary">{formatValue(indicator.unit, indicator.projection)}</p>
+            <p className={cn('mt-4 text-[clamp(0.84rem,1.11cqw,1.11rem)] font-semibold', statusColor[indicator.status])}>{indicator.statusLabel}</p>
           </section>
         ))}
       </div>
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-8 border-t border-border pt-5">
-        <p className="text-[clamp(0.66rem,0.9cqw,0.9rem)] leading-relaxed text-ink-secondary">
+        <p className="text-[clamp(0.89rem,1.22cqw,1.22rem)] leading-relaxed text-ink-secondary">
           Projeção determinística: realizado acumulado / {plan.projection.sampleDays} dias transcorridos × {plan.projection.totalDays} dias totais. Orçamento mensal proporcional aos dias do intervalo; contas em aberto não entram.
         </p>
         <div className="text-right">
-          <p className="text-[clamp(0.6rem,0.78cqw,0.78rem)] text-muted-foreground">Meta percentual de CMV</p>
-          <p className="mt-1 text-[clamp(0.9rem,1.3cqw,1.25rem)] font-bold text-primary-ink">
+          <p className="text-[clamp(0.81rem,1.05cqw,1.05rem)] text-muted-foreground">Meta percentual de CMV</p>
+          <p className="mt-1 text-[clamp(1.12rem,1.62cqw,1.56rem)] font-bold text-primary-ink">
             {plan.budget.cmvTargetPercent === null ? 'Não configurada' : formatPercentBR(plan.budget.cmvTargetPercent, 1)}
           </p>
         </div>
@@ -739,18 +901,18 @@ function ScenarioImpactLayout({ scenario }: { scenario: PresentationScenarioResu
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-7">
       <div className="flex items-center justify-between gap-5">
-        <span className="border border-primary-border bg-primary-soft px-4 py-2 text-[clamp(0.7rem,0.95cqw,0.95rem)] font-bold tracking-[0.18em] text-primary-soft-foreground">SIMULAÇÃO</span>
-        <p className="text-right text-[clamp(0.62rem,0.82cqw,0.82rem)] text-ink-secondary">Base: {scenario.baselineMode === 'actual' ? 'Realizado' : scenario.baselineMode === 'budget' ? 'Orçado' : 'Projeção'} · corte {scenario.cutoffDate}</p>
+        <span className="border border-primary-border bg-primary-soft px-4 py-2 text-[clamp(0.94rem,1.28cqw,1.28rem)] font-bold tracking-[0.18em] text-primary-soft-foreground">SIMULAÇÃO</span>
+        <p className="text-right text-[clamp(0.84rem,1.11cqw,1.11rem)] text-ink-secondary">Base: {scenario.baselineMode === 'actual' ? 'Realizado' : scenario.baselineMode === 'budget' ? 'Orçado' : 'Projeção'} · corte {scenario.cutoffDate}</p>
       </div>
       <div className="grid grid-cols-5 gap-5">
         {metrics.map(metric => (
           <section key={metric.label} className="min-w-0 border-l-2 border-primary-border pl-3">
-            <h3 className="text-[clamp(0.68rem,0.9cqw,0.9rem)] font-semibold text-ink-secondary">{metric.label}</h3>
-            <p className="mt-2 text-[clamp(0.56rem,0.7cqw,0.7rem)] uppercase tracking-wide text-muted-foreground">Base</p>
-            <p className="mt-1 break-words text-[clamp(0.82rem,1.15cqw,1.1rem)] font-semibold text-ink-secondary">{format(metric.baseline, metric.percent)}</p>
-            <p className="mt-2 text-[clamp(0.56rem,0.7cqw,0.7rem)] uppercase tracking-wide text-muted-foreground">Cenário</p>
-            <p className="mt-1 break-words text-[clamp(0.9rem,1.35cqw,1.3rem)] font-bold text-foreground">{format(metric.value, metric.percent)}</p>
-            <p className={cn('mt-2 text-[clamp(0.58rem,0.76cqw,0.76rem)] font-semibold', (metric.impact ?? 0) >= 0 ? 'text-success' : 'text-destructive')}>
+            <h3 className="text-[clamp(0.92rem,1.22cqw,1.22rem)] font-semibold text-ink-secondary">{metric.label}</h3>
+            <p className="mt-2 text-[clamp(0.76rem,0.94cqw,0.94rem)] uppercase tracking-wide text-muted-foreground">Base</p>
+            <p className="mt-1 break-words text-[clamp(1.02rem,1.44cqw,1.38rem)] font-semibold text-ink-secondary">{format(metric.baseline, metric.percent)}</p>
+            <p className="mt-2 text-[clamp(0.76rem,0.94cqw,0.94rem)] uppercase tracking-wide text-muted-foreground">Cenário</p>
+            <p className="mt-1 break-words text-[clamp(1.12rem,1.69cqw,1.62rem)] font-bold text-foreground">{format(metric.value, metric.percent)}</p>
+            <p className={cn('mt-2 text-[clamp(0.78rem,1.03cqw,1.03rem)] font-semibold', (metric.impact ?? 0) >= 0 ? 'text-success' : 'text-destructive')}>
               Impacto {metric.impact === null ? 'indisponível' : metric.percent ? `${metric.impact.toFixed(1)} p.p.` : fmtBRL(metric.impact)}
             </p>
           </section>
@@ -758,10 +920,10 @@ function ScenarioImpactLayout({ scenario }: { scenario: PresentationScenarioResu
       </div>
       <div className="grid min-h-0 grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)] gap-8 border-t border-border pt-5">
         <div>
-          <h3 className="text-[clamp(0.72rem,1cqw,1rem)] font-semibold text-foreground">Premissas explícitas</h3>
+          <h3 className="text-[clamp(0.9rem,1.25cqw,1.25rem)] font-semibold text-foreground">Premissas explícitas</h3>
           <div className="mt-3 grid grid-cols-2 gap-x-5 gap-y-2">
             {scenario.activeLevers.slice(0, 6).map(lever => (
-              <div key={lever.id} className="flex items-center justify-between gap-3 border-b border-border pb-1.5 text-[clamp(0.58rem,0.75cqw,0.75rem)]">
+              <div key={lever.id} className="flex items-center justify-between gap-3 border-b border-border pb-1.5 text-[clamp(0.78rem,1.01cqw,1.01rem)]">
                 <span className="break-words text-ink-secondary">{lever.label}</span>
                 <strong className={lever.resultImpact >= 0 ? 'text-success' : 'text-destructive'}>{fmtBRL(lever.resultImpact)}</strong>
               </div>
@@ -769,10 +931,10 @@ function ScenarioImpactLayout({ scenario }: { scenario: PresentationScenarioResu
           </div>
         </div>
         <div>
-          <h3 className="text-[clamp(0.72rem,1cqw,1rem)] font-semibold text-foreground">Ranking por impacto no resultado</h3>
+          <h3 className="text-[clamp(0.9rem,1.25cqw,1.25rem)] font-semibold text-foreground">Ranking por impacto no resultado</h3>
           <ol className="mt-3 space-y-2">
             {ranking.map((lever, index) => (
-              <li key={lever.id} className="grid grid-cols-[1.3rem_minmax(0,1fr)_auto] gap-2 text-[clamp(0.58rem,0.75cqw,0.75rem)]">
+              <li key={lever.id} className="grid grid-cols-[1.3rem_minmax(0,1fr)_auto] gap-2 text-[clamp(0.78rem,1.01cqw,1.01rem)]">
                 <span className="font-bold text-primary-ink">{index + 1}</span>
                 <span className="break-words text-ink-secondary">{lever.label}</span>
                 <strong className="text-foreground">{fmtBRL(lever.resultImpact)}</strong>
@@ -802,8 +964,8 @@ function ScenarioSensitivityLayout({ scenario }: { scenario: PresentationScenari
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
       <div className="flex items-center justify-between">
-        <span className="border border-primary-border bg-primary-soft px-4 py-2 text-[clamp(0.7rem,0.95cqw,0.95rem)] font-bold tracking-[0.18em] text-primary-soft-foreground">SIMULAÇÃO</span>
-        <p className="text-[clamp(0.62rem,0.82cqw,0.82rem)] text-ink-secondary">Demais alavancas mantidas fixas</p>
+        <span className="border border-primary-border bg-primary-soft px-4 py-2 text-[clamp(0.94rem,1.28cqw,1.28rem)] font-bold tracking-[0.18em] text-primary-soft-foreground">SIMULAÇÃO</span>
+        <p className="text-[clamp(0.84rem,1.11cqw,1.11rem)] text-ink-secondary">Demais alavancas mantidas fixas</p>
       </div>
       <div className="min-h-0 flex-1" role="img" aria-label={`Curva de sensibilidade de ${sensitivity.leverLabel} com ${sensitivity.points.length} pontos.`}>
         <svg viewBox="0 0 1000 360" className="h-full w-full" aria-hidden="true">
@@ -814,13 +976,21 @@ function ScenarioSensitivityLayout({ scenario }: { scenario: PresentationScenari
           <line x1="72" x2="950" y1={y(0)} y2={y(0)} stroke="hsl(var(--chart-axis))" strokeWidth="1.5" />
           {basePoint ? <line x1={x(basePoint.inputValue)} x2={x(basePoint.inputValue)} y1="45" y2="325" stroke="hsl(var(--primary))" strokeDasharray="6 5" /> : null}
           <path d={path} fill="none" stroke="hsl(var(--primary))" strokeWidth="4" strokeLinejoin="round" />
-          {sensitivity.points.map(point => (
-            <circle key={point.inputValue} cx={x(point.inputValue)} cy={y(point.result)} r={point.isBase ? 7 : 3.5} fill={point.isBase ? 'hsl(var(--card))' : 'hsl(var(--primary))'} stroke="hsl(var(--primary))" strokeWidth="2" />
-          ))}
+          {sensitivity.points.map(point => {
+            const inputLabel = sensitivity.unit === 'currency' ? fmtBRL(point.inputValue) : formatPercentBR(point.inputValue, 2);
+            return (
+              <g key={point.inputValue}>
+                <circle cx={x(point.inputValue)} cy={y(point.result)} r={point.isBase ? 7 : 3.5} fill={point.isBase ? 'hsl(var(--card))' : 'hsl(var(--primary))'} stroke="hsl(var(--primary))" strokeWidth="2" />
+                <circle cx={x(point.inputValue)} cy={y(point.result)} r="14" fill="transparent" stroke="none">
+                  <title>{`${sensitivity.leverLabel}: ${inputLabel}${point.isBase ? ' (atual)' : ''} · Resultado: ${fmtBRL(point.result)}`}</title>
+                </circle>
+              </g>
+            );
+          })}
           <text x="500" y="350" textAnchor="middle" fill="hsl(var(--chart-label))" fontSize="14">{sensitivity.leverLabel} ({sensitivity.unit === 'currency' ? 'R$' : '%'})</text>
         </svg>
       </div>
-      <div className="grid grid-cols-3 gap-5 border-t border-border pt-3 text-[clamp(0.62rem,0.82cqw,0.82rem)]">
+      <div className="grid grid-cols-3 gap-5 border-t border-border pt-3 text-[clamp(0.84rem,1.11cqw,1.11rem)]">
         <p className="text-ink-secondary">Faixa: <strong className="text-foreground">{sensitivity.unit === 'currency' ? `${fmtBRL(minX)} a ${fmtBRL(maxX)}` : `${formatPercentBR(minX, 2)} a ${formatPercentBR(maxX, 2)}`}</strong></p>
         <p className="text-ink-secondary">Configuração atual: <strong className="text-foreground">{basePoint ? sensitivity.unit === 'currency' ? fmtBRL(basePoint.inputValue) : formatPercentBR(basePoint.inputValue, 2) : 'Indisponível'}</strong></p>
         <p className="text-ink-secondary">Ponto de equilíbrio: <strong className="text-foreground">{sensitivity.breakEven.state === 'available' ? sensitivity.unit === 'currency' ? fmtBRL(sensitivity.breakEven.inputValue) : formatPercentBR(sensitivity.breakEven.inputValue, 2) : 'Indisponível com as informações atuais'}</strong></p>
@@ -877,6 +1047,7 @@ function TimeSeriesChart({ timeSeries }: { timeSeries: PresentationTimeSeries })
           const barWidth = Math.min(chart.step * 0.22, 22);
           const revenueY = chart.y(point.metrics.revenue);
           const expenseY = chart.y(point.metrics.expense);
+          const periodLabel = formatPresentationSeriesLabel(point.key, timeSeries.granularity);
           return (
             <g key={point.key}>
               <rect
@@ -886,7 +1057,9 @@ function TimeSeriesChart({ timeSeries }: { timeSeries: PresentationTimeSeries })
                 height={Math.max(Math.abs(zeroY - revenueY), 1)}
                 rx="2"
                 fill="hsl(var(--success))"
-              />
+              >
+                <title>{`${periodLabel} · Receita: ${fmtBRL(point.metrics.revenue)}`}</title>
+              </rect>
               <rect
                 x={center + 2}
                 y={Math.min(expenseY, zeroY)}
@@ -894,17 +1067,28 @@ function TimeSeriesChart({ timeSeries }: { timeSeries: PresentationTimeSeries })
                 height={Math.max(Math.abs(zeroY - expenseY), 1)}
                 rx="2"
                 fill="hsl(var(--destructive))"
-              />
+              >
+                <title>{`${periodLabel} · Despesa: ${fmtBRL(point.metrics.expense)}`}</title>
+              </rect>
               <text x={center} y="353" textAnchor="middle" fill="hsl(var(--chart-label))" fontSize="13">
-                {formatPresentationSeriesLabel(point.key, timeSeries.granularity)}
+                {periodLabel}
               </text>
             </g>
           );
         })}
         <path d={linePath} fill="none" stroke="hsl(var(--primary))" strokeWidth="4" strokeLinejoin="round" />
-        {chart.resultPoints.map((point, index) => (
-          <circle key={timeSeries.points[index].key} cx={point.x} cy={point.y} r="5" fill="hsl(var(--primary))" />
-        ))}
+        {chart.resultPoints.map((point, index) => {
+          const seriesPoint = timeSeries.points[index];
+          const periodLabel = formatPresentationSeriesLabel(seriesPoint.key, timeSeries.granularity);
+          return (
+            <g key={seriesPoint.key}>
+              <circle cx={point.x} cy={point.y} r="5" fill="hsl(var(--primary))" />
+              <circle cx={point.x} cy={point.y} r="14" fill="transparent" stroke="none">
+                <title>{`${periodLabel} · Resultado: ${fmtBRL(seriesPoint.metrics.result)}`}</title>
+              </circle>
+            </g>
+          );
+        })}
         <g transform="translate(720 18)" fontSize="14">
           <rect width="12" height="12" fill="hsl(var(--success))" /><text x="18" y="11" fill="hsl(var(--foreground))">Receita</text>
           <rect x="92" width="12" height="12" fill="hsl(var(--destructive))" /><text x="110" y="11" fill="hsl(var(--foreground))">Despesa</text>
@@ -928,11 +1112,11 @@ function CompositionColumn({
   return (
     <section className="min-w-0">
       <div className="mb-2 flex items-center justify-between border-b border-border pb-2">
-        <h3 className={cn('text-[clamp(0.9rem,1.35cqw,1.3rem)] font-semibold', tone === 'revenue' ? 'text-success' : 'text-destructive')}>{title}</h3>
-        <span className="text-[clamp(0.65rem,0.8cqw,0.8rem)] text-muted-foreground">Direto / Acumulado</span>
+        <h3 className={cn('text-[clamp(1.12rem,1.69cqw,1.62rem)] font-semibold', tone === 'revenue' ? 'text-success' : 'text-destructive')}>{title}</h3>
+        <span className="text-[clamp(0.88rem,1.08cqw,1.08rem)] text-muted-foreground">Direto / Acumulado</span>
       </div>
       {rows.length === 0 ? (
-        <p className="py-6 text-center text-[clamp(0.75rem,1cqw,1rem)] text-muted-foreground">Sem valores nesta composição.</p>
+        <p className="py-6 text-center text-[clamp(0.94rem,1.25cqw,1.25rem)] text-muted-foreground">Sem valores nesta composição.</p>
       ) : (
         <div className="space-y-1">
           {rows.map(({ node, depth }, index) => (
@@ -942,14 +1126,14 @@ function CompositionColumn({
             >
               <div className="min-w-0" style={{ paddingLeft: `${depth * 0.8}rem` }}>
                 <p className={cn(
-                  'break-words text-[clamp(0.72rem,1cqw,0.98rem)] leading-tight text-foreground',
+                  'break-words text-[clamp(0.97rem,1.35cqw,1.32rem)] leading-tight text-foreground',
                   depth === 0 && 'font-semibold',
                 )}>
                   {depth > 0 ? '↳ ' : ''}{node.name}
                 </p>
-                <p className="text-[clamp(0.58rem,0.7cqw,0.72rem)] text-muted-foreground">{formatPercentBR(node.sharePercent, 1)} da composição</p>
+                <p className="text-[clamp(0.78rem,0.94cqw,0.97rem)] text-muted-foreground">{formatPercentBR(node.sharePercent, 1)} da composição</p>
               </div>
-              <p className="whitespace-nowrap text-right font-mono text-[clamp(0.65rem,0.82cqw,0.82rem)] text-ink-secondary">
+              <p className="whitespace-nowrap text-right font-mono text-[clamp(0.88rem,1.11cqw,1.11rem)] text-ink-secondary">
                 {fmtBRL(node.directAmount)} <span className="text-muted-foreground">/</span> <strong className="text-foreground">{fmtBRL(node.amount)}</strong>
               </p>
             </div>
@@ -980,19 +1164,19 @@ function RankingColumn({
 }) {
   return (
     <section className="min-w-0">
-      <h3 className={cn('mb-4 text-[clamp(1rem,1.5cqw,1.45rem)] font-semibold', tone === 'revenue' ? 'text-success' : 'text-destructive')}>{title}</h3>
+      <h3 className={cn('mb-4 text-[clamp(1.25rem,1.88cqw,1.81rem)] font-semibold', tone === 'revenue' ? 'text-success' : 'text-destructive')}>{title}</h3>
       {items.length === 0 ? (
         <p className="text-muted-foreground">Nenhuma categoria no período.</p>
       ) : (
         <ol className="space-y-2.5">
           {items.map(item => (
             <li key={`${item.rank}-${item.categoryId ?? item.label}`} className="grid grid-cols-[2.2rem_minmax(0,1fr)_auto] items-center gap-3 border-b border-border pb-2.5">
-              <span className="text-center text-[clamp(1rem,1.5cqw,1.45rem)] font-bold text-primary-ink">{item.rank}</span>
+              <span className="text-center text-[clamp(1.25rem,1.88cqw,1.81rem)] font-bold text-primary-ink">{item.rank}</span>
               <div className="min-w-0">
-                <p className="break-words text-[clamp(0.78rem,1.15cqw,1.1rem)] font-medium leading-tight text-foreground">{item.label}</p>
-                <p className="text-[clamp(0.65rem,0.8cqw,0.82rem)] text-muted-foreground">{formatPercentBR(item.sharePercent, 1)} da composição</p>
+                <p className="break-words text-[clamp(0.98rem,1.44cqw,1.38rem)] font-medium leading-tight text-foreground">{item.label}</p>
+                <p className="text-[clamp(0.88rem,1.08cqw,1.11rem)] text-muted-foreground">{formatPercentBR(item.sharePercent, 1)} da composição</p>
               </div>
-              <strong className={cn('whitespace-nowrap font-mono text-[clamp(0.76rem,1.05cqw,1rem)]', tone === 'revenue' ? 'text-success' : 'text-destructive')}>{fmtBRL(item.amount)}</strong>
+              <strong className={cn('whitespace-nowrap font-mono text-[clamp(0.95rem,1.31cqw,1.25rem)]', tone === 'revenue' ? 'text-success' : 'text-destructive')}>{fmtBRL(item.amount)}</strong>
             </li>
           ))}
         </ol>
@@ -1016,11 +1200,11 @@ function DecisionCommitmentsLayout({ decision }: { decision: PresentationDecisio
       <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] gap-8">
         <section>
           <div className="flex flex-wrap items-center gap-3">
-            <span className="border border-primary-border bg-primary-soft px-3 py-1 text-[clamp(0.62rem,0.8cqw,0.8rem)] font-bold text-primary-soft-foreground">{statusLabel}</span>
-            {decision.decision.referenceType === 'SCENARIO' ? <span className="text-[clamp(0.62rem,0.8cqw,0.8rem)] font-bold tracking-wider text-warning">SIMULAÇÃO</span> : null}
+            <span className="border border-primary-border bg-primary-soft px-3 py-1 text-[clamp(0.84rem,1.08cqw,1.08rem)] font-bold text-primary-soft-foreground">{statusLabel}</span>
+            {decision.decision.referenceType === 'SCENARIO' ? <span className="text-[clamp(0.84rem,1.08cqw,1.08rem)] font-bold tracking-wider text-warning">SIMULAÇÃO</span> : null}
           </div>
-          <p className="mt-4 break-words text-[clamp(0.78rem,1.05cqw,1rem)] leading-relaxed text-ink-secondary">{decision.decision.context}</p>
-          <div className="mt-4 space-y-1 text-[clamp(0.62rem,0.78cqw,0.78rem)] text-muted-foreground">
+          <p className="mt-4 break-words text-[clamp(0.98rem,1.31cqw,1.25rem)] leading-relaxed text-ink-secondary">{decision.decision.context}</p>
+          <div className="mt-4 space-y-1 text-[clamp(0.84rem,1.05cqw,1.05rem)] text-muted-foreground">
             <p>Responsável executivo: {decision.decision.executiveResponsibleName ?? 'Não informado'}</p>
             <p>Aprovador: {currentRevision.approvedByName ?? 'Usuário removido'}</p>
             <p>Revisão {currentRevision.revisionNumber} · corte {currentRevision.snapshot.cutoffDate}</p>
@@ -1029,11 +1213,11 @@ function DecisionCommitmentsLayout({ decision }: { decision: PresentationDecisio
         <section className="grid grid-cols-2 content-start gap-4">
           {metrics.map(([label, value]) => (
             <div key={label} className="border-l-2 border-primary-border pl-3">
-              <p className="text-[clamp(0.58rem,0.72cqw,0.72rem)] text-muted-foreground">{label} esperado</p>
-              <p className="mt-1 text-[clamp(0.9rem,1.3cqw,1.25rem)] font-bold text-foreground">{value === null ? 'Indisponível' : label === 'Margem' ? formatPercentBR(value, 1) : fmtBRL(value)}</p>
+              <p className="text-[clamp(0.78rem,0.97cqw,0.97rem)] text-muted-foreground">{label} esperado</p>
+              <p className="mt-1 text-[clamp(1.12rem,1.62cqw,1.56rem)] font-bold text-foreground">{value === null ? 'Indisponível' : label === 'Margem' ? formatPercentBR(value, 1) : fmtBRL(value)}</p>
             </div>
           ))}
-          <div className="col-span-2 border-t border-border pt-3 text-[clamp(0.6rem,0.75cqw,0.75rem)] text-muted-foreground">
+          <div className="col-span-2 border-t border-border pt-3 text-[clamp(0.81rem,1.01cqw,1.01rem)] text-muted-foreground">
             {currentRevision.snapshot.assumptions.length === 0
               ? 'Referência canônica sem premissas de simulação.'
               : currentRevision.snapshot.assumptions.slice(0, 3).map(item => `${item.label}: ${item.exactValue || item.calculatedInputValue}`).join(' · ')}
@@ -1042,16 +1226,16 @@ function DecisionCommitmentsLayout({ decision }: { decision: PresentationDecisio
         </section>
       </div>
       <div className="min-h-0 border-t border-border pt-4">
-        <h3 className="mb-2 text-[clamp(0.72rem,0.95cqw,0.95rem)] font-semibold text-primary-ink">Compromissos</h3>
-        {decision.actions.length === 0 ? <p className="text-[clamp(0.68rem,0.85cqw,0.85rem)] text-muted-foreground">Nenhuma ação registrada.</p> : (
+        <h3 className="mb-2 text-[clamp(0.97rem,1.28cqw,1.28rem)] font-semibold text-primary-ink">Compromissos</h3>
+        {decision.actions.length === 0 ? <p className="text-[clamp(0.92rem,1.15cqw,1.15rem)] text-muted-foreground">Nenhuma ação registrada.</p> : (
           <div className="grid gap-x-6 gap-y-2 md:grid-cols-2">
             {decision.actions.map(action => (
               <div key={action.id} className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 border-b border-border pb-2">
                 <div>
-                  <p className="break-words text-[clamp(0.64rem,0.8cqw,0.8rem)] leading-snug text-foreground">{action.description}</p>
-                  <p className="mt-1 text-[clamp(0.55rem,0.66cqw,0.66rem)] text-muted-foreground">{action.responsibleName} · {action.dueDate ? formatDateValueBR(action.dueDate) : 'sem prazo'}</p>
+                  <p className="break-words text-[clamp(0.86rem,1.08cqw,1.08rem)] leading-snug text-foreground">{action.description}</p>
+                  <p className="mt-1 text-[clamp(0.74rem,0.89cqw,0.89rem)] text-muted-foreground">{action.responsibleName} · {action.dueDate ? formatDateValueBR(action.dueDate) : 'sem prazo'}</p>
                 </div>
-                <span className="text-[clamp(0.54rem,0.66cqw,0.66rem)] font-semibold text-primary-ink">{presentationActionStatusLabel(action.status)}</span>
+                <span className="text-[clamp(0.73rem,0.89cqw,0.89rem)] font-semibold text-primary-ink">{presentationActionStatusLabel(action.status)}</span>
               </div>
             ))}
           </div>
@@ -1071,11 +1255,11 @@ function DecisionFollowUpLayout({
   const labels = { revenue: 'Receita', expense: 'Despesa', result: 'Resultado', marginPercent: 'Margem', cmv: 'CMV' } as const;
   return (
     <div className="flex min-h-0 flex-1 flex-col justify-center gap-6">
-      <div className="flex items-center justify-between gap-5 text-[clamp(0.62rem,0.8cqw,0.8rem)] text-muted-foreground">
+      <div className="flex items-center justify-between gap-5 text-[clamp(0.84rem,1.08cqw,1.08rem)] text-muted-foreground">
         <span>{decision.decision.title}</span>
         <span>Snapshot {new Date(comparison.snapshotCapturedAt).toLocaleString('pt-BR')} · Base atual {new Date(comparison.currentGeneratedAt).toLocaleString('pt-BR')}</span>
       </div>
-      <div className="grid grid-cols-[1.1fr_repeat(4,1fr)] border-y border-border text-[clamp(0.68rem,0.9cqw,0.9rem)]">
+      <div className="grid grid-cols-[1.1fr_repeat(4,1fr)] border-y border-border text-[clamp(0.92rem,1.22cqw,1.22rem)]">
         <div className="p-3 font-semibold text-ink-secondary">Métrica</div><div className="p-3 text-right font-semibold text-ink-secondary">Snapshot aprovado</div><div className="p-3 text-right font-semibold text-ink-secondary">Base atual</div><div className="p-3 text-right font-semibold text-ink-secondary">Variação</div><div className="p-3 font-semibold text-ink-secondary">Leitura</div>
         {comparison.metrics.map(metric => {
           const percent = metric.key === 'marginPercent';
@@ -1091,7 +1275,7 @@ function DecisionFollowUpLayout({
           );
         })}
       </div>
-      <p className="text-[clamp(0.62rem,0.78cqw,0.78rem)] text-muted-foreground">Comparação informativa entre métricas equivalentes. Não atribui causalidade às ações nem classifica a decisão como sucesso ou falha.</p>
+      <p className="text-[clamp(0.84rem,1.05cqw,1.05rem)] text-muted-foreground">Comparação informativa entre métricas equivalentes. Não atribui causalidade às ações nem classifica a decisão como sucesso ou falha.</p>
     </div>
   );
 }
@@ -1141,6 +1325,8 @@ function SlideContent({
       return <ExpensesRollingLayout expenses={payload.expenses} />;
     case 'expenses-history':
       return <ExpensesHistoryLayout expenses={payload.expenses} />;
+    case 'revenue-expenses-monthly':
+      return <RevenueExpensesMonthlyLayout year={payload.year} points={payload.points} />;
     case 'results-summary':
       return <ResultsSummaryLayout results={payload.results} onOpenResultDetail={onOpenResultDetail} />;
     case 'results-comparison':
@@ -1163,10 +1349,10 @@ function SlideContent({
       return (
         <div className="flex flex-1 flex-col justify-center">
           <div className="mb-8 h-1.5 w-24 rounded-full bg-primary-strong" />
-          <p className="mb-3 text-[clamp(0.8rem,1.25cqw,1.2rem)] font-semibold uppercase tracking-[0.24em] text-ink-secondary">Visão executiva financeira</p>
-          <h1 className="max-w-4xl text-[clamp(2.4rem,6cqw,5.8rem)] font-bold leading-[0.96] tracking-tight text-foreground">Apresentação<br /><span className="text-primary-ink">Sócios</span></h1>
-          <p className="mt-8 text-[clamp(1.1rem,2cqw,1.9rem)] text-ink-secondary">{payload.periodLabel}</p>
-          <p className="mt-2 text-[clamp(0.75rem,1cqw,1rem)] text-muted-foreground">Resultado operacional no regime de caixa do Dashboard. Transferências excluídas.</p>
+          <p className="mb-3 text-[clamp(1rem,1.56cqw,1.5rem)] font-semibold uppercase tracking-[0.24em] text-ink-secondary">Visão executiva financeira</p>
+          <h1 className="max-w-4xl text-[clamp(2.52rem,6.3cqw,6.09rem)] font-bold leading-[0.96] tracking-tight text-foreground">Apresentação<br /><span className="text-primary-ink">Sócios</span></h1>
+          <p className="mt-8 text-[clamp(1.38rem,2.5cqw,2.38rem)] text-ink-secondary">{payload.periodLabel}</p>
+          <p className="mt-2 text-[clamp(0.94rem,1.25cqw,1.25rem)] text-muted-foreground">Resultado operacional no regime de caixa do Dashboard. Transferências excluídas.</p>
         </div>
       );
     case 'executive-summary': {
@@ -1175,10 +1361,10 @@ function SlideContent({
         <div className="grid flex-1 content-center gap-8 sm:grid-cols-2 xl:grid-cols-4">
           {metrics.map(metric => (
             <div key={metric.key} className="border-l-2 border-primary-border pl-5">
-              <p className="text-[clamp(0.78rem,1.05cqw,1rem)] font-medium text-ink-secondary">{metric.label}</p>
-              <p className={cn('mt-3 break-words text-[clamp(1.45rem,2.5cqw,2.45rem)] font-bold tracking-tight', TONE_CLASSES[metric.tone], metric.tone === 'result' && metric.value < 0 && 'text-destructive')}>{metric.formattedValue}</p>
-              <p className="mt-4 text-[clamp(0.68rem,0.9cqw,0.9rem)] text-muted-foreground">vs. período anterior</p>
-              <p className="mt-1 text-[clamp(0.74rem,1cqw,1rem)] font-semibold text-foreground">{metric.comparison}</p>
+              <p className="text-[clamp(0.98rem,1.31cqw,1.25rem)] font-medium text-ink-secondary">{metric.label}</p>
+              <p className={cn('mt-3 break-words text-[clamp(1.67rem,2.88cqw,2.82rem)] font-bold tracking-tight', TONE_CLASSES[metric.tone], metric.tone === 'result' && metric.value < 0 && 'text-destructive')}>{metric.formattedValue}</p>
+              <p className="mt-4 text-[clamp(0.92rem,1.22cqw,1.22rem)] text-muted-foreground">vs. período anterior</p>
+              <p className="mt-1 text-[clamp(0.93rem,1.25cqw,1.25rem)] font-semibold text-foreground">{metric.comparison}</p>
             </div>
           ))}
         </div>
@@ -1215,10 +1401,10 @@ function SlideContent({
             { label: 'Contas a receber em aberto', item: receivable, tone: 'text-foreground' },
           ].map(({ label, item, tone }) => (
             <div key={label} className="border-t-4 border-primary pt-7">
-              <p className="text-[clamp(1rem,1.5cqw,1.45rem)] font-semibold text-ink-secondary">{label}</p>
-              <p className={cn('mt-5 text-[clamp(2rem,4cqw,4rem)] font-bold tracking-tight', tone)}>{fmtBRL(item.amount)}</p>
-              <p className="mt-4 text-[clamp(0.9rem,1.2cqw,1.2rem)] text-ink-secondary">{formatIntegerBR(item.count)} título(s)</p>
-              <p className="mt-2 text-[clamp(0.7rem,0.9cqw,0.9rem)] text-muted-foreground">Indicador em aberto - fora do resultado gerencial</p>
+              <p className="text-[clamp(1.25rem,1.88cqw,1.81rem)] font-semibold text-ink-secondary">{label}</p>
+              <p className={cn('mt-5 text-[clamp(2.1rem,4.2cqw,4.2rem)] font-bold tracking-tight', tone)}>{fmtBRL(item.amount)}</p>
+              <p className="mt-4 text-[clamp(1.12rem,1.5cqw,1.5rem)] text-ink-secondary">{formatIntegerBR(item.count)} título(s)</p>
+              <p className="mt-2 text-[clamp(0.94rem,1.22cqw,1.22rem)] text-muted-foreground">Indicador em aberto - fora do resultado gerencial</p>
             </div>
           ))}
         </div>
@@ -1227,7 +1413,7 @@ function SlideContent({
     case 'non-operational':
       return (
         <div className="flex min-h-0 flex-1 flex-col gap-4">
-          <div className="self-start border border-warning-border bg-warning-soft px-4 py-2 text-[clamp(0.72rem,0.95cqw,0.95rem)] font-semibold text-warning">Fora do resultado operacional</div>
+          <div className="self-start border border-warning-border bg-warning-soft px-4 py-2 text-[clamp(0.97rem,1.28cqw,1.28rem)] font-semibold text-warning">Fora do resultado operacional</div>
           <CompositionLayout section={payload.composition} />
         </div>
       );
@@ -1259,8 +1445,8 @@ export default function PresentationSlideCanvas({
       {slide.kind !== 'cover' ? (
         <header className="mb-[3%] shrink-0">
           <div className="mb-3 h-1 w-14 rounded-full bg-primary-strong" />
-          <h2 className="break-words text-[clamp(1.45rem,3cqw,3rem)] font-bold leading-tight tracking-tight text-foreground">{slide.title}</h2>
-          {slide.subtitle ? <p className="mt-2 max-w-5xl break-words text-[clamp(0.7rem,1.05cqw,1rem)] text-ink-secondary">{slide.subtitle}</p> : null}
+          <h2 className="break-words text-[clamp(1.67rem,3.45cqw,3.45rem)] font-bold leading-tight tracking-tight text-foreground">{slide.title}</h2>
+          {slide.subtitle ? <p className="mt-2 max-w-5xl break-words text-[clamp(0.88rem,1.31cqw,1.25rem)] text-ink-secondary">{slide.subtitle}</p> : null}
         </header>
       ) : null}
 
@@ -1270,11 +1456,13 @@ export default function PresentationSlideCanvas({
         onOpenResultDetail={onOpenResultDetail}
       />
 
-      <footer className="mt-[2.5%] flex shrink-0 items-end justify-between gap-5 border-t border-border pt-2 text-[clamp(0.55rem,0.72cqw,0.72rem)] text-muted-foreground">
+      <footer className="mt-[2.5%] flex shrink-0 items-end justify-between gap-5 border-t border-border pt-2 text-[clamp(0.74rem,0.97cqw,0.97rem)] text-muted-foreground">
         <span>
           {slide.kind === 'chapter-foundation'
             ? 'Estrutura da apresentação · Dados não solicitados nesta fase'
-            : slide.chapter === 'revenue'
+            : slide.kind === 'revenue-expenses-monthly'
+              ? `${REVENUE_EXPENSES_MONTHLY_SOURCE_FOOTER} · ${presentationGeneratedLabel(generatedAt)}`
+              : slide.chapter === 'revenue'
               ? `${REVENUE_SOURCE_FOOTER} · ${presentationGeneratedLabel(generatedAt)}`
               : slide.chapter === 'expenses'
                 ? `${EXPENSES_SOURCE_FOOTER} · ${presentationGeneratedLabel(generatedAt)}`

@@ -68,7 +68,7 @@ describe('composição determinística da Apresentação Sócios', () => {
       'revenue-summary', 'revenue-gross-net', 'revenue-by-brand', 'revenue-weekdays', 'revenue-history',
     ]);
     expect(data.slides.filter(slide => slide.chapter === 'expenses').map(slide => slide.kind)).toEqual([
-      'expenses-summary', 'expenses-tree', 'expenses-rolling', 'expenses-history',
+      'expenses-summary', 'expenses-tree', 'expenses-rolling', 'expenses-history', 'revenue-expenses-monthly',
     ]);
     expect(data.slides.filter(slide => slide.chapter === 'results').map(slide => slide.kind)).toEqual([
       'results-summary',
@@ -80,6 +80,31 @@ describe('composição determinística da Apresentação Sócios', () => {
     expect(data.slides.filter(slide => slide.chapter === 'insights').map(slide => slide.kind))
       .toEqual(['insights']);
     expect(data.slides.every(isPresentationSlideExportable)).toBe(true);
+  });
+
+  it('não publica Receita líquida × Despesa por mês sem Faturamento anexado', () => {
+    const expenses = createPresentationExpensesData();
+    const data = attachPresentationExpenses(createPresentationSociosData(), {
+      state: 'available', data: expenses, fetchedAt: expenses.generatedAt,
+    });
+    expect(data.slides.some(slide => slide.kind === 'revenue-expenses-monthly')).toBe(false);
+  });
+
+  it('esvazia Receita líquida × Despesa por mês quando o ano do mês selecionado está fora do seletor de uma das fontes, mas mantém o slide exportável', () => {
+    const revenue = createPresentationRevenueData();
+    const expenses = structuredClone(createPresentationExpensesData());
+    expenses.requestedYears = [2024, 2025];
+    const withRevenue = attachPresentationRevenue(createPresentationSociosData(), {
+      state: 'available', data: revenue, fetchedAt: revenue.generatedAt,
+    });
+    const data = attachPresentationExpenses(withRevenue, {
+      state: 'available', data: expenses, fetchedAt: expenses.generatedAt,
+    });
+    const slide = data.slides.find(candidate => candidate.kind === 'revenue-expenses-monthly');
+    expect(slide).toBeDefined();
+    expect(slide!.availability.state).toBe('available');
+    expect(slide!.availability.state === 'available' && slide!.availability.data.points).toEqual([]);
+    expect(isPresentationSlideExportable(slide!)).toBe(true);
   });
 
   it('pagina de três em três e conserva o ranking do contrato no registry único', () => {

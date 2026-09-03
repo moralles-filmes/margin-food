@@ -14,6 +14,7 @@ import type {
   PresentationExpenseNode,
   PresentationResultsData,
   PresentationInsight,
+  PresentationRevenueExpenseMonthPoint,
   PresentationSlide,
   PresentationTimeSeries,
 } from '@/domain/financeiro/presentation';
@@ -30,6 +31,7 @@ import {
   presentationGeneratedLabel,
   presentationActionStatusLabel,
   presentationDecisionStatusLabel,
+  revenueExpensesYearMissingMessage,
 } from '@/lib/presentationFormatting';
 import { isPresentationSlideExportable } from '@/lib/presentationSlides';
 import { fmtBRL, fmtBRLCompact, formatDateValueBR, formatIntegerBR, formatPercentBR } from '@/lib/formatters';
@@ -49,12 +51,19 @@ const COLOR = {
   revenue: '6EE7B7',
   expense: 'FDA4AF',
   warning: 'FDE68A',
+  // Série por ano dos gráficos de linha mensais — os tokens --chart-* são
+  // calibrados para fundo claro; sobre o fundo escuro do PPTX precisam de
+  // hexes claros dedicados (mesma paleta do PDF e do canvas).
+  series1: '7AA2F7',
+  series2: 'C4B5FD',
+  series3: 'FCD34D',
 } as const;
 
 const REVENUE_SOURCE_FOOTER = 'Faturamento bruto — Fechamento de Caixa · Data local do fechamento';
 const EXPENSES_SOURCE_FOOTER = 'Despesas financeiras — DFC · Regime de caixa';
 const RESULTS_SOURCE_FOOTER = 'Resultado operacional — mesmo regime de caixa do Dashboard · Fonte: get_fin_presentation_socios';
 const INSIGHTS_SOURCE_FOOTER = 'Insights determinísticos · fonte canônica identificada em cada insight';
+const REVENUE_EXPENSES_MONTHLY_SOURCE_FOOTER = 'Receita líquida — livro razão · Despesas — DFC · ambos em regime de caixa';
 
 function abortIfRequested(signal?: AbortSignal): void {
   if (signal?.aborted) throw new DOMException('Exportação cancelada.', 'AbortError');
@@ -101,7 +110,9 @@ function addFooter(
   slide.addText(
     source.kind === 'chapter-foundation'
       ? `Estrutura da apresentação · Dados não solicitados nesta fase · Slide ${slideNumber} de ${totalSlides}`
-      : source.chapter === 'revenue'
+      : source.kind === 'revenue-expenses-monthly'
+        ? `${REVENUE_EXPENSES_MONTHLY_SOURCE_FOOTER} · ${presentationGeneratedLabel(data.generatedAt)} · Slide ${slideNumber} de ${totalSlides}`
+        : source.chapter === 'revenue'
         ? `${REVENUE_SOURCE_FOOTER} · ${presentationGeneratedLabel(data.generatedAt)} · Slide ${slideNumber} de ${totalSlides}`
         : source.chapter === 'expenses'
           ? `${EXPENSES_SOURCE_FOOTER} · ${presentationGeneratedLabel(data.generatedAt)} · Slide ${slideNumber} de ${totalSlides}`
@@ -374,45 +385,157 @@ function addRevenueWeekdays(
   });
 }
 
+const MONTHLY_LINE_CHART_MONTH_LABELS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+/** Cores por ano (não semânticas de receita/despesa) — mesma paleta do canvas e do PDF. */
+const MONTHLY_LINE_CHART_YEAR_COLORS = [COLOR.series1, COLOR.series2, COLOR.series3];
+
+interface PptxMonthlyLinePoint {
+  month: number;
+  state: 'available' | 'empty' | 'unavailable';
+  value: number;
+}
+
+interface PptxMonthlyLineSeries {
+  label: string;
+  color: string;
+  points: readonly PptxMonthlyLinePoint[];
+}
+
+/** Espelha `MonthlyLineChart` do canvas (mesma escala, mesmos buracos e cápsulas) em shapes PptxGenJS. */
+function addMonthlyLineChart(
+  slide: PptxGenJS.Slide,
+  pptx: PptxGenJS,
+  series: readonly PptxMonthlyLineSeries[],
+  emptyMessage: string,
+): void {
+  const left = 1.25;
+  const right = 12.55;
+  const top = 1.90;
+  const bottom = 5.90;
+  const slot = (right - left) / 12;
+  const x = (month: number) => left + slot * (month - 1) + slot / 2;
+
+  const availableValues = series.flatMap(item => item.points.filter(point => point.state === 'available').map(point => point.value));
+  if (availableValues.length === 0) {
+    addEmpty(slide, pptx, emptyMessage);
+    return;
+  }
+
+  const rawMax = Math.max(0, ...availableValues);
+  const rawMin = Math.min(0, ...availableValues);
+  const spread = rawMax - rawMin;
+  const max = rawMax + Math.max(spread * 0.18, 1);
+  const min = rawMin - (rawMin < 0 ? Math.max(spread * 0.08, 1) : 0);
+  const range = Math.max(max - min, 1);
+  const y = (value: number) => bottom - ((value - min) / range) * (bottom - top);
+
+  for (let index = 0; index < 4; index += 1) {
+    const value = max - ((max - min) * index) / 3;
+    const gridY = y(value);
+    slide.addShape(pptx.ShapeType.line, {
+      x: left, y: gridY, w: right - left, h: 0,
+      line: { color: COLOR.subtle, transparency: 35, width: 0.7 },
+    });
+    slide.addText(fmtBRLCompact(value), {
+      x: 0.58, y: gridY - 0.1, w: 0.62, h: 0.18,
+      fontFace: 'Aptos', fontSize: 9, color: COLOR.muted, align: 'right', margin: 0, fit: 'shrink',
+    });
+  }
+  if (min < 0) {
+    slide.addShape(pptx.ShapeType.line, { x: left, y: y(0), w: right - left, h: 0, line: { color: COLOR.muted, width: 1 } });
+  }
+
+  MONTHLY_LINE_CHART_MONTH_LABELS.forEach((label, index) => {
+    slide.addText(label, {
+      x: x(index + 1) - slot / 2, y: 5.98, w: slot, h: 0.2,
+      fontFace: 'Aptos', fontSize: 9, color: COLOR.muted, align: 'center', margin: 0,
+    });
+  });
+
+  series.forEach(item => {
+    let previous: { x: number; y: number } | null = null;
+    item.points.forEach(point => {
+      if (point.state !== 'available') {
+        previous = null;
+        return;
+      }
+      const current = { x: x(point.month), y: y(point.value) };
+      if (previous) {
+        slide.addShape(pptx.ShapeType.line, {
+          x: previous.x, y: previous.y, w: current.x - previous.x, h: current.y - previous.y,
+          line: { color: item.color, width: 2.25, beginArrowType: 'none', endArrowType: 'none' },
+        });
+      }
+      previous = current;
+    });
+  });
+
+  series.forEach(item => {
+    item.points.filter(point => point.state === 'available').forEach(point => {
+      slide.addShape(pptx.ShapeType.ellipse, {
+        x: x(point.month) - 0.05, y: y(point.value) - 0.05, w: 0.10, h: 0.10,
+        line: { color: item.color, transparency: 100 }, fill: { color: item.color },
+      });
+    });
+  });
+
+  const labelsByMonth = new Map<number, Array<{ color: string; value: number; y: number }>>();
+  series.forEach(item => {
+    item.points.forEach(point => {
+      if (point.state !== 'available') return;
+      const entries = labelsByMonth.get(point.month) ?? [];
+      entries.push({ color: item.color, value: point.value, y: y(point.value) });
+      labelsByMonth.set(point.month, entries);
+    });
+  });
+  labelsByMonth.forEach((entries, month) => {
+    [...entries].sort((left0, right0) => left0.y - right0.y).forEach((entry, index) => {
+      const text = fmtBRLCompact(entry.value);
+      const width = Math.max(text.length * 0.062 + 0.16, 0.42);
+      const labelY = Math.max(entry.y - 0.05 - index * 0.24, top + 0.02);
+      slide.addShape(pptx.ShapeType.roundRect, {
+        x: x(month) - width / 2, y: labelY - 0.11, w: width, h: 0.22,
+        line: { color: entry.color, width: 0.75 },
+        fill: { color: COLOR.background },
+      });
+      slide.addText(text, {
+        x: x(month) - width / 2, y: labelY - 0.11, w: width, h: 0.22,
+        fontFace: 'Aptos', fontSize: 9, bold: true, color: entry.color,
+        align: 'center', valign: 'middle', margin: 0, fit: 'shrink',
+      });
+    });
+  });
+
+  let legendX = 9.0;
+  const legendY = 1.5;
+  series.forEach(item => {
+    slide.addShape(pptx.ShapeType.line, { x: legendX, y: legendY, w: 0.3, h: 0, line: { color: item.color, width: 2.25 } });
+    slide.addText(item.label, {
+      x: legendX + 0.36, y: legendY - 0.11, w: 1.4, h: 0.22,
+      fontFace: 'Aptos', fontSize: 11, color: COLOR.white, margin: 0, fit: 'shrink',
+    });
+    legendX += 0.36 + item.label.length * 0.075 + 0.5;
+  });
+}
+
 function addRevenueHistory(
   slide: PptxGenJS.Slide,
   pptx: PptxGenJS,
   revenue: PresentationRevenueData,
 ): void {
-  const monthLabels = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-  const left = 1.25;
-  const cellWidth = 0.94;
-  monthLabels.forEach((label, index) => {
-    slide.addText(label, {
-      x: left + index * cellWidth, y: 1.62, w: cellWidth - 0.04, h: 0.2,
-      fontFace: 'Aptos', fontSize: 10, bold: true, color: COLOR.muted, align: 'center', margin: 0,
-    });
+  const series = revenue.requestedYears.map((year, index) => {
+    const pointsByMonth = new Map(revenue.history.filter(point => point.year === year).map(point => [point.month, point]));
+    return {
+      label: String(year),
+      color: MONTHLY_LINE_CHART_YEAR_COLORS[index % MONTHLY_LINE_CHART_YEAR_COLORS.length],
+      points: Array.from({ length: 12 }, (_, monthIndex) => {
+        const month = monthIndex + 1;
+        const point = pointsByMonth.get(month);
+        return { month, state: point?.state ?? 'unavailable', value: point?.total ?? 0 };
+      }),
+    };
   });
-  revenue.requestedYears.forEach((year, yearIndex) => {
-    const y = 2.02 + yearIndex * 1.28;
-    slide.addText(String(year), {
-      x: 0.68, y: y + 0.35, w: 0.52, h: 0.25,
-      fontFace: 'Aptos', fontSize: 14, bold: true, color: COLOR.white, margin: 0,
-    });
-    revenue.history.filter(point => point.year === year).forEach((point, monthIndex) => {
-      const x = left + monthIndex * cellWidth;
-      slide.addShape(pptx.ShapeType.roundRect, {
-        x, y, w: cellWidth - 0.06, h: 0.9,
-        line: { color: point.state === 'available' ? COLOR.gold : COLOR.subtle, width: 0.8 },
-        fill: { color: COLOR.background, transparency: 100 },
-      });
-      slide.addText(point.state === 'available' ? fmtBRLCompact(point.total) : '—', {
-        x: x + 0.03, y: y + 0.2, w: cellWidth - 0.12, h: 0.22,
-        fontFace: 'Aptos', fontSize: 10, bold: true,
-        color: point.state === 'available' ? COLOR.white : COLOR.muted,
-        align: 'center', margin: 0, fit: 'shrink',
-      });
-      slide.addText(point.state === 'available' ? `${point.closingCount} fecha.` : point.state === 'empty' ? 'vazio' : 's/ cobertura', {
-        x: x + 0.03, y: y + 0.52, w: cellWidth - 0.12, h: 0.15,
-        fontFace: 'Aptos', fontSize: 8, color: COLOR.muted, align: 'center', margin: 0, fit: 'shrink',
-      });
-    });
-  });
+  addMonthlyLineChart(slide, pptx, series, 'Sem meses com fechamento de caixa nos anos selecionados.');
 }
 
 function expensePeriodText(period: PresentationExpensesData['current']): string {
@@ -503,18 +626,44 @@ function addExpensesRolling(slide: PptxGenJS.Slide, pptx: PptxGenJS, expenses: P
 }
 
 function addExpensesHistory(slide: PptxGenJS.Slide, pptx: PptxGenJS, expenses: PresentationExpensesData): void {
-  const left = 1.25; const cellWidth = 0.94;
-  ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'].forEach((label, index) => slide.addText(label, { x: left + index * cellWidth, y: 1.62, w: cellWidth - 0.04, h: 0.2, fontFace: 'Aptos', fontSize: 10, bold: true, color: COLOR.muted, align: 'center', margin: 0 }));
-  expenses.requestedYears.forEach((year, row) => {
-    const y = 2.02 + row * 1.28;
-    slide.addText(String(year), { x: 0.68, y: y + 0.35, w: 0.52, h: 0.25, fontFace: 'Aptos', fontSize: 14, bold: true, color: COLOR.white, margin: 0 });
-    expenses.history.filter(point => point.year === year).forEach((point, index) => {
-      const x = left + index * cellWidth;
-      slide.addShape(pptx.ShapeType.roundRect, { x, y, w: cellWidth - 0.06, h: 0.9, line: { color: point.state === 'available' ? COLOR.expense : COLOR.subtle, width: 0.8 }, fill: { color: COLOR.background, transparency: 100 } });
-      slide.addText(point.state === 'available' ? fmtBRLCompact(point.total) : '—', { x: x + 0.03, y: y + 0.2, w: cellWidth - 0.12, h: 0.22, fontFace: 'Aptos', fontSize: 10, bold: true, color: point.state === 'available' ? COLOR.white : COLOR.muted, align: 'center', margin: 0, fit: 'shrink' });
-      slide.addText(point.state === 'available' ? `${point.quantity} lanç.` : point.state === 'empty' ? 'vazio' : 's/ cobertura', { x: x + 0.03, y: y + 0.52, w: cellWidth - 0.12, h: 0.15, fontFace: 'Aptos', fontSize: 8, color: COLOR.muted, align: 'center', margin: 0, fit: 'shrink' });
-    });
+  const series = expenses.requestedYears.map((year, index) => {
+    const pointsByMonth = new Map(expenses.history.filter(point => point.year === year).map(point => [point.month, point]));
+    return {
+      label: String(year),
+      color: MONTHLY_LINE_CHART_YEAR_COLORS[index % MONTHLY_LINE_CHART_YEAR_COLORS.length],
+      points: Array.from({ length: 12 }, (_, monthIndex) => {
+        const month = monthIndex + 1;
+        const point = pointsByMonth.get(month);
+        return { month, state: point?.state ?? 'unavailable', value: point?.total ?? 0 };
+      }),
+    };
   });
+  addMonthlyLineChart(slide, pptx, series, 'Sem despesas realizadas nos anos selecionados.');
+}
+
+function addRevenueExpensesMonthly(
+  slide: PptxGenJS.Slide,
+  pptx: PptxGenJS,
+  year: number,
+  points: readonly PresentationRevenueExpenseMonthPoint[],
+): void {
+  if (points.length === 0) {
+    addEmpty(slide, pptx, revenueExpensesYearMissingMessage(year));
+    return;
+  }
+  const series: PptxMonthlyLineSeries[] = [
+    {
+      label: 'Receita líquida',
+      color: COLOR.revenue,
+      points: points.map(point => ({ month: point.month, state: point.netRevenue.state, value: point.netRevenue.total })),
+    },
+    {
+      label: 'Despesa',
+      color: COLOR.expense,
+      points: points.map(point => ({ month: point.month, state: point.expense.state, value: point.expense.total })),
+    },
+  ];
+  addMonthlyLineChart(slide, pptx, series, 'Sem receita líquida ou despesa disponível nos meses deste ano.');
 }
 
 function addResultsSummary(slide: PptxGenJS.Slide, pptx: PptxGenJS, results: PresentationResultsData): void {
@@ -1353,6 +1502,9 @@ function addSlideContent(slide: PptxGenJS.Slide, pptx: PptxGenJS, source: Presen
     case 'expenses-history':
       addExpensesHistory(slide, pptx, payload.expenses);
       break;
+    case 'revenue-expenses-monthly':
+      addRevenueExpensesMonthly(slide, pptx, payload.year, payload.points);
+      break;
     case 'results-summary':
       addResultsSummary(slide, pptx, payload.results);
       break;
@@ -1420,6 +1572,9 @@ function slideSourceNotes(source: PresentationSlide): string {
   }
   if (source.chapter === 'revenue') {
     return '[Sources]\n- public.financeiro_fechamento_caixa.faturamento_bruto\n- data local: public.financeiro_fechamento_caixa.data\n- líquido por loja: livro razão, categoria vinculada em financeiro_fechamento_marcas.categoria_id\n- detalhamento por marcas não somado novamente';
+  }
+  if (source.kind === 'revenue-expenses-monthly') {
+    return '[Sources]\n- receita líquida: public.fin_lancamentos; tipo=RECEITA; status REALIZADO/CONCILIADO; sem rateio (categoria_id direto)\n- despesas: public.fin_lancamentos + public.fin_lancamento_rateios; DFC\n- data efetiva: COALESCE(data_pagamento, conciliado_em::date, data_competencia); regime de caixa\n- excluir_dos_totais (categoria) e excluir_dos_relatorios (lançamento) fora dos totais\n- conciliações pendentes e transferências excluídas';
   }
   if (source.chapter === 'expenses') {
     return '[Sources]\n- public.fin_lancamentos\n- public.fin_lancamento_rateios\n- DFC; regime de caixa\n- data efetiva: COALESCE(data_pagamento, conciliado_em::date, data_competencia)\n- rateio substitui categoria do lançamento\n- transferências e conciliações pendentes excluídas';

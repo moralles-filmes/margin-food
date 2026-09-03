@@ -103,14 +103,14 @@ function PresentationScreenViewport(props: ComponentProps<typeof PresentationSli
   }, []);
 
   return (
-    <div ref={viewportRef} className="relative aspect-video w-full overflow-hidden" data-testid="presentation-slide-viewport">
+    <div ref={viewportRef} className="relative h-full w-full overflow-hidden" data-testid="presentation-slide-viewport">
       <div
-        className="absolute left-0 top-0"
+        className="absolute left-1/2 top-1/2"
         style={{
           width: PRESENTATION_DESIGN_WIDTH,
           height: PRESENTATION_DESIGN_HEIGHT,
-          transform: `scale(${scale})`,
-          transformOrigin: 'top left',
+          transform: `translate(-50%, -50%) scale(${scale})`,
+          transformOrigin: 'center',
         }}
       >
         <PresentationSlideCanvas {...props} />
@@ -447,8 +447,8 @@ export default function PresentationMode({
           </div>
         ) : null}
 
-        <main className="flex min-h-0 flex-1 items-center justify-center overflow-hidden p-2 sm:p-4">
-          <div className="w-full max-w-[min(1600px,calc((100dvh-8rem)*16/9))]">
+        <main className="flex min-h-0 flex-1 overflow-hidden p-2 sm:p-4">
+          <div className="h-full w-full">
             <PresentationScreenViewport
               key={currentSlide.id}
               slide={currentSlide}

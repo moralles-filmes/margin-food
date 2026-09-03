@@ -2,14 +2,18 @@ import JSZip from 'jszip';
 import { describe, expect, it, vi } from 'vitest';
 import { createPresentationPdfBlob } from '@/lib/presentationPdfExport';
 import { createPresentationPptxBlob } from '@/lib/presentationPptxExport';
-import { attachPresentationPlan } from '@/lib/financeiroPresentationAdapter';
+import {
+  attachPresentationExpenses,
+  attachPresentationPlan,
+  attachPresentationRevenue,
+} from '@/lib/financeiroPresentationAdapter';
 import { isPresentationSlideExportable } from '@/lib/presentationSlides';
 import {
   createPresentationPlanData,
   createPresentationSociosData,
 } from '@/test/fixtures/presentationSocios';
-import { createPresentationWithRevenue } from '@/test/fixtures/presentationRevenue';
-import { createPresentationWithExpenses } from '@/test/fixtures/presentationExpenses';
+import { createPresentationRevenueData, createPresentationWithRevenue } from '@/test/fixtures/presentationRevenue';
+import { createPresentationExpensesData, createPresentationWithExpenses } from '@/test/fixtures/presentationExpenses';
 import { createPresentationWithInsights } from '@/test/fixtures/presentationInsights';
 
 async function readPdfText(blob: Blob): Promise<string> {
@@ -117,6 +121,30 @@ describe('exportações da Apresentação Sócios', () => {
     expect(slideXml).toContain('R$1.200,00');
     expect(slideXml).toContain('Insumos');
     expect(notesXml).toContain('regime de caixa');
+    expect(`${pdfText}\n${slideXml}\n${notesXml}`).not.toMatch(/Infinity|NaN/);
+  });
+
+  it('exporta Receita líquida × Despesa por mês com rótulo compacto e fontes das duas origens em PDF e PowerPoint', async () => {
+    const revenue = createPresentationRevenueData();
+    const expenses = createPresentationExpensesData();
+    const withRevenue = attachPresentationRevenue(createPresentationSociosData(), {
+      state: 'available', data: revenue, fetchedAt: revenue.generatedAt,
+    });
+    const data = attachPresentationExpenses(withRevenue, {
+      state: 'available', data: expenses, fetchedAt: expenses.generatedAt,
+    });
+    expect(data.slides.some(slide => slide.kind === 'revenue-expenses-monthly')).toBe(true);
+
+    const pdfText = await readPdfText(await createPresentationPdfBlob(data));
+    expect(pdfText).toContain('Receita líquida');
+    expect(pdfText).toContain('R$2,7k');
+    expect(pdfText).not.toMatch(/Infinity|NaN/);
+
+    const { slideXml, notesXml } = await readPptx(await createPresentationPptxBlob(data));
+    expect(slideXml).toContain('Receita líquida');
+    expect(slideXml).toContain('R$2,7k');
+    expect(notesXml).toContain('receita líquida: public.fin_lancamentos');
+    expect(notesXml).toContain('despesas: public.fin_lancamentos + public.fin_lancamento_rateios; DFC');
     expect(`${pdfText}\n${slideXml}\n${notesXml}`).not.toMatch(/Infinity|NaN/);
   });
 

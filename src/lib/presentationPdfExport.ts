@@ -13,6 +13,7 @@ import type {
   PresentationExpenseNode,
   PresentationResultsData,
   PresentationInsight,
+  PresentationRevenueExpenseMonthPoint,
   PresentationSlide,
   PresentationTimeSeries,
 } from '@/domain/financeiro/presentation';
@@ -29,6 +30,7 @@ import {
   presentationGeneratedLabel,
   presentationActionStatusLabel,
   presentationDecisionStatusLabel,
+  revenueExpensesYearMissingMessage,
 } from '@/lib/presentationFormatting';
 import { isPresentationSlideExportable } from '@/lib/presentationSlides';
 import { fmtBRL, fmtBRLCompact, formatDateValueBR, formatIntegerBR, formatPercentBR } from '@/lib/formatters';
@@ -60,12 +62,19 @@ const COLOR = {
   revenue: '#6ee7b7',
   expense: '#fda4af',
   warning: '#fde68a',
+  // Série por ano dos gráficos de linha mensais — os tokens --chart-* são
+  // calibrados para fundo claro; sobre o fundo escuro do PDF precisam de
+  // hexes claros dedicados.
+  series1: '#7aa2f7',
+  series2: '#c4b5fd',
+  series3: '#fcd34d',
 } as const;
 
 const REVENUE_SOURCE_FOOTER = 'Faturamento bruto — Fechamento de Caixa · Data local do fechamento';
 const EXPENSES_SOURCE_FOOTER = 'Despesas financeiras — DFC · Regime de caixa';
 const RESULTS_SOURCE_FOOTER = 'Resultado operacional — mesmo regime de caixa do Dashboard · Fonte: get_fin_presentation_socios';
 const INSIGHTS_SOURCE_FOOTER = 'Insights determinísticos · fonte canônica identificada em cada insight';
+const REVENUE_EXPENSES_MONTHLY_SOURCE_FOOTER = 'Receita líquida — livro razão · Despesas — DFC · ambos em regime de caixa';
 
 function abortIfRequested(signal?: AbortSignal): void {
   if (signal?.aborted) throw new DOMException('Exportação cancelada.', 'AbortError');
@@ -127,7 +136,9 @@ function drawFooter(
   doc.text(
     slide.kind === 'chapter-foundation'
       ? `Estrutura da apresentação · Dados não solicitados nesta fase · Slide ${slideNumber} de ${totalSlides}`
-      : slide.chapter === 'revenue'
+      : slide.kind === 'revenue-expenses-monthly'
+        ? `${REVENUE_EXPENSES_MONTHLY_SOURCE_FOOTER} · ${presentationGeneratedLabel(data.generatedAt)} · Slide ${slideNumber} de ${totalSlides}`
+        : slide.chapter === 'revenue'
         ? `${REVENUE_SOURCE_FOOTER} · ${presentationGeneratedLabel(data.generatedAt)} · Slide ${slideNumber} de ${totalSlides}`
         : slide.chapter === 'expenses'
           ? `${EXPENSES_SOURCE_FOOTER} · ${presentationGeneratedLabel(data.generatedAt)} · Slide ${slideNumber} de ${totalSlides}`
@@ -369,35 +380,142 @@ function drawRevenueWeekdays(doc: jsPDF, revenue: PresentationRevenueData): void
   });
 }
 
-function drawRevenueHistory(doc: jsPDF, revenue: PresentationRevenueData): void {
-  const monthLabels = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-  const left = 31;
-  const cellWidth = 22.5;
-  monthLabels.forEach((label, index) => {
+const MONTHLY_LINE_CHART_MONTH_LABELS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+/** Cores por ano (não semânticas de receita/despesa) — mesma paleta do canvas. */
+const MONTHLY_LINE_CHART_YEAR_COLORS = [COLOR.series1, COLOR.series2, COLOR.series3];
+
+interface PdfMonthlyLinePoint {
+  month: number;
+  state: 'available' | 'empty' | 'unavailable';
+  value: number;
+}
+
+interface PdfMonthlyLineSeries {
+  label: string;
+  color: string;
+  points: readonly PdfMonthlyLinePoint[];
+}
+
+/** Espelha `MonthlyLineChart` do canvas (mesma escala, mesmos buracos e cápsulas) em vetores jsPDF. */
+function drawMonthlyLineChart(doc: jsPDF, series: readonly PdfMonthlyLineSeries[], emptyMessage: string): void {
+  const left = 35;
+  const right = 301;
+  const top = 54;
+  const bottom = 140;
+  const slot = (right - left) / 12;
+  const x = (month: number) => left + slot * (month - 1) + slot / 2;
+
+  const availableValues = series.flatMap(item => item.points.filter(point => point.state === 'available').map(point => point.value));
+  if (availableValues.length === 0) {
+    drawEmpty(doc, emptyMessage);
+    return;
+  }
+
+  const rawMax = Math.max(0, ...availableValues);
+  const rawMin = Math.min(0, ...availableValues);
+  const spread = rawMax - rawMin;
+  const max = rawMax + Math.max(spread * 0.18, 1);
+  const min = rawMin - (rawMin < 0 ? Math.max(spread * 0.08, 1) : 0);
+  const range = Math.max(max - min, 1);
+  const y = (value: number) => bottom - ((value - min) / range) * (bottom - top);
+
+  for (let index = 0; index < 4; index += 1) {
+    const value = max - ((max - min) * index) / 3;
+    const gridY = y(value);
+    setColor(doc, COLOR.subtle, 'draw');
+    doc.setLineWidth(0.2);
+    doc.line(left, gridY, right, gridY);
     setColor(doc, COLOR.muted);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7);
-    doc.text(label, left + index * cellWidth + cellWidth / 2, 54, { align: 'center' });
-  });
-  revenue.requestedYears.forEach((year, yearIndex) => {
-    const y = 66 + yearIndex * 29;
-    setColor(doc, COLOR.white);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.text(String(year), 18, y + 8);
-    revenue.history.filter(point => point.year === year).forEach((point, monthIndex) => {
-      const x = left + monthIndex * cellWidth;
-      setColor(doc, point.state === 'available' ? COLOR.gold : COLOR.subtle, 'draw');
-      doc.roundedRect(x, y, cellWidth - 1.5, 20, 1, 1, 'S');
-      setColor(doc, point.state === 'available' ? COLOR.white : COLOR.muted);
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(6.5);
-      doc.text(point.state === 'available' ? fmtBRLCompact(point.total) : '-', x + (cellWidth - 1.5) / 2, y + 8, { align: 'center', maxWidth: cellWidth - 3 });
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(5.5);
-      doc.text(point.state === 'available' ? `${point.closingCount} fecha.` : point.state === 'empty' ? 'vazio' : 's/ cobertura', x + (cellWidth - 1.5) / 2, y + 15, { align: 'center', maxWidth: cellWidth - 3 });
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6.5);
+    doc.text(fmtBRLCompact(value), left - 3, gridY + 1.5, { align: 'right' });
+  }
+  if (min < 0) {
+    setColor(doc, COLOR.muted, 'draw');
+    doc.setLineWidth(0.35);
+    doc.line(left, y(0), right, y(0));
+  }
+
+  setColor(doc, COLOR.muted);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.5);
+  MONTHLY_LINE_CHART_MONTH_LABELS.forEach((label, index) => doc.text(label, x(index + 1), 148, { align: 'center' }));
+
+  series.forEach(item => {
+    setColor(doc, item.color, 'draw');
+    doc.setLineWidth(1.1);
+    let previous: { x: number; y: number } | null = null;
+    item.points.forEach(point => {
+      if (point.state !== 'available') {
+        previous = null;
+        return;
+      }
+      const current = { x: x(point.month), y: y(point.value) };
+      if (previous) doc.line(previous.x, previous.y, current.x, current.y);
+      previous = current;
     });
   });
+
+  series.forEach(item => {
+    setColor(doc, item.color, 'fill');
+    item.points.filter(point => point.state === 'available').forEach(point => {
+      doc.circle(x(point.month), y(point.value), 1.4, 'F');
+    });
+  });
+
+  const labelsByMonth = new Map<number, Array<{ color: string; value: number; y: number }>>();
+  series.forEach(item => {
+    item.points.forEach(point => {
+      if (point.state !== 'available') return;
+      const entries = labelsByMonth.get(point.month) ?? [];
+      entries.push({ color: item.color, value: point.value, y: y(point.value) });
+      labelsByMonth.set(point.month, entries);
+    });
+  });
+  labelsByMonth.forEach((entries, month) => {
+    [...entries].sort((left0, right0) => left0.y - right0.y).forEach((entry, index) => {
+      const text = fmtBRLCompact(entry.value);
+      const labelY = Math.max(entry.y - 4 - index * 6.5, top + 3);
+      const width = Math.max(text.length * 1.55 + 3, 8);
+      setColor(doc, COLOR.background, 'fill');
+      setColor(doc, entry.color, 'draw');
+      doc.setLineWidth(0.25);
+      doc.roundedRect(x(month) - width / 2, labelY - 3, width, 4.6, 1.1, 1.1, 'FD');
+      setColor(doc, entry.color);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(5.2);
+      doc.text(text, x(month), labelY, { align: 'center' });
+    });
+  });
+
+  let legendX = 214;
+  const legendY = 42;
+  series.forEach(item => {
+    setColor(doc, item.color, 'draw');
+    doc.setLineWidth(1);
+    doc.line(legendX, legendY - 1.5, legendX + 6, legendY - 1.5);
+    setColor(doc, COLOR.white);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.text(item.label, legendX + 8, legendY);
+    legendX += 8 + item.label.length * 1.7 + 10;
+  });
+}
+
+function drawRevenueHistory(doc: jsPDF, revenue: PresentationRevenueData): void {
+  const series = revenue.requestedYears.map((year, index) => {
+    const pointsByMonth = new Map(revenue.history.filter(point => point.year === year).map(point => [point.month, point]));
+    return {
+      label: String(year),
+      color: MONTHLY_LINE_CHART_YEAR_COLORS[index % MONTHLY_LINE_CHART_YEAR_COLORS.length],
+      points: Array.from({ length: 12 }, (_, monthIndex) => {
+        const month = monthIndex + 1;
+        const point = pointsByMonth.get(month);
+        return { month, state: point?.state ?? 'unavailable', value: point?.total ?? 0 };
+      }),
+    };
+  });
+  drawMonthlyLineChart(doc, series, 'Sem meses com fechamento de caixa nos anos selecionados.');
 }
 
 function expensePeriodText(period: PresentationExpensesData['current']): string {
@@ -482,18 +600,39 @@ function drawExpensesRolling(doc: jsPDF, expenses: PresentationExpensesData): vo
 }
 
 function drawExpensesHistory(doc: jsPDF, expenses: PresentationExpensesData): void {
-  const cellWidth = 21.2;
-  ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'].forEach((label, index) => { setColor(doc, COLOR.muted); doc.setFont('helvetica', 'bold'); doc.setFontSize(6.8); doc.text(label, 45 + index * cellWidth, 50, { align: 'center' }); });
-  expenses.requestedYears.forEach((year, row) => {
-    const y = 68 + row * 34;
-    setColor(doc, COLOR.white); doc.setFontSize(9); doc.text(String(year), 20, y + 8);
-    expenses.history.filter(point => point.year === year).forEach((point, index) => {
-      const x = 34.5 + index * cellWidth;
-      setColor(doc, point.state === 'available' ? COLOR.expense : COLOR.subtle, 'draw'); doc.rect(x, y, 20, 21, 'S');
-      setColor(doc, point.state === 'available' ? COLOR.white : COLOR.muted); doc.setFontSize(6); doc.text(point.state === 'available' ? fmtBRLCompact(point.total) : '-', x + 10, y + 9, { align: 'center', maxWidth: 18 });
-      doc.setFontSize(5.5); doc.text(point.state === 'available' ? `${point.quantity} lanc.` : point.state === 'empty' ? 'vazio' : 's/ cobertura', x + 10, y + 16, { align: 'center' });
-    });
+  const series = expenses.requestedYears.map((year, index) => {
+    const pointsByMonth = new Map(expenses.history.filter(point => point.year === year).map(point => [point.month, point]));
+    return {
+      label: String(year),
+      color: MONTHLY_LINE_CHART_YEAR_COLORS[index % MONTHLY_LINE_CHART_YEAR_COLORS.length],
+      points: Array.from({ length: 12 }, (_, monthIndex) => {
+        const month = monthIndex + 1;
+        const point = pointsByMonth.get(month);
+        return { month, state: point?.state ?? 'unavailable', value: point?.total ?? 0 };
+      }),
+    };
   });
+  drawMonthlyLineChart(doc, series, 'Sem despesas realizadas nos anos selecionados.');
+}
+
+function drawRevenueExpensesMonthly(doc: jsPDF, year: number, points: readonly PresentationRevenueExpenseMonthPoint[]): void {
+  if (points.length === 0) {
+    drawEmpty(doc, revenueExpensesYearMissingMessage(year));
+    return;
+  }
+  const series: PdfMonthlyLineSeries[] = [
+    {
+      label: 'Receita liquida',
+      color: COLOR.revenue,
+      points: points.map(point => ({ month: point.month, state: point.netRevenue.state, value: point.netRevenue.total })),
+    },
+    {
+      label: 'Despesa',
+      color: COLOR.expense,
+      points: points.map(point => ({ month: point.month, state: point.expense.state, value: point.expense.total })),
+    },
+  ];
+  drawMonthlyLineChart(doc, series, 'Sem receita liquida ou despesa disponivel nos meses deste ano.');
 }
 
 function drawResultsSummary(doc: jsPDF, results: PresentationResultsData): void {
@@ -1308,6 +1447,9 @@ function drawSlideContent(doc: jsPDF, slide: PresentationSlide): void {
       break;
     case 'expenses-history':
       drawExpensesHistory(doc, payload.expenses);
+      break;
+    case 'revenue-expenses-monthly':
+      drawRevenueExpensesMonthly(doc, payload.year, payload.points);
       break;
     case 'results-summary':
       drawResultsSummary(doc, payload.results);
