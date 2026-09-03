@@ -1,6 +1,6 @@
 import type { IsoDate, NormalizedPresentationPeriod, YearMonth } from './contracts';
 
-export const PRESENTATION_REVENUE_CONTRACT_VERSION = '1.1' as const;
+export const PRESENTATION_REVENUE_CONTRACT_VERSION = '1.2' as const;
 
 export const PRESENTATION_REVENUE_SOURCE = {
   relation: 'public.financeiro_fechamento_caixa',
@@ -67,6 +67,22 @@ export interface PresentationRevenueHistoryPoint {
 }
 
 /**
+ * Receita operacional líquida do livro razão por mês do histórico (mesma
+ * janela de `history`, até três anos solicitados) — mesma regra de
+ * caixa/exclusões de `netRevenue`. `state` é derivado de `entryCount`
+ * (lançamentos operacionais do razão), NUNCA de `PresentationRevenueHistoryPoint.closingCount`
+ * — um mês pode ter razão sem fechamento de caixa e vice-versa.
+ */
+export interface PresentationRevenueNetHistoryPoint {
+  year: number;
+  month: number;
+  yearMonth: YearMonth;
+  state: PresentationRevenueAvailability;
+  total: number;
+  entryCount: number;
+}
+
+/**
  * Faturamento bruto (e, quando a(s) marca(s) do grupo estiverem vinculadas a
  * uma categoria, líquido do livro razão) do mês selecionado, agrupado por
  * marca/loja do Fechamento de Caixa.
@@ -130,6 +146,7 @@ export interface PresentationRevenueData {
   delta: PresentationRevenueDelta;
   weekdays: readonly PresentationRevenueWeekday[];
   history: readonly PresentationRevenueHistoryPoint[];
+  netHistory: readonly PresentationRevenueNetHistoryPoint[];
   byBrand: readonly PresentationRevenueBrandPoint[];
   netRevenue: { current: PresentationRevenueNetSummary; previous: PresentationRevenueNetSummary };
   grossToNet: PresentationRevenueGrossToNet;

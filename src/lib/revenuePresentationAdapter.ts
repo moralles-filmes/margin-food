@@ -15,6 +15,7 @@ import {
   type PresentationRevenueGrossToNetPeriod,
   type PresentationRevenueGrossToNetReason,
   type PresentationRevenueHistoryPoint,
+  type PresentationRevenueNetHistoryPoint,
   type PresentationRevenueNetSummary,
   type PresentationRevenuePeriodCoverage,
   type PresentationRevenuePeriodSummary,
@@ -211,6 +212,22 @@ function readHistoryPoint(value: unknown, path: string): PresentationRevenueHist
   return { year, month, yearMonth, state, total, closingCount };
 }
 
+function readNetHistoryPoint(value: unknown, path: string): PresentationRevenueNetHistoryPoint {
+  const record = readRecord(value, path);
+  const year = readInteger(record.year, `${path}.year`, 1);
+  const month = readInteger(record.month, `${path}.month`, 1);
+  if (year > 9999 || month > 12) return fail(path, 'ano e mês válidos');
+  const yearMonth = readYearMonth(record.yearMonth, `${path}.yearMonth`);
+  if (yearMonth !== `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}`) {
+    return fail(`${path}.yearMonth`, 'coerente com year e month');
+  }
+  const state = readAvailability(record.state, `${path}.state`);
+  const total = readFiniteNumber(record.total, `${path}.total`);
+  const entryCount = readInteger(record.entryCount, `${path}.entryCount`);
+  if ((state === 'available') !== (entryCount > 0)) return fail(path, 'estado coerente com entryCount');
+  return { year, month, yearMonth, state, total, entryCount };
+}
+
 function readNullableUuid(value: unknown, path: string): string | null {
   if (value === null) return null;
   const id = readString(value, path);
@@ -353,6 +370,22 @@ export function adaptPresentationRevenuePayload(payload: unknown): PresentationR
     current: readNetSummary(netRevenueRecord.current, 'payload.netRevenue.current', selectedMonth),
     previous: readNetSummary(netRevenueRecord.previous, 'payload.netRevenue.previous', previousMonth),
   };
+  const netHistory = readArray(record.netHistory, 'payload.netHistory')
+    .map((point, index) => readNetHistoryPoint(point, `payload.netHistory[${index}]`));
+  if (netHistory.length !== requestedYears.length * 12) {
+    return fail('payload.netHistory', 'doze meses por ano solicitado');
+  }
+  netHistory.forEach((point, index) => {
+    const expectedYear = requestedYears[Math.floor(index / 12)];
+    const expectedMonth = index % 12 + 1;
+    if (point.year !== expectedYear || point.month !== expectedMonth) {
+      fail(`payload.netHistory[${index}]`, 'ordenado por ano e mês');
+    }
+  });
+  const selectedNetHistoryPoint = netHistory.find(point => point.yearMonth === selectedMonth);
+  if (selectedNetHistoryPoint && Math.abs(selectedNetHistoryPoint.total - netRevenue.current.total) > 0.011) {
+    return fail('payload.netHistory', 'coerente com netRevenue.current.total no mês selecionado');
+  }
   const byBrand = readByBrand(record.byBrand, 'payload.byBrand', current.total, netRevenue.current.total);
   const grossToNet = readGrossToNet(record.grossToNet, 'payload.grossToNet', current.total, previous.total);
   return {
@@ -372,6 +405,7 @@ export function adaptPresentationRevenuePayload(payload: unknown): PresentationR
     },
     weekdays: parsedWeekdays,
     history,
+    netHistory,
     byBrand,
     netRevenue,
     grossToNet,
@@ -389,6 +423,7 @@ export function createSafeRevenuePayloadDiagnostic(payload: unknown, error: Pres
       contractVersionType: typeof record?.contractVersion,
       weekdayCount: Array.isArray(record?.weekdays) ? record.weekdays.length : undefined,
       historyCount: Array.isArray(record?.history) ? record.history.length : undefined,
+      netHistoryCount: Array.isArray(record?.netHistory) ? record.netHistory.length : undefined,
     },
   };
 }

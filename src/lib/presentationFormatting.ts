@@ -139,6 +139,10 @@ export function formatPresentationSeriesLabel(key: string, granularity: TimeSeri
   return formatDateBR(parseLocalDate(key));
 }
 
+export function revenueExpensesYearMissingMessage(year: number): string {
+  return `Sem histórico de ${year}. Inclua ${year} no seletor de anos do histórico para ver este gráfico.`;
+}
+
 export function presentationGeneratedLabel(generatedAt: string): string {
   const generatedDate = new Date(generatedAt);
   return Number.isNaN(generatedDate.getTime())

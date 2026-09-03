@@ -9,6 +9,7 @@ import type {
   PresentationResultsData,
   PresentationInsightsData,
   PresentationInsight,
+  PresentationRevenueExpenseMonthPoint,
   PresentationSlide,
   PresentationSlidePayload,
   PresentationTimeSeries,
@@ -26,12 +27,15 @@ import type {
 import { hasPresentationNonOperationalValues } from '@/lib/resultsPresentationAdapter';
 
 const MAX_TIME_SERIES_POINTS_PER_SLIDE = 12;
-const MAX_CATEGORY_ROWS_PER_COLUMN = 8;
-const MAX_REVENUE_BRAND_ROWS_PER_SLIDE = 7;
-const MAX_RANKING_ITEMS_PER_COLUMN = 6;
-const MAX_DECISION_ACTIONS_PER_SLIDE = 6;
-const MAX_DECISION_ACTION_CHARACTERS_PER_SLIDE = 900;
-const MAX_INSIGHT_LAYOUT_CHARACTERS_PER_SLIDE = 1_600;
+// Contadores por slide calibrados para o tamanho de fonte da apresentação
+// (PresentationSlideCanvas.tsx) — se a fonte crescer, reduza aqui também,
+// senão as linhas extrapolam a altura fixa do card e o texto se sobrepõe.
+const MAX_CATEGORY_ROWS_PER_COLUMN = 6;
+const MAX_REVENUE_BRAND_ROWS_PER_SLIDE = 5;
+const MAX_RANKING_ITEMS_PER_COLUMN = 5;
+const MAX_DECISION_ACTIONS_PER_SLIDE = 5;
+const MAX_DECISION_ACTION_CHARACTERS_PER_SLIDE = 700;
+const MAX_INSIGHT_LAYOUT_CHARACTERS_PER_SLIDE = 1_300;
 
 export const PRESENTATION_SLIDE_SEQUENCE = [
   'chapter-foundation',
@@ -44,6 +48,7 @@ export const PRESENTATION_SLIDE_SEQUENCE = [
   'expenses-tree',
   'expenses-rolling',
   'expenses-history',
+  'revenue-expenses-monthly',
   'results-summary',
   'results-comparison',
   'results-evolution',
@@ -187,6 +192,62 @@ function expensesSlideAvailability<T extends PresentationSlidePayload>(
   return copyUnavailable<T>(availability)!;
 }
 
+const UNAVAILABLE_STATE_RANK = { error: 3, unavailable: 2, loading: 1, idle: 0 } as const;
+
+/**
+ * Disponibilidade combinada de duas fontes independentes (faturamento e
+ * despesas): "available" só se AMBAS estiverem disponíveis; "empty" se
+ * ambas forem utilizáveis mas pelo menos uma vazia; senão copia o pior
+ * estado não utilizável entre as duas (error > unavailable > loading > idle)
+ * — nunca inventa disponibilidade a partir de uma fonte só.
+ */
+function combinedSlideAvailability<T extends PresentationSlidePayload>(
+  revenue: NonNullable<PresentationSociosData['revenue']>,
+  expenses: NonNullable<PresentationSociosData['expenses']>,
+  createPayload: (revenue: PresentationRevenueData, expenses: PresentationExpensesData) => T,
+): DataAvailability<T> {
+  const revenueUsable = revenue.state === 'available' || revenue.state === 'empty';
+  const expensesUsable = expenses.state === 'available' || expenses.state === 'empty';
+  if (revenueUsable && expensesUsable) {
+    const state = revenue.state === 'available' && expenses.state === 'available' ? 'available' as const : 'empty' as const;
+    const fetchedAts = [revenue.fetchedAt, expenses.fetchedAt]
+      .filter((value): value is string => Boolean(value))
+      .sort();
+    return { state, data: createPayload(revenue.data, expenses.data), fetchedAt: fetchedAts[0] };
+  }
+  if (revenueUsable) return copyUnavailable<T>(expenses)!;
+  if (expensesUsable) return copyUnavailable<T>(revenue)!;
+  const worse = UNAVAILABLE_STATE_RANK[revenue.state] >= UNAVAILABLE_STATE_RANK[expenses.state] ? revenue : expenses;
+  return copyUnavailable<T>(worse)!;
+}
+
+/**
+ * 12 posições Jan..Dez do `year`, cruzando `revenue.netHistory` e
+ * `expenses.history` por `yearMonth`. Vazio quando `year` não está nos
+ * anos solicitados de AMBAS as fontes — nunca preenche buraco com zero.
+ */
+function buildRevenueExpenseMonthPoints(
+  revenue: PresentationRevenueData,
+  expenses: PresentationExpensesData,
+  year: number,
+): PresentationRevenueExpenseMonthPoint[] {
+  if (!revenue.requestedYears.includes(year) || !expenses.requestedYears.includes(year)) return [];
+  const netByYearMonth = new Map(revenue.netHistory.map(point => [point.yearMonth, point]));
+  const expenseByYearMonth = new Map(expenses.history.map(point => [point.yearMonth, point]));
+  return Array.from({ length: 12 }, (_, index) => {
+    const month = index + 1;
+    const yearMonth = `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}`;
+    const netPoint = netByYearMonth.get(yearMonth);
+    const expensePoint = expenseByYearMonth.get(yearMonth);
+    return {
+      month,
+      yearMonth,
+      netRevenue: { state: netPoint?.state ?? 'unavailable', total: netPoint?.total ?? 0 },
+      expense: { state: expensePoint?.state ?? 'unavailable', total: expensePoint?.total ?? 0 },
+    };
+  });
+}
+
 function resultsSlideAvailability<T extends PresentationSlidePayload>(
   availability: NonNullable<PresentationSociosData['results']>,
   createPayload: (results: PresentationResultsData) => T,
@@ -314,7 +375,7 @@ function splitExpenseNode(node: PresentationExpenseNode, maxRows: number): Prese
   return pages;
 }
 
-function paginateExpenseTree(nodes: readonly PresentationExpenseNode[], maxRows = 7): PresentationExpenseNode[][] {
+function paginateExpenseTree(nodes: readonly PresentationExpenseNode[], maxRows = 5): PresentationExpenseNode[][] {
   if (nodes.length === 0) return [[]];
   const parts = nodes.flatMap(node => splitExpenseNode(node, maxRows));
   const pages: PresentationExpenseNode[][] = [];
@@ -467,7 +528,7 @@ export function buildPresentationSlides(data: PresentationSociosData): Presentat
       if (data.results.state === 'available' || data.results.state === 'empty') {
         const nonOperational = data.results.data.nonOperational;
         if (hasPresentationNonOperationalValues(nonOperational.totals, nonOperational.composition)) {
-          const pages = paginateComposition(nonOperational.composition, 5);
+          const pages = paginateComposition(nonOperational.composition, 4);
           pages.forEach((composition, index) => append({
             id: `results-non-operational-${index + 1}`,
             chapter: 'results',
@@ -537,6 +598,28 @@ export function buildPresentationSlides(data: PresentationSociosData): Presentat
           expenses => ({ type: 'expenses-history', expenses }),
         ),
       });
+      if (data.revenue) {
+        const selectedMonth = data.revenue.state === 'available' || data.revenue.state === 'empty'
+          ? data.revenue.data.selectedMonth
+          : data.expenses.state === 'available' || data.expenses.state === 'empty'
+            ? data.expenses.data.selectedMonth
+            : null;
+        const year = selectedMonth ? Number(selectedMonth.slice(0, 4)) : null;
+        append({
+          id: 'revenue-expenses-monthly',
+          chapter: 'expenses',
+          kind: 'revenue-expenses-monthly',
+          title: year ? `Receita líquida × Despesa por mês — ${year}` : 'Receita líquida × Despesa por mês',
+          subtitle: 'Receita operacional líquida do livro razão × despesas realizadas do DFC · regime de caixa · Jan a Dez do ano do mês selecionado.',
+          availability: combinedSlideAvailability(data.revenue, data.expenses, (revenue, expenses) => ({
+            type: 'revenue-expenses-monthly',
+            year: Number(revenue.selectedMonth.slice(0, 4)),
+            points: buildRevenueExpenseMonthPoints(revenue, expenses, Number(revenue.selectedMonth.slice(0, 4))),
+            revenue,
+            expenses,
+          })),
+        });
+      }
       return;
     }
     if (slide.chapter !== 'revenue' || !data.revenue) {
