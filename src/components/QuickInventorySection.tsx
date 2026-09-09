@@ -6,9 +6,10 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Search, Loader2, ClipboardCheck, Package, CheckCircle, AlertTriangle, Zap, RotateCcw, Trash2 } from 'lucide-react';
-import { fmtBRL, formatFixedBR } from '@/lib/formatters';
+import { Search, Loader2, ClipboardCheck, Package, CheckCircle, AlertTriangle, Zap, RotateCcw } from 'lucide-react';
+import { fmtBRL } from '@/lib/formatters';
 import { normalizeSearchText } from '@/lib/utils';
+import QuickInventoryCountList from './inventario/QuickInventoryCountList';
 
 import { useCan } from '@/permissions/hooks';
 interface CountedItem {
@@ -35,6 +36,9 @@ export default function QuickInventorySection() {
   const [categoryFilter, setCategoryFilter] = useState('');
   const [searchResults, setSearchResults] = useState<ProductRow[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
+  const searchInput = useRef<HTMLInputElement>(null);
+  const [focusProductId, setFocusProductId] = useState<string | null>(null);
+  const addingIds = useRef(new Set<string>());
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Counted items
@@ -99,22 +103,33 @@ export default function QuickInventorySection() {
 
   // Add product to count list
   const addToCount = useCallback(async (product: ProductRow) => {
-    // Fetch current saldo
-    const { data } = await supabase.rpc('get_saldo_produtos', {
-      p_produto_ids: [product.id],
-    });
-    const saldo = data?.[0]?.saldo ?? 0;
+    if (addingIds.current.has(product.id)) return;
+    addingIds.current.add(product.id);
+    try {
+      // Fetch current saldo
+      const { data, error } = await supabase.rpc('get_saldo_produtos', {
+        p_produto_ids: [product.id],
+      });
+      if (error) throw error;
+      const saldo = data?.[0]?.saldo ?? 0;
 
-    setCountedItems(prev => [...prev, {
-      productId: product.id,
-      nomeProduto: product.nome_produto,
-      categoria: product.categoria,
-      unidadeMedida: product.unidade_medida,
-      countedQty: '',
-      saldoTeorico: Number(saldo),
-    }]);
-    // Remove from search results
-    setSearchResults(prev => prev.filter(p => p.id !== product.id));
+      setCountedItems(prev => prev.some(item => item.productId === product.id) ? prev : [...prev, {
+        productId: product.id,
+        nomeProduto: product.nome_produto,
+        categoria: product.categoria,
+        unidadeMedida: product.unidade_medida,
+        countedQty: '',
+        saldoTeorico: Number(saldo),
+      }]);
+      // Remove from search results
+      setSearchResults(prev => prev.filter(p => p.id !== product.id));
+      setFocusProductId(product.id);
+    } catch (error) {
+      console.error('Erro ao adicionar produto à contagem:', error);
+      toast.error('Não foi possível adicionar o produto. Tente novamente.');
+    } finally {
+      addingIds.current.delete(product.id);
+    }
   }, []);
 
   // Update counted quantity
@@ -131,7 +146,7 @@ export default function QuickInventorySection() {
 
   // Valid items (have a counted quantity)
   const validItems = useMemo(() =>
-    countedItems.filter(item => item.countedQty !== '' && Number(item.countedQty) >= 0),
+    countedItems.filter(item => item.countedQty !== '' && Number.isFinite(Number(item.countedQty)) && Number(item.countedQty) >= 0),
   [countedItems]);
 
   // Save quick inventory
@@ -184,6 +199,7 @@ export default function QuickInventorySection() {
     setSearchResults([]);
     setSearchTerm('');
     setCategoryFilter('');
+    setFocusProductId(null);
     setSaved(false);
     setSaveResult(null);
     idempotencyKeyRef.current = null;
@@ -243,18 +259,19 @@ export default function QuickInventorySection() {
       {/* Search & Add */}
       <div className="bg-card border border-border rounded-xl p-4 space-y-3">
         <Label className="text-xs font-medium text-foreground">Buscar e adicionar produtos</Label>
-        <div className="flex gap-2">
-          <div className="relative flex-1">
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <div className="relative min-w-0 flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
             <Input
+              ref={searchInput}
               value={searchTerm}
               onChange={e => handleSearchChange(e.target.value)}
               placeholder="Buscar por nome ou SKU..."
-              className="pl-9 h-9 text-xs bg-secondary border-border"
+              className="pl-9 h-12 text-base md:text-base bg-secondary border-border"
             />
           </div>
           <Select value={categoryFilter || 'all'} onValueChange={handleCategoryChange}>
-            <SelectTrigger className="w-32 h-9 text-xs bg-secondary border-border">
+            <SelectTrigger className="h-12 w-full text-base bg-secondary border-border sm:w-48">
               <SelectValue placeholder="Categoria" />
             </SelectTrigger>
             <SelectContent>
@@ -304,53 +321,14 @@ export default function QuickInventorySection() {
               )}
             </p>
           </div>
-          <div className="divide-y divide-border">
-            {countedItems.map(item => {
-              const counted = Number(item.countedQty);
-              const hasDiff = item.countedQty !== '' && counted !== item.saldoTeorico;
-              const diff = item.countedQty !== '' ? counted - item.saldoTeorico : 0;
-
-              return (
-                <div key={item.productId} className="px-4 py-3 flex items-center gap-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-foreground truncate">{item.nomeProduto}</p>
-                    <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                      <span>{item.categoria}</span>
-                      <span>·</span>
-                      <span>Teórico: {formatFixedBR(item.saldoTeorico, 2)} {item.unidadeMedida}</span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <div className="w-24">
-                      <Input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={item.countedQty}
-                        onChange={e => updateCount(item.productId, e.target.value)}
-                        placeholder="0,00"
-                        className="h-8 text-xs text-right bg-secondary border-border font-mono"
-                      />
-                    </div>
-                    <span className="text-[10px] text-muted-foreground w-6">{item.unidadeMedida}</span>
-
-                    {hasDiff && (
-                      <Badge className={`text-[9px] px-1.5 h-5 ${diff > 0 ? 'bg-success-soft text-success border-success-border' : 'bg-destructive-soft text-destructive border-destructive-border'}`}>
-                        {diff > 0 ? '+' : ''}{formatFixedBR(diff, 2)}
-                      </Badge>
-                    )}
-
-                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
-                      onClick={() => removeFromCount(item.productId)}>
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
+          <QuickInventoryCountList
+            items={countedItems}
+            onChange={updateCount}
+            onRemove={removeFromCount}
+            focusProductId={focusProductId}
+            disabled={saving}
+            onComplete={() => { searchInput.current?.focus(); searchInput.current?.select(); }}
+          />
           {/* Summary */}
           {validItems.length > 0 && (
             <div className="px-4 py-2 bg-background-subtle border-t border-border">
