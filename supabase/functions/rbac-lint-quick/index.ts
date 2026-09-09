@@ -1,3 +1,4 @@
+import { companyHeaders } from "../_shared/company-scope.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
@@ -33,7 +34,7 @@ Deno.serve(async (req) => {
     const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
 
     const userClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
+      global: { headers: { ...companyHeaders(req), Authorization: authHeader } },
     });
 
     const { data: { user }, error: authErr } = await userClient.auth.getUser();

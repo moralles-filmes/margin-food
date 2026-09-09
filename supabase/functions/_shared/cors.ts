@@ -14,6 +14,7 @@ const ALLOWED_HEADERS = [
   "x-client-info",
   "apikey",
   "content-type",
+  "x-company-id",
   "x-supabase-client-platform",
   "x-supabase-client-platform-version",
   "x-supabase-client-runtime",

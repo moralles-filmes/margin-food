@@ -1,3 +1,4 @@
+import { companyHeaders, requestCompanyProfile } from "../_shared/company-scope.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 // ════════════════════════════════════════════════════════════════════════════
 // cotacao-ia — assistente de IA da Cotação (RFQ), por empresa
@@ -12,7 +13,7 @@ import { getCorsHeaders } from "../_shared/cors.ts";
 // Valida JWT → tenant (fail-closed) → compras:cotacao:manage.
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 
 let corsHeaders = getCorsHeaders();
 
@@ -46,18 +47,18 @@ function sanitize(val: unknown): string {
 async function resolveTenantOrThrow(req: Request, supabaseUrl: string, anonKey: string) {
   const authHeader = req.headers.get("Authorization");
   if (!authHeader) throw new Error("AUTH");
-  const supabaseUser = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authHeader } } });
+  const supabaseUser = createClient(supabaseUrl, anonKey, { global: { headers: { ...companyHeaders(req), Authorization: authHeader } } });
   const token = authHeader.replace("Bearer ", "");
   const { data: userData, error: userErr } = await supabaseUser.auth.getUser(token);
   if (userErr || !userData?.user) throw new Error("AUTH");
   const userId = userData.user.id;
-  const { data: profile, error: profErr } = await supabaseUser.from("profiles").select("company_id").eq("id", userId).single();
+  const { data: profile, error: profErr } = await requestCompanyProfile(supabaseUser);
   if (profErr || !profile?.company_id) throw new Error("TENANT_NOT_FOUND");
   if (profile.company_id === PLACEHOLDER_TENANT) throw new Error("TENANT_FORBIDDEN");
   return { userId, companyId: profile.company_id };
 }
 
-async function hasAnyPermission(adminClient: ReturnType<typeof createClient>, userId: string, keys: string[]): Promise<boolean> {
+async function hasAnyPermission(adminClient: SupabaseClient, userId: string, keys: string[]): Promise<boolean> {
   for (const key of keys) {
     const { data, error } = await adminClient.rpc("has_permission", { _user_id: userId, _permission: key });
     if (!error && data) return true;
@@ -123,11 +124,11 @@ serve(async (req) => {
       userId = t.userId; companyId = t.companyId;
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "";
-      if (msg === "TENANT_NOT_FOUND" || msg === "TENANT_FORBIDDEN") return jsonRes({ error: "FORBIDDEN_TENANT", message: "Tenant inválido", request_id: requestId }, 403);
+      if (msg === "TENANT_NOT_FOUND" || msg === "TENANT_FORBIDDEN") return jsonRes({ error: "COMPANY_ACCESS_DENIED", message: "Acesso à unidade negado", request_id: requestId }, 403);
       return jsonRes({ error: "UNAUTHORIZED", request_id: requestId }, 401);
     }
 
-    const adminClient = createClient(supabaseUrl, serviceKey);
+    const adminClient = createClient(supabaseUrl, serviceKey, { global: { headers: companyHeaders(req) } });
     if (!(await hasAnyPermission(adminClient, userId, ["compras:cotacao:manage", "system:global:manage"]))) {
       return jsonRes({ error: "PERMISSION_DENIED", message: "Sem permissão para usar a IA", request_id: requestId }, 403);
     }

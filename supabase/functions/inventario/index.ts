@@ -1,3 +1,4 @@
+import { companyHeaders, requestCompanyProfile } from "../_shared/company-scope.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -13,14 +14,14 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const serviceKey = (Deno.env.get('SB_SECRET_KEY') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'))!
-    const adminClient = createClient(supabaseUrl, serviceKey)
+    const adminClient = createClient(supabaseUrl, serviceKey, { global: { headers: companyHeaders(req) } })
 
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) return unauthorized()
 
     const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!
     const userClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } }
+      global: { headers: { ...companyHeaders(req), Authorization: authHeader } }
     })
     const { data: { user }, error: userError } = await userClient.auth.getUser()
     if (userError || !user) return unauthorized()
@@ -29,8 +30,8 @@ serve(async (req) => {
     const { action, ...payload } = await req.json()
 
     // ===== RESOLVE TENANT ONCE (mandatory for all queries via adminClient) =====
-    const { data: profile } = await adminClient.from('profiles').select('company_id').eq('id', user.id).single()
-    if (!profile?.company_id) return json({ error: 'Tenant não configurado' }, 403)
+    const { data: profile } = await requestCompanyProfile(userClient)
+    if (!profile?.company_id) return json({ error: 'COMPANY_ACCESS_DENIED' }, 403)
     const companyId = profile.company_id
 
     // ===== PERMISSION HELPERS (granular, not legacy roles) =====
@@ -54,7 +55,7 @@ serve(async (req) => {
     }
 
     async function getUserRole(): Promise<string> {
-      const { data } = await adminClient.from('user_roles').select('role').eq('user_id', user!.id)
+      const { data } = await adminClient.from('user_roles').select('role').eq('user_id', user!.id).eq('company_id', companyId)
       return (data || []).map((r: any) => r.role).join(',') || 'viewer'
     }
 
@@ -534,7 +535,7 @@ serve(async (req) => {
           .in('inventario_id', recentIds).eq('company_id', companyId).is('deleted_at', null)
           .not('contado_por', 'is', null)
 
-        const { data: profiles } = await adminClient.from('profiles').select('id, nome').eq('company_id', companyId)
+        const { data: profiles } = await userClient.from('profiles').select('id, nome')
         const profileMap: Record<string, string> = {}
         ;(profiles || []).forEach((p: any) => { profileMap[p.id] = p.nome })
 
@@ -644,7 +645,7 @@ serve(async (req) => {
       const { user_id } = payload
       if (!user_id) return json({ error: 'user_id obrigatório' }, 400)
 
-      const { data: targetProfile } = await adminClient.from('profiles').select('company_id').eq('id', user_id).single()
+      const { data: targetProfile } = await adminClient.from('company_memberships').select('company_id').eq('user_id', user_id).eq('company_id', companyId).eq('status', 'active').maybeSingle()
       if (!targetProfile || targetProfile.company_id !== companyId) return json({ error: 'Usuário não pertence a esta empresa' }, 400)
 
       const { error: insertErr } = await adminClient.from('inventario_conferentes').insert({
@@ -725,7 +726,7 @@ serve(async (req) => {
     return json({ error: 'Ação não reconhecida' }, 400)
   } catch (err) {
     console.error('Inventario error:', err)
-    return new Response(JSON.stringify({ error: err.message || 'Erro interno' }), {
+    return new Response(JSON.stringify({ error: err instanceof Error ? err.message : 'Erro interno' }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }

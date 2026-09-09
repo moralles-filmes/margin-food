@@ -1,3 +1,4 @@
+import { companyHeaders, requireRequestCompany } from "../_shared/company-scope.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -56,24 +57,7 @@ async function checkPermission(
 }
 
 /** Resolve company_id from user profile — fail-closed */
-async function resolveTenantOrThrow(
-  supabaseAdmin: any,
-  userId: string
-): Promise<string> {
-  const { data: profile, error } = await supabaseAdmin
-    .from("profiles")
-    .select("company_id")
-    .eq("id", userId)
-    .single();
 
-  if (error || !profile?.company_id) {
-    throw new Error("Perfil não encontrado ou empresa não vinculada.");
-  }
-  if (profile.company_id === PLACEHOLDER_COMPANY_ID) {
-    throw new Error("Empresa placeholder — sessão inválida.");
-  }
-  return profile.company_id;
-}
 
 serve(async (req) => {
   corsHeaders = getCorsHeaders(req);
@@ -93,9 +77,9 @@ serve(async (req) => {
     const serviceKey = (Deno.env.get("SB_SECRET_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"))!;
 
     const supabaseUser = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
-      global: { headers: { Authorization: authHeader } },
+      global: { headers: { ...companyHeaders(req), Authorization: authHeader } },
     });
-    const supabaseAdmin = createClient(supabaseUrl, serviceKey);
+    const supabaseAdmin = createClient(supabaseUrl, serviceKey, { global: { headers: companyHeaders(req) } });
 
     const { data: { user }, error: authError } = await supabaseUser.auth.getUser();
     if (authError || !user) {
@@ -105,7 +89,7 @@ serve(async (req) => {
     }
 
     // ─── Tenant resolution (fail-closed) ───
-    const companyId = await resolveTenantOrThrow(supabaseAdmin, user.id);
+    const companyId = await requireRequestCompany(supabaseUser);
 
     let body: any = {};
     try { body = await req.json(); } catch { /* no body is ok for some actions */ }
@@ -125,7 +109,7 @@ serve(async (req) => {
       });
     }
 
-    const hasAccess = await checkPermission(supabaseAdmin, user.id, requiredPerm);
+    const hasAccess = await checkPermission(supabaseUser, user.id, requiredPerm);
     if (!hasAccess) {
       return new Response(JSON.stringify({ error: `Sem permissão (${requiredPerm})` }), {
         status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -149,7 +133,6 @@ serve(async (req) => {
         const { data: p } = await supabaseAdmin
           .from("profiles")
           .select("id, nome, email")
-          .eq("company_id", companyId)
           .in("id", userIds);
         profiles = p || [];
       }

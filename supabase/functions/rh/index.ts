@@ -1,3 +1,4 @@
+import { companyHeaders, requestCompanyProfile } from "../_shared/company-scope.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -19,24 +20,20 @@ serve(async (req) => {
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
     // Validate caller
-    const userClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authHeader } } });
+    const userClient = createClient(supabaseUrl, anonKey, { global: { headers: { ...companyHeaders(req), Authorization: authHeader } } });
     const { data: { user }, error: userError } = await userClient.auth.getUser();
     if (userError || !user) {
       return jsonResp({ error: "Unauthorized" }, 401);
     }
     const callerId = user.id;
 
-    const adminClient = createClient(supabaseUrl, serviceKey);
+    const adminClient = createClient(supabaseUrl, serviceKey, { global: { headers: companyHeaders(req) } });
 
     // ── Tenant resolution (fail-closed) ──
-    const { data: profile, error: profileError } = await adminClient
-      .from("profiles")
-      .select("company_id")
-      .eq("id", callerId)
-      .single();
+    const { data: profile, error: profileError } = await requestCompanyProfile(userClient);
 
     if (profileError || !profile?.company_id) {
-      return jsonResp({ error: "Tenant não resolvido. Faça logout e login novamente." }, 403);
+      return jsonResp({ error: "COMPANY_ACCESS_DENIED" }, 403);
     }
 
     const PLACEHOLDER = "00000000-0000-0000-0000-000000000001";

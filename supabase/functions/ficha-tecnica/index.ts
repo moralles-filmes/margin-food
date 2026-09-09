@@ -1,19 +1,10 @@
+import { companyHeaders, requireRequestCompany } from "../_shared/company-scope.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
 let corsHeaders = getCorsHeaders();// ─── TENANT RESOLUTION (FAIL-CLOSED) ───
-async function resolveTenantOrThrow(adminClient: any, userId: string): Promise<string> {
-  const { data, error } = await adminClient
-    .from('profiles')
-    .select('company_id')
-    .eq('id', userId)
-    .single()
-  if (error || !data?.company_id) {
-    throw new Error('403: Tenant não encontrado para o usuário. Acesso negado.')
-  }
-  return data.company_id
-}
+
 
 // ─── REQUEST ID ───
 function generateRequestId(): string {
@@ -58,20 +49,20 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const serviceKey = (Deno.env.get('SB_SECRET_KEY') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'))!
-    const adminClient = createClient(supabaseUrl, serviceKey)
+    const adminClient = createClient(supabaseUrl, serviceKey, { global: { headers: companyHeaders(req) } })
 
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) return json({ error: { code: 'UNAUTHORIZED', message: 'Unauthorized', request_id: requestId } }, 401)
 
     const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!
     const userClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } }
+      global: { headers: { ...companyHeaders(req), Authorization: authHeader } }
     })
     const { data: { user }, error: userError } = await userClient.auth.getUser()
     if (userError || !user) return json({ error: { code: 'UNAUTHORIZED', message: 'Unauthorized', request_id: requestId } }, 401)
 
     // ─── RESOLVE TENANT (FAIL-CLOSED) ───
-    const companyId = await resolveTenantOrThrow(adminClient, user.id)
+    const companyId = await requireRequestCompany(userClient)
 
     const { action, ...payload } = await req.json()
 
@@ -369,7 +360,7 @@ async function calcularCustoComponenteInterno(
   visited: Set<string> = new Set(),
   compCache: Map<string, any> = new Map(),
   prodCache: Map<string, any> = new Map(),
-): Promise<{ custoTotal: number; custoUnitario: number; detalhes: any[]; custoSalmao: number; salmaoPercent: number }> {
+): Promise<{ custoTotal: number; custoUnitario: number; custoUnitarioRaw: number; detalhes: any[]; custoSalmao: number; salmaoPercent: number }> {
   if (visited.has(componenteId)) {
     throw new Error(`Dependência circular detectada no componente ${componenteId}`)
   }

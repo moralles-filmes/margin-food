@@ -1,3 +1,4 @@
+import { companyHeaders, requestCompanyProfile } from "../_shared/company-scope.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'npm:@supabase/supabase-js@2'
@@ -28,27 +29,23 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const serviceKey = (Deno.env.get('SB_SECRET_KEY') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'))!
-    const adminClient = createClient(supabaseUrl, serviceKey)
+    const adminClient = createClient(supabaseUrl, serviceKey, { global: { headers: companyHeaders(req) } })
 
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) return json({ error: 'Unauthorized' }, 401)
 
     const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!
     const userClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } }
+      global: { headers: { ...companyHeaders(req), Authorization: authHeader } }
     })
     const { data: { user }, error: userError } = await userClient.auth.getUser()
     if (userError || !user) return json({ error: 'Unauthorized' }, 401)
 
     // ═══ TENANT RESOLUTION (once per request) ═══
-    const { data: profile, error: profileError } = await adminClient
-      .from('profiles')
-      .select('company_id')
-      .eq('id', user.id)
-      .single()
+    const { data: profile, error: profileError } = await requestCompanyProfile(userClient)
 
     if (profileError || !profile?.company_id) {
-      return json({ error: 'Tenant não resolvido' }, 400)
+      return json({ error: 'COMPANY_ACCESS_DENIED' }, 403)
     }
     if (profile.company_id === PLACEHOLDER_COMPANY) {
       return json({ error: 'Tenant placeholder não permitido' }, 400)
@@ -113,7 +110,7 @@ serve(async (req) => {
     return json({ error: 'Unknown action' }, 400)
   } catch (e) {
     console.error(e)
-    return json({ error: e.message || 'Internal error' }, 500)
+    return json({ error: e instanceof Error ? e.message : 'Internal error' }, 500)
   }
 })
 

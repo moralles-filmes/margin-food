@@ -1,3 +1,5 @@
+import { addCompanyUser } from "../_shared/company-users.ts";
+import { companyHeaders } from "../_shared/company-scope.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -21,12 +23,12 @@ Deno.serve(async (req) => {
     if (!authHeader?.startsWith('Bearer ')) return json({ error: 'Não autorizado' }, 401);
 
     const token = authHeader.replace('Bearer ', '');
-    const authClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authHeader } } });
+    const authClient = createClient(supabaseUrl, anonKey, { global: { headers: { ...companyHeaders(req), Authorization: authHeader } } });
     const { data: claimsData, error: claimsError } = await authClient.auth.getClaims(token);
     if (claimsError || !claimsData?.claims?.sub) return json({ error: 'Não autorizado' }, 401);
     const callerUserId = claimsData.claims.sub as string;
 
-    const adminClient = createClient(supabaseUrl, serviceRoleKey);
+    const adminClient = createClient(supabaseUrl, serviceRoleKey, { global: { headers: companyHeaders(req) } });
 
     // ── Permission: system:global:manage ──
     const { data: hasPerm } = await adminClient.rpc('has_permission', { _user_id: callerUserId, _permission: 'system:global:manage' });
@@ -50,62 +52,19 @@ Deno.serve(async (req) => {
 
       if (!company_id) return json({ error: 'company_id é obrigatório' }, 400);
       if (!email || typeof email !== 'string') return json({ error: 'Email é obrigatório' }, 400);
-      if (!password || typeof password !== 'string' || password.length < 12) {
-        return json({ error: 'Senha obrigatória (mín. 12 caracteres)' }, 400);
-      }
 
       // Verify company exists
       const { data: company } = await adminClient.from('companies').select('id, nome').eq('id', company_id).single();
       if (!company) return json({ error: 'Empresa não encontrada' }, 404);
 
-      const trimmedEmail = email.trim().toLowerCase();
-
-      // Create auth user
-      const { data: authData, error: authError } = await adminClient.auth.admin.createUser({
-        email: trimmedEmail,
-        password,
-        email_confirm: true,
-        user_metadata: { nome: nome || '', company_id },
-      });
-      if (authError) return json({ error: `Erro ao criar usuário: ${authError.message}` }, 400);
-      const authUser = authData.user;
-
-      // Upsert profile with the TARGET company_id (not the caller's)
-      const { error: profileError } = await adminClient
-        .from('profiles')
-        .upsert({
-          id: authUser.id,
-          email: trimmedEmail,
-          nome: nome || '',
-          company_id,
-        }, { onConflict: 'id' });
-
-      if (profileError) {
-        console.error('Profile upsert error:', profileError);
-      }
-
-      // Assign admin role
-      await adminClient.from('user_roles').upsert(
-        { user_id: authUser.id, role: 'admin' },
-        { onConflict: 'user_id,role' }
-      );
-
-      // Audit
-      const { data: callerProfile } = await adminClient.from('profiles').select('company_id').eq('id', callerUserId).single();
-      await adminClient.from('audit_logs').insert({
-        actor_user_id: callerUserId,
-        company_id: callerProfile?.company_id || company_id,
-        action: 'COMPANY_ADMIN_CREATED',
-        module: 'admin',
-        entity: 'profiles',
-        entity_id: authUser.id,
-        metadata: { nome, target_company_id: company_id, target_company_name: company.nome, target_email: trimmedEmail },
+      const result = await addCompanyUser(adminClient, {
+        actorUserId: callerUserId, companyId: company_id, email, password, nome: nome || '', role: 'admin',
       });
 
       return json({
         success: true,
-        user_id: authUser.id,
-        email: trimmedEmail,
+        user_id: result.userId,
+        email: result.email,
         company_id,
         company_name: company.nome,
       });

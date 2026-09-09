@@ -1,3 +1,4 @@
+import { companyHeaders } from "../_shared/company-scope.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -98,7 +99,7 @@ serve(async (req) => {
       });
     }
 
-    const authClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authHeader } } });
+    const authClient = createClient(supabaseUrl, anonKey, { global: { headers: { ...companyHeaders(req), Authorization: authHeader } } });
     const token = authHeader.replace('Bearer ', '');
     const { data: userData, error: authError } = await authClient.auth.getUser(token);
     if (authError || !userData?.user) {

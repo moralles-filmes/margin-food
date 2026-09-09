@@ -1,6 +1,7 @@
+import { companyHeaders, requestCompanyProfile } from "../_shared/company-scope.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { isEstornoMovement, isOriginalEntradaForReversal, getReversalTipo } from "./stock-reversal.ts";
 
 let corsHeaders = getCorsHeaders();
@@ -12,6 +13,9 @@ interface ReqItem {
 }
 
 interface ReqBody {
+  limit?: number;
+  offset?: number;
+  bucket?: string;
   action: string;
   setor: string;
   observacao?: string;
@@ -72,7 +76,7 @@ async function resolveTenantOrThrow(
   if (!authHeader) throw new Error("AUTH");
 
   const supabaseUser = createClient(supabaseUrl, anonKey, {
-    global: { headers: { Authorization: authHeader } },
+    global: { headers: { ...companyHeaders(req), Authorization: authHeader } },
   });
 
   const token = authHeader.replace("Bearer ", "");
@@ -81,11 +85,7 @@ async function resolveTenantOrThrow(
 
   const userId = userData.user.id;
 
-  const { data: profile, error: profErr } = await supabaseUser
-    .from("profiles")
-    .select("company_id")
-    .eq("id", userId)
-    .single();
+  const { data: profile, error: profErr } = await requestCompanyProfile(supabaseUser);
 
   if (profErr || !profile?.company_id) throw new Error("TENANT_NOT_FOUND");
   if (profile.company_id === PLACEHOLDER_TENANT) throw new Error("TENANT_FORBIDDEN");
@@ -96,7 +96,7 @@ async function resolveTenantOrThrow(
 /**
  * Check permission via the DB function has_permission().
  */
-async function checkPermission(adminClient: ReturnType<typeof createClient>, userId: string, permissionKey: string): Promise<boolean> {
+async function checkPermission(adminClient: SupabaseClient, userId: string, permissionKey: string): Promise<boolean> {
   const { data, error } = await adminClient.rpc("has_permission", {
     _user_id: userId,
     _permission: permissionKey,
@@ -105,7 +105,7 @@ async function checkPermission(adminClient: ReturnType<typeof createClient>, use
   return !!data;
 }
 
-async function hasAnyPermission(adminClient: ReturnType<typeof createClient>, userId: string, keys: string[]): Promise<boolean> {
+async function hasAnyPermission(adminClient: SupabaseClient, userId: string, keys: string[]): Promise<boolean> {
   for (const key of keys) {
     if (await checkPermission(adminClient, userId, key)) return true;
   }
@@ -122,7 +122,7 @@ function toSerializableJson(value: unknown): unknown {
 }
 
 async function writeAudit(
-  userClient: ReturnType<typeof createClient>,
+  userClient: SupabaseClient,
   payload: {
     p_source?: string;
     p_module: string;
@@ -184,11 +184,11 @@ serve(async (req) => {
       return jsonRes({ error: "UNAUTHORIZED", request_id: requestId }, 401);
     }
 
-    const adminClient = createClient(supabaseUrl, serviceKey);
+    const adminClient = createClient(supabaseUrl, serviceKey, { global: { headers: companyHeaders(req) } });
 
     // User-scoped client for RLS-bound inserts
     const supabaseUser = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: req.headers.get("Authorization")! } },
+      global: { headers: { ...companyHeaders(req), Authorization: req.headers.get("Authorization")! } },
     });
 
     let body: ReqBody;
@@ -624,7 +624,7 @@ serve(async (req) => {
     // ========================
     // HELPER: sync aggregated parent status from item-level statuses
     // ========================
-    async function syncRequisicaoStatus(reqId: string, cId: string, uId: string, userClient: ReturnType<typeof createClient>) {
+    async function syncRequisicaoStatus(reqId: string, cId: string, uId: string, userClient: SupabaseClient) {
       const { data: statusResult } = await userClient.rpc("compute_requisicao_status_agregado", {
         p_requisicao_id: reqId,
       });

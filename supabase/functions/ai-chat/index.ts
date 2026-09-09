@@ -1,3 +1,4 @@
+import { companyHeaders, requestCompanyProfile } from "../_shared/company-scope.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -101,7 +102,7 @@ serve(async (req) => {
     if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY not configured");
 
     const userClient = createClient(supabaseUrl, supabaseKey, {
-      global: { headers: { Authorization: authHeader || "" } },
+      global: { headers: { ...companyHeaders(req), Authorization: authHeader || "" } },
     });
     const { data: { user }, error: authError } = await userClient.auth.getUser();
     if (authError || !user) {
@@ -129,7 +130,7 @@ serve(async (req) => {
     }
 
     const requiredPermission = `ia:${subtabKey}:create`;
-    const db = createClient(supabaseUrl, serviceKey);
+    const db = createClient(supabaseUrl, serviceKey, { global: { headers: companyHeaders(req) } });
 
     const { data: hasPerm } = await db.rpc("has_permission", {
       _user_id: user.id,
@@ -141,7 +142,7 @@ serve(async (req) => {
       return jsonResponse({ error: { code: "FORBIDDEN_RBAC", message: `Sem permissão (${requiredPermission})` } }, 403, requestId);
     }
 
-    const { data: profileData } = await db.from("profiles").select("company_id").eq("id", user.id).single();
+    const { data: profileData } = await requestCompanyProfile(userClient);
     if (!profileData?.company_id || profileData.company_id === PLACEHOLDER_TENANT) {
       structuredLog("warn", requestId, { event: "tenant_missing", user_id: user.id });
       return jsonResponse({ error: { code: "FORBIDDEN_TENANT", message: "Tenant não encontrado" } }, 403, requestId);
