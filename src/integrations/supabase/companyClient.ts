@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { supabase } from './client';
 import type { Database } from './types';
 import type { CompanyAccessMode } from '@/lib/companyAccess';
+import { supabaseFetch } from './fetch';
 
 export const COMPANY_ACCESS_REVOKED_EVENT = 'company:access-revoked';
 
@@ -25,7 +26,7 @@ export function createCompanyClient(companyId: string, userId: string, mode: Com
           const signal = init?.signal
             ? AbortSignal.any([lifetime.signal, init.signal])
             : lifetime.signal;
-          const response = await fetch(input, { ...init, signal });
+          const response = await supabaseFetch(input, { ...init, signal });
           if (!response.ok && (response.status === 401 || response.status === 403)) {
             const body = await response.clone().text();
             if (body.includes('COMPANY_ACCESS_DENIED')) {

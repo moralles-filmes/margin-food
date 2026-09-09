@@ -1,4 +1,4 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { VitePWA } from "vite-plugin-pwa";
@@ -53,13 +53,23 @@ function manualChunks(id: string) {
   return undefined;
 }
 
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  const { VITE_SUPABASE_URL } = loadEnv(mode, process.cwd(), "VITE_");
+  return {
   server: {
     host: "127.0.0.1",
     port: 8080,
     hmr: {
       overlay: false,
     },
+    // Destino fixo: o proxy local mantém a autenticação e a autorização do Supabase.
+    proxy: VITE_SUPABASE_URL ? {
+      '/__supabase/functions/v1/': {
+        target: new URL(VITE_SUPABASE_URL).origin,
+        changeOrigin: true,
+        rewrite: (requestPath) => requestPath.replace(/^\/__supabase/, ''),
+      },
+    } : undefined,
   },
   plugins: [
     react(),
@@ -112,4 +122,5 @@ export default defineConfig({
       },
     },
   },
+  };
 });

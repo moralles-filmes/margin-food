@@ -14,6 +14,8 @@ O backfill copia a empresa/cargo/setor original de cada perfil e acrescenta a me
 
 O cliente imutável criado por `createCompanyClient(companyId, userId)` envia `x-company-id` em REST, RPC, Storage e Edge Functions e reutiliza a sessão do cliente Auth original. Não cria outro GoTrue client nem outro mecanismo de autenticação.
 
+Em desenvolvimento (`bun run dev`), `supabaseFetch` encaminha somente as Edge Functions do projeto configurado por `/__supabase/functions/v1/`, no proxy do Vite. Isso permite testar localmente quando o CORS publicado aceita apenas o domínio de produção. O proxy tem destino fixo em `VITE_SUPABASE_URL`, preserva JWT, chave pública, unidade, corpo, cancelamento e streaming; REST, Auth e Storage continuam diretos. Builds de produção também mantêm as Edge Functions diretas no Supabase. Não é preciso ampliar as origens permitidas em produção para executar o frontend local.
+
 `get_current_company_id()` lê esse header e verifica `auth.uid()`, membership ativo e empresa ativa. UUID inválido ou unidade sem acesso falha com SQLSTATE `42501` / `COMPANY_ACCESS_DENIED`. Sem header, somente a empresa original ainda autorizada é aceita. `assert_tenant()` falha também quando não há escopo. O header é uma solicitação, nunca prova de autorização.
 
 Roles e permissões são calculadas para a unidade validada. As funções que anteriormente liam o tenant diretamente do perfil foram adaptadas. Uma policy restritiva de fronteira foi adicionada às tabelas públicas com `company_id` e RLS, para impedir que policies permissivas antigas combinadas com OR ampliem o escopo HTTP. Perfis e memberships têm policies específicas para identidade/acessos. Funções auxiliares com tenant explícito que não deveriam ser APIs públicas tiveram o EXECUTE revogado.
