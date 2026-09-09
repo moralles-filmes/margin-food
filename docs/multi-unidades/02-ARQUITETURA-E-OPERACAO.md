@@ -1,6 +1,6 @@
 # Multiunidades: arquitetura e operação
 
-Implementação de 09/09/2026. A auditoria foi concluída e apresentada antes das alterações; veja [auditoria](00-AUDITORIA.md) e [inventário](01-INVENTARIO.md). Este documento descreve a versão preparada no repositório. **Nenhuma migration ou Edge Function desta entrega foi publicada em produção.**
+Implementação e ativação em produção em 09/09/2026. A auditoria foi concluída e apresentada antes das alterações; veja [auditoria](00-AUDITORIA.md) e [inventário](01-INVENTARIO.md). As seis migrations e as 16 Edge Functions foram publicadas, e o frontend do commit `a33e6b1` foi ativado em [www.marginfood.com](https://www.marginfood.com). O cadastro destaca que o acesso a outra unidade usa o mesmo e-mail e senha em branco.
 
 ## Modelo e compatibilidade
 
@@ -101,9 +101,19 @@ Depois do rollback, publicar/reabrir as versões antigas e conferir saldos, gran
 - `bun x tsc --noEmit -p tsconfig.app.json`, build Vite e lint sem erros. O lint mantém avisos preexistentes; as dependências de hooks alterados foram ajustadas. Deno checou as 12 Edge Functions operacionais alteradas.
 - Navegador isolado: login real do Vite e seletores/componentes reais em uma prévia com dados sintéticos, nas larguras desktop e 390 px, incluindo sidebar recolhida, sem erros de execução. A prévia temporária foi removida.
 
-A entrega não afirma ter exercitado JWT/GoTrue, entrega de eventos WebSocket, APIs de Storage ou todas as jornadas de todos os módulos em staging. A autorização correspondente foi testada em PostgreSQL, e o transporte/estado da interface em testes unitários. A verificação integrada desses serviços e o backup completo continuam sendo etapas obrigatórias de publicação; nenhuma operação em produção foi usada para simular esses testes.
+Os testes iniciais acima foram complementados pelo ensaio integrado descrito abaixo. A validação não cobre todas as jornadas de todos os módulos, nem disparos externos de IA, WhatsApp ou e-mail em produção.
 
 A correção de compatibilidade anterior à migração foi validada adicionalmente com 26 testes de acesso/seleção/escopo, TypeScript, lint sem erros e build. Na aba local já autenticada do usuário, o recarregamento abriu a empresa Moralles e carregou Contas a Pagar pelo backend real, sem alterar registros ou publicar migrations. Os testes cobrem login legado, apresentação, headers de Edge Functions, transição para memberships com descarte de clientes/caches e recusa de fallback em falhas de autorização ou migração parcial.
+
+### Verificação da ativação
+
+- Backup lógico completo do banco, export de roles, schema público, metadados de Storage e versões anteriores das funções/frontend arquivados em pasta privada local: `~/.codex/backups/margin-food/20260909-multiunit`. O arquivo de banco inclui Auth e dados; não apenas o schema. Os arquivos de Storage permanecem no serviço original.
+- Restauração dos dados de aplicação/Auth/Storage e permissões no Supabase local isolado com PostgreSQL 17, seguida das seis migrations. As 13 identidades, 13 perfis, 13 roles e 277 overrides foram preservados; o backfill criou os 13 vínculos originais. Os totais e contagens do razão financeiro coincidiram antes/depois.
+- GoTrue real e Edge Functions reais: login com senha, criação de identidade nova, adição do mesmo e-mail com senha vazia, preservação do nome/senha/ID original, duas unidades, permissões locais, unidade forjada, escrita cruzada negada, revogação e reintrodução. O teste identificou e corrigiu a necessidade da reserva administrativa também no cadastro com senha.
+- Storage real: envio, leitura e exclusão autorizados de documento de RH; leitura de outra unidade ou sem permissão local recusada. Realtime real: WebSocket entregou notificações das unidades A/B autorizadas, excluindo unidade C e outro destinatário.
+- Navegador de teste: login, escolha entre duas unidades, entrada na unidade A, lista de usuários e aviso junto ao campo de senha. A suíte final passou em 91 arquivos/719 testes; TypeScript, build e checagem Deno das três funções de cadastro passaram. Lint dos formulários sem erros, com avisos anteriores.
+- Produção: as funções foram atualizadas sequencialmente antes das migrations, durante a janela de atualização; `verify_jwt` e secrets foram preservados. Histórico local/remoto conferido, grants anteriores comparados integralmente e totais financeiros preservados. CORS aceita o domínio publicado e `x-company-id`; chamada não autenticada a `admin-users` retorna 401. O contexto de acesso da conta Moralles continua restrito à empresa original enquanto não receber outro vínculo.
+- Vercel: deploy `dpl_3ynSnEvwdzGx3yoRQRY8riabJV5n`, commit `a33e6b1`, estado `READY`, aliases de produção atualizados. Os novos avisos do advisor sobre helpers `SECURITY DEFINER` autenticados e tabelas privadas sem policy correspondem ao desenho autorizado: helpers validam contexto/membership e snapshots privados permanecem sem acesso da Data API; não foram introduzidos achados de nível ERROR.
 
 ## Cobertura dos 18 casos solicitados
 
