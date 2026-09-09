@@ -1,7 +1,7 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
 import { useCan } from '@/permissions/hooks';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,7 @@ import AdminCompaniesView from '@/components/admin/AdminCompaniesView';
 type RpcResult = { data: unknown; error: string | null; loading: boolean };
 
 function useRpcRunner() {
+  const supabase = useSupabase();
   const [results, setResults] = useState<Record<string, RpcResult>>({});
 
   const run = useCallback(async (key: string, rpcName: string, params?: Record<string, unknown>) => {

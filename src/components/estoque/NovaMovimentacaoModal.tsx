@@ -1,3 +1,4 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 /**
  * ─── NovaMovimentacaoModal ───
  * Modal dedicado para criação de movimentações de estoque.
@@ -23,7 +24,6 @@ import { CurrencyInput } from '@/components/ui/brl-input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import ProductSearchCombobox, { type ProductOption } from '@/components/ui/ProductSearchCombobox';
-import { supabase } from '@/integrations/supabase/client';
 import { useFormDirtyGuard } from '@/hooks/useFormDirtyGuard';
 import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
 import { formatFixedBR, todayBR, fmtBRL, normalizeBRLMoneyToNumber } from '@/lib/formatters';
@@ -93,6 +93,7 @@ export default function NovaMovimentacaoModal({
   userId, hasPermission, canEditPricing,
   addMovimentacao, recalcularPrecos,
 }: Props) {
+  const supabase = useSupabase();
   const emptyForm: MovFormState = {
     produtoId: '',
     tipo: PRESET_DEFAULTS[preset],
@@ -116,7 +117,7 @@ export default function NovaMovimentacaoModal({
     if (!open) return;
     supabase.from('stock_sectors').select('name').eq('is_active', true).order('sort_order').order('name')
       .then(({ data }) => setSetores((data || []).map((s: { name: string }) => s.name)));
-  }, [open]);
+  }, [open, supabase]);
 
   // Product options
   const productOptions: ProductOption[] = useMemo(() =>

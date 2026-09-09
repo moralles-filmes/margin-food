@@ -1,5 +1,5 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -54,6 +54,7 @@ const fmt = fmtBRL;
 
 export default function ControleCustosRhSection({
  colaboradores }: Props) {
+  const supabase = useSupabase();
   const canViewRbac = useCan('rh:custos:view');
   const { user } = useAuth();
   const [custos, setCustos] = useState<CustoMensalView[]>([]);
@@ -71,7 +72,7 @@ export default function ControleCustosRhSection({
     if (error) console.error(error);
     setCustos((data || []) as unknown as CustoMensalView[]);
     setLoading(false);
-  }, []);
+  }, [supabase]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 

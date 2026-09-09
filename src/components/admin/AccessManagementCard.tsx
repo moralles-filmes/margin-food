@@ -1,5 +1,5 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useCallback, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -27,6 +27,7 @@ interface AuditEntry {
 }
 
 export default function AccessManagementCard() {
+  const supabase = useSupabase();
   const { user } = useAuth();
   const [users, setUsers] = useState<UserItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -77,7 +78,7 @@ export default function AccessManagementCard() {
       console.error('[AccessManagementCard.fetchAudit]', e);
       toast.error('Não foi possível carregar o log de auditoria.');
     }
-  }, []);
+  }, [supabase]);
 
   useEffect(() => {
     fetchUsers();
@@ -129,37 +130,24 @@ export default function AccessManagementCard() {
       toast.error('Email é obrigatório');
       return;
     }
-    if (!sendInvite && (!newPassword || newPassword.length < 12)) {
+    if (!sendInvite && newPassword && newPassword.length < 12) {
       toast.error('Senha deve ter no mínimo 12 caracteres');
       return;
     }
     setCreating(true);
     try {
-      const session = (await supabase.auth.getSession()).data.session;
-      if (!session?.access_token) {
-        toast.error('Sessão expirada');
-        return;
-      }
-      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-create-user`;
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-          'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+      const { data, error, response: res } = await supabase.functions.invoke('admin-create-user', {
+        body: {
+          email: newEmail.trim(), nome: newNome.trim() || undefined,
+          send_invite: sendInvite, password: sendInvite ? undefined : newPassword,
         },
-        body: JSON.stringify({
-          email: newEmail.trim(),
-          nome: newNome.trim() || undefined,
-          send_invite: sendInvite,
-          password: sendInvite ? undefined : newPassword,
-        }),
       });
-      const result = await res.json();
+      if (!res) throw error ?? new Error('Sem resposta do servidor');
+      const result = res.ok ? data : await res.json();
       if (!res.ok || !result.success) {
         toast.error(result.error || 'Erro ao criar usuário');
       } else {
-        toast.success(`Usuário ${result.email} criado com sucesso`);
+        toast.success(`Acesso de ${result.email} configurado com sucesso`);
         setCreateOpen(false);
         setNewEmail('');
         setNewNome('');
@@ -383,7 +371,7 @@ export default function AccessManagementCard() {
             </Button>
             <Button
               size="sm"
-              disabled={creating || !newEmail.trim() || (!sendInvite && newPassword.length < 12)}
+              disabled={creating || !newEmail.trim() || (!sendInvite && !!newPassword && newPassword.length < 12)}
               onClick={handleCreateUser}
             >
               {creating ? 'Criando...' : sendInvite ? 'Enviar Convite' : 'Criar Usuário'}

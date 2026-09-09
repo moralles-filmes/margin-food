@@ -1,7 +1,7 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { useCan } from '@/permissions/hooks';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePasswordValidation } from '@/hooks/usePasswordValidation';
 import PasswordStrengthMeter from '@/components/PasswordStrengthMeter';
@@ -55,6 +55,7 @@ const ALL_ROLES = [
 ];
 
 export default function AdminUsersView() {
+  const supabase = useSupabase();
   const { user, rolesLoaded } = useAuth();
   const { confirm, ConfirmDialog } = useConfirmDialog();
   const canManageUsers = useCan('configuracoes:usuarios:manage');
@@ -182,7 +183,7 @@ export default function AdminUsersView() {
       console.error('[fetchJobRoles]', e);
       toast.error('Erro ao carregar cargos. Recarregue a página se o dropdown de cargos estiver vazio.');
     }
-  }, []);
+  }, [supabase]);
 
   const fetchRolePermissions = useCallback(async () => {
     try {
@@ -216,7 +217,7 @@ export default function AdminUsersView() {
       console.error('[fetchRolePermissions]', e);
       toast.error('Erro ao carregar permissões dos perfis. Recarregue a página.');
     }
-  }, []);
+  }, [supabase]);
 
   const fetchAll = useCallback(async () => {
     await Promise.all([
@@ -246,9 +247,9 @@ export default function AdminUsersView() {
   // ─── Handlers ───
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (pwValidation.localErrors.length > 0) { toast.error('Senha não atende os requisitos'); return; }
+    if (pwValidation.password && pwValidation.localErrors.length > 0) { toast.error('Senha não atende os requisitos'); return; }
     setCreating(true);
-    const isServerValid = await pwValidation.checkServer();
+    const isServerValid = !pwValidation.password || await pwValidation.checkServer();
     if (!isServerValid) { toast.error('Senha não aprovada pela verificação de segurança'); setCreating(false); return; }
     try {
       const data = await invoke({
@@ -259,7 +260,7 @@ export default function AdminUsersView() {
       });
 
       if (data?.warning) toast.warning(data.warning);
-      else toast.success(`Usuário ${newEmail} criado!`);
+      else toast.success(data?.linked ? `Acesso de ${newEmail} adicionado à unidade.` : `Usuário ${newEmail} criado!`);
       setShowCreate(false);
       setNewEmail(''); setNewNome(''); setNewRole('operador'); setNewSector(''); setNewJobRoleId('');
       setNewPermissions(new Set());
@@ -349,7 +350,7 @@ export default function AdminUsersView() {
       const { data, error } = await invoke({ action: 'delete', userId: deleteUser.id, motivo: deleteMotivo.trim() });
       if (error) throw error;
       const deletedId = deleteUser.id;
-      toast.success(`Usuário ${deleteUser.nome || deleteUser.email} excluído!`);
+      toast.success(`Usuário ${deleteUser.nome || deleteUser.email} removido desta unidade!`);
       setUsers(prev => prev.filter(u => u.id !== deletedId));
       setDeleteUser(null);
       setDeleteMotivo('');
@@ -544,8 +545,9 @@ export default function AdminUsersView() {
                 <Input type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} required className="mt-1" />
               </div>
               <div>
-                <Label className="text-xs text-muted-foreground">Senha (mín. 12 caracteres)</Label>
-                <PasswordInput value={pwValidation.password} onChange={e => pwValidation.setPassword(e.target.value)} required minLength={12} wrapperClassName="mt-1" />
+                <Label className="text-xs text-muted-foreground">Senha para novo login (mín. 12 caracteres)</Label>
+                <PasswordInput value={pwValidation.password} onChange={e => pwValidation.setPassword(e.target.value)} minLength={12} wrapperClassName="mt-1" />
+                <p className="mt-1 text-xs text-muted-foreground">Se o e-mail já possui login, deixe em branco. A senha existente será preservada.</p>
                 <PasswordStrengthMeter strength={pwValidation.strength} strengthLabel={pwValidation.strengthLabel} strengthColor={pwValidation.strengthColor} errors={pwValidation.localErrors} serverErrors={pwValidation.serverErrors} />
               </div>
               <div>
@@ -576,7 +578,7 @@ export default function AdminUsersView() {
 
             <DialogFooter className="pt-2">
               <Button type="button" variant="outline" size="sm" onClick={() => setShowCreate(false)}>Cancelar</Button>
-              <Button type="submit" size="sm" disabled={creating || pwValidation.isChecking || pwValidation.localErrors.length > 0}>
+              <Button type="submit" size="sm" disabled={creating || pwValidation.isChecking || (!!pwValidation.password && pwValidation.localErrors.length > 0)}>
                 {creating ? <><Loader2 className="w-3 h-3 animate-spin mr-1" /> Criando...</> : 'Criar Usuário'}
               </Button>
             </DialogFooter>
@@ -673,13 +675,13 @@ export default function AdminUsersView() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2 text-destructive">
-              <Trash2 className="w-4 h-4" /> Excluir Usuário
+              <Trash2 className="w-4 h-4" /> Remover acesso à unidade
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-3 mt-2 text-left">
                 <p className="text-xs text-muted-foreground">
-                  Tem certeza que deseja excluir <span className="font-semibold text-foreground">{deleteUser?.nome || deleteUser?.email}</span>?
-                  Esta ação irá desativar permanentemente o acesso e remover o perfil de acesso.
+                  Tem certeza que deseja remover o acesso de <span className="font-semibold text-foreground">{deleteUser?.nome || deleteUser?.email}</span>?
+                  Esta ação remove o acesso a esta unidade. O login e os acessos às demais unidades são preservados.
                 </p>
                 <div>
                   <Label className="text-xs text-muted-foreground">Motivo da exclusão (obrigatório)</Label>

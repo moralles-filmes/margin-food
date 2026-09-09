@@ -1,3 +1,4 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,7 +8,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { parseUTCToBR } from '@/lib/formatters';
 import { RefreshCw, Shield, Search, FileDown, Ban, ChevronDown, ChevronRight, Plus, Pencil, Trash2, Users } from 'lucide-react';
@@ -151,6 +151,7 @@ function entidadeToRoute(entidade: string, entidade_id: string | null): string |
 }
 
 export default function AuditoriaFinSection() {
+  const supabase = useSupabase();
   const canView = useCan('financeiro:auditoria:view');
   const canExport = useCan('financeiro:auditoria:export');
 
@@ -233,7 +234,7 @@ export default function AuditoriaFinSection() {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [canView, filtroEntidade, filtroAcao, busca, dias, cursorCreatedAt, cursorId]);
+  }, [canView, loadingMore, loading, items.length, filtroEntidade, filtroAcao, busca, dias, cursorCreatedAt, cursorId, supabase]);
 
   const reload = useCallback(() => {
     setCursorCreatedAt(null);

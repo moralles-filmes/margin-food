@@ -1,3 +1,4 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useDataEvent } from '@/lib/dataEvents';
 import { useCan } from '@/permissions/hooks';
@@ -5,7 +6,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { supabase } from '@/integrations/supabase/client';
 import { DollarSign, TrendingUp, TrendingDown, Activity, FileDown, Ban, ExternalLink, Wallet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { gerarPDFFluxoCaixa } from '@/lib/pdfFinanceiro';
@@ -87,6 +87,7 @@ function NoAccess() {
 }
 
 export default function FluxoCaixaSection({ onNavigate }: FluxoCaixaProps) {
+  const supabase = useSupabase();
   const canView = useCan('financeiro:fluxo:view');
   const canExport = useCan('financeiro:fluxo:export');
 
@@ -123,7 +124,7 @@ export default function FluxoCaixaSection({ onNavigate }: FluxoCaixaProps) {
     setDias(result?.dias || []);
     setTotais(result?.totais || { entradas: 0, saidas: 0, prev_entradas: 0, prev_saidas: 0, saldo_acumulado: 0 });
     setLoading(false);
-  }, [canView]);
+  }, [canView, supabase]);
 
   useEffect(() => { load(); }, [load]);
   useDataEvent('financeiro:lancamentos', load);

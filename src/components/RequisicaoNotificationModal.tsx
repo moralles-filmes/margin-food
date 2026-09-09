@@ -1,3 +1,4 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
@@ -11,12 +12,12 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useNotificationsContext } from '@/contexts/NotificationsContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 const AUTH_ROUTES = ['/login', '/reset-password'];
 
 export default function RequisicaoNotificationModal() {
+  const supabase = useSupabase();
   const { user } = useAuth();
   const location = useLocation();
   const { notifications, markAsRead } = useNotificationsContext();

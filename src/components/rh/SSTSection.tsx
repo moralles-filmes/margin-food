@@ -1,5 +1,5 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Card, CardContent } from '@/components/ui/card';
@@ -52,6 +52,7 @@ const R = (v: number) => formatIntegerBR(v);
 
 export default function SSTSection({
  colaboradores, canManage }: Props) {
+  const supabase = useSupabase();
   const canViewRbac = useCan('rh:sst:view');
   const { user } = useAuth();
   const [tab, setTab] = useState<SstTab>('epis');
@@ -95,7 +96,7 @@ export default function SSTSection({
       setIncidentes(incData);
     }
     setLoading(false);
-  }, []);
+  }, [supabase]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
@@ -154,6 +155,7 @@ export default function SSTSection({
 
 // ─── EPIs Tab ───
 function EpisTab({ epis, colaboradores, canManage, user, getColabNome, onRefresh }: any) {
+  const supabase = useSupabase();
   const [showForm, setShowForm] = useState(false);
   const emptyForm = { colaborador_id: '', nome: '', tipo: 'Luva', ca_numero: '', data_entrega: format(new Date(), 'yyyy-MM-dd'), data_validade: '', quantidade: 1, observacoes: '' };
   const [form, setForm] = useState(emptyForm);
@@ -282,6 +284,7 @@ function EpisTab({ epis, colaboradores, canManage, user, getColabNome, onRefresh
 
 // ─── Exames Tab ───
 function ExamesTab({ exames, colaboradores, canManage, user, getColabNome, onRefresh }: any) {
+  const supabase = useSupabase();
   const [showForm, setShowForm] = useState(false);
   const emptyForm = { colaborador_id: '', tipo: 'periodico', descricao: '', data_realizacao: '', data_vencimento: '', resultado: 'APTO', clinica: '', medico: '', observacoes: '' };
   const [form, setForm] = useState(emptyForm);
@@ -424,6 +427,7 @@ function ExamesTab({ exames, colaboradores, canManage, user, getColabNome, onRef
 
 // ─── Incidentes Tab ───
 function IncidentesTab({ incidentes, colaboradores, canManage, user, getColabNome, onRefresh }: any) {
+  const supabase = useSupabase();
   const [showForm, setShowForm] = useState(false);
   const emptyForm = {
     colaborador_id: '', tipo: 'incidente', gravidade: 'leve',

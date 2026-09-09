@@ -1520,7 +1520,7 @@ export async function createPresentationPdfBlob(
   if (slides.length === 0) throw new Error('Não há slides disponíveis para exportar.');
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [PAGE_WIDTH, PAGE_HEIGHT] });
   doc.setProperties({
-    title: `Apresentação Sócios - ${data.periodLabel}`,
+    title: `Apresentação Sócios - ${data.company?.name ? data.company.name + ' - ' : ''}${data.periodLabel}`,
     subject: `Faturamento, despesas, resultados e insights - ${data.periodLabel}`,
     author: 'Moralles Food',
     creator: 'Moralles Food',
@@ -1534,6 +1534,10 @@ export async function createPresentationPdfBlob(
     if (slides[index].kind !== 'cover') drawHeader(doc, slides[index]);
     drawSlideContent(doc, slides[index]);
     drawFooter(doc, data, slides[index], index + 1, slides.length);
+    if (data.company) {
+      doc.setFontSize(8);
+      doc.text(data.company.name, 303, 8, { align: 'right', maxWidth: 140 });
+    }
     options.onProgress?.({
       completed: index + 1,
       total: slides.length,

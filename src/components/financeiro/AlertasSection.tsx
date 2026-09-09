@@ -1,10 +1,10 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useDataEvent } from '@/lib/dataEvents';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useCan } from '@/permissions/hooks';
 import { AlertTriangle, Bell, Clock, RefreshCw, ExternalLink, ShieldX, Download } from 'lucide-react';
@@ -86,6 +86,7 @@ function SkeletonCards() {
 }
 
 export default function AlertasSection({ onNavigate }: Props) {
+  const supabase = useSupabase();
   const canView = useCan('financeiro:alertas:view');
   const canExport = useCan('financeiro:alertas:export');
 
@@ -125,7 +126,7 @@ export default function AlertasSection({ onNavigate }: Props) {
         list.push({
           tipo: 'cp_vencida', grupo: 'contas_pagar', severidade: 'critical', navigateTo: 'pagar',
           titulo: `⚠️ VENCIDA: ${cp.descricao}`,
-          descricao: `Venceu em ${formatDateValueBR(cp.data_vencimento)} — ${fmtBRL(Number(cp.valor))}`,
+          descricao: `Venceu em ${formatDateValueBR(String(cp.data_vencimento))} — ${fmtBRL(Number(cp.valor))}`,
         });
       });
 
@@ -139,7 +140,7 @@ export default function AlertasSection({ onNavigate }: Props) {
         list.push({
           tipo: 'cp_vencer', grupo: 'contas_pagar', severidade: 'warning', navigateTo: 'pagar',
           titulo: `Conta a pagar: ${cp.descricao}`,
-          descricao: `Vence em ${formatDateValueBR(cp.data_vencimento)} — ${fmtBRL(Number(cp.valor))}`,
+          descricao: `Vence em ${formatDateValueBR(String(cp.data_vencimento))} — ${fmtBRL(Number(cp.valor))}`,
         });
       });
 
@@ -153,7 +154,7 @@ export default function AlertasSection({ onNavigate }: Props) {
         list.push({
           tipo: 'cr_atrasada', grupo: 'contas_receber', severidade: 'warning', navigateTo: 'receber',
           titulo: `Recebimento atrasado: ${cr.descricao}`,
-          descricao: `Cliente: ${cr.cliente} — Venceu em ${formatDateValueBR(cr.data_vencimento)} — ${fmtBRL(Number(cr.valor))}`,
+          descricao: `Cliente: ${cr.cliente} — Venceu em ${formatDateValueBR(String(cr.data_vencimento))} — ${fmtBRL(Number(cr.valor))}`,
         });
       });
 
@@ -167,7 +168,7 @@ export default function AlertasSection({ onNavigate }: Props) {
         list.push({
           tipo: 'cr_vencer', grupo: 'contas_receber', severidade: 'info', navigateTo: 'receber',
           titulo: `A receber: ${cr.descricao}`,
-          descricao: `Cliente: ${cr.cliente} — Vence em ${formatDateValueBR(cr.data_vencimento)}`,
+          descricao: `Cliente: ${cr.cliente} — Vence em ${formatDateValueBR(String(cr.data_vencimento))}`,
         });
       });
 
@@ -225,7 +226,7 @@ export default function AlertasSection({ onNavigate }: Props) {
       toast.error('Erro inesperado ao carregar alertas');
     }
     setLoading(false);
-  }, []);
+  }, [supabase]);
 
   useEffect(() => { if (canView) load(); }, [load, canView]);
 

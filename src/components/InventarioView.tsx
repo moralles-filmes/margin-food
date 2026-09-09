@@ -1,3 +1,4 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useInventarioStore, Inventario } from '@/hooks/useInventarioStore';
@@ -22,7 +23,6 @@ import { ClipboardCheck, Plus, ArrowLeft, Search, AlertTriangle, CheckCircle, Ba
 import { todayBR, formatDisplayBR, formatInBR, parseUTCToBR } from '@/lib/datetime';
 import { parseLocalDate } from '@/lib/dateUtils';
 import { fmtBRL, formatPercentBR } from '@/lib/formatters';
-import { supabase } from '@/integrations/supabase/client';
 import QuickInventorySection from './QuickInventorySection';
 import InventarioDashboardView from './inventario/InventarioDashboardView';
 import InventarioAuditView from './inventario/InventarioAuditView';
@@ -952,6 +952,7 @@ function ConferentesManagementView({ conferentes, loading, canManage, onAdd, onR
   onRemove: (conferenteId: string) => Promise<void>;
   onBack: () => void;
 }) {
+  const supabase = useSupabase();
   const [profiles, setProfiles] = useState<{ id: string; nome: string; email: string }[]>([]);
   const [selectedUserId, setSelectedUserId] = useState('');
   const [loadingProfiles, setLoadingProfiles] = useState(false);
@@ -966,7 +967,7 @@ function ConferentesManagementView({ conferentes, loading, canManage, onAdd, onR
       setLoadingProfiles(false);
     };
     loadProfiles();
-  }, []);
+  }, [supabase]);
 
   const existingUserIds = new Set(conferentes.map(c => c.user_id));
   const availableProfiles = profiles.filter(p => !existingUserIds.has(p.id));

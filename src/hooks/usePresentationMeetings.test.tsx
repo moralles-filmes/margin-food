@@ -121,7 +121,7 @@ describe('cache e transporte das reuniões executivas', () => {
   it('usa a RPC protegida por export para obter o conteúdo da ata', async () => {
     const detail = createPresentationMeetingDetail();
     vi.mocked(supabase.rpc).mockResolvedValue({ data: detail, error: null } as never);
-    await expect(fetchPresentationMinutesExport(MEETING_ID)).resolves.toMatchObject({
+    await expect(fetchPresentationMinutesExport(supabase, MEETING_ID)).resolves.toMatchObject({
       session: { id: MEETING_ID },
     });
     expect(supabase.rpc).toHaveBeenCalledWith('get_fin_presentation_minutes_export', { p_session_id: MEETING_ID });

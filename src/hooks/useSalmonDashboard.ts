@@ -1,5 +1,5 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { formatDateISO } from '@/lib/datetime';
 import { PeriodRange } from '@/components/PeriodFilter';
 
@@ -55,6 +55,7 @@ const DEFAULT: SalmonDashboardData = {
 };
 
 export function useSalmonDashboard(period: PeriodRange): SalmonDashboardData {
+  const supabase = useSupabase();
   const [data, setData] = useState<SalmonDashboardData>(DEFAULT);
 
   useEffect(() => {
@@ -106,7 +107,7 @@ export function useSalmonDashboard(period: PeriodRange): SalmonDashboardData {
       });
 
     return () => { cancelled = true; };
-  }, [period.start.getTime(), period.end.getTime()]);
+  }, [period.end, period.start, supabase]);
 
   return data;
 }

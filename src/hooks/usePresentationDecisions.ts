@@ -1,3 +1,4 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   parsePresentationDecisionDetail,
@@ -12,7 +13,6 @@ import {
   type PresentationDecisionSnapshot,
   type PresentationDecisionStatus,
 } from '@/domain/financeiro/presentation';
-import { supabase } from '@/integrations/supabase/client';
 import type { Json } from '@/integrations/supabase/types';
 import { normalizeSearchText } from '@/lib/utils';
 
@@ -73,6 +73,7 @@ export function usePresentationDecisions(
   filters: PresentationDecisionFilters,
   enabled: boolean,
 ) {
+  const supabase = useSupabase();
   const pageSize = filters.pageSize ?? 20;
   return useQuery({
     queryKey: [
@@ -110,6 +111,7 @@ export function usePresentationDecisionDetail(
   decisionId: string | undefined,
   enabled: boolean,
 ) {
+  const supabase = useSupabase();
   return useQuery({
     queryKey: [...PRESENTATION_DECISIONS_QUERY_ROOT, companyId, 'detail', decisionId],
     enabled: enabled && Boolean(companyId && decisionId),
@@ -127,6 +129,7 @@ export function usePresentationResponsibleProfiles(
   companyId: string | undefined,
   enabled: boolean,
 ) {
+  const supabase = useSupabase();
   return useQuery({
     queryKey: [...PRESENTATION_DECISIONS_QUERY_ROOT, companyId, 'responsible-profiles'],
     enabled: enabled && Boolean(companyId),
@@ -143,6 +146,7 @@ export function usePresentationResponsibleProfiles(
 }
 
 export function usePresentationDecisionMutations(companyId: string | undefined) {
+  const supabase = useSupabase();
   const queryClient = useQueryClient();
 
   const invalidate = async (decisionId?: string) => {

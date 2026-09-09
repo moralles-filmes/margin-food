@@ -56,6 +56,7 @@ import {
 } from '@/lib/presentationDetailNavigation';
 import { useCan } from '@/permissions/hooks';
 import { useAuth } from '@/contexts/AuthContext';
+import { PresentationCompanyScope } from './PresentationCompanyScope';
 
 const PresentationMode = lazy(() => import('@/components/financeiro/PresentationMode'));
 
@@ -132,12 +133,20 @@ export function PresentationRequestState({
   return null;
 }
 
-export default function ApresentacaoSociosSection({
+export default function ApresentacaoSociosSection(props: { detailTarget?: PresentationDetailTarget; invalidDetail?: boolean }) {
+  return <PresentationCompanyScope>{scope => <ScopedPresentation {...props} {...scope} />}</PresentationCompanyScope>;
+}
+
+function ScopedPresentation({
   detailTarget,
   invalidDetail = false,
+  companySelector,
+  localUnitOverride,
 }: {
   detailTarget?: PresentationDetailTarget;
   invalidDetail?: boolean;
+  companySelector?: React.ReactNode;
+  localUnitOverride?: boolean;
 }) {
   const { profile, user } = useAuth();
   const canView = useCan('financeiro:relatorio-socios:view');
@@ -217,14 +226,14 @@ export default function ApresentacaoSociosSection({
       ? attachPresentationPlan(
           attachPresentationInsights(
             attachPresentationExpenses(
-              attachPresentationRevenue(query.data, revenueQuery.availability),
+              attachPresentationRevenue({ ...query.data, company: { id: profile!.company_id, name: profile!.company_name } }, revenueQuery.availability),
               expensesQuery.availability,
             ),
           ),
           planQuery.availability,
         )
       : undefined,
-    [expensesQuery.availability, planQuery.availability, query.data, revenueQuery.availability],
+    [expensesQuery.availability, planQuery.availability, query.data, revenueQuery.availability, profile],
   );
   const scenarioPlanAvailability = useMemo(() => (
     canSimulate
@@ -274,9 +283,9 @@ export default function ApresentacaoSociosSection({
   }, [exportDecisionQuery.data, planQuery.firstPage, presentationDataWithScenario]);
 
   useEffect(() => {
-    const nextBounds = query.data?.availableBounds;
+    const nextBounds = query.discoveredBounds;
     if (nextBounds && !sameBounds(availableBounds, nextBounds)) setAvailableBounds(nextBounds);
-  }, [availableBounds, query.data?.availableBounds]);
+  }, [availableBounds, query.discoveredBounds]);
 
   useEffect(() => {
     if (detailTarget) setWorkspaceView('preparation');
@@ -433,6 +442,8 @@ export default function ApresentacaoSociosSection({
       initialDraft={initialDraft}
       availableBounds={availableBounds}
       unitName={profile?.company_name}
+      companySelector={companySelector}
+      localUnitOverride={localUnitOverride}
       granularity={granularity}
       rankingLimit={rankingLimit}
       historyYears={historyYears}
@@ -444,7 +455,7 @@ export default function ApresentacaoSociosSection({
     />
   );
 
-  if (!canView) return requestState;
+  if (!canView) return <div className="space-y-4">{companySelector}{requestState}</div>;
 
   if (!detailTarget && workspaceView === 'presentation' && presentationDataWithDecision) {
     return (

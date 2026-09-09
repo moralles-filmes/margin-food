@@ -1,5 +1,5 @@
+import { useSupabase, useCompanyScope } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { emitDataEvent } from '@/lib/dataEvents';
@@ -100,6 +100,8 @@ function matchesPurchaseOrderSearch(order: PurchaseOrder, search: string): boole
 }
 
 export function usePurchaseOrdersStore() {
+  const supabase = useSupabase();
+  const companyId = useCompanyScope()?.companyId;
   const { user } = useAuth();
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -192,7 +194,7 @@ export function usePurchaseOrdersStore() {
     } finally {
       setLoading(false);
     }
-  }, [filters, user]);
+  }, [filters, supabase, user]);
 
   const loadMore = useCallback(() => {
     if (hasMore && !loading) fetchOrders(true);
@@ -219,13 +221,13 @@ export function usePurchaseOrdersStore() {
   useEffect(() => {
     if (!user) return;
     const channel = supabase
-      .channel('purchase-orders-rt')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'purchase_orders' }, () => {
+      .channel('purchase-orders-rt:' + companyId)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'purchase_orders', filter: `company_id=eq.${companyId}` }, () => {
         fetchOrdersRef.current();
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [user]);
+  }, [companyId, supabase, user]);
 
   const fetchItems = useCallback(async (orderId: string): Promise<PurchaseOrderItem[]> => {
     const { data } = await supabase
@@ -234,7 +236,7 @@ export function usePurchaseOrdersStore() {
       .eq('order_id', orderId)
       .is('deleted_at', null);
     return (data || []) as unknown as PurchaseOrderItem[];
-  }, []);
+  }, [supabase]);
 
   // ===== W2: ATOMIC createOrder via RPC =====
   const createOrder = useCallback(async (
@@ -306,7 +308,7 @@ export function usePurchaseOrdersStore() {
     } finally {
       setSaving(false);
     }
-  }, [user, saving, fetchOrders]);
+  }, [user, saving, supabase, fetchOrders]);
 
   // ===== SHOPPING CHECKLIST FUNCTIONS =====
   const updateShoppingItem = useCallback(async (
@@ -320,7 +322,7 @@ export function usePurchaseOrdersStore() {
       shopping_note: note || '',
       // W5: updated_at handled by server trigger
     }).eq('id', itemId);
-  }, [user]);
+  }, [supabase, user]);
 
   const confirmShopping = useCallback(async (orderId: string) => {
     if (!user) return;
@@ -380,7 +382,7 @@ export function usePurchaseOrdersStore() {
     await fetchOrders();
     toast.success('Compra confirmada! Pedido enviado para Recebimento.');
     emitDataEvent('compras:pedidos');
-  }, [user, fetchItems, fetchOrders, orders]);
+  }, [user, fetchItems, supabase, orders, fetchOrders]);
 
   // ===== RECEIVING FUNCTIONS =====
   const receiveItem = useCallback(async (
@@ -398,7 +400,7 @@ export function usePurchaseOrdersStore() {
       received_by: user.id,
       // W5: updated_at handled by server trigger
     }).eq('id', itemId);
-  }, [user]);
+  }, [supabase, user]);
 
   const confirmReceiving = useCallback(async (orderId: string) => {
     if (!user) return;
@@ -478,7 +480,7 @@ export function usePurchaseOrdersStore() {
     toast.success(newStatus === 'COMPLETED' ? 'Pedido concluído! Estoque atualizado.' : 'Recebimento parcial registrado. Itens não entregues pendentes.');
     emitDataEvent('compras:pedidos');
     emitDataEvent('estoque:movimentacoes');
-  }, [user, fetchItems, fetchOrders, orders]);
+  }, [user, fetchItems, supabase, fetchOrders, orders]);
 
   const finalizePartialItem = useCallback(async (itemId: string, qtyReceived: number) => {
     if (!user) return;
@@ -512,7 +514,7 @@ export function usePurchaseOrdersStore() {
     toast.success(newStatus === 'COMPLETED' ? 'Todos os itens recebidos! Pedido concluído.' : 'Item recebido e estoque atualizado.');
     emitDataEvent('compras:pedidos');
     emitDataEvent('estoque:movimentacoes');
-  }, [user, fetchOrders]);
+  }, [user, supabase, fetchOrders]);
 
   const updateOrderStatus = useCallback(async (orderId: string, status: string) => {
     await supabase.from('purchase_orders').update({
@@ -520,7 +522,7 @@ export function usePurchaseOrdersStore() {
       // W5: updated_at handled by server trigger
     }).eq('id', orderId);
     await fetchOrders();
-  }, [fetchOrders]);
+  }, [fetchOrders, supabase]);
 
   const cancelOrder = useCallback(async (orderId: string) => {
     if (!user) return;
@@ -536,7 +538,7 @@ export function usePurchaseOrdersStore() {
     await fetchOrders();
     toast.success('Pedido cancelado.');
     emitDataEvent('compras:pedidos');
-  }, [user, fetchOrders]);
+  }, [user, supabase, fetchOrders]);
 
   // ===== W2: ATOMIC editOrder via RPC =====
   const editOrder = useCallback(async (
@@ -606,7 +608,7 @@ export function usePurchaseOrdersStore() {
     } finally {
       setSaving(false);
     }
-  }, [user, saving, fetchOrders]);
+  }, [user, saving, supabase, fetchOrders]);
 
   const deleteOrder = useCallback(async (orderId: string) => {
     if (!user) return false;
@@ -648,7 +650,7 @@ export function usePurchaseOrdersStore() {
     emitDataEvent('compras:pedidos');
     if (hasReceived) emitDataEvent('estoque:movimentacoes');
     return true;
-  }, [user, fetchItems, fetchOrders]);
+  }, [user, fetchItems, supabase, fetchOrders]);
 
   // Counts
   const pendingCount = orders.filter(o => o.status === 'PENDING').length;
@@ -680,7 +682,7 @@ export function usePurchaseOrdersStore() {
 
     await fetchOrders();
     toast.success('Ciência registrada.');
-  }, [user, fetchOrders]);
+  }, [user, supabase, fetchOrders]);
 
   return {
     orders, loading, saving, errorMessage, hasMore, loadMore, filters, applyFilters,

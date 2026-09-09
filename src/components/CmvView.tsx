@@ -1,7 +1,8 @@
+import { useSupabase, useCompanyScope } from '@/contexts/CompanyScopeContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { supabase } from '@/integrations/supabase/client';
 import { useCan, useModuleAccess } from '@/permissions/hooks';
 import { startOfMonth, endOfMonth } from 'date-fns';
 import { formatInBR, fmtBRL, parseLocalDate, formatPercentBR } from '@/lib/formatters';
@@ -19,6 +20,9 @@ import { cacheGet, cacheSet, cacheInvalidate } from '@/components/cmv/cmvCache';
 import type { CmvResult, MetaCmv, RankingItem } from '@/components/cmv/types';
 
 export default function CmvView() {
+  const supabase = useSupabase();
+  const companyId = useCompanyScope()?.companyId;
+  const { user } = useAuth();
   const { visibleSubtabs } = useModuleAccess('cmv');
   const canEditSemanal = useCan('cmv:semanal:edit');
 
@@ -54,7 +58,7 @@ export default function CmvView() {
   const mesAno = useMemo(() => formatInBR(parseLocalDate(dataInicio), 'yyyy-MM'), [dataInicio]);
 
   const fetchCmv = useCallback(async () => {
-    const cacheParams = { data_inicio: dataInicio, data_fim: dataFim, metodo, escopo, setor: filterSetor };
+    const cacheParams = { companyId, userId: user?.id, data_inicio: dataInicio, data_fim: dataFim, metodo, escopo, setor: filterSetor };
     const cached = cacheGet<CmvResult>('calcular_cmv', cacheParams);
     if (cached) {
       setCmvData(cached);
@@ -72,10 +76,10 @@ export default function CmvView() {
       toast.error('Erro ao calcular CMV: ' + (e.message || ''));
     }
     setLoading(false);
-  }, [dataInicio, dataFim, metodo, escopo, filterSetor]);
+  }, [companyId, user?.id, dataInicio, dataFim, metodo, escopo, filterSetor, supabase.functions]);
 
   const fetchRanking = useCallback(async (offset = 0, append = false) => {
-    const cacheParams = { data_inicio: dataInicio, data_fim: dataFim, escopo, offset };
+    const cacheParams = { companyId, userId: user?.id, data_inicio: dataInicio, data_fim: dataFim, escopo, offset };
     if (!append) {
       const cached = cacheGet<{ ranking: RankingItem[]; next_offset: number | null; total_count: number }>('get_ranking', cacheParams);
       if (cached) {
@@ -111,7 +115,7 @@ export default function CmvView() {
     } finally {
       setRankingLoadingMore(false);
     }
-  }, [dataInicio, dataFim, escopo]);
+  }, [companyId, user?.id, dataInicio, dataFim, escopo, supabase.functions]);
 
   const loadMoreRanking = useCallback(() => {
     if (rankingHasMore && !rankingLoadingMore) {
@@ -120,7 +124,7 @@ export default function CmvView() {
   }, [rankingHasMore, rankingLoadingMore, rankingOffset, fetchRanking]);
 
   const fetchMeta = useCallback(async () => {
-    const cacheParams = { mes_ano: mesAno };
+    const cacheParams = { companyId, userId: user?.id, mes_ano: mesAno };
     const cached = cacheGet<any>('get_metas', cacheParams);
     if (cached !== null) {
       setMeta(cached._empty ? null : cached);
@@ -142,7 +146,7 @@ export default function CmvView() {
       setErrorMeta(msg);
       toast.error('Falha ao carregar metas: ' + msg);
     }
-  }, [mesAno]);
+  }, [companyId, mesAno, supabase.functions, user?.id]);
 
   useEffect(() => {
     fetchCmv();

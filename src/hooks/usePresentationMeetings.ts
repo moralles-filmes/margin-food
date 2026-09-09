@@ -1,3 +1,4 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   parsePresentationMeetingDetail,
@@ -9,7 +10,6 @@ import {
   type PresentationMeetingStatus,
   type TimeSeriesGranularity,
 } from '@/domain/financeiro/presentation';
-import { supabase } from '@/integrations/supabase/client';
 import type { Json } from '@/integrations/supabase/types';
 import { normalizeSearchText } from '@/lib/utils';
 
@@ -74,6 +74,7 @@ export function usePresentationMeetings(
   filters: PresentationMeetingFilters,
   enabled: boolean,
 ) {
+  const supabase = useSupabase();
   const pageSize = filters.pageSize ?? 20;
   return useQuery({
     queryKey: [
@@ -111,6 +112,7 @@ export function usePresentationMeetingDetail(
   sessionId: string | undefined,
   enabled: boolean,
 ) {
+  const supabase = useSupabase();
   return useQuery({
     queryKey: [...PRESENTATION_MEETINGS_QUERY_ROOT, companyId, 'detail', sessionId],
     enabled: enabled && Boolean(companyId && sessionId),
@@ -132,7 +134,7 @@ export function usePresentationPreviousMeetingDetail(
   return usePresentationMeetingDetail(companyId, previousSessionId, enabled);
 }
 
-export async function fetchPresentationMinutesExport(sessionId: string) {
+export async function fetchPresentationMinutesExport(supabase: typeof import("@/integrations/supabase/client").supabase, sessionId: string) {
   const { data, error } = await supabase.rpc('get_fin_presentation_minutes_export', {
     p_session_id: sessionId,
   });
@@ -141,6 +143,7 @@ export async function fetchPresentationMinutesExport(sessionId: string) {
 }
 
 export function usePresentationMeetingMutations(companyId: string | undefined) {
+  const supabase = useSupabase();
   const queryClient = useQueryClient();
   const invalidate = async (sessionId?: string) => {
     await queryClient.invalidateQueries({ queryKey: PRESENTATION_MEETINGS_QUERY_ROOT });

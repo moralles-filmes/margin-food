@@ -1,7 +1,7 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { includesNormalized } from '@/lib/utils';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
-import { supabase } from '@/integrations/supabase/client';
 
 import { useCan, useModuleAccess } from '@/permissions/hooks';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -91,7 +91,7 @@ interface SalmonRef {
   preco_auto: number;
 }
 
-async function invokeApi(action: string, payload: any = {}) {
+async function invokeApi(supabase: typeof import("@/integrations/supabase/client").supabase, action: string, payload: any = {}) {
   const { data, error } = await supabase.functions.invoke('ficha-tecnica', {
     body: { action, ...payload },
   });
@@ -218,6 +218,7 @@ function NivelTable({ tipo, tipoLabel, tipoIcon, componentes, canCreate, canEdit
 // MAIN VIEW
 // ============================================================
 export default function FichaTecnicaView({ lotesLimpos = [] }: { lotesLimpos?: LoteSalmaoLimpo[] }) {
+  const supabase = useSupabase();
   const { confirm, ConfirmDialog } = useConfirmDialog();
   const { visibleSubtabs, canView } = useModuleAccess('ficha');
 
@@ -272,10 +273,10 @@ export default function FichaTecnicaView({ lotesLimpos = [] }: { lotesLimpos?: L
     setLoading(true);
     try {
       const [compRes, canaisRes, prodsRes, salmonRefRes] = await Promise.all([
-        invokeApi('listar_componentes', { ativo: true }),
-        invokeApi('listar_canais'),
+        invokeApi(supabase, 'listar_componentes', { ativo: true }),
+        invokeApi(supabase, 'listar_canais'),
         supabase.from('produtos').select('id, nome_produto, custo_ultima_compra, custo_padrao, unidade_medida, categoria').eq('ativo', true).order('nome_produto'),
-        invokeApi('get_preco_referencia_salmao'),
+        invokeApi(supabase, 'get_preco_referencia_salmao'),
       ]);
       setComponentes(compRes.componentes || []);
       setCanais(canaisRes.canais || []);
@@ -285,7 +286,7 @@ export default function FichaTecnicaView({ lotesLimpos = [] }: { lotesLimpos?: L
       toast.error(e.message);
     }
     setLoading(false);
-  }, []);
+  }, [supabase]);
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
@@ -296,11 +297,11 @@ export default function FichaTecnicaView({ lotesLimpos = [] }: { lotesLimpos?: L
         .filter(l => l.kgRestante > 0 && l.status !== 'VENCIDO')
         .sort((a, b) => b.dataManipulacao.localeCompare(a.dataManipulacao))[0];
       const info = latestLot ? `Lote de ${formatDateValueBR(latestLot.dataManipulacao)} — ${R$(localSalmonCost)}/kg limpo` : '';
-      invokeApi('sync_preco_salmao_auto', { preco_kg_limpo: localSalmonCost, lote_info: info })
+      invokeApi(supabase, 'sync_preco_salmao_auto', { preco_kg_limpo: localSalmonCost, lote_info: info })
         .then(() => setSalmonRef(prev => ({ ...prev, preco: localSalmonCost, preco_auto: localSalmonCost, origem: 'lote_recente', info })))
         .catch((e) => console.warn('[salmon-price-sync] falha ao sincronizar preço do salmão com o backend:', e));
     }
-  }, [localSalmonCost]);
+  }, [localSalmonCost, lotesLimpos, supabase]);
 
   const openNew = (tipo: ComponenteTipo) => {
     setEditingComp(null);
@@ -316,7 +317,7 @@ export default function FichaTecnicaView({ lotesLimpos = [] }: { lotesLimpos?: L
 
   async function openDetalhe(id: string) {
     try {
-      const res = await invokeApi('get_componente_detalhe', { id });
+      const res = await invokeApi(supabase, 'get_componente_detalhe', { id });
       setDetalheComp(res.componente);
       setDetalheItens(res.itens);
       setDetalheCusto(res.custo);
@@ -329,7 +330,7 @@ export default function FichaTecnicaView({ lotesLimpos = [] }: { lotesLimpos?: L
     if (!ok) return;
     if (deleting) return; // prevent double-click
     setDeleting(c.id);
-    try { await invokeApi('deletar_componente', { id: c.id }); toast.success('Componente excluído'); loadAll(); }
+    try { await invokeApi(supabase, 'deletar_componente', { id: c.id }); toast.success('Componente excluído'); loadAll(); }
     catch (e: any) { toast.error(e.message); }
     finally { setDeleting(null); }
   }
@@ -383,7 +384,7 @@ export default function FichaTecnicaView({ lotesLimpos = [] }: { lotesLimpos?: L
             <Button size="sm" variant="outline" className="h-8 text-xs" disabled={recalculating} onClick={async () => {
               if (recalculating) return;
               setRecalculating(true);
-              try { await invokeApi('recalcular_todos_custos'); toast.success('Custos recalculados'); loadAll(); }
+              try { await invokeApi(supabase, 'recalcular_todos_custos'); toast.success('Custos recalculados'); loadAll(); }
               catch (e: any) { toast.error(e.message); }
               finally { setRecalculating(false); }
             }}><RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${recalculating ? 'animate-spin' : ''}`} />{recalculating ? 'Recalculando...' : 'Recalcular Todos'}</Button>
@@ -464,7 +465,7 @@ export default function FichaTecnicaView({ lotesLimpos = [] }: { lotesLimpos?: L
                       <div className="flex gap-1">
                         <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => { setEditingCanal(canal); setShowCanalForm(true); }}><Settings2 className="w-3.5 h-3.5" /></Button>
                         <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={async () => {
-                          try { await invokeApi('deletar_canal', { id: canal.id }); toast.success('Canal removido'); loadAll(); }
+                          try { await invokeApi(supabase, 'deletar_canal', { id: canal.id }); toast.success('Canal removido'); loadAll(); }
                           catch (e: any) { toast.error(e.message); }
                         }}><Trash2 className="w-3.5 h-3.5" /></Button>
                       </div>
@@ -548,6 +549,7 @@ function ComponenteFormDialog({ open, onClose, componente, forcedTipo, component
   open: boolean; onClose: () => void; componente: Componente | null; forcedTipo: ComponenteTipo | null;
   componentes: Componente[]; produtos: any[]; salmonRef: SalmonRef; onSaved: () => void;
 }) {
+  const supabase = useSupabase();
   const [form, setForm] = useState({
     tipo: 'PRE_PREPARO' as ComponenteTipo,
     nome: '', categoria: 'Geral', rendimento: '1', unidade_rendimento: 'un',
@@ -579,7 +581,7 @@ function ComponenteFormDialog({ open, onClose, componente, forcedTipo, component
         tempo_preparo_min: componente.tempo_preparo_min ? String(componente.tempo_preparo_min) : '',
         modo_preparo: componente.modo_preparo || '', observacoes: componente.observacoes || '',
       });
-      invokeApi('get_componente_detalhe', { id: componente.id }).then(res => {
+      invokeApi(supabase, 'get_componente_detalhe', { id: componente.id }).then(res => {
         setBomItens((res.itens || []).map((i: any) => ({
           produto_id: i.produto_id || undefined,
           componente_filho_id: i.componente_filho_id || undefined,
@@ -601,13 +603,13 @@ function ComponenteFormDialog({ open, onClose, componente, forcedTipo, component
       });
       setBomItens([]);
     }
-  }, [componente, forcedTipo, open]);
+  }, [componente, forcedTipo, open, supabase]);
 
   const handleSave = async () => {
     if (!form.nome.trim()) { toast.error('Nome obrigatório'); return; }
     setSaving(true);
     try {
-      const res = await invokeApi('salvar_componente', {
+      const res = await invokeApi(supabase, 'salvar_componente', {
         id: componente?.id, tipo: form.tipo, nome: form.nome, categoria: form.categoria,
         rendimento: parseDecimal(form.rendimento) || 1, unidade_rendimento: form.unidade_rendimento,
         perda_estimada_percent: parseDecimal(form.perda_estimada_percent) || 0,
@@ -618,7 +620,7 @@ function ComponenteFormDialog({ open, onClose, componente, forcedTipo, component
       });
       const compId = componente?.id || res.id;
       if (bomItens.length > 0) {
-        await invokeApi('salvar_componente_itens', {
+        await invokeApi(supabase, 'salvar_componente_itens', {
           componente_pai_id: compId,
           itens: bomItens.map(i => ({
             produto_id: i.produto_id || null, componente_filho_id: i.componente_filho_id || null,
@@ -884,6 +886,7 @@ function ComponenteFormDialog({ open, onClose, componente, forcedTipo, component
 function CanalFormDialog({ open, onClose, canal, onSaved }: {
   open: boolean; onClose: () => void; canal: Canal | null; onSaved: () => void;
 }) {
+  const supabase = useSupabase();
   const [form, setForm] = useState({ nome: '', taxa_percentual: '0', taxa_fixa: '0', imposto_percent: '0', custo_embalagem_adicional: '0' });
   const [saving, setSaving] = useState(false);
 
@@ -899,7 +902,7 @@ function CanalFormDialog({ open, onClose, canal, onSaved }: {
     if (!form.nome.trim()) { toast.error('Nome obrigatório'); return; }
     setSaving(true);
     try {
-      await invokeApi('salvar_canal', {
+      await invokeApi(supabase, 'salvar_canal', {
         id: canal?.id,
         nome: form.nome,
         taxa_percentual: parseDecimal(form.taxa_percentual) || 0,
@@ -1044,24 +1047,25 @@ function DetalheDialog({ open, onClose, componente, itens, custo }: {
 function PrecificacaoDialog({ open, onClose, componente, canais, onSaved }: {
   open: boolean; onClose: () => void; componente: Componente; canais: Canal[]; onSaved: () => void;
 }) {
+  const supabase = useSupabase();
   const [precos, setPrecos] = useState<Record<string, string>>({});
   const [analise, setAnalise] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    invokeApi('get_precificacao', { componente_id: componente.id }).then(res => {
+    invokeApi(supabase, 'get_precificacao', { componente_id: componente.id }).then(res => {
       const map: Record<string, string> = {};
       (res.precos || []).forEach((p: any) => { map[p.canal_id] = String(p.preco_venda); });
       canais.forEach(c => { if (!map[c.id]) map[c.id] = '0'; });
       setPrecos(map);
       setAnalise(res.analise || []);
     }).catch(e => toast.error(e.message));
-  }, [componente, canais]);
+  }, [componente, canais, supabase]);
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      await invokeApi('salvar_precificacao', {
+      await invokeApi(supabase, 'salvar_precificacao', {
         componente_id: componente.id,
         precos: Object.entries(precos).map(([canal_id, preco_venda]) => ({
           canal_id,
@@ -1069,7 +1073,7 @@ function PrecificacaoDialog({ open, onClose, componente, canais, onSaved }: {
         })),
       });
       toast.success('Precificação salva');
-      const res = await invokeApi('get_precificacao', { componente_id: componente.id });
+      const res = await invokeApi(supabase, 'get_precificacao', { componente_id: componente.id });
       setAnalise(res.analise || []);
       onSaved();
     } catch (e: any) { toast.error(e.message); }
@@ -1140,6 +1144,7 @@ function PrecificacaoDialog({ open, onClose, componente, canais, onSaved }: {
 function SimuladorDialog({ open, onClose, componente, canais }: {
   open: boolean; onClose: () => void; componente: Componente; canais: Canal[];
 }) {
+  const supabase = useSupabase();
   const [ajusteCusto, setAjusteCusto] = useState(0);
   const [ajustePerda, setAjustePerda] = useState(Number(componente.perda_estimada_percent) || 0);
   const [ajustePorc, setAjustePorc] = useState(0);
@@ -1151,7 +1156,7 @@ function SimuladorDialog({ open, onClose, componente, canais }: {
   const simular = async () => {
     setLoading(true);
     try {
-      const res = await invokeApi('simular_cenario', {
+      const res = await invokeApi(supabase, 'simular_cenario', {
         componente_id: componente.id, ajuste_custo_percent: ajusteCusto,
         ajuste_perda_percent: ajustePerda, ajuste_porcionamento_g: ajustePorc,
         ajuste_preco_final: precoFinal ? normalizeBRLMoneyToNumber(precoFinal) ?? undefined : undefined,
@@ -1343,6 +1348,7 @@ function MarkupExplicacao() {
 function SalmonConfigDialog({ open, onClose, salmonRef, isAdmin, onSaved }: {
   open: boolean; onClose: () => void; salmonRef: SalmonRef; isAdmin: boolean; onSaved: () => void;
 }) {
+  const supabase = useSupabase();
   const [manualPrice, setManualPrice] = useState(String(salmonRef.preco_manual || ''));
   const [saving, setSaving] = useState(false);
 
@@ -1353,7 +1359,7 @@ function SalmonConfigDialog({ open, onClose, salmonRef, isAdmin, onSaved }: {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await invokeApi('set_preco_referencia_salmao', { preco_manual: normalizeBRLMoneyToNumber(manualPrice) || 0 });
+      await invokeApi(supabase, 'set_preco_referencia_salmao', { preco_manual: normalizeBRLMoneyToNumber(manualPrice) || 0 });
       toast.success('Preço de referência do salmão atualizado');
       onSaved();
     } catch (e: any) { toast.error(e.message); }

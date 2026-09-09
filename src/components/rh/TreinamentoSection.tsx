@@ -1,5 +1,5 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -79,6 +79,7 @@ const TIPO_ICONS = { leitura: FileText, video: Video, quiz: HelpCircle };
 
 export default function TreinamentoSection({
  colaboradores, canManage }: Props) {
+  const supabase = useSupabase();
   const canViewRbac = useCan('rh:treinamento:view');
   const { user } = useAuth();
   const [trilhas, setTrilhas] = useState<Trilha[]>([]);
@@ -115,7 +116,7 @@ export default function TreinamentoSection({
       console.error(e);
     }
     setLoading(false);
-  }, []);
+  }, [supabase]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 

@@ -1,5 +1,5 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { Fragment, useState, useEffect, useCallback, useMemo } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCan } from '@/permissions';
 import { emitDataEvent, useDataEvent } from '@/lib/dataEvents';
@@ -58,7 +58,6 @@ interface CentroCustoRef { id: string; nome: string }
 interface ContaRef { id: string; nome: string }
 type UntypedRpc = (name: string, params: Record<string, unknown>) => Promise<{ error: { message: string } | null }>;
 
-const callUntypedRpc = supabase.rpc as unknown as UntypedRpc;
 
 // ─── Helpers ───
 function NoAccess() {
@@ -115,6 +114,8 @@ function capitalizeFirst(text: string): string {
 }
 
 export default function LivroRazaoSection({ initialContaId, initialDateFrom, initialDateTo }: LivroRazaoProps = {}) {
+  const supabase = useSupabase();
+  const callUntypedRpc = supabase.rpc.bind(supabase) as unknown as UntypedRpc;
   const { user } = useAuth();
   const canView = useCan('financeiro:lancamentos:view');
   const canCreate = useCan('financeiro:lancamentos:create');
@@ -204,7 +205,7 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
       setCursorId(last.id);
     }
     setLoading(false);
-  }, [filtroDataDe, filtroDataAte, filtroTipo, filtroConta, filtroOrigem, filtroCategoria]);
+  }, [supabase, filtroDataDe, filtroDataAte, filtroTipo, filtroConta, filtroOrigem, filtroCategoria]);
 
   const loadTotais = useCallback(async () => {
     const { data, error } = await supabase.rpc('get_fin_lancamentos_totais', {
@@ -223,7 +224,7 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
       total_transferencia: Number(result?.total_transferencia) || 0,
       resultado: Number(result?.resultado) || 0,
     });
-  }, [filtroDataDe, filtroDataAte, filtroTipo, filtroConta, filtroOrigem, filtroCategoria]);
+  }, [supabase, filtroDataDe, filtroDataAte, filtroTipo, filtroConta, filtroOrigem, filtroCategoria]);
 
   const loadSaldoAtual = useCallback(async () => {
     const { data, error } = await supabase.rpc('get_fin_saldo_atual', {
@@ -232,7 +233,7 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
     });
     if (error) { console.error('[LivroRazaoSection.loadSaldoAtual]', error); return; }
     setSaldoAtual(Number(data) || 0);
-  }, [filtroConta, filtroDataAte]);
+  }, [filtroConta, filtroDataAte, supabase]);
 
   const load = useCallback(async () => {
     setCursorDate(null);
@@ -248,7 +249,7 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
     setCategorias(buildCategoryOptions((catRes.data as CategoriaRef[]) || []));
     setCentros((ccRes.data as CentroCustoRef[]) || []);
     setContas((contRes.data as ContaRef[]) || []);
-  }, [loadPage, loadTotais, loadSaldoAtual]);
+  }, [loadPage, supabase, loadTotais, loadSaldoAtual]);
 
   useEffect(() => { if (canView) load(); }, [load, canView]);
   useEffect(() => { setCursorDate(null); setCursorId(null); setItems([]); loadPage(null, null); loadTotais(); loadSaldoAtual(); }, [filtroTipo, filtroOrigem, filtroConta, filtroCategoria, filtroDataDe, filtroDataAte, loadPage, loadTotais, loadSaldoAtual]);

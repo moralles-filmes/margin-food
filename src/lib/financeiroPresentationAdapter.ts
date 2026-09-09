@@ -55,6 +55,7 @@ export interface PresentationAnalyticsComparisonData extends Omit<PresentationCo
 }
 
 export interface PresentationSociosData extends Omit<PresentationData, 'current' | 'comparisons'> {
+  company?: { id: string; name: string };
   current: DataAvailability<PresentationAnalyticsSnapshot>;
   revenue?: DataAvailability<PresentationRevenueData>;
   expenses?: DataAvailability<PresentationExpensesData>;

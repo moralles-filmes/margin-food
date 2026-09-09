@@ -1,5 +1,5 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -118,7 +118,6 @@ const agentes: Agente[] = [
   },
 ];
 
-const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-chat`;
 
 function NoAccess() {
   return (
@@ -130,6 +129,7 @@ function NoAccess() {
 }
 
 export default function CentralIAView() {
+  const supabase = useSupabase();
   const { toast } = useToast();
   const { visibleSubtabs, canView } = useModuleAccess('ia');
 
@@ -185,22 +185,14 @@ export default function CentralIAView() {
     };
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) throw new Error('Sessão expirada. Faça login novamente.');
-
-      const resp = await fetch(CHAT_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
-          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-        },
-        body: JSON.stringify({ messages: newMessages, agente: activeAgent }),
+      const { data: responseData, error: requestError, response: resp } = await supabase.functions.invoke('ai-chat', {
+        body: { messages: newMessages, agente: activeAgent },
       });
+      if (!resp) throw requestError ?? new Error('Sem resposta do servidor');
 
       const contentType = resp.headers.get('content-type') || '';
       if (contentType.includes('application/json')) {
-        const json = await resp.json();
+        const json = resp.ok ? responseData : await resp.json();
         if (json.no_data) {
           setMessages(prev => [...prev, { role: 'assistant', content: json.message }]);
           return;

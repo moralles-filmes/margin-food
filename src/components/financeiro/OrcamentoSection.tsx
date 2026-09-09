@@ -1,3 +1,4 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { fmtBRL, formatInBR, formatPercentBR } from '@/lib/formatters';
 import { BRLInput } from '@/components/ui/brl-input';
@@ -8,7 +9,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import StatusBadge from '@/components/ui/StatusBadge';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { subMonths } from 'date-fns';
 import {
@@ -122,6 +122,7 @@ function NoAccess() {
 // ─── Component ───
 
 export default function OrcamentoSection() {
+  const supabase = useSupabase();
   const [categorias, setCategorias] = useState<Omit<CatNode, 'children'>[]>([]);
   const [orcamentos, setOrcamentos] = useState<OrcamentoRow[]>([]);
   const [realizadoMap, setRealizadoMap] = useState<Record<string, number>>({});
@@ -175,7 +176,7 @@ export default function OrcamentoSection() {
       toast.error('Erro ao carregar orçamento');
     }
     setLoading(false);
-  }, [mesAtual]);
+  }, [mesAtual, supabase]);
 
   useEffect(() => { load(); }, [load]);
 

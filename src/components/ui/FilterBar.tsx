@@ -2,7 +2,7 @@ import * as React from 'react';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-interface FilterFieldProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+interface FilterFieldProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'value'> {
   icon: React.ElementType;
   label: string;
   value: React.ReactNode;

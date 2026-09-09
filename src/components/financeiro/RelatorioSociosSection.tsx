@@ -1,8 +1,8 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { subMonths } from 'date-fns';
 import { formatInBR, formatDateTimeBR, fmtBRL, formatPercentBR } from '@/lib/formatters';
@@ -53,6 +53,7 @@ function NoAccess() {
 }
 
 export default function RelatorioSociosSection() {
+  const supabase = useSupabase();
   const [mesAtual, setMesAtual] = useState(formatInBR(new Date(), 'yyyy-MM'));
   const [loading, setLoading] = useState(false);
   const [resumo, setResumo] = useState<RelatorioSociosResumo | null>(null);
@@ -95,7 +96,7 @@ export default function RelatorioSociosSection() {
       toast.error('Erro ao carregar relatório');
     }
     setLoading(false);
-  }, [mesAtual]);
+  }, [mesAtual, supabase]);
 
   useEffect(() => { if (canView) load(); }, [load, canView]);
 

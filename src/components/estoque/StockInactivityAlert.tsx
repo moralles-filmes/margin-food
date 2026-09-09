@@ -1,3 +1,4 @@
+import { useSupabase, useCompanyScope } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
 import { Clock, AlertTriangle, ChevronDown, ChevronUp, Package } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -5,7 +6,6 @@ import { Badge } from '@/components/ui/badge';
 import SearchableSelect from '@/components/ui/SearchableSelect';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { supabase } from '@/integrations/supabase/client';
 import { parseUTCToBR } from '@/lib/datetime';
 
 import { useCan } from '@/permissions/hooks';
@@ -23,6 +23,8 @@ interface InactiveItem {
 
 export default function StockInactivityAlert({
  categorias }: { categorias: string[] }) {
+  const supabase = useSupabase();
+  const companyId = useCompanyScope()?.companyId;
   const canViewRbac = useCan('estoque:preditivo:view');
   const [items, setItems] = useState<InactiveItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,18 +41,18 @@ export default function StockInactivityAlert({
       console.error('Erro ao buscar itens inativos:', e);
     }
     setLoading(false);
-  }, []);
+  }, [supabase]);
 
-  useEffect(() => { fetchInactive(); }, [fetchInactive]);
+  useEffect(() => { fetchInactive(); }, [fetchInactive, companyId, supabase]);
 
   // Auto-refresh on movement changes
   useEffect(() => {
     const channel = supabase
-      .channel('inactivity-alert-refresh')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'movimentacoes_estoque' }, () => fetchInactive())
+      .channel('inactivity-alert-refresh:' + companyId)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'movimentacoes_estoque', filter: `company_id=eq.${companyId}` }, () => fetchInactive())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [fetchInactive]);
+  }, [fetchInactive, companyId, supabase]);
 
   const filtered = items.filter(i => {
     if (filterCat && i.category !== filterCat) return false;

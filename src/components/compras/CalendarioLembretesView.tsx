@@ -1,5 +1,5 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEstoqueGeralStoreContext } from '@/contexts/EstoqueGeralStoreContext';
 import { useSalmonStoreContext } from '@/contexts/SalmonStoreContext';
@@ -55,6 +55,7 @@ const emptyForm = {
 };
 
 export default function CalendarioLembretesView() {
+  const supabase = useSupabase();
   const canViewRbac = useCan('compras:calendario:view');
   const { user } = useAuth();
   const { produtos } = useEstoqueGeralStoreContext();
@@ -74,7 +75,7 @@ export default function CalendarioLembretesView() {
       .order('day_of_week', { ascending: true });
     setReminders((data || []) as unknown as Reminder[]);
     setLoading(false);
-  }, []);
+  }, [supabase]);
 
   useEffect(() => { if (user) fetchReminders(); }, [user, fetchReminders]);
 

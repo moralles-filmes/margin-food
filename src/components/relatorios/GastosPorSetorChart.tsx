@@ -1,6 +1,6 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
-import { supabase } from '@/integrations/supabase/client';
 import { PeriodRange } from '@/components/PeriodFilter';
 import { Switch } from '@/components/ui/switch';
 import { Loader2, PieChart as PieIcon } from 'lucide-react';
@@ -29,6 +29,7 @@ const fmtR$ = fmtBRL;
 
 export default function GastosPorSetorChart({
  period }: { period: PeriodRange }) {
+  const supabase = useSupabase();
   const canViewRbac = useCan('relatorios:cmv:view');
   const [data, setData] = useState<SpendBySectorData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -54,7 +55,7 @@ export default function GastosPorSetorChart({
       }
     }
     fetch();
-  }, [period, includeLosses]);
+  }, [period, includeLosses, supabase]);
 
   const breakdown = data?.breakdown || [];
 

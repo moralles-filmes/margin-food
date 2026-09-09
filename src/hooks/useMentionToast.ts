@@ -1,17 +1,19 @@
+import { useSupabase, useCompanyScope } from '@/contexts/CompanyScopeContext';
 import { useEffect, useRef } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-const SESSION_KEY = 'mentions_toast_last_shown_at';
 
 export function useMentionToast(userId: string | undefined, onNavigate: () => void) {
+  const supabase = useSupabase();
+  const companyId = useCompanyScope()?.companyId;
+  const sessionKey = `mentions_toast_last_shown_at:${userId}:${companyId}`;
   const shownRef = useRef(false);
 
   useEffect(() => {
     if (!userId || shownRef.current) return;
 
     const checkMentions = async () => {
-      const lastShown = sessionStorage.getItem(SESSION_KEY);
+      const lastShown = sessionStorage.getItem(sessionKey);
 
       let query = supabase
         .from('notifications')
@@ -28,7 +30,7 @@ export function useMentionToast(userId: string | undefined, onNavigate: () => vo
       if (!data || data.length === 0) return;
 
       shownRef.current = true;
-      sessionStorage.setItem(SESSION_KEY, new Date().toISOString());
+      sessionStorage.setItem(sessionKey, new Date().toISOString());
 
       toast.info(`Você tem ${data.length} menção(ões) pendente(s) em Requisições.`, {
         duration: 10000,
@@ -44,26 +46,27 @@ export function useMentionToast(userId: string | undefined, onNavigate: () => vo
     };
 
     checkMentions();
-  }, [userId, onNavigate]);
+  }, [userId, companyId, supabase, onNavigate, sessionKey]);
 
   // Realtime: listen for new notifications
   useEffect(() => {
     if (!userId) return;
 
     const channel = supabase
-      .channel('mention-toast-' + userId)
+      .channel('mention-toast-' + userId + ':' + companyId)
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
           table: 'notifications',
-          filter: `recipient_user_id=eq.${userId}`,
+          filter: `company_id=eq.${companyId}`,
         },
         (payload: any) => {
           const row = payload.new;
+          if (row.recipient_user_id !== userId) return;
           if (row?.type === 'MENTION_MARKET_SEASONAL' && !row?.read_at) {
-            sessionStorage.setItem(SESSION_KEY, new Date().toISOString());
+            sessionStorage.setItem(sessionKey, new Date().toISOString());
             toast.info('Nova menção recebida em Mercado & Sazonais', {
               duration: 8000,
               action: {
@@ -79,5 +82,5 @@ export function useMentionToast(userId: string | undefined, onNavigate: () => vo
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [userId, onNavigate]);
+  }, [userId, companyId, supabase, onNavigate, sessionKey]);
 }

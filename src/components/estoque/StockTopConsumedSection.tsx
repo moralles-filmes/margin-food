@@ -1,3 +1,4 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { todayBR } from '@/lib/datetime';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,7 +11,6 @@ import SearchableSelect from '@/components/ui/SearchableSelect';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
 import { AlertTriangle, AlertCircle, RefreshCw, TrendingDown, DollarSign, ShieldAlert, CircleDot } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 import EmptyState from '@/components/ui/EmptyState';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Cell, PieChart, Pie, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { fmtBRL, fmtBRLCompact, formatFixedBR, formatPercentBR } from '@/lib/formatters';
@@ -64,6 +64,7 @@ type RankBy = 'quantity' | 'cost';
 
 export default function StockTopConsumedSection({
  categorias }: { categorias: string[] }) {
+  const supabase = useSupabase();
   const canViewRbac = useCan('estoque:ranking:view');
   const [data, setData] = useState<TopConsumedData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -108,7 +109,7 @@ export default function StockTopConsumedSection({
       setError('Falha ao carregar ranking de consumo');
     }
     setLoading(false);
-  }, [startDate, endDate, rankBy, filterCategory]);
+  }, [startDate, endDate, rankBy, filterCategory, supabase]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 

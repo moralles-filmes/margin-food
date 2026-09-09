@@ -1,3 +1,4 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { emitDataEvent, useDataEvent } from '@/lib/dataEvents';
 import { Card, CardContent } from '@/components/ui/card';
@@ -10,7 +11,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SubmoduleSwitcher, type SubmoduleItem } from '@/components/ui/SubmoduleSwitcher';
-import { supabase } from '@/integrations/supabase/client';
 import { cacheInvalidate } from '@/components/cmv/cmvCache';
 import { toast } from 'sonner';
 import { Plus, Edit, Trash2, RefreshCw, DollarSign, Calendar, FileDown, FileSpreadsheet, AlertTriangle, Store } from 'lucide-react';
@@ -86,6 +86,7 @@ function NoAccess() {
 // ── Component ──
 
 export default function FechamentoCaixaSection() {
+  const supabase = useSupabase();
   const canView = useCan('financeiro:fechamento:view');
   const canCreate = useCan('financeiro:fechamento:create');
   const canEdit = useCan('financeiro:fechamento:edit');
@@ -138,7 +139,7 @@ export default function FechamentoCaixaSection() {
       setBrands((data || []) as FechamentoMarca[]);
     }
     setBrandsLoading(false);
-  }, []);
+  }, [supabase]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -175,7 +176,7 @@ export default function FechamentoCaixaSection() {
       }
     }
     setLoading(false);
-  }, [startDate, endDate]);
+  }, [supabase, startDate, endDate]);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => { loadBrands(); }, [loadBrands]);
@@ -273,7 +274,7 @@ export default function FechamentoCaixaSection() {
       p_descontos: descontos,
       p_observacao: formObs || null,
       p_marcas: formUsesBrands
-        ? brandBreakdownPayload.items
+        ? brandBreakdownPayload.items.map(item => ({ ...item }))
         : [],
       p_expected_updated_at: editUpdatedAt,
     });
@@ -606,7 +607,7 @@ export default function FechamentoCaixaSection() {
       <SubmoduleSwitcher
         items={FECHAMENTO_TABS}
         value={activeTab}
-        onChange={setActiveTab}
+        onChange={value => setActiveTab(value as FechamentoTab)}
       />
 
       {activeTab === 'diario' ? (

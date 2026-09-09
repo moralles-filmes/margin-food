@@ -1,5 +1,5 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { emitDataEvent } from '@/lib/dataEvents';
 import { toast } from 'sonner';
@@ -40,6 +40,7 @@ interface Props {
 
 export default function CategoriasFinSection({
  canCreate, canEdit, canDelete }: Props) {
+  const supabase = useSupabase();
   const canViewRbac = useCan('financeiro:cadastros:view');
   const { user, profile } = useAuth();
   const [items, setItems] = useState<CategoriaRow[]>([]);

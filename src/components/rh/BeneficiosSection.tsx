@@ -1,7 +1,7 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
 import { DecimalInput, parseDecimal } from '@/components/ui/decimal-input';
 import { CurrencyInput } from '@/components/ui/brl-input';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -75,6 +75,7 @@ const R = (v: number) => formatFixedBR(v, 2);
 
 export default function BeneficiosSection({
  colaboradores, canManage }: Props) {
+  const supabase = useSupabase();
   const canViewRbac = useCan('rh:beneficios:view');
   const { user } = useAuth();
   const [beneficios, setBeneficios] = useState<Beneficio[]>([]);
@@ -113,7 +114,7 @@ export default function BeneficiosSection({
     }
     setBenHasMore(newItems.length === PAGE_SIZE);
     setLoading(false);
-  }, []);
+  }, [supabase]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 

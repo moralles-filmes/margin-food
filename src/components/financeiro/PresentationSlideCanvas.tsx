@@ -42,6 +42,7 @@ import {
 } from '@/lib/presentationInsightsFormatting';
 
 interface PresentationSlideCanvasProps {
+  companyName?: string;
   slide: PresentationSlide;
   generatedAt: string;
   slideNumber: number;
@@ -1423,6 +1424,7 @@ function SlideContent({
 }
 
 export default function PresentationSlideCanvas({
+  companyName,
   slide,
   generatedAt,
   slideNumber,
@@ -1458,6 +1460,7 @@ export default function PresentationSlideCanvas({
 
       <footer className="mt-[2.5%] flex shrink-0 items-end justify-between gap-5 border-t border-border pt-2 text-[clamp(0.74rem,0.97cqw,0.97rem)] text-muted-foreground">
         <span>
+          {companyName ? <span className="mb-0.5 block font-medium">{companyName}</span> : null}
           {slide.kind === 'chapter-foundation'
             ? 'Estrutura da apresentação · Dados não solicitados nesta fase'
             : slide.kind === 'revenue-expenses-monthly'

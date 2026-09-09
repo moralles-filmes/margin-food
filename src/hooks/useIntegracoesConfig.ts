@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useAuth } from '@/contexts/AuthContext';
 
 // Configs MASCARADAS retornadas pelas RPCs get_* (o segredo nunca volta inteiro).
@@ -41,10 +41,10 @@ export interface IaSaveInput {
 }
 
 // RPCs novas ainda não estão nos tipos gerados do Supabase.
-const db = supabase as any;
 
 /** Lê/grava as credenciais de integração (Z-API + IA) da empresa, sempre mascaradas. */
 export function useIntegracoesConfig() {
+  const db = useSupabase() as any;
   const { user } = useAuth();
   const [zapi, setZapi] = useState<ZapiConfigMasked | null>(null);
   const [ia, setIa] = useState<IaConfigMasked | null>(null);
@@ -70,7 +70,7 @@ export function useIntegracoesConfig() {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, db]);
 
   useEffect(() => { reload(); }, [reload]);
 
@@ -86,7 +86,7 @@ export function useIntegracoesConfig() {
     if (err) throw err;
     setZapi(data as ZapiConfigMasked);
     return data as ZapiConfigMasked;
-  }, []);
+  }, [db]);
 
   const saveIa = useCallback(async (input: IaSaveInput) => {
     const { data, error: err } = await db.rpc('save_cotacao_ia_config', {
@@ -98,7 +98,7 @@ export function useIntegracoesConfig() {
     if (err) throw err;
     setIa(data as IaConfigMasked);
     return data as IaConfigMasked;
-  }, []);
+  }, [db]);
 
   return { zapi, ia, loading, error, reload, saveZapi, saveIa };
 }

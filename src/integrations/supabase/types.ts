@@ -9501,6 +9501,11 @@ export type Database = {
       }
     }
     Functions: {
+      get_fin_orcamento_arvore: { Args: { p_mes: string }; Returns: Json }
+      _guarded_bulk_upsert_orcamento: { Args: { p_mes_ano: string; p_items: Json }; Returns: Json }
+      list_my_companies: { Args: Record<PropertyKey, never>; Returns: { id: string; nome: string }[] }
+      get_my_company_context: { Args: Record<PropertyKey, never>; Returns: Json }
+
       _fin_dfc_effective_allocations: {
         Args: { p_company_id: string; p_end_inclusive: string; p_start: string }
         Returns: {

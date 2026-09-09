@@ -203,6 +203,6 @@ export function derivePresentationResultsAvailability(
   };
 
   return source.current.state === 'empty'
-    ? { state: 'empty', data, fetchedAt: source.current.fetchedAt }
-    : { state: 'available', data, fetchedAt: source.current.fetchedAt };
+    ? { state: 'empty', data, fetchedAt: 'fetchedAt' in source.current ? source.current.fetchedAt : undefined }
+    : { state: 'available', data, fetchedAt: 'fetchedAt' in source.current ? source.current.fetchedAt : undefined };
 }

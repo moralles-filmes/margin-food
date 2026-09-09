@@ -1,10 +1,10 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useCallback } from 'react';
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   NormalizedDateRange,
   TimeSeriesGranularity,
 } from '@/domain/financeiro/presentation';
-import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
 import { useDataEvent } from '@/lib/dataEvents';
 
@@ -185,7 +185,7 @@ export function isPresentationDetailPermissionError(error: unknown): boolean {
     ));
 }
 
-export async function fetchPresentationDetailRows(
+export async function fetchPresentationDetailRows(supabase: typeof import("@/integrations/supabase/client").supabase,
   filters: PresentationDetailFilters,
   page: number,
   pageSize: number,
@@ -207,7 +207,7 @@ export async function fetchPresentationDetailRows(
   return parsePresentationDetailRowsPage(data);
 }
 
-export async function fetchPresentationDetailSeries(
+export async function fetchPresentationDetailSeries(supabase: typeof import("@/integrations/supabase/client").supabase,
   filters: Omit<PresentationDetailFilters, 'kind'>,
   granularity: TimeSeriesGranularity,
   signal?: AbortSignal,
@@ -232,10 +232,11 @@ export function usePresentationDetailRows(
   companyId: string | null | undefined,
   pageSize = 25,
 ) {
+  const supabase = useSupabase();
   const queryClient = useQueryClient();
   const query = useInfiniteQuery({
     queryKey: [...detailKey(filters), companyId ?? 'unresolved', 'rows', pageSize],
-    queryFn: ({ pageParam, signal }) => fetchPresentationDetailRows(filters, pageParam, pageSize, signal),
+    queryFn: ({ pageParam, signal }) => fetchPresentationDetailRows(supabase, filters, pageParam, pageSize, signal),
     initialPageParam: 1,
     getNextPageParam: lastPage => lastPage.hasMore ? lastPage.page + 1 : undefined,
     enabled: enabled && Boolean(companyId),
@@ -254,9 +255,10 @@ export function usePresentationDetailSeries(
   enabled: boolean,
   companyId: string | null | undefined,
 ) {
+  const supabase = useSupabase();
   return useQuery({
     queryKey: [...detailKey({ ...filters, kind: 'ledger' }), companyId ?? 'unresolved', 'series', granularity],
-    queryFn: ({ signal }) => fetchPresentationDetailSeries(filters, granularity, signal),
+    queryFn: ({ signal }) => fetchPresentationDetailSeries(supabase, filters, granularity, signal),
     enabled: enabled && Boolean(companyId),
     retry: (failureCount, error) => failureCount < 1 && !isPresentationDetailPermissionError(error),
   });

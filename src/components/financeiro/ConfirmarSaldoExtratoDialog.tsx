@@ -1,10 +1,10 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { CurrencyInput } from '@/components/ui/brl-input';
 import { DateInput } from '@/components/ui/DateInput';
-import { supabase } from '@/integrations/supabase/client';
 import { diaAnterior } from '@/lib/extratoParser';
 import { getConsolidatedBankDelta, isAutomaticInvestmentLine } from '@/lib/conciliacaoInvestimentoAutomatico';
 import { fmtBRL, formatDateBR, parseLocalDate } from '@/lib/formatters';
@@ -76,6 +76,7 @@ export default function ConfirmarSaldoExtratoDialog({
   saldoContaCorrenteArquivo, internalMovementCount = 0, contaId,
   onCancel, onConfirmed,
 }: ConfirmarSaldoExtratoDialogProps) {
+  const supabase = useSupabase();
   const [valorInput, setValorInput] = useState(() =>
     internalMovementCount === 0 && saldoSugerido ? formatNumberToBRL(saldoSugerido.valor) : ''
   );

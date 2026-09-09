@@ -1,5 +1,5 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Card, CardContent } from '@/components/ui/card';
@@ -45,6 +45,7 @@ const SETOR_LABELS: Record<string, string> = {
 
 export default function ComunicacaoInternaSection({
  canManage }: Props) {
+  const supabase = useSupabase();
   const canViewRbac = useCan('rh:mural:view');
   const { user } = useAuth();
   const [comunicados, setComunicados] = useState<any[]>([]);
@@ -81,7 +82,7 @@ export default function ComunicacaoInternaSection({
     }
     setHasMore(newItems.length === PAGE_SIZE);
     setLoading(false);
-  }, []);
+  }, [supabase]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 

@@ -1,5 +1,5 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Users, Clock, DollarSign, AlertTriangle, CalendarOff, Award, Heart } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, CartesianGrid } from 'recharts';
@@ -44,6 +44,7 @@ const SETOR_LABELS: Record<string, string> = {
 
 export default function DashboardRhSection({
  colaboradores }: Props) {
+  const supabase = useSupabase();
   const canViewRbac = useCan('rh:dashboard:view');
   const [periodo, setPeriodo] = useState(() => {
     const d = new Date();
@@ -93,7 +94,7 @@ export default function DashboardRhSection({
     setFerias(ferRes.data || []);
     setPontos(pontoRes.data || []);
     setLoading(false);
-  }, [periodo]);
+  }, [periodo, supabase]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 

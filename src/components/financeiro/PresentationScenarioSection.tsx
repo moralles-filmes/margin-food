@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import {
   AlertTriangle,
   ArrowDownRight,
@@ -400,7 +400,7 @@ function SensitivityChartTooltip({
   active?: boolean;
   label?: ReactNode;
   payload?: ChartTooltipPayloadItem[];
-  unit: 'currency' | 'percentage';
+  unit: 'currency' | 'percent';
 }) {
   const title = label == null
     ? undefined

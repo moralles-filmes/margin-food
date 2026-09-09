@@ -1,10 +1,10 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
 import { usePersistedTab } from '@/hooks/usePersistedTab';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { DecimalInput, parseDecimal } from '@/components/ui/decimal-input';
 import { CurrencyInput } from '@/components/ui/brl-input';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
 import { useCan, useModuleAccess } from '@/permissions/hooks';
 import { toast } from 'sonner';
 import { fmtBRL, formatDateBR, formatInBR, normalizeBRLMoneyToNumber, todayBR } from '@/lib/formatters';
@@ -134,6 +134,7 @@ export default function RhView() {
 function RhViewInner({ visibleSubtabs, user }: {
   visibleSubtabs: string[]; user: any;
 }) {
+  const supabase = useSupabase();
   const { confirm, ConfirmDialog } = useConfirmDialog();
   const canCreateProntuario = useCan('rh:prontuario:create');
   const canEditProntuario = useCan('rh:prontuario:edit');
@@ -211,7 +212,7 @@ function RhViewInner({ visibleSubtabs, user }: {
   const fetchProfiles = useCallback(async () => {
     const { data } = await supabase.rpc('list_profiles_minimal', { p_search: '', p_limit: 200 });
     setProfiles((data || []) as Profile[]);
-  }, []);
+  }, [supabase]);
 
   const fetchColaboradores = useCallback(async (page = 0, append = false) => {
     let query = supabase.from('rh_colaboradores').select('id, user_id, nome, cpf, telefone, email, cargo, funcao, setor, data_admissao, tipo_contrato, status, carga_horaria_semanal, salario, valor_hora, created_at, adicional_noturno_percent').order('nome')
@@ -230,7 +231,7 @@ function RhViewInner({ visibleSubtabs, user }: {
       const mine = newData.find(c => c.user_id === user.id);
       setMyColaboradorId(mine?.id || null);
     }
-  }, [user, showInativos]);
+  }, [supabase, showInativos, user]);
 
   const fetchPontos = useCallback(async () => {
     // Coluna `data` é date no Postgres: exige yyyy-MM-dd (datetime), não dd/MM/yyyy (formatters)
@@ -241,7 +242,7 @@ function RhViewInner({ visibleSubtabs, user }: {
       .order('hora', { ascending: true }).range(0, PAGE_SIZE - 1);
     if (error) { console.error(error); return; }
     setPontos(data || []);
-  }, [pontoDate]);
+  }, [pontoDate, supabase]);
 
   const fetchBancoHoras = useCallback(async (page = 0, append = false) => {
     const { data, error } = await supabase.from('rh_banco_horas').select('id, colaborador_id, periodo, horas_trabalhadas, horas_escaladas, horas_extras, banco_horas_saldo, atrasos_min, faltas, dias_trabalhados').eq('periodo', bhPeriodo)
@@ -254,7 +255,7 @@ function RhViewInner({ visibleSubtabs, user }: {
       setBancoHoras(newData);
     }
     setBhHasMore(newData.length === PAGE_SIZE);
-  }, [bhPeriodo]);
+  }, [bhPeriodo, supabase]);
 
   // Reset pagination on filter change
   useEffect(() => {

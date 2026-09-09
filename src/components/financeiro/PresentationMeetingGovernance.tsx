@@ -1,3 +1,4 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useMemo, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import {
@@ -169,6 +170,7 @@ export default function PresentationMeetingGovernance({
   canApprove: boolean;
   canExport: boolean;
 }) {
+  const supabase = useSupabase();
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -356,7 +358,7 @@ export default function PresentationMeetingGovernance({
     if (!detail || !followUp || !canExport || exporting) return;
     setExporting(kind);
     try {
-      const exportDetail = await fetchPresentationMinutesExport(detail.session.id);
+      const exportDetail = await fetchPresentationMinutesExport(supabase, detail.session.id);
       const revision = exportDetail.revisions.find(item => item.id === (urlState.revisionId ?? exportDetail.session.currentRevisionId)) ?? null;
       const exportFollowUp = buildPresentationMeetingFollowUp({ detail: exportDetail, dueWindowEnd, today: todayBR() });
       const exportComparison = comparePresentationMeetingRevisions({

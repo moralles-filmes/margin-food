@@ -1,5 +1,5 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useMemo } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { ShieldAlert, Download, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -29,6 +29,7 @@ const ACTION_LABELS: Record<string, { label: string; color: string }> = {
 };
 
 export default function SecurityAuditView() {
+  const supabase = useSupabase();
   const { hasAnyRole } = useAuth();
   const [entries, setEntries] = useState<AuditEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,7 +48,7 @@ export default function SecurityAuditView() {
       setLoading(false);
     };
     loadAudit();
-  }, []);
+  }, [supabase]);
 
   const filtered = useMemo(() => {
     let list = entries;

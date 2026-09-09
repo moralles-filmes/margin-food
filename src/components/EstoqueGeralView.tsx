@@ -1,3 +1,4 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { includesNormalized } from '@/lib/utils';
 import { usePersistedTab } from '@/hooks/usePersistedTab';
@@ -78,6 +79,7 @@ const SUB_VIEW_REGISTRY_MAP: Record<SubView, string> = {
 };
 
 export default function EstoqueGeralView() {
+  const supabase = useSupabase();
   const [activeView, setActiveView] = usePersistedTab<SubView>('app:tab:estoque', 'dashboard');
   const store = useEstoqueGeralStoreContext();
   const salmonStore = useSalmonStoreContext();
@@ -100,7 +102,7 @@ export default function EstoqueGeralView() {
   const refreshReqBadge = useCallback(async () => {
     const { data, error } = await supabase.rpc('count_requisicoes_with_pending_items');
     if (!error && typeof data === 'number') setReqPendingCount(data);
-  }, []);
+  }, [supabase]);
   useEffect(() => { refreshReqBadge(); }, [refreshReqBadge, activeView]);
 
   const movProductOptions: ProductOption[] = useMemo(() =>
@@ -123,7 +125,7 @@ export default function EstoqueGeralView() {
     ]);
     setDbCategorias((catRes.data || []).map((c: { name: string }) => c.name));
     setDbLocais((locRes.data || []).map((l: { name: string }) => l.name));
-  }, []);
+  }, [supabase]);
   useEffect(() => { fetchCadastros(); }, [fetchCadastros]);
 
   // Merge DB categories with any legacy categories from products

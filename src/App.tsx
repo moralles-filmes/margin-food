@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { GlobalCompanyBoundary } from "@/contexts/CompanyScopeProvider";
 import { NotificationsProvider } from "@/contexts/NotificationsContext";
 import RequisicaoNotificationModal from "@/components/RequisicaoNotificationModal";
 import LegacyPresentationRedirect from "@/components/financeiro/LegacyPresentationRedirect";
@@ -156,6 +157,7 @@ const App = () => {
           <PwaUpdatePrompt />
           <ErrorBoundary>
             <BrowserRouter>
+              <GlobalCompanyBoundary>
               <NotificationsProvider>
               <Suspense fallback={<div className="h-screen bg-background" />}>
                 <RequisicaoNotificationModal />
@@ -178,6 +180,7 @@ const App = () => {
                 <FloatingCalculator />
               </Suspense>
               </NotificationsProvider>
+              </GlobalCompanyBoundary>
             </BrowserRouter>
           </ErrorBoundary>
         </TooltipProvider>

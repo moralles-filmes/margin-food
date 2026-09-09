@@ -1,3 +1,4 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useCallback, useMemo } from 'react';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -9,8 +10,8 @@ import {
   type PresentationPeriodFilter,
   type TimeSeriesGranularity,
 } from '@/domain/financeiro/presentation';
-import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
+import { todayBR } from '@/lib/formatters';
 import { useDataEvent } from '@/lib/dataEvents';
 import {
   PresentationPayloadError,
@@ -125,7 +126,7 @@ export function createPresentationQueryDefinition(
   };
 }
 
-export async function fetchPresentationSocios(
+export async function fetchPresentationSocios(supabase: typeof import("@/integrations/supabase/client").supabase,
   definition: PresentationQueryDefinition,
   signal?: AbortSignal,
 ): Promise<PresentationSociosData> {
@@ -164,18 +165,21 @@ export function presentationQueryAvailability(
 }
 
 export function usePresentationSocios(options: PresentationQueryOptions) {
+  const supabase = useSupabase();
   const queryClient = useQueryClient();
+  const bootstrapMonth = useMemo(() => todayBR().slice(0, 7), []);
+  const needsBounds = options.filter.kind === 'all-time' && !options.availableBounds;
   const definition = useMemo(() => createPresentationQueryDefinition(
-    options.filter,
+    needsBounds ? { kind: 'month', month: bootstrapMonth } : options.filter,
     options.availableBounds,
     options.granularity,
     options.rankingLimit,
     options.companyId,
-  ), [options.filter, options.availableBounds, options.granularity, options.rankingLimit, options.companyId]);
+  ), [options.filter, options.availableBounds, options.granularity, options.rankingLimit, options.companyId, needsBounds, bootstrapMonth]);
 
   const query = useQuery({
     queryKey: definition.queryKey,
-    queryFn: ({ signal }) => fetchPresentationSocios(definition, signal),
+    queryFn: ({ signal }) => fetchPresentationSocios(supabase, definition, signal),
     enabled: options.enabled && Boolean(options.companyId),
     // Mantém os dados do período anterior visíveis enquanto o novo período
     // carrega — sem isso, `query.data` fica undefined por um instante a cada
@@ -195,9 +199,13 @@ export function usePresentationSocios(options: PresentationQueryOptions) {
   }, [queryClient]);
   useDataEvent('financeiro:*', invalidate);
 
+  // Discover the new company's full range before displaying an all-time total.
+  const waitingForRange = needsBounds || (options.filter.kind === 'all-time' && query.data?.period.filterKind !== 'all-time');
+  const visibleQuery = { ...query, data: waitingForRange ? undefined : query.data, isPending: query.isPending || (waitingForRange && !query.error) };
   return {
-    ...query,
+    ...visibleQuery,
+    discoveredBounds: query.data?.availableBounds,
     definition,
-    availability: presentationQueryAvailability(options.enabled, query),
+    availability: presentationQueryAvailability(options.enabled, visibleQuery),
   };
 }

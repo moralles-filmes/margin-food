@@ -1625,9 +1625,9 @@ export async function createPresentationPptxBlob(
   const pptx = new PptxGenJS();
   pptx.layout = 'LAYOUT_WIDE';
   pptx.author = 'Moralles Food';
-  pptx.company = 'Moralles Food';
+  pptx.company = data.company?.name ?? 'Moralles Food';
   pptx.subject = `Faturamento, despesas, resultados e insights - ${data.periodLabel}`;
-  pptx.title = `Apresentação Sócios - ${data.periodLabel}`;
+  pptx.title = `Apresentação Sócios - ${data.company?.name ? data.company.name + ' - ' : ''}${data.periodLabel}`;
   pptx.theme = {
     headFontFace: 'Aptos Display',
     bodyFontFace: 'Aptos',
@@ -1640,7 +1640,8 @@ export async function createPresentationPptxBlob(
     addSlideContent(outputSlide, pptx, slides[index]);
     if (slides[index].kind !== 'cover') addHeader(outputSlide, pptx, slides[index]);
     addFooter(outputSlide, pptx, data, slides[index], index + 1, slides.length);
-    outputSlide.addNotes(slideNotes(slides[index]));
+    if (data.company) outputSlide.addText(data.company.name, { x: 0.7, y: 7.2, w: 11.9, h: 0.18, fontFace: 'Aptos', fontSize: 9, color: COLOR.muted, margin: 0, fit: 'shrink' });
+    outputSlide.addNotes(`${data.company ? `[Unit]\n- id=${data.company.id}\n- name=${data.company.name}\n` : ''}${slideNotes(slides[index])}`);
     options.onProgress?.({
       completed: index + 1,
       total: slides.length,

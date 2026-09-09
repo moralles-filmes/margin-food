@@ -1,5 +1,5 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -95,6 +95,7 @@ const FASE_LABELS: Record<string, string> = {
 
 export default function OnboardingSection({
  colaboradores, canManage }: Props) {
+  const supabase = useSupabase();
   const canViewRbac = useCan('rh:onboarding:view');
   const { user } = useAuth();
   const [onboardings, setOnboardings] = useState<Onboarding[]>([]);
@@ -127,7 +128,7 @@ export default function OnboardingSection({
     }));
     setOnboardings(parsed);
     setLoading(false);
-  }, []);
+  }, [supabase]);
 
   useEffect(() => { fetchOnboardings(); }, [fetchOnboardings]);
 

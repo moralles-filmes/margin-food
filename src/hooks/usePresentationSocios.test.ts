@@ -227,7 +227,7 @@ describe('estados de erro e RBAC da consulta', () => {
     vi.mocked(supabase.rpc).mockReturnValue({ abortSignal } as never);
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    await expect(fetchPresentationSocios(definition, new AbortController().signal))
+    await expect(fetchPresentationSocios(supabase, definition, new AbortController().signal))
       .rejects.toBeInstanceOf(PresentationPayloadError);
 
     expect(consoleError).toHaveBeenCalledOnce();

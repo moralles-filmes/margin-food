@@ -1,5 +1,5 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -81,6 +81,7 @@ const ACTION_COLORS: Record<string, string> = {
 };
 
 export default function GlobalAuditView() {
+  const supabase = useSupabase();
   const canViewRbac = useCan('configuracoes:auditoria-sistema:view');
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -124,7 +125,7 @@ export default function GlobalAuditView() {
     }
 
     return query;
-  }, [dateFrom, dateTo, moduleFilter, actionFilter, search]);
+  }, [supabase, dateFrom, dateTo, moduleFilter, actionFilter, search]);
 
   const fetchLogs = useCallback(async (cursor: CursorState | null, append: boolean) => {
     setLoading(true);
@@ -158,7 +159,7 @@ export default function GlobalAuditView() {
     }
 
     setLoading(false);
-  }, [buildQuery, profiles]);
+  }, [buildQuery, profiles, supabase]);
 
   const resetAndFetch = useCallback(() => {
     cursorRef.current = null;

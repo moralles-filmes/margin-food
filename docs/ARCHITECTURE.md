@@ -6,6 +6,8 @@
 
 ---
 
+> Multiunidades: ver [arquitetura, implantação e rollback](multi-unidades/02-ARQUITETURA-E-OPERACAO.md). As mudanças requerem publicação coordenada de banco, Edge Functions e frontend.
+
 ## 1. VISÃO GERAL DO SISTEMA
 
 ### 1.1 Identidade
@@ -27,8 +29,8 @@
 
 ### 1.3 Filosofia de Segurança
 - **Deny-by-default:** Sem permissão explícita = acesso negado
-- **Database-enforced tenancy:** `company_id` é forçado por triggers no banco, nunca enviado pelo frontend
-- **FORCE RLS:** Todas as tabelas têm RLS ativado e forçado
+- **Database-enforced tenancy:** `x-company-id` é validado contra memberships ativos; INSERTs enviam `company_id` explícito e a RLS valida o tenant. Apenas produtos têm trigger de imposição.
+- **RLS:** obrigatória e forçada em tabelas novas; divergências legadas observadas na auditoria estão documentadas em `multi-unidades/00-AUDITORIA.md`.
 - **RBAC granular:** Permissões no formato `<módulo>:<subaba>:<ação>` com 11 ações padronizadas
 - **Soft delete:** Registros críticos nunca são excluídos fisicamente
 - **Auditoria completa:** Todas as operações críticas são logadas
@@ -80,7 +82,7 @@
 
 ```
 ┌─────────────────────────────────────────┐
-│  auth.users  ──→  profiles (company_id) │
+│ auth.users → profiles → memberships  │
 │                       │                  │
 │              ┌────────┴────────┐        │
 │              │   companies     │        │
@@ -94,7 +96,7 @@
 ### 3.2 Mecanismos de Proteção
 
 #### `get_current_company_id()`
-- Função SQL que resolve o `company_id` do usuário logado via `auth.uid()` → `profiles.company_id`
+- Valida `x-company-id` contra `company_memberships` ativo e empresa ativa; sem header mantém a empresa original autorizada para compatibilidade
 - Usada em todas as políticas RLS de SELECT
 
 #### `assert_tenant()`
@@ -106,7 +108,7 @@
 - Impede operações em dados de seed/template
 
 #### `trg_force_company_id`
-- Trigger que força o `company_id` em INSERT/UPDATE, ignorando qualquer valor enviado pelo cliente
+- Trigger de produtos que impõe o `company_id`; outras tabelas recebem o campo explicitamente e validam RLS
 - Resolve via `get_current_company_id()` no banco
 
 #### RLS Policies (Padrão)
@@ -114,15 +116,15 @@
 -- SELECT: isolamento por tenant
 CREATE POLICY "select_own_company" ON tabela
   FOR SELECT TO authenticated
-  USING (company_id = get_current_company_id());
+  USING (company_id = (SELECT get_current_company_id()));
 
--- INSERT: company_id forçado por trigger
+-- INSERT: company_id explícito + WITH CHECK; produtos também impõem via trigger
 -- UPDATE/DELETE: validado via has_permission() + company_id
 ```
 
 ### 3.3 Garantias
-1. **Frontend NUNCA envia `company_id`** em operações de escrita
-2. **Edge Functions** resolvem `company_id` via perfil do usuário
+1. **Frontend envia `company_id`** de `useCompanyId()` nos INSERTs; o backend valida independentemente esse valor
+2. **Edge Functions** encaminham `x-company-id` ao cliente autenticado e validam `assert_tenant()` antes de usar service_role
 3. **RPCs** usam `auth.uid()` internamente — nunca aceitam `p_user_id`
 4. **Queries sempre filtradas** por `company_id = get_current_company_id()`
 5. **Backup tables** (_bkp_) não têm RLS e não são acessíveis via API
@@ -274,7 +276,7 @@ CREATE POLICY "select_own_company" ON tabela
 
 **Edge Function:** `ai-chat/` — Processa prompts com contexto do tenant (17+ queries de contexto) usando provedor LLM configurado por secret na Edge Function (chave da API nunca exposta ao cliente)
 
-**Segurança:** Todas as queries de contexto aplicam `.eq("company_id", companyId)` via adminClient com company_id resolvido do perfil do usuário
+**Segurança:** Todas as queries de contexto aplicam `.eq("company_id", companyId)` via adminClient com company_id validado pelo cliente autenticado via assert_tenant()
 
 ### 4.9 RH — Pessoas (`rh`)
 **Objetivo:** Gestão completa de recursos humanos.
@@ -367,7 +369,8 @@ CREATE POLICY "select_own_company" ON tabela
 |--------|-----------|
 | `companies` | Cadastro de empresas (tenants) |
 | `profiles` | Perfil do usuário (nome, email, company_id, sector, job_role_id) |
-| `user_roles` | Roles do usuário (enum app_role) |
+| `company_memberships` | Acesso ativo/inativo/revogado por usuário e empresa; cargo/setor locais |
+| `user_roles` | Roles por usuário e empresa (enum app_role) |
 | `user_permissions` | Permissões granulares por usuário |
 | `permissions` | Catálogo de permissões disponíveis |
 | `job_roles` | Cargos/funções por empresa |
@@ -509,7 +512,7 @@ CREATE POLICY "select_own_company" ON tabela
 ### 6.1 RPCs de Segurança
 | RPC | Finalidade |
 |-----|-----------|
-| `get_current_company_id` | Resolve company_id do usuário via auth.uid() |
+| `get_current_company_id` | Valida o escopo solicitado contra os memberships do usuário |
 | `get_current_company_id_strict` | Versão estrita (lança exceção se inválido) |
 | `assert_tenant` | Guard de tenant para RPCs |
 | `has_permission(_user_id, _permission)` | Verifica permissão granular |
@@ -669,7 +672,7 @@ CREATE POLICY "select_own_company" ON tabela
 1. Extraem JWT do header `Authorization`
 2. Criam `userClient` (com token do usuário) e `adminClient` (service role)
 3. Verificam permissões via RPC `admin_has_permission`
-4. Resolvem `company_id` via perfil do usuário
+4. Validam `x-company-id` contra o membership do usuário com `assert_tenant()`
 5. Usam `adminClient` apenas para operações autorizadas na whitelist
 6. `userClient` para todas as RPCs que dependem de `auth.uid()`
 
@@ -1021,7 +1024,7 @@ Centralizado em `src/lib/formatters.ts`:
 ### 15.3 Edge Functions
 - **userClient** para RPCs que dependem de `auth.uid()`
 - **adminClient** apenas para operações na whitelist autorizada
-- **Resolver `company_id`** via perfil do usuário, nunca do request body
+- **Resolver `company_id`** via `assert_tenant()` no cliente JWT com header da unidade; nunca confiar no request body
 - **npm imports:** `npm:@supabase/supabase-js@2`
 
 ### 15.4 Nomenclatura

@@ -89,9 +89,10 @@ margin-food/
 
 ### Multi-tenancy
 - Toda tabela tem `company_id NOT NULL`. Trigger `force_company_id` só existe em `produtos` — **qualquer outra tabela exige `company_id` explícito no payload do INSERT** vindo de `useCompanyId()` (UPDATE/DELETE não precisam, a RLS resolve pelo registro existente).
-- `get_current_company_id()` resolve `auth.uid()` → `profiles.company_id`. **Nunca** confiar em `company_id` vindo do cliente.
+- `get_current_company_id()` valida o header `x-company-id` contra `company_memberships` ativo + empresa ativa; sem header usa a empresa original autorizada. `profiles.company_id` é legado/origem, nunca preferência de navegação.
 - UUID placeholder `00000000-0000-0000-0000-000000000001` é reservado para o sistema, bloqueado para operações comuns.
 - Onboarding via `onboard_new_company()`.
+- Apresentação Sócios usa escopo independente no parâmetro `presentationUnit`; queries, permissões, detalhes e exports herdam o provider local. Implantação e rollback: `docs/multi-unidades/02-ARQUITETURA-E-OPERACAO.md`.
 
 ### RLS (Row-Level Security)
 - `FORCE RLS` em todas as tabelas, sem exceção.
@@ -107,8 +108,8 @@ margin-food/
 
 ### Autenticação
 - JWT Supabase Auth, validado via Bearer token nas Edge Functions (`verify_jwt = false` no config, validação manual dentro de cada função).
-- Cache de roles/permissões no `sessionStorage` (TTL 5min) via AuthContext.
-- Soft delete em registros críticos (`deleted_at`) — hard delete de usuário preserva histórico via FKs `ON DELETE SET NULL`; `admin-users` chama `auth.admin.deleteUser`, CASCADE limpa `profiles`/`user_roles`/`user_permissions`.
+- Uma identidade Auth pode ter N memberships; roles/overrides são por `(user_id, company_id)`. `AuthContext` persiste só a preferência de unidade e revalida acessos; dados operacionais usam `useSupabase()`/`CompanyScopeProvider`, nunca o cliente global.
+- `admin-users` desativa/revoga somente o membership da unidade; nunca exclui a identidade compartilhada. Cadastrar e-mail existente adiciona acesso sem alterar senha/nome/e-mail; alterações de identidade compartilhada exigem administração global.
 
 ---
 

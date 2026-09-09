@@ -1,3 +1,4 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
 import { PeriodRange } from './PeriodFilter';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
@@ -6,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line } from 'recharts';
 import { ArrowUpDown, Package, Loader2, AlertTriangle, Search, TrendingUp, TrendingDown } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 
 import { fmtBRL, formatPercentBR, formatFixedBR } from '@/lib/formatters';
@@ -76,6 +76,7 @@ const PAGE_SIZE = 20;
 
 export default function AnaliseItemView({
  period }: Props) {
+  const supabase = useSupabase();
   const canViewRbac = useCan('ficha:analise:view');
   const [items, setItems] = useState<ReportItem[]>([]);
   const [hasMore, setHasMore] = useState(false);
@@ -163,7 +164,7 @@ export default function AnaliseItemView({
 
     setLoading(false);
     setLoadingMore(false);
-  }, [pStart, pEnd, searchDebounced, sortKey, sortAsc]);
+  }, [supabase, pStart, pEnd, searchDebounced, sortKey, sortAsc]);
 
   // Fetch summary
   const fetchSummary = useCallback(async () => {
@@ -174,7 +175,7 @@ export default function AnaliseItemView({
     });
     if (!err && data) setSummary(data as unknown as SummaryData);
     setSummaryLoading(false);
-  }, [pStart, pEnd]);
+  }, [supabase, pStart, pEnd]);
 
   // Reset & fetch on period/search/sort change
   useEffect(() => {
@@ -204,7 +205,7 @@ export default function AnaliseItemView({
       if (!err && data) setDetail(data as unknown as ItemDetail);
       setDetailLoading(false);
     });
-  }, [selectedId, pStart, pEnd]);
+  }, [selectedId, pStart, pEnd, supabase]);
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) setSortAsc(!sortAsc);

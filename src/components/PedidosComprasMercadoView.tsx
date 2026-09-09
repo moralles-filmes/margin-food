@@ -1,3 +1,4 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { includesNormalized, normalizeSearchText } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -26,7 +27,6 @@ import {
   Truck, MoreVertical, Pencil, Trash2, Eye, Building2, ChevronsUpDown, FileDown
 } from 'lucide-react';
 import ExportPedidoModal from '@/components/compras/ExportPedidoModal';
-import { supabase } from '@/integrations/supabase/client';
 import StatusBadge, { type StatusType } from '@/components/ui/StatusBadge';
 
 type SubTab = 'pedidos' | 'recebimento' | 'concluidos' | 'nao-entregues';
@@ -64,6 +64,7 @@ function serializeCategories(cats: string[]): string {
 }
 
 export default function PedidosComprasMercadoView() {
+  const supabase = useSupabase();
   const { user } = useAuth();
   const store = usePurchaseOrdersStoreContext();
   const estoqueStore = useEstoqueGeralStoreContext();
@@ -119,7 +120,7 @@ export default function PedidosComprasMercadoView() {
       .then(({ data }) => {
         if (data) setDbCategorias(data.map((c: { name: string }) => c.name));
       });
-  }, []);
+  }, [supabase]);
   const [supplierOpen, setSupplierOpen] = useState(false);
 
   const toggleCategory = useCallback((cat: string) => {

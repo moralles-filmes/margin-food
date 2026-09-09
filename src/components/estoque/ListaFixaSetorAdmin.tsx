@@ -1,10 +1,10 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 /**
  * Admin-only component to manage fixed product lists per sector.
  * Only users with estoque:requisicoes:manage can see/use this.
  */
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { includesNormalized } from '@/lib/utils';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCan } from '@/permissions';
 import { useCompanyId } from '@/hooks/useCompanyId';
@@ -41,6 +41,7 @@ interface Props {
 }
 
 export default function ListaFixaSetorAdmin({ produtos }: Props) {
+  const supabase = useSupabase();
   const canManage = useCan('estoque:requisicoes:manage');
   const { companyId } = useCompanyId();
   const { user } = useAuth();
@@ -56,7 +57,7 @@ export default function ListaFixaSetorAdmin({ produtos }: Props) {
         setSetores(nomes);
         setSelectedSetor(current => current || nomes[0] || '');
       });
-  }, []);
+  }, [supabase]);
   const [items, setItems] = useState<ListaFixaItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -80,7 +81,7 @@ export default function ListaFixaSetorAdmin({ produtos }: Props) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [supabase]);
 
   const loadItems = useCallback(async (listaId: string) => {
     const { data, error } = await supabase
@@ -90,7 +91,7 @@ export default function ListaFixaSetorAdmin({ produtos }: Props) {
       .order('ordem');
     if (error) { console.error(error); return; }
     setItems((data || []) as ListaFixaItem[]);
-  }, []);
+  }, [supabase]);
 
   useEffect(() => { loadListas(); }, [loadListas]);
 

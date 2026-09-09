@@ -1,3 +1,4 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
 import { Tag, MapPin, Building2, Plus, Edit2, Power, PowerOff, Trash2, Loader2 } from 'lucide-react';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
@@ -8,7 +9,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
@@ -48,6 +48,7 @@ const LOCATION_TYPES = [
 ];
 
 export default function StockCadastrosSection() {
+  const supabase = useSupabase();
   const canViewRbac = useCan('estoque:cadastros:view');
   const { user, profile } = useAuth();
   const [tab, setTab] = useState('categorias');
@@ -88,7 +89,7 @@ export default function StockCadastrosSection() {
       .order('name', { ascending: true });
     setCategories((data as StockCategory[]) || []);
     setLoadingCat(false);
-  }, []);
+  }, [profile?.company_id, supabase]);
 
   // Fetch locations
   const fetchLocations = useCallback(async () => {
@@ -100,7 +101,7 @@ export default function StockCadastrosSection() {
       .order('name', { ascending: true });
     setLocations((data as StockLocation[]) || []);
     setLoadingLoc(false);
-  }, []);
+  }, [profile?.company_id, supabase]);
 
   // Fetch sectors
   const fetchSectors = useCallback(async () => {
@@ -113,7 +114,7 @@ export default function StockCadastrosSection() {
       .order('name', { ascending: true });
     setSectors((data as StockSector[]) || []);
     setLoadingSec(false);
-  }, []);
+  }, [profile?.company_id, supabase]);
 
   useEffect(() => {
     fetchCategories();

@@ -1,9 +1,9 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useQuery } from '@tanstack/react-query';
 import {
   type PresentationCategoryMetadata,
   type PresentationCategoryMetadataMap,
 } from '@/domain/financeiro/presentation/dashboard';
-import { supabase } from '@/integrations/supabase/client';
 
 export const PRESENTATION_CATEGORY_METADATA_QUERY_ROOT = [
   'financeiro',
@@ -36,16 +36,17 @@ export function parsePresentationCategoryMetadata(payload: unknown): Presentatio
   return parsed;
 }
 
-export async function fetchPresentationCategoryMetadata(): Promise<PresentationCategoryMetadataMap> {
+export async function fetchPresentationCategoryMetadata(supabase: typeof import("@/integrations/supabase/client").supabase, ): Promise<PresentationCategoryMetadataMap> {
   const { data, error } = await supabase.rpc('get_fin_presentation_category_metadata');
   if (error) throw error;
   return parsePresentationCategoryMetadata(data);
 }
 
 export function usePresentationCategoryMetadata(companyId: string | null | undefined, enabled: boolean) {
+  const supabase = useSupabase();
   return useQuery({
     queryKey: [...PRESENTATION_CATEGORY_METADATA_QUERY_ROOT, companyId ?? 'unresolved'],
-    queryFn: fetchPresentationCategoryMetadata,
+    queryFn: () => fetchPresentationCategoryMetadata(supabase),
     enabled: enabled && Boolean(companyId),
     staleTime: 10 * 60 * 1000,
     gcTime: 30 * 60 * 1000,

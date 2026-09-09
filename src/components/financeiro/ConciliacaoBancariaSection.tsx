@@ -1,3 +1,4 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { emitDataEvent } from '@/lib/dataEvents';
 import { Card, CardContent } from '@/components/ui/card';
@@ -14,7 +15,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
-import { supabase } from '@/integrations/supabase/client';
 import { parseExtrato, verifyContaExtrato, decodeExtratoBuffer, type ExtratoConta } from '@/lib/extratoParser';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -138,7 +138,7 @@ function clearLinhas(contaId: string) {
  * Busca binária sobre as datas distintas do extrato — assume que, uma vez que a diferença
  * aparece, ela não se autocorrige nos dias seguintes (heurística de diagnóstico, não prova).
  */
-async function localizarDiaDivergencia(
+async function localizarDiaDivergencia(supabase: typeof import("@/integrations/supabase/client").supabase,
   contaId: string,
   saldoExtrato: SaldoExtratoRef,
   linhas: LinhaExtrato[],
@@ -202,6 +202,7 @@ function fitidsDasLinhas(linhas: Pick<LinhaExtrato, 'tipo' | 'fitId'>[]): Set<st
 }
 
 export default function ConciliacaoBancariaSection() {
+  const supabase = useSupabase();
   const canViewRbac = useCan('financeiro:conciliacao:view');
   const canReconcileRbac = useCan('financeiro:conciliacao:reconcile');
   const { user } = useAuth();
@@ -353,7 +354,7 @@ export default function ConciliacaoBancariaSection() {
       setCategorias(buildCategoryOptions(catRes.data || []));
       setCentrosCusto(ccRes.data || []);
     });
-  }, []);
+  }, [contaSel, supabase]);
 
   useEffect(() => {
     setLinhasAntigasAusentes([]);
@@ -411,14 +412,14 @@ export default function ConciliacaoBancariaSection() {
         return;
       }
       try {
-        setDiaDivergencia(await localizarDiaDivergencia(contaSel, saldoExtrato, linhas));
+        setDiaDivergencia(await localizarDiaDivergencia(supabase, contaSel, saldoExtrato, linhas));
       } catch (err) {
         console.error('[ConciliacaoBancariaSection.diaDivergencia]', err);
         setDiaDivergencia(null);
       }
     }, 600);
     return () => clearTimeout(t);
-  }, [contaSel, saldoExtrato, linhas]);
+  }, [contaSel, saldoExtrato, linhas, supabase]);
 
   useEffect(() => {
     if (contaSel && view === 'conciliar') loadLancamentos();

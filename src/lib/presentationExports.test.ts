@@ -33,6 +33,17 @@ async function readPptx(blob: Blob) {
 }
 
 describe('exportações da Apresentação Sócios', () => {
+  it('grava a unidade analisada em todas as páginas PDF e slides PowerPoint', async () => {
+    const data = { ...createPresentationSociosData(), company: { id:'unit-b',name:'Loja Shopping' } };
+    const pdf = await readPdfText(await createPresentationPdfBlob(data));
+    expect(pdf).toContain('Loja Shopping');expect(pdf).not.toContain('Loja Centro');
+    const pptx = await readPptx(await createPresentationPptxBlob(data));
+    expect(pptx.coreXml).toContain('Loja Shopping');
+    expect(pptx.slideXml.match(/Loja Shopping/g)).toHaveLength(pptx.slideFiles.length);
+    expect(pptx.notesXml).toContain('id=unit-b');
+    expect(pptx.slideXml).not.toContain('Loja Centro');
+  });
+
   it('usa o mesmo registry de Resultados na tela, no PDF e no PowerPoint', async () => {
     const data = createPresentationSociosData();
     const exportable = data.slides.filter(isPresentationSlideExportable);

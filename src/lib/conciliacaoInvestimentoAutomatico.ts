@@ -9,7 +9,7 @@ interface AutomaticInvestmentLineState extends AutomaticInvestmentLine {
   jaConciliada?: boolean;
   ignorada?: boolean;
   matchId?: string;
-  transferReconhecida?: boolean;
+  transferReconhecida?: boolean | { id: string; data: string; conta_id: string; conta_destino_id: string };
   movimentacaoInterna?: boolean;
 }
 

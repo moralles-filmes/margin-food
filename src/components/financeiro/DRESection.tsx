@@ -1,7 +1,7 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { supabase } from '@/integrations/supabase/client';
 import { formatInBR } from '@/lib/formatters';
 import { FileDown, FileSpreadsheet, ShieldAlert } from 'lucide-react';
 import { exportDemonstrativoPDF, exportDemonstrativoExcel } from '@/lib/exportDemonstrativo';
@@ -51,6 +51,7 @@ function formatMonthLabelShort(value: string): string {
 }
 
 export default function DRESection() {
+  const supabase = useSupabase();
   const [categorias, setCategorias] = useState<any[]>([]);
   const [lancamentos, setLancamentos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -85,7 +86,7 @@ export default function DRESection() {
     setCategorias(result?.categorias || []);
     setLancamentos(valoresMapToLancamentos(result?.valores_por_categoria || {}));
     setLoading(false);
-  }, [mesAncora, meses]);
+  }, [mesAncora, meses, supabase]);
 
   useEffect(() => { load(); }, [load]);
   useDataEvent('financeiro:lancamentos', load);

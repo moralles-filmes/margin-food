@@ -1,3 +1,4 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -12,7 +13,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import TableActions from '@/components/ui/TableActions';
 import CategoryCombobox from '@/components/financeiro/CategoryCombobox';
 import { useCompanyId } from '@/hooks/useCompanyId';
-import { supabase } from '@/integrations/supabase/client';
 import { emitDataEvent } from '@/lib/dataEvents';
 import { buildCategoryOptions } from '@/lib/categoriaOptions';
 import { filterEligibleMarcaCategoryOptions } from '@/domain/financeiro/marcaCategoriaOptions';
@@ -62,6 +62,7 @@ export default function FechamentoMarcasTab({
   canCreate,
   canEdit,
 }: FechamentoMarcasTabProps) {
+  const supabase = useSupabase();
   const { companyId, loading: companyLoading, error: companyError } = useCompanyId();
   const [showForm, setShowForm] = useState(false);
   const [editItem, setEditItem] = useState<FechamentoMarca | null>(null);
@@ -87,7 +88,7 @@ export default function FechamentoMarcasTab({
         setCategorias((data as CategoriaRow[]) || []);
       });
     return () => { cancelled = true; };
-  }, [companyId]);
+  }, [companyId, supabase]);
 
   const categoryOptions = useMemo(
     () => buildCategoryOptions(filterEligibleMarcaCategoryOptions(categorias)),

@@ -1,3 +1,4 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { todayBR } from '@/lib/datetime';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,7 +11,6 @@ import SearchableSelect from '@/components/ui/SearchableSelect';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
 import { Trash2, RefreshCw, DollarSign, AlertTriangle, Package, Calendar } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, LineChart, Line, Cell } from 'recharts';
 import { fmtBRL, fmtBRLCompact, formatFixedBR, formatDateBR, formatInBR } from '@/lib/formatters';
 import { SEMANTIC_CHART_COLORS, SERIES_COLORS } from '@/lib/chartTheme';
@@ -59,6 +59,7 @@ const LOSS_TYPE_OPTIONS = [
 
 export default function StockLossesSection({
  categorias }: { categorias: string[] }) {
+  const supabase = useSupabase();
   const canViewRbac = useCan('estoque:perdas:view');
   const [data, setData] = useState<LossData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -99,7 +100,7 @@ export default function StockLossesSection({
       console.error('Erro relatório perdas:', e);
     }
     setLoading(false);
-  }, [startDate, endDate, groupBy, orderBy, filterCategory, lossType]);
+  }, [startDate, endDate, groupBy, orderBy, filterCategory, lossType, supabase]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 

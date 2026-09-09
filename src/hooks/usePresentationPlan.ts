@@ -1,3 +1,4 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useCallback, useMemo } from 'react';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import type {
@@ -13,7 +14,6 @@ import type {
   PresentationProjectionState,
   TimeSeriesGranularity,
 } from '@/domain/financeiro/presentation';
-import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
 import { useDataEvent } from '@/lib/dataEvents';
 
@@ -274,7 +274,7 @@ export function isPresentationPlanPermissionError(error: unknown): boolean {
     || (typeof shape.message === 'string' && shape.message.includes('PERMISSION_DENIED'));
 }
 
-export async function fetchPresentationPlan(
+export async function fetchPresentationPlan(supabase: typeof import("@/integrations/supabase/client").supabase,
   filters: PresentationPlanFilters,
   page: number,
   pageSize: number,
@@ -313,6 +313,7 @@ export function presentationPlanAvailability(
 }
 
 export function usePresentationPlan(options: PresentationPlanQueryOptions) {
+  const supabase = useSupabase();
   const queryClient = useQueryClient();
   const pageSize = options.pageSize ?? 25;
   const query = useInfiniteQuery({
@@ -327,7 +328,7 @@ export function usePresentationPlan(options: PresentationPlanQueryOptions) {
       options.categoryId ?? null,
       pageSize,
     ],
-    queryFn: ({ pageParam, signal }) => fetchPresentationPlan(options, pageParam, pageSize, signal),
+    queryFn: ({ pageParam, signal }) => fetchPresentationPlan(supabase, options, pageParam, pageSize, signal),
     initialPageParam: 1,
     getNextPageParam: lastPage => lastPage.categories.hasMore
       ? lastPage.categories.page + 1

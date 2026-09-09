@@ -187,7 +187,7 @@ export function readPresentationNavigationContext(
   const availableBounds = filter.kind === 'all-time' ? readBounds(params) : undefined;
 
   try {
-    const period = normalizePresentationPeriod(filter, { availableBounds });
+    const period = normalizePresentationPeriod(filter.kind === 'all-time' && !availableBounds ? fallback.filter : filter, { availableBounds });
     const revenueMonth = presentationRevenueMonthFromPeriod(period);
     const historyYears = readHistoryYears(params, defaultPresentationHistoryYears(revenueMonth));
     return {
@@ -368,6 +368,8 @@ export function writePresentationMeetingUrlState(
 }
 
 export function copyPresentationDecisionParams(source: URLSearchParams, target: URLSearchParams): URLSearchParams {
+  const presentationUnit = source.get('presentationUnit');
+  if (presentationUnit) target.set('presentationUnit', presentationUnit);
   const withDecision = writePresentationDecisionUrlState(target, readPresentationDecisionUrlState(source));
   return writePresentationMeetingUrlState(withDecision, readPresentationMeetingUrlState(source));
 }

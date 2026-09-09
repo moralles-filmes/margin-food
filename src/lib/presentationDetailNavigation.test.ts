@@ -15,6 +15,11 @@ import {
 } from '@/lib/presentationDetailNavigation';
 
 describe('navegação dos detalhes da Apresentação Sócios', () => {
+  it('preserva Total ao trocar de unidade antes de descobrir os limites da nova loja', () => {
+    const context = readPresentationNavigationContext(new URLSearchParams('period=all-time&presentationUnit=B'), '2026-09-09');
+    expect(context.filter).toEqual({ kind:'all-time' });
+    expect(context.availableBounds).toBeUndefined();
+  });
   it('serializa e restaura período, datas, granularidade, ranking e posição de retorno', () => {
     const filter = { kind: 'month-range' as const, startMonth: '2026-01', endMonth: '2026-03' };
     const period = normalizePresentationPeriod(filter);

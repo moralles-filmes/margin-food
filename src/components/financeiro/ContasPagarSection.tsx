@@ -1,3 +1,4 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { CursorListResponse, FinStatusCounts } from '@/types/financeiro';
 import { emitDataEvent, useDataEvent } from '@/lib/dataEvents';
@@ -11,7 +12,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Plus, AlertTriangle, CheckCircle, Clock, Ban, FileDown, RefreshCw, Undo2, Search, X } from 'lucide-react';
 import { useFormDirtyGuard } from '@/hooks/useFormDirtyGuard';
@@ -79,6 +79,7 @@ function NoAccess() {
 }
 
 export default function ContasPagarSection() {
+  const supabase = useSupabase();
   const canView = useCan('financeiro:pagar:view');
   const canCreate = useCan('financeiro:pagar:create');
   const canEdit = useCan('financeiro:pagar:edit');
@@ -163,7 +164,7 @@ export default function ContasPagarSection() {
     } else setItems(prev => [...prev, ...newItems]);
     if (newItems.length > 0) { const last = newItems[newItems.length - 1]; setCursorDate(last.data_vencimento); setCursorId(last.id); }
     setLoading(false);
-  }, [buscaAplicada, filtroCategoria, filtroConta, filtroDataDe, filtroDataAte, filtroStatus]);
+  }, [supabase, filtroStatus, filtroDataDe, filtroDataAte, filtroConta, buscaAplicada, filtroCategoria]);
 
   const handleMesChange = (mes: string) => {
     setMesFiltro(mes);
@@ -184,7 +185,7 @@ export default function ContasPagarSection() {
   const loadTotals = useCallback(async () => {
     const { data } = await supabase.rpc('get_fin_counts_by_status');
     if (data) { const d = (data as unknown) as FinStatusCounts; setServerTotals({ totalPendente: Number(d.total_pagar_pendente) || 0, vencidas: Number(d.vencidas_pagar) || 0 }); }
-  }, []);
+  }, [supabase]);
 
   const loadLimiteAprovacao = useCallback(async () => {
     const { data, error } = await (supabase.rpc as any)('fin_get_limite_aprovacao_atual');
@@ -204,7 +205,7 @@ export default function ContasPagarSection() {
     setContas((contRes.data as Conta[]) || []);
     setSuppliers((supRes.data as Supplier[]) || []);
     void loadLimiteAprovacao();
-  }, [loadLimiteAprovacao]);
+  }, [loadLimiteAprovacao, supabase]);
 
   useEffect(() => { if (canView) void loadAux(); }, [canView, loadAux]);
   useEffect(() => { if (canView) void loadTotals(); }, [canView, loadTotals]);

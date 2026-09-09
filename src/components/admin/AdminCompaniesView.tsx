@@ -1,5 +1,5 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCan } from '@/permissions/hooks';
 import { Button } from '@/components/ui/button';
@@ -31,6 +31,7 @@ function extractEdgeFnError(data: any, error: any): string {
 }
 
 export default function AdminCompaniesView() {
+  const supabase = useSupabase();
   const { user } = useAuth();
   const canCreate = useCan('configuracoes:empresas:create');
   const canEdit = useCan('configuracoes:empresas:edit');
@@ -143,7 +144,7 @@ export default function AdminCompaniesView() {
   const handleCreateAdmin = async () => {
     if (!adminTarget) return;
     if (!adminEmail.trim()) { toast.error('Email é obrigatório'); return; }
-    if (!adminPassword || adminPassword.length < 12) {
+    if (adminPassword && adminPassword.length < 12) {
       toast.error('Senha deve ter no mínimo 12 caracteres');
       return;
     }
@@ -446,7 +447,8 @@ export default function AdminCompaniesView() {
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="admin-password">Senha * (mín. 12 caracteres)</Label>
+              <Label htmlFor="admin-password">Senha para novo login (mín. 12 caracteres)</Label>
+              <p className="text-xs text-muted-foreground">Se o e-mail já possui login, deixe em branco para adicionar acesso.</p>
               <Input
                 id="admin-password"
                 type="password"
@@ -476,7 +478,7 @@ export default function AdminCompaniesView() {
             </Button>
             <Button
               onClick={handleCreateAdmin}
-              disabled={creatingAdmin || !adminEmail.trim() || adminPassword.length < 12}
+              disabled={creatingAdmin || !adminEmail.trim() || (!!adminPassword && adminPassword.length < 12)}
             >
               {creatingAdmin ? (
                 <><Loader2 className="w-4 h-4 animate-spin mr-1" /> Criando...</>

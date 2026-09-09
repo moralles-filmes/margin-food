@@ -1,3 +1,4 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { fmtBRL } from '@/lib/money';
 import { ShoppingCart, Check, X, RefreshCw, Inbox, ChevronRight, Send, CheckCircle2 } from 'lucide-react';
@@ -9,7 +10,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCan } from '@/permissions/hooks';
 import { PurchaseOrderItem } from '@/hooks/usePurchaseOrdersStore';
 import { usePurchaseOrdersStoreContext } from '@/contexts/PurchaseOrdersStoreContext';
-import { supabase } from '@/integrations/supabase/client';
 import { formatDateValueBR } from '@/lib/formatters';
 
 interface Props {
@@ -17,6 +17,7 @@ interface Props {
 }
 
 export default function ShoppingChecklistView({ onNavigateToOrder }: Props) {
+  const supabase = useSupabase();
   const { user } = useAuth();
   const store = usePurchaseOrdersStoreContext();
   const isAdmin = useCan('system:global:manage');

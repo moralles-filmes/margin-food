@@ -1,5 +1,5 @@
+import { useSupabase, useCompanyScope } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Cotacao, CotacaoCounts, CotacaoItem, CotacaoFornecedor, CotacaoResposta, CotacaoWhatsappLog, CotacaoWhatsappTipo } from '@/types/cotacao';
 import { COTACAO_STATUS_ABERTOS } from '@/types/cotacao';
@@ -55,7 +55,7 @@ export interface CotacaoCreateInput {
 // (`src/integrations/supabase/types`). Após `supabase db push` + regeneração
 // dos tipos, o cast `as any` abaixo pode ser removido. Padrão já usado no
 // projeto para tabelas recém-criadas.
-const db = supabase as any;
+
 
 /**
  * Store do sub-módulo Cotação (RFQ).
@@ -65,6 +65,9 @@ const db = supabase as any;
  * `usePurchaseOrdersStore`). CRUD/mutations chegam nas próximas fases via RPCs.
  */
 export function useCotacoesStore() {
+  const supabase = useSupabase();
+  const companyId = useCompanyScope()?.companyId;
+  const db = supabase as any;
   const { user } = useAuth();
   const [cotacoes, setCotacoes] = useState<Cotacao[]>([]);
   const [loading, setLoading] = useState(true);
@@ -93,7 +96,7 @@ export function useCotacoesStore() {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [db, user]);
 
   useEffect(() => {
     fetchCotacoes();
@@ -103,18 +106,18 @@ export function useCotacoesStore() {
   useEffect(() => {
     if (!user) return;
     const channel = supabase
-      .channel('cotacoes-rt')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'cotacoes' }, () => {
+      .channel('cotacoes-rt:' + companyId)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cotacoes', filter: `company_id=eq.${companyId}` }, () => {
         fetchCotacoes();
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'cotacao_fornecedores' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cotacao_fornecedores', filter: `company_id=eq.${companyId}` }, () => {
         fetchCotacoes();
       })
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, fetchCotacoes]);
+  }, [user, fetchCotacoes, supabase, companyId]);
 
   const counts: CotacaoCounts = useMemo(() => {
     const now = new Date();
@@ -146,7 +149,7 @@ export function useCotacoesStore() {
     if (err) throw err;
     await fetchCotacoes();
     return data as { success: boolean; id: string; codigo: string };
-  }, [fetchCotacoes]);
+  }, [db, fetchCotacoes]);
 
   const updateCotacao = useCallback(async (
     id: string,
@@ -165,7 +168,7 @@ export function useCotacoesStore() {
     if (err) throw err;
     await fetchCotacoes();
     return data as { success: boolean; id: string };
-  }, [fetchCotacoes]);
+  }, [db, fetchCotacoes]);
 
   const deleteCotacao = useCallback(async (id: string, expectedUpdatedAt?: string | null) => {
     const { data, error: err } = await db.rpc('soft_delete_cotacao', {
@@ -175,7 +178,7 @@ export function useCotacoesStore() {
     if (err) throw err;
     await fetchCotacoes();
     return data as { success: boolean; id: string };
-  }, [fetchCotacoes]);
+  }, [db, fetchCotacoes]);
 
   /** Carrega itens + fornecedores + respostas de uma cotação (para o drawer de detalhe). */
   const fetchCotacaoDetail = useCallback(async (cotacaoId: string): Promise<{
@@ -202,7 +205,7 @@ export function useCotacoesStore() {
       fornecedores: (fornRes.data ?? []) as CotacaoFornecedor[],
       respostas,
     };
-  }, []);
+  }, [db]);
 
   /** Persiste a sugestão escolhida (marca respostas selecionadas, status → EM_ANALISE). */
   const saveSugestao = useCallback(async (
@@ -226,7 +229,7 @@ export function useCotacoesStore() {
     if (err) throw err;
     await fetchCotacoes();
     return data as { success: boolean; id: string };
-  }, [fetchCotacoes]);
+  }, [db, fetchCotacoes]);
 
   /**
    * Converte a sugestão salva em pedido(s) de compra (1 por fornecedor vencedor).
@@ -243,7 +246,7 @@ export function useCotacoesStore() {
     if (err) throw err;
     await fetchCotacoes();
     return data as { success: boolean; orders: number; items: number; order_ids: string[] };
-  }, [fetchCotacoes]);
+  }, [db, fetchCotacoes]);
 
   /**
    * Envia uma mensagem de WhatsApp via Edge Function `send-whatsapp-zapi`
@@ -287,7 +290,7 @@ export function useCotacoesStore() {
       .order('created_at', { ascending: false });
     if (err) throw err;
     return (data ?? []) as CotacaoWhatsappLog[];
-  }, []);
+  }, [db]);
 
   /** Salva a matriz de preços + meta dos fornecedores. */
   const saveRespostas = useCallback(async (
@@ -303,7 +306,7 @@ export function useCotacoesStore() {
     if (err) throw err;
     await fetchCotacoes();
     return data as { success: boolean; upserts: number };
-  }, [fetchCotacoes]);
+  }, [db, fetchCotacoes]);
 
   return {
     cotacoes,

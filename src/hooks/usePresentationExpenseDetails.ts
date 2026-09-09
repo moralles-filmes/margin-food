@@ -1,7 +1,7 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useCallback, useMemo } from 'react';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import type { PresentationExpenseDetailCursor, YearMonth } from '@/domain/financeiro/presentation';
-import { supabase } from '@/integrations/supabase/client';
 import type { Database, Json } from '@/integrations/supabase/types';
 import { useDataEvent } from '@/lib/dataEvents';
 import { adaptPresentationExpenseDetailsPayload } from '@/lib/expenseDetailsPresentationAdapter';
@@ -36,6 +36,7 @@ export function usePresentationExpenseDetails({
   enabled: boolean;
   limit?: number;
 }) {
+  const supabase = useSupabase();
   const queryClient = useQueryClient();
   const queryKey = useMemo(
     () => createPresentationExpenseDetailsQueryKey(companyId, month, categoryId, limit),

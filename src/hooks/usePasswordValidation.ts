@@ -1,5 +1,5 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useCallback, useMemo } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 
 interface PasswordValidation {
   password: string;
@@ -21,6 +21,7 @@ const COMMON_PASSWORDS = [
 ];
 
 export function usePasswordValidation(): PasswordValidation {
+  const supabase = useSupabase();
   const [password, setPassword] = useState('');
   const [serverErrors, setServerErrors] = useState<string[]>([]);
   const [isChecking, setIsChecking] = useState(false);

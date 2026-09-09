@@ -631,7 +631,7 @@ export default function PresentationAnalytics({
       return;
     }
     if (request.target === 'ranking-revenue') setActiveAnalysis('revenue');
-    else if (request.target === 'ranking-expense') setActiveAnalysis('expense');
+    else if (request.target === 'ranking-expense' || request.target === 'expenses') setActiveAnalysis('expense');
     else if (request.target === 'result' || request.target === 'margin') setActiveAnalysis('overview');
     else setActiveAnalysis(request.target);
   };

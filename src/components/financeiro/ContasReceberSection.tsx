@@ -1,3 +1,4 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { CursorListResponse, FinStatusCounts } from '@/types/financeiro';
 import { emitDataEvent, useDataEvent } from '@/lib/dataEvents';
@@ -10,7 +11,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Plus, FileDown, RefreshCw, Ban, Undo2, Search, X } from 'lucide-react';
 import { useFormDirtyGuard } from '@/hooks/useFormDirtyGuard';
@@ -76,6 +76,7 @@ function NoAccess() {
 }
 
 export default function ContasReceberSection() {
+  const supabase = useSupabase();
   const canView = useCan('financeiro:receber:view');
   const canCreate = useCan('financeiro:receber:create');
   const canEdit = useCan('financeiro:receber:edit');
@@ -149,7 +150,7 @@ export default function ContasReceberSection() {
     } else setItems(prev => [...prev, ...newItems]);
     if (newItems.length > 0) { const last = newItems[newItems.length - 1]; setCursorDate(last.data_vencimento); setCursorId(last.id); }
     setLoading(false);
-  }, [buscaAplicada, filtroCategoria, filtroConta, filtroDataDe, filtroDataAte, filtroStatus]);
+  }, [supabase, filtroStatus, filtroDataDe, filtroDataAte, filtroConta, buscaAplicada, filtroCategoria]);
 
   const handleMesChange = (mes: string) => {
     setMesFiltro(mes);
@@ -170,7 +171,7 @@ export default function ContasReceberSection() {
   const loadTotals = useCallback(async () => {
     const { data } = await supabase.rpc('get_fin_counts_by_status');
     if (data) { const d = (data as unknown) as FinStatusCounts; setServerTotals({ totalPendente: Number(d.total_receber_pendente) || 0, vencidas: Number(d.vencidas_receber) || 0 }); }
-  }, []);
+  }, [supabase]);
 
   const loadAux = useCallback(async () => {
     const [catRes, ccRes, contRes] = await Promise.all([
@@ -181,7 +182,7 @@ export default function ContasReceberSection() {
     setCategorias(buildCategoryOptions((catRes.data as Categoria[]) || []));
     setCentros((ccRes.data as Centro[]) || []);
     setContas((contRes.data as Conta[]) || []);
-  }, []);
+  }, [supabase]);
 
   useEffect(() => { if (canView) void loadAux(); }, [canView, loadAux]);
   useEffect(() => { if (canView) void loadTotals(); }, [canView, loadTotals]);

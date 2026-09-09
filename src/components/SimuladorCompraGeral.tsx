@@ -1,3 +1,4 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,7 +9,6 @@ import SearchableSelect from '@/components/ui/SearchableSelect';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCan } from '@/permissions/hooks';
 import { toast } from 'sonner';
@@ -48,6 +48,7 @@ import { formatFixedBR } from '@/lib/formatters';
 const fmt = (v: number) => formatFixedBR(v, 2);
 
 export default function SimuladorCompraGeral() {
+  const supabase = useSupabase();
   const { hasPermission } = useAuth();
   const canCreatePedidos = useCan('compras:pedidos:create');
   const canEdit = hasPermission('purchases:create') || canCreatePedidos;

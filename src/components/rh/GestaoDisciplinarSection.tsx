@@ -1,5 +1,5 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Card, CardContent } from '@/components/ui/card';
@@ -45,6 +45,7 @@ const GRAVIDADES: Record<string, { label: string; variant: 'default' | 'secondar
 };
 
 export default function GestaoDisciplinarSection({ colaboradores, canManage }: Props) {
+  const supabase = useSupabase();
   const { user } = useAuth();
   const [ocorrencias, setOcorrencias] = useState<OcorrenciaRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -81,7 +82,7 @@ export default function GestaoDisciplinarSection({ colaboradores, canManage }: P
     }
     setDiscHasMore(newItems.length === PAGE_SIZE);
     setLoading(false);
-  }, []);
+  }, [supabase]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 

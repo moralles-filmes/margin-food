@@ -1,5 +1,5 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useMemo } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { X, AtSign } from 'lucide-react';
@@ -20,6 +20,7 @@ interface UserMentionSelectProps {
 
 export default function UserMentionSelect({
  value, onChange, placeholder = 'Buscar usuário (@nome)...' }: UserMentionSelectProps) {
+  const supabase = useSupabase();
   const canViewRbac = useCan('configuracoes:usuarios:view');
   const [users, setUsers] = useState<UserOption[]>([]);
   const [search, setSearch] = useState('');
@@ -31,7 +32,7 @@ export default function UserMentionSelect({
       const { data } = await supabase.rpc('list_profiles_minimal', { p_search: '', p_limit: 200 });
       if (data) setUsers(data as UserOption[]);
     })();
-  }, []);
+  }, [supabase]);
 
   // Resolve initial value
   useEffect(() => {

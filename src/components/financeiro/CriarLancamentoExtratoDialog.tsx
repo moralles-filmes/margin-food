@@ -1,3 +1,4 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -10,7 +11,6 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { BRLInput } from '@/components/ui/brl-input';
 import { DecimalInput } from '@/components/ui/decimal-input';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { emitDataEvent } from '@/lib/dataEvents';
 import { fmtBRL } from '@/lib/money';
@@ -50,6 +50,7 @@ type Destino = 'lancamento' | 'conta_pagar' | 'conta_receber';
 
 export default function CriarLancamentoExtratoDialog({
  open, onOpenChange, linha, contaBancariaId, onCreated }: Props) {
+  const supabase = useSupabase();
   const canViewRbac = useCan('financeiro:conciliacao:reconcile');
   const { user } = useAuth();
 
@@ -88,7 +89,7 @@ export default function CriarLancamentoExtratoDialog({
       setCentrosCusto(ccRes.data || []);
       setSuppliers((supRes.data || []).map((s: any) => ({ id: s.id, name: s.name })));
     });
-  }, [open]);
+  }, [open, supabase]);
 
   // Pre-fill from extrato line
   useEffect(() => {

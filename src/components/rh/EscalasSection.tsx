@@ -1,6 +1,6 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -69,6 +69,7 @@ interface Props {
 
 export default function EscalasSection({
  colaboradores, canManage }: Props) {
+  const supabase = useSupabase();
   const canViewRbac = useCan('rh:escalas:view');
   const { user, profile } = useAuth();
   const { confirm, ConfirmDialog } = useConfirmDialog();
@@ -130,7 +131,7 @@ export default function EscalasSection({
       setTrocas([]);
     }
     setLoading(false);
-  }, [weekStartStr, setor]);
+  }, [supabase, profile?.company_id, weekStartStr, setor]);
 
   useEffect(() => { fetchEscala(); }, [fetchEscala]);
 

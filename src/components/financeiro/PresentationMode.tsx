@@ -453,6 +453,7 @@ export default function PresentationMode({
               key={currentSlide.id}
               slide={currentSlide}
               generatedAt={data.generatedAt}
+              companyName={data.company?.name}
               slideNumber={currentIndex + 1}
               totalSlides={slides.length}
               onOpenExpenseCategory={onOpenExpenseCategory}
@@ -482,6 +483,7 @@ export default function PresentationMode({
               key={`print-${slide.id}`}
               slide={slide}
               generatedAt={data.generatedAt}
+              companyName={data.company?.name}
               slideNumber={index + 1}
               totalSlides={exportableSlides.length}
               className="presentation-print-slide"

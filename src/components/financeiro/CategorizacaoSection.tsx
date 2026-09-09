@@ -1,3 +1,4 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,7 +9,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { supabase } from '@/integrations/supabase/client';
 import { useCan } from '@/permissions';
 import { emitDataEvent, useDataEvent } from '@/lib/dataEvents';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
@@ -75,6 +75,7 @@ function SkeletonRows() {
 }
 
 export default function CategorizacaoSection() {
+  const supabase = useSupabase();
   const canView = useCan('financeiro:categorizacao:view');
   const canCreate = useCan('financeiro:categorizacao:create');
   const canEdit = useCan('financeiro:categorizacao:edit');
@@ -114,7 +115,7 @@ export default function CategorizacaoSection() {
     setCentros((centrosRes.data || []) as Centro[]);
     setSemCategoriaCount(typeof countRes.data === 'number' ? countRes.data : null);
     setLoading(false);
-  }, []);
+  }, [supabase]);
 
   useEffect(() => { if (canView) load(); }, [load, canView]);
 

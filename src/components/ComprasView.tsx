@@ -1,3 +1,4 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useMemo, useEffect } from 'react';
 import { usePersistedTab } from '@/hooks/usePersistedTab';
 import { ShoppingCart, Calendar, BarChart3, ClipboardList, ShoppingBag, Building2, ShieldAlert, PackageX, FileText } from 'lucide-react';
@@ -13,7 +14,6 @@ import CalendarioLembretesView from '@/components/compras/CalendarioLembretesVie
 import RankingFornecedoresView from '@/components/compras/RankingFornecedoresView';
 import CotacaoView from '@/components/compras/cotacao/CotacaoView';
 import { useCotacoesStore } from '@/hooks/useCotacoesStore';
-import { supabase } from '@/integrations/supabase/client';
 import { useModuleAccess, useCan } from '@/permissions/hooks';
 
 // Map internal subtab keys to registry keys
@@ -33,6 +33,7 @@ const DIAS = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domi
 const CATEGORIAS = ['Peixe', 'Oriental', 'Bebidas', 'Limpeza', 'Embalagens', 'Cozinha', 'Descartáveis', 'Proteínas', 'Hortifruti', 'Outros'];
 
 export default function ComprasView() {
+  const supabase = useSupabase();
   const { user } = useAuth();
   const { visibleSubtabs, canView } = useModuleAccess('compras');
   
@@ -95,7 +96,7 @@ export default function ComprasView() {
       .select('id', { count: 'exact', head: true })
       .eq('status', 'PENDENTE')
       .then(({ count }) => setAlertasFaltaCount(count ?? 0));
-  }, [activeView]);
+  }, [activeView, supabase]);
 
   // Deep-link from notification
   useEffect(() => {

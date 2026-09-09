@@ -1,3 +1,4 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown, TrendingDown, TrendingUp, DollarSign, Package, Filter, X, Edit2, Trash2, Eye, Ban, RotateCcw, Settings2 } from 'lucide-react';
 import { emitDataEvent } from '@/lib/dataEvents';
@@ -13,7 +14,6 @@ import SearchableSelect from '@/components/ui/SearchableSelect';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Produto, MovimentacaoEstoque } from '@/types/salmon';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCan } from '@/permissions/hooks';
 import { toast } from 'sonner';
@@ -69,6 +69,7 @@ export default function MovimentacoesSection({
   canEditPricing, recalculating, recalcularPrecos,
   onRefresh, onFilterChange, onLoadMore, hasMore, movKpis, movKpisLoading,
 }: Props) {
+  const supabase = useSupabase();
   const { hasPermission } = useAuth();
   const canEditMovimentacoes = useCan('estoque:movimentacoes:edit');
   const canCancelMovimentacoes = useCan('estoque:movimentacoes:cancel');
@@ -83,7 +84,7 @@ export default function MovimentacoesSection({
   useEffect(() => {
     supabase.from('stock_sectors').select('name').eq('is_active', true).order('sort_order').order('name')
       .then(({ data }) => setSetores((data || []).map((s: { name: string }) => s.name)));
-  }, []);
+  }, [supabase]);
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
   const [showFilters, setShowFilters] = useState(false);

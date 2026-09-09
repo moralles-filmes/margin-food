@@ -1,5 +1,5 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useMemo, useCallback, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useEstoqueGeralStoreContext } from '@/contexts/EstoqueGeralStoreContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -38,6 +38,7 @@ interface Props {
 
 export default function StockTransfersSection({
  categorias, locais }: Props) {
+  const supabase = useSupabase();
   const canViewRbac = useCan('estoque:transferencias:view');
   const store = useEstoqueGeralStoreContext();
   const { produtos, saldos } = store;
@@ -94,7 +95,7 @@ export default function StockTransfersSection({
       setTotalCount(result.total || 0);
     }
     setLoading(false);
-  }, [period, filterProduct, filterLocation]);
+  }, [period, filterProduct, filterLocation, supabase]);
 
   useEffect(() => {
     fetchTransfers(0);

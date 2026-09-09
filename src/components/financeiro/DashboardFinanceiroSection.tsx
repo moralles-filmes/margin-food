@@ -1,3 +1,4 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useDataEvent } from '@/lib/dataEvents';
 import { Card, CardContent } from '@/components/ui/card';
@@ -8,7 +9,6 @@ import { DatePicker } from '@/components/ui/DatePicker';
 import { Skeleton } from '@/components/ui/skeleton';
 import KpiCard, { type KpiCardDelta, type KpiVariant } from '@/components/ui/KpiCard';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
-import { supabase } from '@/integrations/supabase/client';
 import { useCan } from '@/permissions/hooks';
 import { toast } from 'sonner';
 import { todayBR, fmtBRL, formatPercentBR } from '@/lib/formatters';
@@ -71,6 +71,7 @@ function buildDelta(current: number, previous: number, invert = false): KpiCardD
 // ── Component ──
 
 export default function DashboardFinanceiroSection({ onNavigate }: { onNavigate?: (tab: FinSubTab) => void }) {
+  const supabase = useSupabase();
   const canView = useCan('financeiro:dashboard:view');
   const canExport = useCan('financeiro:dashboard:export');
 
@@ -157,7 +158,7 @@ export default function DashboardFinanceiroSection({ onNavigate }: { onNavigate?
       toast.error('Erro ao carregar resumo do dashboard');
     }
     setLoading(false);
-  }, [filterType, mesAno, selectedDate, periodoInicio, periodoFim]);
+  }, [loading, resumo.receita, filterType, supabase, periodoInicio, periodoFim, selectedDate, mesAno]);
 
   // Keep ref in sync
   loadResumoRef.current = loadResumo;

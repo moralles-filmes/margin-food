@@ -1,3 +1,4 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -5,7 +6,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
 import { DollarSign, Package, AlertTriangle, AlertCircle, RefreshCw, ArrowDown, ArrowUp, Minus, Inbox } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
 import StockInactivityAlert from './StockInactivityAlert';
 import { fmtBRL, fmtBRLCompact, formatDecimalBR, parseUTCToBR } from '@/lib/formatters';
@@ -153,6 +153,7 @@ function normalizeDashboardData(raw: unknown): DashboardData | null {
 
 export default function StockDashboardSection({
  categorias, onNavigate }: Props) {
+  const supabase = useSupabase();
   const canViewRbac = useCan('estoque:dashboard:view');
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -181,7 +182,7 @@ export default function StockDashboardSection({
       setError(msg);
     }
     setLoading(false);
-  }, [days]);
+  }, [days, supabase]);
 
   useEffect(() => { fetchDashboard(); }, [fetchDashboard]);
 

@@ -1,5 +1,5 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Stethoscope, Copy, CheckCircle2, XCircle, MinusCircle, ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
@@ -210,6 +210,7 @@ function DetailRenderer({ details }: { details: Record<string, unknown> }) {
 }
 
 export default function CheckupSuiteCard() {
+  const supabase = useSupabase();
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<CheckupResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -238,25 +239,9 @@ export default function CheckupSuiteCard() {
     setLintLoading(true);
     const endpoint = mode === 'full' ? '/functions/v1/rbac-lint-full' : '/functions/v1/rbac-lint-quick';
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        updateLintSection(current, 'FAIL', { reason: 'Sem sessão ativa' });
-        return;
-      }
-
-      // Use raw fetch to capture full HTTP details
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const url = `${supabaseUrl}${endpoint}`;
-      const resp = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      const bodyText = await resp.text();
+      const { data, error, response: resp } = await supabase.functions.invoke(mode === 'full' ? 'rbac-lint-full' : 'rbac-lint-quick');
+      if (!resp) throw error ?? new Error('Sem resposta do servidor');
+      const bodyText = resp.ok ? (typeof data === 'string' ? data : JSON.stringify(data)) : await resp.text();
 
       if (!resp.ok) {
         let parsed: Record<string, unknown> = {};

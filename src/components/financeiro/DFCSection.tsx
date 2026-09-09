@@ -1,7 +1,7 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { supabase } from '@/integrations/supabase/client';
 import { formatInBR } from '@/lib/formatters';
 import { FileDown, FileSpreadsheet, ShieldAlert } from 'lucide-react';
 import { exportDemonstrativoPDF, exportDemonstrativoExcel } from '@/lib/exportDemonstrativo';
@@ -50,6 +50,7 @@ function valoresMapToLancamentos(valoresMap: Record<string, number>) {
 }
 
 export default function DFCSection() {
+  const supabase = useSupabase();
   const [mesAncora, setMesAncora] = useState(() => formatInBR(new Date(), 'yyyy-MM'));
   const [meses, setMeses] = useState('3');
   const [loading, setLoading] = useState(true);
@@ -89,7 +90,7 @@ export default function DFCSection() {
     setLancamentos(valoresMapToLancamentos(result?.valores_por_categoria || {}));
     setSaldoInicial(Number(result?.saldo_inicial || 0));
     setLoading(false);
-  }, [mesAncora, meses]);
+  }, [mesAncora, meses, supabase]);
 
   useEffect(() => { load(); }, [load]);
   useDataEvent('financeiro:lancamentos', load);

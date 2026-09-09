@@ -1,7 +1,7 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { PeriodRange } from '@/components/PeriodFilter';
 import { format } from 'date-fns';
-import { supabase } from '@/integrations/supabase/client';
 
 // ── Server-side KPIs (CMV + Estoque) ──
 interface ServerKpis {
@@ -182,6 +182,7 @@ export interface RelatoriosData {
 const MONTH_NAMES = ['', 'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
 export function useRelatoriosData(period: PeriodRange): RelatoriosData {
+  const supabase = useSupabase();
   // Server-side KPIs
   const [serverKpis, setServerKpis] = useState<ServerKpis | null>(null);
   const [serverLoading, setServerLoading] = useState(true);
@@ -257,7 +258,7 @@ export function useRelatoriosData(period: PeriodRange): RelatoriosData {
       });
 
     return () => { cancelled = true; };
-  }, [pStart, pEnd]);
+  }, [pStart, pEnd, supabase]);
 
   // Simulation callback with debounce ref
   const simTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -276,7 +277,7 @@ export function useRelatoriosData(period: PeriodRange): RelatoriosData {
         setSimulationLoading(false);
       });
     }, 400);
-  }, [pStart, pEnd]);
+  }, [supabase, pStart, pEnd]);
 
   const sk = serverKpis;
   const td = tendenciaData;

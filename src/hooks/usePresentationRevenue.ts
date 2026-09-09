@@ -1,3 +1,4 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useCallback, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -7,7 +8,6 @@ import {
   type PresentationRevenueData,
   type YearMonth,
 } from '@/domain/financeiro/presentation';
-import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
 import { useDataEvent } from '@/lib/dataEvents';
 import {
@@ -63,7 +63,7 @@ export function createPresentationRevenueQueryDefinition(
   };
 }
 
-export async function fetchPresentationRevenue(
+export async function fetchPresentationRevenue(supabase: typeof import("@/integrations/supabase/client").supabase,
   definition: PresentationRevenueQueryDefinition,
   signal?: AbortSignal,
 ): Promise<PresentationRevenueData> {
@@ -106,6 +106,7 @@ export function presentationRevenueQueryAvailability(
 }
 
 export function usePresentationRevenue(options: PresentationRevenueQueryOptions) {
+  const supabase = useSupabase();
   const queryClient = useQueryClient();
   const definition = useMemo(() => createPresentationRevenueQueryDefinition(
     options.month,
@@ -114,7 +115,7 @@ export function usePresentationRevenue(options: PresentationRevenueQueryOptions)
   ), [options.companyId, options.historyYears, options.month]);
   const query = useQuery({
     queryKey: definition.queryKey,
-    queryFn: ({ signal }) => fetchPresentationRevenue(definition, signal),
+    queryFn: ({ signal }) => fetchPresentationRevenue(supabase, definition, signal),
     enabled: options.enabled && Boolean(options.companyId),
     retry: (failureCount, error) => (
       failureCount < 1

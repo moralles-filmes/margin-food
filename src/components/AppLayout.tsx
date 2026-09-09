@@ -6,6 +6,7 @@ import NotificationBell from '@/components/NotificationBell';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth } from '@/contexts/AuthContext';
+import { CompanySelector } from '@/components/CompanySelector';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import {
@@ -132,7 +133,7 @@ const tabLabels: Record<TabId, string> = {
 
 export default function AppLayout({ children, activeTab, onTabChange, isOffline, entries = [], metasCompra = [] }: LayoutProps) {
   const { theme, toggleTheme } = useTheme();
-  const { profile, signOut, roles, hasPermission, permissionState, rbacDebug } = useAuth();
+  const { profile, signOut, roles, hasPermission, permissionState, rbacDebug, accessibleCompanies, activeCompanyId, setActiveCompany } = useAuth();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -227,13 +228,13 @@ export default function AppLayout({ children, activeTab, onTabChange, isOffline,
     <div className="flex flex-col h-full">
       {/* Logo */}
       <div className={`flex items-center gap-2.5 px-4 py-5 border-b border-sidebar-border ${sidebarCollapsed ? 'justify-center px-2' : ''}`}>
-        <div className="w-8 h-8 rounded-lg bg-primary-strong flex items-center justify-center shadow-sm shrink-0">
+        {sidebarCollapsed && accessibleCompanies.length > 1 ? <CompanySelector companies={accessibleCompanies} value={activeCompanyId!} onChange={id => void setActiveCompany(id)} compact label="Trocar unidade" /> : <div className="w-8 h-8 rounded-lg bg-primary-strong flex items-center justify-center shadow-sm shrink-0">
           <span className="text-primary-strong-foreground font-black text-base tracking-tighter">M</span>
-        </div>
+        </div>}
         {!sidebarCollapsed && (
           <div className="flex flex-col min-w-0">
             <span className="text-[15px] font-bold text-sidebar-foreground leading-tight tracking-tight truncate">Margin Food</span>
-            <span className="text-[11px] text-muted-foreground leading-tight truncate">{profile?.company_name || 'Moralles Food'}</span>
+            <div className="text-[11px] text-muted-foreground leading-tight truncate"><CompanySelector companies={accessibleCompanies} value={activeCompanyId!} onChange={id => void setActiveCompany(id)} label="Trocar unidade" /></div>
           </div>
         )}
 

@@ -1,10 +1,10 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { RefreshCw, TrendingUp, TrendingDown, Clock, AlertTriangle, DollarSign, BarChart3, Users, Calendar, FileDown, Ban } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -72,6 +72,7 @@ function formatMesLabel(mes: string): string {
 }
 
 export default function KPIsSection() {
+  const supabase = useSupabase();
   const canView = useCan('financeiro:kpis:view');
   const canExport = useCan('financeiro:kpis:export');
 
@@ -128,7 +129,7 @@ export default function KPIsSection() {
       setErrorState(true);
     }
     setLoading(false);
-  }, [canView, meses]);
+  }, [canView, loading, meses, supabase]);
 
   // Auto-load
   useEffect(() => { load(); }, [meses]);

@@ -1,5 +1,5 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { MetaCompraMensal } from '@/types/salmon';
 import { toast } from 'sonner';
 import { emitDataEvent } from '@/lib/dataEvents';
@@ -54,6 +54,7 @@ function toLegacy(m: PlanningMeta): MetaCompraMensal {
 }
 
 export function usePlanningStore() {
+  const supabase = useSupabase();
   const [metas, setMetas] = useState<PlanningMeta[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -90,7 +91,7 @@ export function usePlanningStore() {
     } finally {
       if (mounted.current) setLoading(false);
     }
-  }, []);
+  }, [supabase]);
 
   // ── Upsert meta (guarded RPC) ──
   const saveMeta = useCallback(async (payload: {
@@ -133,7 +134,7 @@ export function usePlanningStore() {
     } finally {
       if (mounted.current) setSaving(false);
     }
-  }, [saving, fetchMetas]);
+  }, [saving, supabase, fetchMetas]);
 
   // ── Delete meta (guarded RPC) ──
   const deleteMeta = useCallback(async (id: string): Promise<boolean> => {
@@ -153,7 +154,7 @@ export function usePlanningStore() {
     } finally {
       if (mounted.current) setSaving(false);
     }
-  }, [saving]);
+  }, [saving, supabase]);
 
   // ── Fetch aggregated spend summary (guarded RPC) ──
   const fetchSpendSummary = useCallback(async (year: number, month: number, source?: string | null, categoria?: string | null) => {
@@ -176,7 +177,7 @@ export function usePlanningStore() {
     } finally {
       if (mounted.current) setSpendLoading(false);
     }
-  }, []);
+  }, [supabase]);
 
   /** Legacy-compatible metas array for existing components */
   const metasCompra: MetaCompraMensal[] = metas.map(toLegacy);

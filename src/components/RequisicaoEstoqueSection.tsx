@@ -1,3 +1,4 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { X, Check, Inbox, AlertTriangle, ShoppingCart, RefreshCw, Ban, ClipboardList, ChevronDown, ChevronUp, Edit3 } from 'lucide-react';
@@ -10,7 +11,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCan } from '@/permissions';
-import { supabase } from '@/integrations/supabase/client';
 import type { ProdutoExtended } from '@/types/estoque';
 import { resolveListedRequisitionItemDisplay } from '@/domain/estoque/requisition';
 import {
@@ -81,6 +81,7 @@ async function extractEdgeFnErrorMessage(error: unknown, fallback: string): Prom
 type FormMode = 'none' | 'manual' | 'lista-fixa';
 
 export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefresh }: Props) {
+  const supabase = useSupabase();
   const { user, profile } = useAuth();
   const canManage = useCan('estoque:requisicoes:manage');
   const canCreate = useCan('estoque:requisicoes:create');
@@ -112,7 +113,7 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
         setSetores(nomes);
         setSetor(current => nomes.includes(current) ? current : nomes[0] || '');
       });
-  }, []);
+  }, [supabase]);
   const [observacao, setObservacao] = useState('');
   const [itens, setItens] = useState<ManualRequisitionItem[]>([]);
   const [cancelling, setCancelling] = useState<string | null>(null);

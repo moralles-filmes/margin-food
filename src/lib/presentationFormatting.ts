@@ -169,5 +169,6 @@ export function presentationFilename(
     ? 'data-indisponivel'
     : formatDateBR(generatedDate).split('/').reverse().join('-');
   const period = safeFilenameSegment(`${data.period.start}-a-${endInclusive}`);
-  return `apresentacao-socios-${period}-gerado-${generated}.${extension}`;
+  const unit = data.company ? `${safeFilenameSegment(data.company.name)}-` : '';
+  return `apresentacao-socios-${unit}${period}-gerado-${generated}.${extension}`;
 }

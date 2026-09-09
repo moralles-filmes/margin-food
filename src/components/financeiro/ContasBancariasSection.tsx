@@ -1,5 +1,5 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCan } from '@/permissions';
 import { emitDataEvent, useDataEvent } from '@/lib/dataEvents';
@@ -98,6 +98,7 @@ interface ContasBancariasProps {
 }
 
 export default function ContasBancariasSection({ onNavigateExtrato }: ContasBancariasProps = {}) {
+  const supabase = useSupabase();
   const { user } = useAuth();
   const canView = useCan('financeiro:contas:view');
   const canCreate = useCan('financeiro:contas:create');
@@ -136,7 +137,7 @@ export default function ContasBancariasSection({ onNavigateExtrato }: ContasBanc
       }
       setSaldos(map);
     }
-  }, []);
+  }, [supabase]);
 
   const load = useCallback(async () => {
     if (!canView) return;
@@ -144,7 +145,7 @@ export default function ContasBancariasSection({ onNavigateExtrato }: ContasBanc
     const { data } = await supabase.from('fin_contas').select(CONTA_FIELDS).eq('ativo', true).order('nome');
     setItems((data as ContaBancaria[] | null) || []);
     setLoading(false);
-  }, [canView]);
+  }, [canView, supabase]);
 
   useEffect(() => {
     load().then(() => loadSaldos());
@@ -189,7 +190,7 @@ export default function ContasBancariasSection({ onNavigateExtrato }: ContasBanc
     });
 
     return () => { cancelled = true; };
-  }, [canCheckSaldoNaReferencia, items, saldos]);
+  }, [canCheckSaldoNaReferencia, items, saldos, supabase]);
 
   // Reactive events
   useDataEvent('financeiro:contas', load);

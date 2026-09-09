@@ -101,7 +101,7 @@ interface DetailDefinition {
   tone: 'revenue' | 'expense' | 'result' | 'neutral';
 }
 
-const DETAIL_DEFINITIONS: Record<PresentationDetailTarget, DetailDefinition> = {
+const DETAIL_DEFINITIONS: Record<Exclude<PresentationDetailTarget, 'expenses'>, DetailDefinition> = {
   revenue: {
     title: 'Receita operacional',
     description: 'Evolução, composição, participação, ranking e lançamentos relacionados.',

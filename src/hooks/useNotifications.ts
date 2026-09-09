@@ -1,5 +1,5 @@
+import { useSupabase, useCompanyScope } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 
 export interface AppNotification {
   id: string;
@@ -18,6 +18,8 @@ export interface AppNotification {
 }
 
 export function useNotifications(userId: string | undefined) {
+  const supabase = useSupabase();
+  const companyId = useCompanyScope()?.companyId;
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -32,12 +34,12 @@ export function useNotifications(userId: string | undefined) {
       .limit(50);
     if (data) setNotifications(data as unknown as AppNotification[]);
     setLoading(false);
-  }, [userId]);
+  }, [userId, supabase]);
 
   const markAsRead = useCallback(async (id: string) => {
     await supabase.from('notifications').update({ read_at: new Date().toISOString() }).eq('id', id);
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read_at: new Date().toISOString() } : n));
-  }, []);
+  }, [supabase]);
 
   const markAllAsRead = useCallback(async () => {
     if (!userId) return;
@@ -49,7 +51,7 @@ export function useNotifications(userId: string | undefined) {
 
     const now = new Date().toISOString();
     setNotifications(prev => prev.map(n => ({ ...n, read_at: n.read_at || now })));
-  }, [userId, notifications]);
+  }, [userId, notifications, supabase]);
 
   const unreadCount = notifications.filter(n => !n.read_at).length;
 
@@ -59,19 +61,20 @@ export function useNotifications(userId: string | undefined) {
   useEffect(() => {
     if (!userId) return;
     const channel = supabase
-      .channel('notif-bell-' + userId)
+      .channel('notif-bell-' + userId + ':' + companyId)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
         table: 'notifications',
-        filter: `recipient_user_id=eq.${userId}`,
+        filter: `company_id=eq.${companyId}`,
       }, (payload: any) => {
         const row = payload.new as AppNotification;
+        if (row.recipient_user_id !== userId) return;
         setNotifications(prev => [row, ...prev].slice(0, 50));
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [userId]);
+  }, [userId, companyId, supabase]);
 
   return { notifications, unreadCount, loading, load, markAsRead, markAllAsRead };
 }

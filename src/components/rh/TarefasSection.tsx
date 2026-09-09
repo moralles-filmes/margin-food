@@ -1,5 +1,5 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -71,6 +71,7 @@ const STATUS_LABELS: Record<string, { label: string; icon: typeof Clock }> = {
 
 export default function TarefasSection({
  colaboradores, canManage }: Props) {
+  const supabase = useSupabase();
   const canViewRbac = useCan('rh:tarefas:view');
   const { user } = useAuth();
   const [tarefas, setTarefas] = useState<Tarefa[]>([]);
@@ -109,7 +110,7 @@ export default function TarefasSection({
     }
     setTarefaHasMore(parsed.length === PAGE_SIZE);
     setLoading(false);
-  }, []);
+  }, [supabase]);
 
   useEffect(() => { fetchTarefas(); }, [fetchTarefas]);
 

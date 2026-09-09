@@ -1,5 +1,5 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -30,6 +30,7 @@ interface ProductRow {
 }
 
 export default function QuickInventorySection() {
+  const supabase = useSupabase();
   const canViewRbac = useCan('inventario:rapido:view');
   // Product search
   const [searchTerm, setSearchTerm] = useState('');
@@ -55,7 +56,7 @@ export default function QuickInventorySection() {
       .then(({ data }) => {
         if (data) setCategories(data.map((c: any) => c.name));
       });
-  }, []);
+  }, [supabase]);
 
   // Search products server-side
   const searchProducts = useCallback(async (term: string, cat: string) => {
@@ -86,7 +87,7 @@ export default function QuickInventorySection() {
     const countedIds = new Set(countedItems.map(c => c.productId));
     setSearchResults((data || []).filter(p => !countedIds.has(p.id)));
     setSearchLoading(false);
-  }, [countedItems]);
+  }, [countedItems, supabase]);
 
   // Debounced search
   const handleSearchChange = useCallback((value: string) => {
@@ -130,7 +131,7 @@ export default function QuickInventorySection() {
     } finally {
       addingIds.current.delete(product.id);
     }
-  }, []);
+  }, [supabase]);
 
   // Update counted quantity
   const updateCount = useCallback((productId: string, qty: string) => {

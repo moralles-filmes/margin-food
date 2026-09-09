@@ -1,3 +1,4 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,7 +7,6 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { formatInBR, fmtBRL, formatPercentBR, formatDecimalBR } from '@/lib/formatters';
 import { subMonths } from 'date-fns';
@@ -72,6 +72,7 @@ function formatMesLabel(mes: string): string {
 }
 
 export default function ComparativoSection() {
+  const supabase = useSupabase();
   const canView = useCan('financeiro:comparativo:view');
   const canExport = useCan('financeiro:comparativo:export');
 
@@ -116,7 +117,7 @@ export default function ComparativoSection() {
       setErrorState(true);
     }
     setLoading(false);
-  }, [canView, mesA, mesB]);
+  }, [canView, loading, mesA, mesB, supabase]);
 
   // Auto-load on mount
   useEffect(() => {

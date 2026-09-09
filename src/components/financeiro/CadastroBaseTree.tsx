@@ -1,5 +1,5 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCan } from '@/permissions';
 import { emitDataEvent, useDataEvent } from '@/lib/dataEvents';
@@ -362,6 +362,7 @@ const CATEGORY_FIELDS = `
 
 // ─── Main component ───
 export default function CadastroBaseTree() {
+  const supabase = useSupabase();
   const { user } = useAuth();
   const canView = useCan('financeiro:cadastros:view');
   const canCreate = useCan('financeiro:cadastros:create');
@@ -401,7 +402,7 @@ export default function CadastroBaseTree() {
     setItems((catRes.data as CatRow[] | null) || []);
     setCentros((ccRes.data as CentroCusto[] | null) || []);
     setLoading(false);
-  }, [canView]);
+  }, [canView, supabase]);
 
   useEffect(() => { load(); }, [load]);
   useDataEvent('financeiro:cadastros', load);

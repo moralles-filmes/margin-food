@@ -1,6 +1,6 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useCallback } from 'react';
 import { emitDataEvent } from '@/lib/dataEvents';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 export interface Inventario {
@@ -93,6 +93,7 @@ export interface DashboardData {
 }
 
 export function useInventarioStore() {
+  const supabase = useSupabase();
   const [inventarios, setInventarios] = useState<Inventario[]>([]);
   const [currentInventario, setCurrentInventario] = useState<Inventario | null>(null);
   const [currentItens, setCurrentItens] = useState<InventarioItem[]>([]);

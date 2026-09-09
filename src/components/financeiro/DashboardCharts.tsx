@@ -1,9 +1,9 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useDataEvent } from '@/lib/dataEvents';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { supabase } from '@/integrations/supabase/client';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from 'recharts';
 import { subMonths, startOfMonth, endOfMonth, subDays } from 'date-fns';
 import { formatDateISO, formatInBR } from '@/lib/datetime';
@@ -55,6 +55,7 @@ interface DashboardChartsProps {
 }
 
 export default function DashboardCharts({ periodStart, periodEndExclusive }: DashboardChartsProps) {
+  const supabase = useSupabase();
   const canViewRbac = useCan('financeiro:dashboard:view');
   const [chartData, setChartData] = useState<ChartsData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -107,7 +108,7 @@ export default function DashboardCharts({ periodStart, periodEndExclusive }: Das
       })),
     });
     setLoading(false);
-  }, [meses, periodStart, periodEndExclusive]);
+  }, [meses, periodEndExclusive, supabase, periodStart]);
 
   loadRef.current = load;
 

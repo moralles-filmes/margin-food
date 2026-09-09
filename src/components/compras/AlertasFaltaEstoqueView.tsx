@@ -1,3 +1,4 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 /**
  * ─── Alertas de Falta de Estoque (Sub-aba Compras) ───
  *
@@ -15,7 +16,6 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useCan } from '@/permissions';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -53,6 +53,7 @@ function NoAccess() {
 }
 
 export default function AlertasFaltaEstoqueView() {
+  const supabase = useSupabase();
   const canViewAlertas = useCan('compras:alertas_falta:view');
   const canViewPedidos = useCan('compras:pedidos:view');
   const canApproveAlertas = useCan('compras:alertas_falta:approve');
@@ -91,7 +92,7 @@ export default function AlertasFaltaEstoqueView() {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter]);
+  }, [statusFilter, supabase]);
 
   useEffect(() => { load(); }, [load]);
 

@@ -1,9 +1,9 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 /**
  * Operator flow for creating requisitions from a fixed sector list.
  * Steps: 1) Select sector → 2) Fill quantities → 3) Preview → 4) Confirm & submit
  */
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCan } from '@/permissions/hooks';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
@@ -38,6 +38,7 @@ function getRequisitionProductDisplay(prod: ProdutoExtended) {
 }
 
 export default function RequisicaoListaFixa({ produtos, saldos, onSuccess, onCancel }: Props) {
+  const supabase = useSupabase();
   const { profile } = useAuth();
   const canCreate = useCan('estoque:requisicoes:create');
   const { confirm, ConfirmDialog } = useConfirmDialog();
@@ -55,7 +56,7 @@ export default function RequisicaoListaFixa({ produtos, saldos, onSuccess, onCan
         setSetores(nomes);
         setSetor(current => nomes.includes(current) ? current : nomes[0] || '');
       });
-  }, [canCreate]);
+  }, [canCreate, supabase]);
   const [observacao, setObservacao] = useState('');
   const [items, setItems] = useState<ListaFixaItem[]>([]);
   const [quantities, setQuantities] = useState<Record<string, string>>({});
@@ -106,7 +107,7 @@ export default function RequisicaoListaFixa({ produtos, saldos, onSuccess, onCan
     } finally {
       if (currentRequest === requestId.current) setLoading(false);
     }
-  }, []);
+  }, [supabase]);
 
   useEffect(() => {
     if (canCreate) loadListaFixa(setor);

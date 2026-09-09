@@ -24,6 +24,8 @@ interface PresentationPeriodFiltersProps {
   initialDraft: PresentationFilterDraft;
   availableBounds?: AvailablePeriodBounds;
   unitName?: string | null;
+  companySelector?: ReactNode;
+  localUnitOverride?: boolean;
   granularity: TimeSeriesGranularity;
   rankingLimit: number;
   historyYears: readonly number[];
@@ -60,6 +62,8 @@ export default function PresentationPeriodFilters({
   initialDraft,
   availableBounds,
   unitName,
+  companySelector,
+  localUnitOverride,
   granularity,
   rankingLimit,
   historyYears,
@@ -162,7 +166,8 @@ export default function PresentationPeriodFilters({
             <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
             <div className="min-w-0">
               <p className="text-[11px] font-medium text-muted-foreground">Unidade</p>
-              <p className="truncate text-sm font-medium text-foreground">{unitName ?? 'Unidade atual'}</p>
+              <div className="truncate text-sm font-medium text-foreground">{companySelector ?? unitName ?? 'Unidade atual'}</div>
+              {localUnitOverride ? <p className="text-[11px] text-muted-foreground">Somente nesta apresentação</p> : null}
             </div>
           </div>
         </div>

@@ -1,6 +1,6 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { includesNormalized } from '@/lib/utils';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEstoqueGeralStoreContext } from '@/contexts/EstoqueGeralStoreContext';
 import { Button } from '@/components/ui/button';
@@ -36,6 +36,7 @@ interface RankingRow {
 type RankingTab = 'cheapest' | 'expensive' | 'by-item' | 'by-category';
 
 export default function RankingFornecedoresView() {
+  const supabase = useSupabase();
   const canViewRbac = useCan('compras:ranking:view');
   const { user } = useAuth();
   const { produtos } = useEstoqueGeralStoreContext();
@@ -76,7 +77,7 @@ export default function RankingFornecedoresView() {
 
     setLoading(false);
     setLoadingMore(false);
-  }, [tab, selectedItem, selectedCategory]);
+  }, [tab, selectedItem, selectedCategory, supabase]);
 
   useEffect(() => {
     if (user) fetchRanking();

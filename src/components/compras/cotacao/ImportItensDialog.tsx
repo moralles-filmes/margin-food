@@ -3,10 +3,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button';
 import { PackageX, ClipboardList, Check } from 'lucide-react';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import type { CotacaoItemInput } from '@/hooks/useCotacoesStore';
 
-const db = supabase as any;
 
 type Source = 'alertas' | 'checklist';
 
@@ -22,6 +21,7 @@ interface ImportItensDialogProps {
 }
 
 export default function ImportItensDialog({ open, onOpenChange, onImport }: ImportItensDialogProps) {
+  const db = useSupabase() as any;
   const [source, setSource] = useState<Source>('alertas');
   const [rows, setRows] = useState<ImportRow[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -83,7 +83,7 @@ export default function ImportItensDialog({ open, onOpenChange, onImport }: Impo
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [db]);
 
   useEffect(() => {
     if (open) load(source);

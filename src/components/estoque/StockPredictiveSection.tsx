@@ -1,5 +1,5 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -87,6 +87,7 @@ const DOW_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
 export default function StockPredictiveSection({
  categorias }: Props) {
+  const supabase = useSupabase();
   const canViewRbac = useCan('estoque:preditivo:view');
   const [items, setItems] = useState<PredictiveItem[]>([]);
   const [kpis, setKpis] = useState<PredictiveKpis | null>(null);
@@ -117,7 +118,7 @@ export default function StockPredictiveSection({
       toast.error(err.message || 'Erro ao carregar análise preditiva');
     }
     setLoading(false);
-  }, [filterCat, targetDays, onlyCritical, useWeekday]);
+  }, [supabase, filterCat, targetDays, onlyCritical, useWeekday]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 

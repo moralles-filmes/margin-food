@@ -1,3 +1,4 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -5,7 +6,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { RefreshCw, TrendingUp, TrendingDown, Wallet, FileDown, Ban, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
@@ -54,6 +54,7 @@ function SkeletonKpis() {
 
 
 export default function ProjecaoFluxoSection() {
+  const supabase = useSupabase();
   const canView = useCan('financeiro:projecao:view');
   const canExport = useCan('financeiro:projecao:export');
 
@@ -96,7 +97,7 @@ export default function ProjecaoFluxoSection() {
       setErrorState(true);
     }
     setLoading(false);
-  }, [canView, dias, saldoManual]);
+  }, [canView, dias, loading, saldoManual, supabase]);
 
   // Auto-load on mount and when dias changes
   useEffect(() => {

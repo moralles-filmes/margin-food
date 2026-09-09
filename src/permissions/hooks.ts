@@ -12,7 +12,8 @@
 
 import { useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+import { useSupabase } from '@/contexts/CompanyScopeContext';
+import type { supabase as identityClient } from '@/integrations/supabase/client';
 import { LEGACY_PERMISSION_MAP, MODULE_MANIFESTS, subtabViewKey } from './registry';
 
 /** The super-admin permission key — grants access to everything */
@@ -26,8 +27,9 @@ const ENABLE_LEGACY_PERMISSIONS = import.meta.env.VITE_ENABLE_LEGACY_PERMISSIONS
 const _loggedLegacyKeys = new Set<string>();
 
 /** Fire-and-forget telemetry for legacy permission usage */
-function logLegacyUsage(legacyKey: string, resolvedTo: string[], userId?: string, companyId?: string | null) {
-  const dedupeKey = `${userId || 'anon'}:${legacyKey}`;
+function logLegacyUsage(client: typeof identityClient | undefined, legacyKey: string, resolvedTo: string[], userId?: string, companyId?: string | null) {
+  if (!client || !companyId || !userId) return;
+  const dedupeKey = `${userId}:${companyId}:${legacyKey}`;
   if (_loggedLegacyKeys.has(dedupeKey)) return;
   _loggedLegacyKeys.add(dedupeKey);
 
@@ -36,7 +38,8 @@ function logLegacyUsage(legacyKey: string, resolvedTo: string[], userId?: string
   }
 
   try {
-    supabase.from('rbac_legacy_usage').insert({
+    client.from('rbac_legacy_usage').insert({
+      company_id: companyId,
       user_id: userId || null,
       legacy_key: legacyKey,
       resolved_to: resolvedTo,
@@ -57,6 +60,7 @@ function resolvePermission(
   effectivePermissions: string[],
   userId?: string,
   companyId?: string | null,
+  client?: typeof identityClient,
 ): boolean {
   // Direct match (new granular key)
   if (effectivePermissions.includes(perm)) return true;
@@ -71,7 +75,7 @@ function resolvePermission(
     const mapped = LEGACY_PERMISSION_MAP[legacyKey];
     if (mapped && mapped.includes(perm)) {
       // Telemetry: log that legacy fallback was used
-      logLegacyUsage(legacyKey, mapped, userId, companyId);
+      logLegacyUsage(client, legacyKey, mapped, userId, companyId);
       return true;
     }
   }
@@ -87,36 +91,40 @@ function isSystemAdmin(effectivePermissions: string[]): boolean {
 /** Check a single granular permission */
 export function useCan(perm: string): boolean {
   const { effectivePermissions, permissionState, user, profile } = useAuth();
+  const client = useSupabase();
   return useMemo(() => {
     if (permissionState !== 'READY') return false;
     if (isSystemAdmin(effectivePermissions)) return true;
-    return resolvePermission(perm, effectivePermissions, user?.id, profile?.company_id);
-  }, [perm, effectivePermissions, permissionState, user?.id, profile]);
+    return resolvePermission(perm, effectivePermissions, user?.id, profile?.company_id, client);
+  }, [perm, effectivePermissions, permissionState, user?.id, profile, client]);
 }
 
 /** Check if user has ANY of the given permissions */
 export function useCanAny(...perms: string[]): boolean {
   const { effectivePermissions, permissionState, user, profile } = useAuth();
+  const client = useSupabase();
   return useMemo(() => {
     if (permissionState !== 'READY') return false;
     if (isSystemAdmin(effectivePermissions)) return true;
-    return perms.some(p => resolvePermission(p, effectivePermissions, user?.id, profile?.company_id));
-  }, [perms, effectivePermissions, permissionState, user?.id, profile]);
+    return perms.some(p => resolvePermission(p, effectivePermissions, user?.id, profile?.company_id, client));
+  }, [perms, effectivePermissions, permissionState, user?.id, profile, client]);
 }
 
 /** Check if user has ALL of the given permissions */
 export function useCanAll(...perms: string[]): boolean {
   const { effectivePermissions, permissionState, user, profile } = useAuth();
+  const client = useSupabase();
   return useMemo(() => {
     if (permissionState !== 'READY') return false;
     if (isSystemAdmin(effectivePermissions)) return true;
-    return perms.every(p => resolvePermission(p, effectivePermissions, user?.id, profile?.company_id));
-  }, [perms, effectivePermissions, permissionState, user?.id, profile]);
+    return perms.every(p => resolvePermission(p, effectivePermissions, user?.id, profile?.company_id, client));
+  }, [perms, effectivePermissions, permissionState, user?.id, profile, client]);
 }
 
 /** Get visible subtab keys for a module based on :view permissions */
 export function useModuleAccess(moduleKey: string) {
   const { effectivePermissions, permissionState, user, profile } = useAuth();
+  const client = useSupabase();
 
   return useMemo(() => {
     const manifest = MODULE_MANIFESTS.find(m => m.key === moduleKey);
@@ -138,11 +146,11 @@ export function useModuleAccess(moduleKey: string) {
         const viewKey = subtabViewKey(moduleKey, sub.key);
         const hasViewAction = sub.actions.some(a => a.action === 'view');
         const hasAnyGrantedAction = sub.actions.some(a =>
-          resolvePermission(`${moduleKey}:${sub.key}:${a.action}`, effectivePermissions, uid, cid)
+          resolvePermission(`${moduleKey}:${sub.key}:${a.action}`, effectivePermissions, uid, cid, client)
         );
 
         if (hasViewAction) {
-          return resolvePermission(viewKey, effectivePermissions, uid, cid) || hasAnyGrantedAction;
+          return resolvePermission(viewKey, effectivePermissions, uid, cid, client) || hasAnyGrantedAction;
         }
 
         return hasAnyGrantedAction;
@@ -153,7 +161,7 @@ export function useModuleAccess(moduleKey: string) {
       visibleSubtabs,
       canView: visibleSubtabs.length > 0,
     };
-  }, [moduleKey, effectivePermissions, permissionState, user?.id, profile]);
+  }, [moduleKey, effectivePermissions, permissionState, user?.id, profile, client]);
 }
 
 /** Imperative permission check (non-hook, for callbacks) */

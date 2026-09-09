@@ -1,5 +1,5 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import PasswordInput from '@/components/PasswordInput';
@@ -10,6 +10,7 @@ import PasswordStrengthMeter from '@/components/PasswordStrengthMeter';
 import logoMarginPro from '@/assets/logo-marginpro.png';
 
 export default function ResetPassword() {
+  const supabase = useSupabase();
   const { password, setPassword, strength, strengthLabel, strengthColor, localErrors, serverErrors, isChecking, checkServer } = usePasswordValidation();
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);

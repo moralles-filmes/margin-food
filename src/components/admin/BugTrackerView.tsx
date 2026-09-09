@@ -1,5 +1,5 @@
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCompanyId } from '@/hooks/useCompanyId';
@@ -51,6 +51,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function BugTrackerView() {
+  const supabase = useSupabase();
   const { user } = useAuth();
   const { companyId } = useCompanyId();
   const [bugs, setBugs] = useState<SystemBug[]>([]);
@@ -293,6 +294,7 @@ export default function BugTrackerView() {
 }
 
 export function useCriticalBugCount() {
+  const supabase = useSupabase();
   const [count, setCount] = useState(0);
   useEffect(() => {
     supabase
@@ -301,6 +303,6 @@ export function useCriticalBugCount() {
       .in('severity', ['critical'])
       .in('status', ['open', 'in_progress'])
       .then(({ count: c }) => setCount(c ?? 0));
-  }, []);
+  }, [supabase]);
   return count;
 }
