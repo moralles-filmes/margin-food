@@ -17,10 +17,12 @@ export async function addCompanyUser(admin: SupabaseClient, input: {
   let created = false;
   if (!userId) {
     if (!input.sendInvite && (!input.password || input.password.length < 12)) throw new Error('Nova identidade exige senha com no mínimo 12 caracteres.');
-    if (input.sendInvite) {
-      const { error } = await admin.rpc('reserve_company_invitation', { p_actor_user_id:input.actorUserId,p_company_id:input.companyId,p_email:email });
-      if (error) throw error;
-    }
+    // Auth grava app_metadata após o INSERT de auth.users. A reserva validada
+    // permite que o trigger encontre a empresa também no cadastro com senha.
+    const { error: reservationError } = await admin.rpc('reserve_company_invitation', {
+      p_actor_user_id:input.actorUserId,p_company_id:input.companyId,p_email:email,
+    });
+    if (reservationError) throw reservationError;
     const { data, error } = input.sendInvite
       ? await admin.auth.admin.inviteUserByEmail(email,{ data:{ nome:input.nome } })
       : await admin.auth.admin.createUser({

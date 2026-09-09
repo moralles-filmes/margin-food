@@ -110,6 +110,7 @@ margin-food/
 - JWT Supabase Auth, validado via Bearer token nas Edge Functions (`verify_jwt = false` no config, validação manual dentro de cada função).
 - Uma identidade Auth pode ter N memberships; roles/overrides são por `(user_id, company_id)`. `AuthContext` persiste só a preferência de unidade e revalida acessos; dados operacionais usam `useSupabase()`/`CompanyScopeProvider`, nunca o cliente global.
 - `admin-users` desativa/revoga somente o membership da unidade; nunca exclui a identidade compartilhada. Cadastrar e-mail existente adiciona acesso sem alterar senha/nome/e-mail; alterações de identidade compartilhada exigem administração global.
+- GoTrue grava `app_metadata` após o INSERT de `auth.users`; tanto cadastro com senha quanto convite exigem a reserva administrativa de empresa antes da criação, para o trigger não depender desses metadados ainda ausentes.
 
 ---
 
