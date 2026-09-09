@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
-import { useInventarioStore, Inventario, InventarioItem } from '@/hooks/useInventarioStore';
+import { useInventarioStore, Inventario } from '@/hooks/useInventarioStore';
+import { useQuantityNavigation } from '@/hooks/useQuantityNavigation';
+import InventoryItemRow from './inventario/InventoryItemRow';
 
 import { useCan, useModuleAccess } from '@/permissions/hooks';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DateInput } from '@/components/ui/DateInput';
-import { DecimalInput } from '@/components/ui/decimal-input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -14,14 +15,13 @@ import SearchableSelect from '@/components/ui/SearchableSelect';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
+import { Table, TableHeader, TableBody, TableRow, TableHead } from '@/components/ui/table';
 import KpiCard from '@/components/ui/KpiCard';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { ClipboardCheck, Plus, ArrowLeft, Search, AlertTriangle, CheckCircle, BarChart3, Lock, Loader2, ShieldAlert, Users, FileText, Flame, Shield, Eye, MoreVertical, Trash2, RotateCcw, UserPlus, UserMinus, Settings, Zap, Printer, TrendingUp, TrendingDown } from 'lucide-react';
 import { todayBR, formatDisplayBR, formatInBR, parseUTCToBR } from '@/lib/datetime';
 import { parseLocalDate } from '@/lib/dateUtils';
 import { fmtBRL, formatPercentBR } from '@/lib/formatters';
-import { decomposeStockLayers, formatStockLayers } from '@/lib/unitConversions';
 import { supabase } from '@/integrations/supabase/client';
 import QuickInventorySection from './QuickInventorySection';
 import InventarioDashboardView from './inventario/InventarioDashboardView';
@@ -44,6 +44,7 @@ const tipoDisplayLabel = (tipo: string) => {
 
 export default function InventarioView() {
   const store = useInventarioStore();
+  const quantityNavigation = useQuantityNavigation();
   const { visibleSubtabs } = useModuleAccess('inventario');
 
   // Granular permission gates
@@ -771,8 +772,8 @@ export default function InventarioView() {
 
         {/* Items table */}
         <div className="bg-card border border-border rounded-xl overflow-hidden">
-          <Table className="text-xs">
-            <TableHeader>
+          <Table className="block text-sm md:table">
+            <TableHeader className="hidden md:table-header-group">
               <TableRow>
                 <TableHead>Produto</TableHead>
                 <TableHead className="text-right">Teórico</TableHead>
@@ -783,11 +784,13 @@ export default function InventarioView() {
                 <TableHead className="text-center">Class.</TableHead>
               </TableRow>
             </TableHeader>
-            <TableBody>
+            <TableBody className="block md:table-row-group">
               {filteredItems.map(item => (
-                <ItemRow key={item.id} item={item}
+                <InventoryItemRow key={item.id} item={item}
                   canCount={canEditDetail && !isFinalizado && !isSobAnalise && inv.status !== 'RASCUNHO'}
-                  onSave={(val) => store.updateContagem(item.id, val)} classColor={classColor} />
+                  inputRef={input => quantityNavigation.register(item.id, input)}
+                  onNext={() => quantityNavigation.next(item.id, filteredItems.map(row => row.id))}
+                  onSave={async val => (await store.updateContagem(item.id, val)) !== null} classColor={classColor} />
               ))}
             </TableBody>
           </Table>
@@ -939,110 +942,6 @@ export default function InventarioView() {
 }
 
 // ===== Helper Components =====
-
-function ItemRow({ item, canCount, onSave, classColor }: {
-  item: InventarioItem;
-  canCount: boolean;
-  onSave: (val: number) => Promise<any>;
-  classColor: (c: string) => string;
-}) {
-  const unidade = item.produtos?.unidade_medida ?? 'UN';
-  const unidadeCompra = item.produtos?.unidade_compra || unidade;
-  const fator = item.produtos?.fator_conversao_padrao || 1;
-  const hasDual = unidadeCompra.toUpperCase() !== unidade.toUpperCase() && fator !== 1;
-
-  // Convert base-unit values to purchase units for display (same as EstoqueGeralView)
-  const teoricoBase = Number(item.saldo_teorico);
-  const teoricoLayers = decomposeStockLayers(teoricoBase, fator, unidadeCompra, unidade);
-
-  // contagem_fisica is stored in base units — convert to purchase units for display
-  const fisicaBase = item.contagem_fisica !== null ? Number(item.contagem_fisica) : null;
-  const fisicaLayers = fisicaBase !== null ? decomposeStockLayers(fisicaBase, fator, unidadeCompra, unidade) : null;
-
-  // Input state in purchase units (user types in purchase unit, we convert on save)
-  const toDisplayVal = (baseVal: number | null) => {
-    if (baseVal === null) return '';
-    if (!hasDual) return String(baseVal);
-    return String(parseFloat((baseVal / fator).toFixed(4)));
-  };
-
-  const [editing, setEditing] = useState(false);
-  const [value, setValue] = useState(toDisplayVal(item.contagem_fisica));
-
-  const handleBlur = async () => {
-    const displayPrev = toDisplayVal(item.contagem_fisica);
-    if (value === '' || value === displayPrev) { setEditing(false); return; }
-    const parsed = parseFloat(value.replace(',', '.'));
-    if (isNaN(parsed) || parsed < 0) { setEditing(false); return; }
-    // Convert purchase units back to base units before saving
-    const baseVal = hasDual ? parseFloat((parsed * fator).toFixed(4)) : parsed;
-    await onSave(baseVal);
-    setEditing(false);
-  };
-
-  const nome = item.produtos?.nome_produto || 'Item sem nome';
-  // diferenca_qtd is in base units from backend — convert to purchase units for display
-  const difPurchase = hasDual ? Number(item.diferenca_qtd) / fator : Number(item.diferenca_qtd);
-
-  return (
-    <TableRow>
-      <TableCell>
-        <div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-foreground font-medium">{nome}</span>
-            <Badge className="text-[9px] bg-primary-soft text-primary-ink border-primary-border font-mono px-1 py-0">
-              {unidadeCompra}
-            </Badge>
-          </div>
-          {hasDual && (
-            <p className="text-[10px] text-muted-foreground mt-0.5">
-              1 {unidadeCompra} = {fator} {unidade}
-            </p>
-          )}
-        </div>
-      </TableCell>
-      <TableCell className="text-right text-muted-foreground">
-        {teoricoLayers.hasLayers ? formatStockLayers(teoricoLayers) : `${teoricoBase.toFixed(1)} ${unidade}`}
-      </TableCell>
-      <TableCell className="text-right">
-        {canCount && !editing ? (
-          <button onClick={() => setEditing(true)} className="text-primary underline cursor-pointer">
-            {fisicaLayers !== null
-              ? (fisicaLayers.hasLayers ? formatStockLayers(fisicaLayers) : `${(fisicaBase!).toFixed(1)}`)
-              : '—'}
-          </button>
-        ) : canCount && editing ? (
-          <DecimalInput value={value} onValueChange={(raw) => setValue(raw)} onBlur={handleBlur}
-            onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === 'Enter') handleBlur(); }} autoFocus className="w-20 h-7 text-xs text-right ml-auto bg-secondary border-border" />
-        ) : (
-          <span>
-            {fisicaLayers !== null
-              ? (fisicaLayers.hasLayers ? formatStockLayers(fisicaLayers) : `${(fisicaBase!).toFixed(1)}`)
-              : '—'}
-          </span>
-        )}
-      </TableCell>
-      <TableCell className={`text-right font-bold ${difPurchase < 0 ? 'text-destructive' : difPurchase > 0 ? 'text-success' : 'text-muted-foreground'}`}>
-        {item.contagem_fisica !== null ? `${difPurchase >= 0 ? '+' : ''}${parseFloat(difPurchase.toFixed(2))} ${unidadeCompra}` : '—'}
-      </TableCell>
-      <TableCell className={`text-right ${classColor(item.classificacao)}`}>
-        {item.contagem_fisica !== null ? formatPercentBR(Number(item.diferenca_percent)) : '—'}
-      </TableCell>
-      <TableCell className={`text-right font-bold ${Number(item.impacto_financeiro) < 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
-        {item.contagem_fisica !== null ? fmtBRL(Number(item.impacto_financeiro)) : '—'}
-      </TableCell>
-      <TableCell className="text-center">
-        {item.contagem_fisica !== null && (
-          <StatusBadge
-            status={item.classificacao === 'CRITICO' ? 'danger' : item.classificacao === 'ALERTA' ? 'warning' : 'success'}
-            label={item.classificacao}
-            size="xs"
-          />
-        )}
-      </TableCell>
-    </TableRow>
-  );
-}
 
 // ===== Conferentes Management View =====
 function ConferentesManagementView({ conferentes, loading, canManage, onAdd, onRemove, onBack }: {

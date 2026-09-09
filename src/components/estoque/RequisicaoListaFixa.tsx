@@ -2,7 +2,7 @@
  * Operator flow for creating requisitions from a fixed sector list.
  * Steps: 1) Select sector → 2) Fill quantities → 3) Preview → 4) Confirm & submit
  */
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCan } from '@/permissions/hooks';
@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ClipboardList, Eye, Send, ArrowLeft, Inbox, AlertTriangle, ShoppingCart, Loader2 } from 'lucide-react';
+import RequisicaoQuantityList from './RequisicaoQuantityList';
 import type { ProdutoExtended } from '@/types/estoque';
 import { toRequisitionDisplayProduct } from '@/domain/estoque/requisition';
 
@@ -40,15 +41,19 @@ export default function RequisicaoListaFixa({ produtos, saldos, onSuccess, onCan
   const { profile } = useAuth();
   const canCreate = useCan('estoque:requisicoes:create');
   const { confirm, ConfirmDialog } = useConfirmDialog();
+  const previewRef = useRef<HTMLButtonElement>(null);
+  const requestId = useRef(0);
+  const [listError, setListError] = useState(false);
   const [setor, setSetor] = useState(profile?.sector || '');
   const [setores, setSetores] = useState<string[]>([]);
   useEffect(() => {
     if (!canCreate) return;
     supabase.from('stock_sectors').select('name').eq('is_active', true).order('sort_order').order('name')
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (error) { toast.error('Erro ao carregar setores. Tente novamente.'); return; }
         const nomes = (data || []).map((s: { name: string }) => s.name);
         setSetores(nomes);
-        setSetor(current => current || nomes[0] || '');
+        setSetor(current => nomes.includes(current) ? current : nomes[0] || '');
       });
   }, [canCreate]);
   const [observacao, setObservacao] = useState('');
@@ -60,10 +65,13 @@ export default function RequisicaoListaFixa({ produtos, saldos, onSuccess, onCan
   const [listaExists, setListaExists] = useState<boolean | null>(null);
 
   const loadListaFixa = useCallback(async (sectorName: string) => {
+    const currentRequest = ++requestId.current;
     setLoading(true);
+    setListError(false);
     setItems([]);
     setQuantities({});
     setListaExists(null);
+    if (!sectorName) { setLoading(false); return; }
     try {
       const { data: lista, error: listaErr } = await supabase
         .from('listas_fixas_setor')
@@ -72,6 +80,7 @@ export default function RequisicaoListaFixa({ produtos, saldos, onSuccess, onCan
         .eq('ativo', true)
         .maybeSingle();
 
+      if (currentRequest !== requestId.current) return;
       if (listaErr) throw listaErr;
       if (!lista) {
         setListaExists(false);
@@ -86,22 +95,26 @@ export default function RequisicaoListaFixa({ produtos, saldos, onSuccess, onCan
         .eq('lista_fixa_id', lista.id)
         .order('ordem');
 
+      if (currentRequest !== requestId.current) return;
       if (itensErr) throw itensErr;
       setItems((itens || []) as ListaFixaItem[]);
     } catch (err) {
+      if (currentRequest !== requestId.current) return;
       console.error('Erro ao carregar lista fixa:', err);
       toast.error('Erro ao carregar lista do setor');
-      setListaExists(false);
+      setListError(true);
     } finally {
-      setLoading(false);
+      if (currentRequest === requestId.current) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    loadListaFixa(setor);
-  }, [setor, loadListaFixa]);
+    if (canCreate) loadListaFixa(setor);
+    return () => { requestId.current += 1; };
+  }, [setor, canCreate, loadListaFixa]);
 
-  const getProd = (id: string) => produtos.find(prod => prod.id === id);
+  const productsById = useMemo(() => new Map(produtos.map(prod => [prod.id, prod])), [produtos]);
+  const getProd = useCallback((id: string) => productsById.get(id), [productsById]);
   const getSaldo = (id: string) => saldos[id]?.saldo || 0;
 
   const activeItems = useMemo(() => {
@@ -109,7 +122,7 @@ export default function RequisicaoListaFixa({ produtos, saldos, onSuccess, onCan
       const prod = getProd(item.produto_id);
       return prod && prod.ativo;
     });
-  }, [items, produtos]);
+  }, [items, getProd]);
 
   const invalidUnitItemsCount = useMemo(() => {
     return activeItems.filter(item => {
@@ -117,7 +130,7 @@ export default function RequisicaoListaFixa({ produtos, saldos, onSuccess, onCan
       if (!prod) return false;
       return !getRequisitionProductDisplay(prod).hasValidPurchaseUnit;
     }).length;
-  }, [activeItems, produtos]);
+  }, [activeItems, getProd]);
 
   const filledItems = useMemo(() => {
     return activeItems
@@ -127,8 +140,8 @@ export default function RequisicaoListaFixa({ produtos, saldos, onSuccess, onCan
         const display = prod ? getRequisitionProductDisplay(prod) : null;
         return { ...item, quantidade, prod, display };
       })
-      .filter(item => item.quantidade > 0 && item.prod && item.display?.hasValidPurchaseUnit && item.display.displayUnitForRequisition);
-  }, [activeItems, quantities, produtos]);
+      .filter(item => Number.isFinite(item.quantidade) && item.quantidade > 0 && item.prod && item.display?.hasValidPurchaseUnit && item.display.displayUnitForRequisition);
+  }, [activeItems, quantities, getProd]);
 
   const handleSetorChange = (newSetor: string) => {
     const hasData = Object.values(quantities).some(value => parseFloat(value) > 0);
@@ -193,7 +206,7 @@ export default function RequisicaoListaFixa({ produtos, saldos, onSuccess, onCan
           semEstoque.forEach((result: Record<string, unknown>) => {
             const nome = getProd(result.produto_id as string)?.nomeProduto || '';
             toast.info(
-              `${nome}: sem estoque (disponível: ${result.saldo}). Pedido de compra criado automaticamente.`,
+              `${nome}: sem estoque. Pedido de compra criado automaticamente.`,
               { duration: 6000 },
             );
           });
@@ -214,15 +227,15 @@ export default function RequisicaoListaFixa({ produtos, saldos, onSuccess, onCan
   return (
     <>
       <div className="bg-card border border-border rounded-xl p-4 space-y-4 animate-scale-in">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             <ClipboardList className="w-4 h-4 text-primary" />
-            <p className="text-sm font-semibold text-foreground">
+            <p className="text-lg font-semibold text-foreground break-words">
               {step === 'fill' ? 'Requisição por Lista Fixa' : 'Prévia da Requisição'}
             </p>
           </div>
           {step === 'preview' && (
-            <Button size="sm" variant="ghost" className="gap-1 text-xs" onClick={() => setStep('fill')}>
+            <Button size="sm" variant="ghost" className="gap-1 text-sm" onClick={() => setStep('fill')}>
               <ArrowLeft className="w-3 h-3" /> Voltar
             </Button>
           )}
@@ -230,19 +243,19 @@ export default function RequisicaoListaFixa({ produtos, saldos, onSuccess, onCan
 
         {step === 'fill' && (
           <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <Label className="text-[11px] text-muted-foreground">Setor</Label>
+                <Label className="text-sm text-muted-foreground">Setor</Label>
                 <Select value={setor} onValueChange={handleSetorChange}>
-                  <SelectTrigger className="bg-secondary border-border text-foreground"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="h-auto min-h-12 text-base whitespace-normal bg-secondary border-border text-foreground [&>span]:line-clamp-none [&>span]:text-left [&>span]:break-words"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {setores.map(sector => <SelectItem key={sector} value={sector}>{sector}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <Label className="text-[11px] text-muted-foreground">Observação</Label>
-                <Input value={observacao} onChange={event => setObservacao(event.target.value)} className="bg-secondary border-border text-foreground" placeholder="Opcional" />
+                <Label className="text-sm text-muted-foreground">Observação</Label>
+                <Input value={observacao} onChange={event => setObservacao(event.target.value)} className="h-12 text-base md:text-base bg-secondary border-border text-foreground" placeholder="Opcional" />
               </div>
             </div>
 
@@ -252,11 +265,18 @@ export default function RequisicaoListaFixa({ produtos, saldos, onSuccess, onCan
               </div>
             )}
 
+            {listError && (
+              <div role="alert" className="space-y-2 text-base text-destructive">
+                <p>Não foi possível carregar a lista fixa.</p>
+                <Button type="button" variant="outline" onClick={() => loadListaFixa(setor)}>Tentar novamente</Button>
+              </div>
+            )}
+
             {!loading && listaExists === false && (
               <div className="bg-background-subtle border border-border rounded-lg p-6 text-center">
                 <Inbox className="w-10 h-10 mx-auto text-muted-foreground/40 mb-2" />
                 <p className="text-sm font-medium text-foreground mb-1">Nenhuma lista fixa para {setor}</p>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-sm text-muted-foreground">
                   Solicite ao administrador que crie uma lista fixa para este setor, ou use a requisição manual.
                 </p>
               </div>
@@ -264,66 +284,27 @@ export default function RequisicaoListaFixa({ produtos, saldos, onSuccess, onCan
 
             {!loading && listaExists && activeItems.length > 0 && (
               <div className="space-y-1">
-                <p className="text-[11px] text-muted-foreground font-medium">{activeItems.length} itens • Preencha as quantidades desejadas</p>
-                <div className="max-h-[400px] overflow-y-auto space-y-1 pr-1">
-                  {activeItems.map(item => {
-                    const prod = getProd(item.produto_id);
-                    if (!prod) return null;
-
-                    const saldo = getSaldo(item.produto_id);
-                    const qty = parseFloat(quantities[item.produto_id] || '0');
-                    const exceedsSaldo = qty > 0 && qty > saldo;
+                <p className="text-sm text-muted-foreground font-medium">{activeItems.length} itens • Preencha as quantidades desejadas</p>
+                <RequisicaoQuantityList
+                  rows={activeItems.map(item => {
+                    const prod = getProd(item.produto_id)!;
                     const display = getRequisitionProductDisplay(prod);
-                    const purchaseUnitMissing = !display.hasValidPurchaseUnit || !display.displayUnitForRequisition;
-
-                    return (
-                      <div
-                        key={item.id}
-                        className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs ${purchaseUnitMissing ? 'bg-warning-soft border border-warning-border' : exceedsSaldo ? 'bg-destructive-soft border border-destructive-border' : 'bg-background-subtle'}`}
-                      >
-                        <div className="flex-1 min-w-0">
-                          <p className="text-foreground font-medium truncate">{prod.nomeProduto}</p>
-                          {purchaseUnitMissing ? (
-                            <p className="text-[10px] text-warning">{display.issueMessage}</p>
-                          ) : (
-                            <p className="text-[10px] text-muted-foreground">
-                              Disp: {saldo.toFixed(1)} {display.displayUnitForRequisition}
-                              {exceedsSaldo && (
-                                <span className="ml-1 text-destructive">
-                                  <AlertTriangle className="w-2.5 h-2.5 inline" /> Excede saldo
-                                </span>
-                              )}
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <Input
-                            type="text"
-                            inputMode="decimal"
-                            value={quantities[item.produto_id] || ''}
-                            onChange={event => handleQtyChange(item.produto_id, event.target.value)}
-                            placeholder="0"
-                            className="w-20 h-8 text-xs text-center bg-background border-border text-foreground"
-                            disabled={purchaseUnitMissing}
-                          />
-                          <span className={`text-[10px] w-16 text-right ${purchaseUnitMissing ? 'text-warning' : 'text-muted-foreground'}`}>
-                            {display.displayUnitForRequisition || 'Configurar'}
-                          </span>
-                        </div>
-                      </div>
-                    );
+                    return { id: item.produto_id, name: prod.nomeProduto, unit: display.displayUnitForRequisition, issue: display.issueMessage, observation: item.observacao };
                   })}
-                </div>
+                  quantities={quantities}
+                  onChange={handleQtyChange}
+                  onComplete={() => previewRef.current?.focus()}
+                />
 
                 {invalidUnitItemsCount > 0 && (
-                  <div className="flex items-center gap-2 p-2 bg-warning-soft border border-warning-border rounded-lg text-[10px] text-warning">
+                  <div className="flex flex-wrap items-center gap-2 p-2 bg-warning-soft border border-warning-border rounded-lg text-sm text-warning">
                     <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
                     <span>{invalidUnitItemsCount} item(ns) bloqueado(s) por falta de unidade de compra no cadastro.</span>
                   </div>
                 )}
 
                 {filledItems.some(item => item.quantidade > getSaldo(item.produto_id)) && (
-                  <div className="flex items-center gap-2 p-2 bg-warning-soft border border-warning-border rounded-lg text-[10px] text-warning">
+                  <div className="flex flex-wrap items-center gap-2 p-2 bg-warning-soft border border-warning-border rounded-lg text-sm text-warning">
                     <ShoppingCart className="w-3.5 h-3.5 shrink-0" />
                     <span>Itens sem estoque serão enviados como Solicitação de Compra.</span>
                   </div>
@@ -337,11 +318,12 @@ export default function RequisicaoListaFixa({ produtos, saldos, onSuccess, onCan
               </div>
             )}
 
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="ghost" size="sm" onClick={onCancel}>Cancelar</Button>
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button type="button" variant="ghost" size="sm" className="h-auto min-h-12 whitespace-normal text-base" onClick={onCancel}>Cancelar</Button>
               <Button
+                ref={previewRef}
                 size="sm"
-                className="bg-primary-strong text-primary-foreground border-0 gap-1.5 text-xs"
+                className="h-auto min-h-12 whitespace-normal bg-primary-strong text-primary-foreground border-0 gap-2 py-2 text-base"
                 onClick={handleGoToPreview}
                 disabled={filledItems.length === 0}
               >
@@ -354,8 +336,8 @@ export default function RequisicaoListaFixa({ produtos, saldos, onSuccess, onCan
         {step === 'preview' && (
           <div className="space-y-3">
             <div className="bg-primary-soft border border-primary-border rounded-lg p-3">
-              <p className="text-xs font-medium text-foreground mb-1">📋 Resumo da Requisição</p>
-              <div className="flex gap-4 text-[11px] text-muted-foreground">
+              <p className="text-sm font-medium text-foreground mb-1">📋 Resumo da Requisição</p>
+              <div className="flex flex-wrap gap-3 text-sm break-words text-muted-foreground">
                 <span>Setor: <strong className="text-foreground">{setor}</strong></span>
                 <span>Itens: <strong className="text-foreground">{filledItems.length}</strong></span>
                 {observacao && <span>Obs: <strong className="text-foreground">{observacao}</strong></span>}
@@ -367,16 +349,16 @@ export default function RequisicaoListaFixa({ produtos, saldos, onSuccess, onCan
                 const saldo = getSaldo(item.produto_id);
                 const exceedsSaldo = item.quantidade > saldo;
                 return (
-                  <div key={item.id} className={`flex items-center justify-between rounded-lg px-3 py-2 text-xs ${exceedsSaldo ? 'bg-destructive-soft border border-destructive-border' : 'bg-background-subtle'}`}>
-                    <div className="flex items-center gap-2">
-                      <span className="text-foreground font-medium">{item.prod?.nomeProduto}</span>
+                  <div key={item.id} className={`flex flex-wrap items-center justify-between gap-3 rounded-lg px-3 py-3 text-base break-words ${exceedsSaldo ? 'bg-destructive-soft border border-destructive-border' : 'bg-background-subtle'}`}>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="min-w-0 text-base text-foreground font-medium break-words">{item.prod?.nomeProduto}</span>
                       {exceedsSaldo && (
-                        <span className="flex items-center gap-0.5 text-[9px] text-destructive">
+                        <span className="flex items-center gap-0.5 text-sm text-destructive">
                           <AlertTriangle className="w-2.5 h-2.5" /> Sem estoque suficiente
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <span className="font-semibold text-foreground">{item.quantidade}</span>
                       <span className="text-muted-foreground">{item.display!.displayUnitForRequisition}</span>
                     </div>
@@ -386,19 +368,19 @@ export default function RequisicaoListaFixa({ produtos, saldos, onSuccess, onCan
             </div>
 
             {filledItems.some(item => item.quantidade > getSaldo(item.produto_id)) && (
-              <div className="flex items-center gap-2 p-2 bg-warning-soft border border-warning-border rounded-lg text-[10px] text-warning">
+              <div className="flex flex-wrap items-center gap-2 p-2 bg-warning-soft border border-warning-border rounded-lg text-sm text-warning">
                 <ShoppingCart className="w-3.5 h-3.5 shrink-0" />
                 <span>Itens sem estoque serão encaminhados como solicitação de compra.</span>
               </div>
             )}
 
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="ghost" size="sm" onClick={() => setStep('fill')}>
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button type="button" variant="ghost" size="sm" className="h-auto min-h-12 whitespace-normal text-base" onClick={() => setStep('fill')}>
                 <ArrowLeft className="w-3 h-3 mr-1" /> Voltar e Editar
               </Button>
               <Button
                 size="sm"
-                className="bg-primary-strong text-primary-foreground border-0 gap-1.5 text-xs"
+                className="h-auto min-h-12 whitespace-normal bg-primary-strong text-primary-foreground border-0 gap-2 py-2 text-base"
                 onClick={handleSubmit}
                 disabled={submitting}
               >

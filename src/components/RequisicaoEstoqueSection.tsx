@@ -1,11 +1,8 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
-import { Plus, X, Check, Inbox, AlertTriangle, ShoppingCart, RefreshCw, Ban, Search, ClipboardList, ChevronDown, ChevronUp, Edit3, History } from 'lucide-react';
+import { X, Check, Inbox, AlertTriangle, ShoppingCart, RefreshCw, Ban, ClipboardList, ChevronDown, ChevronUp, Edit3 } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
-import { parseUTCToBR } from '@/lib/datetime';
-import { includesNormalized } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -15,7 +12,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCan } from '@/permissions';
 import { supabase } from '@/integrations/supabase/client';
 import type { ProdutoExtended } from '@/types/estoque';
-import { resolveListedRequisitionItemDisplay, toRequisitionDisplayProduct } from '@/domain/estoque/requisition';
+import { resolveListedRequisitionItemDisplay } from '@/domain/estoque/requisition';
 import {
   MOTIVOS_RECUSA,
   canRejectItem,
@@ -24,13 +21,14 @@ import {
   hasPendingItems,
   itemStatusLabel,
   itemStatusStyle,
-  requisicaoStatusLabel,
-  requisicaoStatusStyle,
 } from '@/domain/estoque/requisitionStatus';
 import { toast } from 'sonner';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import ListaFixaSetorAdmin from './estoque/ListaFixaSetorAdmin';
 import RequisicaoListaFixa from './estoque/RequisicaoListaFixa';
+import RequisicaoToolbar from './estoque/RequisicaoToolbar';
+import RequisicaoCardHeader from './estoque/RequisicaoCardHeader';
+import RequisicaoProductPicker, { type ManualRequisitionItem } from './estoque/RequisicaoProductPicker';
 
 interface Props {
   produtos: ProdutoExtended[];
@@ -82,16 +80,6 @@ async function extractEdgeFnErrorMessage(error: unknown, fallback: string): Prom
 
 type FormMode = 'none' | 'manual' | 'lista-fixa';
 
-type ManualItem = {
-  produtoId: string;
-  quantidade: number;
-  unidade: string;
-};
-
-function getRequisitionProductDisplay(prod: ProdutoExtended) {
-  return toRequisitionDisplayProduct(prod);
-}
-
 export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefresh }: Props) {
   const { user, profile } = useAuth();
   const canManage = useCan('estoque:requisicoes:manage');
@@ -118,17 +106,15 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
   const [setores, setSetores] = useState<string[]>([]);
   useEffect(() => {
     supabase.from('stock_sectors').select('name').eq('is_active', true).order('sort_order').order('name')
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (error) { toast.error('Erro ao carregar setores. Tente novamente.'); return; }
         const nomes = (data || []).map((s: { name: string }) => s.name);
         setSetores(nomes);
-        setSetor(current => current || nomes[0] || '');
+        setSetor(current => nomes.includes(current) ? current : nomes[0] || '');
       });
   }, []);
   const [observacao, setObservacao] = useState('');
-  const [itens, setItens] = useState<ManualItem[]>([]);
-  const [itemProd, setItemProd] = useState('');
-  const [itemQtd, setItemQtd] = useState('');
-  const [productSearch, setProductSearch] = useState('');
+  const [itens, setItens] = useState<ManualRequisitionItem[]>([]);
   const [cancelling, setCancelling] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
@@ -158,30 +144,6 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
 
   // Per-item quantity adjustments (inline editing)
   const [editingQty, setEditingQty] = useState<Record<string, string>>({});
-
-  const filteredProductOptions = useMemo(() => {
-    const active = produtos
-      .filter(prod => prod.ativo)
-      .map(prod => ({ product: prod, display: getRequisitionProductDisplay(prod) }));
-
-    if (!productSearch.trim()) return active;
-
-    const term = productSearch.trim();
-    return active.filter(({ product }) =>
-      includesNormalized(product.nomeProduto, term) ||
-      (product.sku ? includesNormalized(product.sku, term) : false),
-    );
-  }, [produtos, productSearch]);
-
-  const selectedProduct = useMemo(
-    () => produtos.find(prod => prod.id === itemProd) ?? null,
-    [produtos, itemProd],
-  );
-
-  const selectedProductDisplay = useMemo(
-    () => (selectedProduct ? getRequisitionProductDisplay(selectedProduct) : null),
-    [selectedProduct],
-  );
 
   const PAGE_SIZE = 20;
 
@@ -243,34 +205,21 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
   const resetManualForm = () => {
     setItens([]);
     setObservacao('');
-    setItemProd('');
-    setItemQtd('');
-    setProductSearch('');
     setFormMode('none');
   };
 
-  const handleAddItem = () => {
-    if (!selectedProduct || !selectedProductDisplay || !itemQtd) return;
-
-    if (!selectedProductDisplay.hasValidPurchaseUnit || !selectedProductDisplay.displayUnitForRequisition) {
-      toast.error(selectedProductDisplay.issueMessage || 'Produto sem unidade de compra configurada.');
-      return;
-    }
-
-    setItens(prev => [
-      ...prev,
-      {
-        produtoId: selectedProduct.id,
-        quantidade: parseFloat(itemQtd),
-        unidade: selectedProductDisplay.displayUnitForRequisition,
-      },
-    ]);
-    setItemProd('');
-    setItemQtd('');
+  const handleAddItem = (item: ManualRequisitionItem) => {
+    setItens(prev => prev.some(current => current.produtoId === item.produtoId)
+      ? prev.map(current => current.produtoId === item.produtoId
+        ? { ...current, quantidade: Number((current.quantidade + item.quantidade).toFixed(6)) }
+        : current)
+      : [...prev, item]);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting || !canCreate) return;
+    if (!setor) { toast.error('Selecione o setor da requisição'); return; }
     if (itens.length === 0) {
       toast.error('Adicione pelo menos 1 item');
       return;
@@ -299,7 +248,7 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
         if (semEstoque.length > 0) {
           semEstoque.forEach((result: Record<string, unknown>) => {
             toast.info(
-              `${getProdNome(result.produto_id as string)}: sem estoque (disponível: ${result.saldo}). Alerta enviado para Compras.`,
+              `${getProdNome(result.produto_id as string)}: sem estoque. Alerta enviado para Compras.`,
               { duration: 6000, icon: <AlertTriangle className="w-4 h-4" /> },
            );
           });
@@ -557,44 +506,16 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
 
   return (
     <>
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-semibold text-foreground">Requisições de Estoque</p>
-            <p className="text-[10px] text-muted-foreground">{pendentes} pendente{pendentes !== 1 ? 's' : ''}</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button size="sm" variant="ghost" onClick={() => loadRequisicoes()} disabled={loading}>
-              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-            </Button>
-            {formMode === 'none' && (
-              <Button
-                size="sm"
-                variant="ghost"
-                className="gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-                onClick={() => setHistoricoOpen(true)}
-              >
-                <History className="w-3.5 h-3.5" /> Histórico
-              </Button>
-            )}
-            {canCreate && formMode === 'none' && (
-              <>
-                <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={() => setFormMode('lista-fixa')}>
-                  <ClipboardList className="w-3.5 h-3.5" /> Lista Fixa
-                </Button>
-                <Button size="sm" className="bg-primary-strong text-primary-foreground border-0 gap-1.5 text-xs" onClick={() => setFormMode('manual')}>
-                  <Plus className="w-3.5 h-3.5" /> Manual
-                </Button>
-              </>
-            )}
-          </div>
-        </div>
+      <div className="min-w-0 space-y-4">
+        <RequisicaoToolbar pendentes={pendentes} loading={loading} canCreate={canCreate} showActions={formMode === 'none'}
+          onRefresh={() => loadRequisicoes()} onHistory={() => setHistoricoOpen(true)}
+          onCreate={() => setFormMode('manual')} onFixedList={() => setFormMode('lista-fixa')} />
 
         {canManage && formMode === 'none' && (
           <Collapsible open={listaFixaOpen} onOpenChange={setListaFixaOpen}>
             <CollapsibleTrigger asChild>
-              <button type="button" className="w-full flex items-center justify-between bg-card border border-border rounded-xl px-4 py-3 hover:bg-surface-hover transition-colors">
-                <div className="flex items-center gap-2">
+              <button type="button" className="w-full flex flex-wrap items-center justify-between gap-2 bg-card border border-border rounded-xl px-4 py-3 hover:bg-surface-hover transition-colors">
+                <div className="flex flex-wrap items-center gap-2">
                   <ClipboardList className="w-4 h-4 text-primary" />
                   <span className="text-sm font-semibold text-foreground">Gerenciar Listas Fixas por Setor</span>
                 </div>
@@ -621,89 +542,23 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
 
         {formMode === 'manual' && (
           <form onSubmit={handleSubmit} className="bg-card border border-border rounded-xl p-4 space-y-3 animate-scale-in">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <Label className="text-[11px] text-muted-foreground">Setor</Label>
+                <Label className="text-sm text-muted-foreground">Setor</Label>
                 <Select value={setor} onValueChange={setSetor}>
-                  <SelectTrigger className="bg-secondary border-border text-foreground"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="h-auto min-h-12 text-base whitespace-normal bg-secondary border-border text-foreground [&>span]:line-clamp-none [&>span]:text-left [&>span]:break-words"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {setores.map(setorOption => <SelectItem key={setorOption} value={setorOption}>{setorOption}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <Label className="text-[11px] text-muted-foreground">Observação</Label>
-                <Input value={observacao} onChange={event => setObservacao(event.target.value)} className="bg-secondary border-border text-foreground" />
+                <Label className="text-sm text-muted-foreground">Observação</Label>
+                <Input value={observacao} onChange={event => setObservacao(event.target.value)} className="h-12 text-base md:text-base bg-secondary border-border text-foreground" />
               </div>
             </div>
 
-            <div>
-              <Label className="text-[11px] text-muted-foreground">Adicionar item</Label>
-              <div className="relative mt-1 mb-2">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-                <Input
-                  value={productSearch}
-                  onChange={event => setProductSearch(event.target.value)}
-                  placeholder="Buscar produto por nome ou SKU…"
-                  className="pl-8 h-8 text-xs bg-secondary border-border text-foreground"
-                />
-                {productSearch && (
-                  <button type="button" onClick={() => setProductSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                    <X className="w-3 h-3" />
-                  </button>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                <Select value={itemProd} onValueChange={setItemProd}>
-                  <SelectTrigger className="flex-1 bg-secondary border-border text-foreground"><SelectValue placeholder="Produto" /></SelectTrigger>
-                  <SelectContent>
-                    {filteredProductOptions.length === 0 ? (
-                      <div className="px-3 py-2 text-xs text-muted-foreground text-center">
-                        {productSearch ? 'Nenhum produto encontrado' : 'Nenhum produto disponível'}
-                      </div>
-                    ) : (
-                      filteredProductOptions.map(({ product, display }) => (
-                        <SelectItem key={product.id} value={product.id} disabled={!display.hasValidPurchaseUnit}>
-                          <div className="flex flex-col">
-                            <span>{product.nomeProduto}</span>
-                            <span className="text-[10px] text-muted-foreground">
-                              {display.hasValidPurchaseUnit && display.displayUnitForRequisition
-                                ? `Disp: ${getSaldo(product.id).toFixed(1)} ${display.displayUnitForRequisition}`
-                                : display.issueMessage}
-                            </span>
-                          </div>
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
-                <Input
-                  type="number"
-                  step="0.1"
-                  placeholder="Qtd"
-                  value={itemQtd}
-                  onChange={event => setItemQtd(event.target.value)}
-                  className="w-20 bg-secondary border-border text-foreground"
-                  disabled={!selectedProductDisplay?.hasValidPurchaseUnit}
-                />
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={handleAddItem}
-                  disabled={!itemProd || !itemQtd || !selectedProductDisplay?.hasValidPurchaseUnit}
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                </Button>
-              </div>
-
-              {selectedProductDisplay && !selectedProductDisplay.hasValidPurchaseUnit && (
-                <div className="mt-2 flex items-center gap-2 rounded-lg border border-warning-border bg-warning-soft px-3 py-2 text-[11px] text-warning">
-                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                  <span>{selectedProductDisplay.issueMessage}</span>
-                </div>
-              )}
-            </div>
+            <RequisicaoProductPicker produtos={produtos} onAdd={handleAddItem} />
 
             {itens.length > 0 && (
               <div className="space-y-1">
@@ -711,18 +566,18 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
                   const saldo = getSaldo(item.produtoId);
                   const semEstoque = saldo < item.quantidade;
                   return (
-                    <div key={index} className={`flex items-center justify-between rounded-lg px-3 py-1.5 text-xs ${semEstoque ? 'bg-destructive-soft border border-destructive-border' : 'bg-background-subtle'}`}>
-                      <div className="flex items-center gap-2">
-                        <span className="text-foreground">{getProdNome(item.produtoId)}</span>
+                    <div key={index} className={`flex flex-wrap items-center justify-between gap-2 rounded-lg px-3 py-3 text-base break-words ${semEstoque ? 'bg-destructive-soft border border-destructive-border' : 'bg-background-subtle'}`}>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="min-w-0 break-words text-foreground">{getProdNome(item.produtoId)}</span>
                         {semEstoque && (
-                          <span className="flex items-center gap-1 text-[9px] text-destructive">
-                            <AlertTriangle className="w-3 h-3" /> Sem estoque (disp: {saldo.toFixed(1)})
+                          <span className="flex items-center gap-1 text-sm text-destructive">
+                            <AlertTriangle className="w-3 h-3" /> Sem estoque suficiente
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <span className="text-muted-foreground">{item.quantidade} {item.unidade}</span>
-                        <button type="button" onClick={() => setItens(prev => prev.filter((_, itemIndex) => itemIndex !== index))} className="text-destructive">
+                        <button type="button" onClick={() => setItens(prev => prev.filter((_, itemIndex) => itemIndex !== index))} aria-label={`Remover ${getProdNome(item.produtoId)}`} className="flex h-11 w-11 shrink-0 items-center justify-center text-destructive">
                           <X className="w-3 h-3" />
                         </button>
                       </div>
@@ -731,7 +586,7 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
                 })}
 
                 {itens.some(item => getSaldo(item.produtoId) < item.quantidade) && (
-                  <div className="flex items-center gap-2 p-2 bg-warning-soft border border-warning-border rounded-lg text-[10px] text-warning">
+                  <div className="flex flex-wrap items-center gap-2 p-2 bg-warning-soft border border-warning-border rounded-lg text-sm text-warning">
                     <ShoppingCart className="w-3.5 h-3.5 shrink-0" />
                     <span>Itens sem estoque serão enviados como Solicitação de Compra para o setor de Compras.</span>
                   </div>
@@ -739,9 +594,9 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
               </div>
             )}
 
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="ghost" size="sm" onClick={resetManualForm}>Cancelar</Button>
-              <Button type="submit" size="sm" className="bg-primary-strong text-primary-foreground border-0" disabled={submitting}>
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button type="button" variant="ghost" size="sm" className="min-h-12 text-base" onClick={resetManualForm}>Cancelar</Button>
+              <Button type="submit" size="sm" className="min-h-12 text-base bg-primary-strong text-primary-foreground border-0" disabled={submitting}>
                 {submitting ? 'Enviando...' : 'Enviar'}
               </Button>
             </div>
@@ -761,49 +616,22 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
               const isPending = canActOnRequisicao(req.status);
               const isExpanded = expandedReq === req.id;
               const pendingItemsExist = hasPendingItems(req.requisicao_estoque_itens || []);
-              const itemCount = req.requisicao_estoque_itens?.length || 0;
-              const atendidosCount = req.requisicao_estoque_itens?.filter(i => i.status === 'ATENDIDO').length || 0;
-              const recusadosCount = req.requisicao_estoque_itens?.filter(i => i.status === 'RECUSADO').length || 0;
 
               return (
                 <div key={req.id} className="bg-card border border-border rounded-xl animate-fade-up" style={{ animationDelay: `${index * 30}ms` }}>
                   {/* Header */}
-                  <button
-                    type="button"
-                    className="w-full flex items-center justify-between p-3 text-left"
-                    onClick={() => setExpandedReq(isExpanded ? null : req.id)}
-                  >
-                    <div>
-                      <p className="text-xs font-semibold text-foreground">{req.setor} • {parseUTCToBR(req.created_at)}</p>
-                      <p className="text-[10px] text-muted-foreground">
-                        {itemCount} itens
-                        {atendidosCount > 0 && <span className="text-success ml-1">• {atendidosCount} atendido{atendidosCount > 1 ? 's' : ''}</span>}
-                        {recusadosCount > 0 && <span className="text-destructive ml-1">• {recusadosCount} recusado{recusadosCount > 1 ? 's' : ''}</span>}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className={`text-[9px] px-2 py-0.5 rounded-full font-medium ${requisicaoStatusStyle(req.status)}`}>
-                        {requisicaoStatusLabel(req.status)}
-                      </span>
-                      {['ATENDIDA', 'PARCIALMENTE_ATENDIDA', 'NEGADA'].includes(req.status) && (
-                        req.confirmado_pelo_solicitante_em
-                          ? <Badge variant="outline" className="text-[9px] h-4 px-1.5 text-success border-success-border">✓ Visto</Badge>
-                          : <Badge variant="outline" className="text-[9px] h-4 px-1.5 text-warning border-warning-border">⏱ Aguardando</Badge>
-                      )}
-                      {isExpanded ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />}
-                    </div>
-                  </button>
+                  <RequisicaoCardHeader req={req} expanded={isExpanded} onToggle={() => setExpandedReq(isExpanded ? null : req.id)} />
 
                   {/* Expanded detail */}
                   {isExpanded && (
                     <div className="px-3 pb-3 space-y-2 border-t border-border pt-2">
                       {/* Bulk actions */}
                       {canApprove && isPending && pendingItemsExist && (
-                        <div className="flex items-center gap-2 justify-end">
+                        <div className="flex flex-wrap items-center gap-2 justify-end">
                           <Button
                             size="sm"
                             variant="outline"
-                            className="h-7 text-[10px] gap-1"
+                            className="h-auto min-h-11 whitespace-normal py-2 text-sm gap-1"
                             onClick={() => handleAtenderTodos(req.id)}
                             disabled={!!actionLoading}
                           >
@@ -812,7 +640,7 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
                           <Button
                             size="sm"
                             variant="outline"
-                            className="h-7 text-[10px] gap-1 text-destructive border-destructive-border hover:bg-destructive-soft"
+                            className="h-auto min-h-11 whitespace-normal py-2 text-sm gap-1 text-destructive border-destructive-border hover:bg-destructive-soft"
                             onClick={() => handleNegar(req.id)}
                           >
                             <Ban className="w-3 h-3" /> Negar Tudo
@@ -826,13 +654,12 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
                           const listedItemDisplay = resolveListedRequisitionItemDisplay(item);
                           const isItemPending = canAttendItem(item.status);
                           const isItemRejectable = canRejectItem(item.status);
-                          const saldoProduto = getSaldo(item.produto_id);
                           const isPartiallyFulfilled = item.status === 'ATENDIDO' && item.quantidade_atendida > 0 && item.quantidade_atendida < item.quantidade_solicitada;
 
                           return (
                             <div
                               key={item.id}
-                              className={`rounded-lg px-3 py-2 text-[11px] ${
+                              className={`rounded-lg px-3 py-3 text-base break-words ${
                                 item.status === 'RECUSADO'
                                   ? 'bg-destructive-soft border border-destructive-border'
                                   : item.status === 'ATENDIDO'
@@ -840,41 +667,37 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
                                     : 'bg-background-subtle'
                               }`}
                             >
-                              <div className="flex items-center justify-between">
-                                <div className="min-w-0 flex-1">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-foreground font-medium">{item.produtos?.nome_produto || getProdNome(item.produto_id)}</span>
-                                    <span className={`text-[8px] px-1.5 py-0.5 rounded-full font-medium ${itemStatusStyle(item.status)}`}>
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div className="min-w-0 flex-1 basis-48">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <span className="text-base text-foreground font-medium break-words">{item.produtos?.nome_produto || getProdNome(item.produto_id)}</span>
+                                    <span className={`text-sm px-1.5 py-0.5 rounded-full font-medium ${itemStatusStyle(item.status)}`}>
                                       {itemStatusLabel(item.status)}
                                     </span>
                                   </div>
                                   {listedItemDisplay.issueCode && listedItemDisplay.issueMessage && (
-                                    <div className="mt-0.5 flex items-center gap-1 text-[9px] text-warning">
+                                    <div className="mt-0.5 flex items-center gap-1 text-sm text-warning">
                                       <AlertTriangle className="w-2.5 h-2.5 shrink-0" />
                                       <span>{listedItemDisplay.issueMessage}</span>
                                     </div>
                                   )}
                                   {item.status === 'RECUSADO' && item.motivo_recusa && (
-                                    <p className="mt-0.5 text-[9px] text-destructive italic">
+                                    <p className="mt-0.5 text-sm text-destructive italic">
                                       Motivo: {item.motivo_recusa}
                                     </p>
                                   )}
                                   {isPartiallyFulfilled && (
-                                    <p className="mt-0.5 text-[9px] text-warning italic">
+                                    <p className="mt-0.5 text-sm text-warning italic">
                                       Atendido parcialmente: {item.quantidade_atendida} de {item.quantidade_solicitada} {listedItemDisplay.unitLabel ?? ''}
                                     </p>
                                   )}
                                 </div>
-                                <div className="flex items-center gap-2 shrink-0">
+                                <div className="flex min-w-0 flex-wrap items-center gap-2">
                                   <div className="text-right">
                                     <span className="text-muted-foreground">
                                       {item.quantidade_solicitada} {listedItemDisplay.unitLabel ?? 'Configurar'}
                                     </span>
-                                    {isItemPending && canApprove && (
-                                      <p className="text-[9px] text-muted-foreground">
-                                        Disp: {saldoProduto.toFixed(1)}
-                                      </p>
-                                    )}
+
                                   </div>
                                   {/* Per-item actions for users with approve permission */}
                                   {canApprove && isItemPending && (
@@ -883,7 +706,7 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
                                       <Button
                                         size="sm"
                                         variant="ghost"
-                                        className="h-6 w-6 p-0 text-primary hover:bg-primary-soft"
+                                        className="h-11 w-11 p-0 text-primary hover:bg-primary-soft"
                                         onClick={() => openAttendDialog(req.id, item)}
                                         disabled={!!actionLoading}
                                         title="Atender com ajuste de quantidade"
@@ -894,7 +717,7 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
                                       <Button
                                         size="sm"
                                         variant="ghost"
-                                        className="h-6 w-6 p-0 text-success hover:bg-success-soft"
+                                        className="h-11 w-11 p-0 text-success hover:bg-success-soft"
                                         onClick={() => handleAtenderItemDirect(req.id, item.id)}
                                         disabled={actionLoading === item.id}
                                         title="Atender quantidade total"
@@ -904,7 +727,7 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
                                       <Button
                                         size="sm"
                                         variant="ghost"
-                                        className="h-6 w-6 p-0 text-destructive hover:bg-destructive-soft"
+                                        className="h-11 w-11 p-0 text-destructive hover:bg-destructive-soft"
                                         onClick={() => openRejectDialog(req.id, item.id, item.produtos?.nome_produto || getProdNome(item.produto_id))}
                                         disabled={!!actionLoading}
                                         title="Recusar item"
@@ -926,7 +749,7 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
                           <Button
                             size="sm"
                             variant="outline"
-                            className="h-7 text-[10px] gap-1 text-destructive border-destructive-border hover:bg-destructive-soft"
+                            className="h-auto min-h-11 whitespace-normal py-2 text-sm gap-1 text-destructive border-destructive-border hover:bg-destructive-soft"
                             onClick={() => handleCancelar(req.id)}
                             disabled={cancelling === req.id}
                           >
@@ -946,7 +769,7 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
                 <Button
                   size="sm"
                   variant="outline"
-                  className="text-xs gap-1.5"
+                  className="text-sm gap-1.5"
                   onClick={() => loadRequisicoes(requisicoes.length, true)}
                   disabled={loadingMore}
                 >
@@ -960,7 +783,7 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
           <div className="bg-card border border-border rounded-xl p-8 text-center">
             <Inbox className="w-12 h-12 mx-auto text-muted-foreground/30 mb-3" />
             <p className="text-sm font-medium text-foreground mb-1">Nenhuma requisição</p>
-            <p className="text-xs text-muted-foreground">Solicite produtos disponíveis em estoque para operação do dia.</p>
+            <p className="text-sm text-muted-foreground">Solicite produtos disponíveis em estoque para operação do dia.</p>
           </div>
         )}
       </div>
@@ -972,13 +795,13 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
             <DialogTitle className="text-sm">Recusar Item</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               Recusar <strong className="text-foreground">{rejectDialog?.productName}</strong>. Os demais itens da requisição não serão afetados.
             </p>
             <div>
-              <Label className="text-[11px] text-muted-foreground">Motivo da recusa</Label>
+              <Label className="text-sm text-muted-foreground">Motivo da recusa</Label>
               <Select value={rejectReason} onValueChange={setRejectReason}>
-                <SelectTrigger className="bg-secondary border-border text-foreground">
+                <SelectTrigger className="h-12 text-base md:text-base bg-secondary border-border text-foreground">
                   <SelectValue placeholder="Selecione o motivo" />
                 </SelectTrigger>
                 <SelectContent>
@@ -990,11 +813,11 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
             </div>
             {rejectReason === 'Outro motivo' && (
               <div>
-                <Label className="text-[11px] text-muted-foreground">Descreva o motivo</Label>
+                <Label className="text-sm text-muted-foreground">Descreva o motivo</Label>
                 <Textarea
                   value={rejectCustomReason}
                   onChange={e => setRejectCustomReason(e.target.value)}
-                  className="bg-secondary border-border text-foreground text-xs"
+                  className="bg-secondary border-border text-foreground text-sm"
                   placeholder="Informe o motivo da recusa..."
                   maxLength={500}
                   rows={2}
@@ -1025,26 +848,20 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
             <DialogTitle className="text-sm">Atender Item</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               Atender <strong className="text-foreground">{attendDialog?.productName}</strong>
             </p>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <Label className="text-[11px] text-muted-foreground">Qtd Solicitada</Label>
+                <Label className="text-sm text-muted-foreground">Qtd Solicitada</Label>
                 <div className="text-sm font-medium text-foreground mt-1">
                   {attendDialog?.quantidadeSolicitada} {attendDialog?.unidade}
                 </div>
               </div>
-              <div>
-                <Label className="text-[11px] text-muted-foreground">Saldo Disponível</Label>
-                <div className="text-sm font-medium text-foreground mt-1">
-                  {attendDialog?.saldoDisponivel.toFixed(1)} {attendDialog?.unidade}
-                </div>
-              </div>
             </div>
             <div>
-              <Label className="text-[11px] text-muted-foreground">Quantidade a enviar</Label>
-              <div className="flex items-center gap-2 mt-1">
+              <Label className="text-sm text-muted-foreground">Quantidade a enviar</Label>
+              <div className="flex flex-wrap items-center gap-2 mt-1">
                 <Input
                   type="number"
                   step="0.01"
@@ -1052,13 +869,13 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
                   max={attendDialog?.quantidadeSolicitada}
                   value={attendQty}
                   onChange={e => setAttendQty(e.target.value)}
-                  className="bg-secondary border-border text-foreground"
+                  className="h-12 text-base md:text-base bg-secondary border-border text-foreground"
                   placeholder="Quantidade"
                 />
                 <span className="text-sm text-muted-foreground whitespace-nowrap">{attendDialog?.unidade}</span>
               </div>
               {attendDialog && parseFloat(attendQty) > 0 && parseFloat(attendQty) < attendDialog.quantidadeSolicitada && (
-                <p className="mt-1 text-[10px] text-warning flex items-center gap-1">
+                <p className="mt-1 text-sm text-warning flex items-center gap-1">
                   <AlertTriangle className="w-3 h-3" />
                   Atendimento parcial: {parseFloat(attendQty)} de {attendDialog.quantidadeSolicitada}. O saldo faltante gerará alerta para Compras.
                 </p>
@@ -1084,15 +901,15 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
       {/* ── Histórico Sheet ────────────────────────────────────── */}
       <Sheet open={historicoOpen} onOpenChange={setHistoricoOpen}>
         <SheetContent side="right" className="w-full sm:max-w-md flex flex-col p-0">
-          <SheetHeader className="px-4 pt-5 pb-3 border-b border-border">
-            <SheetTitle className="text-sm">Histórico de Requisições</SheetTitle>
-            <SheetDescription className="text-[11px]">
+          <SheetHeader className="pl-4 pr-12 pt-5 pb-3 border-b border-border">
+            <SheetTitle className="text-lg">Histórico de Requisições</SheetTitle>
+            <SheetDescription className="text-sm">
               Requisições encerradas (todos itens aceitos ou recusados) e canceladas.
               {historicoTotal > 0 && ` ${historicoTotal} encerrada${historicoTotal !== 1 ? 's' : ''}.`}
             </SheetDescription>
           </SheetHeader>
 
-          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3 space-y-2">
             {historicoLoading ? (
               <div className="flex justify-center py-8">
                 <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
@@ -1101,43 +918,16 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
               <div className="bg-card border border-border rounded-xl p-8 text-center">
                 <Inbox className="w-12 h-12 mx-auto text-muted-foreground/30 mb-3" />
                 <p className="text-sm font-medium text-foreground mb-1">Sem histórico</p>
-                <p className="text-xs text-muted-foreground">Nenhuma requisição encerrada ainda.</p>
+                <p className="text-sm text-muted-foreground">Nenhuma requisição encerrada ainda.</p>
               </div>
             ) : (
               <>
                 {historicoItems.map((req, index) => {
                   const isExpanded = expandedHistReq === req.id;
-                  const itemCount = req.requisicao_estoque_itens?.length || 0;
-                  const atendidosCount = req.requisicao_estoque_itens?.filter(i => i.status === 'ATENDIDO').length || 0;
-                  const recusadosCount = req.requisicao_estoque_itens?.filter(i => i.status === 'RECUSADO').length || 0;
 
                   return (
                     <div key={req.id} className="bg-card border border-border rounded-xl animate-fade-up" style={{ animationDelay: `${index * 20}ms` }}>
-                      <button
-                        type="button"
-                        className="w-full flex items-center justify-between p-3 text-left"
-                        onClick={() => setExpandedHistReq(isExpanded ? null : req.id)}
-                      >
-                        <div>
-                          <p className="text-xs font-semibold text-foreground">{req.setor} • {parseUTCToBR(req.created_at)}</p>
-                          <p className="text-[10px] text-muted-foreground">
-                            {itemCount} itens
-                            {atendidosCount > 0 && <span className="text-success ml-1">• {atendidosCount} atendido{atendidosCount > 1 ? 's' : ''}</span>}
-                            {recusadosCount > 0 && <span className="text-destructive ml-1">• {recusadosCount} recusado{recusadosCount > 1 ? 's' : ''}</span>}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className={`text-[9px] px-2 py-0.5 rounded-full font-medium ${requisicaoStatusStyle(req.status)}`}>
-                            {requisicaoStatusLabel(req.status)}
-                          </span>
-                          {['ATENDIDA', 'PARCIALMENTE_ATENDIDA', 'NEGADA'].includes(req.status) && (
-                            req.confirmado_pelo_solicitante_em
-                              ? <Badge variant="outline" className="text-[9px] h-4 px-1.5 text-success border-success-border">✓ Visto</Badge>
-                              : <Badge variant="outline" className="text-[9px] h-4 px-1.5 text-warning border-warning-border">⏱ Aguardando</Badge>
-                          )}
-                          {isExpanded ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />}
-                        </div>
-                      </button>
+                      <RequisicaoCardHeader req={req} expanded={isExpanded} onToggle={() => setExpandedHistReq(isExpanded ? null : req.id)} />
 
                       {isExpanded && (
                         <div className="px-3 pb-3 space-y-1 border-t border-border pt-2">
@@ -1148,7 +938,7 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
                             return (
                               <div
                                 key={item.id}
-                                className={`rounded-lg px-3 py-2 text-[11px] ${
+                                className={`rounded-lg px-3 py-3 text-base break-words ${
                                   item.status === 'RECUSADO'
                                     ? 'bg-destructive-soft border border-destructive-border'
                                     : item.status === 'ATENDIDO'
@@ -1156,26 +946,26 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
                                       : 'bg-background-subtle'
                                 }`}
                               >
-                                <div className="flex items-center justify-between">
-                                  <div className="min-w-0 flex-1">
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-foreground font-medium">{item.produtos?.nome_produto || getProdNome(item.produto_id)}</span>
-                                      <span className={`text-[8px] px-1.5 py-0.5 rounded-full font-medium ${itemStatusStyle(item.status)}`}>
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <div className="min-w-0 flex-1 basis-48">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <span className="text-base text-foreground font-medium break-words">{item.produtos?.nome_produto || getProdNome(item.produto_id)}</span>
+                                      <span className={`text-sm px-1.5 py-0.5 rounded-full font-medium ${itemStatusStyle(item.status)}`}>
                                         {itemStatusLabel(item.status)}
                                       </span>
                                     </div>
                                     {item.status === 'RECUSADO' && item.motivo_recusa && (
-                                      <p className="mt-0.5 text-[9px] text-destructive italic">
+                                      <p className="mt-0.5 text-sm text-destructive italic">
                                         Motivo: {item.motivo_recusa}
                                       </p>
                                     )}
                                     {isPartiallyFulfilled && (
-                                      <p className="mt-0.5 text-[9px] text-warning italic">
+                                      <p className="mt-0.5 text-sm text-warning italic">
                                         Atendido parcialmente: {item.quantidade_atendida} de {item.quantidade_solicitada} {listedItemDisplay.unitLabel ?? ''}
                                       </p>
                                     )}
                                   </div>
-                                  <span className="text-muted-foreground shrink-0">
+                                  <span className="text-muted-foreground break-words">
                                     {item.quantidade_solicitada} {listedItemDisplay.unitLabel ?? ''}
                                   </span>
                                 </div>
@@ -1193,7 +983,7 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
                     <Button
                       size="sm"
                       variant="outline"
-                      className="text-xs gap-1.5"
+                      className="text-sm gap-1.5"
                       onClick={() => loadHistorico(historicoItems.length, true)}
                       disabled={historicoLoadingMore}
                     >
