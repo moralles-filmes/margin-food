@@ -350,14 +350,17 @@ export default function AccessManagementCard() {
             </div>
             {!sendInvite && (
               <div>
-                <label className="text-xs font-medium text-muted-foreground">Senha (mín. 12 caracteres)</label>
+                <label htmlFor="access-user-password" className="text-xs font-medium text-muted-foreground">Senha para novo login (mín. 12 caracteres)</label>
                 <Input
+                  id="access-user-password"
+                  aria-describedby="access-user-password-hint"
                   type="password"
                   value={newPassword}
                   onChange={e => setNewPassword(e.target.value)}
                   placeholder="••••••••••••"
                   className="mt-1 text-sm"
                 />
+                <p id="access-user-password-hint" className="mt-2 rounded-md border border-primary/20 bg-primary/5 p-2 text-xs leading-relaxed text-foreground">Se o usuário já tem acesso a outra unidade, informe o mesmo e-mail e <strong>deixe a senha em branco</strong>. Ele continuará usando o mesmo login e senha.</p>
                 {newPassword && newPassword.length < 12 && (
                   <p className="text-[10px] text-destructive mt-1">Mínimo 12 caracteres</p>
                 )}

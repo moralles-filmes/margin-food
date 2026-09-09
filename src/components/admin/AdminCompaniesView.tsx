@@ -448,15 +448,16 @@ export default function AdminCompaniesView() {
             </div>
             <div className="grid gap-2">
               <Label htmlFor="admin-password">Senha para novo login (mín. 12 caracteres)</Label>
-              <p className="text-xs text-muted-foreground">Se o e-mail já possui login, deixe em branco para adicionar acesso.</p>
               <Input
                 id="admin-password"
+                aria-describedby="admin-password-hint"
                 type="password"
                 value={adminPassword}
                 onChange={(e) => setAdminPassword(e.target.value)}
                 placeholder="Senha segura..."
                 disabled={creatingAdmin}
               />
+              <p id="admin-password-hint" className="rounded-md border border-primary/20 bg-primary/5 p-2 text-xs leading-relaxed text-foreground">Se o usuário já tem acesso a outra unidade, informe o mesmo e-mail e <strong>deixe a senha em branco</strong>. Ele continuará usando o mesmo login e senha.</p>
               {adminPassword.length > 0 && adminPassword.length < 12 && (
                 <p className="text-[10px] text-destructive">
                   {12 - adminPassword.length} caractere{12 - adminPassword.length !== 1 ? 's' : ''} restante{12 - adminPassword.length !== 1 ? 's' : ''}

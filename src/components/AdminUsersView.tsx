@@ -545,9 +545,9 @@ export default function AdminUsersView() {
                 <Input type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} required className="mt-1" />
               </div>
               <div>
-                <Label className="text-xs text-muted-foreground">Senha para novo login (mín. 12 caracteres)</Label>
-                <PasswordInput value={pwValidation.password} onChange={e => pwValidation.setPassword(e.target.value)} minLength={12} wrapperClassName="mt-1" />
-                <p className="mt-1 text-xs text-muted-foreground">Se o e-mail já possui login, deixe em branco. A senha existente será preservada.</p>
+                <Label htmlFor="new-user-password" className="text-xs text-muted-foreground">Senha para novo login (mín. 12 caracteres)</Label>
+                <PasswordInput id="new-user-password" aria-describedby="new-user-password-hint" value={pwValidation.password} onChange={e => pwValidation.setPassword(e.target.value)} minLength={12} wrapperClassName="mt-1" />
+                <p id="new-user-password-hint" className="mt-2 rounded-md border border-primary/20 bg-primary/5 p-2 text-xs leading-relaxed text-foreground">Se o usuário já tem acesso a outra unidade, informe o mesmo e-mail e <strong>deixe a senha em branco</strong>. Ele continuará usando o mesmo login e senha.</p>
                 <PasswordStrengthMeter strength={pwValidation.strength} strengthLabel={pwValidation.strengthLabel} strengthColor={pwValidation.strengthColor} errors={pwValidation.localErrors} serverErrors={pwValidation.serverErrors} />
               </div>
               <div>
