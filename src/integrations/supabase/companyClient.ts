@@ -1,11 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 import { supabase } from './client';
 import type { Database } from './types';
+import type { CompanyAccessMode } from '@/lib/companyAccess';
 
 export const COMPANY_ACCESS_REVOKED_EVENT = 'company:access-revoked';
 
 /** A fixed scope for the whole operation, including delayed follow-up requests. */
-export function createCompanyClient(companyId: string, userId: string) {
+export function createCompanyClient(companyId: string, userId: string, mode: CompanyAccessMode = 'memberships') {
   const lifetime = new AbortController();
   const client = createClient<Database>(
     import.meta.env.VITE_SUPABASE_URL,
@@ -17,7 +18,8 @@ export function createCompanyClient(companyId: string, userId: string) {
         return data.session.access_token;
       },
       global: {
-        headers: { 'x-company-id': companyId },
+        // Edge Functions anteriores à migração ainda não aceitam este header no CORS.
+        headers: mode === 'memberships' ? { 'x-company-id': companyId } : {},
         fetch: async (input, init) => {
           if (lifetime.signal.aborted) throw new DOMException('Unidade encerrada', 'AbortError');
           const signal = init?.signal

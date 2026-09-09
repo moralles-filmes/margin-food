@@ -4,6 +4,7 @@ import { createCompanyClient, COMPANY_ACCESS_REVOKED_EVENT } from '@/integration
 import { useCompanyScope, type CompanyProfile } from '@/contexts/CompanyScopeContext';
 import { resolveCompanySelection, readCompanyPreference, writeCompanyPreference, type AccessibleCompany } from '@/lib/companySelection';
 import type { User, Session } from '@supabase/supabase-js';
+import { loadAccessibleCompanies, loadCompanyProfile, type CompanyAccessMode } from '@/lib/companyAccess';
 
 export type AppRole = 'admin' | 'operador' | 'viewer' | 'sem_role';
 export type PermissionState = 'IDLE' | 'LOADING' | 'READY' | 'ERROR';
@@ -21,6 +22,7 @@ interface AuthContextType {
   profile: CompanyProfile | null;
   effectivePermissions: string[];
   accessibleCompanies: AccessibleCompany[];
+  companyAccessMode: CompanyAccessMode;
   activeCompanyId: string | null;
   switchingCompany: boolean;
   setActiveCompany: (companyId: string) => Promise<void>;
@@ -39,16 +41,6 @@ interface AuthContextType {
   rbacDebug: { roles: AppRole[]; permissions: string[]; nonce: string; state: PermissionState };
 }
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-export function parseCompanyProfile(value: unknown): CompanyProfile {
-  const v = value as CompanyProfile | null;
-  if (!v || typeof v.company_id !== 'string' || typeof v.company_name !== 'string'
-    || !Array.isArray(v.roles) || !v.roles.every(role => typeof role === 'string')
-    || !Array.isArray(v.permissions) || !v.permissions.every(key => typeof key === 'string')) {
-    throw new Error('Contexto da unidade inválido.');
-  }
-  return v;
-}
 
 function permissionsValue(profile: CompanyProfile | null, state: PermissionState, nonce: string) {
   const roles = (profile?.roles ?? []) as AppRole[];
@@ -76,6 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [permissionError, setPermissionError] = useState<string | null>(null);
   const [profile, setProfile] = useState<CompanyProfile | null>(null);
   const [accessibleCompanies, setCompanies] = useState<AccessibleCompany[]>([]);
+  const [companyAccessMode, setCompanyAccessMode] = useState<CompanyAccessMode>('memberships');
   const [activeCompanyId, setActiveId] = useState<string | null>(null);
   const [switchingCompany, setSwitching] = useState(false);
   const [sessionNonce] = useState(() => crypto.randomUUID());
@@ -83,14 +76,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const activeRef = useRef<string | null>(null);
   const requestId = useRef(0);
 
-  const loadContext = useCallback(async (userId: string, companyId: string, generation: number) => {
-    const resource = createCompanyClient(companyId, userId);
+  const loadContext = useCallback(async (userId: string, companyId: string, generation: number, mode: CompanyAccessMode) => {
+    const resource = createCompanyClient(companyId, userId, mode);
     try {
-      const { data, error } = await resource.client.rpc('get_my_company_context').abortSignal(AbortSignal.timeout(15_000));
-      if (error) throw error;
-      const next = parseCompanyProfile(data);
-      if (next.company_id !== companyId) throw new Error('Unidade retornada incompatível.');
+      const next = await loadCompanyProfile(resource.client, userId, companyId, mode, AbortSignal.timeout(15_000));
       if (generation !== requestId.current || userId !== userRef.current) return;
+      setCompanyAccessMode(mode);
       activeRef.current = companyId;
       setActiveId(companyId);
       setProfile(next);
@@ -105,14 +96,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!userId) return;
     const generation = ++requestId.current;
     try {
-      const { data, error } = await supabase.rpc('list_my_companies').abortSignal(AbortSignal.timeout(15_000));
-      if (error) throw error;
+      const { companies, mode } = await loadAccessibleCompanies(supabase, userId, AbortSignal.timeout(15_000));
       if (generation !== requestId.current || userId !== userRef.current) return;
-      const companies = (data ?? []) as AccessibleCompany[];
       setCompanies(companies);
       const selected = resolveCompanySelection(companies, activeRef.current ?? readCompanyPreference(userId));
-      if (selected) await loadContext(userId, selected, generation);
+      if (selected) await loadContext(userId, selected, generation, mode);
       else {
+        setCompanyAccessMode(mode);
         activeRef.current = null;
         setActiveId(null);
         setProfile(null);
@@ -137,14 +127,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(null);
     setPermissionState('LOADING');
     setPermissionError(null);
-    try { await loadContext(userId, companyId, generation); }
+    try { await loadContext(userId, companyId, generation, companyAccessMode); }
     catch (error) {
       if (generation !== requestId.current) return;
       console.error('[Auth] Falha ao trocar unidade:', error);
       setPermissionState('ERROR');
       setPermissionError('Não foi possível acessar esta unidade. Atualize seus acessos e tente novamente.');
     } finally { if (generation === requestId.current) setSwitching(false); }
-  }, [accessibleCompanies, loadContext]);
+  }, [accessibleCompanies, companyAccessMode, loadContext]);
 
   useEffect(() => {
     let alive = true;
@@ -197,10 +187,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
   const value = useMemo<AuthContextType>(() => ({
     ...permissionsValue(profile, permissionState, sessionNonce),
-    user, session, loading, permissionError, accessibleCompanies, activeCompanyId, switchingCompany,
+    user, session, loading, permissionError, accessibleCompanies, companyAccessMode, activeCompanyId, switchingCompany,
     setActiveCompany, refreshCompanies, signOut, refreshRoles: refreshCompanies,
     retryPermissions: () => { void refreshCompanies(); }, sessionNonce,
-  }), [profile, permissionState, sessionNonce, user, session, loading, permissionError, accessibleCompanies,
+  }), [profile, permissionState, sessionNonce, user, session, loading, permissionError, accessibleCompanies, companyAccessMode,
     activeCompanyId, switchingCompany, setActiveCompany, refreshCompanies, signOut]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

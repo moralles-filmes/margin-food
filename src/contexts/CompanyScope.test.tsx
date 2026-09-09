@@ -20,14 +20,21 @@ const identity = vi.hoisted(() => {
   return { session, list:vi.fn(), callbacks:new Set<(event:string, session:unknown)=>void>(),
     getSession:vi.fn(async () => ({ data:{ session } })), signOut:vi.fn(async () => ({})) };
 });
-vi.mock('@/integrations/supabase/client', () => ({ supabase: {
+vi.mock('@/integrations/supabase/client', async () => {
+  const { createClient } = await import('@supabase/supabase-js');
+  const transport = createClient('http://127.0.0.1:54321', 'test-publishable-key', {
+    accessToken: async () => identity.session.access_token,
+  });
+  return { supabase: {
   auth:{ getSession:identity.getSession, signOut:identity.signOut,
     onAuthStateChange:(callback:(event:string, session:unknown)=>void) => {
       identity.callbacks.add(callback);
       return { data:{ subscription:{ unsubscribe:() => identity.callbacks.delete(callback) } } };
     } },
   rpc:() => { const promise=Promise.resolve(identity.list());return Object.assign(promise,{ abortSignal:() => promise }); },
-} }));
+  from: transport.from.bind(transport),
+} };
+});
 const exports = vi.hoisted(() => ({pdf:vi.fn(),pptx:vi.fn()}));
 vi.mock('@/lib/presentationPdfExport',()=>({createPresentationPdfBlob:exports.pdf}));
 vi.mock('@/lib/presentationPptxExport',()=>({createPresentationPptxBlob:exports.pptx}));
@@ -95,6 +102,43 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup();vi.unstubAllGlobals();expect(identity.callbacks.size).toBe(0); });
 describe('escopo de unidade com um login',() => {
+  it('entra no banco anterior à migração, inclusive na apresentação e nas Edge Functions',async()=>{
+    identity.list.mockReturnValue({data:null,error:{code:'PGRST202',message:'Could not find the function public.list_my_companies without parameters in the schema cache'}});
+    localStorage.setItem(companyPreferenceKey('user-1'),'B');
+    vi.mocked(fetch).mockImplementation(async(input,init)=>{
+      const url=new URL(String(input));
+      // O CORS das Edge Functions antigas ainda não aceita x-company-id.
+      expect(new Headers(init?.headers).has('x-company-id')).toBe(false);
+      const json=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json'}});
+      if(url.pathname.endsWith('/user_roles'))return url.searchParams.get('select')==='company_id'
+        ?json({code:'42703',message:'column user_roles.company_id does not exist'},400):json([{role:'admin'}]);
+      if(url.pathname.endsWith('/profiles'))return json({...profile('A'),id:'user-1',companies:{id:'A',nome:'Loja Centro',ativo:true}});
+      if(url.pathname.endsWith('/assert_tenant'))return json('A');
+      if(url.pathname.endsWith('/get_effective_permissions'))return json(profile('A').permissions);
+      return json([{nome:'Conta A'}]);
+    });
+    mount('/presentation');
+    await waitFor(()=>expect(screen.getByLabelText('apresentação')).toHaveTextContent('Conta A'));
+    expect(screen.getByLabelText('global')).toHaveTextContent('Conta A');
+    expect(screen.queryByRole('button',{name:/Unidade global/})).toBeNull();
+    expect(localStorage.getItem(companyPreferenceKey('user-1'))).toBe('A');
+    expect((await clients.get('global:A')!.functions.invoke('cmv',{body:{action:'test'}})).error).toBeNull();
+    const oldClient=clients.get('global:A')!;
+    const oldCache=caches.get('global:A')!;
+    identity.list.mockImplementation(()=>({data:allowed,error:null}));
+    vi.mocked(fetch).mockImplementation(async(input,init)=>{
+      const id=new Headers(init?.headers).get('x-company-id');
+      expect(id).toBe('A');
+      return new Response(JSON.stringify(String(input).includes('get_my_company_context')?profile('A'):[{nome:'Conta A'}]),{status:200});
+    });
+    fireEvent.click(screen.getByRole('button',{name:'Revalidar'}));
+    await waitFor(()=>expect(clients.get('global:A')).not.toBe(oldClient));
+    await waitFor(()=>expect(screen.getByLabelText('apresentação')).toHaveTextContent('Conta A'));
+    expect(oldCache.getQueryCache().getAll()).toHaveLength(0);
+    expect(oldClient.getChannels()).toHaveLength(0);
+    expect(screen.getByRole('button',{name:/Unidade global/})).toBeInTheDocument();
+    expect(identity.signOut).not.toHaveBeenCalled();
+  });
   it('entra automaticamente com uma loja e não mostra dropdown',async()=>{
     allowed=[companies[0]];mount();await waitFor(()=>expect(screen.getByLabelText('global')).toHaveTextContent('Conta A'));
     expect(screen.queryByRole('button',{name:/Unidade global/})).toBeNull();expect(identity.signOut).not.toHaveBeenCalled();

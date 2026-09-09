@@ -2,12 +2,13 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createCompanyClient, COMPANY_ACCESS_REVOKED_EVENT } from '@/integrations/supabase/companyClient';
 import { CompanyScopeContext, type CompanyProfile } from './CompanyScopeContext';
-import { parseCompanyProfile, useAuth } from './AuthContext';
+import { useAuth } from './AuthContext';
+import { loadCompanyProfile, type CompanyAccessMode } from '@/lib/companyAccess';
 import { Button } from '@/components/ui/button';
 import { useLocation } from 'react-router-dom';
 
-function ScopedContent({ companyId, resource, queryClient, initialProfile, children }: {
-  companyId: string; resource: ReturnType<typeof createCompanyClient>; queryClient: QueryClient; initialProfile?: CompanyProfile; children: ReactNode;
+function ScopedContent({ companyId, userId, mode, resource, queryClient, initialProfile, children }: {
+  companyId: string; userId: string; mode: CompanyAccessMode; resource: ReturnType<typeof createCompanyClient>; queryClient: QueryClient; initialProfile?: CompanyProfile; children: ReactNode;
 }) {
   const [profile, setProfile] = useState<CompanyProfile | null>(initialProfile ?? null);
   const [error, setError] = useState<string | null>(null);
@@ -16,10 +17,7 @@ function ScopedContent({ companyId, resource, queryClient, initialProfile, child
     let alive = true;
     const load = async () => {
       try {
-        const { data, error: failure } = await resource.client.rpc('get_my_company_context').abortSignal(AbortSignal.timeout(15_000));
-        if (failure) throw failure;
-        const next = parseCompanyProfile(data);
-        if (next.company_id !== companyId) throw new Error('COMPANY_SCOPE_MISMATCH');
+        const next = await loadCompanyProfile(resource.client, userId, companyId, mode, AbortSignal.timeout(15_000));
         if (alive) { setProfile(next); setError(null); }
       } catch (failure) {
         console.error('[Unidade] Falha de autorização:', failure);
@@ -34,7 +32,7 @@ function ScopedContent({ companyId, resource, queryClient, initialProfile, child
     };
     window.addEventListener(COMPANY_ACCESS_REVOKED_EVENT, revoked);
     return () => { alive = false; clearInterval(timer); window.removeEventListener(COMPANY_ACCESS_REVOKED_EVENT, revoked); };
-  }, [attempt, companyId, queryClient, resource]);
+  }, [attempt, companyId, userId, mode, queryClient, resource]);
   const scope = useMemo(() => profile ? { companyId, client: resource.client, profile } : null, [companyId, resource, profile]);
   if (error) return <div role="alert" className="space-y-3 p-6 text-sm"><p>{error}</p><Button variant="outline" onClick={() => { setError(null); setAttempt(value => value + 1); }}>Tentar novamente</Button></div>;
   if (!scope) return <div role="status" aria-label="Carregando unidade" className="min-h-48 animate-pulse rounded-lg bg-muted" />;
@@ -42,22 +40,23 @@ function ScopedContent({ companyId, resource, queryClient, initialProfile, child
 }
 
 export function CompanyScopeProvider(props: { companyId: string; userId: string; initialProfile?: CompanyProfile; children: ReactNode }) {
-  return <CompanyScopeLifetime key={`${props.userId}:${props.companyId}`} {...props} />;
+  const { companyAccessMode } = useAuth();
+  return <CompanyScopeLifetime key={`${props.userId}:${props.companyId}:${companyAccessMode}`} {...props} mode={companyAccessMode} />;
 }
 
-function CompanyScopeLifetime({ companyId, userId, ...props }: { companyId: string; userId: string; initialProfile?: CompanyProfile; children: ReactNode }) {
+function CompanyScopeLifetime({ companyId, userId, mode, ...props }: { companyId: string; userId: string; mode: CompanyAccessMode; initialProfile?: CompanyProfile; children: ReactNode }) {
   const [resources, setResources] = useState<{ resource: ReturnType<typeof createCompanyClient>; queryClient: QueryClient } | null>(null);
   useEffect(() => {
-    const resource = createCompanyClient(companyId, userId);
+    const resource = createCompanyClient(companyId, userId, mode);
     const queryClient = new QueryClient({ defaultOptions: { queries: {
       refetchOnWindowFocus: false, refetchOnReconnect: true, refetchOnMount: false,
       retry: 1, staleTime: 3 * 60_000, gcTime: 10 * 60_000,
     } } });
     setResources({ resource, queryClient });
     return () => { void queryClient.cancelQueries(); queryClient.clear(); resource.dispose(); };
-  }, [companyId, userId]);
+  }, [companyId, userId, mode]);
   if (!resources) return <div role="status" aria-label="Carregando unidade" className="min-h-48 animate-pulse rounded-lg bg-muted" />;
-  return <ScopedContent {...props} {...resources} companyId={companyId} />;
+  return <ScopedContent {...props} {...resources} companyId={companyId} userId={userId} mode={mode} />;
 }
 
 export function GlobalCompanyBoundary({ children }: { children: ReactNode }) {

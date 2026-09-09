@@ -26,6 +26,8 @@ Para Realtime, a RLS verifica membership e permissão da empresa de cada linha, 
 
 `AuthContext` carrega somente `{ id, nome }` das unidades autorizadas. Uma unidade entra automaticamente. Várias unidades exigem escolha quando não existe preferência válida. A preferência é armazenada em `marginpro:last-company:<userId>` e sempre comparada à lista retornada pelo backend.
 
+Antes da publicação das migrations, o frontend também aceita o banco de empresa única. `loadAccessibleCompanies` só ativa essa compatibilidade quando `list_my_companies` retorna `PGRST202` **e** `user_roles.company_id` ainda não existe (`42703`); falhas de rede, autenticação, permissão ou schema parcialmente migrado continuam bloqueadas. Nesse modo, oferece exclusivamente a empresa original ativa, valida `assert_tenant()` e usa as roles/permissões existentes. Não envia `x-company-id`, pois o CORS das Edge Functions anteriores ainda não aceita esse header. Tanto o escopo global quanto o da apresentação usam esse modo; preferências e URLs não permitem selecionar outra empresa. A revalidação passa automaticamente ao modelo de memberships quando o backend estiver publicado, recriando clientes e caches. Esse modo permite executar o frontend local contra o backend atual, mas não habilita multiunidades antes da implantação completa.
+
 O `CompanySelector` reutiliza o dropdown existente. Na sidebar expandida aparece junto à identificação da empresa; recolhida, usa um botão com ícone e nome acessível. Uma unidade não recebe dropdown.
 
 A troca global mostra carregamento e desmonta o escopo anterior. Cada escopo possui seu cliente, AbortController e QueryClient; cancelar o escopo cancela requisições, limpa cache e remove canais. Uma operação atrasada mantém a empresa original e não pode reaproveitar o cliente encerrado para escrever na nova empresa. Operações já confirmadas no servidor não são desfeitas pelo cancelamento do navegador.
@@ -98,6 +100,8 @@ Depois do rollback, publicar/reabrir as versões antigas e conferir saldos, gran
 - Navegador isolado: login real do Vite e seletores/componentes reais em uma prévia com dados sintéticos, nas larguras desktop e 390 px, incluindo sidebar recolhida, sem erros de execução. A prévia temporária foi removida.
 
 A entrega não afirma ter exercitado JWT/GoTrue, entrega de eventos WebSocket, APIs de Storage ou todas as jornadas de todos os módulos em staging. A autorização correspondente foi testada em PostgreSQL, e o transporte/estado da interface em testes unitários. A verificação integrada desses serviços e o backup completo continuam sendo etapas obrigatórias de publicação; nenhuma operação em produção foi usada para simular esses testes.
+
+A correção de compatibilidade anterior à migração foi validada adicionalmente com 26 testes de acesso/seleção/escopo, TypeScript, lint sem erros e build. Na aba local já autenticada do usuário, o recarregamento abriu a empresa Moralles e carregou Contas a Pagar pelo backend real, sem alterar registros ou publicar migrations. Os testes cobrem login legado, apresentação, headers de Edge Functions, transição para memberships com descarte de clientes/caches e recusa de fallback em falhas de autorização ou migração parcial.
 
 ## Cobertura dos 18 casos solicitados
 
