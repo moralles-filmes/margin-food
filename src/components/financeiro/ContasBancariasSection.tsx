@@ -106,8 +106,8 @@ export default function ContasBancariasSection({ onNavigateExtrato }: ContasBanc
   const canDelete = useCan('financeiro:contas:delete');
   const canExport = useCan('financeiro:contas:export');
   const canViewConciliacao = useCan('financeiro:conciliacao:view');
-  const canManageConciliacao = useCan('financeiro:conciliacao:manage');
-  const canCheckSaldoNaReferencia = canViewConciliacao || canManageConciliacao;
+  const canReconcile = useCan('financeiro:conciliacao:reconcile');
+  const canCheckSaldoNaReferencia = canViewConciliacao || canReconcile;
 
   const [items, setItems] = useState<ContaBancaria[]>([]);
   const [saldos, setSaldos] = useState<Record<string, number>>({});

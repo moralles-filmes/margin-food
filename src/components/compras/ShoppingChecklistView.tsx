@@ -21,6 +21,9 @@ export default function ShoppingChecklistView({ onNavigateToOrder }: Props) {
   const { user } = useAuth();
   const store = usePurchaseOrdersStoreContext();
   const isAdmin = useCan('system:global:manage');
+  // Ver o checklist de outros responsáveis é atribuição de quem aprova, não
+  // privilégio de super-admin — chave granular concedível em Admin → Permissões.
+  const canSeeAllChecklists = useCan('compras:checklist:approve');
 
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [items, setItems] = useState<PurchaseOrderItem[]>([]);
@@ -34,9 +37,9 @@ export default function ShoppingChecklistView({ onNavigateToOrder }: Props) {
     return store.orders.filter(o =>
       (o.type === 'MERCADO' || o.type === 'SAZONAL') &&
       o.status === 'PENDING' &&
-      (o.responsible_user_id === user.id || isAdmin)
+      (o.responsible_user_id === user.id || canSeeAllChecklists || isAdmin)
     );
-  }, [store.orders, user, isAdmin]);
+  }, [store.orders, user, canSeeAllChecklists, isAdmin]);
 
   const fetchItemsFn = store.fetchItems;
   const loadItems = useCallback(async (orderId: string) => {

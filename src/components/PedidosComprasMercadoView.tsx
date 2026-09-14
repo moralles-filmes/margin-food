@@ -1071,7 +1071,9 @@ export default function PedidosComprasMercadoView() {
             const sc = STATUS_CONFIG[order.status] || STATUS_CONFIG.OPEN;
             const isNaoEntregues = subTab === 'nao-entregues';
             const acked = !!order.not_delivered_ack_at;
-            const canAck = !acked && (order.created_by === user?.id || isAdmin);
+            // Baixar pedido de outro criador é atribuição de quem edita pedidos,
+            // não privilégio de super-admin.
+            const canAck = !acked && (order.created_by === user?.id || canEdit || isAdmin);
             return (
               <div key={order.id}
                 className={`w-full bg-card border rounded-xl p-3 hover:border-primary/30 transition-all animate-fade-up ${
