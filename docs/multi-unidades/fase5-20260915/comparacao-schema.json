@@ -1,0 +1,34 @@
+{
+  "template": "moralles_phase4_test_committed",
+  "productionFunctions": 321,
+  "equalFunctions": 300,
+  "expectedPhase2Phase3Phase4Differences": [
+    "_guarded_list_fin_audit_logs(text,text,text,integer,timestamp with time zone,uuid,integer)",
+    "_salmon_cancel_entry_guarded(uuid,text)",
+    "_salmon_cancel_manipulation_guarded(uuid,text)",
+    "_salmon_create_entry_guarded(text,text,text,text,integer,integer,numeric,numeric,text,text)",
+    "_salmon_create_manipulation_guarded(uuid,text,integer,numeric,numeric,numeric,text)",
+    "audit_log_write(text,text,text,text,jsonb,jsonb,jsonb,text)",
+    "audit_trigger_fn()",
+    "cancel_salmon_entry_atomic(uuid,text)",
+    "cancel_salmon_manipulation_atomic(uuid,text)",
+    "cleanup_old_audit_logs(integer)",
+    "create_quick_inventory_atomic(jsonb,text,text)",
+    "create_salmon_entry_atomic(date,text,text,text,integer,integer,numeric,numeric,text,date)",
+    "ensure_salmon_raw_product()",
+    "log_audit(text,text,text,text,text,jsonb,jsonb,jsonb)",
+    "log_audit(text,text,text,uuid,text,jsonb,jsonb,jsonb)",
+    "log_integration_error(text,text,text,text,jsonb)",
+    "refresh_materialized_views()",
+    "rpc_create_company(text,text)",
+    "rpc_recebimentos_close(uuid,boolean,text)",
+    "stock_transfer_between_locations(uuid,text,text,numeric,text)",
+    "upsert_salmon_leftover_atomic(date,numeric,text)"
+  ],
+  "additionalPublicFunctions": [
+    "backfill_log_scope(text,integer,boolean)",
+    "list_restricted_logs(text,text,integer,timestamp with time zone,uuid,text,text,text)",
+    "service_write_audit(uuid,uuid,text,text,text,uuid,jsonb,jsonb,jsonb)"
+  ],
+  "targetedCatalogPreflight": "PASS local and production READ ONLY"
+}

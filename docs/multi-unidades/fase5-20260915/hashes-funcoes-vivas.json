@@ -1,0 +1,1286 @@
+[
+  {
+    "signature": "_fin_bordero_payload(uuid,date,date)",
+    "hash": "fde3f6966e02e68546002d30e720e86d"
+  },
+  {
+    "signature": "_fin_dfc_effective_allocations(uuid,date,date)",
+    "hash": "415e8c5bbd57f9d1c18548a538ec4119"
+  },
+  {
+    "signature": "_guarded_add_presentation_decision_revision(uuid,text,jsonb,text,text,timestamp with time zone)",
+    "hash": "e9bac99fbc42925391650fbd33971317"
+  },
+  {
+    "signature": "_guarded_aprovar_conta_pagar(uuid,timestamp with time zone)",
+    "hash": "fecd92b959247d7db8580432dc200067"
+  },
+  {
+    "signature": "_guarded_bulk_upsert_orcamento(text,jsonb)",
+    "hash": "a2d27549d0a1fc2cf93deaf65ad5d5ba"
+  },
+  {
+    "signature": "_guarded_create_conta_pagar(text,numeric,text,uuid,date,date,uuid,uuid,uuid,text,text,jsonb,jsonb)",
+    "hash": "fe69330a99b5ef40bec875aa27a57ec0"
+  },
+  {
+    "signature": "_guarded_create_conta_receber(text,text,numeric,date,date,uuid,uuid,uuid,text,text,jsonb,jsonb,uuid)",
+    "hash": "ac4928ba28130533ab3534cce054c2d0"
+  },
+  {
+    "signature": "_guarded_create_presentation_decision_action(uuid,text,uuid,text,timestamp with time zone,date,text)",
+    "hash": "c4b153e5633ba6c0c64d4990bbe20442"
+  },
+  {
+    "signature": "_guarded_create_presentation_decision(text,text,date,date,text,text,jsonb,uuid)",
+    "hash": "36f5ba42e73cde1f143c12ba4ca0e2a1"
+  },
+  {
+    "signature": "_guarded_create_presentation_session(text,text,date,date,text,date,uuid,uuid[],uuid,jsonb)",
+    "hash": "38ad18689c2124f4f756bbeb9e53dc65"
+  },
+  {
+    "signature": "_guarded_delete_categoria(uuid)",
+    "hash": "159cdce81ea1a4aebf9a482d320f2e1f"
+  },
+  {
+    "signature": "_guarded_delete_centro_custo(uuid)",
+    "hash": "bb48bf3354219466bcb7d9134022bb74"
+  },
+  {
+    "signature": "_guarded_delete_conta_pagar(uuid,timestamp with time zone)",
+    "hash": "e8e86a8d90a67508d058f31b0cac330e"
+  },
+  {
+    "signature": "_guarded_delete_conta_receber(uuid,timestamp with time zone)",
+    "hash": "a743fb9bcd2d5b05f53e933a4ab761ac"
+  },
+  {
+    "signature": "_guarded_delete_conta(uuid)",
+    "hash": "f6417e8c81790052cadcb92067963e4b"
+  },
+  {
+    "signature": "_guarded_delete_lancamento(uuid,timestamp with time zone)",
+    "hash": "3566bf0fbeb7534c197c5befa1f05fe0"
+  },
+  {
+    "signature": "_guarded_delete_orcamento(uuid,timestamp with time zone)",
+    "hash": "f10f1a615c795420dfdd2c6f8dd49eb4"
+  },
+  {
+    "signature": "_guarded_delete_plano_contas(uuid)",
+    "hash": "a59dbe31a41605521f394a6574d23047"
+  },
+  {
+    "signature": "_guarded_estornar_conta_pagar(uuid,text)",
+    "hash": "b20da8d8b69f6644d47c08e49711e3c4"
+  },
+  {
+    "signature": "_guarded_estornar_conta_receber(uuid,text)",
+    "hash": "a3eb3a116a7a45c767b3f970fdb6a5e0"
+  },
+  {
+    "signature": "_guarded_list_fin_audit_logs(text,text,text,integer,timestamp with time zone,uuid,integer)",
+    "hash": "f25c4d8650f6f2486f2e9d6dda9661fd"
+  },
+  {
+    "signature": "_guarded_list_recorrencias(timestamp with time zone,uuid,integer,text)",
+    "hash": "fe05cc8f47e1f02660def9b21ead576b"
+  },
+  {
+    "signature": "_guarded_save_presentation_session(uuid,text,text,date,uuid,uuid[],uuid,jsonb,text,timestamp with time zone)",
+    "hash": "da470bd7d79b3993796473b507e10d3c"
+  },
+  {
+    "signature": "_guarded_start_presentation_session(uuid,jsonb,text,timestamp with time zone)",
+    "hash": "c6f3114de446efb5318d3e5dc111dc79"
+  },
+  {
+    "signature": "_guarded_submit_presentation_minutes(uuid,text,text,timestamp with time zone)",
+    "hash": "609154e2b17accf3e5a86a7e52457036"
+  },
+  {
+    "signature": "_guarded_transition_presentation_decision_action(uuid,text,text,text,timestamp with time zone)",
+    "hash": "1efe5859a5b20306a72e4124d552eb0e"
+  },
+  {
+    "signature": "_guarded_transition_presentation_decision(uuid,text,text,text,timestamp with time zone)",
+    "hash": "ee88920698bae7d48e349322f25eef3b"
+  },
+  {
+    "signature": "_guarded_transition_presentation_session(uuid,text,text,text,timestamp with time zone)",
+    "hash": "a0ed9a437f69ea04e39ae3b29e2f0b27"
+  },
+  {
+    "signature": "_guarded_update_categoria(uuid,text,text,text,text,uuid,timestamp with time zone)",
+    "hash": "e47a693e2206d8deb55d046770b3294b"
+  },
+  {
+    "signature": "_guarded_update_centro_custo(uuid,text,text,timestamp with time zone)",
+    "hash": "6c4b68f90e4195c31c8bacdb64f92d8a"
+  },
+  {
+    "signature": "_guarded_update_conta_pagar(uuid,text,numeric,text,uuid,date,date,uuid,uuid,uuid,text,text,jsonb,jsonb,timestamp with time zone)",
+    "hash": "20077f93e748a02ae7571120997de8ce"
+  },
+  {
+    "signature": "_guarded_update_conta_receber(uuid,text,text,numeric,date,date,uuid,uuid,uuid,text,text,jsonb,jsonb,uuid,timestamp with time zone)",
+    "hash": "6dfd3a1ee692628dbc359f2eca01f839"
+  },
+  {
+    "signature": "_guarded_update_conta(uuid,text,text,text,text,text,numeric,timestamp with time zone)",
+    "hash": "70c36cd98e58fa8fa346e4ad14619b49"
+  },
+  {
+    "signature": "_guarded_update_plano_contas(uuid,text,text,text,text,text,timestamp with time zone)",
+    "hash": "ca16a7422ee1c0a8fe37ccb19a64e3af"
+  },
+  {
+    "signature": "_guarded_update_presentation_decision_action(uuid,text,uuid,date,text,text,timestamp with time zone)",
+    "hash": "41db611f6f10a4752a959cd19a640ff0"
+  },
+  {
+    "signature": "_guarded_update_presentation_decision_draft(uuid,text,text,uuid,timestamp with time zone)",
+    "hash": "38354e6ec1a1143b2efffb91ace90420"
+  },
+  {
+    "signature": "_guarded_update_reconciled_classification(uuid,uuid,uuid,text,jsonb,timestamp with time zone,text)",
+    "hash": "8e4ca971dc17c1488c4463f1aa14c2da"
+  },
+  {
+    "signature": "_guarded_upsert_lancamento(uuid,text,text,numeric,uuid,uuid,uuid,date,date,date,text,text,text,text,boolean,jsonb,jsonb,timestamp with time zone,text)",
+    "hash": "d39cf69b0036aa5c8b09ad562e8fc7ce"
+  },
+  {
+    "signature": "_guarded_upsert_orcamento(uuid,text,numeric,timestamp with time zone)",
+    "hash": "1c2e2d3981f78ff85ff8e89a06d07dbd"
+  },
+  {
+    "signature": "_planning_delete_meta_guarded(uuid)",
+    "hash": "a66c6f1ebd30f72118e64f71aeb2ef85"
+  },
+  {
+    "signature": "_planning_spend_summary_guarded(integer,integer,text,text)",
+    "hash": "476a3d480ddf8bc1b72489ab207104ce"
+  },
+  {
+    "signature": "_planning_spend_summary_inner(uuid,integer,integer,text,text)",
+    "hash": "60f3df4510560a80f9c757e1bb78c6ad"
+  },
+  {
+    "signature": "_planning_upsert_meta_guarded(integer,integer,text,numeric,numeric,numeric)",
+    "hash": "900f7f1babdec4b985ceef8c805bfe74"
+  },
+  {
+    "signature": "_relatorios_compras_guarded(text,text)",
+    "hash": "a236b183faa3992e2f1f87957311d427"
+  },
+  {
+    "signature": "_relatorios_kpis_guarded(text,text)",
+    "hash": "03a4de928f183605cfbbe94a749f0dc1"
+  },
+  {
+    "signature": "_relatorios_score_guarded(text,text)",
+    "hash": "c9c5e45e48e082d011d470ec54e204be"
+  },
+  {
+    "signature": "_relatorios_tendencia_guarded(text,text)",
+    "hash": "df99903e20e9ccc50d411261938ee097"
+  },
+  {
+    "signature": "_replace_fin_presentation_session_content(uuid,uuid,uuid,text,uuid[],jsonb)",
+    "hash": "a30c16aa24597ceb91e480ca52183c4b"
+  },
+  {
+    "signature": "_salmon_cancel_entry_guarded(uuid,text)",
+    "hash": "0c12273e1b367bcd5cb9bc561bdecd5b"
+  },
+  {
+    "signature": "_salmon_cancel_manipulation_guarded(uuid,text)",
+    "hash": "71a4b90f8bd0bc465bba847bab710ade"
+  },
+  {
+    "signature": "_salmon_create_entry_guarded(text,text,text,text,integer,integer,numeric,numeric,text,text)",
+    "hash": "9a9c6a84d4b6920e8f7c655edfa537aa"
+  },
+  {
+    "signature": "_salmon_create_manipulation_guarded(uuid,text,integer,numeric,numeric,numeric,text)",
+    "hash": "ada0ccfb00c35163e19c8e3593238cf8"
+  },
+  {
+    "signature": "_salmon_dashboard_guarded(text,text)",
+    "hash": "46cc87e4198bd9a46fd787f36f916fa1"
+  },
+  {
+    "signature": "_simulate_relatorios_guarded(text,text,jsonb)",
+    "hash": "706743368e161f3754aa2e75e22b99eb"
+  },
+  {
+    "signature": "_validate_fin_presentation_decision_snapshot(jsonb,date,date,text,text)",
+    "hash": "91e1ae4b27f73abc9dcbfebc819c7f9c"
+  },
+  {
+    "signature": "_validate_fin_presentation_meeting_snapshot(jsonb,uuid,date,date,text)",
+    "hash": "b28217e8948904d08f6c0ea3ab33f9ef"
+  },
+  {
+    "signature": "admin_checkup_suite()",
+    "hash": "59dd6ba1978f7a54b368811c9cd12910"
+  },
+  {
+    "signature": "admin_has_permission(uuid,text)",
+    "hash": "3fa25cef36350f868e0a6e5691a9986d"
+  },
+  {
+    "signature": "admin_health_counts()",
+    "hash": "cb1bf9e86003e0286fa7894e7d43bfa9"
+  },
+  {
+    "signature": "admin_list_users()",
+    "hash": "95e874889013abffeb7426e14aa3580b"
+  },
+  {
+    "signature": "admin_set_super_admin(uuid,boolean,text,text)",
+    "hash": "5ffd0359143156ffd40187f2df07cc4a"
+  },
+  {
+    "signature": "admin_upsert_company_membership(uuid,uuid,uuid,app_role,text[],text,uuid,text,boolean)",
+    "hash": "353ed3cb9f163776b94a8ef322845915"
+  },
+  {
+    "signature": "aplicar_regras_categorizacao()",
+    "hash": "09460fc6f3071ee11cebb13a29349ed7"
+  },
+  {
+    "signature": "aprovar_ferias(uuid,uuid)",
+    "hash": "cc921267a0d38e524db4e623341881b2"
+  },
+  {
+    "signature": "assert_requisicao_estoque_movement_consistency()",
+    "hash": "b472edc24fdc843d4f9b3cd0df5d5692"
+  },
+  {
+    "signature": "assert_tenant()",
+    "hash": "749e660df028d5848d78bcaa1ca6b75d"
+  },
+  {
+    "signature": "attend_requisicao_item_atomic(uuid,uuid,numeric)",
+    "hash": "0a254b542f113ed0705e36243f34cb83"
+  },
+  {
+    "signature": "audit_log_write(text,text,text,text,jsonb,jsonb,jsonb,text)",
+    "hash": "f2c3a9bd7c29b8488eaa82d64d5fba3f"
+  },
+  {
+    "signature": "audit_trigger_fn()",
+    "hash": "7050f2c7eaebfc670d7ff12476e1d71b"
+  },
+  {
+    "signature": "batch_reorder_fin_categorias(jsonb)",
+    "hash": "a85d0a48b349fc2d0844823fbd6ab320"
+  },
+  {
+    "signature": "block_categoria_pai_vinculada_a_marca()",
+    "hash": "727ef10af2118b564e80f0c70fa95d46"
+  },
+  {
+    "signature": "can_access_company_document(text,text)",
+    "hash": "c9ad5b642ab6215407a42149df4a77a4"
+  },
+  {
+    "signature": "can_receive_company_change(uuid,text[])",
+    "hash": "efa637048fd9d678f3d427e0dbf97995"
+  },
+  {
+    "signature": "cancel_salmon_entry_atomic(uuid,text)",
+    "hash": "75b37ebb797f45d8924e206d4ae1eaa8"
+  },
+  {
+    "signature": "cancel_salmon_manipulation_atomic(uuid,text)",
+    "hash": "552d4b9896921dce796328c2beaf5e08"
+  },
+  {
+    "signature": "cleanup_old_audit_logs(integer)",
+    "hash": "6675cad966ebc41b38198dd29052f002"
+  },
+  {
+    "signature": "comparativo_periodos(text,text)",
+    "hash": "e16aad8a248e6649ccd477572c3365f1"
+  },
+  {
+    "signature": "compute_requisicao_status_agregado(uuid)",
+    "hash": "0e10d7a34dcd49104b32554d233008f9"
+  },
+  {
+    "signature": "contar_lancamentos_sem_categoria()",
+    "hash": "7c8450d492c55b93c96650e7645dc061"
+  },
+  {
+    "signature": "copiar_orcamento_mes(text,text)",
+    "hash": "b29d48e10615226410dfa9cd834c443c"
+  },
+  {
+    "signature": "cotacao_force_company_id()",
+    "hash": "90721d88bc1f276e12e7aba6582c7427"
+  },
+  {
+    "signature": "count_requisicoes_with_pending_items()",
+    "hash": "71251a90c519a961dc9e1cfcf1991f5b"
+  },
+  {
+    "signature": "create_cotacao_atomic(text,text,date,text,uuid,jsonb,jsonb)",
+    "hash": "c2f2e028b29308a9cf694487d83ff5a8"
+  },
+  {
+    "signature": "create_inventory_atomic(text,date,text,uuid,text[],text,text)",
+    "hash": "bb6597b5e7b1929eed98a3f8f6a8e309"
+  },
+  {
+    "signature": "create_purchase_order_atomic(jsonb,uuid)",
+    "hash": "b93addea8a750814736e1a1690c11ab5"
+  },
+  {
+    "signature": "create_purchase_orders_from_cotacao_atomic(uuid,timestamp with time zone)",
+    "hash": "7a783cc28dd7f67627a881ee6a55068c"
+  },
+  {
+    "signature": "create_quick_inventory_atomic(jsonb,text,text)",
+    "hash": "6fddbb29af31218709522eaaf7a6b5a5"
+  },
+  {
+    "signature": "create_salmon_entry_atomic(date,text,text,text,integer,integer,numeric,numeric,text,date)",
+    "hash": "1b4ea77aedd68b928f83b4b0f21a16bd"
+  },
+  {
+    "signature": "create_salmon_manipulation_atomic(uuid,date,integer,numeric,numeric,numeric,text)",
+    "hash": "cc97629d6b24bd0d9c5a671fb9c1c01f"
+  },
+  {
+    "signature": "create_transfer(uuid,uuid,numeric,date,text,uuid)",
+    "hash": "5e17e4e96fd79fcf08d0f53c5b9b7269"
+  },
+  {
+    "signature": "debug_company_inventory()",
+    "hash": "530ad6660a4133486e3c76d3596e3d17"
+  },
+  {
+    "signature": "debug_stock_last_movements(integer)",
+    "hash": "aa7de5d059b88f7bed1c1f86cc85e9c7"
+  },
+  {
+    "signature": "debug_tenant()",
+    "hash": "abbc0da28271e539280dd2208929fa13"
+  },
+  {
+    "signature": "delete_transfer(uuid)",
+    "hash": "84cb5dcfe4a9347ceaca4f4146dfefb6"
+  },
+  {
+    "signature": "edit_purchase_order_atomic(uuid,jsonb)",
+    "hash": "01f845d1f73fa9f8ee9fba51c830a8a1"
+  },
+  {
+    "signature": "ensure_salmon_raw_product()",
+    "hash": "69331eb6003fa0b0af91ad858f31f1d2"
+  },
+  {
+    "signature": "ficha_salvar_componente_itens_atomic(uuid,jsonb)",
+    "hash": "a0ebf725819019c0d5d0747a732d6342"
+  },
+  {
+    "signature": "fin_audit_integrity_check()",
+    "hash": "e59f91afba890131c8752b9211ddb360"
+  },
+  {
+    "signature": "fin_block_contamax_ledger_entry()",
+    "hash": "66fe2d75e4a3c5da5eabfee79eadd5c1"
+  },
+  {
+    "signature": "fin_categoria_fora_do_resultado(uuid,uuid)",
+    "hash": "a88b795dfe2b9792cec84553b6bd7cca"
+  },
+  {
+    "signature": "fin_category_is_excluded(uuid,uuid)",
+    "hash": "da570623c93e2e3ae11365b85a04e799"
+  },
+  {
+    "signature": "fin_ensure_non_operational_categories(uuid)",
+    "hash": "673d00e02de36210ea7c78d6f07eda89"
+  },
+  {
+    "signature": "fin_entity_has_category(uuid,uuid,uuid)",
+    "hash": "a03e5b0304cffdc787dc0157061931e9"
+  },
+  {
+    "signature": "fin_get_categoria_desconto_baixa(uuid)",
+    "hash": "f6663a1f5b07dd4021d22769e45a87ac"
+  },
+  {
+    "signature": "fin_get_categoria_desconto_concedido(uuid)",
+    "hash": "f8d59cabb5f2c73d6067afae47ed6ffd"
+  },
+  {
+    "signature": "fin_get_limite_aprovacao_atual()",
+    "hash": "1e82055372159f1239eb2bf1f5eed10f"
+  },
+  {
+    "signature": "fin_get_limite_aprovacao(uuid)",
+    "hash": "5f7bdf9ef7fb6dd4aa24101e5f09b57f"
+  },
+  {
+    "signature": "fin_prepare_category_reporting_class()",
+    "hash": "b80c0639687967d9e42844b0b8f34c7f"
+  },
+  {
+    "signature": "fin_preserve_materialized_recurrence()",
+    "hash": "343fc2c43eb8972a49d90bee400e9458"
+  },
+  {
+    "signature": "fin_protect_system_category()",
+    "hash": "95b0d7c93bfaa1f101c528a6bdedecb3"
+  },
+  {
+    "signature": "fin_recompute_entity_report_exclusion(uuid,uuid)",
+    "hash": "68efee32a857307de4ee76515531b1b6"
+  },
+  {
+    "signature": "fin_recorrencia_config_valida(jsonb)",
+    "hash": "ba858d95d090e7e2fec29303a09d4845"
+  },
+  {
+    "signature": "fin_set_entity_report_exclusion()",
+    "hash": "71465123fdb923dfe4d41c014de1f402"
+  },
+  {
+    "signature": "fin_set_limite_aprovacao(numeric)",
+    "hash": "872a1e95cd4e66a99e8e95cc81ed4cca"
+  },
+  {
+    "signature": "fin_validate_orcamento_scope()",
+    "hash": "6a2674fd3524a1043dba8e1799a876d7"
+  },
+  {
+    "signature": "fin_validate_recorrencia_config(jsonb)",
+    "hash": "5b54668998306c6fea8010b3c79f15f1"
+  },
+  {
+    "signature": "finalize_inventory_atomic(uuid,text)",
+    "hash": "9910efed51cbc89a3e3afa57da095fae"
+  },
+  {
+    "signature": "find_auth_user_by_email(text)",
+    "hash": "6fe47187abeff4bfff8432905f7e4edd"
+  },
+  {
+    "signature": "fn_recompute_product_saldo(uuid,uuid)",
+    "hash": "1e2d099b3ae7a6f746162c3ef55a7a71"
+  },
+  {
+    "signature": "fn_update_product_stock()",
+    "hash": "9b2ae02b990ea48366eacc08056b19e4"
+  },
+  {
+    "signature": "generate_next_sku(text)",
+    "hash": "5c0fba787bd586068c6d8ffc2d3035bf"
+  },
+  {
+    "signature": "generate_requisition_code()",
+    "hash": "560596d8ad4a59c51c1421f079e2615e"
+  },
+  {
+    "signature": "gerar_parcela_recorrente(uuid)",
+    "hash": "0180f7b3661e4352f5e5539304dc3ae3"
+  },
+  {
+    "signature": "get_all_saldos_contas()",
+    "hash": "c6f64775068599839132ae42a75865ed"
+  },
+  {
+    "signature": "get_beneficios_masked(uuid)",
+    "hash": "cfbad7ad42af7900978cdcdd47404428"
+  },
+  {
+    "signature": "get_catalog_counts()",
+    "hash": "84630fcc172b14aa5499a7077c66626f"
+  },
+  {
+    "signature": "get_company_permissions(uuid,uuid)",
+    "hash": "3d525d50884f5330721625ce2db97c0b"
+  },
+  {
+    "signature": "get_consumo_por_produto(uuid,date,text[],uuid[])",
+    "hash": "a8f0c7e4a2d8941fd4541552986c3322"
+  },
+  {
+    "signature": "get_cotacao_ia_config()",
+    "hash": "7d3c1c972da1f3c34cce991a6621b1dd"
+  },
+  {
+    "signature": "get_cotacao_zapi_config()",
+    "hash": "196b61411e3ffc7022009459255470a4"
+  },
+  {
+    "signature": "get_current_company_id_strict()",
+    "hash": "ed653b8b9fc10348da2fcc0c0fc89b30"
+  },
+  {
+    "signature": "get_current_company_id()",
+    "hash": "a5e5953a3980f3cf00479ae0f66ed90f"
+  },
+  {
+    "signature": "get_effective_permissions(uuid)",
+    "hash": "51bfee6d3f51f2e2469a51ebba878254"
+  },
+  {
+    "signature": "get_fin_alertas()",
+    "hash": "3f599ded9b07f7b184141d7643eeae31"
+  },
+  {
+    "signature": "get_fin_bordero(date,date)",
+    "hash": "b5bf55a3a7b46ca8c1b40c5a41d66efb"
+  },
+  {
+    "signature": "get_fin_cashflow(date,date)",
+    "hash": "214c4d0e728a9b3baa01ce7d760cb38a"
+  },
+  {
+    "signature": "get_fin_counts_by_status(date,date)",
+    "hash": "eed07f96311fc7ed59f72fab57fb8c45"
+  },
+  {
+    "signature": "get_fin_dashboard_charts(date,date)",
+    "hash": "3276d35365038be4430c72e3ffaf1000"
+  },
+  {
+    "signature": "get_fin_dashboard_summary(date,date)",
+    "hash": "948a167d0e1c1f7602c9111934bc5064"
+  },
+  {
+    "signature": "get_fin_dfc_summary(date,date)",
+    "hash": "5d9c6bdb408b62e7814923a4f37185b3"
+  },
+  {
+    "signature": "get_fin_dre_summary(date,date)",
+    "hash": "3f27ae9e6194a699076dd2847a4f7957"
+  },
+  {
+    "signature": "get_fin_fluxo_projecao(integer,numeric)",
+    "hash": "9109abd609aab3b99c573e3410d133e3"
+  },
+  {
+    "signature": "get_fin_kpis(date,date)",
+    "hash": "664387d3b1d568071b174f002783ba23"
+  },
+  {
+    "signature": "get_fin_kpis(integer)",
+    "hash": "92238a9ace1329ee611ed97d510778b2"
+  },
+  {
+    "signature": "get_fin_lancamentos_totais(date,date,text,uuid,text,uuid,boolean)",
+    "hash": "5e277952caf96ea0d46d83b7e699a015"
+  },
+  {
+    "signature": "get_fin_orcamento_arvore(text)",
+    "hash": "188ec83efacf6da8534fe21b9343a974"
+  },
+  {
+    "signature": "get_fin_presentation_category_metadata()",
+    "hash": "2abfacdd232762bbdc2dc6ffbc762350"
+  },
+  {
+    "signature": "get_fin_presentation_decision(uuid)",
+    "hash": "7ab61d41da7c7430905d2a43416cb2f2"
+  },
+  {
+    "signature": "get_fin_presentation_detail_rows(date,date,text,text,uuid,text,integer,integer)",
+    "hash": "a87ea8e1089fdcc7601a59a954521a8e"
+  },
+  {
+    "signature": "get_fin_presentation_detail_series(date,date,text,text,uuid,text)",
+    "hash": "31573595e0f98f7ab0ea17d1d1a3b446"
+  },
+  {
+    "signature": "get_fin_presentation_expense_details(text,uuid,jsonb,integer)",
+    "hash": "00b4135e8a282ba6fb845be03c4df01b"
+  },
+  {
+    "signature": "get_fin_presentation_expenses(text,integer[])",
+    "hash": "6b13ef4e428317e9d3ce3bcabebb1083"
+  },
+  {
+    "signature": "get_fin_presentation_minutes_export(uuid)",
+    "hash": "1e69dcc235cc6952b268483deffae0c6"
+  },
+  {
+    "signature": "get_fin_presentation_plan(date,date,text,text,text,uuid,integer,integer)",
+    "hash": "02550da5610f75fcc778ea47ef09663b"
+  },
+  {
+    "signature": "get_fin_presentation_revenue(text,integer[])",
+    "hash": "0f0d33e6edc7ae3f0acb13bfe6e15848"
+  },
+  {
+    "signature": "get_fin_presentation_session(uuid)",
+    "hash": "52131adb07921e15a0e07bd2d81ccdde"
+  },
+  {
+    "signature": "get_fin_presentation_socios(date,date,date,date,date,date,text,integer)",
+    "hash": "9ef37bc5633a2278c21328b62220849e"
+  },
+  {
+    "signature": "get_fin_saldo_atual(uuid,date)",
+    "hash": "051dac1afd188899e1fea13d3efaced8"
+  },
+  {
+    "signature": "get_fin_saldo_conta_em(uuid,date)",
+    "hash": "5ee001b6b7829ff3199ab8c493f28996"
+  },
+  {
+    "signature": "get_inactive_stock_items()",
+    "hash": "7460f912e47f4c5194d4e5dd55e5ba58"
+  },
+  {
+    "signature": "get_movimentacoes_kpis(uuid,text,date,date,boolean)",
+    "hash": "a3624f5bf19985f171b514eb8c9be14e"
+  },
+  {
+    "signature": "get_my_company_context()",
+    "hash": "b72d64cebde74504429b9acd3352eb79"
+  },
+  {
+    "signature": "get_or_set_cache(text,integer)",
+    "hash": "5c7a4f72996ee96bafbbbd943b87c88e"
+  },
+  {
+    "signature": "get_relatorios_compras(date,date)",
+    "hash": "e393ea7557a7db7cc555356f8d4ec402"
+  },
+  {
+    "signature": "get_relatorios_compras(text,text)",
+    "hash": "ec04b7063749edd85b108a3f579a85d2"
+  },
+  {
+    "signature": "get_relatorios_kpis(date,date)",
+    "hash": "4c1c6a7e2095ad0afb86e2a56566f605"
+  },
+  {
+    "signature": "get_relatorios_kpis(text,text)",
+    "hash": "c106b5573ea94176651a3a2afca2da5d"
+  },
+  {
+    "signature": "get_relatorios_score(date,date)",
+    "hash": "310c494442e33f499c3dc55394414af9"
+  },
+  {
+    "signature": "get_relatorios_score(text,text)",
+    "hash": "a09e281e07094942e78b24bfabd558fe"
+  },
+  {
+    "signature": "get_relatorios_tendencia(date,date)",
+    "hash": "11056f95e933acae2a42f390ba6951c5"
+  },
+  {
+    "signature": "get_relatorios_tendencia(text,text)",
+    "hash": "cd2a85dde5a24418fbec8b48cffe2307"
+  },
+  {
+    "signature": "get_report_item_detail(uuid,date,date)",
+    "hash": "87279c2b17e67eb516142fd8d456628e"
+  },
+  {
+    "signature": "get_report_items_summary(date,date)",
+    "hash": "a6b56019942bcef2d98afdffb340a419"
+  },
+  {
+    "signature": "get_rh_beneficios_total()",
+    "hash": "dd907ec136ad561ea35bcdd0bdc35817"
+  },
+  {
+    "signature": "get_saldo_conta(uuid)",
+    "hash": "8af960ebb4b1ad76a1ddbf1cd84a45a9"
+  },
+  {
+    "signature": "get_saldo_produto(uuid)",
+    "hash": "1df9e419d06f54452e9ab78030a6ea5c"
+  },
+  {
+    "signature": "get_saldo_produtos(uuid[])",
+    "hash": "79c2ba6ea9b1030db7927135f8001da3"
+  },
+  {
+    "signature": "get_salmon_dashboard_summary(date,date)",
+    "hash": "bc1e7723566cbeef8fb1e231b2cbed80"
+  },
+  {
+    "signature": "get_salmon_inventory_adjustment_kg()",
+    "hash": "be809426fbdb462daac9e8bffca7b50d"
+  },
+  {
+    "signature": "get_salmon_reconciliation_kpis()",
+    "hash": "dc150f0b70de3327b18036c1bdda979a"
+  },
+  {
+    "signature": "get_spend_by_sector(date,date,boolean)",
+    "hash": "1bad08007419d0225a8bd915fefd9fda"
+  },
+  {
+    "signature": "get_stock_consumption_history(date,date,text,uuid,text)",
+    "hash": "d1992f315fbb4b3cf17876f9893940f2"
+  },
+  {
+    "signature": "get_stock_dashboard(integer)",
+    "hash": "d2dd42ac4f445cec81a604a997808f8e"
+  },
+  {
+    "signature": "get_stock_losses_report(date,date,text,uuid,text,text,text)",
+    "hash": "00d7ed3117c468d07d1ea4ac54599e4e"
+  },
+  {
+    "signature": "get_stock_predictive_analysis_v2(text,uuid,integer,boolean,boolean)",
+    "hash": "141c76c4c973257fd7e181bf55d72120"
+  },
+  {
+    "signature": "get_stock_predictive_analysis(text,uuid,integer,integer,boolean)",
+    "hash": "6a024687b56a75a5192a7a5f6a11eaa0"
+  },
+  {
+    "signature": "get_stock_summary()",
+    "hash": "f37bd25e3a70c6f7ca89f45cbcdc4f5e"
+  },
+  {
+    "signature": "get_stock_top_consumed(date,date,text,integer,text)",
+    "hash": "19f734caa816e1d20ee8803d1847da38"
+  },
+  {
+    "signature": "get_supplier_ranking(uuid,text,integer,integer,text)",
+    "hash": "b6cecd23c7303fd4bf3e1ab6f3857f92"
+  },
+  {
+    "signature": "handle_first_admin()",
+    "hash": "198eb0e188889228a30595da4b3ee1a4"
+  },
+  {
+    "signature": "handle_new_user()",
+    "hash": "8824142c9fc88fa476de0073df520a1c"
+  },
+  {
+    "signature": "has_any_permission(uuid,text[])",
+    "hash": "339332a1bbd079c914ea377c93974dc1"
+  },
+  {
+    "signature": "has_compras_view(uuid)",
+    "hash": "660a1208f0f1ccd7b749c5f9e9d88d86"
+  },
+  {
+    "signature": "has_permission_quick(uuid,text)",
+    "hash": "b1d1a621e0f177f6160ee0e0df97829b"
+  },
+  {
+    "signature": "has_permission(text)",
+    "hash": "0e016b55669c0a24f661f86e00424cfd"
+  },
+  {
+    "signature": "has_permission(uuid,text)",
+    "hash": "e2cd02acb98d4bfb7f381d91c6020cc4"
+  },
+  {
+    "signature": "has_role(uuid,app_role)",
+    "hash": "7c270e176323672f0bef11e7e85726e5"
+  },
+  {
+    "signature": "immutable_unaccent(text)",
+    "hash": "e6cb61f7a5b63a6f696dce1f75fe3a15"
+  },
+  {
+    "signature": "is_company_member(uuid,uuid)",
+    "hash": "4e351f8c65051fd3da9c94977b8be830"
+  },
+  {
+    "signature": "list_companies()",
+    "hash": "bd2071c2534a9aec4f6aba719594ae08"
+  },
+  {
+    "signature": "list_fin_contas_pagar_abertas(text,numeric,date,integer)",
+    "hash": "d9bb9d8766f0ca6eee4a3c8ebad08f32"
+  },
+  {
+    "signature": "list_fin_contas_pagar_cursor(text,text,text,integer,date,uuid,date,date,uuid,uuid,boolean)",
+    "hash": "1798b6981e81ac454d006fdf64c69662"
+  },
+  {
+    "signature": "list_fin_contas_receber_cursor(text,text,text,integer,date,uuid,date,date,uuid,uuid,boolean)",
+    "hash": "02ce55c1da12ed7043f1631a8642a8f1"
+  },
+  {
+    "signature": "list_fin_lancamentos_cursor(date,date,text,text,uuid,text,integer,date,uuid,text,uuid,boolean)",
+    "hash": "35af5bb5b31f60e825831ff8c790cb3d"
+  },
+  {
+    "signature": "list_fin_lancamentos_cursor(date,date,text,text,uuid,text,integer,date,uuid)",
+    "hash": "65bdb728f7511c38ee06e506ee0951bf"
+  },
+  {
+    "signature": "list_fin_presentation_decisions(date,date,text,uuid,text,text,integer,integer)",
+    "hash": "97b18c472ae57ce661647aa489767002"
+  },
+  {
+    "signature": "list_fin_presentation_sessions(date,date,text,uuid,uuid,text,integer,integer)",
+    "hash": "c6864b7e309694af3cf3aefb2a0b8011"
+  },
+  {
+    "signature": "list_movimentacoes_cursor(text,uuid,text,text,date,date,boolean,timestamp with time zone,uuid,integer)",
+    "hash": "ef93cbd481c120212e1a3a831bdbe04a"
+  },
+  {
+    "signature": "list_my_companies()",
+    "hash": "bf98e746f2660558f709a5747ed01e17"
+  },
+  {
+    "signature": "list_profiles_minimal(text,integer)",
+    "hash": "3a17aa4892e0a10e1da20550195543ff"
+  },
+  {
+    "signature": "list_purchase_orders_cursor(integer,timestamp with time zone,uuid,text,text,text,text,text)",
+    "hash": "48cbb3eb1eb1d4665c09bc7a3582c980"
+  },
+  {
+    "signature": "list_report_items_cursor(date,date,integer,timestamp with time zone,uuid,text,text,text,boolean)",
+    "hash": "f684ce488c02880a6a7b45091fe7604e"
+  },
+  {
+    "signature": "list_report_items_page(date,date,integer,integer,text,text,text,boolean)",
+    "hash": "aa80d6a6cac292550d1fb73dfd3ef3f2"
+  },
+  {
+    "signature": "list_solic_compra_mercado_cursor(integer,timestamp with time zone,uuid,text,text,uuid,text,date,date)",
+    "hash": "adcd98fb0e9cc75fa4331df5df27658a"
+  },
+  {
+    "signature": "list_stock_transfers(date,date,uuid,text,integer,integer)",
+    "hash": "247b56de5c537cb41bace34d34444b9b"
+  },
+  {
+    "signature": "log_audit(text,text,text,text,text,jsonb,jsonb,jsonb)",
+    "hash": "841885508b2f38ec2336bcfd0cc10e5d"
+  },
+  {
+    "signature": "log_audit(text,text,text,uuid,text,jsonb,jsonb,jsonb)",
+    "hash": "b26eb4adf9e4f1a2422dafb90ba98734"
+  },
+  {
+    "signature": "log_integration_error(text,text,text,text,jsonb)",
+    "hash": "f745050252d9dfa10754d24ab3aada97"
+  },
+  {
+    "signature": "mark_all_notifications_read()",
+    "hash": "2593645c43be89341a97b3a047733216"
+  },
+  {
+    "signature": "onboard_new_company(text,text,uuid)",
+    "hash": "b8fc02fccc0e24b383a9a9ebde368871"
+  },
+  {
+    "signature": "orcamento_execucao_mensal(text)",
+    "hash": "cfce5d838e494cfab3df40ea82a5f420"
+  },
+  {
+    "signature": "pay_conta_pagar(uuid,text,date,uuid)",
+    "hash": "c0d2f14706d467cbde1376ec9de5a4a5"
+  },
+  {
+    "signature": "preview_regra_categorizacao(text,text)",
+    "hash": "0dbc395f943cc47e8d5901b539f78037"
+  },
+  {
+    "signature": "produtos_force_company_id()",
+    "hash": "01d04fbe3a259c85242cb15e2a1b7c8d"
+  },
+  {
+    "signature": "protect_profile_identity_scope()",
+    "hash": "fa71367acebf0058ce52a4312526c68c"
+  },
+  {
+    "signature": "rbac_permissions_diff(jsonb)",
+    "hash": "9776713b87b6554b975f84cc76d992b6"
+  },
+  {
+    "signature": "rbac_sql_lint_report_admin(uuid)",
+    "hash": "a6e3b9a643625a32b2a57f3e5fec02d9"
+  },
+  {
+    "signature": "rbac_sql_lint_report_internal()",
+    "hash": "b47d5408b5f843bb7d5fbeb9690e56dc"
+  },
+  {
+    "signature": "rbac_sql_lint_report_quick(uuid)",
+    "hash": "6252597bf4472eb7180370a2d3928477"
+  },
+  {
+    "signature": "rbac_sql_lint_report()",
+    "hash": "20d91f739832af307f0680d836f75cbf"
+  },
+  {
+    "signature": "rbac_top_legacy_usage(integer,integer)",
+    "hash": "c7fa75346512d347f7256ae29c553a71"
+  },
+  {
+    "signature": "recalc_product_costs(uuid)",
+    "hash": "567e550b359c25dafc83771d6e4f1b03"
+  },
+  {
+    "signature": "receive_conta_receber(uuid,text,date)",
+    "hash": "3daae02376fe172ac6b93a02e64fb886"
+  },
+  {
+    "signature": "receive_market_order_atomic(uuid,jsonb,text)",
+    "hash": "362a129ee109b27ed135af0299c3f8ec"
+  },
+  {
+    "signature": "receive_purchase_order_atomic(uuid,jsonb,jsonb)",
+    "hash": "26322b53f62d1d1ccc824c759300cc39"
+  },
+  {
+    "signature": "reconcile_auto_bind_transfer_counterparts(uuid,jsonb)",
+    "hash": "ea6a0af0117d0843934816148a4da139"
+  },
+  {
+    "signature": "reconcile_batch_lancamentos(uuid[])",
+    "hash": "b261b20bbd5a377cbde150c92e0cd5d3"
+  },
+  {
+    "signature": "reconcile_bind_extrato(uuid,text,text,uuid)",
+    "hash": "019c7c4f1755f5b0b69e462831418974"
+  },
+  {
+    "signature": "reconcile_create_transfer_from_extrato(date,numeric,text,uuid,uuid,text,text)",
+    "hash": "bee0f27014043120abc68188d8b5ff8a"
+  },
+  {
+    "signature": "reconcile_create_transfer(date,numeric,text,uuid,uuid,uuid)",
+    "hash": "be8274b844199c8c5dfdecd5f0fc3c57"
+  },
+  {
+    "signature": "reconcile_ignorar_lancamento(uuid,date,numeric,text,text,uuid)",
+    "hash": "29b33e4a2ed3d01a45531143853a5d26"
+  },
+  {
+    "signature": "reconcile_import_lancamento(date,text,numeric,text,uuid,uuid,jsonb,text,boolean,integer)",
+    "hash": "977d26ca6f02e34a00d500dce874c320"
+  },
+  {
+    "signature": "reconcile_link_existing_lancamento(uuid,uuid,text,text,date)",
+    "hash": "9432a5cb427aae5eab203ca3ad6ed2d3"
+  },
+  {
+    "signature": "reconcile_neutralize_contamax(uuid,jsonb)",
+    "hash": "17d3f76cc30a5f3438f3a7802a6563f0"
+  },
+  {
+    "signature": "reconcile_pay_conta_pagar(uuid,uuid,date,uuid,numeric,text,uuid)",
+    "hash": "bc34c29b3de9ef8ee29c333076304bf9"
+  },
+  {
+    "signature": "reconcile_receive_conta_receber(uuid,uuid,date,uuid,numeric,text,uuid)",
+    "hash": "92588da8c1b57feb9a956bbcb248eb15"
+  },
+  {
+    "signature": "reconcile_reconsiderar_ignorada(uuid)",
+    "hash": "609bdd1dc3430c912ddaaceb8cba14ee"
+  },
+  {
+    "signature": "refresh_materialized_views()",
+    "hash": "6c3cf0451140358d1e54543ed021c2c5"
+  },
+  {
+    "signature": "refresh_saldo_cache(uuid)",
+    "hash": "03da197147c7f3c70bf5fd57c922a5c5"
+  },
+  {
+    "signature": "reject_ponto_record(uuid,text)",
+    "hash": "db6c364c2274c5e2513166afca5abc25"
+  },
+  {
+    "signature": "relatorio_socios_resumo(text)",
+    "hash": "525c1c8b66522fdf5936e0bc0421764b"
+  },
+  {
+    "signature": "reopen_inventory(uuid,text)",
+    "hash": "796a741cc4b39fbb8aa1a6edfbb355b4"
+  },
+  {
+    "signature": "reorder_fin_categoria(uuid,text)",
+    "hash": "9b0fb56d173d272047bc466604c0d8a1"
+  },
+  {
+    "signature": "reserve_company_invitation(uuid,uuid,text)",
+    "hash": "96c1007ab4194fe600de7f5d33d2cf03"
+  },
+  {
+    "signature": "rpc_confirmacoes_approve(uuid)",
+    "hash": "d64c67853334d6c6e8b1aaf0fb61755d"
+  },
+  {
+    "signature": "rpc_create_company(text,text)",
+    "hash": "99eb617eecda215482d743a246aa5df1"
+  },
+  {
+    "signature": "rpc_delete_fechamento_caixa(uuid)",
+    "hash": "dc5dc6f74f8afa04639e52161b520048"
+  },
+  {
+    "signature": "rpc_recebimentos_close(uuid,boolean,text)",
+    "hash": "641fde95377056d579e71abb1233830b"
+  },
+  {
+    "signature": "rpc_set_user_company(uuid,uuid)",
+    "hash": "cc8d9fcdb578e088d1cc01f202200ead"
+  },
+  {
+    "signature": "rpc_upsert_fechamento_caixa_com_marcas(date,numeric,numeric,numeric,text,jsonb,timestamp with time zone)",
+    "hash": "706c7f1fed23ff923e932bda01b5a883"
+  },
+  {
+    "signature": "rpc_upsert_fechamento_caixa(date,numeric,numeric,numeric,text,timestamp with time zone)",
+    "hash": "e19de1efb884cd8c7fd08944b295a25c"
+  },
+  {
+    "signature": "rpc_upsert_fechamento_caixa(date,numeric,numeric,numeric,text)",
+    "hash": "3e0deec7ad857d200e6063a616dcb90b"
+  },
+  {
+    "signature": "save_cotacao_ia_config(text,text,text,boolean)",
+    "hash": "3905a234ef84b3227c95e5498e157cd9"
+  },
+  {
+    "signature": "save_cotacao_respostas_atomic(uuid,jsonb,jsonb)",
+    "hash": "43bf3fd01d66deb7d7ffb84e4e837603"
+  },
+  {
+    "signature": "save_cotacao_sugestao(uuid,text,numeric,numeric,jsonb,jsonb)",
+    "hash": "f7de01ed360379f18b2b1d50e86a1e22"
+  },
+  {
+    "signature": "save_cotacao_zapi_config(text,text,text,text,text,boolean)",
+    "hash": "2f3f0e881c099c9a80aae02f5a0d2331"
+  },
+  {
+    "signature": "seed_default_categories()",
+    "hash": "f78669e546bc52a40a9653471483b5a8"
+  },
+  {
+    "signature": "set_cache(text,jsonb,integer)",
+    "hash": "dc7ed22cecfd6744e6b73eba0f846be3"
+  },
+  {
+    "signature": "set_stock_movement_direction()",
+    "hash": "a126e95ebd0503a516c7b8d24bb36d96"
+  },
+  {
+    "signature": "set_updated_at()",
+    "hash": "a475bd8584c23f5ef44cf6bf1ad40d01"
+  },
+  {
+    "signature": "simulate_relatorios_score(date,date,jsonb)",
+    "hash": "53163bb1ef1e3dd7c7dec35e1d3a2d7c"
+  },
+  {
+    "signature": "simulate_relatorios_score(text,text,jsonb)",
+    "hash": "bd8813a4a2c073eaec7fe51b7929616b"
+  },
+  {
+    "signature": "soft_delete_cotacao(uuid,timestamp with time zone)",
+    "hash": "8ad793e95b4c1eebe53afe129ffd5b80"
+  },
+  {
+    "signature": "soft_delete_inventory(uuid,text)",
+    "hash": "42bb52e69e5bef239146712c9cb43d8a"
+  },
+  {
+    "signature": "stock_insert_movement_atomic(uuid,numeric,text,text,text,text,text,text,text,jsonb)",
+    "hash": "56774860b7bf79dfb2eff0186f87d083"
+  },
+  {
+    "signature": "stock_transfer_between_locations(uuid,text,text,numeric,text)",
+    "hash": "612a69553ba0f7e02fee09fb9b684069"
+  },
+  {
+    "signature": "storno_purchase_order_stock(uuid)",
+    "hash": "ddb806614e9d97e4a68a3a4b2c8df0d2"
+  },
+  {
+    "signature": "strip_html(text)",
+    "hash": "5debc9bf8fed27807f821863eec49791"
+  },
+  {
+    "signature": "sync_permissions_from_registry(jsonb)",
+    "hash": "41129d1f143180f31bbfcae499b4ea3e"
+  },
+  {
+    "signature": "trg_block_placeholder_company()",
+    "hash": "8c477702989856a5740ce082cdcf8d7f"
+  },
+  {
+    "signature": "trg_ficha_itens_invalidate_parent()",
+    "hash": "05b6988120237cf0cca102a7d9af4fe4"
+  },
+  {
+    "signature": "trg_fin_category_propagate_reporting_class()",
+    "hash": "21b9925ec4803ee3e832a60ff56f9040"
+  },
+  {
+    "signature": "trg_fin_contas_pagar_aprovado_em()",
+    "hash": "013dc1b6cc03b1cbb5ce22ed17b56b5c"
+  },
+  {
+    "signature": "trg_fin_ensure_non_operational_categories()",
+    "hash": "6654aaf507d77ea3e97603a58dd4081e"
+  },
+  {
+    "signature": "trg_fin_rateio_report_exclusion()",
+    "hash": "b19577d50b43143343ca47678303070f"
+  },
+  {
+    "signature": "trg_fin_require_category_on_reconciliation()",
+    "hash": "8145fb1172bf7b2a381429a353b195d8"
+  },
+  {
+    "signature": "trg_force_company_alertas_falta()",
+    "hash": "5ab4437194d70dea9f9da5393b390d95"
+  },
+  {
+    "signature": "trg_mask_numero_cartao()",
+    "hash": "d1e11b5fa574a7acd1f58b21fa74d702"
+  },
+  {
+    "signature": "trg_po_block_post_approval_changes()",
+    "hash": "3041d45c94a0fa33e46fb877a6150a52"
+  },
+  {
+    "signature": "trg_refresh_saldo_cache_conta()",
+    "hash": "38cd41ddcfc07fc8dc3021531f437c04"
+  },
+  {
+    "signature": "trg_refresh_saldo_cache_lancamento()",
+    "hash": "72149303ca5433d113d4aa5339852b18"
+  },
+  {
+    "signature": "trg_set_updated_at()",
+    "hash": "1425f5178264da995326ee8c0846e3ff"
+  },
+  {
+    "signature": "trg_validate_fin_lancamento_update()",
+    "hash": "d790487b7115b468512cee3b9e683ea5"
+  },
+  {
+    "signature": "trg_validate_rateio_sum()",
+    "hash": "492ef56cff30dfa95fd1844a911a71d9"
+  },
+  {
+    "signature": "unreconcile_lancamento(uuid)",
+    "hash": "a8fb3d64813880e07a717aac62f92c52"
+  },
+  {
+    "signature": "update_company(uuid,text,text,boolean)",
+    "hash": "1e83056ea4386049deeba4c1030bd7cc"
+  },
+  {
+    "signature": "update_cotacao_atomic(uuid,text,text,date,jsonb,jsonb,timestamp with time zone)",
+    "hash": "904131d694a928bc37ff807c0348282f"
+  },
+  {
+    "signature": "update_produto_last_movement()",
+    "hash": "8db8af53cd48ec3a587cdc129d2f7206"
+  },
+  {
+    "signature": "update_transfer(uuid,numeric,date,text,uuid,uuid)",
+    "hash": "f11cf0ebe803be32832bc7327b57e9cf"
+  },
+  {
+    "signature": "update_updated_at_column()",
+    "hash": "3210625d1c794f6db7b3c3defc5984dd"
+  },
+  {
+    "signature": "upsert_salmon_leftover_atomic(date,numeric,text)",
+    "hash": "0ce1ab02f1ee4889c724f1a5025acc56"
+  },
+  {
+    "signature": "upsert_supplier(text)",
+    "hash": "ea5e790b1608da95c56d2731f8ddb9ac"
+  },
+  {
+    "signature": "validate_cp_valor()",
+    "hash": "5154dc6839e86dde1929ceb58843c615"
+  },
+  {
+    "signature": "validate_cr_valor()",
+    "hash": "352da65c783fa65e54450fceebc966e2"
+  },
+  {
+    "signature": "validate_estorno_movement()",
+    "hash": "1185b9d20417713f9c8b7ee0a27f0dc3"
+  },
+  {
+    "signature": "validate_fechamento_marca_total()",
+    "hash": "0744e699bc9293ab945404c5c816e2bf"
+  },
+  {
+    "signature": "validate_fin_lancamento()",
+    "hash": "18cabcba86ac8f5786e4f0881703a941"
+  },
+  {
+    "signature": "validate_marca_categoria_vinculo()",
+    "hash": "011359351c565848df48cd12d8bba65f"
+  },
+  {
+    "signature": "validate_ponto_ferias()",
+    "hash": "28011c7f19412ab6df7dc90fe35b0654"
+  },
+  {
+    "signature": "validate_ponto_registro()",
+    "hash": "cbaaa4ebf390b6b7d31562ee23bac517"
+  },
+  {
+    "signature": "validate_ponto_update()",
+    "hash": "008e1c127743eaac3ae2a9cbfb0271d7"
+  },
+  {
+    "signature": "validate_purchase_order_item()",
+    "hash": "60c68353649f99479fc172aa49ff1733"
+  },
+  {
+    "signature": "validate_requisicao_item_status()",
+    "hash": "76f3bf50c98884a801c762ca62dc1757"
+  },
+  {
+    "signature": "validate_rh_banco_horas_numeric()",
+    "hash": "0e12197e2c406cb3cbfb5b46a1fc47ea"
+  },
+  {
+    "signature": "validate_rh_beneficios_numeric()",
+    "hash": "6ce3825750724ab567cbd6c0a5ac801f"
+  },
+  {
+    "signature": "validate_rh_colaboradores_numeric()",
+    "hash": "b572144ccf74b2ba9afb41d0932791e2"
+  },
+  {
+    "signature": "validate_rh_folha_numeric()",
+    "hash": "4419a87f1499bd3be02749f12f4a1ec3"
+  },
+  {
+    "signature": "validate_salmon_entry()",
+    "hash": "556ec046d4477d301fcc80e2235f091b"
+  },
+  {
+    "signature": "validate_salmon_manipulation()",
+    "hash": "00eda507d2eb6461a3937df6dea790e7"
+  },
+  {
+    "signature": "validate_stock_movement()",
+    "hash": "d2f22845b71d289db70e55262ef728b4"
+  },
+  {
+    "signature": "validate_supplier_item_price()",
+    "hash": "136331a3edc3c3a053dc9920933e8b8f"
+  }
+]

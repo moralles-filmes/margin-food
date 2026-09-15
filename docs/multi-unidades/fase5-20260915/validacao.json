@@ -1,0 +1,45 @@
+{
+  "codeCommit": "59157c2",
+  "database": "moralles_phase5_test_release",
+  "sqlAssertions": [
+    67,
+    175,
+    146
+  ],
+  "driftCases": [
+    "body",
+    "column",
+    "acl",
+    "caller",
+    "index",
+    "column_acl",
+    "trigger",
+    "policy",
+    "overload",
+    "table_acl"
+  ],
+  "concurrency": {
+    "phase5": 13,
+    "phase4Regression": 15,
+    "database": "moralles_phase5_test_release_races"
+  },
+  "unit": {
+    "passed": 773,
+    "files": 97
+  },
+  "lint": {
+    "errors": 0,
+    "warnings": 1355
+  },
+  "typescript": [
+    "app PASS",
+    "node PASS"
+  ],
+  "build": "PASS",
+  "deno": "No Edge changed in Phase5",
+  "securityCheck": "static PASS; SQL skipped due to absent service configuration",
+  "migrationSha256": "2e25ed4afb4827157a0592f9c74ee210e99a2d18ac58b837a41477e8a4e67690",
+  "httpGatewayTested": false,
+  "authenticatedBrowserTested": false,
+  "productionWrites": 0
+}

@@ -1,0 +1,17 @@
+{
+  "prices": 4,
+  "versions": [
+    "20260910003448"
+  ],
+  "suppliers": 54,
+  "checked_at": "2026-09-15T23:16:28.079223+00:00",
+  "price_null_uuid": 0,
+  "upsert_supplier_md5": "ea5e790b1608da95c56d2731f8ddb9ac",
+  "price_orphan_or_cross": 0,
+  "exact_duplicate_groups": 0,
+  "quote_cross_supplier_id": 0,
+  "salmon_null_supplier_id": 5,
+  "salmon_cross_supplier_id": 0,
+  "salmon_unmatched_name_snapshot": 0,
+  "similar_name_groups_for_review_only": 0
+}

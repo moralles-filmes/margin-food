@@ -1,0 +1,76 @@
+[
+  {
+    "acl": [
+      "postgres=X/postgres",
+      "authenticated=X/postgres"
+    ],
+    "anon": false,
+    "owner": "postgres",
+    "definer": true,
+    "signature": "get_supplier_ranking(uuid,text,integer,integer,text)",
+    "search_path": [
+      "search_path=public, pg_temp"
+    ],
+    "service_role": false,
+    "authenticated": true
+  },
+  {
+    "acl": [
+      "postgres=X/postgres",
+      "authenticated=X/postgres"
+    ],
+    "anon": false,
+    "owner": "postgres",
+    "definer": true,
+    "signature": "receive_purchase_order_atomic(uuid,jsonb,jsonb)",
+    "search_path": [
+      "search_path=public, pg_temp"
+    ],
+    "service_role": false,
+    "authenticated": true
+  },
+  {
+    "acl": [
+      "postgres=X/postgres",
+      "authenticated=X/postgres"
+    ],
+    "anon": false,
+    "owner": "postgres",
+    "definer": true,
+    "signature": "upsert_supplier(text)",
+    "search_path": [
+      "search_path=\"\""
+    ],
+    "service_role": false,
+    "authenticated": true
+  },
+  {
+    "acl": [
+      "postgres=X/postgres",
+      "authenticated=X/postgres"
+    ],
+    "anon": false,
+    "owner": "postgres",
+    "definer": true,
+    "signature": "upsert_supplier_price(text,uuid,numeric,text)",
+    "search_path": [
+      "search_path=\"\""
+    ],
+    "service_role": false,
+    "authenticated": true
+  },
+  {
+    "acl": [
+      "postgres=X/postgres"
+    ],
+    "anon": false,
+    "owner": "postgres",
+    "definer": true,
+    "signature": "validate_supplier_item_price()",
+    "search_path": [
+      "search_path=\"\""
+    ],
+    "service_role": false,
+    "authenticated": false
+  }
+]

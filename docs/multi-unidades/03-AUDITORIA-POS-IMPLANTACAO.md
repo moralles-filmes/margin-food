@@ -1,6 +1,6 @@
 # Auditoria pós-implantação multiunidade
 
-Data: 2026-09-15. **Fase 1 concluída; Fases 2, 3 e 4 implementadas e ensaiadas localmente, com publicação pendente. Estabilização ainda em andamento.**
+Data: 2026-09-15. **Fase 1 concluída; Fases 2, 3, 4 e 5 implementadas e ensaiadas localmente, com publicação pendente. Estabilização ainda em andamento.**
 
 Atualização Fase 2: [resultados, testes e sequência de produção](fase2-20260915/RESULTADOS.md). C01/C02 foram corrigidos no código e testados com 82 assertions SQL reais, cinco casos de drift e rollback de contenção; **continuam abertos em produção**, que recebeu somente leituras. A baseline e os achados abaixo preservam a auditoria da Fase 1.
 
@@ -11,6 +11,8 @@ Base: `main`, commit `1fdea27e69e3d687b49fdd04e91069b25cc70850`. Diretório inic
 Atualização Fase 4: [resultados, ACLs, testes e publicação](fase4-20260915/RESULTADOS.md). Main atualizada até `80dcf4e` foi integrada, preservando validade/FEFO e correção de estorno do Salmão. H04 corrigido localmente com 146 assertions SQL, oito recusas de drift e 15 checks de concorrência/recuo; regressão de 175 assertions de logs e 773 unitários aprovada. **Às 20:28 UTC, Fases 2/3/4 ainda ausentes do banco vivo.** O preflight histórico da Fase 3 precisa ser reconciliado com as assinaturas/corpos de Salmão já publicados; não foi contornado. `20260910003448` reapareceu no Git e histórico remoto, sem encerrar a revisão histórica da Fase 9. Próximo prompt: [Fase 5 — fornecedores](07-PROMPT-FASE-5.md).
 
 ## 1. Resumo executivo
+
+Atualização Fase 5: [resultados, consumers e operação](fase5-20260915/RESULTADOS.md). Fornecedor/preço manual atômico, FKs por empresa e recebimento corrigidos localmente; 67 assertions SQL, dez recusas de drift, 13 checks concorrência/recuo e regressões de 175/146 assertions + 15 checks Salmão aprovados. **Às 23:16 UTC, Fases 2/3/4/5 ainda ausentes do banco vivo; H05 aberto em produção.** Nenhum saneamento automático. Próximo prompt: [Fase 6 — produtos e permissões](08-PROMPT-FASE-6.md).
 
 A arquitetura de memberships e clientes imutáveis por empresa está presente e deve ser preservada. Os riscos encontrados estão em caminhos legados que continuam acessíveis no banco.
 
@@ -137,6 +139,8 @@ Todos os itens abaixo estão **ABERTOS em produção**. C01/C02 possuem correç�
 
 ### H05 — HIGH — upsert_supplier incompatível com unicidade existente
 
+**Fase 5:** migration `20260915225538` e consumer corrigidos/ensaiados localmente, incluindo recebimento e FKs de preço/cotação. A unicidade existente foi preservada; snapshots não foram convertidos indiscriminadamente. Publicação depende das Fases 2/3/4 reconciliadas; [evidências e limites](fase5-20260915/RESULTADOS.md). Baseline histórica abaixo mantida; snapshot novo: 54 fornecedores/quatro preços, zero vínculos cruzados nos preços.
+
 - Schema vivo: `suppliers_name_company_key UNIQUE(name,company_id)`; nenhum UNIQUE(name) isolado. company_id NOT NULL com DEFAULT get_current_company_id().
 - RPC: INSERT(name) e `ON CONFLICT(name) DO UPDATE`. O alvo não encontra índice árbitro compatível; erro esperado 42P10, sem chamar RPC de escrita em produção.
 - 52 fornecedores, zero company_id nulo, zero órfãos de empresa e zero grupos duplicados por (company_id,name).
@@ -242,7 +246,7 @@ A numeração abaixo é a deste trabalho; agrupa as 20 frentes do pedido origina
 | **2 — implementada/testada localmente; publicação pendente** | Contenção crítica: companies_admin/rpc_create_company e RPCs globais de manutenção | 82 assertions SQL e recuo seguro aprovados; faltam publicação, validação do scheduler externo e pós-validação viva |
 | 3 | Logs completos: escrita, leitura, histórico e escopo global | Implementado e ensaiado localmente; publicação/backfill pendentes ([resultados](fase3-20260915/RESULTADOS.md)) |
 | 4 | RPCs de Salmão, funções internas e grants | Implementada e ensaiada localmente; publicação pendente ([resultados](fase4-20260915/RESULTADOS.md)) |
-| 5 | Fornecedores e preço por item | Mesmo nome em A/B sem conflito, identidade correta no consumer |
+| 5 | Fornecedores e preço por item | Implementada e ensaiada localmente; publicação pendente ([resultados](fase5-20260915/RESULTADOS.md)) |
 | 6 | Produtos e inventário automático de permissões | Comparar backend vivo, migrations, Edges e frontend com registry; classificar VÁLIDA/LEGADA/FANTASMA/NÃO ENCONTRADA/DIVERGENTE/GLOBAL |
 | 7 | Todas as tabelas, INSERTs, RLS, views e SECURITY DEFINER | Classificação global/tenant, FKs/índices, guard/grant por função e testes reais dos achados |
 | 8 | Edges, Storage, Realtime, integrações e jobs | Tenant explícito/autorizado, revogação, isolamento de arquivos e canais e ausência de mistura em jobs |

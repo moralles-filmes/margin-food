@@ -1,0 +1,757 @@
+{
+  "method": "TypeScript AST; excludes tests and generated database types. Calls may be non-Supabase; dynamic targets and payload provenance require manual review.",
+  "files": [
+    {
+      "file": "src/components/compras/RankingFornecedoresView.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [],
+      "rpcs": [
+        {
+          "line": 75,
+          "name": "get_supplier_ranking"
+        },
+        {
+          "line": 116,
+          "name": "upsert_supplier_price"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 40,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/financeiro/ContasPagarSection.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 64,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 66,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 202,
+          "name": "fin_categorias"
+        },
+        {
+          "line": 203,
+          "name": "fin_centros_custo"
+        },
+        {
+          "line": 204,
+          "name": "fin_contas"
+        },
+        {
+          "line": 205,
+          "name": "suppliers"
+        },
+        {
+          "line": 250,
+          "name": "fin_contas_pagar"
+        },
+        {
+          "line": 257,
+          "name": "fin_lancamento_rateios"
+        },
+        {
+          "line": 316,
+          "name": "fin_contas_pagar"
+        },
+        {
+          "line": 323,
+          "name": "fin_lancamento_rateios"
+        },
+        {
+          "line": 482,
+          "name": "fin_contas_pagar"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 150,
+          "name": "list_fin_contas_pagar_cursor"
+        },
+        {
+          "line": 190,
+          "name": "get_fin_counts_by_status"
+        },
+        {
+          "line": 455,
+          "name": "_guarded_aprovar_conta_pagar"
+        },
+        {
+          "line": 502,
+          "name": "pay_conta_pagar"
+        },
+        {
+          "line": 532,
+          "name": "_guarded_estornar_conta_pagar"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 86,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/financeiro/CriarLancamentoExtratoDialog.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 84,
+          "name": "fin_categorias"
+        },
+        {
+          "line": 85,
+          "name": "fin_centros_custo"
+        },
+        {
+          "line": 86,
+          "name": "suppliers"
+        },
+        {
+          "line": 237,
+          "name": "fin_lancamentos"
+        },
+        {
+          "line": 283,
+          "name": "fin_contas_pagar"
+        },
+        {
+          "line": 299,
+          "name": "fin_lancamentos"
+        },
+        {
+          "line": 349,
+          "name": "fin_contas_receber"
+        },
+        {
+          "line": 360,
+          "name": "fin_lancamentos"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 144,
+          "name": "reconcile_bind_extrato"
+        },
+        {
+          "line": 204,
+          "name": "reconcile_import_lancamento"
+        },
+        {
+          "line": 249,
+          "name": "reconcile_import_lancamento"
+        },
+        {
+          "line": 314,
+          "name": "reconcile_import_lancamento"
+        }
+      ],
+      "writes": [
+        {
+          "line": 283,
+          "method": "insert"
+        },
+        {
+          "line": 349,
+          "method": "insert"
+        }
+      ],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 53,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/hooks/useCotacoesStore.ts",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 83,
+          "name": "cotacoes"
+        },
+        {
+          "line": 190,
+          "name": "cotacao_itens"
+        },
+        {
+          "line": 191,
+          "name": "cotacao_fornecedores"
+        },
+        {
+          "line": 199,
+          "name": "cotacao_respostas"
+        },
+        {
+          "line": 286,
+          "name": "cotacao_whatsapp_logs"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 140,
+          "name": "create_cotacao_atomic"
+        },
+        {
+          "line": 159,
+          "name": "update_cotacao_atomic"
+        },
+        {
+          "line": 174,
+          "name": "soft_delete_cotacao"
+        },
+        {
+          "line": 221,
+          "name": "save_cotacao_sugestao"
+        },
+        {
+          "line": 242,
+          "name": "create_purchase_orders_from_cotacao_atomic"
+        },
+        {
+          "line": 301,
+          "name": "save_cotacao_respostas_atomic"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [
+        108,
+        108
+      ],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 68,
+          "hook": "useSupabase"
+        },
+        {
+          "line": 69,
+          "hook": "useCompanyScope"
+        }
+      ],
+      "edgeInvocations": [
+        {
+          "line": 262,
+          "name": "send-whatsapp-zapi"
+        },
+        {
+          "line": 279,
+          "name": "cotacao-ia"
+        }
+      ]
+    },
+    {
+      "file": "src/hooks/useIntegracoesConfig.ts",
+      "imports": [
+        {
+          "line": 2,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [],
+      "rpcs": [
+        {
+          "line": 59,
+          "name": "get_cotacao_zapi_config"
+        },
+        {
+          "line": 60,
+          "name": "get_cotacao_ia_config"
+        },
+        {
+          "line": 78,
+          "name": "save_cotacao_zapi_config"
+        },
+        {
+          "line": 92,
+          "name": "save_cotacao_ia_config"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 47,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/hooks/usePurchaseOrdersStore.ts",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 156,
+          "name": "purchase_orders"
+        },
+        {
+          "line": 233,
+          "name": "purchase_order_items"
+        },
+        {
+          "line": 290,
+          "name": "profiles"
+        },
+        {
+          "line": 292,
+          "name": "notifications"
+        },
+        {
+          "line": 322,
+          "name": "purchase_order_items"
+        },
+        {
+          "line": 349,
+          "name": "purchase_order_items"
+        },
+        {
+          "line": 355,
+          "name": "purchase_orders"
+        },
+        {
+          "line": 364,
+          "name": "profiles"
+        },
+        {
+          "line": 366,
+          "name": "notifications"
+        },
+        {
+          "line": 393,
+          "name": "purchase_order_items"
+        },
+        {
+          "line": 453,
+          "name": "notifications"
+        },
+        {
+          "line": 462,
+          "name": "notifications"
+        },
+        {
+          "line": 486,
+          "name": "purchase_order_items"
+        },
+        {
+          "line": 518,
+          "name": "purchase_orders"
+        },
+        {
+          "line": 527,
+          "name": "purchase_orders"
+        },
+        {
+          "line": 582,
+          "name": "purchase_orders"
+        },
+        {
+          "line": 583,
+          "name": "profiles"
+        },
+        {
+          "line": 585,
+          "name": "notifications"
+        },
+        {
+          "line": 624,
+          "name": "purchase_order_items"
+        },
+        {
+          "line": 629,
+          "name": "purchase_orders"
+        },
+        {
+          "line": 661,
+          "name": "purchase_orders"
+        },
+        {
+          "line": 667,
+          "name": "notifications"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 136,
+          "name": "list_purchase_orders_cursor"
+        },
+        {
+          "line": 277,
+          "name": "create_purchase_order_atomic"
+        },
+        {
+          "line": 436,
+          "name": "receive_purchase_order_atomic"
+        },
+        {
+          "line": 497,
+          "name": "receive_purchase_order_atomic"
+        },
+        {
+          "line": 573,
+          "name": "edit_purchase_order_atomic"
+        },
+        {
+          "line": 614,
+          "name": "storno_purchase_order_stock"
+        }
+      ],
+      "writes": [
+        {
+          "line": 292,
+          "method": "insert"
+        },
+        {
+          "line": 366,
+          "method": "insert"
+        },
+        {
+          "line": 462,
+          "method": "insert"
+        },
+        {
+          "line": 585,
+          "method": "insert"
+        }
+      ],
+      "queryKeys": [],
+      "realtime": [
+        223
+      ],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 103,
+          "hook": "useSupabase"
+        },
+        {
+          "line": 104,
+          "hook": "useCompanyScope"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/hooks/useSalmonStore.ts",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        },
+        {
+          "line": 5,
+          "module": "@/integrations/supabase/client",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 127,
+          "name": "salmon_entries"
+        },
+        {
+          "line": 128,
+          "name": "salmon_manipulations"
+        },
+        {
+          "line": 129,
+          "name": "salmon_config"
+        },
+        {
+          "line": 130,
+          "name": "salmon_daily_records"
+        },
+        {
+          "line": 131,
+          "name": "suppliers"
+        },
+        {
+          "line": 132,
+          "name": "planning_metas_compra"
+        },
+        {
+          "line": 133,
+          "name": "salmon_metas_provisionadas"
+        },
+        {
+          "line": 134,
+          "name": "salmon_auditorias_compra"
+        },
+        {
+          "line": 262,
+          "name": "suppliers"
+        },
+        {
+          "line": 321,
+          "name": "suppliers"
+        },
+        {
+          "line": 331,
+          "name": "suppliers"
+        },
+        {
+          "line": 348,
+          "name": "planning_metas_compra"
+        },
+        {
+          "line": 388,
+          "name": "salmon_metas_provisionadas"
+        },
+        {
+          "line": 659,
+          "name": "salmon_daily_records"
+        },
+        {
+          "line": 686,
+          "name": "salmon_daily_records"
+        },
+        {
+          "line": 698,
+          "name": "salmon_config"
+        },
+        {
+          "line": 700,
+          "name": "salmon_config"
+        },
+        {
+          "line": 951,
+          "name": "salmon_auditorias_compra"
+        },
+        {
+          "line": 996,
+          "name": "salmon_entries"
+        },
+        {
+          "line": 1003,
+          "name": "salmon_manipulations"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 239,
+          "name": "get_salmon_inventory_adjustment_kg"
+        },
+        {
+          "line": 421,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 463,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 474,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 503,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 525,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 564,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 574,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 610,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 634,
+          "name": "<dynamic>"
+        }
+      ],
+      "writes": [
+        {
+          "line": 262,
+          "method": "insert"
+        },
+        {
+          "line": 348,
+          "method": "upsert"
+        },
+        {
+          "line": 388,
+          "method": "upsert"
+        },
+        {
+          "line": 659,
+          "method": "upsert"
+        },
+        {
+          "line": 951,
+          "method": "insert"
+        }
+      ],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 96,
+          "hook": "useSupabase"
+        },
+        {
+          "line": 97,
+          "hook": "useCompanyId"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "supabase/functions/cotacao-ia/index.ts",
+      "imports": [
+        {
+          "line": 16,
+          "module": "npm:@supabase/supabase-js@2",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 146,
+          "name": "cotacao_ia_config"
+        },
+        {
+          "line": 158,
+          "name": "cotacoes"
+        },
+        {
+          "line": 164,
+          "name": "cotacao_itens"
+        },
+        {
+          "line": 165,
+          "name": "cotacao_fornecedores"
+        },
+        {
+          "line": 172,
+          "name": "cotacao_respostas"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 63,
+          "name": "has_permission"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "supabase/functions/send-whatsapp-zapi/index.ts",
+      "imports": [
+        {
+          "line": 13,
+          "module": "npm:@supabase/supabase-js@2",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 134,
+          "name": "cotacoes"
+        },
+        {
+          "line": 143,
+          "name": "cotacao_zapi_config"
+        },
+        {
+          "line": 181,
+          "name": "cotacao_whatsapp_logs"
+        },
+        {
+          "line": 200,
+          "name": "cotacao_fornecedores"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 71,
+          "name": "has_permission"
+        }
+      ],
+      "writes": [
+        {
+          "line": 181,
+          "method": "insert"
+        }
+      ],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [],
+      "edgeInvocations": []
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "project": "wuzxpbixprrgssoeeaez",
+  "database_checked_at": "2026-09-15T23:16:28.079223+00:00",
+  "server_version": "17.6",
+  "pending_versions": ["20260915140812", "20260915144030", "20260915144031", "20260915200818", "20260915225538"],
+  "historical_version_20260910003448_present": true,
+  "production": {
+    "deployment": "dpl_79oubxDxhgVF4owXmEXiEP6QUV5N",
+    "commit": "80dcf4ec527d1a7e86ed3509496638b71219ab43",
+    "state": "READY",
+    "target": "production"
+  },
+  "edges": {
+    "scheduled-jobs": 7,
+    "inventario": 15,
+    "ficha-tecnica": 11,
+    "requisicao-estoque": 14,
+    "purchase-requisitions": 10
+  },
+  "preflight_phase5_read_only": "PASS",
+  "upsert_supplier_live_body_md5": "ea5e790b1608da95c56d2731f8ddb9ac",
+  "writes_in_production": 0,
+  "backup_restorability_proven": false,
+  "push": false
+}
