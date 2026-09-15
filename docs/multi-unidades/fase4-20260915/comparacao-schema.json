@@ -1,0 +1,25 @@
+{
+  "template": "moralles_phase3_test_phase4_current",
+  "productionFunctions": 321,
+  "equalFunctions": 309,
+  "expectedPhase2Phase3Differences": [
+    "_guarded_list_fin_audit_logs(text,text,text,integer,timestamp with time zone,uuid,integer)",
+    "audit_log_write(text,text,text,text,jsonb,jsonb,jsonb,text)",
+    "audit_trigger_fn()",
+    "cleanup_old_audit_logs(integer)",
+    "create_quick_inventory_atomic(jsonb,text,text)",
+    "log_audit(text,text,text,text,text,jsonb,jsonb,jsonb)",
+    "log_audit(text,text,text,uuid,text,jsonb,jsonb,jsonb)",
+    "log_integration_error(text,text,text,text,jsonb)",
+    "refresh_materialized_views()",
+    "rpc_create_company(text,text)",
+    "rpc_recebimentos_close(uuid,boolean,text)",
+    "stock_transfer_between_locations(uuid,text,text,numeric,text)"
+  ],
+  "additionalPublicFunctions": [
+    "backfill_log_scope(text,integer,boolean)",
+    "list_restricted_logs(text,text,integer,timestamp with time zone,uuid,text,text,text)",
+    "service_write_audit(uuid,uuid,text,text,text,uuid,jsonb,jsonb,jsonb)"
+  ],
+  "targetedCatalogPreflight": "PASS local and production READ ONLY"
+}

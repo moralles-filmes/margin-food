@@ -1,0 +1,1118 @@
+[
+  {
+    "acl": "{postgres=arwdDxtm/postgres,authenticated=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+    "rls": true,
+    "force": true,
+    "table": "movimentacoes_estoque",
+    "columns": [
+      {
+        "acl": null,
+        "name": "id",
+        "type": "uuid",
+        "default": "gen_random_uuid()",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "produto_id",
+        "type": "uuid",
+        "default": null,
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "data",
+        "type": "date",
+        "default": "CURRENT_DATE",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "tipo",
+        "type": "text",
+        "default": null,
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "quantidade",
+        "type": "numeric(12,3)",
+        "default": "0",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "custo_unitario",
+        "type": "numeric(12,2)",
+        "default": "0",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "custo_total",
+        "type": "numeric(12,2)",
+        "default": "0",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "origem",
+        "type": "text",
+        "default": "''::text",
+        "notnull": false,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "referencia_id",
+        "type": "text",
+        "default": "''::text",
+        "notnull": false,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "observacao",
+        "type": "text",
+        "default": "''::text",
+        "notnull": false,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "created_by",
+        "type": "uuid",
+        "default": null,
+        "notnull": false,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "default": "now()",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "status",
+        "type": "text",
+        "default": "'ATIVO'::text",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "estorno_de_id",
+        "type": "uuid",
+        "default": null,
+        "notnull": false,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "justificativa_cancelamento",
+        "type": "text",
+        "default": null,
+        "notnull": false,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "cancelado_por",
+        "type": "uuid",
+        "default": null,
+        "notnull": false,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "cancelado_em",
+        "type": "timestamp with time zone",
+        "default": null,
+        "notnull": false,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "editado_por",
+        "type": "uuid",
+        "default": null,
+        "notnull": false,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "editado_em",
+        "type": "timestamp with time zone",
+        "default": null,
+        "notnull": false,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "justificativa_edicao",
+        "type": "text",
+        "default": null,
+        "notnull": false,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "setor",
+        "type": "text",
+        "default": null,
+        "notnull": false,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "reference_type",
+        "type": "text",
+        "default": null,
+        "notnull": false,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "reference_id",
+        "type": "text",
+        "default": null,
+        "notnull": false,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "internal_transfer",
+        "type": "boolean",
+        "default": "false",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "source_module",
+        "type": "text",
+        "default": null,
+        "notnull": false,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "salmon_lot_id",
+        "type": "text",
+        "default": null,
+        "notnull": false,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "direction",
+        "type": "text",
+        "default": null,
+        "notnull": false,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "company_id",
+        "type": "uuid",
+        "default": "get_current_company_id()",
+        "notnull": true,
+        "generated": ""
+      }
+    ],
+    "constraints": [
+      {
+        "def": "FOREIGN KEY (estorno_de_id) REFERENCES movimentacoes_estoque(id) ON DELETE SET NULL",
+        "name": "fk_mov_estorno"
+      },
+      {
+        "def": "FOREIGN KEY (produto_id) REFERENCES produtos(id) ON DELETE RESTRICT",
+        "name": "fk_mov_produto"
+      },
+      {
+        "def": "FOREIGN KEY (company_id) REFERENCES companies(id)",
+        "name": "movimentacoes_estoque_company_fk"
+      },
+      {
+        "def": "FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL",
+        "name": "movimentacoes_estoque_created_by_fkey"
+      },
+      {
+        "def": "PRIMARY KEY (id)",
+        "name": "movimentacoes_estoque_pkey"
+      },
+      {
+        "def": "CHECK (tipo = ANY (ARRAY['ENTRADA'::text, 'SAIDA'::text, 'AJUSTE'::text, 'BAIXA_PERDA'::text, 'ENTRADA_ESTORNO'::text, 'SAIDA_ESTORNO'::text, 'ENTRADA_COMPRA'::text, 'ENTRADA_INICIAL'::text, 'SAIDA_CONSUMO'::text, 'SAIDA_REQUISICAO'::text, 'SAIDA_PERDA'::text, 'SAIDA_AJUSTE_NEGATIVO'::text, 'SAIDA_VENCIMENTO'::text, 'SAIDA_TRANSFERENCIA'::text, 'AJUSTE_INVENTARIO_POSITIVO'::text, 'AJUSTE_INVENTARIO_NEGATIVO'::text, 'AJUSTE_CORRECAO_POSTERIOR_ENTRADA'::text, 'AJUSTE_CORRECAO_POSTERIOR_SAIDA'::text]))",
+        "name": "movimentacoes_estoque_tipo_check"
+      }
+    ]
+  },
+  {
+    "acl": "{postgres=arwdDxtm/postgres,authenticated=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+    "rls": true,
+    "force": true,
+    "table": "produtos",
+    "columns": [
+      {
+        "acl": null,
+        "name": "id",
+        "type": "uuid",
+        "default": "gen_random_uuid()",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "nome_produto",
+        "type": "text",
+        "default": null,
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "sku",
+        "type": "text",
+        "default": "''::text",
+        "notnull": false,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "categoria",
+        "type": "text",
+        "default": "'Outros'::text",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "unidade_medida",
+        "type": "text",
+        "default": "'UN'::text",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "conversoes",
+        "type": "text",
+        "default": "''::text",
+        "notnull": false,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "custo_padrao",
+        "type": "numeric(12,2)",
+        "default": "0",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "fornecedores_preferenciais",
+        "type": "text[]",
+        "default": "'{}'::text[]",
+        "notnull": false,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "lead_time_dias",
+        "type": "integer",
+        "default": "1",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "estoque_minimo",
+        "type": "numeric(12,3)",
+        "default": "0",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "estoque_ideal",
+        "type": "numeric(12,3)",
+        "default": "0",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "local_estoque",
+        "type": "text",
+        "default": "''::text",
+        "notnull": false,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "ativo",
+        "type": "boolean",
+        "default": "true",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "observacoes",
+        "type": "text",
+        "default": "''::text",
+        "notnull": false,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "default": "now()",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "unidade_compra",
+        "type": "text",
+        "default": "'UN'::text",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "fator_conversao_padrao",
+        "type": "numeric",
+        "default": "1",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "custo_medio_30d",
+        "type": "numeric",
+        "default": "0",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "custo_ultima_compra",
+        "type": "numeric",
+        "default": "0",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "default_cost_purchase_unit",
+        "type": "numeric",
+        "default": "0",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "default_cost_base_unit",
+        "type": "numeric",
+        "default": "0",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "needs_cost_review",
+        "type": "boolean",
+        "default": "false",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "last_cost_purchase_unit",
+        "type": "numeric",
+        "default": "0",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "last_cost_base_unit",
+        "type": "numeric",
+        "default": "0",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "last_purchase_date",
+        "type": "text",
+        "default": null,
+        "notnull": false,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "last_supplier",
+        "type": "text",
+        "default": null,
+        "notnull": false,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "avg30_cost_base_unit",
+        "type": "numeric",
+        "default": "0",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "avg30_cost_purchase_unit",
+        "type": "numeric",
+        "default": "0",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "avg30_variation_percent",
+        "type": "numeric",
+        "default": "0",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "inactivity_days_threshold",
+        "type": "integer",
+        "default": null,
+        "notnull": false,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "last_movement_at",
+        "type": "timestamp with time zone",
+        "default": null,
+        "notnull": false,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "is_salmon_raw_linked",
+        "type": "boolean",
+        "default": "false",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "company_id",
+        "type": "uuid",
+        "default": "get_current_company_id_strict()",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "conta_no_cmv",
+        "type": "boolean",
+        "default": "true",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "package_quantity",
+        "type": "numeric",
+        "default": null,
+        "notnull": false,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "package_measure_unit",
+        "type": "text",
+        "default": null,
+        "notnull": false,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "conversion_mode",
+        "type": "text",
+        "default": "'manual'::text",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "saldo_atual",
+        "type": "numeric",
+        "default": "0",
+        "notnull": false,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "nome_produto_unaccent",
+        "type": "text",
+        "default": "lower(immutable_unaccent(nome_produto))",
+        "notnull": false,
+        "generated": "s"
+      },
+      {
+        "acl": null,
+        "name": "sku_unaccent",
+        "type": "text",
+        "default": "lower(immutable_unaccent(sku))",
+        "notnull": false,
+        "generated": "s"
+      }
+    ],
+    "constraints": [
+      {
+        "def": "FOREIGN KEY (company_id) REFERENCES companies(id)",
+        "name": "produtos_company_fk"
+      },
+      {
+        "def": "PRIMARY KEY (id)",
+        "name": "produtos_pkey"
+      }
+    ]
+  },
+  {
+    "acl": "{postgres=arwdDxtm/postgres,authenticated=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+    "rls": true,
+    "force": true,
+    "table": "salmon_entries",
+    "columns": [
+      {
+        "acl": null,
+        "name": "id",
+        "type": "uuid",
+        "default": "gen_random_uuid()",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "entry_date",
+        "type": "date",
+        "default": "CURRENT_DATE",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "lot",
+        "type": "text",
+        "default": "''::text",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "sif",
+        "type": "text",
+        "default": "''::text",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "supplier_id",
+        "type": "uuid",
+        "default": null,
+        "notnull": false,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "supplier_name",
+        "type": "text",
+        "default": "''::text",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "boxes",
+        "type": "integer",
+        "default": "0",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "units",
+        "type": "integer",
+        "default": "0",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "gross_kg",
+        "type": "numeric",
+        "default": null,
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "total_value",
+        "type": "numeric",
+        "default": "0",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "unit_cost",
+        "type": "numeric",
+        "default": "\nCASE\n    WHEN (gross_kg > (0)::numeric) THEN round((total_value / gross_kg), 4)\n    ELSE (0)::numeric\nEND",
+        "notnull": false,
+        "generated": "s"
+      },
+      {
+        "acl": null,
+        "name": "notes",
+        "type": "text",
+        "default": "''::text",
+        "notnull": false,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "status",
+        "type": "text",
+        "default": "'ACTIVE'::text",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "created_by",
+        "type": "uuid",
+        "default": "auth.uid()",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "default": "now()",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "default": "now()",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "company_id",
+        "type": "uuid",
+        "default": "get_current_company_id()",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "expiration_date",
+        "type": "date",
+        "default": null,
+        "notnull": false,
+        "generated": ""
+      }
+    ],
+    "constraints": [
+      {
+        "def": "FOREIGN KEY (company_id) REFERENCES companies(id)",
+        "name": "salmon_entries_company_fk"
+      },
+      {
+        "def": "PRIMARY KEY (id)",
+        "name": "salmon_entries_pkey"
+      },
+      {
+        "def": "FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE SET NULL",
+        "name": "salmon_entries_supplier_id_fkey"
+      }
+    ]
+  },
+  {
+    "acl": "{postgres=arwdDxtm/postgres,authenticated=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+    "rls": true,
+    "force": true,
+    "table": "salmon_manipulations",
+    "columns": [
+      {
+        "acl": null,
+        "name": "id",
+        "type": "uuid",
+        "default": "gen_random_uuid()",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "entry_id",
+        "type": "uuid",
+        "default": null,
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "manipulation_date",
+        "type": "date",
+        "default": "CURRENT_DATE",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "lot",
+        "type": "text",
+        "default": "''::text",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "sif",
+        "type": "text",
+        "default": "''::text",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "supplier_name",
+        "type": "text",
+        "default": "''::text",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "fish_count",
+        "type": "integer",
+        "default": "0",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "gross_out_kg",
+        "type": "numeric",
+        "default": null,
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "clean_in_kg",
+        "type": "numeric",
+        "default": "0",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "leftover_kg",
+        "type": "numeric",
+        "default": "0",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "leftover_recorded",
+        "type": "boolean",
+        "default": "false",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "waste_kg",
+        "type": "numeric",
+        "default": "GREATEST((gross_out_kg - clean_in_kg), (0)::numeric)",
+        "notnull": false,
+        "generated": "s"
+      },
+      {
+        "acl": null,
+        "name": "yield_percent",
+        "type": "numeric",
+        "default": "\nCASE\n    WHEN (gross_out_kg > (0)::numeric) THEN round(((clean_in_kg / gross_out_kg) * (100)::numeric), 2)\n    ELSE (0)::numeric\nEND",
+        "notnull": false,
+        "generated": "s"
+      },
+      {
+        "acl": null,
+        "name": "loss_percent",
+        "type": "numeric",
+        "default": "\nCASE\n    WHEN (gross_out_kg > (0)::numeric) THEN round((((gross_out_kg - clean_in_kg) / gross_out_kg) * (100)::numeric), 2)\n    ELSE (0)::numeric\nEND",
+        "notnull": false,
+        "generated": "s"
+      },
+      {
+        "acl": null,
+        "name": "cost_per_kg_gross",
+        "type": "numeric",
+        "default": "0",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "notes",
+        "type": "text",
+        "default": "''::text",
+        "notnull": false,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "status",
+        "type": "text",
+        "default": "'ACTIVE'::text",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "created_by",
+        "type": "uuid",
+        "default": "auth.uid()",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "default": "now()",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "default": "now()",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "company_id",
+        "type": "uuid",
+        "default": "get_current_company_id()",
+        "notnull": true,
+        "generated": ""
+      }
+    ],
+    "constraints": [
+      {
+        "def": "FOREIGN KEY (company_id) REFERENCES companies(id)",
+        "name": "salmon_manipulations_company_fk"
+      },
+      {
+        "def": "FOREIGN KEY (entry_id) REFERENCES salmon_entries(id) ON DELETE RESTRICT",
+        "name": "salmon_manipulations_entry_id_fkey"
+      },
+      {
+        "def": "PRIMARY KEY (id)",
+        "name": "salmon_manipulations_pkey"
+      }
+    ]
+  },
+  {
+    "acl": "{postgres=arwdDxtm/postgres,authenticated=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+    "rls": true,
+    "force": true,
+    "table": "stock_sku_counter",
+    "columns": [
+      {
+        "acl": null,
+        "name": "id",
+        "type": "uuid",
+        "default": "gen_random_uuid()",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "prefix",
+        "type": "text",
+        "default": "'MP'::text",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "next_value",
+        "type": "integer",
+        "default": "0",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "pad_length",
+        "type": "integer",
+        "default": "4",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "default": "now()",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "company_id",
+        "type": "uuid",
+        "default": "get_current_company_id()",
+        "notnull": true,
+        "generated": ""
+      }
+    ],
+    "constraints": [
+      {
+        "def": "FOREIGN KEY (company_id) REFERENCES companies(id)",
+        "name": "stock_sku_counter_company_fk"
+      },
+      {
+        "def": "UNIQUE (company_id, prefix)",
+        "name": "stock_sku_counter_company_prefix_key"
+      },
+      {
+        "def": "PRIMARY KEY (id)",
+        "name": "stock_sku_counter_pkey"
+      }
+    ]
+  },
+  {
+    "acl": "{postgres=arwdDxtm/postgres,authenticated=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+    "rls": true,
+    "force": true,
+    "table": "supplier_item_prices",
+    "columns": [
+      {
+        "acl": null,
+        "name": "id",
+        "type": "uuid",
+        "default": "gen_random_uuid()",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "supplier_id",
+        "type": "text",
+        "default": null,
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "stock_item_id",
+        "type": "uuid",
+        "default": null,
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "purchase_unit",
+        "type": "text",
+        "default": "'UN'::text",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "unit_cost",
+        "type": "numeric",
+        "default": "0",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "last_updated_at",
+        "type": "timestamp with time zone",
+        "default": "now()",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "source",
+        "type": "text",
+        "default": "'manual'::text",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "company_id",
+        "type": "uuid",
+        "default": "get_current_company_id()",
+        "notnull": true,
+        "generated": ""
+      },
+      {
+        "acl": null,
+        "name": "supplier_uuid",
+        "type": "uuid",
+        "default": null,
+        "notnull": false,
+        "generated": ""
+      }
+    ],
+    "constraints": [
+      {
+        "def": "FOREIGN KEY (company_id) REFERENCES companies(id)",
+        "name": "supplier_item_prices_company_fk"
+      },
+      {
+        "def": "PRIMARY KEY (id)",
+        "name": "supplier_item_prices_pkey"
+      },
+      {
+        "def": "FOREIGN KEY (stock_item_id) REFERENCES produtos(id)",
+        "name": "supplier_item_prices_stock_item_id_fkey"
+      }
+    ]
+  }
+]

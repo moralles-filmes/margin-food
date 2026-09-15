@@ -1,0 +1,188 @@
+[
+  {
+    "signature": "_salmon_cancel_entry_guarded(uuid,text)",
+    "owner": "postgres",
+    "prosecdef": true,
+    "proconfig": [
+      "search_path=public"
+    ],
+    "proacl": "{=X/postgres,postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+    "definition": "CREATE OR REPLACE FUNCTION public._salmon_cancel_entry_guarded(p_entry_id uuid, p_reason text DEFAULT ''::text)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\nBEGIN\n  IF NOT has_permission(auth.uid(), 'salmon:entradas:delete') THEN\n    RAISE EXCEPTION 'Sem permissão (salmon:entradas:delete)';\n  END IF;\n  RETURN public.cancel_salmon_entry_atomic(p_entry_id, p_reason);\nEND;\n$function$\n"
+  },
+  {
+    "signature": "_salmon_cancel_manipulation_guarded(uuid,text)",
+    "owner": "postgres",
+    "prosecdef": true,
+    "proconfig": [
+      "search_path=public"
+    ],
+    "proacl": "{=X/postgres,postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+    "definition": "CREATE OR REPLACE FUNCTION public._salmon_cancel_manipulation_guarded(p_manip_id uuid, p_reason text DEFAULT ''::text)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\nBEGIN\n  IF NOT has_permission(auth.uid(), 'salmon:manipulacao:delete') THEN\n    RAISE EXCEPTION 'Sem permissão (salmon:manipulacao:delete)';\n  END IF;\n  RETURN public.cancel_salmon_manipulation_atomic(p_manip_id, p_reason);\nEND;\n$function$\n"
+  },
+  {
+    "signature": "_salmon_create_entry_guarded(text,text,text,text,integer,integer,numeric,numeric,text,text)",
+    "owner": "postgres",
+    "prosecdef": true,
+    "proconfig": [
+      "search_path=public"
+    ],
+    "proacl": null,
+    "definition": "CREATE OR REPLACE FUNCTION public._salmon_create_entry_guarded(p_entry_date text, p_lot text, p_sif text, p_supplier_name text, p_boxes integer, p_units integer, p_gross_kg numeric, p_total_value numeric, p_notes text DEFAULT ''::text, p_expiration_date text DEFAULT NULL::text)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\nBEGIN\n  IF NOT has_permission(auth.uid(), 'salmon:entradas:create') THEN\n    RAISE EXCEPTION 'Sem permissão (salmon:entradas:create)';\n  END IF;\n  RETURN public.create_salmon_entry_atomic(\n    p_entry_date::date, p_lot, p_sif, p_supplier_name,\n    p_boxes, p_units, p_gross_kg, p_total_value, p_notes,\n    NULLIF(p_expiration_date, '')::date\n  );\nEND;\n$function$\n"
+  },
+  {
+    "signature": "_salmon_create_manipulation_guarded(uuid,text,integer,numeric,numeric,numeric,text)",
+    "owner": "postgres",
+    "prosecdef": true,
+    "proconfig": [
+      "search_path=public"
+    ],
+    "proacl": "{=X/postgres,postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+    "definition": "CREATE OR REPLACE FUNCTION public._salmon_create_manipulation_guarded(p_entry_id uuid, p_manipulation_date text, p_fish_count integer, p_gross_out_kg numeric, p_clean_in_kg numeric, p_leftover_kg numeric, p_notes text DEFAULT ''::text)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\nBEGIN\n  IF NOT has_permission(auth.uid(), 'salmon:manipulacao:create') THEN\n    RAISE EXCEPTION 'Sem permissão (salmon:manipulacao:create)';\n  END IF;\n  RETURN public.create_salmon_manipulation_atomic(\n    p_entry_id, p_manipulation_date::date, p_fish_count,\n    p_gross_out_kg, p_clean_in_kg, p_leftover_kg, p_notes\n  );\nEND;\n$function$\n"
+  },
+  {
+    "signature": "assert_requisicao_estoque_movement_consistency()",
+    "owner": "postgres",
+    "prosecdef": true,
+    "proconfig": [
+      "search_path=public"
+    ],
+    "proacl": "{=X/postgres,postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+    "definition": "CREATE OR REPLACE FUNCTION public.assert_requisicao_estoque_movement_consistency()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\nDECLARE\n  req_item record;\n  prod record;\n  expected_qty numeric;\n  v_item_id uuid;\nBEGIN\n  IF NEW.origem IS DISTINCT FROM 'REQUISICAO_ESTOQUE' OR NEW.status IS DISTINCT FROM 'ATIVO' THEN\n    RETURN NEW;\n  END IF;\n\n  IF NEW.produto_id IS NULL THEN\n    RAISE EXCEPTION 'Movimentação de requisição sem produto_id';\n  END IF;\n\n  IF COALESCE(NEW.reference_type, '') = 'REQUISICAO_ITEM' THEN\n    IF NEW.reference_id IS NULL THEN\n      RAISE EXCEPTION 'Movimentação de requisição por item sem reference_id';\n    END IF;\n\n    BEGIN\n      v_item_id := NEW.reference_id::uuid;\n    EXCEPTION WHEN others THEN\n      RAISE EXCEPTION 'reference_id da movimentação de requisição é inválido: %', NEW.reference_id;\n    END;\n\n    SELECT rei.id,\n           rei.requisicao_id,\n           rei.quantidade_solicitada,\n           rei.quantidade_atendida,\n           r.company_id\n      INTO req_item\n    FROM public.requisicao_estoque_itens rei\n    JOIN public.requisicoes_estoque r ON r.id = rei.requisicao_id\n    WHERE rei.id = v_item_id\n      AND rei.produto_id = NEW.produto_id\n      AND r.company_id = NEW.company_id\n    LIMIT 1;\n\n    IF NOT FOUND THEN\n      RAISE EXCEPTION 'Movimentação não corresponde ao item da requisição';\n    END IF;\n\n    IF NEW.referencia_id IS NOT NULL AND NEW.referencia_id <> req_item.requisicao_id::text THEN\n      RAISE EXCEPTION 'referencia_id divergente para baixa do item da requisição';\n    END IF;\n  ELSE\n    IF NEW.referencia_id IS NULL THEN\n      RAISE EXCEPTION 'Movimentação de requisição sem referencia_id';\n    END IF;\n\n    SELECT rei.id,\n           rei.requisicao_id,\n           rei.quantidade_solicitada,\n           rei.quantidade_atendida,\n           r.company_id\n      INTO req_item\n    FROM public.requisicao_estoque_itens rei\n    JOIN public.requisicoes_estoque r ON r.id = rei.requisicao_id\n    WHERE rei.requisicao_id = NEW.referencia_id::uuid\n      AND rei.produto_id = NEW.produto_id\n      AND r.company_id = NEW.company_id\n    ORDER BY rei.created_at DESC, rei.id DESC\n    LIMIT 1;\n\n    IF NOT FOUND THEN\n      RAISE EXCEPTION 'Movimentação não corresponde a item da requisição';\n    END IF;\n  END IF;\n\n  SELECT p.fator_conversao_padrao\n    INTO prod\n  FROM public.produtos p\n  WHERE p.id = NEW.produto_id\n    AND p.company_id = NEW.company_id;\n\n  IF NOT FOUND THEN\n    RAISE EXCEPTION 'Produto da movimentação de requisição não encontrado';\n  END IF;\n\n  expected_qty := ROUND((\n    COALESCE(NULLIF(req_item.quantidade_atendida, 0), req_item.quantidade_solicitada)\n    * COALESCE(NULLIF(prod.fator_conversao_padrao, 0), 1)\n  )::numeric, 3);\n\n  IF NEW.direction IS DISTINCT FROM 'OUT' THEN\n    RAISE EXCEPTION 'Baixa de requisição deve ter direction OUT';\n  END IF;\n\n  IF NEW.tipo IS DISTINCT FROM 'SAIDA' THEN\n    RAISE EXCEPTION 'Baixa de requisição deve ter tipo SAIDA';\n  END IF;\n\n  IF ROUND(COALESCE(NEW.quantidade, 0)::numeric, 3) <> expected_qty THEN\n    RAISE EXCEPTION 'Quantidade inconsistente para baixa de requisição. Esperado: %, recebido: %', expected_qty, NEW.quantidade;\n  END IF;\n\n  RETURN NEW;\nEND;\n$function$\n"
+  },
+  {
+    "signature": "audit_trigger_fn()",
+    "owner": "postgres",
+    "prosecdef": true,
+    "proconfig": [
+      "search_path=public"
+    ],
+    "proacl": "{=X/postgres,postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+    "definition": "CREATE OR REPLACE FUNCTION public.audit_trigger_fn()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\nDECLARE\n  v_module text;\n  v_entity text;\n  v_action text;\n  v_before jsonb;\n  v_after jsonb;\n  v_entity_id uuid;\n  v_sensitive_keys text[] := ARRAY['cpf','senha','password','token','card_number','secret'];\n  k text;\nBEGIN\n  v_module := TG_ARGV[0];\n  v_entity := TG_ARGV[1];\n\n  IF TG_OP = 'INSERT' THEN\n    v_action := 'CREATE';\n    v_after := row_to_json(NEW)::jsonb;\n    v_entity_id := NEW.id;\n  ELSIF TG_OP = 'UPDATE' THEN\n    v_action := 'UPDATE';\n    v_before := row_to_json(OLD)::jsonb;\n    v_after := row_to_json(NEW)::jsonb;\n    v_entity_id := NEW.id;\n  ELSIF TG_OP = 'DELETE' THEN\n    v_action := 'DELETE';\n    v_before := row_to_json(OLD)::jsonb;\n    v_entity_id := OLD.id;\n  END IF;\n\n  -- Mask sensitive fields\n  FOREACH k IN ARRAY v_sensitive_keys LOOP\n    IF v_before IS NOT NULL AND v_before ? k THEN\n      v_before := v_before || jsonb_build_object(k, '***');\n    END IF;\n    IF v_after IS NOT NULL AND v_after ? k THEN\n      v_after := v_after || jsonb_build_object(k, '***');\n    END IF;\n  END LOOP;\n\n  INSERT INTO public.audit_logs (actor_user_id, source, module, entity, entity_id, action, before, after)\n  VALUES (auth.uid(), 'db', v_module, v_entity, v_entity_id, v_action, v_before, v_after);\n\n  IF TG_OP = 'DELETE' THEN RETURN OLD; ELSE RETURN NEW; END IF;\nEND;\n$function$\n"
+  },
+  {
+    "signature": "create_salmon_entry_atomic(date,text,text,text,integer,integer,numeric,numeric,text,date)",
+    "owner": "postgres",
+    "prosecdef": true,
+    "proconfig": [
+      "search_path=public"
+    ],
+    "proacl": null,
+    "definition": "CREATE OR REPLACE FUNCTION public.create_salmon_entry_atomic(p_entry_date date, p_lot text, p_sif text, p_supplier_name text, p_boxes integer, p_units integer, p_gross_kg numeric, p_total_value numeric, p_notes text DEFAULT ''::text, p_expiration_date date DEFAULT NULL::date)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\nDECLARE\n  v_entry_id uuid;\n  v_mov_id uuid;\n  v_produto_id uuid;\n  v_cost_per_kg numeric;\n  v_supplier_uuid uuid;\n  v_caller uuid;\n  v_company_id uuid;\nBEGIN\n  -- Multi-tenant enforcement\n  v_company_id := assert_tenant();\n  v_caller := auth.uid();\n  IF v_caller IS NULL THEN RAISE EXCEPTION 'Não autenticado.'; END IF;\n  IF p_gross_kg <= 0 THEN RAISE EXCEPTION 'gross_kg deve ser > 0'; END IF;\n  IF p_total_value < 0 THEN RAISE EXCEPTION 'total_value não pode ser negativo'; END IF;\n  IF p_expiration_date IS NOT NULL AND p_expiration_date < p_entry_date THEN\n    RAISE EXCEPTION 'Validade (%) não pode ser anterior à data de entrada (%).', p_expiration_date, p_entry_date;\n  END IF;\n\n  v_cost_per_kg := CASE WHEN p_gross_kg > 0 THEN ROUND(p_total_value / p_gross_kg, 4) ELSE 0 END;\n\n  -- 1. Insert salmon_entries\n  INSERT INTO salmon_entries (\n    entry_date, lot, sif, supplier_name, boxes, units, gross_kg, total_value, notes, created_by, company_id,\n    expiration_date\n  ) VALUES (\n    p_entry_date, COALESCE(p_lot,''), COALESCE(p_sif,''), COALESCE(p_supplier_name,''),\n    COALESCE(p_boxes,0), COALESCE(p_units,0), p_gross_kg, p_total_value,\n    COALESCE(p_notes,''), v_caller, v_company_id,\n    p_expiration_date\n  ) RETURNING id INTO v_entry_id;\n\n  -- 2. Ensure salmon raw product (v_produto_id is global reference but logically belongs to the tenant)\n  SELECT ensure_salmon_raw_product() INTO v_produto_id;\n\n  -- 3. Mirror to stock (ENTRADA)\n  SELECT id INTO v_mov_id FROM movimentacoes_estoque\n    WHERE reference_type = 'SALMON_ENTRY' AND reference_id = v_entry_id::text\n      AND status = 'ATIVO' AND company_id = v_company_id\n    FOR UPDATE;\n\n  IF v_mov_id IS NOT NULL THEN\n    UPDATE movimentacoes_estoque SET\n      quantidade = p_gross_kg, custo_unitario = v_cost_per_kg,\n      custo_total = ROUND((p_gross_kg * v_cost_per_kg)::numeric, 2),\n      data = p_entry_date,\n      observacao = 'Entrada Salmão Bruto — Lote: ' || COALESCE(p_lot,'') || ' — Forn: ' || COALESCE(p_supplier_name,'')\n        || CASE WHEN p_expiration_date IS NULL THEN '' ELSE ' — Val: ' || to_char(p_expiration_date, 'DD/MM/YYYY') END,\n      editado_em = now(), editado_por = v_caller,\n      salmon_lot_id = p_lot\n    WHERE id = v_mov_id AND company_id = v_company_id;\n  ELSE\n    INSERT INTO movimentacoes_estoque (\n      produto_id, data, tipo, quantidade, custo_unitario, custo_total,\n      origem, observacao, created_by, status,\n      reference_type, reference_id, internal_transfer, source_module, salmon_lot_id, company_id\n    ) VALUES (\n      v_produto_id, p_entry_date, 'ENTRADA', p_gross_kg, v_cost_per_kg,\n      ROUND((p_gross_kg * v_cost_per_kg)::numeric, 2),\n      'Controle de Salmão',\n      'Entrada Salmão Bruto — Lote: ' || COALESCE(p_lot,'') || ' — Forn: ' || COALESCE(p_supplier_name,'')\n        || CASE WHEN p_expiration_date IS NULL THEN '' ELSE ' — Val: ' || to_char(p_expiration_date, 'DD/MM/YYYY') END,\n      v_caller, 'ATIVO', 'SALMON_ENTRY', v_entry_id::text, false, 'salmon', p_lot, v_company_id\n    ) RETURNING id INTO v_mov_id;\n  END IF;\n\n  -- 4. Update produto cost (Global but context of company insert)\n  IF v_cost_per_kg > 0 THEN\n    UPDATE produtos SET\n      last_cost_purchase_unit = v_cost_per_kg, last_cost_base_unit = v_cost_per_kg,\n      last_purchase_date = p_entry_date::text, last_supplier = p_supplier_name,\n      custo_padrao = CASE WHEN custo_padrao = 0 THEN v_cost_per_kg ELSE custo_padrao END,\n      default_cost_purchase_unit = CASE WHEN default_cost_purchase_unit = 0 THEN v_cost_per_kg ELSE default_cost_purchase_unit END,\n      default_cost_base_unit = CASE WHEN default_cost_base_unit = 0 THEN v_cost_per_kg ELSE default_cost_base_unit END\n    WHERE id = v_produto_id AND (company_id = v_company_id OR company_id IS NULL);\n  END IF;\n\n  -- 5. Upsert supplier + supplier_item_prices\n  IF p_supplier_name IS NOT NULL AND p_supplier_name != '' THEN\n    INSERT INTO suppliers (name, company_id) VALUES (p_supplier_name, v_company_id)\n    ON CONFLICT (name, company_id) DO UPDATE SET updated_at = now()\n    RETURNING id INTO v_supplier_uuid;\n\n    IF v_supplier_uuid IS NOT NULL THEN\n      INSERT INTO supplier_item_prices (supplier_id, supplier_uuid, stock_item_id, unit_cost, purchase_unit, last_updated_at, source, company_id)\n      VALUES (p_supplier_name, v_supplier_uuid, v_produto_id, v_cost_per_kg, 'KG', now(), 'salmon', v_company_id)\n      ON CONFLICT (supplier_id, stock_item_id, company_id) DO UPDATE SET\n        unit_cost = EXCLUDED.unit_cost, supplier_uuid = EXCLUDED.supplier_uuid,\n        last_updated_at = EXCLUDED.last_updated_at, source = 'salmon';\n    END IF;\n  END IF;\n\n  -- 6. Audit (includes company_id)\n  PERFORM log_audit('rpc', 'salmon', 'salmon_entries', v_entry_id, 'CREATE_ATOMIC', NULL,\n    jsonb_build_object('gross_kg', p_gross_kg, 'total_value', p_total_value, 'lot', p_lot,\n      'supplier', p_supplier_name, 'mov_id', v_mov_id, 'expiration_date', p_expiration_date));\n\n  RETURN jsonb_build_object('entry_id', v_entry_id, 'movement_id', v_mov_id, 'unit_cost', v_cost_per_kg,\n    'expiration_date', p_expiration_date, 'company_id', v_company_id);\nEND;\n$function$\n"
+  },
+  {
+    "signature": "create_salmon_manipulation_atomic(uuid,date,integer,numeric,numeric,numeric,text)",
+    "owner": "postgres",
+    "prosecdef": true,
+    "proconfig": [
+      "search_path=public"
+    ],
+    "proacl": "{=X/postgres,postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+    "definition": "CREATE OR REPLACE FUNCTION public.create_salmon_manipulation_atomic(p_entry_id uuid, p_manipulation_date date, p_fish_count integer, p_gross_out_kg numeric, p_clean_in_kg numeric, p_leftover_kg numeric DEFAULT 0, p_notes text DEFAULT ''::text)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\nDECLARE\n  v_entry RECORD;\n  v_manip_id uuid;\n  v_mov_id uuid;\n  v_produto_id uuid;\n  v_cost_per_kg numeric;\n  v_caller uuid;\n  v_company_id uuid;\nBEGIN\n  v_company_id := assert_tenant();\n  v_caller := auth.uid();\n  IF v_caller IS NULL THEN RAISE EXCEPTION 'Não autenticado.'; END IF;\n  IF p_gross_out_kg <= 0 THEN RAISE EXCEPTION 'gross_out_kg deve ser > 0'; END IF;\n  IF p_clean_in_kg < 0 THEN RAISE EXCEPTION 'clean_in_kg não pode ser negativo'; END IF;\n\n  -- Lock parent entry by company_id\n  SELECT * INTO v_entry FROM salmon_entries \n  WHERE id = p_entry_id AND company_id = v_company_id \n  FOR UPDATE;\n  \n  IF NOT FOUND THEN RAISE EXCEPTION 'Entrada não encontrada ou sem permissão.'; END IF;\n  IF v_entry.status != 'ACTIVE' THEN RAISE EXCEPTION 'Entrada não está ativa (status: %)', v_entry.status; END IF;\n\n  v_cost_per_kg := CASE WHEN v_entry.gross_kg > 0 THEN ROUND(v_entry.total_value / v_entry.gross_kg, 4) ELSE 0 END;\n\n  -- 1. Insert manipulation\n  INSERT INTO salmon_manipulations (\n    entry_id, manipulation_date, lot, sif, supplier_name, fish_count,\n    gross_out_kg, clean_in_kg, leftover_kg, cost_per_kg_gross, notes, created_by, company_id\n  ) VALUES (\n    p_entry_id, p_manipulation_date, v_entry.lot, v_entry.sif, v_entry.supplier_name,\n    COALESCE(p_fish_count, 0), p_gross_out_kg, p_clean_in_kg,\n    COALESCE(p_leftover_kg, 0), v_cost_per_kg, COALESCE(p_notes,''), v_caller, v_company_id\n  ) RETURNING id INTO v_manip_id;\n\n  -- 2. Mirror to stock (SAIDA for gross)\n  SELECT ensure_salmon_raw_product() INTO v_produto_id;\n\n  SELECT id INTO v_mov_id FROM movimentacoes_estoque\n    WHERE reference_type = 'SALMON_MANIPULATION' AND reference_id = v_manip_id::text \n      AND status = 'ATIVO' AND company_id = v_company_id\n    FOR UPDATE;\n\n  IF v_mov_id IS NOT NULL THEN\n    UPDATE movimentacoes_estoque SET\n      quantidade = p_gross_out_kg, custo_unitario = v_cost_per_kg,\n      custo_total = ROUND((p_gross_out_kg * v_cost_per_kg)::numeric, 2),\n      data = p_manipulation_date,\n      observacao = 'Saída Manipulação — Lote: ' || v_entry.lot,\n      editado_em = now(), editado_por = v_caller, salmon_lot_id = v_entry.lot\n    WHERE id = v_mov_id AND company_id = v_company_id;\n  ELSE\n    INSERT INTO movimentacoes_estoque (\n      produto_id, data, tipo, quantidade, custo_unitario, custo_total,\n      origem, observacao, created_by, status,\n      reference_type, reference_id, internal_transfer, source_module, salmon_lot_id, setor, company_id\n    ) VALUES (\n      v_produto_id, p_manipulation_date, 'SAIDA', p_gross_out_kg, v_cost_per_kg,\n      ROUND((p_gross_out_kg * v_cost_per_kg)::numeric, 2),\n      'Controle de Salmão', 'Saída Manipulação — Lote: ' || v_entry.lot,\n      v_caller, 'ATIVO', 'SALMON_MANIPULATION', v_manip_id::text, true, 'salmon', v_entry.lot, 'Sushi', v_company_id\n    ) RETURNING id INTO v_mov_id;\n  END IF;\n\n  -- 3. Audit\n  PERFORM log_audit('rpc', 'salmon', 'salmon_manipulations', v_manip_id, 'CREATE_ATOMIC', NULL,\n    jsonb_build_object(\n      'entry_id', p_entry_id, 'gross_out_kg', p_gross_out_kg, 'clean_in_kg', p_clean_in_kg,\n      'cost_per_kg', v_cost_per_kg, 'mov_id', v_mov_id\n    ));\n\n  RETURN jsonb_build_object(\n    'manipulation_id', v_manip_id, 'movement_id', v_mov_id,\n    'waste_kg', GREATEST(p_gross_out_kg - p_clean_in_kg, 0),\n    'yield_percent', CASE WHEN p_gross_out_kg > 0 THEN ROUND(p_clean_in_kg / p_gross_out_kg * 100, 2) ELSE 0 END,\n    'cost_per_kg_gross', v_cost_per_kg,\n    'company_id', v_company_id\n  );\nEND;\n$function$\n"
+  },
+  {
+    "signature": "fn_update_product_stock()",
+    "owner": "postgres",
+    "prosecdef": true,
+    "proconfig": [
+      "search_path=public"
+    ],
+    "proacl": null,
+    "definition": "CREATE OR REPLACE FUNCTION public.fn_update_product_stock()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\nDECLARE\n  v_produto_id uuid;\n  v_company_id uuid;\nBEGIN\n  -- Identificar o produto e a empresa afetados\n  IF (TG_OP = 'DELETE') THEN\n    v_produto_id := OLD.produto_id;\n    v_company_id := OLD.company_id;\n  ELSE\n    v_produto_id := NEW.produto_id;\n    v_company_id := NEW.company_id;\n  END IF;\n\n  -- Reutilizar a função de recomputação para garantir consistência\n  PERFORM public.fn_recompute_product_saldo(v_produto_id, v_company_id);\n\n  RETURN NULL;\nEND;\n$function$\n"
+  },
+  {
+    "signature": "generate_next_sku(text)",
+    "owner": "postgres",
+    "prosecdef": true,
+    "proconfig": [
+      "search_path=public"
+    ],
+    "proacl": "{=X/postgres,postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+    "definition": "CREATE OR REPLACE FUNCTION public.generate_next_sku(p_prefix text DEFAULT 'MP'::text)\n RETURNS text\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\nDECLARE\n  v_company_id uuid;\n  v_next bigint;\n  v_pad integer;\n  v_candidate text;\n  v_attempts integer := 0;\n  v_max_attempts integer := 1000;\nBEGIN\n  v_company_id := public.get_current_company_id();\n\n  INSERT INTO public.stock_sku_counter (company_id, prefix, next_value, pad_length, updated_at)\n  VALUES (v_company_id, p_prefix, 0, 4, now())\n  ON CONFLICT (company_id, prefix) DO NOTHING;\n\n  LOOP\n    v_attempts := v_attempts + 1;\n    IF v_attempts > v_max_attempts THEN\n      RAISE EXCEPTION\n        'generate_next_sku: nao foi possivel gerar SKU unico apos % tentativas (company=%, prefix=%)',\n        v_max_attempts, v_company_id, p_prefix;\n    END IF;\n\n    UPDATE public.stock_sku_counter\n       SET next_value = next_value + 1,\n           updated_at = now()\n     WHERE company_id = v_company_id\n       AND prefix = p_prefix\n    RETURNING next_value, pad_length INTO v_next, v_pad;\n\n    v_candidate := p_prefix || '-' || lpad(v_next::text, GREATEST(COALESCE(v_pad, 4), 1), '0');\n\n    IF NOT EXISTS (\n      SELECT 1\n      FROM public.produtos\n      WHERE company_id = v_company_id\n        AND sku = v_candidate\n    ) THEN\n      RETURN v_candidate;\n    END IF;\n  END LOOP;\nEND;\n$function$\n"
+  },
+  {
+    "signature": "produtos_force_company_id()",
+    "owner": "postgres",
+    "prosecdef": false,
+    "proconfig": [
+      "search_path=public"
+    ],
+    "proacl": "{=X/postgres,postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+    "definition": "CREATE OR REPLACE FUNCTION public.produtos_force_company_id()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO 'public'\nAS $function$\nBEGIN\n  IF TG_OP = 'INSERT' THEN\n    NEW.company_id := public.get_current_company_id_strict();\n  ELSIF TG_OP = 'UPDATE' THEN\n    NEW.company_id := OLD.company_id;\n  END IF;\n\n  RETURN NEW;\nEND;\n$function$\n"
+  },
+  {
+    "signature": "set_stock_movement_direction()",
+    "owner": "postgres",
+    "prosecdef": false,
+    "proconfig": null,
+    "proacl": "{=X/postgres,postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+    "definition": "CREATE OR REPLACE FUNCTION public.set_stock_movement_direction()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n  NEW.direction := CASE\n    -- Estorno segue a direção semântica do movimento reverso,\n    -- mas os cálculos de saldo/valor ignoram tipos *_ESTORNO.\n    WHEN NEW.tipo = 'SAIDA_ESTORNO' THEN 'OUT'\n    WHEN NEW.tipo = 'ENTRADA_ESTORNO' THEN 'IN'\n    WHEN NEW.tipo LIKE 'ENTRADA%' THEN 'IN'\n    WHEN NEW.tipo = 'AJUSTE_INVENTARIO_POSITIVO' THEN 'IN'\n    WHEN NEW.tipo = 'AJUSTE_CORRECAO_POSTERIOR_ENTRADA' THEN 'IN'\n    WHEN NEW.tipo LIKE 'SAIDA%' THEN 'OUT'\n    WHEN NEW.tipo = 'BAIXA_PERDA' THEN 'OUT'\n    WHEN NEW.tipo = 'AJUSTE_INVENTARIO_NEGATIVO' THEN 'OUT'\n    WHEN NEW.tipo = 'AJUSTE_CORRECAO_POSTERIOR_SAIDA' THEN 'OUT'\n    WHEN NEW.tipo = 'AJUSTE' THEN 'OUT'\n    ELSE 'OUT'\n  END;\n  RETURN NEW;\nEND;\n$function$\n"
+  },
+  {
+    "signature": "trg_block_placeholder_company()",
+    "owner": "postgres",
+    "prosecdef": false,
+    "proconfig": [
+      "search_path=\"\""
+    ],
+    "proacl": "{=X/postgres,postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+    "definition": "CREATE OR REPLACE FUNCTION public.trg_block_placeholder_company()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO ''\nAS $function$\nBEGIN\n  IF NEW.company_id = '00000000-0000-0000-0000-000000000001'::uuid THEN\n    RAISE EXCEPTION 'company_id placeholder não permitido';\n  END IF;\n  RETURN NEW;\nEND;\n$function$\n"
+  },
+  {
+    "signature": "update_produto_last_movement()",
+    "owner": "postgres",
+    "prosecdef": true,
+    "proconfig": [
+      "search_path=public"
+    ],
+    "proacl": "{=X/postgres,postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+    "definition": "CREATE OR REPLACE FUNCTION public.update_produto_last_movement()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\nBEGIN\n  IF NEW.status = 'ATIVO' AND NEW.tipo NOT IN ('ENTRADA_ESTORNO', 'SAIDA_ESTORNO') THEN\n    UPDATE produtos SET last_movement_at = NEW.created_at\n    WHERE id = NEW.produto_id\n      AND (last_movement_at IS NULL OR last_movement_at < NEW.created_at);\n  END IF;\n  RETURN NEW;\nEND;\n$function$\n"
+  },
+  {
+    "signature": "update_updated_at_column()",
+    "owner": "postgres",
+    "prosecdef": false,
+    "proconfig": [
+      "search_path=public"
+    ],
+    "proacl": "{=X/postgres,postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+    "definition": "CREATE OR REPLACE FUNCTION public.update_updated_at_column()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO 'public'\nAS $function$\nBEGIN\n  NEW.updated_at = now();\n  RETURN NEW;\nEND;\n$function$\n"
+  },
+  {
+    "signature": "validate_estorno_movement()",
+    "owner": "postgres",
+    "prosecdef": false,
+    "proconfig": null,
+    "proacl": "{=X/postgres,postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+    "definition": "CREATE OR REPLACE FUNCTION public.validate_estorno_movement()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n  v_original RECORD;\nBEGIN\n  -- Only validate ESTORNO types\n  IF NEW.tipo NOT IN ('ENTRADA_ESTORNO', 'SAIDA_ESTORNO') THEN\n    RETURN NEW;\n  END IF;\n\n  -- 1. Must have estorno_de_id\n  IF NEW.estorno_de_id IS NULL THEN\n    RAISE EXCEPTION '400: Movimentação de estorno deve referenciar a movimentação original (estorno_de_id obrigatório).';\n  END IF;\n\n  -- 2. Original movement must exist and belong to same company\n  SELECT id, company_id, status INTO v_original\n  FROM public.movimentacoes_estoque\n  WHERE id = NEW.estorno_de_id;\n\n  IF NOT FOUND THEN\n    RAISE EXCEPTION '404: Movimentação original não encontrada.';\n  END IF;\n\n  IF v_original.company_id != NEW.company_id THEN\n    RAISE EXCEPTION '403: Movimentação original pertence a outro tenant.';\n  END IF;\n\n  -- 3. Original must not already be CANCELADO\n  IF v_original.status = 'CANCELADO' THEN\n    RAISE EXCEPTION '409: Movimentação original já foi cancelada. Estorno duplicado bloqueado.';\n  END IF;\n\n  RETURN NEW;\nEND;\n$function$\n"
+  },
+  {
+    "signature": "validate_salmon_entry()",
+    "owner": "postgres",
+    "prosecdef": true,
+    "proconfig": [
+      "search_path=public"
+    ],
+    "proacl": "{=X/postgres,postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+    "definition": "CREATE OR REPLACE FUNCTION public.validate_salmon_entry()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\nBEGIN\n  IF NEW.gross_kg <= 0 THEN RAISE EXCEPTION 'gross_kg deve ser > 0'; END IF;\n  IF NEW.total_value < 0 THEN RAISE EXCEPTION 'total_value não pode ser negativo'; END IF;\n  IF NEW.status NOT IN ('ACTIVE', 'CANCELLED') THEN RAISE EXCEPTION 'status inválido: %', NEW.status; END IF;\n  RETURN NEW;\nEND;\n$function$\n"
+  },
+  {
+    "signature": "validate_salmon_manipulation()",
+    "owner": "postgres",
+    "prosecdef": true,
+    "proconfig": [
+      "search_path=public"
+    ],
+    "proacl": "{=X/postgres,postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+    "definition": "CREATE OR REPLACE FUNCTION public.validate_salmon_manipulation()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\nBEGIN\n  IF NEW.gross_out_kg <= 0 THEN RAISE EXCEPTION 'gross_out_kg deve ser > 0'; END IF;\n  IF NEW.clean_in_kg < 0 THEN RAISE EXCEPTION 'clean_in_kg não pode ser negativo'; END IF;\n  IF NEW.status NOT IN ('ACTIVE', 'CANCELLED') THEN RAISE EXCEPTION 'status inválido: %', NEW.status; END IF;\n  RETURN NEW;\nEND;\n$function$\n"
+  },
+  {
+    "signature": "validate_stock_movement()",
+    "owner": "postgres",
+    "prosecdef": true,
+    "proconfig": [
+      "search_path=public"
+    ],
+    "proacl": "{=X/postgres,postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+    "definition": "CREATE OR REPLACE FUNCTION public.validate_stock_movement()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\nBEGIN\n  IF NEW.quantidade <= 0 THEN\n    RAISE EXCEPTION 'Quantidade deve ser maior que zero (recebido: %)', NEW.quantidade;\n  END IF;\n\n  IF NEW.custo_unitario < 0 THEN\n    RAISE EXCEPTION 'Custo unitário não pode ser negativo';\n  END IF;\n\n  NEW.custo_total := ROUND((COALESCE(NEW.quantidade, 0) * COALESCE(NEW.custo_unitario, 0))::numeric, 2);\n\n  IF NEW.custo_total < 0 THEN\n    RAISE EXCEPTION 'Custo total não pode ser negativo';\n  END IF;\n\n  RETURN NEW;\nEND;\n$function$\n"
+  }
+]

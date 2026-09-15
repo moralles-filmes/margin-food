@@ -1,0 +1,997 @@
+{
+  "indexes": [
+    {
+      "indexdef": "CREATE UNIQUE INDEX movimentacoes_estoque_pkey ON public.movimentacoes_estoque USING btree (id)",
+      "indexname": "movimentacoes_estoque_pkey",
+      "tablename": "movimentacoes_estoque",
+      "schemaname": "public",
+      "tablespace": null
+    },
+    {
+      "indexdef": "CREATE INDEX idx_mov_estoque_data_tipo ON public.movimentacoes_estoque USING btree (data, tipo)",
+      "indexname": "idx_mov_estoque_data_tipo",
+      "tablename": "movimentacoes_estoque",
+      "schemaname": "public",
+      "tablespace": null
+    },
+    {
+      "indexdef": "CREATE INDEX idx_movimentacoes_produto_data ON public.movimentacoes_estoque USING btree (produto_id, data)",
+      "indexname": "idx_movimentacoes_produto_data",
+      "tablename": "movimentacoes_estoque",
+      "schemaname": "public",
+      "tablespace": null
+    },
+    {
+      "indexdef": "CREATE INDEX idx_movimentacoes_tipo_data ON public.movimentacoes_estoque USING btree (tipo, data)",
+      "indexname": "idx_movimentacoes_tipo_data",
+      "tablename": "movimentacoes_estoque",
+      "schemaname": "public",
+      "tablespace": null
+    },
+    {
+      "indexdef": "CREATE INDEX idx_mov_produto_status_data ON public.movimentacoes_estoque USING btree (produto_id, status, data DESC)",
+      "indexname": "idx_mov_produto_status_data",
+      "tablename": "movimentacoes_estoque",
+      "schemaname": "public",
+      "tablespace": null
+    },
+    {
+      "indexdef": "CREATE INDEX idx_mov_status_created ON public.movimentacoes_estoque USING btree (status, created_at DESC)",
+      "indexname": "idx_mov_status_created",
+      "tablename": "movimentacoes_estoque",
+      "schemaname": "public",
+      "tablespace": null
+    },
+    {
+      "indexdef": "CREATE INDEX idx_mov_direction_status_created ON public.movimentacoes_estoque USING btree (direction, status, created_at DESC)",
+      "indexname": "idx_mov_direction_status_created",
+      "tablename": "movimentacoes_estoque",
+      "schemaname": "public",
+      "tablespace": null
+    },
+    {
+      "indexdef": "CREATE INDEX idx_movimentacoes_estoque_company_id ON public.movimentacoes_estoque USING btree (company_id)",
+      "indexname": "idx_movimentacoes_estoque_company_id",
+      "tablename": "movimentacoes_estoque",
+      "schemaname": "public",
+      "tablespace": null
+    },
+    {
+      "indexdef": "CREATE INDEX idx_movimentacoes_company_data ON public.movimentacoes_estoque USING btree (company_id, data DESC)",
+      "indexname": "idx_movimentacoes_company_data",
+      "tablename": "movimentacoes_estoque",
+      "schemaname": "public",
+      "tablespace": null
+    },
+    {
+      "indexdef": "CREATE INDEX idx_mov_reference_active ON public.movimentacoes_estoque USING btree (reference_type, reference_id) WHERE (status = 'ATIVO'::text)",
+      "indexname": "idx_mov_reference_active",
+      "tablename": "movimentacoes_estoque",
+      "schemaname": "public",
+      "tablespace": null
+    },
+    {
+      "indexdef": "CREATE UNIQUE INDEX idx_mov_estoque_inv_ajuste_idempotent ON public.movimentacoes_estoque USING btree (reference_type, reference_id, produto_id, tipo) WHERE ((reference_type = 'INVENTARIO_AJUSTE'::text) AND (status = 'ATIVO'::text))",
+      "indexname": "idx_mov_estoque_inv_ajuste_idempotent",
+      "tablename": "movimentacoes_estoque",
+      "schemaname": "public",
+      "tablespace": null
+    },
+    {
+      "indexdef": "CREATE INDEX idx_mov_estoque_company_produto_data_ativo ON public.movimentacoes_estoque USING btree (company_id, produto_id, data) WHERE (status = 'ATIVO'::text)",
+      "indexname": "idx_mov_estoque_company_produto_data_ativo",
+      "tablename": "movimentacoes_estoque",
+      "schemaname": "public",
+      "tablespace": null
+    },
+    {
+      "indexdef": "CREATE INDEX idx_mov_estoque_company_data_ativo ON public.movimentacoes_estoque USING btree (company_id, data) WHERE (status = 'ATIVO'::text)",
+      "indexname": "idx_mov_estoque_company_data_ativo",
+      "tablename": "movimentacoes_estoque",
+      "schemaname": "public",
+      "tablespace": null
+    },
+    {
+      "indexdef": "CREATE INDEX idx_mov_estoque_company_tipo_data_ativo ON public.movimentacoes_estoque USING btree (company_id, tipo, data) WHERE (status = 'ATIVO'::text)",
+      "indexname": "idx_mov_estoque_company_tipo_data_ativo",
+      "tablename": "movimentacoes_estoque",
+      "schemaname": "public",
+      "tablespace": null
+    },
+    {
+      "indexdef": "CREATE UNIQUE INDEX idx_mov_reference_unique ON public.movimentacoes_estoque USING btree (reference_type, reference_id) WHERE ((reference_type IS NOT NULL) AND (reference_id IS NOT NULL) AND (status = 'ATIVO'::text) AND (reference_type <> ALL (ARRAY['INVENTARIO_AJUSTE'::text, 'AJUSTE_CORRECAO_POSTERIOR'::text])))",
+      "indexname": "idx_mov_reference_unique",
+      "tablename": "movimentacoes_estoque",
+      "schemaname": "public",
+      "tablespace": null
+    },
+    {
+      "indexdef": "CREATE INDEX idx_mov_direction_date ON public.movimentacoes_estoque USING btree (company_id, direction, created_at DESC) WHERE (status = 'ATIVO'::text)",
+      "indexname": "idx_mov_direction_date",
+      "tablename": "movimentacoes_estoque",
+      "schemaname": "public",
+      "tablespace": null
+    },
+    {
+      "indexdef": "CREATE INDEX idx_movimentacoes_estoque_per_product ON public.movimentacoes_estoque USING btree (company_id, produto_id, status)",
+      "indexname": "idx_movimentacoes_estoque_per_product",
+      "tablename": "movimentacoes_estoque",
+      "schemaname": "public",
+      "tablespace": null
+    },
+    {
+      "indexdef": "CREATE INDEX idx_movimentacoes_estoque_created_at ON public.movimentacoes_estoque USING btree (company_id, created_at DESC)",
+      "indexname": "idx_movimentacoes_estoque_created_at",
+      "tablename": "movimentacoes_estoque",
+      "schemaname": "public",
+      "tablespace": null
+    },
+    {
+      "indexdef": "CREATE UNIQUE INDEX uq_movimentacoes_estorno_de_id_ativo ON public.movimentacoes_estoque USING btree (estorno_de_id) WHERE ((status = 'ATIVO'::text) AND (estorno_de_id IS NOT NULL))",
+      "indexname": "uq_movimentacoes_estorno_de_id_ativo",
+      "tablename": "movimentacoes_estoque",
+      "schemaname": "public",
+      "tablespace": null
+    },
+    {
+      "indexdef": "CREATE UNIQUE INDEX produtos_pkey ON public.produtos USING btree (id)",
+      "indexname": "produtos_pkey",
+      "tablename": "produtos",
+      "schemaname": "public",
+      "tablespace": null
+    },
+    {
+      "indexdef": "CREATE INDEX idx_produtos_categoria ON public.produtos USING btree (categoria)",
+      "indexname": "idx_produtos_categoria",
+      "tablename": "produtos",
+      "schemaname": "public",
+      "tablespace": null
+    },
+    {
+      "indexdef": "CREATE INDEX idx_produtos_ativo ON public.produtos USING btree (ativo)",
+      "indexname": "idx_produtos_ativo",
+      "tablename": "produtos",
+      "schemaname": "public",
+      "tablespace": null
+    },
+    {
+      "indexdef": "CREATE INDEX idx_produtos_created_at ON public.produtos USING btree (created_at DESC)",
+      "indexname": "idx_produtos_created_at",
+      "tablename": "produtos",
+      "schemaname": "public",
+      "tablespace": null
+    },
+    {
+      "indexdef": "CREATE INDEX idx_produtos_company_id ON public.produtos USING btree (company_id)",
+      "indexname": "idx_produtos_company_id",
+      "tablename": "produtos",
+      "schemaname": "public",
+      "tablespace": null
+    },
+    {
+      "indexdef": "CREATE INDEX idx_produtos_company_nome ON public.produtos USING btree (company_id, nome_produto)",
+      "indexname": "idx_produtos_company_nome",
+      "tablename": "produtos",
+      "schemaname": "public",
+      "tablespace": null
+    },
+    {
+      "indexdef": "CREATE UNIQUE INDEX produtos_company_sku_unique ON public.produtos USING btree (company_id, sku) WHERE ((sku IS NOT NULL) AND (sku <> ''::text))",
+      "indexname": "produtos_company_sku_unique",
+      "tablename": "produtos",
+      "schemaname": "public",
+      "tablespace": null
+    },
+    {
+      "indexdef": "CREATE INDEX idx_produtos_nome_unaccent_trgm ON public.produtos USING gin (nome_produto_unaccent gin_trgm_ops)",
+      "indexname": "idx_produtos_nome_unaccent_trgm",
+      "tablename": "produtos",
+      "schemaname": "public",
+      "tablespace": null
+    },
+    {
+      "indexdef": "CREATE INDEX idx_produtos_sku_unaccent_trgm ON public.produtos USING gin (sku_unaccent gin_trgm_ops)",
+      "indexname": "idx_produtos_sku_unaccent_trgm",
+      "tablename": "produtos",
+      "schemaname": "public",
+      "tablespace": null
+    },
+    {
+      "indexdef": "CREATE UNIQUE INDEX salmon_entries_pkey ON public.salmon_entries USING btree (id)",
+      "indexname": "salmon_entries_pkey",
+      "tablename": "salmon_entries",
+      "schemaname": "public",
+      "tablespace": null
+    },
+    {
+      "indexdef": "CREATE INDEX idx_salmon_entries_date ON public.salmon_entries USING btree (entry_date DESC)",
+      "indexname": "idx_salmon_entries_date",
+      "tablename": "salmon_entries",
+      "schemaname": "public",
+      "tablespace": null
+    },
+    {
+      "indexdef": "CREATE INDEX idx_salmon_entries_company_id ON public.salmon_entries USING btree (company_id)",
+      "indexname": "idx_salmon_entries_company_id",
+      "tablename": "salmon_entries",
+      "schemaname": "public",
+      "tablespace": null
+    },
+    {
+      "indexdef": "CREATE INDEX idx_salmon_entries_status ON public.salmon_entries USING btree (status)",
+      "indexname": "idx_salmon_entries_status",
+      "tablename": "salmon_entries",
+      "schemaname": "public",
+      "tablespace": null
+    },
+    {
+      "indexdef": "CREATE INDEX idx_salmon_entries_supplier ON public.salmon_entries USING btree (supplier_id)",
+      "indexname": "idx_salmon_entries_supplier",
+      "tablename": "salmon_entries",
+      "schemaname": "public",
+      "tablespace": null
+    },
+    {
+      "indexdef": "CREATE INDEX idx_salmon_entries_expiration ON public.salmon_entries USING btree (company_id, expiration_date) WHERE (status = 'ACTIVE'::text)",
+      "indexname": "idx_salmon_entries_expiration",
+      "tablename": "salmon_entries",
+      "schemaname": "public",
+      "tablespace": null
+    },
+    {
+      "indexdef": "CREATE UNIQUE INDEX salmon_manipulations_pkey ON public.salmon_manipulations USING btree (id)",
+      "indexname": "salmon_manipulations_pkey",
+      "tablename": "salmon_manipulations",
+      "schemaname": "public",
+      "tablespace": null
+    },
+    {
+      "indexdef": "CREATE INDEX idx_salmon_manipulations_date ON public.salmon_manipulations USING btree (manipulation_date DESC)",
+      "indexname": "idx_salmon_manipulations_date",
+      "tablename": "salmon_manipulations",
+      "schemaname": "public",
+      "tablespace": null
+    },
+    {
+      "indexdef": "CREATE INDEX idx_salmon_manipulations_company_id ON public.salmon_manipulations USING btree (company_id)",
+      "indexname": "idx_salmon_manipulations_company_id",
+      "tablename": "salmon_manipulations",
+      "schemaname": "public",
+      "tablespace": null
+    },
+    {
+      "indexdef": "CREATE INDEX idx_salmon_manipulations_status ON public.salmon_manipulations USING btree (status)",
+      "indexname": "idx_salmon_manipulations_status",
+      "tablename": "salmon_manipulations",
+      "schemaname": "public",
+      "tablespace": null
+    },
+    {
+      "indexdef": "CREATE INDEX idx_salmon_manipulations_entry ON public.salmon_manipulations USING btree (entry_id)",
+      "indexname": "idx_salmon_manipulations_entry",
+      "tablename": "salmon_manipulations",
+      "schemaname": "public",
+      "tablespace": null
+    },
+    {
+      "indexdef": "CREATE UNIQUE INDEX stock_sku_counter_pkey ON public.stock_sku_counter USING btree (id)",
+      "indexname": "stock_sku_counter_pkey",
+      "tablename": "stock_sku_counter",
+      "schemaname": "public",
+      "tablespace": null
+    },
+    {
+      "indexdef": "CREATE INDEX idx_stock_sku_counter_company_id ON public.stock_sku_counter USING btree (company_id)",
+      "indexname": "idx_stock_sku_counter_company_id",
+      "tablename": "stock_sku_counter",
+      "schemaname": "public",
+      "tablespace": null
+    },
+    {
+      "indexdef": "CREATE UNIQUE INDEX stock_sku_counter_company_prefix_key ON public.stock_sku_counter USING btree (company_id, prefix)",
+      "indexname": "stock_sku_counter_company_prefix_key",
+      "tablename": "stock_sku_counter",
+      "schemaname": "public",
+      "tablespace": null
+    }
+  ],
+  "policies": [
+    {
+      "cmd": "SELECT",
+      "qual": "can_receive_company_change(company_id, ARRAY['estoque:movimentacoes:view'::text, 'estoque:preditivo:view'::text, 'stock:read'::text, 'system:global:manage'::text])",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "movimentacoes_estoque",
+      "permissive": "PERMISSIVE",
+      "policyname": "company_realtime_read",
+      "schemaname": "public",
+      "with_check": null
+    },
+    {
+      "cmd": "DELETE",
+      "qual": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND ( SELECT has_any_permission(auth.uid(), ARRAY['stock:delete'::text, 'estoque:movimentacoes:delete'::text, 'estoque:movimentacoes:manage'::text, 'system:global:manage'::text]) AS has_any_permission))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "movimentacoes_estoque",
+      "permissive": "PERMISSIVE",
+      "policyname": "movimentacoes_delete",
+      "schemaname": "public",
+      "with_check": null
+    },
+    {
+      "cmd": "INSERT",
+      "qual": null,
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "movimentacoes_estoque",
+      "permissive": "PERMISSIVE",
+      "policyname": "movimentacoes_insert",
+      "schemaname": "public",
+      "with_check": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND ( SELECT has_any_permission(auth.uid(), ARRAY['stock:movements:create'::text, 'estoque:movimentacoes:create'::text, 'estoque:movimentacoes:manage'::text, 'system:global:manage'::text]) AS has_any_permission))"
+    },
+    {
+      "cmd": "SELECT",
+      "qual": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND ( SELECT has_any_permission(auth.uid(), ARRAY['stock:movements:read'::text, 'estoque:movimentacoes:view'::text, 'cmv:categoria:view'::text, 'cmv:top-itens:view'::text, 'cmv:setor:view'::text, 'cmv:semanal:view'::text, 'cmv:simulador:view'::text, 'system:global:manage'::text]) AS has_any_permission))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "movimentacoes_estoque",
+      "permissive": "PERMISSIVE",
+      "policyname": "movimentacoes_select",
+      "schemaname": "public",
+      "with_check": null
+    },
+    {
+      "cmd": "UPDATE",
+      "qual": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND ( SELECT has_any_permission(auth.uid(), ARRAY['stock:movements:edit'::text, 'estoque:movimentacoes:edit'::text, 'estoque:movimentacoes:manage'::text, 'system:global:manage'::text]) AS has_any_permission))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "movimentacoes_estoque",
+      "permissive": "PERMISSIVE",
+      "policyname": "movimentacoes_update",
+      "schemaname": "public",
+      "with_check": "(company_id = ( SELECT get_current_company_id() AS get_current_company_id))"
+    },
+    {
+      "cmd": "ALL",
+      "qual": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) OR (( SELECT (NULLIF(current_setting('request.headers'::text, true), ''::text) IS NULL)) AND is_company_member(( SELECT auth.uid() AS uid), company_id)))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "movimentacoes_estoque",
+      "permissive": "RESTRICTIVE",
+      "policyname": "multiunit_scope_boundary",
+      "schemaname": "public",
+      "with_check": "(company_id = ( SELECT get_current_company_id() AS get_current_company_id))"
+    },
+    {
+      "cmd": "SELECT",
+      "qual": "can_receive_company_change(company_id, ARRAY['estoque:catalogo:view'::text, 'stock:read'::text, 'system:global:manage'::text])",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "produtos",
+      "permissive": "PERMISSIVE",
+      "policyname": "company_realtime_read",
+      "schemaname": "public",
+      "with_check": null
+    },
+    {
+      "cmd": "ALL",
+      "qual": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) OR (( SELECT (NULLIF(current_setting('request.headers'::text, true), ''::text) IS NULL)) AND is_company_member(( SELECT auth.uid() AS uid), company_id)))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "produtos",
+      "permissive": "RESTRICTIVE",
+      "policyname": "multiunit_scope_boundary",
+      "schemaname": "public",
+      "with_check": "(company_id = ( SELECT get_current_company_id() AS get_current_company_id))"
+    },
+    {
+      "cmd": "DELETE",
+      "qual": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND ( SELECT has_any_permission(auth.uid(), ARRAY['stock:delete'::text, 'estoque:cadastros:delete'::text, 'estoque:cadastros:manage'::text, 'system:global:manage'::text]) AS has_any_permission))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "produtos",
+      "permissive": "PERMISSIVE",
+      "policyname": "produtos_delete",
+      "schemaname": "public",
+      "with_check": null
+    },
+    {
+      "cmd": "INSERT",
+      "qual": null,
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "produtos",
+      "permissive": "PERMISSIVE",
+      "policyname": "produtos_insert",
+      "schemaname": "public",
+      "with_check": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND ( SELECT has_any_permission(auth.uid(), ARRAY['stock:edit'::text, 'estoque:cadastros:create'::text, 'estoque:cadastros:manage'::text, 'system:global:manage'::text]) AS has_any_permission))"
+    },
+    {
+      "cmd": "SELECT",
+      "qual": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND ( SELECT has_any_permission(auth.uid(), ARRAY['stock:read'::text, 'estoque:geral:view'::text, 'estoque:cadastros:view'::text, 'estoque:catalogo:view'::text, 'estoque:saldo:view'::text, 'estoque:requisicoes:view'::text, 'estoque:requisicoes:create'::text, 'estoque:dashboard:view'::text, 'estoque:movimentacoes:view'::text, 'estoque:consumo:view'::text, 'estoque:ranking:view'::text, 'estoque:perdas:view'::text, 'estoque:transferencias:view'::text, 'estoque:preditivo:view'::text, 'estoque:simulador:view'::text, 'cmv:categoria:view'::text, 'cmv:top-itens:view'::text, 'cmv:setor:view'::text, 'cmv:semanal:view'::text, 'cmv:precos:view'::text, 'cmv:simulador:view'::text, 'system:global:manage'::text]) AS has_any_permission))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "produtos",
+      "permissive": "PERMISSIVE",
+      "policyname": "produtos_select",
+      "schemaname": "public",
+      "with_check": null
+    },
+    {
+      "cmd": "UPDATE",
+      "qual": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND ( SELECT has_any_permission(auth.uid(), ARRAY['stock:edit'::text, 'estoque:cadastros:edit'::text, 'estoque:cadastros:manage'::text, 'cmv:precos:edit'::text, 'system:global:manage'::text]) AS has_any_permission))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "produtos",
+      "permissive": "PERMISSIVE",
+      "policyname": "produtos_update",
+      "schemaname": "public",
+      "with_check": "(company_id = ( SELECT get_current_company_id() AS get_current_company_id))"
+    },
+    {
+      "cmd": "DELETE",
+      "qual": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND ( SELECT has_permission_quick(auth.uid(), 'stock:delete'::text) AS has_permission_quick))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "produtos",
+      "permissive": "PERMISSIVE",
+      "policyname": "tenant_delete",
+      "schemaname": "public",
+      "with_check": null
+    },
+    {
+      "cmd": "INSERT",
+      "qual": null,
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "produtos",
+      "permissive": "PERMISSIVE",
+      "policyname": "tenant_insert",
+      "schemaname": "public",
+      "with_check": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND ( SELECT has_permission_quick(auth.uid(), 'stock:edit'::text) AS has_permission_quick))"
+    },
+    {
+      "cmd": "SELECT",
+      "qual": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND (( SELECT has_permission_quick(auth.uid(), 'stock:read'::text) AS has_permission_quick) OR ( SELECT has_permission_quick(auth.uid(), 'admin'::text) AS has_permission_quick)))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "produtos",
+      "permissive": "PERMISSIVE",
+      "policyname": "tenant_read",
+      "schemaname": "public",
+      "with_check": null
+    },
+    {
+      "cmd": "UPDATE",
+      "qual": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND ( SELECT has_permission_quick(auth.uid(), 'stock:edit'::text) AS has_permission_quick))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "produtos",
+      "permissive": "PERMISSIVE",
+      "policyname": "tenant_update",
+      "schemaname": "public",
+      "with_check": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND ( SELECT has_permission_quick(auth.uid(), 'stock:edit'::text) AS has_permission_quick))"
+    },
+    {
+      "cmd": "ALL",
+      "qual": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) OR (( SELECT (NULLIF(current_setting('request.headers'::text, true), ''::text) IS NULL)) AND is_company_member(( SELECT auth.uid() AS uid), company_id)))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "salmon_entries",
+      "permissive": "RESTRICTIVE",
+      "policyname": "multiunit_scope_boundary",
+      "schemaname": "public",
+      "with_check": "(company_id = ( SELECT get_current_company_id() AS get_current_company_id))"
+    },
+    {
+      "cmd": "DELETE",
+      "qual": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND ( SELECT has_any_permission(auth.uid(), ARRAY['salmon:entradas:delete'::text, 'salmon:delete'::text, 'system:global:manage'::text]) AS has_any_permission))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "salmon_entries",
+      "permissive": "PERMISSIVE",
+      "policyname": "salmon_tenant_delete",
+      "schemaname": "public",
+      "with_check": null
+    },
+    {
+      "cmd": "INSERT",
+      "qual": null,
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "salmon_entries",
+      "permissive": "PERMISSIVE",
+      "policyname": "salmon_tenant_insert",
+      "schemaname": "public",
+      "with_check": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND ( SELECT has_any_permission(auth.uid(), ARRAY['salmon:entradas:create'::text, 'salmon:entries:create'::text, 'system:global:manage'::text]) AS has_any_permission))"
+    },
+    {
+      "cmd": "SELECT",
+      "qual": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND ( SELECT has_any_permission(auth.uid(), ARRAY['salmon:entradas:view'::text, 'salmon:read'::text, 'salmon:manipulacao:view'::text, 'salmon:estoque:view'::text, 'salmon:dashboard:view'::text, 'salmon:planejamento:view'::text, 'salmon:metas:view'::text, 'system:global:manage'::text]) AS has_any_permission))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "salmon_entries",
+      "permissive": "PERMISSIVE",
+      "policyname": "salmon_tenant_select",
+      "schemaname": "public",
+      "with_check": null
+    },
+    {
+      "cmd": "UPDATE",
+      "qual": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND ( SELECT has_any_permission(auth.uid(), ARRAY['salmon:entradas:edit'::text, 'salmon:edit'::text, 'system:global:manage'::text]) AS has_any_permission))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "salmon_entries",
+      "permissive": "PERMISSIVE",
+      "policyname": "salmon_tenant_update",
+      "schemaname": "public",
+      "with_check": "(company_id = ( SELECT get_current_company_id() AS get_current_company_id))"
+    },
+    {
+      "cmd": "ALL",
+      "qual": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) OR (( SELECT (NULLIF(current_setting('request.headers'::text, true), ''::text) IS NULL)) AND is_company_member(( SELECT auth.uid() AS uid), company_id)))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "salmon_manipulations",
+      "permissive": "RESTRICTIVE",
+      "policyname": "multiunit_scope_boundary",
+      "schemaname": "public",
+      "with_check": "(company_id = ( SELECT get_current_company_id() AS get_current_company_id))"
+    },
+    {
+      "cmd": "DELETE",
+      "qual": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND ( SELECT has_any_permission(auth.uid(), ARRAY['salmon:manipulacao:delete'::text, 'system:global:manage'::text]) AS has_any_permission))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "salmon_manipulations",
+      "permissive": "PERMISSIVE",
+      "policyname": "salmon_manipulations_delete",
+      "schemaname": "public",
+      "with_check": null
+    },
+    {
+      "cmd": "INSERT",
+      "qual": null,
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "salmon_manipulations",
+      "permissive": "PERMISSIVE",
+      "policyname": "salmon_manipulations_insert",
+      "schemaname": "public",
+      "with_check": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND ( SELECT has_any_permission(auth.uid(), ARRAY['salmon:manipulacao:create'::text, 'system:global:manage'::text]) AS has_any_permission))"
+    },
+    {
+      "cmd": "SELECT",
+      "qual": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND ( SELECT has_any_permission(auth.uid(), ARRAY['salmon:manipulacao:view'::text, 'salmon:dashboard:view'::text, 'system:global:manage'::text]) AS has_any_permission))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "salmon_manipulations",
+      "permissive": "PERMISSIVE",
+      "policyname": "salmon_manipulations_select",
+      "schemaname": "public",
+      "with_check": null
+    },
+    {
+      "cmd": "UPDATE",
+      "qual": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND ( SELECT has_any_permission(auth.uid(), ARRAY['salmon:manipulacao:create'::text, 'salmon:manipulacao:edit'::text, 'system:global:manage'::text]) AS has_any_permission))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "salmon_manipulations",
+      "permissive": "PERMISSIVE",
+      "policyname": "salmon_manipulations_update",
+      "schemaname": "public",
+      "with_check": "(company_id = ( SELECT get_current_company_id() AS get_current_company_id))"
+    },
+    {
+      "cmd": "ALL",
+      "qual": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) OR (( SELECT (NULLIF(current_setting('request.headers'::text, true), ''::text) IS NULL)) AND is_company_member(( SELECT auth.uid() AS uid), company_id)))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "stock_sku_counter",
+      "permissive": "RESTRICTIVE",
+      "policyname": "multiunit_scope_boundary",
+      "schemaname": "public",
+      "with_check": "(company_id = ( SELECT get_current_company_id() AS get_current_company_id))"
+    },
+    {
+      "cmd": "DELETE",
+      "qual": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND ( SELECT has_any_permission(auth.uid(), ARRAY['stock:delete'::text, 'estoque:sku:manage'::text, 'system:global:manage'::text]) AS has_any_permission))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "stock_sku_counter",
+      "permissive": "PERMISSIVE",
+      "policyname": "stock_sku_counter_delete",
+      "schemaname": "public",
+      "with_check": null
+    },
+    {
+      "cmd": "INSERT",
+      "qual": null,
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "stock_sku_counter",
+      "permissive": "PERMISSIVE",
+      "policyname": "stock_sku_counter_insert",
+      "schemaname": "public",
+      "with_check": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND ( SELECT has_any_permission(auth.uid(), ARRAY['stock:edit'::text, 'estoque:catalogo:create'::text, 'estoque:sku:manage'::text, 'system:global:manage'::text]) AS has_any_permission))"
+    },
+    {
+      "cmd": "SELECT",
+      "qual": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND ( SELECT has_any_permission(auth.uid(), ARRAY['stock:read'::text, 'estoque:catalogo:view'::text, 'estoque:catalogo:create'::text, 'system:global:manage'::text]) AS has_any_permission))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "stock_sku_counter",
+      "permissive": "PERMISSIVE",
+      "policyname": "stock_sku_counter_select",
+      "schemaname": "public",
+      "with_check": null
+    },
+    {
+      "cmd": "UPDATE",
+      "qual": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND ( SELECT has_any_permission(auth.uid(), ARRAY['stock:edit'::text, 'estoque:catalogo:create'::text, 'estoque:sku:manage'::text, 'system:global:manage'::text]) AS has_any_permission))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "stock_sku_counter",
+      "permissive": "PERMISSIVE",
+      "policyname": "stock_sku_counter_update",
+      "schemaname": "public",
+      "with_check": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND ( SELECT has_any_permission(auth.uid(), ARRAY['stock:edit'::text, 'estoque:catalogo:create'::text, 'estoque:sku:manage'::text, 'system:global:manage'::text]) AS has_any_permission))"
+    }
+  ],
+  "triggers": [
+    {
+      "name": "trg_aa_produtos_force_company_id",
+      "table": "produtos",
+      "enabled": "O",
+      "definition": "CREATE TRIGGER trg_aa_produtos_force_company_id BEFORE INSERT OR UPDATE ON produtos FOR EACH ROW EXECUTE FUNCTION produtos_force_company_id()"
+    },
+    {
+      "name": "trg_audit_produtos",
+      "table": "produtos",
+      "enabled": "O",
+      "definition": "CREATE TRIGGER trg_audit_produtos AFTER INSERT OR DELETE OR UPDATE ON produtos FOR EACH ROW EXECUTE FUNCTION audit_trigger_fn('estoque', 'produtos')"
+    },
+    {
+      "name": "trg_block_placeholder_company",
+      "table": "produtos",
+      "enabled": "O",
+      "definition": "CREATE TRIGGER trg_block_placeholder_company BEFORE INSERT OR UPDATE ON produtos FOR EACH ROW EXECUTE FUNCTION trg_block_placeholder_company()"
+    },
+    {
+      "name": "trg_assert_requisicao_estoque_movement_consistency",
+      "table": "movimentacoes_estoque",
+      "enabled": "O",
+      "definition": "CREATE TRIGGER trg_assert_requisicao_estoque_movement_consistency BEFORE INSERT OR UPDATE ON movimentacoes_estoque FOR EACH ROW EXECUTE FUNCTION assert_requisicao_estoque_movement_consistency()"
+    },
+    {
+      "name": "trg_audit_movimentacoes_estoque",
+      "table": "movimentacoes_estoque",
+      "enabled": "O",
+      "definition": "CREATE TRIGGER trg_audit_movimentacoes_estoque AFTER INSERT OR DELETE OR UPDATE ON movimentacoes_estoque FOR EACH ROW EXECUTE FUNCTION audit_trigger_fn('estoque', 'movimentacoes_estoque')"
+    },
+    {
+      "name": "trg_block_placeholder_company",
+      "table": "movimentacoes_estoque",
+      "enabled": "O",
+      "definition": "CREATE TRIGGER trg_block_placeholder_company BEFORE INSERT OR UPDATE ON movimentacoes_estoque FOR EACH ROW EXECUTE FUNCTION trg_block_placeholder_company()"
+    },
+    {
+      "name": "trg_set_direction",
+      "table": "movimentacoes_estoque",
+      "enabled": "O",
+      "definition": "CREATE TRIGGER trg_set_direction BEFORE INSERT OR UPDATE OF tipo ON movimentacoes_estoque FOR EACH ROW EXECUTE FUNCTION set_stock_movement_direction()"
+    },
+    {
+      "name": "trg_update_last_movement",
+      "table": "movimentacoes_estoque",
+      "enabled": "O",
+      "definition": "CREATE TRIGGER trg_update_last_movement AFTER INSERT ON movimentacoes_estoque FOR EACH ROW EXECUTE FUNCTION update_produto_last_movement()"
+    },
+    {
+      "name": "trg_update_stock_on_mov",
+      "table": "movimentacoes_estoque",
+      "enabled": "O",
+      "definition": "CREATE TRIGGER trg_update_stock_on_mov AFTER INSERT OR DELETE OR UPDATE ON movimentacoes_estoque FOR EACH ROW EXECUTE FUNCTION fn_update_product_stock()"
+    },
+    {
+      "name": "trg_validate_estorno",
+      "table": "movimentacoes_estoque",
+      "enabled": "O",
+      "definition": "CREATE TRIGGER trg_validate_estorno BEFORE INSERT ON movimentacoes_estoque FOR EACH ROW EXECUTE FUNCTION validate_estorno_movement()"
+    },
+    {
+      "name": "trg_validate_stock_movement",
+      "table": "movimentacoes_estoque",
+      "enabled": "O",
+      "definition": "CREATE TRIGGER trg_validate_stock_movement BEFORE INSERT OR UPDATE OF quantidade, custo_unitario, custo_total ON movimentacoes_estoque FOR EACH ROW EXECUTE FUNCTION validate_stock_movement()"
+    },
+    {
+      "name": "trg_block_placeholder_company",
+      "table": "stock_sku_counter",
+      "enabled": "O",
+      "definition": "CREATE TRIGGER trg_block_placeholder_company BEFORE INSERT OR UPDATE ON stock_sku_counter FOR EACH ROW EXECUTE FUNCTION trg_block_placeholder_company()"
+    },
+    {
+      "name": "trg_block_placeholder_company",
+      "table": "supplier_item_prices",
+      "enabled": "O",
+      "definition": "CREATE TRIGGER trg_block_placeholder_company BEFORE INSERT OR UPDATE ON supplier_item_prices FOR EACH ROW EXECUTE FUNCTION trg_block_placeholder_company()"
+    },
+    {
+      "name": "trg_validate_sip",
+      "table": "supplier_item_prices",
+      "enabled": "O",
+      "definition": "CREATE TRIGGER trg_validate_sip BEFORE INSERT OR UPDATE ON supplier_item_prices FOR EACH ROW EXECUTE FUNCTION validate_supplier_item_price()"
+    },
+    {
+      "name": "trg_audit_salmon_entries",
+      "table": "salmon_entries",
+      "enabled": "O",
+      "definition": "CREATE TRIGGER trg_audit_salmon_entries AFTER INSERT OR DELETE OR UPDATE ON salmon_entries FOR EACH ROW EXECUTE FUNCTION audit_trigger_fn('salmon', 'salmon_entries')"
+    },
+    {
+      "name": "trg_block_placeholder_company",
+      "table": "salmon_entries",
+      "enabled": "O",
+      "definition": "CREATE TRIGGER trg_block_placeholder_company BEFORE INSERT OR UPDATE ON salmon_entries FOR EACH ROW EXECUTE FUNCTION trg_block_placeholder_company()"
+    },
+    {
+      "name": "trg_salmon_entries_updated",
+      "table": "salmon_entries",
+      "enabled": "O",
+      "definition": "CREATE TRIGGER trg_salmon_entries_updated BEFORE UPDATE ON salmon_entries FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()"
+    },
+    {
+      "name": "trg_validate_salmon_entry",
+      "table": "salmon_entries",
+      "enabled": "O",
+      "definition": "CREATE TRIGGER trg_validate_salmon_entry BEFORE INSERT OR UPDATE ON salmon_entries FOR EACH ROW EXECUTE FUNCTION validate_salmon_entry()"
+    },
+    {
+      "name": "trg_audit_salmon_manipulations",
+      "table": "salmon_manipulations",
+      "enabled": "O",
+      "definition": "CREATE TRIGGER trg_audit_salmon_manipulations AFTER INSERT OR DELETE OR UPDATE ON salmon_manipulations FOR EACH ROW EXECUTE FUNCTION audit_trigger_fn('salmon', 'salmon_manipulations')"
+    },
+    {
+      "name": "trg_block_placeholder_company",
+      "table": "salmon_manipulations",
+      "enabled": "O",
+      "definition": "CREATE TRIGGER trg_block_placeholder_company BEFORE INSERT OR UPDATE ON salmon_manipulations FOR EACH ROW EXECUTE FUNCTION trg_block_placeholder_company()"
+    },
+    {
+      "name": "trg_salmon_manipulations_updated",
+      "table": "salmon_manipulations",
+      "enabled": "O",
+      "definition": "CREATE TRIGGER trg_salmon_manipulations_updated BEFORE UPDATE ON salmon_manipulations FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()"
+    },
+    {
+      "name": "trg_validate_salmon_manipulation",
+      "table": "salmon_manipulations",
+      "enabled": "O",
+      "definition": "CREATE TRIGGER trg_validate_salmon_manipulation BEFORE INSERT OR UPDATE ON salmon_manipulations FOR EACH ROW EXECUTE FUNCTION validate_salmon_manipulation()"
+    }
+  ],
+  "salmon_acl": [
+    {
+      "anon": true,
+      "signature": "create_salmon_entry_atomic(date,text,text,text,integer,integer,numeric,numeric,text,date)",
+      "service_role": true,
+      "authenticated": true
+    },
+    {
+      "anon": true,
+      "signature": "_salmon_create_entry_guarded(text,text,text,text,integer,integer,numeric,numeric,text,text)",
+      "service_role": true,
+      "authenticated": true
+    },
+    {
+      "anon": true,
+      "signature": "cancel_salmon_entry_atomic(uuid,text)",
+      "service_role": true,
+      "authenticated": true
+    },
+    {
+      "anon": true,
+      "signature": "cancel_salmon_manipulation_atomic(uuid,text)",
+      "service_role": true,
+      "authenticated": true
+    },
+    {
+      "anon": true,
+      "signature": "ensure_salmon_raw_product()",
+      "service_role": true,
+      "authenticated": true
+    },
+    {
+      "anon": true,
+      "signature": "validate_salmon_entry()",
+      "service_role": true,
+      "authenticated": true
+    },
+    {
+      "anon": true,
+      "signature": "validate_salmon_manipulation()",
+      "service_role": true,
+      "authenticated": true
+    },
+    {
+      "anon": true,
+      "signature": "get_salmon_reconciliation_kpis()",
+      "service_role": true,
+      "authenticated": true
+    },
+    {
+      "anon": true,
+      "signature": "get_salmon_inventory_adjustment_kg()",
+      "service_role": true,
+      "authenticated": true
+    },
+    {
+      "anon": true,
+      "signature": "get_salmon_dashboard_summary(date,date)",
+      "service_role": true,
+      "authenticated": true
+    },
+    {
+      "anon": true,
+      "signature": "_salmon_cancel_entry_guarded(uuid,text)",
+      "service_role": true,
+      "authenticated": true
+    },
+    {
+      "anon": true,
+      "signature": "_salmon_create_manipulation_guarded(uuid,text,integer,numeric,numeric,numeric,text)",
+      "service_role": true,
+      "authenticated": true
+    },
+    {
+      "anon": true,
+      "signature": "create_salmon_manipulation_atomic(uuid,date,integer,numeric,numeric,numeric,text)",
+      "service_role": true,
+      "authenticated": true
+    },
+    {
+      "anon": true,
+      "signature": "_salmon_dashboard_guarded(text,text)",
+      "service_role": true,
+      "authenticated": true
+    },
+    {
+      "anon": true,
+      "signature": "_salmon_cancel_manipulation_guarded(uuid,text)",
+      "service_role": true,
+      "authenticated": true
+    },
+    {
+      "anon": true,
+      "signature": "upsert_salmon_leftover_atomic(date,numeric,text)",
+      "service_role": true,
+      "authenticated": true
+    }
+  ],
+  "captured_at": "2026-09-15T20:06:06.210106+00:00",
+  "role_memberships": [
+    {
+      "role": "pg_read_all_settings",
+      "member": "pg_monitor"
+    },
+    {
+      "role": "pg_read_all_stats",
+      "member": "pg_monitor"
+    },
+    {
+      "role": "pg_stat_scan_tables",
+      "member": "pg_monitor"
+    },
+    {
+      "role": "pg_read_all_data",
+      "member": "supabase_etl_admin"
+    },
+    {
+      "role": "pg_read_all_data",
+      "member": "supabase_read_only_user"
+    },
+    {
+      "role": "anon",
+      "member": "authenticator"
+    },
+    {
+      "role": "authenticated",
+      "member": "authenticator"
+    },
+    {
+      "role": "service_role",
+      "member": "authenticator"
+    },
+    {
+      "role": "authenticator",
+      "member": "supabase_storage_admin"
+    },
+    {
+      "role": "anon",
+      "member": "postgres"
+    },
+    {
+      "role": "authenticated",
+      "member": "postgres"
+    },
+    {
+      "role": "service_role",
+      "member": "postgres"
+    },
+    {
+      "role": "authenticator",
+      "member": "postgres"
+    },
+    {
+      "role": "pg_monitor",
+      "member": "postgres"
+    },
+    {
+      "role": "pg_read_all_data",
+      "member": "postgres"
+    },
+    {
+      "role": "pg_signal_backend",
+      "member": "postgres"
+    },
+    {
+      "role": "pg_monitor",
+      "member": "supabase_etl_admin"
+    },
+    {
+      "role": "pg_monitor",
+      "member": "supabase_read_only_user"
+    },
+    {
+      "role": "pg_create_subscription",
+      "member": "postgres"
+    },
+    {
+      "role": "postgres",
+      "member": "cli_login_postgres"
+    },
+    {
+      "role": "supabase_privileged_role",
+      "member": "postgres"
+    },
+    {
+      "role": "supabase_privileged_role",
+      "member": "supabase_etl_admin"
+    }
+  ],
+  "foreign_movements": 0,
+  "duplicate_linked_groups": 0
+}

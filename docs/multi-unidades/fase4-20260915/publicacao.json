@@ -1,0 +1,49 @@
+{
+  "project": "wuzxpbixprrgssoeeaez",
+  "database": {
+    "checked_at": "2026-09-15 20:28:41.07073+00",
+    "server_version": "17.6",
+    "selected_versions_present": [
+      "20260910003448"
+    ],
+    "cleanup_anon": true,
+    "refresh_authenticated": true,
+    "helper_authenticated": true,
+    "companies_admin": "( SELECT has_permission(auth.uid(), 'system:admin'::text) AS has_permission)"
+  },
+  "preflight_phase4_read_only": "PASS",
+  "production": {
+    "id": "dpl_79oubxDxhgVF4owXmEXiEP6QUV5N",
+    "commit": "80dcf4ec527d1a7e86ed3509496638b71219ab43",
+    "state": "READY",
+    "domain": "www.marginfood.com"
+  },
+  "edges": [
+    {
+      "slug": "inventario",
+      "version": 15,
+      "updated_at": 1788996434894
+    },
+    {
+      "slug": "requisicao-estoque",
+      "version": 14,
+      "updated_at": 1788996434894
+    },
+    {
+      "slug": "ficha-tecnica",
+      "version": 11,
+      "updated_at": 1789498411130
+    },
+    {
+      "slug": "scheduled-jobs",
+      "version": 7,
+      "updated_at": 1782999924516
+    }
+  ],
+  "advisors": {
+    "INFO": 1,
+    "WARN": 6
+  },
+  "writes_in_production": 0,
+  "backup_restorability_proven": false
+}

@@ -1,0 +1,7 @@
+{
+  "slug": "requisicao-estoque",
+  "version": 14,
+  "hash": "4aa1a03e851549c6322e6ba432063c0087944c51b06db23f9e4f8a2aed529445",
+  "callsAtomic": false,
+  "cascadeSection": "// 3) Cascade cancel to salmon module if source_module = 'salmon'\n      if (mov.source_module === \"salmon\" && mov.reference_type && mov.reference_id) {\n        const refType = mov.reference_type as string;\n        const refId = mov.reference_id as string;\n\n        if (refType === \"SALMON_ENTRY\" && refId && !refId.endsWith(\"_ESTORNO\")) {\n          const { error: salmonErr } = await adminClient\n            .from(\"salmon_entries\")\n            .update({ status: \"CANCELLED\", updated_at: new Date().toISOString() })\n            .eq(\"id\", refId)\n            .eq(\"company_id\", companyId);\n\n          if (salmonErr) console.error(\"Cascade cancel salmon entry failed:\", salmonErr);\n        } else if (refType === \"SALMON_MANIPULATION\" && refId && !refId.endsWith(\"_ESTORNO\")) {\n          const { error: salmonErr } = await adminClient\n            .from(\"salmon_manipulations\")\n            .update({ status: \"CANCELLED\", updated_at: new Date().toISOString() })\n            .eq(\"id\", refId)\n            .eq(\"company_id\", companyId);\n\n          if (salmonErr) console.error(\"Cascade cancel salmon manipulation failed:\", salmonErr);\n        }\n      }\n\n      "
+}

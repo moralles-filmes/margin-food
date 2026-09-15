@@ -1,0 +1,40 @@
+{
+  "codeCommit": "275c63d",
+  "testCommit": "c4c117e",
+  "database": "moralles_phase4_test_committed",
+  "sqlAssertions": [
+    146,
+    175
+  ],
+  "driftCases": [
+    "index",
+    "policy",
+    "overload",
+    "trigger",
+    "acl",
+    "caller",
+    "body",
+    "column"
+  ],
+  "beforeProofs": 2,
+  "concurrencyChecks": 15,
+  "concurrencyDatabase": "moralles_phase4_test_final",
+  "unit": {
+    "passed": 773,
+    "files": 97
+  },
+  "lint": {
+    "errors": 0,
+    "warnings": 1355
+  },
+  "typecheck": [
+    "app",
+    "node"
+  ],
+  "build": "PASS",
+  "deno": "2.9.6 check ficha-tecnica PASS",
+  "securityCheck": "static PASS; remote SQL skipped because configuration absent",
+  "migrationSha256": "1b8a0fb45b9c1c750a58164cba27ccb125ee57ce42960a2c9dc0f1a84114fcb7",
+  "httpGatewayTested": false,
+  "productionWrites": 0
+}

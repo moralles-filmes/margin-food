@@ -1,12 +1,14 @@
 # Auditoria pós-implantação multiunidade
 
-Data: 2026-09-15. **Fase 1 concluída; Fases 2 e 3 implementadas e ensaiadas localmente, com publicação pendente. Estabilização ainda em andamento.**
+Data: 2026-09-15. **Fase 1 concluída; Fases 2, 3 e 4 implementadas e ensaiadas localmente, com publicação pendente. Estabilização ainda em andamento.**
 
 Atualização Fase 2: [resultados, testes e sequência de produção](fase2-20260915/RESULTADOS.md). C01/C02 foram corrigidos no código e testados com 82 assertions SQL reais, cinco casos de drift e rollback de contenção; **continuam abertos em produção**, que recebeu somente leituras. A baseline e os achados abaixo preservam a auditoria da Fase 1.
 
 Atualização Fase 3: [resultados, classificação e ordem de publicação](fase3-20260915/RESULTADOS.md). H01/H02/H03 corrigidos localmente com 175 assertions SQL, nove casos de drift, concorrência e recuo com preservação integral. **Continuam abertos em produção**; Fase 2 revalidada como não publicada em 15/09 às 15:21 UTC. A prévia histórica encontrou 34/32.414 eventos correlacionáveis em audit_log/audit_logs e 79/2.937 ambíguos, sem executar backfill. Próximo prompt: [Fase 4 — Salmão e grants](06-PROMPT-FASE-4.md).
 
 Base: `main`, commit `1fdea27e69e3d687b49fdd04e91069b25cc70850`. Diretório inicialmente limpo. Projeto consultado: `wuzxpbixprrgssoeeaez`. Produção recebeu apenas consultas de leitura; nenhuma RPC de escrita foi executada, nenhuma migration, deploy ou reparação de histórico foi aplicada.
+
+Atualização Fase 4: [resultados, ACLs, testes e publicação](fase4-20260915/RESULTADOS.md). Main atualizada até `80dcf4e` foi integrada, preservando validade/FEFO e correção de estorno do Salmão. H04 corrigido localmente com 146 assertions SQL, oito recusas de drift e 15 checks de concorrência/recuo; regressão de 175 assertions de logs e 773 unitários aprovada. **Às 20:28 UTC, Fases 2/3/4 ainda ausentes do banco vivo.** O preflight histórico da Fase 3 precisa ser reconciliado com as assinaturas/corpos de Salmão já publicados; não foi contornado. `20260910003448` reapareceu no Git e histórico remoto, sem encerrar a revisão histórica da Fase 9. Próximo prompt: [Fase 5 — fornecedores](07-PROMPT-FASE-5.md).
 
 ## 1. Resumo executivo
 
@@ -239,7 +241,7 @@ A numeração abaixo é a deste trabalho; agrupa as 20 frentes do pedido origina
 | **1 — concluída** | Auditoria inicial, inventário vivo, baseline e plano | Evidências salvas e nenhuma mudança operacional |
 | **2 — implementada/testada localmente; publicação pendente** | Contenção crítica: companies_admin/rpc_create_company e RPCs globais de manutenção | 82 assertions SQL e recuo seguro aprovados; faltam publicação, validação do scheduler externo e pós-validação viva |
 | 3 | Logs completos: escrita, leitura, histórico e escopo global | Implementado e ensaiado localmente; publicação/backfill pendentes ([resultados](fase3-20260915/RESULTADOS.md)) |
-| 4 | RPCs de Salmão, funções internas e grants | Tenant + permissão funcional; espelhos/cancelamento preservados |
+| 4 | RPCs de Salmão, funções internas e grants | Implementada e ensaiada localmente; publicação pendente ([resultados](fase4-20260915/RESULTADOS.md)) |
 | 5 | Fornecedores e preço por item | Mesmo nome em A/B sem conflito, identidade correta no consumer |
 | 6 | Produtos e inventário automático de permissões | Comparar backend vivo, migrations, Edges e frontend com registry; classificar VÁLIDA/LEGADA/FANTASMA/NÃO ENCONTRADA/DIVERGENTE/GLOBAL |
 | 7 | Todas as tabelas, INSERTs, RLS, views e SECURITY DEFINER | Classificação global/tenant, FKs/índices, guard/grant por função e testes reais dos achados |

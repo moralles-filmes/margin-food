@@ -1,0 +1,210 @@
+[
+  {
+    "acl": "{postgres=X/postgres,authenticated=X/postgres}",
+    "anon": false,
+    "owner": "postgres",
+    "proconfig": [
+      "search_path=public"
+    ],
+    "prosecdef": true,
+    "signature": "_salmon_cancel_entry_guarded(uuid,text)",
+    "service_role": false,
+    "authenticated": true,
+    "definition_hash": "045b38d1eda8ffc5de48fe22ee6811c7"
+  },
+  {
+    "acl": "{postgres=X/postgres,authenticated=X/postgres}",
+    "anon": false,
+    "owner": "postgres",
+    "proconfig": [
+      "search_path=public"
+    ],
+    "prosecdef": true,
+    "signature": "_salmon_cancel_manipulation_guarded(uuid,text)",
+    "service_role": false,
+    "authenticated": true,
+    "definition_hash": "0c0f9dc74c32a18a834f214818a1397a"
+  },
+  {
+    "acl": "{postgres=X/postgres,authenticated=X/postgres}",
+    "anon": false,
+    "owner": "postgres",
+    "proconfig": [
+      "search_path=public"
+    ],
+    "prosecdef": true,
+    "signature": "_salmon_create_entry_guarded(text,text,text,text,integer,integer,numeric,numeric,text,text)",
+    "service_role": false,
+    "authenticated": true,
+    "definition_hash": "883b6917b7dac65b2e3f4308057c04d1"
+  },
+  {
+    "acl": "{postgres=X/postgres,authenticated=X/postgres}",
+    "anon": false,
+    "owner": "postgres",
+    "proconfig": [
+      "search_path=public"
+    ],
+    "prosecdef": true,
+    "signature": "_salmon_create_manipulation_guarded(uuid,text,integer,numeric,numeric,numeric,text)",
+    "service_role": false,
+    "authenticated": true,
+    "definition_hash": "837161e7a9949b5491dfcecb64537bc3"
+  },
+  {
+    "acl": "{postgres=X/postgres,authenticated=X/postgres}",
+    "anon": false,
+    "owner": "postgres",
+    "proconfig": [
+      "search_path=public"
+    ],
+    "prosecdef": true,
+    "signature": "_salmon_dashboard_guarded(text,text)",
+    "service_role": false,
+    "authenticated": true,
+    "definition_hash": "46cc87e4198bd9a46fd787f36f916fa1"
+  },
+  {
+    "acl": "{postgres=X/postgres}",
+    "anon": false,
+    "owner": "postgres",
+    "proconfig": [
+      "search_path=public"
+    ],
+    "prosecdef": true,
+    "signature": "cancel_salmon_entry_atomic(uuid,text)",
+    "service_role": false,
+    "authenticated": false,
+    "definition_hash": "c0c99b604995995ebe3ad2cea18d08bd"
+  },
+  {
+    "acl": "{postgres=X/postgres}",
+    "anon": false,
+    "owner": "postgres",
+    "proconfig": [
+      "search_path=public"
+    ],
+    "prosecdef": true,
+    "signature": "cancel_salmon_manipulation_atomic(uuid,text)",
+    "service_role": false,
+    "authenticated": false,
+    "definition_hash": "f3d7429102b5238297156e5b02c69407"
+  },
+  {
+    "acl": "{postgres=X/postgres}",
+    "anon": false,
+    "owner": "postgres",
+    "proconfig": [
+      "search_path=public"
+    ],
+    "prosecdef": true,
+    "signature": "create_salmon_entry_atomic(date,text,text,text,integer,integer,numeric,numeric,text,date)",
+    "service_role": false,
+    "authenticated": false,
+    "definition_hash": "62a5133da10830bf03db8386c22c3db3"
+  },
+  {
+    "acl": "{postgres=X/postgres}",
+    "anon": false,
+    "owner": "postgres",
+    "proconfig": [
+      "search_path=public"
+    ],
+    "prosecdef": true,
+    "signature": "create_salmon_manipulation_atomic(uuid,date,integer,numeric,numeric,numeric,text)",
+    "service_role": false,
+    "authenticated": false,
+    "definition_hash": "cc97629d6b24bd0d9c5a671fb9c1c01f"
+  },
+  {
+    "acl": "{postgres=X/postgres}",
+    "anon": false,
+    "owner": "postgres",
+    "proconfig": [
+      "search_path=public"
+    ],
+    "prosecdef": true,
+    "signature": "ensure_salmon_raw_product()",
+    "service_role": false,
+    "authenticated": false,
+    "definition_hash": "8226da5a523b0965590318410796570f"
+  },
+  {
+    "acl": "{postgres=X/postgres}",
+    "anon": false,
+    "owner": "postgres",
+    "proconfig": [
+      "search_path=public"
+    ],
+    "prosecdef": true,
+    "signature": "get_salmon_dashboard_summary(date,date)",
+    "service_role": false,
+    "authenticated": false,
+    "definition_hash": "bc1e7723566cbeef8fb1e231b2cbed80"
+  },
+  {
+    "acl": "{postgres=X/postgres,authenticated=X/postgres}",
+    "anon": false,
+    "owner": "postgres",
+    "proconfig": [
+      "search_path=public"
+    ],
+    "prosecdef": true,
+    "signature": "get_salmon_inventory_adjustment_kg()",
+    "service_role": false,
+    "authenticated": true,
+    "definition_hash": "be809426fbdb462daac9e8bffca7b50d"
+  },
+  {
+    "acl": "{postgres=X/postgres,authenticated=X/postgres}",
+    "anon": false,
+    "owner": "postgres",
+    "proconfig": [
+      "search_path=public"
+    ],
+    "prosecdef": true,
+    "signature": "get_salmon_reconciliation_kpis()",
+    "service_role": false,
+    "authenticated": true,
+    "definition_hash": "dc150f0b70de3327b18036c1bdda979a"
+  },
+  {
+    "acl": "{postgres=X/postgres,authenticated=X/postgres}",
+    "anon": false,
+    "owner": "postgres",
+    "proconfig": [
+      "search_path=public"
+    ],
+    "prosecdef": true,
+    "signature": "upsert_salmon_leftover_atomic(date,numeric,text)",
+    "service_role": false,
+    "authenticated": true,
+    "definition_hash": "f761757bc82d5f8646b57ee0b8aabb30"
+  },
+  {
+    "acl": "{postgres=X/postgres}",
+    "anon": false,
+    "owner": "postgres",
+    "proconfig": [
+      "search_path=public"
+    ],
+    "prosecdef": true,
+    "signature": "validate_salmon_entry()",
+    "service_role": false,
+    "authenticated": false,
+    "definition_hash": "556ec046d4477d301fcc80e2235f091b"
+  },
+  {
+    "acl": "{postgres=X/postgres}",
+    "anon": false,
+    "owner": "postgres",
+    "proconfig": [
+      "search_path=public"
+    ],
+    "prosecdef": true,
+    "signature": "validate_salmon_manipulation()",
+    "service_role": false,
+    "authenticated": false,
+    "definition_hash": "00eda507d2eb6461a3937df6dea790e7"
+  }
+]
