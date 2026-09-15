@@ -1,0 +1,7657 @@
+{
+  "method": "TypeScript AST; excludes tests and generated database types. Calls may be non-Supabase; dynamic targets and payload provenance require manual review.",
+  "files": [
+    {
+      "file": "src/App.tsx",
+      "imports": [
+        {
+          "line": 8,
+          "module": "@/contexts/CompanyScopeProvider",
+          "typeOnly": false
+        }
+      ],
+      "tables": [],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [
+        {
+          "line": 54,
+          "method": "getItem"
+        },
+        {
+          "line": 55,
+          "method": "setItem"
+        },
+        {
+          "line": 60,
+          "method": "removeItem"
+        },
+        {
+          "line": 83,
+          "method": "removeItem"
+        }
+      ],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/AdminUsersView.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 179,
+          "name": "job_roles"
+        },
+        {
+          "line": 195,
+          "name": "role_permissions"
+        },
+        {
+          "line": 259,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 303,
+          "name": "<dynamic>"
+        }
+      ],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 58,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": [
+        {
+          "line": 132,
+          "name": "admin-users"
+        }
+      ]
+    },
+    {
+      "file": "src/components/AnaliseItemView.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [],
+      "rpcs": [
+        {
+          "line": 114,
+          "name": "list_report_items_cursor"
+        },
+        {
+          "line": 172,
+          "name": "get_report_items_summary"
+        },
+        {
+          "line": 200,
+          "name": "get_report_item_detail"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 79,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/AppLayout.tsx",
+      "imports": [],
+      "tables": [],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [
+        {
+          "line": 142,
+          "method": "getItem"
+        },
+        {
+          "line": 157,
+          "method": "setItem"
+        }
+      ],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/CentralIAView.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 132,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": [
+        {
+          "line": 188,
+          "name": "ai-chat"
+        }
+      ]
+    },
+    {
+      "file": "src/components/CmvView.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 23,
+          "hook": "useSupabase"
+        },
+        {
+          "line": 24,
+          "hook": "useCompanyScope"
+        }
+      ],
+      "edgeInvocations": [
+        {
+          "line": 69,
+          "name": "cmv"
+        },
+        {
+          "line": 97,
+          "name": "cmv"
+        },
+        {
+          "line": 136,
+          "name": "cmv"
+        },
+        {
+          "line": 159,
+          "name": "cmv"
+        }
+      ]
+    },
+    {
+      "file": "src/components/ComprasView.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 94,
+          "name": "alertas_falta_estoque"
+        }
+      ],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 36,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/EstoqueGeralView.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        },
+        {
+          "line": 40,
+          "module": "@/integrations/supabase/client",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 123,
+          "name": "stock_categories"
+        },
+        {
+          "line": 124,
+          "name": "stock_locations"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 103,
+          "name": "count_requisicoes_with_pending_items"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 82,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": [
+        {
+          "line": 463,
+          "name": "cmv"
+        }
+      ]
+    },
+    {
+      "file": "src/components/FichaTecnicaView.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 278,
+          "name": "produtos"
+        }
+      ],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 221,
+          "hook": "useSupabase"
+        },
+        {
+          "line": 552,
+          "hook": "useSupabase"
+        },
+        {
+          "line": 889,
+          "hook": "useSupabase"
+        },
+        {
+          "line": 1050,
+          "hook": "useSupabase"
+        },
+        {
+          "line": 1147,
+          "hook": "useSupabase"
+        },
+        {
+          "line": 1351,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": [
+        {
+          "line": 95,
+          "name": "ficha-tecnica"
+        }
+      ]
+    },
+    {
+      "file": "src/components/FinanceiroView.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 196,
+          "name": "fin_contas_pagar"
+        }
+      ],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 165,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/FloatingCalculator.tsx",
+      "imports": [],
+      "tables": [],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [
+        {
+          "line": 24,
+          "method": "getItem"
+        },
+        {
+          "line": 35,
+          "method": "setItem"
+        }
+      ],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/GlobalAuditView.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 103,
+          "name": "audit_logs"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 152,
+          "name": "list_profiles_minimal"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 84,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/InventarioView.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 513,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 517,
+          "name": "<dynamic>"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 964,
+          "name": "list_profiles_minimal"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 955,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/MovimentacoesSection.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 85,
+          "name": "stock_sectors"
+        }
+      ],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 72,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": [
+        {
+          "line": 205,
+          "name": "requisicao-estoque"
+        },
+        {
+          "line": 237,
+          "name": "requisicao-estoque"
+        }
+      ]
+    },
+    {
+      "file": "src/components/PedidosComprasMercadoView.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 114,
+          "name": "stock_categories"
+        }
+      ],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 67,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/PerformanceMonitorView.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 35,
+          "name": "audit_logs"
+        },
+        {
+          "line": 45,
+          "name": "audit_logs"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 65,
+          "name": "refresh_materialized_views"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 25,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/PlanningView.tsx",
+      "imports": [],
+      "tables": [
+        {
+          "line": 118,
+          "name": "<dynamic>"
+        }
+      ],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/PwaUpdatePrompt.tsx",
+      "imports": [],
+      "tables": [],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [
+        {
+          "line": 15,
+          "method": "getItem"
+        },
+        {
+          "line": 16,
+          "method": "removeItem"
+        },
+        {
+          "line": 53,
+          "method": "setItem"
+        }
+      ],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/QuickInventorySection.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 55,
+          "name": "stock_categories"
+        },
+        {
+          "line": 68,
+          "name": "produtos"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 111,
+          "name": "get_saldo_produtos"
+        },
+        {
+          "line": 170,
+          "name": "create_quick_inventory_atomic"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 33,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/RequisicaoEstoqueSection.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 109,
+          "name": "stock_sectors"
+        }
+      ],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 84,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": [
+        {
+          "line": 154,
+          "name": "requisicao-estoque"
+        },
+        {
+          "line": 177,
+          "name": "requisicao-estoque"
+        },
+        {
+          "line": 231,
+          "name": "requisicao-estoque"
+        },
+        {
+          "line": 300,
+          "name": "requisicao-estoque"
+        },
+        {
+          "line": 343,
+          "name": "requisicao-estoque"
+        },
+        {
+          "line": 392,
+          "name": "requisicao-estoque"
+        },
+        {
+          "line": 427,
+          "name": "requisicao-estoque"
+        },
+        {
+          "line": 459,
+          "name": "requisicao-estoque"
+        },
+        {
+          "line": 487,
+          "name": "requisicao-estoque"
+        }
+      ]
+    },
+    {
+      "file": "src/components/RequisicaoNotificationModal.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 20,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": [
+        {
+          "line": 39,
+          "name": "requisicao-estoque"
+        }
+      ]
+    },
+    {
+      "file": "src/components/RhView.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 218,
+          "name": "rh_colaboradores"
+        },
+        {
+          "line": 239,
+          "name": "rh_ponto_registros"
+        },
+        {
+          "line": 248,
+          "name": "rh_banco_horas"
+        },
+        {
+          "line": 292,
+          "name": "rh_colaboradores"
+        },
+        {
+          "line": 330,
+          "name": "rh_colaboradores"
+        },
+        {
+          "line": 344,
+          "name": "rh_colaboradores"
+        },
+        {
+          "line": 351,
+          "name": "rh_colaboradores"
+        },
+        {
+          "line": 365,
+          "name": "rh_ponto_registros"
+        },
+        {
+          "line": 387,
+          "name": "rh_ponto_registros"
+        },
+        {
+          "line": 438,
+          "name": "rh_ponto_registros"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 213,
+          "name": "list_profiles_minimal"
+        },
+        {
+          "line": 404,
+          "name": "reject_ponto_record"
+        }
+      ],
+      "writes": [
+        {
+          "line": 292,
+          "method": "insert"
+        },
+        {
+          "line": 365,
+          "method": "insert"
+        }
+      ],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 137,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": [
+        {
+          "line": 455,
+          "name": "rh"
+        }
+      ]
+    },
+    {
+      "file": "src/components/SecurityAuditView.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 42,
+          "name": "audit_log"
+        }
+      ],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 32,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/SimuladorCompraGeral.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 51,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": [
+        {
+          "line": 72,
+          "name": "cmv"
+        }
+      ]
+    },
+    {
+      "file": "src/components/StockCadastrosSection.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 84,
+          "name": "stock_categories"
+        },
+        {
+          "line": 97,
+          "name": "stock_locations"
+        },
+        {
+          "line": 109,
+          "name": "stock_sectors"
+        },
+        {
+          "line": 142,
+          "name": "stock_categories"
+        },
+        {
+          "line": 148,
+          "name": "audit_log"
+        },
+        {
+          "line": 156,
+          "name": "stock_categories"
+        },
+        {
+          "line": 162,
+          "name": "audit_log"
+        },
+        {
+          "line": 182,
+          "name": "stock_categories"
+        },
+        {
+          "line": 184,
+          "name": "audit_log"
+        },
+        {
+          "line": 209,
+          "name": "stock_locations"
+        },
+        {
+          "line": 214,
+          "name": "audit_log"
+        },
+        {
+          "line": 220,
+          "name": "stock_locations"
+        },
+        {
+          "line": 226,
+          "name": "audit_log"
+        },
+        {
+          "line": 246,
+          "name": "stock_locations"
+        },
+        {
+          "line": 248,
+          "name": "audit_log"
+        },
+        {
+          "line": 259,
+          "name": "stock_categories"
+        },
+        {
+          "line": 268,
+          "name": "audit_log"
+        },
+        {
+          "line": 293,
+          "name": "stock_sectors"
+        },
+        {
+          "line": 298,
+          "name": "audit_log"
+        },
+        {
+          "line": 305,
+          "name": "stock_sectors"
+        },
+        {
+          "line": 311,
+          "name": "audit_log"
+        },
+        {
+          "line": 331,
+          "name": "stock_sectors"
+        },
+        {
+          "line": 333,
+          "name": "audit_log"
+        },
+        {
+          "line": 344,
+          "name": "stock_sectors"
+        },
+        {
+          "line": 353,
+          "name": "audit_log"
+        },
+        {
+          "line": 364,
+          "name": "stock_locations"
+        },
+        {
+          "line": 373,
+          "name": "audit_log"
+        }
+      ],
+      "rpcs": [],
+      "writes": [
+        {
+          "line": 148,
+          "method": "insert"
+        },
+        {
+          "line": 156,
+          "method": "insert"
+        },
+        {
+          "line": 162,
+          "method": "insert"
+        },
+        {
+          "line": 184,
+          "method": "insert"
+        },
+        {
+          "line": 214,
+          "method": "insert"
+        },
+        {
+          "line": 220,
+          "method": "insert"
+        },
+        {
+          "line": 226,
+          "method": "insert"
+        },
+        {
+          "line": 248,
+          "method": "insert"
+        },
+        {
+          "line": 268,
+          "method": "insert"
+        },
+        {
+          "line": 298,
+          "method": "insert"
+        },
+        {
+          "line": 305,
+          "method": "insert"
+        },
+        {
+          "line": 311,
+          "method": "insert"
+        },
+        {
+          "line": 333,
+          "method": "insert"
+        },
+        {
+          "line": 353,
+          "method": "insert"
+        },
+        {
+          "line": 373,
+          "method": "insert"
+        }
+      ],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 51,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/UserMentionSelect.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [],
+      "rpcs": [
+        {
+          "line": 32,
+          "name": "list_profiles_minimal"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 23,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/admin/AccessManagementCard.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 70,
+          "name": "admin_actions_log"
+        }
+      ],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 30,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": [
+        {
+          "line": 139,
+          "name": "admin-create-user"
+        }
+      ]
+    },
+    {
+      "file": "src/components/admin/AdminCompaniesView.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 34,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": [
+        {
+          "line": 154,
+          "name": "admin-companies"
+        }
+      ]
+    },
+    {
+      "file": "src/components/admin/BugTrackerView.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        },
+        {
+          "line": 3,
+          "module": "@/integrations/supabase/types",
+          "typeOnly": true
+        }
+      ],
+      "tables": [
+        {
+          "line": 76,
+          "name": "system_bugs"
+        },
+        {
+          "line": 131,
+          "name": "system_bugs"
+        },
+        {
+          "line": 144,
+          "name": "system_bugs"
+        },
+        {
+          "line": 300,
+          "name": "system_bugs"
+        }
+      ],
+      "rpcs": [],
+      "writes": [
+        {
+          "line": 144,
+          "method": "insert"
+        }
+      ],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 54,
+          "hook": "useSupabase"
+        },
+        {
+          "line": 56,
+          "hook": "useCompanyId"
+        },
+        {
+          "line": 297,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/admin/CheckupSuiteCard.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 213,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": [
+        {
+          "line": 242,
+          "name": "<dynamic>"
+        }
+      ]
+    },
+    {
+      "file": "src/components/cmv/CmvFiltersBar.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 35,
+          "name": "stock_sectors"
+        }
+      ],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 30,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/compras/AlertasFaltaEstoqueView.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 75,
+          "name": "alertas_falta_estoque"
+        },
+        {
+          "line": 118,
+          "name": "alertas_falta_estoque"
+        }
+      ],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 56,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/compras/CalendarioLembretesView.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 72,
+          "name": "purchase_reminders"
+        },
+        {
+          "line": 108,
+          "name": "purchase_reminders"
+        },
+        {
+          "line": 112,
+          "name": "purchase_reminders"
+        },
+        {
+          "line": 124,
+          "name": "purchase_reminders"
+        }
+      ],
+      "rpcs": [],
+      "writes": [
+        {
+          "line": 112,
+          "method": "insert"
+        }
+      ],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 58,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/compras/RankingFornecedoresView.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 104,
+          "name": "supplier_item_prices"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 63,
+          "name": "get_supplier_ranking"
+        },
+        {
+          "line": 101,
+          "name": "upsert_supplier"
+        }
+      ],
+      "writes": [
+        {
+          "line": 104,
+          "method": "upsert"
+        }
+      ],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 39,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/compras/ShoppingChecklistView.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 171,
+          "name": "purchase_order_items"
+        }
+      ],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 20,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/compras/cotacao/ImportItensDialog.tsx",
+      "imports": [
+        {
+          "line": 6,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 35,
+          "name": "alertas_falta_estoque"
+        },
+        {
+          "line": 53,
+          "name": "purchase_orders"
+        },
+        {
+          "line": 62,
+          "name": "purchase_order_items"
+        }
+      ],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 24,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/estoque/ListaFixaSetorAdmin.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 54,
+          "name": "stock_sectors"
+        },
+        {
+          "line": 72,
+          "name": "listas_fixas_setor"
+        },
+        {
+          "line": 87,
+          "name": "listas_fixas_setor_itens"
+        },
+        {
+          "line": 122,
+          "name": "listas_fixas_setor"
+        },
+        {
+          "line": 148,
+          "name": "listas_fixas_setor_itens"
+        },
+        {
+          "line": 173,
+          "name": "listas_fixas_setor_itens"
+        },
+        {
+          "line": 199,
+          "name": "listas_fixas_setor_itens"
+        },
+        {
+          "line": 200,
+          "name": "listas_fixas_setor_itens"
+        },
+        {
+          "line": 209,
+          "name": "listas_fixas_setor"
+        }
+      ],
+      "rpcs": [],
+      "writes": [
+        {
+          "line": 122,
+          "method": "insert"
+        },
+        {
+          "line": 148,
+          "method": "insert"
+        }
+      ],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 44,
+          "hook": "useSupabase"
+        },
+        {
+          "line": 46,
+          "hook": "useCompanyId"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/estoque/NovaMovimentacaoModal.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 118,
+          "name": "stock_sectors"
+        }
+      ],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 96,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/estoque/ProdutoFormPanel.tsx",
+      "imports": [
+        {
+          "line": 20,
+          "module": "@/lib/supabaseErrors",
+          "typeOnly": false
+        }
+      ],
+      "tables": [],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/estoque/RequisicaoListaFixa.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 52,
+          "name": "stock_sectors"
+        },
+        {
+          "line": 77,
+          "name": "listas_fixas_setor"
+        },
+        {
+          "line": 93,
+          "name": "listas_fixas_setor_itens"
+        }
+      ],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 41,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": [
+        {
+          "line": 196,
+          "name": "requisicao-estoque"
+        }
+      ]
+    },
+    {
+      "file": "src/components/estoque/StockDashboardSection.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [],
+      "rpcs": [
+        {
+          "line": 167,
+          "name": "get_stock_dashboard"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 156,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/estoque/StockInactivityAlert.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [],
+      "rpcs": [
+        {
+          "line": 38,
+          "name": "get_inactive_stock_items"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [
+        50
+      ],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 26,
+          "hook": "useSupabase"
+        },
+        {
+          "line": 27,
+          "hook": "useCompanyScope"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/estoque/StockLossesSection.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [],
+      "rpcs": [
+        {
+          "line": 97,
+          "name": "get_stock_losses_report"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 62,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/estoque/StockPredictiveSection.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [],
+      "rpcs": [
+        {
+          "line": 106,
+          "name": "<dynamic>"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 90,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/estoque/StockTopConsumedSection.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [],
+      "rpcs": [
+        {
+          "line": 101,
+          "name": "get_stock_top_consumed"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 67,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/estoque/StockTransfersSection.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [],
+      "rpcs": [
+        {
+          "line": 88,
+          "name": "list_stock_transfers"
+        },
+        {
+          "line": 122,
+          "name": "stock_transfer_between_locations"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 41,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/financeiro/AlertasSection.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 74,
+          "name": "<dynamic>"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 108,
+          "name": "get_fin_alertas"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 89,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/financeiro/ApresentacaoSociosSection.tsx",
+      "imports": [
+        {
+          "line": 59,
+          "module": "./PresentationCompanyScope",
+          "typeOnly": false
+        }
+      ],
+      "tables": [],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/financeiro/AuditoriaFinSection.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 79,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 81,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 97,
+          "name": "<dynamic>"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 203,
+          "name": "_guarded_list_fin_audit_logs"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 154,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/financeiro/CadastroBaseTree.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 399,
+          "name": "fin_categorias"
+        },
+        {
+          "line": 400,
+          "name": "fin_centros_custo"
+        },
+        {
+          "line": 432,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 534,
+          "name": "fin_categorias"
+        },
+        {
+          "line": 547,
+          "name": "fin_categorias"
+        },
+        {
+          "line": 568,
+          "name": "fin_lancamentos"
+        },
+        {
+          "line": 569,
+          "name": "fin_lancamento_rateios"
+        },
+        {
+          "line": 587,
+          "name": "fin_categorias"
+        },
+        {
+          "line": 602,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 622,
+          "name": "fin_lancamentos"
+        },
+        {
+          "line": 623,
+          "name": "fin_lancamento_rateios"
+        },
+        {
+          "line": 630,
+          "name": "fin_categorias"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 660,
+          "name": "reorder_fin_categoria"
+        },
+        {
+          "line": 717,
+          "name": "batch_reorder_fin_categorias"
+        },
+        {
+          "line": 739,
+          "name": "<dynamic>"
+        }
+      ],
+      "writes": [
+        {
+          "line": 547,
+          "method": "insert"
+        }
+      ],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 365,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/financeiro/CategoriasFinSection.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 59,
+          "name": "fin_categorias"
+        },
+        {
+          "line": 60,
+          "name": "fin_centros_custo"
+        },
+        {
+          "line": 98,
+          "name": "fin_categorias"
+        }
+      ],
+      "rpcs": [],
+      "writes": [
+        {
+          "line": 98,
+          "method": "insert"
+        }
+      ],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 43,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/financeiro/CategorizacaoSection.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 66,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 68,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 108,
+          "name": "fin_regras_categorizacao"
+        },
+        {
+          "line": 109,
+          "name": "fin_categorias"
+        },
+        {
+          "line": 110,
+          "name": "fin_centros_custo"
+        },
+        {
+          "line": 180,
+          "name": "fin_regras_categorizacao"
+        },
+        {
+          "line": 184,
+          "name": "fin_regras_categorizacao"
+        },
+        {
+          "line": 206,
+          "name": "fin_regras_categorizacao"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 111,
+          "name": "contar_lancamentos_sem_categoria"
+        },
+        {
+          "line": 217,
+          "name": "aplicar_regras_categorizacao"
+        },
+        {
+          "line": 258,
+          "name": "preview_regra_categorizacao"
+        }
+      ],
+      "writes": [
+        {
+          "line": 184,
+          "method": "insert"
+        }
+      ],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 78,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/financeiro/CategoryCombobox.tsx",
+      "imports": [],
+      "tables": [
+        {
+          "line": 48,
+          "name": "<dynamic>"
+        }
+      ],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/financeiro/CentrosCustoFinSection.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 48,
+          "name": "fin_centros_custo"
+        },
+        {
+          "line": 80,
+          "name": "fin_centros_custo"
+        }
+      ],
+      "rpcs": [],
+      "writes": [
+        {
+          "line": 80,
+          "method": "insert"
+        }
+      ],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 34,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/financeiro/ComparativoSection.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 301,
+          "name": "<dynamic>"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 96,
+          "name": "comparativo_periodos"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 75,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/financeiro/ConciliacaoBancariaSection.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        },
+        {
+          "line": 32,
+          "module": "@/lib/supabaseErrors",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 149,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 345,
+          "name": "fin_contas"
+        },
+        {
+          "line": 351,
+          "name": "fin_categorias"
+        },
+        {
+          "line": 352,
+          "name": "fin_centros_custo"
+        },
+        {
+          "line": 435,
+          "name": "fin_lancamentos"
+        },
+        {
+          "line": 437,
+          "name": "fin_lancamentos"
+        },
+        {
+          "line": 454,
+          "name": "fin_lancamentos"
+        },
+        {
+          "line": 483,
+          "name": "fin_lancamento_rateios"
+        },
+        {
+          "line": 518,
+          "name": "fin_lancamento_rateios"
+        },
+        {
+          "line": 578,
+          "name": "fin_lancamento_rateios"
+        },
+        {
+          "line": 839,
+          "name": "fin_conciliacao_vinculos"
+        },
+        {
+          "line": 863,
+          "name": "fin_lancamentos"
+        },
+        {
+          "line": 888,
+          "name": "fin_lancamentos"
+        },
+        {
+          "line": 912,
+          "name": "fin_lancamentos"
+        },
+        {
+          "line": 914,
+          "name": "fin_contas_pagar"
+        },
+        {
+          "line": 916,
+          "name": "fin_contas_receber"
+        },
+        {
+          "line": 920,
+          "name": "fin_conciliacao_ignoradas"
+        },
+        {
+          "line": 928,
+          "name": "fin_lancamentos"
+        },
+        {
+          "line": 935,
+          "name": "fin_lancamentos"
+        },
+        {
+          "line": 997,
+          "name": "<dynamic>"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 157,
+          "name": "get_fin_saldo_conta_em"
+        },
+        {
+          "line": 394,
+          "name": "get_fin_saldo_conta_em"
+        },
+        {
+          "line": 546,
+          "name": "reconcile_batch_lancamentos"
+        },
+        {
+          "line": 554,
+          "name": "unreconcile_lancamento"
+        },
+        {
+          "line": 645,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 698,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 743,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 792,
+          "name": "reconcile_batch_lancamentos"
+        },
+        {
+          "line": 1206,
+          "name": "reconcile_auto_bind_transfer_counterparts"
+        },
+        {
+          "line": 1228,
+          "name": "reconcile_neutralize_contamax"
+        },
+        {
+          "line": 1475,
+          "name": "reconcile_ignorar_lancamento"
+        },
+        {
+          "line": 1498,
+          "name": "reconcile_reconsiderar_ignorada"
+        },
+        {
+          "line": 1630,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 1675,
+          "name": "reconcile_bind_extrato"
+        },
+        {
+          "line": 1691,
+          "name": "reconcile_create_transfer_from_extrato"
+        },
+        {
+          "line": 1759,
+          "name": "reconcile_import_lancamento"
+        },
+        {
+          "line": 1862,
+          "name": "reconcile_pay_conta_pagar"
+        },
+        {
+          "line": 1874,
+          "name": "reconcile_receive_conta_receber"
+        },
+        {
+          "line": 1978,
+          "name": "reconcile_import_lancamento"
+        },
+        {
+          "line": 2004,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 2016,
+          "name": "reconcile_batch_lancamentos"
+        },
+        {
+          "line": 2029,
+          "name": "reconcile_pay_conta_pagar"
+        },
+        {
+          "line": 2047,
+          "name": "reconcile_receive_conta_receber"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [
+        {
+          "line": 120,
+          "method": "setItem"
+        },
+        {
+          "line": 125,
+          "method": "getItem"
+        },
+        {
+          "line": 131,
+          "method": "removeItem"
+        }
+      ],
+      "scope": [
+        {
+          "line": 205,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/financeiro/ConfirmarSaldoExtratoDialog.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [],
+      "rpcs": [
+        {
+          "line": 122,
+          "name": "get_fin_saldo_conta_em"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 79,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/financeiro/ContasBancariasSection.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 145,
+          "name": "fin_contas"
+        },
+        {
+          "line": 264,
+          "name": "fin_contas"
+        },
+        {
+          "line": 280,
+          "name": "fin_lancamentos"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 132,
+          "name": "get_all_saldos_contas"
+        },
+        {
+          "line": 174,
+          "name": "get_fin_saldo_conta_em"
+        }
+      ],
+      "writes": [
+        {
+          "line": 264,
+          "method": "insert"
+        }
+      ],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 101,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/financeiro/ContasPagarSection.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 64,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 66,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 198,
+          "name": "fin_categorias"
+        },
+        {
+          "line": 199,
+          "name": "fin_centros_custo"
+        },
+        {
+          "line": 200,
+          "name": "fin_contas"
+        },
+        {
+          "line": 201,
+          "name": "suppliers"
+        },
+        {
+          "line": 246,
+          "name": "fin_contas_pagar"
+        },
+        {
+          "line": 253,
+          "name": "fin_lancamento_rateios"
+        },
+        {
+          "line": 312,
+          "name": "fin_contas_pagar"
+        },
+        {
+          "line": 319,
+          "name": "fin_lancamento_rateios"
+        },
+        {
+          "line": 478,
+          "name": "fin_contas_pagar"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 146,
+          "name": "list_fin_contas_pagar_cursor"
+        },
+        {
+          "line": 186,
+          "name": "get_fin_counts_by_status"
+        },
+        {
+          "line": 451,
+          "name": "_guarded_aprovar_conta_pagar"
+        },
+        {
+          "line": 498,
+          "name": "pay_conta_pagar"
+        },
+        {
+          "line": 528,
+          "name": "_guarded_estornar_conta_pagar"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 82,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/financeiro/ContasReceberSection.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 61,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 63,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 178,
+          "name": "fin_categorias"
+        },
+        {
+          "line": 179,
+          "name": "fin_centros_custo"
+        },
+        {
+          "line": 180,
+          "name": "fin_contas"
+        },
+        {
+          "line": 205,
+          "name": "fin_contas_receber"
+        },
+        {
+          "line": 212,
+          "name": "fin_lancamento_rateios"
+        },
+        {
+          "line": 269,
+          "name": "fin_contas_receber"
+        },
+        {
+          "line": 276,
+          "name": "fin_lancamento_rateios"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 132,
+          "name": "list_fin_contas_receber_cursor"
+        },
+        {
+          "line": 172,
+          "name": "get_fin_counts_by_status"
+        },
+        {
+          "line": 404,
+          "name": "receive_conta_receber"
+        },
+        {
+          "line": 427,
+          "name": "_guarded_estornar_conta_receber"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 79,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/financeiro/CriarLancamentoExtratoDialog.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 84,
+          "name": "fin_categorias"
+        },
+        {
+          "line": 85,
+          "name": "fin_centros_custo"
+        },
+        {
+          "line": 86,
+          "name": "suppliers"
+        },
+        {
+          "line": 237,
+          "name": "fin_lancamentos"
+        },
+        {
+          "line": 283,
+          "name": "fin_contas_pagar"
+        },
+        {
+          "line": 299,
+          "name": "fin_lancamentos"
+        },
+        {
+          "line": 349,
+          "name": "fin_contas_receber"
+        },
+        {
+          "line": 360,
+          "name": "fin_lancamentos"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 144,
+          "name": "reconcile_bind_extrato"
+        },
+        {
+          "line": 204,
+          "name": "reconcile_import_lancamento"
+        },
+        {
+          "line": 249,
+          "name": "reconcile_import_lancamento"
+        },
+        {
+          "line": 314,
+          "name": "reconcile_import_lancamento"
+        }
+      ],
+      "writes": [
+        {
+          "line": 283,
+          "method": "insert"
+        },
+        {
+          "line": 349,
+          "method": "insert"
+        }
+      ],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 53,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/financeiro/DFCSection.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 29,
+          "name": "<dynamic>"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 76,
+          "name": "get_fin_dfc_summary"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 53,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/financeiro/DRESection.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 28,
+          "name": "<dynamic>"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 76,
+          "name": "get_fin_dre_summary"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 54,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/financeiro/DashboardCharts.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [],
+      "rpcs": [
+        {
+          "line": 76,
+          "name": "get_fin_dashboard_charts"
+        },
+        {
+          "line": 77,
+          "name": "get_fin_dashboard_charts"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 58,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/financeiro/DashboardFinanceiroSection.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 97,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 316,
+          "name": "<dynamic>"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 134,
+          "name": "get_fin_dashboard_summary"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 74,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/financeiro/DateRangePresets.tsx",
+      "imports": [],
+      "tables": [
+        {
+          "line": 63,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 80,
+          "name": "<dynamic>"
+        }
+      ],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/financeiro/FechamentoCaixaSection.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 128,
+          "name": "financeiro_fechamento_marcas"
+        },
+        {
+          "line": 146,
+          "name": "financeiro_fechamento_caixa"
+        },
+        {
+          "line": 164,
+          "name": "financeiro_fechamento_marca_valores"
+        },
+        {
+          "line": 349,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 688,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 690,
+          "name": "<dynamic>"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 270,
+          "name": "rpc_upsert_fechamento_caixa_com_marcas"
+        },
+        {
+          "line": 312,
+          "name": "rpc_delete_fechamento_caixa"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 89,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/financeiro/FechamentoMarcasTab.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 78,
+          "name": "fin_categorias"
+        },
+        {
+          "line": 146,
+          "name": "financeiro_fechamento_marcas"
+        },
+        {
+          "line": 154,
+          "name": "financeiro_fechamento_marcas"
+        },
+        {
+          "line": 182,
+          "name": "financeiro_fechamento_marcas"
+        },
+        {
+          "line": 249,
+          "name": "<dynamic>"
+        }
+      ],
+      "rpcs": [],
+      "writes": [
+        {
+          "line": 154,
+          "method": "insert"
+        }
+      ],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 65,
+          "hook": "useSupabase"
+        },
+        {
+          "line": 66,
+          "hook": "useCompanyId"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/financeiro/FluxoCaixaSection.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 72,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 74,
+          "name": "<dynamic>"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 120,
+          "name": "get_fin_cashflow"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 90,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/financeiro/KPIsSection.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 60,
+          "name": "<dynamic>"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 91,
+          "name": "get_fin_kpis"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 75,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/financeiro/LivroRazaoSection.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 243,
+          "name": "fin_categorias"
+        },
+        {
+          "line": 244,
+          "name": "fin_centros_custo"
+        },
+        {
+          "line": 245,
+          "name": "fin_contas"
+        },
+        {
+          "line": 294,
+          "name": "fin_lancamento_rateios"
+        },
+        {
+          "line": 378,
+          "name": "fin_lancamento_rateios"
+        },
+        {
+          "line": 572,
+          "name": "<dynamic>"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 185,
+          "name": "list_fin_lancamentos_cursor"
+        },
+        {
+          "line": 211,
+          "name": "get_fin_lancamentos_totais"
+        },
+        {
+          "line": 230,
+          "name": "get_fin_saldo_atual"
+        },
+        {
+          "line": 488,
+          "name": "delete_transfer"
+        },
+        {
+          "line": 522,
+          "name": "update_transfer"
+        },
+        {
+          "line": 533,
+          "name": "create_transfer"
+        },
+        {
+          "line": 627,
+          "name": "<dynamic>"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 117,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/financeiro/MonthNavigator.tsx",
+      "imports": [],
+      "tables": [
+        {
+          "line": 41,
+          "name": "<dynamic>"
+        }
+      ],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/financeiro/OrcamentoSection.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 149,
+          "name": "<dynamic>"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 164,
+          "name": "get_fin_orcamento_arvore"
+        },
+        {
+          "line": 309,
+          "name": "_guarded_bulk_upsert_orcamento"
+        },
+        {
+          "line": 345,
+          "name": "_guarded_delete_orcamento"
+        },
+        {
+          "line": 363,
+          "name": "copiar_orcamento_mes"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 125,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/financeiro/PlanoContasFinSection.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 52,
+          "name": "fin_plano_contas"
+        },
+        {
+          "line": 89,
+          "name": "fin_plano_contas"
+        }
+      ],
+      "rpcs": [],
+      "writes": [
+        {
+          "line": 89,
+          "method": "insert"
+        }
+      ],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 38,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/financeiro/PresentationCompanyScope.tsx",
+      "imports": [
+        {
+          "line": 4,
+          "module": "@/contexts/CompanyScopeProvider",
+          "typeOnly": false
+        }
+      ],
+      "tables": [],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/financeiro/PresentationDecisionRegisterDialog.tsx",
+      "imports": [],
+      "tables": [],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [
+        {
+          "line": 121,
+          "method": "getItem"
+        },
+        {
+          "line": 133,
+          "method": "removeItem"
+        },
+        {
+          "line": 138,
+          "method": "removeItem"
+        },
+        {
+          "line": 150,
+          "method": "setItem"
+        },
+        {
+          "line": 195,
+          "method": "removeItem"
+        }
+      ],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/financeiro/PresentationMeetingGovernance.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 173,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/financeiro/PresentationMode.tsx",
+      "imports": [],
+      "tables": [
+        {
+          "line": 253,
+          "name": "<dynamic>"
+        }
+      ],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/financeiro/PresentationSlideCanvas.tsx",
+      "imports": [],
+      "tables": [
+        {
+          "line": 408,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 571,
+          "name": "<dynamic>"
+        }
+      ],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/financeiro/ProjecaoFluxoSection.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 48,
+          "name": "<dynamic>"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 75,
+          "name": "get_fin_fluxo_projecao"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 57,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/financeiro/RecorrenciasSection.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 89,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 91,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 120,
+          "name": "<dynamic>"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 148,
+          "name": "_guarded_list_recorrencias"
+        },
+        {
+          "line": 216,
+          "name": "gerar_parcela_recorrente"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 101,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/financeiro/RelatorioSociosSection.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 67,
+          "name": "<dynamic>"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 74,
+          "name": "relatorio_socios_resumo"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 56,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/relatorios/GastosPorSetorChart.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [],
+      "rpcs": [
+        {
+          "line": 44,
+          "name": "get_spend_by_sector"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 32,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/rh/BeneficiosSection.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 103,
+          "name": "rh_beneficios"
+        },
+        {
+          "line": 147,
+          "name": "rh_beneficios"
+        },
+        {
+          "line": 151,
+          "name": "rh_beneficios"
+        },
+        {
+          "line": 187,
+          "name": "rh_beneficios"
+        },
+        {
+          "line": 218,
+          "name": "rh_beneficios"
+        }
+      ],
+      "rpcs": [],
+      "writes": [
+        {
+          "line": 151,
+          "method": "insert"
+        },
+        {
+          "line": 218,
+          "method": "insert"
+        }
+      ],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 78,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/rh/ComunicacaoInternaSection.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 69,
+          "name": "rh_comunicados"
+        },
+        {
+          "line": 108,
+          "name": "rh_comunicados"
+        },
+        {
+          "line": 112,
+          "name": "rh_comunicados"
+        },
+        {
+          "line": 139,
+          "name": "rh_comunicados"
+        },
+        {
+          "line": 146,
+          "name": "rh_comunicados"
+        }
+      ],
+      "rpcs": [],
+      "writes": [
+        {
+          "line": 112,
+          "method": "insert"
+        }
+      ],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 48,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/rh/ControleCustosRhSection.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        },
+        {
+          "line": 18,
+          "module": "@/integrations/supabase/types",
+          "typeOnly": true
+        }
+      ],
+      "tables": [
+        {
+          "line": 67,
+          "name": "rh_custos_mensais"
+        },
+        {
+          "line": 105,
+          "name": "rh_banco_horas"
+        },
+        {
+          "line": 145,
+          "name": "rh_custos_mensais"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 100,
+          "name": "get_rh_beneficios_total"
+        }
+      ],
+      "writes": [
+        {
+          "line": 145,
+          "method": "upsert"
+        }
+      ],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 57,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/rh/DashboardRhSection.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 74,
+          "name": "rh_banco_horas"
+        },
+        {
+          "line": 76,
+          "name": "rh_folha_pagamento"
+        },
+        {
+          "line": 78,
+          "name": "rh_beneficios"
+        },
+        {
+          "line": 80,
+          "name": "rh_ferias_afastamentos"
+        },
+        {
+          "line": 82,
+          "name": "rh_ponto_registros"
+        }
+      ],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 47,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/rh/DocumentosComplianceSection.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 103,
+          "name": "rh_documentos"
+        },
+        {
+          "line": 146,
+          "name": "rh-documentos"
+        },
+        {
+          "line": 155,
+          "name": "rh_documentos"
+        },
+        {
+          "line": 193,
+          "name": "rh-documentos"
+        },
+        {
+          "line": 210,
+          "name": "rh-documentos"
+        },
+        {
+          "line": 212,
+          "name": "rh_documentos"
+        }
+      ],
+      "rpcs": [],
+      "writes": [
+        {
+          "line": 155,
+          "method": "insert"
+        }
+      ],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 75,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/rh/EscalasSection.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 95,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 101,
+          "name": "rh_escalas"
+        },
+        {
+          "line": 112,
+          "name": "rh_escala_slots"
+        },
+        {
+          "line": 121,
+          "name": "rh_trocas_turno"
+        },
+        {
+          "line": 145,
+          "name": "rh_escalas"
+        },
+        {
+          "line": 173,
+          "name": "rh_escalas"
+        },
+        {
+          "line": 191,
+          "name": "rh_escala_slots"
+        },
+        {
+          "line": 220,
+          "name": "rh_escala_slots"
+        },
+        {
+          "line": 227,
+          "name": "rh_trocas_turno"
+        }
+      ],
+      "rpcs": [],
+      "writes": [
+        {
+          "line": 145,
+          "method": "insert"
+        },
+        {
+          "line": 191,
+          "method": "insert"
+        }
+      ],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 72,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/rh/FeriasAfastamentosSection.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 111,
+          "name": "rh_ferias_afastamentos"
+        },
+        {
+          "line": 113,
+          "name": "rh_ferias_saldo"
+        },
+        {
+          "line": 146,
+          "name": "rh_ferias_afastamentos"
+        },
+        {
+          "line": 186,
+          "name": "rh_ferias_afastamentos"
+        },
+        {
+          "line": 203,
+          "name": "rh_ferias_afastamentos"
+        },
+        {
+          "line": 342,
+          "name": "<dynamic>"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 180,
+          "name": "aprovar_ferias"
+        }
+      ],
+      "writes": [
+        {
+          "line": 146,
+          "method": "insert"
+        }
+      ],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 85,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/rh/FolhaPagamentoSection.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 105,
+          "name": "rh_folha_pagamento"
+        },
+        {
+          "line": 128,
+          "name": "rh_banco_horas"
+        },
+        {
+          "line": 195,
+          "name": "rh_folha_pagamento"
+        },
+        {
+          "line": 197,
+          "name": "rh_folha_pagamento"
+        },
+        {
+          "line": 211,
+          "name": "rh_folha_pagamento"
+        },
+        {
+          "line": 221,
+          "name": "rh_folha_pagamento"
+        }
+      ],
+      "rpcs": [],
+      "writes": [
+        {
+          "line": 197,
+          "method": "insert"
+        }
+      ],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 93,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/rh/GestaoDisciplinarSection.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        },
+        {
+          "line": 22,
+          "module": "@/integrations/supabase/types",
+          "typeOnly": true
+        }
+      ],
+      "tables": [
+        {
+          "line": 71,
+          "name": "rh_ocorrencias_disciplinares"
+        },
+        {
+          "line": 112,
+          "name": "rh_ocorrencias_disciplinares"
+        },
+        {
+          "line": 131,
+          "name": "rh_ocorrencias_disciplinares"
+        }
+      ],
+      "rpcs": [],
+      "writes": [
+        {
+          "line": 112,
+          "method": "insert"
+        }
+      ],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 48,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/rh/OnboardingSection.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 114,
+          "name": "rh_onboarding"
+        },
+        {
+          "line": 137,
+          "name": "rh_onboarding"
+        },
+        {
+          "line": 164,
+          "name": "rh_onboarding"
+        },
+        {
+          "line": 196,
+          "name": "rh_onboarding"
+        }
+      ],
+      "rpcs": [],
+      "writes": [
+        {
+          "line": 137,
+          "method": "insert"
+        }
+      ],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 98,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/rh/SSTSection.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 75,
+          "name": "rh_epis"
+        },
+        {
+          "line": 77,
+          "name": "rh_exames"
+        },
+        {
+          "line": 79,
+          "name": "rh_incidentes"
+        },
+        {
+          "line": 165,
+          "name": "rh_epis"
+        },
+        {
+          "line": 176,
+          "name": "rh_epis"
+        },
+        {
+          "line": 294,
+          "name": "rh_exames"
+        },
+        {
+          "line": 309,
+          "name": "rh_exames"
+        },
+        {
+          "line": 442,
+          "name": "rh_incidentes"
+        },
+        {
+          "line": 455,
+          "name": "rh_incidentes"
+        }
+      ],
+      "rpcs": [],
+      "writes": [
+        {
+          "line": 165,
+          "method": "insert"
+        },
+        {
+          "line": 294,
+          "method": "insert"
+        },
+        {
+          "line": 442,
+          "method": "insert"
+        }
+      ],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 55,
+          "hook": "useSupabase"
+        },
+        {
+          "line": 158,
+          "hook": "useSupabase"
+        },
+        {
+          "line": 287,
+          "hook": "useSupabase"
+        },
+        {
+          "line": 430,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/rh/TarefasSection.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 96,
+          "name": "rh_tarefas"
+        },
+        {
+          "line": 127,
+          "name": "rh_tarefas"
+        },
+        {
+          "line": 156,
+          "name": "rh_tarefas"
+        },
+        {
+          "line": 169,
+          "name": "rh_tarefas"
+        }
+      ],
+      "rpcs": [],
+      "writes": [
+        {
+          "line": 127,
+          "method": "insert"
+        }
+      ],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 74,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/components/rh/TreinamentoSection.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 110,
+          "name": "rh_trilhas_treinamento"
+        },
+        {
+          "line": 111,
+          "name": "rh_progresso_treinamento"
+        },
+        {
+          "line": 126,
+          "name": "rh_trilhas_treinamento"
+        },
+        {
+          "line": 156,
+          "name": "rh_progresso_treinamento"
+        },
+        {
+          "line": 191,
+          "name": "rh_progresso_treinamento"
+        }
+      ],
+      "rpcs": [],
+      "writes": [
+        {
+          "line": 126,
+          "method": "insert"
+        },
+        {
+          "line": 156,
+          "method": "insert"
+        }
+      ],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 82,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/contexts/AuthContext.tsx",
+      "imports": [
+        {
+          "line": 2,
+          "module": "@/integrations/supabase/client",
+          "typeOnly": false
+        },
+        {
+          "line": 3,
+          "module": "@/integrations/supabase/companyClient",
+          "typeOnly": false
+        },
+        {
+          "line": 4,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        },
+        {
+          "line": 6,
+          "module": "@supabase/supabase-js",
+          "typeOnly": true
+        }
+      ],
+      "tables": [],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [
+        {
+          "line": 144,
+          "method": "removeItem"
+        },
+        {
+          "line": 144,
+          "method": "removeItem"
+        }
+      ],
+      "scope": [
+        {
+          "line": 200,
+          "hook": "useCompanyScope"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/contexts/CompanyScopeContext.tsx",
+      "imports": [
+        {
+          "line": 2,
+          "module": "@/integrations/supabase/client",
+          "typeOnly": false
+        }
+      ],
+      "tables": [],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 25,
+          "hook": "useCompanyScope"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/contexts/CompanyScopeProvider.tsx",
+      "imports": [
+        {
+          "line": 3,
+          "module": "@/integrations/supabase/companyClient",
+          "typeOnly": false
+        },
+        {
+          "line": 4,
+          "module": "./CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/domain/financeiro/presentation/revenue.ts",
+      "imports": [],
+      "tables": [
+        {
+          "line": 180,
+          "name": "<dynamic>"
+        }
+      ],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/hooks/useCotacoesStore.ts",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 83,
+          "name": "cotacoes"
+        },
+        {
+          "line": 190,
+          "name": "cotacao_itens"
+        },
+        {
+          "line": 191,
+          "name": "cotacao_fornecedores"
+        },
+        {
+          "line": 199,
+          "name": "cotacao_respostas"
+        },
+        {
+          "line": 286,
+          "name": "cotacao_whatsapp_logs"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 140,
+          "name": "create_cotacao_atomic"
+        },
+        {
+          "line": 159,
+          "name": "update_cotacao_atomic"
+        },
+        {
+          "line": 174,
+          "name": "soft_delete_cotacao"
+        },
+        {
+          "line": 221,
+          "name": "save_cotacao_sugestao"
+        },
+        {
+          "line": 242,
+          "name": "create_purchase_orders_from_cotacao_atomic"
+        },
+        {
+          "line": 301,
+          "name": "save_cotacao_respostas_atomic"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [
+        108,
+        108
+      ],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 68,
+          "hook": "useSupabase"
+        },
+        {
+          "line": 69,
+          "hook": "useCompanyScope"
+        }
+      ],
+      "edgeInvocations": [
+        {
+          "line": 262,
+          "name": "send-whatsapp-zapi"
+        },
+        {
+          "line": 279,
+          "name": "cotacao-ia"
+        }
+      ]
+    },
+    {
+      "file": "src/hooks/useEstoqueGeralStore.ts",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 319,
+          "name": "produtos"
+        },
+        {
+          "line": 368,
+          "name": "produtos"
+        },
+        {
+          "line": 483,
+          "name": "movimentacoes_estoque"
+        },
+        {
+          "line": 615,
+          "name": "produtos"
+        },
+        {
+          "line": 682,
+          "name": "produtos"
+        },
+        {
+          "line": 701,
+          "name": "produtos"
+        },
+        {
+          "line": 741,
+          "name": "movimentacoes_estoque"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 266,
+          "name": "get_saldo_produtos"
+        },
+        {
+          "line": 455,
+          "name": "get_movimentacoes_kpis"
+        },
+        {
+          "line": 473,
+          "name": "list_movimentacoes_cursor"
+        },
+        {
+          "line": 606,
+          "name": "generate_next_sku"
+        }
+      ],
+      "writes": [
+        {
+          "line": 615,
+          "method": "insert"
+        },
+        {
+          "line": 741,
+          "method": "insert"
+        }
+      ],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 232,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/hooks/useIntegracoesConfig.ts",
+      "imports": [
+        {
+          "line": 2,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [],
+      "rpcs": [
+        {
+          "line": 59,
+          "name": "get_cotacao_zapi_config"
+        },
+        {
+          "line": 60,
+          "name": "get_cotacao_ia_config"
+        },
+        {
+          "line": 78,
+          "name": "save_cotacao_zapi_config"
+        },
+        {
+          "line": 92,
+          "name": "save_cotacao_ia_config"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 47,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/hooks/useInventarioStore.ts",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 96,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": [
+        {
+          "line": 109,
+          "name": "inventario"
+        }
+      ]
+    },
+    {
+      "file": "src/hooks/useMentionToast.ts",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 18,
+          "name": "notifications"
+        }
+      ],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [
+        55
+      ],
+      "persistence": [
+        {
+          "line": 16,
+          "method": "getItem"
+        },
+        {
+          "line": 33,
+          "method": "setItem"
+        },
+        {
+          "line": 69,
+          "method": "setItem"
+        }
+      ],
+      "scope": [
+        {
+          "line": 7,
+          "hook": "useSupabase"
+        },
+        {
+          "line": 8,
+          "hook": "useCompanyScope"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/hooks/useNotifications.ts",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 29,
+          "name": "notifications"
+        },
+        {
+          "line": 40,
+          "name": "notifications"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 49,
+          "name": "mark_all_notifications_read"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [
+        63
+      ],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 21,
+          "hook": "useSupabase"
+        },
+        {
+          "line": 22,
+          "hook": "useCompanyScope"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/hooks/usePasswordValidation.ts",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 24,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": [
+        {
+          "line": 76,
+          "name": "check-password"
+        }
+      ]
+    },
+    {
+      "file": "src/hooks/usePersistedTab.ts",
+      "imports": [],
+      "tables": [],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [
+        {
+          "line": 18,
+          "method": "getItem"
+        },
+        {
+          "line": 26,
+          "method": "removeItem"
+        },
+        {
+          "line": 41,
+          "method": "setItem"
+        }
+      ],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/hooks/usePlanningStore.ts",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 75,
+          "name": "planning_metas_compra"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 111,
+          "name": "_planning_upsert_meta_guarded"
+        },
+        {
+          "line": 144,
+          "name": "_planning_delete_meta_guarded"
+        },
+        {
+          "line": 164,
+          "name": "_planning_spend_summary_guarded"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 57,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/hooks/usePresentationCategoryMetadata.ts",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [],
+      "rpcs": [
+        {
+          "line": 40,
+          "name": "get_fin_presentation_category_metadata"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [
+        48
+      ],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 46,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/hooks/usePresentationDecisions.ts",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        },
+        {
+          "line": 16,
+          "module": "@/integrations/supabase/types",
+          "typeOnly": true
+        }
+      ],
+      "tables": [],
+      "rpcs": [
+        {
+          "line": 93,
+          "name": "list_fin_presentation_decisions"
+        },
+        {
+          "line": 119,
+          "name": "get_fin_presentation_decision"
+        },
+        {
+          "line": 138,
+          "name": "list_profiles_minimal"
+        },
+        {
+          "line": 171,
+          "name": "_guarded_create_presentation_decision"
+        },
+        {
+          "line": 195,
+          "name": "_guarded_update_presentation_decision_draft"
+        },
+        {
+          "line": 217,
+          "name": "_guarded_add_presentation_decision_revision"
+        },
+        {
+          "line": 249,
+          "name": "_guarded_transition_presentation_decision"
+        },
+        {
+          "line": 272,
+          "name": "_guarded_create_presentation_decision_action"
+        },
+        {
+          "line": 298,
+          "name": "_guarded_update_presentation_decision_action"
+        },
+        {
+          "line": 332,
+          "name": "_guarded_transition_presentation_decision_action"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [
+        79,
+        116,
+        134,
+        153,
+        156
+      ],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 76,
+          "hook": "useSupabase"
+        },
+        {
+          "line": 114,
+          "hook": "useSupabase"
+        },
+        {
+          "line": 132,
+          "hook": "useSupabase"
+        },
+        {
+          "line": 149,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/hooks/usePresentationDetail.ts",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        },
+        {
+          "line": 8,
+          "module": "@/integrations/supabase/types",
+          "typeOnly": true
+        }
+      ],
+      "tables": [],
+      "rpcs": [
+        {
+          "line": 204,
+          "name": "get_fin_presentation_detail_rows"
+        },
+        {
+          "line": 223,
+          "name": "get_fin_presentation_detail_series"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [
+        238,
+        246,
+        260
+      ],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 235,
+          "hook": "useSupabase"
+        },
+        {
+          "line": 258,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/hooks/usePresentationExpenseDetails.ts",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        },
+        {
+          "line": 5,
+          "module": "@/integrations/supabase/types",
+          "typeOnly": true
+        }
+      ],
+      "tables": [],
+      "rpcs": [
+        {
+          "line": 55,
+          "name": "get_fin_presentation_expense_details"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [
+        64
+      ],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 39,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/hooks/usePresentationExpenses.ts",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        },
+        {
+          "line": 11,
+          "module": "@/integrations/supabase/types",
+          "typeOnly": true
+        }
+      ],
+      "tables": [],
+      "rpcs": [
+        {
+          "line": 65,
+          "name": "get_fin_presentation_expenses"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [
+        57,
+        110,
+        120
+      ],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 102,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/hooks/usePresentationMeetings.ts",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        },
+        {
+          "line": 13,
+          "module": "@/integrations/supabase/types",
+          "typeOnly": true
+        }
+      ],
+      "tables": [],
+      "rpcs": [
+        {
+          "line": 94,
+          "name": "list_fin_presentation_sessions"
+        },
+        {
+          "line": 120,
+          "name": "get_fin_presentation_session"
+        },
+        {
+          "line": 138,
+          "name": "get_fin_presentation_minutes_export"
+        },
+        {
+          "line": 164,
+          "name": "_guarded_create_presentation_session"
+        },
+        {
+          "line": 190,
+          "name": "_guarded_save_presentation_session"
+        },
+        {
+          "line": 214,
+          "name": "_guarded_start_presentation_session"
+        },
+        {
+          "line": 232,
+          "name": "_guarded_submit_presentation_minutes"
+        },
+        {
+          "line": 252,
+          "name": "_guarded_transition_presentation_session"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [
+        80,
+        117,
+        149,
+        152
+      ],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 77,
+          "hook": "useSupabase"
+        },
+        {
+          "line": 115,
+          "hook": "useSupabase"
+        },
+        {
+          "line": 146,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/hooks/usePresentationPlan.ts",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        },
+        {
+          "line": 17,
+          "module": "@/integrations/supabase/types",
+          "typeOnly": true
+        }
+      ],
+      "tables": [],
+      "rpcs": [
+        {
+          "line": 293,
+          "name": "get_fin_presentation_plan"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [
+        320,
+        340
+      ],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 316,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/hooks/usePresentationRevenue.ts",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        },
+        {
+          "line": 11,
+          "module": "@/integrations/supabase/types",
+          "typeOnly": true
+        }
+      ],
+      "tables": [],
+      "rpcs": [
+        {
+          "line": 70,
+          "name": "get_fin_presentation_revenue"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [
+        57,
+        117,
+        127
+      ],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 109,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/hooks/usePresentationScenario.ts",
+      "imports": [],
+      "tables": [],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [
+        {
+          "line": 60,
+          "method": "getItem"
+        },
+        {
+          "line": 63,
+          "method": "removeItem"
+        },
+        {
+          "line": 73,
+          "method": "removeItem"
+        },
+        {
+          "line": 91,
+          "method": "setItem"
+        },
+        {
+          "line": 221,
+          "method": "removeItem"
+        }
+      ],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/hooks/usePresentationSocios.ts",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        },
+        {
+          "line": 13,
+          "module": "@/integrations/supabase/types",
+          "typeOnly": true
+        }
+      ],
+      "tables": [],
+      "rpcs": [
+        {
+          "line": 133,
+          "name": "get_fin_presentation_socios"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [
+        113,
+        181,
+        198
+      ],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 168,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/hooks/usePurchaseOrdersStore.ts",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 156,
+          "name": "purchase_orders"
+        },
+        {
+          "line": 233,
+          "name": "purchase_order_items"
+        },
+        {
+          "line": 288,
+          "name": "profiles"
+        },
+        {
+          "line": 290,
+          "name": "notifications"
+        },
+        {
+          "line": 320,
+          "name": "purchase_order_items"
+        },
+        {
+          "line": 347,
+          "name": "purchase_order_items"
+        },
+        {
+          "line": 353,
+          "name": "purchase_orders"
+        },
+        {
+          "line": 362,
+          "name": "profiles"
+        },
+        {
+          "line": 364,
+          "name": "notifications"
+        },
+        {
+          "line": 377,
+          "name": "audit_log"
+        },
+        {
+          "line": 395,
+          "name": "purchase_order_items"
+        },
+        {
+          "line": 455,
+          "name": "notifications"
+        },
+        {
+          "line": 464,
+          "name": "notifications"
+        },
+        {
+          "line": 488,
+          "name": "purchase_order_items"
+        },
+        {
+          "line": 520,
+          "name": "purchase_orders"
+        },
+        {
+          "line": 529,
+          "name": "purchase_orders"
+        },
+        {
+          "line": 533,
+          "name": "audit_log"
+        },
+        {
+          "line": 588,
+          "name": "purchase_orders"
+        },
+        {
+          "line": 589,
+          "name": "profiles"
+        },
+        {
+          "line": 591,
+          "name": "notifications"
+        },
+        {
+          "line": 630,
+          "name": "purchase_order_items"
+        },
+        {
+          "line": 635,
+          "name": "purchase_orders"
+        },
+        {
+          "line": 643,
+          "name": "audit_log"
+        },
+        {
+          "line": 671,
+          "name": "purchase_orders"
+        },
+        {
+          "line": 677,
+          "name": "notifications"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 136,
+          "name": "list_purchase_orders_cursor"
+        },
+        {
+          "line": 275,
+          "name": "create_purchase_order_atomic"
+        },
+        {
+          "line": 438,
+          "name": "receive_purchase_order_atomic"
+        },
+        {
+          "line": 499,
+          "name": "receive_purchase_order_atomic"
+        },
+        {
+          "line": 579,
+          "name": "edit_purchase_order_atomic"
+        },
+        {
+          "line": 620,
+          "name": "storno_purchase_order_stock"
+        }
+      ],
+      "writes": [
+        {
+          "line": 290,
+          "method": "insert"
+        },
+        {
+          "line": 364,
+          "method": "insert"
+        },
+        {
+          "line": 377,
+          "method": "insert"
+        },
+        {
+          "line": 464,
+          "method": "insert"
+        },
+        {
+          "line": 533,
+          "method": "insert"
+        },
+        {
+          "line": 591,
+          "method": "insert"
+        },
+        {
+          "line": 643,
+          "method": "insert"
+        }
+      ],
+      "queryKeys": [],
+      "realtime": [
+        223
+      ],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 103,
+          "hook": "useSupabase"
+        },
+        {
+          "line": 104,
+          "hook": "useCompanyScope"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/hooks/useRelatoriosData.ts",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [],
+      "rpcs": [
+        {
+          "line": 229,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 237,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 245,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 253,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 271,
+          "name": "<dynamic>"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 185,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/hooks/useSalmonDashboard.ts",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [],
+      "rpcs": [
+        {
+          "line": 68,
+          "name": "<dynamic>"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 58,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/hooks/useSalmonStore.ts",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        },
+        {
+          "line": 4,
+          "module": "@/integrations/supabase/client",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 112,
+          "name": "salmon_entries"
+        },
+        {
+          "line": 113,
+          "name": "salmon_manipulations"
+        },
+        {
+          "line": 114,
+          "name": "salmon_config"
+        },
+        {
+          "line": 115,
+          "name": "salmon_daily_records"
+        },
+        {
+          "line": 116,
+          "name": "suppliers"
+        },
+        {
+          "line": 117,
+          "name": "planning_metas_compra"
+        },
+        {
+          "line": 118,
+          "name": "salmon_metas_provisionadas"
+        },
+        {
+          "line": 119,
+          "name": "salmon_auditorias_compra"
+        },
+        {
+          "line": 246,
+          "name": "suppliers"
+        },
+        {
+          "line": 303,
+          "name": "suppliers"
+        },
+        {
+          "line": 312,
+          "name": "suppliers"
+        },
+        {
+          "line": 328,
+          "name": "planning_metas_compra"
+        },
+        {
+          "line": 368,
+          "name": "salmon_metas_provisionadas"
+        },
+        {
+          "line": 637,
+          "name": "salmon_daily_records"
+        },
+        {
+          "line": 664,
+          "name": "salmon_daily_records"
+        },
+        {
+          "line": 676,
+          "name": "salmon_config"
+        },
+        {
+          "line": 678,
+          "name": "salmon_config"
+        },
+        {
+          "line": 906,
+          "name": "salmon_auditorias_compra"
+        },
+        {
+          "line": 951,
+          "name": "salmon_entries"
+        },
+        {
+          "line": 958,
+          "name": "salmon_manipulations"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 224,
+          "name": "get_salmon_inventory_adjustment_kg"
+        },
+        {
+          "line": 401,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 442,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 453,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 481,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 503,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 542,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 552,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 588,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 612,
+          "name": "<dynamic>"
+        }
+      ],
+      "writes": [
+        {
+          "line": 246,
+          "method": "insert"
+        },
+        {
+          "line": 328,
+          "method": "upsert"
+        },
+        {
+          "line": 368,
+          "method": "upsert"
+        },
+        {
+          "line": 637,
+          "method": "upsert"
+        },
+        {
+          "line": 906,
+          "method": "insert"
+        }
+      ],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 83,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/hooks/useTheme.ts",
+      "imports": [],
+      "tables": [],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [
+        {
+          "line": 6,
+          "method": "getItem"
+        },
+        {
+          "line": 15,
+          "method": "setItem"
+        }
+      ],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/integrations/supabase/client.ts",
+      "imports": [
+        {
+          "line": 2,
+          "module": "@supabase/supabase-js",
+          "typeOnly": false
+        }
+      ],
+      "tables": [],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/integrations/supabase/companyClient.ts",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@supabase/supabase-js",
+          "typeOnly": false
+        }
+      ],
+      "tables": [],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/lib/companyAccess.ts",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@supabase/supabase-js",
+          "typeOnly": true
+        },
+        {
+          "line": 2,
+          "module": "@/integrations/supabase/types",
+          "typeOnly": true
+        },
+        {
+          "line": 3,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": true
+        }
+      ],
+      "tables": [
+        {
+          "line": 21,
+          "name": "profiles"
+        },
+        {
+          "line": 38,
+          "name": "user_roles"
+        },
+        {
+          "line": 61,
+          "name": "user_roles"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 33,
+          "name": "list_my_companies"
+        },
+        {
+          "line": 51,
+          "name": "get_my_company_context"
+        },
+        {
+          "line": 60,
+          "name": "assert_tenant"
+        },
+        {
+          "line": 62,
+          "name": "get_effective_permissions"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/lib/companySelection.ts",
+      "imports": [],
+      "tables": [],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [
+        {
+          "line": 8,
+          "method": "getItem"
+        },
+        {
+          "line": 11,
+          "method": "setItem"
+        }
+      ],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/lib/conciliacaoAutoBind.ts",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/lib/supabaseErrors",
+          "typeOnly": false
+        }
+      ],
+      "tables": [],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/lib/conciliacaoSaldoExtrato.ts",
+      "imports": [],
+      "tables": [],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [
+        {
+          "line": 66,
+          "method": "setItem"
+        },
+        {
+          "line": 74,
+          "method": "getItem"
+        },
+        {
+          "line": 87,
+          "method": "removeItem"
+        }
+      ],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/lib/dataEvents.ts",
+      "imports": [],
+      "tables": [],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [
+        {
+          "line": 81,
+          "method": "setItem"
+        },
+        {
+          "line": 82,
+          "method": "removeItem"
+        }
+      ],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/lib/extratoParser.ts",
+      "imports": [],
+      "tables": [
+        {
+          "line": 193,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 198,
+          "name": "<dynamic>"
+        }
+      ],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/lib/pdfInventarioContagem.ts",
+      "imports": [],
+      "tables": [
+        {
+          "line": 82,
+          "name": "<dynamic>"
+        }
+      ],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/lib/presentationMeetingDraft.ts",
+      "imports": [],
+      "tables": [],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [
+        {
+          "line": 46,
+          "method": "setItem"
+        },
+        {
+          "line": 56,
+          "method": "getItem"
+        },
+        {
+          "line": 66,
+          "method": "removeItem"
+        },
+        {
+          "line": 72,
+          "method": "removeItem"
+        },
+        {
+          "line": 82,
+          "method": "removeItem"
+        }
+      ],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/lib/presentationMinutesPptxExport.ts",
+      "imports": [],
+      "tables": [
+        {
+          "line": 35,
+          "name": "<dynamic>"
+        }
+      ],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/lib/presentationPdfExport.ts",
+      "imports": [],
+      "tables": [
+        {
+          "line": 511,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 608,
+          "name": "<dynamic>"
+        }
+      ],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/lib/presentationPptxExport.ts",
+      "imports": [],
+      "tables": [
+        {
+          "line": 531,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 634,
+          "name": "<dynamic>"
+        }
+      ],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/lib/presentationSlides.ts",
+      "imports": [],
+      "tables": [
+        {
+          "line": 237,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 405,
+          "name": "<dynamic>"
+        },
+        {
+          "line": 415,
+          "name": "<dynamic>"
+        }
+      ],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/lib/safeXlsx.ts",
+      "imports": [],
+      "tables": [
+        {
+          "line": 19,
+          "name": "<dynamic>"
+        }
+      ],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/lib/tenant.ts",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/integrations/supabase/client",
+          "typeOnly": true
+        }
+      ],
+      "tables": [],
+      "rpcs": [
+        {
+          "line": 7,
+          "name": "assert_tenant"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/main.tsx",
+      "imports": [],
+      "tables": [],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [
+        {
+          "line": 21,
+          "method": "getItem"
+        },
+        {
+          "line": 22,
+          "method": "setItem"
+        },
+        {
+          "line": 26,
+          "method": "removeItem"
+        },
+        {
+          "line": 39,
+          "method": "getItem"
+        },
+        {
+          "line": 40,
+          "method": "setItem"
+        },
+        {
+          "line": 43,
+          "method": "removeItem"
+        }
+      ],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/pages/AdminPanel.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [
+        {
+          "line": 67,
+          "method": "removeItem"
+        }
+      ],
+      "scope": [
+        {
+          "line": 19,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/pages/Login.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 15,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/pages/ResetPassword.tsx",
+      "imports": [
+        {
+          "line": 1,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        }
+      ],
+      "tables": [],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 13,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "src/permissions/hooks.ts",
+      "imports": [
+        {
+          "line": 15,
+          "module": "@/contexts/CompanyScopeContext",
+          "typeOnly": false
+        },
+        {
+          "line": 16,
+          "module": "@/integrations/supabase/client",
+          "typeOnly": true
+        }
+      ],
+      "tables": [
+        {
+          "line": 41,
+          "name": "rbac_legacy_usage"
+        }
+      ],
+      "rpcs": [],
+      "writes": [
+        {
+          "line": 41,
+          "method": "insert"
+        }
+      ],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [
+        {
+          "line": 94,
+          "hook": "useSupabase"
+        },
+        {
+          "line": 105,
+          "hook": "useSupabase"
+        },
+        {
+          "line": 116,
+          "hook": "useSupabase"
+        },
+        {
+          "line": 127,
+          "hook": "useSupabase"
+        }
+      ],
+      "edgeInvocations": []
+    },
+    {
+      "file": "supabase/functions/_shared/company-scope.ts",
+      "imports": [
+        {
+          "line": 1,
+          "module": "npm:@supabase/supabase-js@2",
+          "typeOnly": true
+        }
+      ],
+      "tables": [],
+      "rpcs": [
+        {
+          "line": 10,
+          "name": "assert_tenant"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "supabase/functions/_shared/company-users.ts",
+      "imports": [
+        {
+          "line": 1,
+          "module": "npm:@supabase/supabase-js@2",
+          "typeOnly": true
+        }
+      ],
+      "tables": [],
+      "rpcs": [
+        {
+          "line": 14,
+          "name": "find_auth_user_by_email"
+        },
+        {
+          "line": 22,
+          "name": "reserve_company_invitation"
+        },
+        {
+          "line": 34,
+          "name": "find_auth_user_by_email"
+        },
+        {
+          "line": 39,
+          "name": "admin_upsert_company_membership"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "supabase/functions/admin-companies/index.ts",
+      "imports": [
+        {
+          "line": 4,
+          "module": "npm:@supabase/supabase-js@2",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 57,
+          "name": "companies"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 34,
+          "name": "has_permission"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "supabase/functions/admin-create-user/index.ts",
+      "imports": [
+        {
+          "line": 4,
+          "module": "npm:@supabase/supabase-js@2",
+          "typeOnly": false
+        }
+      ],
+      "tables": [],
+      "rpcs": [
+        {
+          "line": 34,
+          "name": "has_permission"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "supabase/functions/admin-users/index.ts",
+      "imports": [
+        {
+          "line": 4,
+          "module": "npm:@supabase/supabase-js@2",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 29,
+          "name": "admin_actions_log"
+        },
+        {
+          "line": 34,
+          "name": "company_memberships"
+        },
+        {
+          "line": 53,
+          "name": "profiles"
+        },
+        {
+          "line": 54,
+          "name": "company_memberships"
+        },
+        {
+          "line": 68,
+          "name": "company_memberships"
+        },
+        {
+          "line": 71,
+          "name": "user_roles"
+        },
+        {
+          "line": 72,
+          "name": "user_permissions"
+        },
+        {
+          "line": 73,
+          "name": "job_roles"
+        },
+        {
+          "line": 104,
+          "name": "profiles"
+        },
+        {
+          "line": 127,
+          "name": "job_roles"
+        },
+        {
+          "line": 132,
+          "name": "job_roles"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 19,
+          "name": "get_effective_permissions"
+        },
+        {
+          "line": 41,
+          "name": "admin_upsert_company_membership"
+        }
+      ],
+      "writes": [
+        {
+          "line": 29,
+          "method": "insert"
+        },
+        {
+          "line": 127,
+          "method": "insert"
+        }
+      ],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "supabase/functions/ai-chat/index.ts",
+      "imports": [
+        {
+          "line": 4,
+          "module": "npm:@supabase/supabase-js@2",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 154,
+          "name": "ai_logs"
+        },
+        {
+          "line": 191,
+          "name": "ai_logs"
+        },
+        {
+          "line": 237,
+          "name": "ai_logs"
+        },
+        {
+          "line": 268,
+          "name": "ai_logs"
+        },
+        {
+          "line": 381,
+          "name": "financeiro_fechamento_caixa"
+        },
+        {
+          "line": 391,
+          "name": "metas_cmv"
+        },
+        {
+          "line": 397,
+          "name": "produtos"
+        },
+        {
+          "line": 406,
+          "name": "movimentacoes_estoque"
+        },
+        {
+          "line": 431,
+          "name": "solic_compra_mercado"
+        },
+        {
+          "line": 441,
+          "name": "ficha_componentes"
+        },
+        {
+          "line": 452,
+          "name": "config_precificacao"
+        },
+        {
+          "line": 460,
+          "name": "inventarios"
+        },
+        {
+          "line": 469,
+          "name": "fin_lancamentos"
+        },
+        {
+          "line": 496,
+          "name": "fin_contas_pagar"
+        },
+        {
+          "line": 504,
+          "name": "fin_contas_receber"
+        },
+        {
+          "line": 512,
+          "name": "fin_contas"
+        },
+        {
+          "line": 518,
+          "name": "fin_orcamentos"
+        },
+        {
+          "line": 527,
+          "name": "rh_colaboradores"
+        },
+        {
+          "line": 549,
+          "name": "rh_banco_horas"
+        },
+        {
+          "line": 561,
+          "name": "rh_ferias_afastamentos"
+        },
+        {
+          "line": 567,
+          "name": "rh_treinamentos"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 135,
+          "name": "has_permission"
+        }
+      ],
+      "writes": [
+        {
+          "line": 191,
+          "method": "insert"
+        },
+        {
+          "line": 237,
+          "method": "insert"
+        }
+      ],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "supabase/functions/check-password/index.ts",
+      "imports": [
+        {
+          "line": 4,
+          "module": "npm:@supabase/supabase-js@2",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 47,
+          "name": "<dynamic>"
+        }
+      ],
+      "rpcs": [],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "supabase/functions/cmv/index.ts",
+      "imports": [
+        {
+          "line": 4,
+          "module": "npm:@supabase/supabase-js@2",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 126,
+          "name": "produtos"
+        },
+        {
+          "line": 162,
+          "name": "produtos"
+        },
+        {
+          "line": 173,
+          "name": "financeiro_fechamento_caixa"
+        },
+        {
+          "line": 182,
+          "name": "movimentacoes_estoque"
+        },
+        {
+          "line": 224,
+          "name": "inventario_itens"
+        },
+        {
+          "line": 230,
+          "name": "inventario_itens"
+        },
+        {
+          "line": 345,
+          "name": "financeiro_fechamento_caixa"
+        },
+        {
+          "line": 362,
+          "name": "financeiro_fechamento_caixa"
+        },
+        {
+          "line": 382,
+          "name": "metas_cmv"
+        },
+        {
+          "line": 394,
+          "name": "metas_cmv"
+        },
+        {
+          "line": 423,
+          "name": "movimentacoes_estoque"
+        },
+        {
+          "line": 432,
+          "name": "produtos"
+        },
+        {
+          "line": 489,
+          "name": "produtos"
+        },
+        {
+          "line": 501,
+          "name": "movimentacoes_estoque"
+        },
+        {
+          "line": 531,
+          "name": "produtos"
+        },
+        {
+          "line": 563,
+          "name": "produtos"
+        },
+        {
+          "line": 589,
+          "name": "movimentacoes_estoque"
+        },
+        {
+          "line": 613,
+          "name": "produtos"
+        },
+        {
+          "line": 646,
+          "name": "movimentacoes_estoque"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 59,
+          "name": "has_permission"
+        },
+        {
+          "line": 628,
+          "name": "get_consumo_por_produto"
+        }
+      ],
+      "writes": [
+        {
+          "line": 362,
+          "method": "upsert"
+        },
+        {
+          "line": 394,
+          "method": "upsert"
+        }
+      ],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "supabase/functions/cotacao-ia/index.ts",
+      "imports": [
+        {
+          "line": 16,
+          "module": "npm:@supabase/supabase-js@2",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 146,
+          "name": "cotacao_ia_config"
+        },
+        {
+          "line": 158,
+          "name": "cotacoes"
+        },
+        {
+          "line": 164,
+          "name": "cotacao_itens"
+        },
+        {
+          "line": 165,
+          "name": "cotacao_fornecedores"
+        },
+        {
+          "line": 172,
+          "name": "cotacao_respostas"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 63,
+          "name": "has_permission"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "supabase/functions/ficha-tecnica/index.ts",
+      "imports": [
+        {
+          "line": 4,
+          "module": "npm:@supabase/supabase-js@2",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 87,
+          "name": "ficha_componentes"
+        },
+        {
+          "line": 138,
+          "name": "ficha_componentes"
+        },
+        {
+          "line": 145,
+          "name": "ficha_componentes"
+        },
+        {
+          "line": 174,
+          "name": "ficha_componentes"
+        },
+        {
+          "line": 197,
+          "name": "canais_venda"
+        },
+        {
+          "line": 213,
+          "name": "canais_venda"
+        },
+        {
+          "line": 281,
+          "name": "config_precificacao"
+        },
+        {
+          "line": 371,
+          "name": "ficha_componentes"
+        },
+        {
+          "line": 378,
+          "name": "ficha_componente_itens"
+        },
+        {
+          "line": 385,
+          "name": "produtos"
+        },
+        {
+          "line": 467,
+          "name": "ficha_componentes"
+        },
+        {
+          "line": 482,
+          "name": "ficha_componentes"
+        },
+        {
+          "line": 524,
+          "name": "ficha_componentes"
+        },
+        {
+          "line": 532,
+          "name": "ficha_componentes"
+        },
+        {
+          "line": 564,
+          "name": "ficha_componente_itens"
+        },
+        {
+          "line": 572,
+          "name": "ficha_componentes"
+        },
+        {
+          "line": 591,
+          "name": "ficha_componentes"
+        },
+        {
+          "line": 630,
+          "name": "ficha_componentes"
+        },
+        {
+          "line": 634,
+          "name": "ficha_componente_itens"
+        },
+        {
+          "line": 640,
+          "name": "produtos"
+        },
+        {
+          "line": 649,
+          "name": "ficha_componentes"
+        },
+        {
+          "line": 697,
+          "name": "canais_venda"
+        },
+        {
+          "line": 704,
+          "name": "canais_venda"
+        },
+        {
+          "line": 711,
+          "name": "canais_venda"
+        },
+        {
+          "line": 721,
+          "name": "canais_venda"
+        },
+        {
+          "line": 740,
+          "name": "ficha_componentes"
+        },
+        {
+          "line": 745,
+          "name": "canais_venda"
+        },
+        {
+          "line": 749,
+          "name": "precificacao_canal"
+        },
+        {
+          "line": 766,
+          "name": "precificacao_canal"
+        },
+        {
+          "line": 771,
+          "name": "ficha_componentes"
+        },
+        {
+          "line": 819,
+          "name": "ficha_componentes"
+        },
+        {
+          "line": 837,
+          "name": "precificacao_canal"
+        },
+        {
+          "line": 878,
+          "name": "ficha_componentes"
+        },
+        {
+          "line": 882,
+          "name": "cenarios_simulacao"
+        },
+        {
+          "line": 899,
+          "name": "ficha_componentes"
+        },
+        {
+          "line": 915,
+          "name": "ficha_componentes"
+        },
+        {
+          "line": 939,
+          "name": "config_precificacao"
+        },
+        {
+          "line": 956,
+          "name": "config_precificacao"
+        },
+        {
+          "line": 973,
+          "name": "config_precificacao"
+        },
+        {
+          "line": 987,
+          "name": "config_precificacao"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 26,
+          "name": "audit_log_write"
+        },
+        {
+          "line": 77,
+          "name": "has_permission"
+        },
+        {
+          "line": 82,
+          "name": "has_any_permission"
+        },
+        {
+          "line": 543,
+          "name": "ficha_salvar_componente_itens_atomic"
+        }
+      ],
+      "writes": [
+        {
+          "line": 532,
+          "method": "insert"
+        },
+        {
+          "line": 704,
+          "method": "insert"
+        },
+        {
+          "line": 749,
+          "method": "upsert"
+        },
+        {
+          "line": 882,
+          "method": "insert"
+        },
+        {
+          "line": 973,
+          "method": "upsert"
+        },
+        {
+          "line": 987,
+          "method": "upsert"
+        }
+      ],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "supabase/functions/inventario/index.ts",
+      "imports": [
+        {
+          "line": 4,
+          "module": "npm:@supabase/supabase-js@2",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 58,
+          "name": "user_roles"
+        },
+        {
+          "line": 65,
+          "name": "audit_inventario_log"
+        },
+        {
+          "line": 84,
+          "name": "inventarios"
+        },
+        {
+          "line": 126,
+          "name": "turnos"
+        },
+        {
+          "line": 136,
+          "name": "inventarios"
+        },
+        {
+          "line": 137,
+          "name": "inventario_itens"
+        },
+        {
+          "line": 142,
+          "name": "audit_inventario_log"
+        },
+        {
+          "line": 184,
+          "name": "inventarios"
+        },
+        {
+          "line": 188,
+          "name": "inventario_itens"
+        },
+        {
+          "line": 207,
+          "name": "inventarios"
+        },
+        {
+          "line": 212,
+          "name": "inventarios"
+        },
+        {
+          "line": 226,
+          "name": "inventario_itens"
+        },
+        {
+          "line": 257,
+          "name": "inventario_itens"
+        },
+        {
+          "line": 281,
+          "name": "inventarios"
+        },
+        {
+          "line": 285,
+          "name": "inventario_itens"
+        },
+        {
+          "line": 303,
+          "name": "inventarios"
+        },
+        {
+          "line": 317,
+          "name": "inventarios"
+        },
+        {
+          "line": 342,
+          "name": "inventario_itens"
+        },
+        {
+          "line": 398,
+          "name": "inventarios"
+        },
+        {
+          "line": 405,
+          "name": "audit_log"
+        },
+        {
+          "line": 433,
+          "name": "inventarios"
+        },
+        {
+          "line": 436,
+          "name": "inventarios"
+        },
+        {
+          "line": 453,
+          "name": "inventarios"
+        },
+        {
+          "line": 456,
+          "name": "produtos"
+        },
+        {
+          "line": 459,
+          "name": "inventario_itens"
+        },
+        {
+          "line": 470,
+          "name": "movimentacoes_estoque"
+        },
+        {
+          "line": 490,
+          "name": "inventarios"
+        },
+        {
+          "line": 508,
+          "name": "inventario_itens"
+        },
+        {
+          "line": 516,
+          "name": "inventario_itens"
+        },
+        {
+          "line": 533,
+          "name": "inventario_itens"
+        },
+        {
+          "line": 538,
+          "name": "profiles"
+        },
+        {
+          "line": 608,
+          "name": "audit_inventario_log"
+        },
+        {
+          "line": 620,
+          "name": "inventario_conferentes"
+        },
+        {
+          "line": 629,
+          "name": "profiles"
+        },
+        {
+          "line": 648,
+          "name": "company_memberships"
+        },
+        {
+          "line": 651,
+          "name": "inventario_conferentes"
+        },
+        {
+          "line": 672,
+          "name": "inventario_conferentes"
+        },
+        {
+          "line": 675,
+          "name": "inventario_conferentes"
+        },
+        {
+          "line": 690,
+          "name": "inventarios"
+        },
+        {
+          "line": 695,
+          "name": "inventario_conferentes"
+        },
+        {
+          "line": 699,
+          "name": "inventarios"
+        },
+        {
+          "line": 706,
+          "name": "notifications"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 39,
+          "name": "has_permission"
+        },
+        {
+          "line": 168,
+          "name": "create_inventory_atomic"
+        },
+        {
+          "line": 332,
+          "name": "finalize_inventory_atomic"
+        },
+        {
+          "line": 569,
+          "name": "reopen_inventory"
+        },
+        {
+          "line": 591,
+          "name": "soft_delete_inventory"
+        }
+      ],
+      "writes": [
+        {
+          "line": 65,
+          "method": "insert"
+        },
+        {
+          "line": 405,
+          "method": "insert"
+        },
+        {
+          "line": 470,
+          "method": "insert"
+        },
+        {
+          "line": 651,
+          "method": "insert"
+        },
+        {
+          "line": 706,
+          "method": "insert"
+        }
+      ],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "supabase/functions/purchase-requisitions/index.ts",
+      "imports": [
+        {
+          "line": 4,
+          "module": "npm:@supabase/supabase-js@2",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 49,
+          "name": "user_roles"
+        },
+        {
+          "line": 121,
+          "name": "purchase_requisitions"
+        },
+        {
+          "line": 133,
+          "name": "profiles"
+        },
+        {
+          "line": 160,
+          "name": "purchase_requisitions"
+        },
+        {
+          "line": 168,
+          "name": "purchase_requisition_audit"
+        },
+        {
+          "line": 177,
+          "name": "profiles"
+        },
+        {
+          "line": 189,
+          "name": "profiles"
+        },
+        {
+          "line": 218,
+          "name": "purchase_requisitions"
+        },
+        {
+          "line": 244,
+          "name": "purchase_requisition_items"
+        },
+        {
+          "line": 251,
+          "name": "purchase_requisition_audit"
+        },
+        {
+          "line": 271,
+          "name": "purchase_requisitions"
+        },
+        {
+          "line": 290,
+          "name": "purchase_requisitions"
+        },
+        {
+          "line": 303,
+          "name": "purchase_requisition_items"
+        },
+        {
+          "line": 307,
+          "name": "purchase_requisition_items"
+        },
+        {
+          "line": 313,
+          "name": "purchase_requisitions"
+        },
+        {
+          "line": 317,
+          "name": "purchase_requisition_audit"
+        },
+        {
+          "line": 346,
+          "name": "purchase_requisition_items"
+        },
+        {
+          "line": 350,
+          "name": "purchase_requisition_items"
+        },
+        {
+          "line": 354,
+          "name": "purchase_requisition_items"
+        },
+        {
+          "line": 360,
+          "name": "purchase_requisitions"
+        },
+        {
+          "line": 363,
+          "name": "purchase_requisition_audit"
+        },
+        {
+          "line": 385,
+          "name": "purchase_requisitions"
+        },
+        {
+          "line": 389,
+          "name": "purchase_requisition_audit"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 33,
+          "name": "has_permission"
+        },
+        {
+          "line": 41,
+          "name": "has_permission"
+        }
+      ],
+      "writes": [
+        {
+          "line": 218,
+          "method": "insert"
+        },
+        {
+          "line": 244,
+          "method": "insert"
+        },
+        {
+          "line": 251,
+          "method": "insert"
+        },
+        {
+          "line": 317,
+          "method": "insert"
+        },
+        {
+          "line": 363,
+          "method": "insert"
+        },
+        {
+          "line": 389,
+          "method": "insert"
+        }
+      ],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "supabase/functions/rbac-lint-full/index.ts",
+      "imports": [
+        {
+          "line": 3,
+          "module": "npm:@supabase/supabase-js@2",
+          "typeOnly": false
+        }
+      ],
+      "tables": [],
+      "rpcs": [
+        {
+          "line": 47,
+          "name": "admin_has_permission"
+        },
+        {
+          "line": 61,
+          "name": "rbac_sql_lint_report_admin"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "supabase/functions/rbac-lint-quick/index.ts",
+      "imports": [
+        {
+          "line": 3,
+          "module": "npm:@supabase/supabase-js@2",
+          "typeOnly": false
+        }
+      ],
+      "tables": [],
+      "rpcs": [
+        {
+          "line": 47,
+          "name": "admin_has_permission"
+        },
+        {
+          "line": 61,
+          "name": "rbac_sql_lint_report_quick"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "supabase/functions/rbac-lint/index.ts",
+      "imports": [
+        {
+          "line": 3,
+          "module": "npm:@supabase/supabase-js@2",
+          "typeOnly": false
+        }
+      ],
+      "tables": [],
+      "rpcs": [
+        {
+          "line": 47,
+          "name": "admin_has_permission"
+        },
+        {
+          "line": 61,
+          "name": "rbac_sql_lint_report_quick"
+        }
+      ],
+      "writes": [],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "supabase/functions/requisicao-estoque/index.ts",
+      "imports": [
+        {
+          "line": 4,
+          "module": "npm:@supabase/supabase-js@2",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 222,
+          "name": "movimentacoes_estoque"
+        },
+        {
+          "line": 236,
+          "name": "inventarios"
+        },
+        {
+          "line": 271,
+          "name": "movimentacoes_estoque"
+        },
+        {
+          "line": 311,
+          "name": "movimentacoes_estoque"
+        },
+        {
+          "line": 323,
+          "name": "movimentacoes_estoque"
+        },
+        {
+          "line": 335,
+          "name": "inventarios"
+        },
+        {
+          "line": 350,
+          "name": "movimentacoes_estoque"
+        },
+        {
+          "line": 377,
+          "name": "movimentacoes_estoque"
+        },
+        {
+          "line": 399,
+          "name": "salmon_entries"
+        },
+        {
+          "line": 407,
+          "name": "salmon_manipulations"
+        },
+        {
+          "line": 454,
+          "name": "produtos"
+        },
+        {
+          "line": 497,
+          "name": "requisicoes_estoque"
+        },
+        {
+          "line": 523,
+          "name": "requisicao_estoque_itens"
+        },
+        {
+          "line": 542,
+          "name": "produtos"
+        },
+        {
+          "line": 553,
+          "name": "requisicao_estoque_itens"
+        },
+        {
+          "line": 583,
+          "name": "alertas_falta_estoque"
+        },
+        {
+          "line": 643,
+          "name": "requisicoes_estoque"
+        },
+        {
+          "line": 654,
+          "name": "requisicoes_estoque"
+        },
+        {
+          "line": 679,
+          "name": "notifications"
+        },
+        {
+          "line": 746,
+          "name": "requisicoes_estoque"
+        },
+        {
+          "line": 756,
+          "name": "requisicao_estoque_itens"
+        },
+        {
+          "line": 768,
+          "name": "requisicao_estoque_itens"
+        },
+        {
+          "line": 858,
+          "name": "requisicoes_estoque"
+        },
+        {
+          "line": 880,
+          "name": "produtos"
+        },
+        {
+          "line": 898,
+          "name": "alertas_falta_estoque"
+        },
+        {
+          "line": 980,
+          "name": "requisicao_estoque_itens"
+        },
+        {
+          "line": 993,
+          "name": "requisicoes_estoque"
+        },
+        {
+          "line": 1026,
+          "name": "requisicoes_estoque"
+        },
+        {
+          "line": 1041,
+          "name": "requisicoes_estoque"
+        },
+        {
+          "line": 1049,
+          "name": "notifications"
+        },
+        {
+          "line": 1068,
+          "name": "requisicoes_estoque"
+        },
+        {
+          "line": 1091,
+          "name": "requisicoes_estoque"
+        },
+        {
+          "line": 1133,
+          "name": "requisicao_estoque_itens"
+        },
+        {
+          "line": 1146,
+          "name": "requisicoes_estoque"
+        },
+        {
+          "line": 1157,
+          "name": "requisicoes_estoque"
+        },
+        {
+          "line": 1183,
+          "name": "produtos"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 100,
+          "name": "has_permission"
+        },
+        {
+          "line": 142,
+          "name": "audit_log_write"
+        },
+        {
+          "line": 479,
+          "name": "get_saldo_produto"
+        },
+        {
+          "line": 628,
+          "name": "compute_requisicao_status_agregado"
+        },
+        {
+          "line": 710,
+          "name": "attend_requisicao_item_atomic"
+        },
+        {
+          "line": 1192,
+          "name": "get_saldo_produto"
+        }
+      ],
+      "writes": [
+        {
+          "line": 350,
+          "method": "insert"
+        },
+        {
+          "line": 497,
+          "method": "insert"
+        },
+        {
+          "line": 523,
+          "method": "insert"
+        },
+        {
+          "line": 583,
+          "method": "upsert"
+        },
+        {
+          "line": 679,
+          "method": "upsert"
+        },
+        {
+          "line": 898,
+          "method": "upsert"
+        }
+      ],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "supabase/functions/rh/index.ts",
+      "imports": [
+        {
+          "line": 4,
+          "module": "npm:@supabase/supabase-js@2",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 63,
+          "name": "rh_colaboradores"
+        },
+        {
+          "line": 81,
+          "name": "rh_ponto_registros"
+        },
+        {
+          "line": 132,
+          "name": "rh_banco_horas"
+        },
+        {
+          "line": 158,
+          "name": "rh_audit_log"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 47,
+          "name": "has_permission"
+        }
+      ],
+      "writes": [
+        {
+          "line": 132,
+          "method": "upsert"
+        },
+        {
+          "line": 158,
+          "method": "insert"
+        }
+      ],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "supabase/functions/scheduled-jobs/index.ts",
+      "imports": [
+        {
+          "line": 2,
+          "module": "npm:@supabase/supabase-js@2",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 49,
+          "name": "audit_logs"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 39,
+          "name": "refresh_materialized_views"
+        },
+        {
+          "line": 44,
+          "name": "cleanup_old_audit_logs"
+        }
+      ],
+      "writes": [
+        {
+          "line": 49,
+          "method": "insert"
+        }
+      ],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [],
+      "edgeInvocations": []
+    },
+    {
+      "file": "supabase/functions/send-whatsapp-zapi/index.ts",
+      "imports": [
+        {
+          "line": 13,
+          "module": "npm:@supabase/supabase-js@2",
+          "typeOnly": false
+        }
+      ],
+      "tables": [
+        {
+          "line": 134,
+          "name": "cotacoes"
+        },
+        {
+          "line": 143,
+          "name": "cotacao_zapi_config"
+        },
+        {
+          "line": 181,
+          "name": "cotacao_whatsapp_logs"
+        },
+        {
+          "line": 200,
+          "name": "cotacao_fornecedores"
+        }
+      ],
+      "rpcs": [
+        {
+          "line": 71,
+          "name": "has_permission"
+        }
+      ],
+      "writes": [
+        {
+          "line": 181,
+          "method": "insert"
+        }
+      ],
+      "queryKeys": [],
+      "realtime": [],
+      "persistence": [],
+      "scope": [],
+      "edgeInvocations": []
+    }
+  ]
+}
