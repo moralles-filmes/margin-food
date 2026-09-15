@@ -5,19 +5,19 @@ import { describe, expect, it } from 'vitest';
 const migration = readFileSync(
   resolve(process.cwd(), 'supabase/migrations/20260915190000_fin_bordero.sql'),
   'utf8',
-);
+).replace(/\r\n/g, '\n');
 const fullExpense = readFileSync(
   resolve(process.cwd(), 'supabase/migrations/20260915210000_fin_bordero_despesa_completa.sql'),
   'utf8',
-);
+).replace(/\r\n/g, '\n');
 const paidByPayment = readFileSync(
   resolve(process.cwd(), 'supabase/migrations/20260915220000_fin_bordero_pagas_por_pagamento.sql'),
   'utf8',
-);
+).replace(/\r\n/g, '\n');
 const ephemeral = readFileSync(
   resolve(process.cwd(), 'supabase/tests/database/bordero_ephemeral.sql'),
   'utf8',
-);
+).replace(/\r\n/g, '\n');
 
 const helperBody = migration.slice(
   migration.indexOf('CREATE OR REPLACE FUNCTION public._fin_bordero_payload'),
