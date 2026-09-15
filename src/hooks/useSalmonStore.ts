@@ -25,7 +25,11 @@ async function getCurrentUserId(): Promise<string | null> {
 // Nesse caso a exclusão no Salmão é um no-op idempotente: o registro já não é
 // mais válido, então removemos da lista em vez de tratar como erro.
 function isAlreadyCancelledError(message?: string | null): boolean {
-  return !!message && /j[áa]\s+cancelad[ao]/i.test(message);
+  // Cobre tanto "Entrada/Manipulação já cancelada." quanto "Movimentação
+  // original já foi cancelada." (trg_validate_estorno) — o "foi" entre "já" e
+  // "cancelad[ao]" quebrava o regex antigo e a exclusão idempotente nunca era
+  // acionada, virando um erro visível pro usuário.
+  return !!message && /j[áa]\s+(foi\s+)?cancelad[ao]/i.test(message);
 }
 
 // Map DB row → frontend SalmonEntry
