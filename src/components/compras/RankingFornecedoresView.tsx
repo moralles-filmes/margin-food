@@ -1,5 +1,5 @@
 import { useSupabase } from '@/contexts/CompanyScopeContext';
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { includesNormalized } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEstoqueGeralStoreContext } from '@/contexts/EstoqueGeralStoreContext';
@@ -39,6 +39,15 @@ type RankingTab = 'cheapest' | 'expensive' | 'by-item' | 'by-category';
 export default function RankingFornecedoresView() {
   const supabase = useSupabase();
   const canViewRbac = useCan('compras:ranking:view');
+  const canEditPrices = useCan('compras:fornecedores:edit');
+  const requestGeneration = useRef(0);
+  const active = useRef(true);
+  const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    active.current = true;
+    const requests = requestGeneration;
+    return () => { active.current = false; requests.current++; };
+  }, [supabase]);
   const { user } = useAuth();
   const { produtos } = useEstoqueGeralStoreContext();
   const [rows, setRows] = useState<RankingRow[]>([]);
@@ -55,6 +64,8 @@ export default function RankingFornecedoresView() {
   const [priceForm, setPriceForm] = useState({ supplier_id: '', stock_item_id: '', unit_cost: '', purchase_unit: '' });
 
   const fetchRanking = useCallback(async (offset = 0, append = false) => {
+    if (!canViewRbac) return;
+    const generation = ++requestGeneration.current;
     if (offset === 0) setLoading(true); else setLoadingMore(true);
 
     const sortMap: Record<RankingTab, string> = { cheapest: 'cheapest', expensive: 'expensive', 'by-item': 'cheapest', 'by-category': 'cheapest' };
@@ -69,6 +80,7 @@ export default function RankingFornecedoresView() {
       p_sort: sortMap[tab] || 'cheapest',
     });
 
+    if (!active.current || generation !== requestGeneration.current) return;
     if (error) { console.error(error); setLoading(false); setLoadingMore(false); return; }
     const result = (data || []) as unknown as RankingRow[];
     setHasMore(result.length === PAGE_SIZE);
@@ -78,7 +90,7 @@ export default function RankingFornecedoresView() {
 
     setLoading(false);
     setLoadingMore(false);
-  }, [tab, selectedItem, selectedCategory, supabase]);
+  }, [tab, selectedItem, selectedCategory, supabase, canViewRbac]);
 
   useEffect(() => {
     if (user) fetchRanking();
@@ -89,6 +101,7 @@ export default function RankingFornecedoresView() {
   }, [hasMore, loadingMore, rows.length, fetchRanking]);
 
   const handleAddPrice = async () => {
+    if (!canEditPrices || saving) return;
     if (!priceForm.supplier_id || !priceForm.stock_item_id || !priceForm.unit_cost) {
       toast.error('Preencha todos os campos'); return;
     }
@@ -98,19 +111,17 @@ export default function RankingFornecedoresView() {
     }
     const prod = produtos.find(p => p.id === priceForm.stock_item_id);
 
-    // Ensure supplier exists via RPC
-    const { error: supplierErr } = await supabase.rpc('upsert_supplier', { p_name: priceForm.supplier_id });
-    if (supplierErr) { toast.error('Erro ao registrar fornecedor: ' + supplierErr.message); return; }
-
-    const { error } = await supabase.from('supplier_item_prices').upsert({
-      supplier_id: priceForm.supplier_id,
-      stock_item_id: priceForm.stock_item_id,
-      purchase_unit: priceForm.purchase_unit || prod?.unidadeCompra || 'UN',
-      unit_cost: parsedCost,
-      last_updated_at: new Date().toISOString(),
-      source: 'manual',
-    }, { onConflict: 'supplier_id,stock_item_id' });
-    if (error) { toast.error('Erro: ' + error.message); return; }
+    setSaving(true);
+    // Nome é entrada de cadastro; a RPC usa o UUID retornado no preço, na mesma transação.
+    const { error } = await supabase.rpc('upsert_supplier_price', {
+      p_name: priceForm.supplier_id,
+      p_stock_item_id: priceForm.stock_item_id,
+      p_purchase_unit: priceForm.purchase_unit || prod?.unidadeCompra || 'UN',
+      p_unit_cost: parsedCost,
+    });
+    if (!active.current) return;
+    setSaving(false);
+    if (error) { console.error('Erro ao registrar preço', error); toast.error('Erro: ' + error.message); return; }
     toast.success('Preço salvo!');
     setShowAddPrice(false);
     setPriceForm({ supplier_id: '', stock_item_id: '', unit_cost: '', purchase_unit: '' });
@@ -149,9 +160,9 @@ export default function RankingFornecedoresView() {
           <p className="text-sm font-semibold text-foreground">Top Fornecedores</p>
           <p className="text-[10px] text-muted-foreground">Ranking de preços por fornecedor e item</p>
         </div>
-        <Button size="sm" className="gap-1.5 text-xs h-8" onClick={() => setShowAddPrice(true)}>
+        {canEditPrices && <Button size="sm" className="gap-1.5 text-xs h-8" onClick={() => setShowAddPrice(true)}>
           <Plus className="w-3.5 h-3.5" /> Cadastrar Preço
-        </Button>
+        </Button>}
       </div>
 
       {/* Sub-tabs */}
@@ -212,9 +223,9 @@ export default function RankingFornecedoresView() {
           <Inbox className="w-12 h-12 mx-auto text-muted-foreground/30 mb-3" />
           <p className="text-sm text-muted-foreground mb-1">Ainda não há preços por fornecedor</p>
           <p className="text-[10px] text-muted-foreground mb-3">Registre preços em recebimentos ou cadastre manualmente.</p>
-          <Button size="sm" variant="outline" onClick={() => setShowAddPrice(true)}>
+          {canEditPrices && <Button size="sm" variant="outline" onClick={() => setShowAddPrice(true)}>
             <Plus className="w-3.5 h-3.5 mr-1" /> Cadastrar preços
-          </Button>
+          </Button>}
         </div>
       ) : (
         <div className="space-y-2">
@@ -296,7 +307,7 @@ export default function RankingFornecedoresView() {
           </div>
           <DialogFooter>
             <Button variant="outline" size="sm" onClick={() => setShowAddPrice(false)}>Cancelar</Button>
-            <Button size="sm" onClick={handleAddPrice}>Salvar</Button>
+            <Button size="sm" onClick={handleAddPrice} disabled={saving || !canEditPrices}>{saving ? 'Salvando...' : 'Salvar'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

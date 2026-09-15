@@ -1,4 +1,5 @@
 import { useSupabase } from '@/contexts/CompanyScopeContext';
+import { useCompanyId } from '@/hooks/useCompanyId';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { SalmonEntry, Manipulation, DailyRecord, StockConfig, StockState, Supplier, LotStock, MetaCompraMensal, AuditoriaCompra, LoteSalmaoLimpo, MetaProvisionadaSalmao, SmartSuggestion } from '@/types/salmon';
 import { supabase } from '@/integrations/supabase/client';
@@ -93,6 +94,7 @@ function sortKey(lot: { expirationDate?: string; entryDate: string }): string {
 
 export function useSalmonStore() {
   const supabase = useSupabase();
+  const { companyId } = useCompanyId();
   const [entries, setEntries] = useState<SalmonEntry[]>([]);
   const [manipulations, setManipulations] = useState<Manipulation[]>([]);
   const [dailyRecords, setDailyRecords] = useState<DailyRecord[]>([]);
@@ -248,6 +250,7 @@ export function useSalmonStore() {
 
   // Supplier CRUD — persisted to suppliers table
   const addSupplier = useCallback(async (s: Omit<Supplier, 'id' | 'createdAt'>) => {
+    if (!companyId) throw new Error('Unidade não selecionada');
     const contactInfo = {
       cnpj: s.cnpj || '',
       contact: s.contact || '',
@@ -259,6 +262,7 @@ export function useSalmonStore() {
     const { data, error } = await supabase
       .from('suppliers')
       .insert({
+        company_id: companyId,
         name: s.name,
         is_active: s.active,
         contact_info: contactInfo as any,
@@ -270,6 +274,7 @@ export function useSalmonStore() {
       .single();
 
     if (error) {
+      console.error('Erro ao cadastrar fornecedor', error);
       toast.error('Erro ao cadastrar fornecedor: ' + error.message);
       throw new Error(error.message);
     }
@@ -291,7 +296,7 @@ export function useSalmonStore() {
     };
     setSuppliers(prev => [newS, ...prev]);
     return newS;
-  }, [supabase]);
+  }, [supabase, companyId]);
 
   const updateSupplier = useCallback(async (id: string, data: Partial<Supplier>) => {
     const current = suppliers.find(s => s.id === id);
@@ -315,6 +320,7 @@ export function useSalmonStore() {
 
     const { error } = await supabase.from('suppliers').update(updatePayload).eq('id', id);
     if (error) {
+      console.error('Erro ao atualizar fornecedor', error);
       toast.error('Erro ao atualizar fornecedor: ' + error.message);
       return;
     }
@@ -324,6 +330,7 @@ export function useSalmonStore() {
   const deleteSupplier = useCallback(async (id: string) => {
     const { error } = await supabase.from('suppliers').delete().eq('id', id);
     if (error) {
+      console.error('Erro ao excluir fornecedor', error);
       toast.error('Erro ao excluir fornecedor: ' + error.message);
       return;
     }

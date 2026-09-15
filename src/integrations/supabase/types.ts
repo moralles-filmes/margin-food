@@ -11275,6 +11275,15 @@ export type Database = {
         Returns: Json
       }
       upsert_supplier: { Args: { p_name: string }; Returns: string }
+      upsert_supplier_price: {
+        Args: {
+          p_name: string
+          p_stock_item_id: string
+          p_unit_cost: number
+          p_purchase_unit?: string
+        }
+        Returns: string
+      }
     }
     Enums: {
       app_role:
