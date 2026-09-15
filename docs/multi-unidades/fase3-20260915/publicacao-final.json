@@ -1,0 +1,41 @@
+{
+  "checked_at": "2026-09-15 15:21:01.369026+00",
+  "database": {
+    "checked_at": "2026-09-15 15:21:01.369026+00",
+    "phase2_present": false,
+    "phase3_present": false,
+    "cleanup_anon": true,
+    "refresh_authenticated": true,
+    "companies_admin": "( SELECT has_permission(auth.uid(), 'system:admin'::text) AS has_permission)"
+  },
+  "production": [
+    {
+      "id": "dpl_BKSLbqzyKxgEsnfhdthKheMQGWvP",
+      "url": "moralles-food-4x5c32569-moralles-filmes-projects.vercel.app",
+      "state": "READY",
+      "commit": "1fdea27e69e3d687b49fdd04e91069b25cc70850"
+    }
+  ],
+  "edges": [
+    {
+      "slug": "inventario",
+      "version": 15,
+      "updated_at": 1788996434894
+    },
+    {
+      "slug": "requisicao-estoque",
+      "version": 14,
+      "updated_at": 1788996434894
+    },
+    {
+      "slug": "ficha-tecnica",
+      "version": 10,
+      "updated_at": 1788996434894
+    },
+    {
+      "slug": "scheduled-jobs",
+      "version": 7,
+      "updated_at": 1782999924516
+    }
+  ]
+}

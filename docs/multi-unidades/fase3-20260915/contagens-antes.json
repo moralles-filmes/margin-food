@@ -1,0 +1,360 @@
+{
+  "audit_log": [
+    {
+      "n": 9,
+      "tabela": "purchase_orders"
+    },
+    {
+      "n": 4,
+      "tabela": "stock_locations"
+    },
+    {
+      "n": 7,
+      "tabela": "inventarios"
+    },
+    {
+      "n": 73,
+      "tabela": "auth.users"
+    },
+    {
+      "n": 4,
+      "tabela": "stock_sectors"
+    },
+    {
+      "n": 16,
+      "tabela": "stock_categories"
+    }
+  ],
+  "audit_logs": [
+    {
+      "n": 13,
+      "action": "ALERTA_FALTA_CRIADO",
+      "entity": "alertas_falta_estoque",
+      "source": "edge_function",
+      "unassigned": 0
+    },
+    {
+      "n": 2,
+      "action": "COMPANY_CREATED",
+      "entity": "companies",
+      "source": "db",
+      "unassigned": 0
+    },
+    {
+      "n": 1,
+      "action": "COMPANY_UPDATED",
+      "entity": "companies",
+      "source": "db",
+      "unassigned": 0
+    },
+    {
+      "n": 13,
+      "action": "CREATE",
+      "entity": "fin_contas",
+      "source": "db",
+      "unassigned": 12
+    },
+    {
+      "n": 33,
+      "action": "UPDATE",
+      "entity": "fin_contas",
+      "source": "db",
+      "unassigned": 33
+    },
+    {
+      "n": 763,
+      "action": "CREATE",
+      "entity": "fin_contas_pagar",
+      "source": "db",
+      "unassigned": 762
+    },
+    {
+      "n": 67,
+      "action": "DELETE",
+      "entity": "fin_contas_pagar",
+      "source": "db",
+      "unassigned": 67
+    },
+    {
+      "n": 451,
+      "action": "UPDATE",
+      "entity": "fin_contas_pagar",
+      "source": "db",
+      "unassigned": 451
+    },
+    {
+      "n": 17,
+      "action": "PAY",
+      "entity": "fin_contas_pagar",
+      "source": "rpc",
+      "unassigned": 17
+    },
+    {
+      "n": 3363,
+      "action": "CREATE",
+      "entity": "fin_lancamento_rateios",
+      "source": "db",
+      "unassigned": 3363
+    },
+    {
+      "n": 316,
+      "action": "DELETE",
+      "entity": "fin_lancamento_rateios",
+      "source": "db",
+      "unassigned": 316
+    },
+    {
+      "n": 3,
+      "action": "UPDATE",
+      "entity": "fin_lancamento_rateios",
+      "source": "db",
+      "unassigned": 3
+    },
+    {
+      "n": 3697,
+      "action": "CREATE",
+      "entity": "fin_lancamentos",
+      "source": "db",
+      "unassigned": 3697
+    },
+    {
+      "n": 541,
+      "action": "DELETE",
+      "entity": "fin_lancamentos",
+      "source": "db",
+      "unassigned": 541
+    },
+    {
+      "n": 1779,
+      "action": "UPDATE",
+      "entity": "fin_lancamentos",
+      "source": "db",
+      "unassigned": 1779
+    },
+    {
+      "n": 5834,
+      "action": "CREATE",
+      "entity": "inventario_itens",
+      "source": "db",
+      "unassigned": 5834
+    },
+    {
+      "n": 6127,
+      "action": "UPDATE",
+      "entity": "inventario_itens",
+      "source": "db",
+      "unassigned": 6127
+    },
+    {
+      "n": 22,
+      "action": "CREATE",
+      "entity": "inventarios",
+      "source": "db",
+      "unassigned": 22
+    },
+    {
+      "n": 54,
+      "action": "UPDATE",
+      "entity": "inventarios",
+      "source": "db",
+      "unassigned": 54
+    },
+    {
+      "n": 2806,
+      "action": "CREATE",
+      "entity": "movimentacoes_estoque",
+      "source": "db",
+      "unassigned": 2802
+    },
+    {
+      "n": 288,
+      "action": "DELETE",
+      "entity": "movimentacoes_estoque",
+      "source": "db",
+      "unassigned": 288
+    },
+    {
+      "n": 34,
+      "action": "UPDATE",
+      "entity": "movimentacoes_estoque",
+      "source": "db",
+      "unassigned": 32
+    },
+    {
+      "n": 27,
+      "action": "CANCEL_MOVEMENT",
+      "entity": "movimentacoes_estoque",
+      "source": "edge_function",
+      "unassigned": 0
+    },
+    {
+      "n": 4,
+      "action": "MARK_ALL_READ",
+      "entity": "notifications",
+      "source": "rpc",
+      "unassigned": 4
+    },
+    {
+      "n": 146,
+      "action": "CREATE",
+      "entity": "produtos",
+      "source": "db",
+      "unassigned": 145
+    },
+    {
+      "n": 8846,
+      "action": "UPDATE",
+      "entity": "produtos",
+      "source": "db",
+      "unassigned": 7403
+    },
+    {
+      "n": 2,
+      "action": "ENSURE_RAW_PRODUCT",
+      "entity": "produtos",
+      "source": "rpc",
+      "unassigned": 2
+    },
+    {
+      "n": 5,
+      "action": "COMPANY_ADMIN_CREATED",
+      "entity": "profiles",
+      "source": "db",
+      "unassigned": 0
+    },
+    {
+      "n": 9,
+      "action": "CREATE",
+      "entity": "purchase_order_items",
+      "source": "db",
+      "unassigned": 9
+    },
+    {
+      "n": 14,
+      "action": "UPDATE",
+      "entity": "purchase_order_items",
+      "source": "db",
+      "unassigned": 14
+    },
+    {
+      "n": 3,
+      "action": "CREATE",
+      "entity": "purchase_orders",
+      "source": "db",
+      "unassigned": 3
+    },
+    {
+      "n": 6,
+      "action": "UPDATE",
+      "entity": "purchase_orders",
+      "source": "db",
+      "unassigned": 6
+    },
+    {
+      "n": 2,
+      "action": "ITEM_RECUSADO",
+      "entity": "requisicao_estoque_itens",
+      "source": "edge_function",
+      "unassigned": 0
+    },
+    {
+      "n": 6,
+      "action": "ITEM_ATENDIDO",
+      "entity": "requisicao_estoque_itens",
+      "source": "rpc",
+      "unassigned": 6
+    },
+    {
+      "n": 2,
+      "action": "ITEM_ATENDIDO_PARCIAL",
+      "entity": "requisicao_estoque_itens",
+      "source": "rpc",
+      "unassigned": 2
+    },
+    {
+      "n": 3,
+      "action": "REQUISICAO_ATENDIDA",
+      "entity": "requisicoes_estoque",
+      "source": "edge_function",
+      "unassigned": 0
+    },
+    {
+      "n": 13,
+      "action": "REQUISICAO_CRIADA",
+      "entity": "requisicoes_estoque",
+      "source": "edge_function",
+      "unassigned": 0
+    },
+    {
+      "n": 7,
+      "action": "REQUISICAO_NEGADA",
+      "entity": "requisicoes_estoque",
+      "source": "edge_function",
+      "unassigned": 0
+    },
+    {
+      "n": 1,
+      "action": "REQUISICAO_SOFT_DELETE",
+      "entity": "requisicoes_estoque",
+      "source": "edge_function",
+      "unassigned": 0
+    },
+    {
+      "n": 1,
+      "action": "CREATE",
+      "entity": "salmon_config",
+      "source": "db",
+      "unassigned": 0
+    },
+    {
+      "n": 2,
+      "action": "CREATE",
+      "entity": "salmon_entries",
+      "source": "db",
+      "unassigned": 2
+    },
+    {
+      "n": 1,
+      "action": "UPDATE",
+      "entity": "salmon_entries",
+      "source": "db",
+      "unassigned": 1
+    },
+    {
+      "n": 2,
+      "action": "CREATE_ATOMIC",
+      "entity": "salmon_entries",
+      "source": "rpc",
+      "unassigned": 2
+    },
+    {
+      "n": 3,
+      "action": "CREATE",
+      "entity": "salmon_manipulations",
+      "source": "db",
+      "unassigned": 3
+    },
+    {
+      "n": 2,
+      "action": "UPDATE",
+      "entity": "salmon_manipulations",
+      "source": "db",
+      "unassigned": 2
+    },
+    {
+      "n": 3,
+      "action": "CREATE_ATOMIC",
+      "entity": "salmon_manipulations",
+      "source": "rpc",
+      "unassigned": 3
+    },
+    {
+      "n": 1,
+      "action": "create_first_admin",
+      "entity": "user_roles",
+      "source": "trigger",
+      "unassigned": 0
+    }
+  ],
+  "integration_logs": 0
+}

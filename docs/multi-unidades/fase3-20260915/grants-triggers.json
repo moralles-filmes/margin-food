@@ -1,0 +1,188 @@
+{
+  "auth_triggers": [
+    {
+      "enabled": "O",
+      "function": "handle_new_user()",
+      "definition": "CREATE TRIGGER on_auth_user_created AFTER INSERT ON auth.users FOR EACH ROW EXECUTE FUNCTION handle_new_user()"
+    }
+  ],
+  "column_grants": 0,
+  "effective_grants": [
+    {
+      "role": "anon",
+      "table": "audit_log",
+      "delete": false,
+      "insert": false,
+      "select": false,
+      "update": false,
+      "trigger": false,
+      "truncate": false
+    },
+    {
+      "role": "authenticated",
+      "table": "audit_log",
+      "delete": true,
+      "insert": true,
+      "select": true,
+      "update": true,
+      "trigger": true,
+      "truncate": true
+    },
+    {
+      "role": "service_role",
+      "table": "audit_log",
+      "delete": true,
+      "insert": true,
+      "select": true,
+      "update": true,
+      "trigger": true,
+      "truncate": true
+    },
+    {
+      "role": "anon",
+      "table": "audit_logs",
+      "delete": false,
+      "insert": false,
+      "select": false,
+      "update": false,
+      "trigger": false,
+      "truncate": false
+    },
+    {
+      "role": "authenticated",
+      "table": "audit_logs",
+      "delete": true,
+      "insert": true,
+      "select": true,
+      "update": true,
+      "trigger": true,
+      "truncate": true
+    },
+    {
+      "role": "service_role",
+      "table": "audit_logs",
+      "delete": true,
+      "insert": true,
+      "select": true,
+      "update": true,
+      "trigger": true,
+      "truncate": true
+    },
+    {
+      "role": "anon",
+      "table": "integration_logs",
+      "delete": false,
+      "insert": false,
+      "select": false,
+      "update": false,
+      "trigger": false,
+      "truncate": false
+    },
+    {
+      "role": "authenticated",
+      "table": "integration_logs",
+      "delete": true,
+      "insert": true,
+      "select": true,
+      "update": true,
+      "trigger": true,
+      "truncate": true
+    },
+    {
+      "role": "service_role",
+      "table": "integration_logs",
+      "delete": true,
+      "insert": true,
+      "select": true,
+      "update": true,
+      "trigger": true,
+      "truncate": true
+    }
+  ],
+  "resource_triggers": [
+    {
+      "table": "stock_categories",
+      "enabled": "O",
+      "function": "update_updated_at_column()",
+      "definition": "CREATE TRIGGER stock_categories_updated_at BEFORE UPDATE ON public.stock_categories FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()"
+    },
+    {
+      "table": "stock_categories",
+      "enabled": "O",
+      "function": "trg_block_placeholder_company()",
+      "definition": "CREATE TRIGGER trg_block_placeholder_company BEFORE INSERT OR UPDATE ON public.stock_categories FOR EACH ROW EXECUTE FUNCTION trg_block_placeholder_company()"
+    },
+    {
+      "table": "stock_locations",
+      "enabled": "O",
+      "function": "update_updated_at_column()",
+      "definition": "CREATE TRIGGER stock_locations_updated_at BEFORE UPDATE ON public.stock_locations FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()"
+    },
+    {
+      "table": "stock_locations",
+      "enabled": "O",
+      "function": "trg_block_placeholder_company()",
+      "definition": "CREATE TRIGGER trg_block_placeholder_company BEFORE INSERT OR UPDATE ON public.stock_locations FOR EACH ROW EXECUTE FUNCTION trg_block_placeholder_company()"
+    },
+    {
+      "table": "salmon_entries",
+      "enabled": "O",
+      "function": "audit_trigger_fn()",
+      "definition": "CREATE TRIGGER trg_audit_salmon_entries AFTER INSERT OR DELETE OR UPDATE ON public.salmon_entries FOR EACH ROW EXECUTE FUNCTION audit_trigger_fn('salmon', 'salmon_entries')"
+    },
+    {
+      "table": "salmon_entries",
+      "enabled": "O",
+      "function": "trg_block_placeholder_company()",
+      "definition": "CREATE TRIGGER trg_block_placeholder_company BEFORE INSERT OR UPDATE ON public.salmon_entries FOR EACH ROW EXECUTE FUNCTION trg_block_placeholder_company()"
+    },
+    {
+      "table": "salmon_entries",
+      "enabled": "O",
+      "function": "update_updated_at_column()",
+      "definition": "CREATE TRIGGER trg_salmon_entries_updated BEFORE UPDATE ON public.salmon_entries FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()"
+    },
+    {
+      "table": "salmon_entries",
+      "enabled": "O",
+      "function": "validate_salmon_entry()",
+      "definition": "CREATE TRIGGER trg_validate_salmon_entry BEFORE INSERT OR UPDATE ON public.salmon_entries FOR EACH ROW EXECUTE FUNCTION validate_salmon_entry()"
+    },
+    {
+      "table": "salmon_manipulations",
+      "enabled": "O",
+      "function": "audit_trigger_fn()",
+      "definition": "CREATE TRIGGER trg_audit_salmon_manipulations AFTER INSERT OR DELETE OR UPDATE ON public.salmon_manipulations FOR EACH ROW EXECUTE FUNCTION audit_trigger_fn('salmon', 'salmon_manipulations')"
+    },
+    {
+      "table": "salmon_manipulations",
+      "enabled": "O",
+      "function": "trg_block_placeholder_company()",
+      "definition": "CREATE TRIGGER trg_block_placeholder_company BEFORE INSERT OR UPDATE ON public.salmon_manipulations FOR EACH ROW EXECUTE FUNCTION trg_block_placeholder_company()"
+    },
+    {
+      "table": "salmon_manipulations",
+      "enabled": "O",
+      "function": "update_updated_at_column()",
+      "definition": "CREATE TRIGGER trg_salmon_manipulations_updated BEFORE UPDATE ON public.salmon_manipulations FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()"
+    },
+    {
+      "table": "salmon_manipulations",
+      "enabled": "O",
+      "function": "validate_salmon_manipulation()",
+      "definition": "CREATE TRIGGER trg_validate_salmon_manipulation BEFORE INSERT OR UPDATE ON public.salmon_manipulations FOR EACH ROW EXECUTE FUNCTION validate_salmon_manipulation()"
+    },
+    {
+      "table": "stock_sectors",
+      "enabled": "O",
+      "function": "update_updated_at_column()",
+      "definition": "CREATE TRIGGER stock_sectors_updated_at BEFORE UPDATE ON public.stock_sectors FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()"
+    },
+    {
+      "table": "stock_sectors",
+      "enabled": "O",
+      "function": "trg_block_placeholder_company()",
+      "definition": "CREATE TRIGGER trg_block_placeholder_company BEFORE INSERT OR UPDATE ON public.stock_sectors FOR EACH ROW EXECUTE FUNCTION trg_block_placeholder_company()"
+    }
+  ]
+}

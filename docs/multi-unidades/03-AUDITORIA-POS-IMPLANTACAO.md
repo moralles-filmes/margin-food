@@ -1,8 +1,10 @@
 # Auditoria pós-implantação multiunidade
 
-Data: 2026-09-15. **Fase 1 concluída; Fase 2 implementada e ensaiada localmente, com publicação pendente. Estabilização ainda em andamento.**
+Data: 2026-09-15. **Fase 1 concluída; Fases 2 e 3 implementadas e ensaiadas localmente, com publicação pendente. Estabilização ainda em andamento.**
 
-Atualização Fase 2: [resultados, testes e sequência de produção](fase2-20260915/RESULTADOS.md). C01/C02 foram corrigidos no código e testados com 82 assertions SQL reais, cinco casos de drift e rollback de contenção; **continuam abertos em produção**, que recebeu somente leituras. A baseline e os achados abaixo preservam a auditoria da Fase 1. Próximo prompt: [Fase 3 — logs](05-PROMPT-FASE-3.md).
+Atualização Fase 2: [resultados, testes e sequência de produção](fase2-20260915/RESULTADOS.md). C01/C02 foram corrigidos no código e testados com 82 assertions SQL reais, cinco casos de drift e rollback de contenção; **continuam abertos em produção**, que recebeu somente leituras. A baseline e os achados abaixo preservam a auditoria da Fase 1.
+
+Atualização Fase 3: [resultados, classificação e ordem de publicação](fase3-20260915/RESULTADOS.md). H01/H02/H03 corrigidos localmente com 175 assertions SQL, nove casos de drift, concorrência e recuo com preservação integral. **Continuam abertos em produção**; Fase 2 revalidada como não publicada em 15/09 às 15:21 UTC. A prévia histórica encontrou 34/32.414 eventos correlacionáveis em audit_log/audit_logs e 79/2.937 ambíguos, sem executar backfill. Próximo prompt: [Fase 4 — Salmão e grants](06-PROMPT-FASE-4.md).
 
 Base: `main`, commit `1fdea27e69e3d687b49fdd04e91069b25cc70850`. Diretório inicialmente limpo. Projeto consultado: `wuzxpbixprrgssoeeaez`. Produção recebeu apenas consultas de leitura; nenhuma RPC de escrita foi executada, nenhuma migration, deploy ou reparação de histórico foi aplicada.
 
@@ -24,7 +26,7 @@ O relatório anterior não representa integralmente o banco atual:
 - `suppliers` **já tem** UNIQUE `(name, company_id)`. A RPC ainda usa `ON CONFLICT(name)`, sem índice compatível.
 - As 844 versões locais e remotas coincidem. Isso não resolve a rastreabilidade da migration desaparecida nem prova equivalência do schema.
 
-Nenhum achado foi marcado como resolvido no banco vivo. As correções locais de C01/C02 da Fase 2 estão documentadas separadamente acima.
+Nenhum achado foi marcado como resolvido no banco vivo. As correções locais de C01/C02 e H01/H02/H03 estão documentadas separadamente acima.
 
 ## 2. Evidências e reprodução
 
@@ -55,7 +57,7 @@ Lidos AGENTS/CLAUDE e os documentos 00/01/02/ARCHITECTURE; examinadas as seis mi
 
 ## 3. Achados por severidade
 
-Todos os itens abaixo estão **ABERTOS em produção**. C01/C02 possuem migration corretiva nova ensaiada na Fase 2; os demais permanecem para as etapas seguintes.
+Todos os itens abaixo estão **ABERTOS em produção**. C01/C02 possuem correção ensaiada na Fase 2, H01/H02/H03 na Fase 3; os demais permanecem para as etapas seguintes.
 
 ### C01 — CRITICAL — Limpeza global de auditoria chamável por anon
 
@@ -85,6 +87,8 @@ Todos os itens abaixo estão **ABERTOS em produção**. C01/C02 possuem migratio
 
 ### H01 — HIGH — audit_log sem isolamento entre empresas
 
+**Fase 3:** migration `20260915144030` adiciona escopo, RLS/ACL e triggers atômicos que substituem os INSERTs do browser/Edge. `handle_first_admin` não tem trigger ativo. Histórico classificado somente por recurso corroborado, via mecanismo explícito de `20260915144031`; prévia 34 tenant/79 ambíguos. Publicação/backfill pendentes.
+
 - Sem company_id, FK/índice de empresa, FORCE RLS ou fronteira restritiva.
 - SELECT exige apenas uma das permissões `configuracoes:auditoria-seguranca:view`, `system:read`, `system:global:manage`; não verifica empresa da linha.
 - INSERT checa somente `auth.uid()=user_id`; permite declarar tabela/registro sem validar vínculo ao recurso.
@@ -95,6 +99,8 @@ Todos os itens abaixo estão **ABERTOS em produção**. C01/C02 possuem migratio
 - Correção/teste: fase 3, com escrita autenticada não falsificável, leitura A/A permitida e A/B negada; histórico sem atribuição confiável permanece restrito.
 
 ### H02 — HIGH — audit_logs perde tenant e ignora permissão funcional na leitura
+
+**Fase 3:** 21 triggers, helpers/callers e readers corrigidos localmente; APIs genéricas internas, duas fronteiras RESTRICTIVE e serviço/global explícitos. Prévia posterior: 35.351 eventos, 32.414 correlacionáveis e 2.937 ambíguos. Não substituir os números da baseline abaixo por uma alegação de backfill executado.
 
 - Possui company_id nullable, FK para companies, índice `idx_audit_logs_company_created`, RLS e `multiunit_scope_boundary`; FORCE RLS false.
 - `audit_logs_select_tenant` libera qualquer membro do tenant, independentemente da permissão da tela. A policy `perm_audit_logs_select` não restringe essa liberação porque ambas são permissivas.
@@ -107,6 +113,8 @@ Todos os itens abaixo estão **ABERTOS em produção**. C01/C02 possuem migratio
 - Correção/testes: fase 3 deve tratar geração, atribuição histórica, leitura por permissão, falsificação por INSERT/RPC e logs globais explícitos conjuntamente.
 
 ### H03 — HIGH — integration_logs sem tenant, writer privilegiado público
+
+**Fase 3:** tenant derivado da referência Salmão, ACL de escrita exclusivamente interna, leitura tenant + permissão, escopo ambíguo preservado. Nenhum caller ativo de `log_integration_error` nem linha na tabela no catálogo atual; fluxo completo de Salmão continua na Fase 4. Publicação pendente.
 
 - Tabela sem company_id, FK de tenant, índice de tenant, FORCE RLS ou fronteira.
 - SELECT depende apenas de `system:read`. Sem consumidor de leitura localizado em src/Edges; isso não impede acesso direto via Data API.
@@ -230,7 +238,7 @@ A numeração abaixo é a deste trabalho; agrupa as 20 frentes do pedido origina
 |---|---|---|
 | **1 — concluída** | Auditoria inicial, inventário vivo, baseline e plano | Evidências salvas e nenhuma mudança operacional |
 | **2 — implementada/testada localmente; publicação pendente** | Contenção crítica: companies_admin/rpc_create_company e RPCs globais de manutenção | 82 assertions SQL e recuo seguro aprovados; faltam publicação, validação do scheduler externo e pós-validação viva |
-| 3 | Logs completos: escrita, leitura, histórico e escopo global | audit_log/audit_logs/integration_logs isolados, backfill justificável e testes A/B/rejeição de forja |
+| 3 | Logs completos: escrita, leitura, histórico e escopo global | Implementado e ensaiado localmente; publicação/backfill pendentes ([resultados](fase3-20260915/RESULTADOS.md)) |
 | 4 | RPCs de Salmão, funções internas e grants | Tenant + permissão funcional; espelhos/cancelamento preservados |
 | 5 | Fornecedores e preço por item | Mesmo nome em A/B sem conflito, identidade correta no consumer |
 | 6 | Produtos e inventário automático de permissões | Comparar backend vivo, migrations, Edges e frontend com registry; classificar VÁLIDA/LEGADA/FANTASMA/NÃO ENCONTRADA/DIVERGENTE/GLOBAL |

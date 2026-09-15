@@ -1,0 +1,2857 @@
+{
+  "views": null,
+  "callers": [
+    {
+      "schema": "public",
+      "signature": "_planning_delete_meta_guarded(uuid)"
+    },
+    {
+      "schema": "public",
+      "signature": "_planning_upsert_meta_guarded(integer,integer,text,numeric,numeric,numeric)"
+    },
+    {
+      "schema": "public",
+      "signature": "log_audit(text,text,text,text,text,jsonb,jsonb,jsonb)"
+    }
+  ],
+  "functions": [
+    {
+      "acl": null,
+      "md5": "0e016b55669c0a24f661f86e00424cfd",
+      "signature": "has_permission(text)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "00d7ed3117c468d07d1ea4ac54599e4e",
+      "signature": "get_stock_losses_report(date,date,text,uuid,text,text,text)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "c6864b7e309694af3cf3aefb2a0b8011",
+      "signature": "list_fin_presentation_sessions(date,date,text,uuid,uuid,text,integer,integer)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "52131adb07921e15a0e07bd2d81ccdde",
+      "signature": "get_fin_presentation_session(uuid)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "fecd92b959247d7db8580432dc200067",
+      "signature": "_guarded_aprovar_conta_pagar(uuid,timestamp with time zone)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "c6f3114de446efb5318d3e5dc111dc79",
+      "signature": "_guarded_start_presentation_session(uuid,jsonb,text,timestamp with time zone)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "609154e2b17accf3e5a86a7e52457036",
+      "signature": "_guarded_submit_presentation_minutes(uuid,text,text,timestamp with time zone)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "a0ed9a437f69ea04e39ae3b29e2f0b27",
+      "signature": "_guarded_transition_presentation_session(uuid,text,text,text,timestamp with time zone)"
+    },
+    {
+      "acl": null,
+      "md5": "159cdce81ea1a4aebf9a482d320f2e1f",
+      "signature": "_guarded_delete_categoria(uuid)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "198eb0e188889228a30595da4b3ee1a4",
+      "signature": "handle_first_admin()"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "1e69dcc235cc6952b268483deffae0c6",
+      "signature": "get_fin_presentation_minutes_export(uuid)"
+    },
+    {
+      "acl": null,
+      "md5": "20077f93e748a02ae7571120997de8ce",
+      "signature": "_guarded_update_conta_pagar(uuid,text,numeric,text,uuid,date,date,uuid,uuid,uuid,text,text,jsonb,jsonb,timestamp with time zone)"
+    },
+    {
+      "acl": null,
+      "md5": "4bfd1b10fad566394a388214cea10362",
+      "signature": "create_salmon_entry_atomic(date,text,text,text,integer,integer,numeric,numeric,text)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "1782d37555a645020636444181fca0d7",
+      "signature": "cancel_salmon_entry_atomic(uuid,text)"
+    },
+    {
+      "acl": null,
+      "md5": "6dfd3a1ee692628dbc359f2eca01f839",
+      "signature": "_guarded_update_conta_receber(uuid,text,text,numeric,date,date,uuid,uuid,uuid,text,text,jsonb,jsonb,uuid,timestamp with time zone)"
+    },
+    {
+      "acl": null,
+      "md5": "ca16a7422ee1c0a8fe37ccb19a64e3af",
+      "signature": "_guarded_update_plano_contas(uuid,text,text,text,text,text,timestamp with time zone)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "d0a15ca28c66c94f07526d34712decde",
+      "signature": "cancel_salmon_manipulation_atomic(uuid,text)"
+    },
+    {
+      "acl": null,
+      "md5": "a59dbe31a41605521f394a6574d23047",
+      "signature": "_guarded_delete_plano_contas(uuid)"
+    },
+    {
+      "acl": null,
+      "md5": "e47a693e2206d8deb55d046770b3294b",
+      "signature": "_guarded_update_categoria(uuid,text,text,text,text,uuid,timestamp with time zone)"
+    },
+    {
+      "acl": null,
+      "md5": "6c4b68f90e4195c31c8bacdb64f92d8a",
+      "signature": "_guarded_update_centro_custo(uuid,text,text,timestamp with time zone)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "69331eb6003fa0b0af91ad858f31f1d2",
+      "signature": "ensure_salmon_raw_product()"
+    },
+    {
+      "acl": null,
+      "md5": "bb48bf3354219466bcb7d9134022bb74",
+      "signature": "_guarded_delete_centro_custo(uuid)"
+    },
+    {
+      "acl": null,
+      "md5": "70c36cd98e58fa8fa346e4ad14619b49",
+      "signature": "_guarded_update_conta(uuid,text,text,text,text,text,numeric,timestamp with time zone)"
+    },
+    {
+      "acl": null,
+      "md5": "f6417e8c81790052cadcb92067963e4b",
+      "signature": "_guarded_delete_conta(uuid)"
+    },
+    {
+      "acl": null,
+      "md5": "b20da8d8b69f6644d47c08e49711e3c4",
+      "signature": "_guarded_estornar_conta_pagar(uuid,text)"
+    },
+    {
+      "acl": null,
+      "md5": "a3eb3a116a7a45c767b3f970fdb6a5e0",
+      "signature": "_guarded_estornar_conta_receber(uuid,text)"
+    },
+    {
+      "acl": null,
+      "md5": "e59f91afba890131c8752b9211ddb360",
+      "signature": "fin_audit_integrity_check()"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "a6e3b9a643625a32b2a57f3e5fec02d9",
+      "signature": "rbac_sql_lint_report_admin(uuid)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres"
+      ],
+      "md5": "bd2071c2534a9aec4f6aba719594ae08",
+      "signature": "list_companies()"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres"
+      ],
+      "md5": "1e83056ea4386049deeba4c1030bd7cc",
+      "signature": "update_company(uuid,text,text,boolean)"
+    },
+    {
+      "acl": [
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "a88b795dfe2b9792cec84553b6bd7cca",
+      "signature": "fin_categoria_fora_do_resultado(uuid,uuid)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "03a4de928f183605cfbbe94a749f0dc1",
+      "signature": "_relatorios_kpis_guarded(text,text)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "556ec046d4477d301fcc80e2235f091b",
+      "signature": "validate_salmon_entry()"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "f745050252d9dfa10754d24ab3aada97",
+      "signature": "log_integration_error(text,text,text,text,jsonb)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "a66c6f1ebd30f72118e64f71aeb2ef85",
+      "signature": "_planning_delete_meta_guarded(uuid)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "900f7f1babdec4b985ceef8c805bfe74",
+      "signature": "_planning_upsert_meta_guarded(integer,integer,text,numeric,numeric,numeric)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "bc34c29b3de9ef8ee29c333076304bf9",
+      "signature": "reconcile_pay_conta_pagar(uuid,uuid,date,uuid,numeric,text,uuid)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres"
+      ],
+      "md5": "bee0f27014043120abc68188d8b5ff8a",
+      "signature": "reconcile_create_transfer_from_extrato(date,numeric,text,uuid,uuid,text,text)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "5c0fba787bd586068c6d8ffc2d3035bf",
+      "signature": "generate_next_sku(text)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "214c4d0e728a9b3baa01ce7d760cb38a",
+      "signature": "get_fin_cashflow(date,date)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "4419a87f1499bd3be02749f12f4a1ec3",
+      "signature": "validate_rh_folha_numeric()"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "362a129ee109b27ed135af0299c3f8ec",
+      "signature": "receive_market_order_atomic(uuid,jsonb,text)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "9910efed51cbc89a3e3afa57da095fae",
+      "signature": "finalize_inventory_atomic(uuid,text)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "cbaaa4ebf390b6b7d31562ee23bac517",
+      "signature": "validate_ponto_registro()"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "008e1c127743eaac3ae2a9cbfb0271d7",
+      "signature": "validate_ponto_update()"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "28011c7f19412ab6df7dc90fe35b0654",
+      "signature": "validate_ponto_ferias()"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "a0ebf725819019c0d5d0747a732d6342",
+      "signature": "ficha_salvar_componente_itens_atomic(uuid,jsonb)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "01d04fbe3a259c85242cb15e2a1b7c8d",
+      "signature": "produtos_force_company_id()"
+    },
+    {
+      "acl": null,
+      "md5": "e6cb61f7a5b63a6f696dce1f75fe3a15",
+      "signature": "immutable_unaccent(text)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "1bad08007419d0225a8bd915fefd9fda",
+      "signature": "get_spend_by_sector(date,date,boolean)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "d790487b7115b468512cee3b9e683ea5",
+      "signature": "trg_validate_fin_lancamento_update()"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "660a1208f0f1ccd7b749c5f9e9d88d86",
+      "signature": "has_compras_view(uuid)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "1425f5178264da995326ee8c0846e3ff",
+      "signature": "trg_set_updated_at()"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "188ec83efacf6da8534fe21b9343a974",
+      "signature": "get_fin_orcamento_arvore(text)"
+    },
+    {
+      "acl": null,
+      "md5": "0744e699bc9293ab945404c5c816e2bf",
+      "signature": "validate_fechamento_marca_total()"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres"
+      ],
+      "md5": "706c7f1fed23ff923e932bda01b5a883",
+      "signature": "rpc_upsert_fechamento_caixa_com_marcas(date,numeric,numeric,numeric,text,jsonb,timestamp with time zone)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "f684ce488c02880a6a7b45091fe7604e",
+      "signature": "list_report_items_cursor(date,date,integer,timestamp with time zone,uuid,text,text,text,boolean)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres"
+      ],
+      "md5": "a3624f5bf19985f171b514eb8c9be14e",
+      "signature": "get_movimentacoes_kpis(uuid,text,date,date,boolean)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "0f0d33e6edc7ae3f0acb13bfe6e15848",
+      "signature": "get_fin_presentation_revenue(text,integer[])"
+    },
+    {
+      "acl": [
+        "postgres=X/postgres"
+      ],
+      "md5": "415e8c5bbd57f9d1c18548a538ec4119",
+      "signature": "_fin_dfc_effective_allocations(uuid,date,date)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "6b13ef4e428317e9d3ce3bcabebb1083",
+      "signature": "get_fin_presentation_expenses(text,integer[])"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "00b4135e8a282ba6fb845be03c4df01b",
+      "signature": "get_fin_presentation_expense_details(text,uuid,jsonb,integer)"
+    },
+    {
+      "acl": [
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "f8d59cabb5f2c73d6067afae47ed6ffd",
+      "signature": "fin_get_categoria_desconto_concedido(uuid)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres"
+      ],
+      "md5": "dd907ec136ad561ea35bcdd0bdc35817",
+      "signature": "get_rh_beneficios_total()"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "92588da8c1b57feb9a956bbcb248eb15",
+      "signature": "reconcile_receive_conta_receber(uuid,uuid,date,uuid,numeric,text,uuid)"
+    },
+    {
+      "acl": [
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "f6663a1f5b07dd4021d22769e45a87ac",
+      "signature": "fin_get_categoria_desconto_baixa(uuid)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "9109abd609aab3b99c573e3410d133e3",
+      "signature": "get_fin_fluxo_projecao(integer,numeric)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres"
+      ],
+      "md5": "977d26ca6f02e34a00d500dce874c320",
+      "signature": "reconcile_import_lancamento(date,text,numeric,text,uuid,uuid,jsonb,text,boolean,integer)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "fe05cc8f47e1f02660def9b21ead576b",
+      "signature": "_guarded_list_recorrencias(timestamp with time zone,uuid,integer,text)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "841885508b2f38ec2336bcfd0cc10e5d",
+      "signature": "log_audit(text,text,text,text,text,jsonb,jsonb,jsonb)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "5154dc6839e86dde1929ceb58843c615",
+      "signature": "validate_cp_valor()"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "8db8af53cd48ec3a587cdc129d2f7206",
+      "signature": "update_produto_last_movement()"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "d1e11b5fa574a7acd1f58b21fa74d702",
+      "signature": "trg_mask_numero_cartao()"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres"
+      ],
+      "md5": "e8e86a8d90a67508d058f31b0cac330e",
+      "signature": "_guarded_delete_conta_pagar(uuid,timestamp with time zone)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres"
+      ],
+      "md5": "17d3f76cc30a5f3438f3a7802a6563f0",
+      "signature": "reconcile_neutralize_contamax(uuid,jsonb)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres"
+      ],
+      "md5": "609bdd1dc3430c912ddaaceb8cba14ee",
+      "signature": "reconcile_reconsiderar_ignorada(uuid)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "cd2a85dde5a24418fbec8b48cffe2307",
+      "signature": "get_relatorios_tendencia(text,text)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "1798b6981e81ac454d006fdf64c69662",
+      "signature": "list_fin_contas_pagar_cursor(text,text,text,integer,date,uuid,date,date,uuid,uuid,boolean)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "5e277952caf96ea0d46d83b7e699a015",
+      "signature": "get_fin_lancamentos_totais(date,date,text,uuid,text,uuid,boolean)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "c9c5e45e48e082d011d470ec54e204be",
+      "signature": "_relatorios_score_guarded(text,text)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "df99903e20e9ccc50d411261938ee097",
+      "signature": "_relatorios_tendencia_guarded(text,text)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "f37bd25e3a70c6f7ca89f45cbcdc4f5e",
+      "signature": "get_stock_summary()"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "00eda507d2eb6461a3937df6dea790e7",
+      "signature": "validate_salmon_manipulation()"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "8c477702989856a5740ce082cdcf8d7f",
+      "signature": "trg_block_placeholder_company()"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "3f599ded9b07f7b184141d7643eeae31",
+      "signature": "get_fin_alertas()"
+    },
+    {
+      "acl": [
+        "postgres=X/postgres"
+      ],
+      "md5": "66fe2d75e4a3c5da5eabfee79eadd5c1",
+      "signature": "fin_block_contamax_ledger_entry()"
+    },
+    {
+      "acl": null,
+      "md5": "727ef10af2118b564e80f0c70fa95d46",
+      "signature": "block_categoria_pai_vinculada_a_marca()"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "948a167d0e1c1f7602c9111934bc5064",
+      "signature": "get_fin_dashboard_summary(date,date)"
+    },
+    {
+      "acl": null,
+      "md5": "011359351c565848df48cd12d8bba65f",
+      "signature": "validate_marca_categoria_vinculo()"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "a2d27549d0a1fc2cf93deaf65ad5d5ba",
+      "signature": "_guarded_bulk_upsert_orcamento(text,jsonb)"
+    },
+    {
+      "acl": null,
+      "md5": "bb6597b5e7b1929eed98a3f8f6a8e309",
+      "signature": "create_inventory_atomic(text,date,text,uuid,text[],text,text)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres"
+      ],
+      "md5": "dc150f0b70de3327b18036c1bdda979a",
+      "signature": "get_salmon_reconciliation_kpis()"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres"
+      ],
+      "md5": "be809426fbdb462daac9e8bffca7b50d",
+      "signature": "get_salmon_inventory_adjustment_kg()"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "d2dd42ac4f445cec81a604a997808f8e",
+      "signature": "get_stock_dashboard(integer)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres"
+      ],
+      "md5": "a743fb9bcd2d5b05f53e933a4ab761ac",
+      "signature": "_guarded_delete_conta_receber(uuid,timestamp with time zone)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "f10f1a615c795420dfdd2c6f8dd49eb4",
+      "signature": "_guarded_delete_orcamento(uuid,timestamp with time zone)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "a87ea8e1089fdcc7601a59a954521a8e",
+      "signature": "get_fin_presentation_detail_rows(date,date,text,text,uuid,text,integer,integer)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres"
+      ],
+      "md5": "3566bf0fbeb7534c197c5befa1f05fe0",
+      "signature": "_guarded_delete_lancamento(uuid,timestamp with time zone)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres"
+      ],
+      "md5": "3f27ae9e6194a699076dd2847a4f7957",
+      "signature": "get_fin_dre_summary(date,date)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "8e4ca971dc17c1488c4463f1aa14c2da",
+      "signature": "_guarded_update_reconciled_classification(uuid,uuid,uuid,text,jsonb,timestamp with time zone,text)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "3276d35365038be4430c72e3ffaf1000",
+      "signature": "get_fin_dashboard_charts(date,date)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "7460f912e47f4c5194d4e5dd55e5ba58",
+      "signature": "get_inactive_stock_items()"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "141c76c4c973257fd7e181bf55d72120",
+      "signature": "get_stock_predictive_analysis_v2(text,uuid,integer,boolean,boolean)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "e16aad8a248e6649ccd477572c3365f1",
+      "signature": "comparativo_periodos(text,text)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "38cd41ddcfc07fc8dc3021531f437c04",
+      "signature": "trg_refresh_saldo_cache_conta()"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres"
+      ],
+      "md5": "b8fc02fccc0e24b383a9a9ebde368871",
+      "signature": "onboard_new_company(text,text,uuid)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "8824142c9fc88fa476de0073df520a1c",
+      "signature": "handle_new_user()"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "95e874889013abffeb7426e14aa3580b",
+      "signature": "admin_list_users()"
+    },
+    {
+      "acl": [
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "27384e68ba2a3e84ed10ed218f45b68e",
+      "signature": "admin_upsert_company_membership(uuid,uuid,uuid,app_role,text[],text,uuid,text,boolean)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "5ab4437194d70dea9f9da5393b390d95",
+      "signature": "trg_force_company_alertas_falta()"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres"
+      ],
+      "md5": "5ee001b6b7829ff3199ab8c493f28996",
+      "signature": "get_fin_saldo_conta_em(uuid,date)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "ba858d95d090e7e2fec29303a09d4845",
+      "signature": "fin_recorrencia_config_valida(jsonb)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "26322b53f62d1d1ccc824c759300cc39",
+      "signature": "receive_purchase_order_atomic(uuid,jsonb,jsonb)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "4c1c6a7e2095ad0afb86e2a56566f605",
+      "signature": "get_relatorios_kpis(date,date)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "e393ea7557a7db7cc555356f8d4ec402",
+      "signature": "get_relatorios_compras(date,date)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "b26eb4adf9e4f1a2422dafb90ba98734",
+      "signature": "log_audit(text,text,text,uuid,text,jsonb,jsonb,jsonb)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "352da65c783fa65e54450fceebc966e2",
+      "signature": "validate_cr_valor()"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "7050f2c7eaebfc670d7ff12476e1d71b",
+      "signature": "audit_trigger_fn()"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "3210625d1c794f6db7b3c3defc5984dd",
+      "signature": "update_updated_at_column()"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "560596d8ad4a59c51c1421f079e2615e",
+      "signature": "generate_requisition_code()"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "7c270e176323672f0bef11e7e85726e5",
+      "signature": "has_role(uuid,app_role)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "5c7a4f72996ee96bafbbbd943b87c88e",
+      "signature": "get_or_set_cache(text,integer)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "dc7ed22cecfd6744e6b73eba0f846be3",
+      "signature": "set_cache(text,jsonb,integer)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "6675cad966ebc41b38198dd29052f002",
+      "signature": "cleanup_old_audit_logs(integer)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "cc921267a0d38e524db4e623341881b2",
+      "signature": "aprovar_ferias(uuid,uuid)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "79c2ba6ea9b1030db7927135f8001da3",
+      "signature": "get_saldo_produtos(uuid[])"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "b572144ccf74b2ba9afb41d0932791e2",
+      "signature": "validate_rh_colaboradores_numeric()"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "f25c4d8650f6f2486f2e9d6dda9661fd",
+      "signature": "_guarded_list_fin_audit_logs(text,text,text,integer,timestamp with time zone,uuid,integer)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "60c68353649f99479fc172aa49ff1733",
+      "signature": "validate_purchase_order_item()"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "136331a3edc3c3a053dc9920933e8b8f",
+      "signature": "validate_supplier_item_price()"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "2593645c43be89341a97b3a047733216",
+      "signature": "mark_all_notifications_read()"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "a475bd8584c23f5ef44cf6bf1ad40d01",
+      "signature": "set_updated_at()"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "6c3cf0451140358d1e54543ed021c2c5",
+      "signature": "refresh_materialized_views()"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "99eb617eecda215482d743a246aa5df1",
+      "signature": "rpc_create_company(text,text)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "8af960ebb4b1ad76a1ddbf1cd84a45a9",
+      "signature": "get_saldo_conta(uuid)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "1df9e419d06f54452e9ab78030a6ea5c",
+      "signature": "get_saldo_produto(uuid)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "11056f95e933acae2a42f390ba6951c5",
+      "signature": "get_relatorios_tendencia(date,date)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "cfbad7ad42af7900978cdcdd47404428",
+      "signature": "get_beneficios_masked(uuid)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "bc1e7723566cbeef8fb1e231b2cbed80",
+      "signature": "get_salmon_dashboard_summary(date,date)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "5b54668998306c6fea8010b3c79f15f1",
+      "signature": "fin_validate_recorrencia_config(jsonb)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "5e17e4e96fd79fcf08d0f53c5b9b7269",
+      "signature": "create_transfer(uuid,uuid,numeric,date,text,uuid)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "641fde95377056d579e71abb1233830b",
+      "signature": "rpc_recebimentos_close(uuid,boolean,text)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "d64c67853334d6c6e8b1aaf0fb61755d",
+      "signature": "rpc_confirmacoes_approve(uuid)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "cc8d9fcdb578e088d1cc01f202200ead",
+      "signature": "rpc_set_user_company(uuid,uuid)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "c106b5573ea94176651a3a2afca2da5d",
+      "signature": "get_relatorios_kpis(text,text)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "ec04b7063749edd85b108a3f579a85d2",
+      "signature": "get_relatorios_compras(text,text)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "a09e281e07094942e78b24bfabd558fe",
+      "signature": "get_relatorios_score(text,text)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "bd8813a4a2c073eaec7fe51b7929616b",
+      "signature": "simulate_relatorios_score(text,text,jsonb)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "0c12273e1b367bcd5cb9bc561bdecd5b",
+      "signature": "_salmon_cancel_entry_guarded(uuid,text)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "ceaa3ad4fd6d1a5b0227374ac32e8ac1",
+      "signature": "_salmon_create_entry_guarded(text,text,text,text,integer,integer,numeric,numeric,text)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "41129d1f143180f31bbfcae499b4ea3e",
+      "signature": "sync_permissions_from_registry(jsonb)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "c7fa75346512d347f7256ae29c553a71",
+      "signature": "rbac_top_legacy_usage(integer,integer)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "9776713b87b6554b975f84cc76d992b6",
+      "signature": "rbac_permissions_diff(jsonb)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "339332a1bbd079c914ea377c93974dc1",
+      "signature": "has_any_permission(uuid,text[])"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "a236b183faa3992e2f1f87957311d427",
+      "signature": "_relatorios_compras_guarded(text,text)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "706743368e161f3754aa2e75e22b99eb",
+      "signature": "_simulate_relatorios_guarded(text,text,jsonb)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "ada0ccfb00c35163e19c8e3593238cf8",
+      "signature": "_salmon_create_manipulation_guarded(uuid,text,integer,numeric,numeric,numeric,text)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "abbc0da28271e539280dd2208929fa13",
+      "signature": "debug_tenant()"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "6ce3825750724ab567cbd6c0a5ac801f",
+      "signature": "validate_rh_beneficios_numeric()"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "530ad6660a4133486e3c76d3596e3d17",
+      "signature": "debug_company_inventory()"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "aa7de5d059b88f7bed1c1f86cc85e9c7",
+      "signature": "debug_stock_last_movements(integer)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "cb1bf9e86003e0286fa7894e7d43bfa9",
+      "signature": "admin_health_counts()"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "b47d5408b5f843bb7d5fbeb9690e56dc",
+      "signature": "rbac_sql_lint_report_internal()"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "6252597bf4472eb7180370a2d3928477",
+      "signature": "rbac_sql_lint_report_quick(uuid)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "18cabcba86ac8f5786e4f0881703a941",
+      "signature": "validate_fin_lancamento()"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "cc97629d6b24bd0d9c5a671fb9c1c01f",
+      "signature": "create_salmon_manipulation_atomic(uuid,date,integer,numeric,numeric,numeric,text)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "0e12197e2c406cb3cbfb5b46a1fc47ea",
+      "signature": "validate_rh_banco_horas_numeric()"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "476a3d480ddf8bc1b72489ab207104ce",
+      "signature": "_planning_spend_summary_guarded(integer,integer,text,text)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "0180f7b3661e4352f5e5539304dc3ae3",
+      "signature": "gerar_parcela_recorrente(uuid)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "56774860b7bf79dfb2eff0186f87d083",
+      "signature": "stock_insert_movement_atomic(uuid,numeric,text,text,text,text,text,text,text,jsonb)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "749e660df028d5848d78bcaa1ca6b75d",
+      "signature": "assert_tenant()"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "db6c364c2274c5e2513166afca5abc25",
+      "signature": "reject_ponto_record(uuid,text)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "492ef56cff30dfa95fd1844a911a71d9",
+      "signature": "trg_validate_rateio_sum()"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "05b6988120237cf0cca102a7d9af4fe4",
+      "signature": "trg_ficha_itens_invalidate_parent()"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "46cc87e4198bd9a46fd787f36f916fa1",
+      "signature": "_salmon_dashboard_guarded(text,text)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "f78669e546bc52a40a9653471483b5a8",
+      "signature": "seed_default_categories()"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "a6b56019942bcef2d98afdffb340a419",
+      "signature": "get_report_items_summary(date,date)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "1185b9d20417713f9c8b7ee0a27f0dc3",
+      "signature": "validate_estorno_movement()"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "567e550b359c25dafc83771d6e4f1b03",
+      "signature": "recalc_product_costs(uuid)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "d1992f315fbb4b3cf17876f9893940f2",
+      "signature": "get_stock_consumption_history(date,date,text,uuid,text)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "f2c3a9bd7c29b8488eaa82d64d5fba3f",
+      "signature": "audit_log_write(text,text,text,text,jsonb,jsonb,jsonb,text)"
+    },
+    {
+      "acl": null,
+      "md5": "343fc2c43eb8972a49d90bee400e9458",
+      "signature": "fin_preserve_materialized_recurrence()"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "6a024687b56a75a5192a7a5f6a11eaa0",
+      "signature": "get_stock_predictive_analysis(text,uuid,integer,integer,boolean)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "ac4928ba28130533ab3534cce054c2d0",
+      "signature": "_guarded_create_conta_receber(text,text,numeric,date,date,uuid,uuid,uuid,text,text,jsonb,jsonb,uuid)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "6fddbb29af31218709522eaaf7a6b5a5",
+      "signature": "create_quick_inventory_atomic(jsonb,text,text)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "612a69553ba0f7e02fee09fb9b684069",
+      "signature": "stock_transfer_between_locations(uuid,text,text,numeric,text)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "7c8450d492c55b93c96650e7645dc061",
+      "signature": "contar_lancamentos_sem_categoria()"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "796a741cc4b39fbb8aa1a6edfbb355b4",
+      "signature": "reopen_inventory(uuid,text)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "ef93cbd481c120212e1a3a831bdbe04a",
+      "signature": "list_movimentacoes_cursor(text,uuid,text,text,date,date,boolean,timestamp with time zone,uuid,integer)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "d39cf69b0036aa5c8b09ad562e8fc7ce",
+      "signature": "_guarded_upsert_lancamento(uuid,text,text,numeric,uuid,uuid,uuid,date,date,date,text,text,text,text,boolean,jsonb,jsonb,timestamp with time zone,text)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "5debc9bf8fed27807f821863eec49791",
+      "signature": "strip_html(text)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "525c1c8b66522fdf5936e0bc0421764b",
+      "signature": "relatorio_socios_resumo(text)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "9ef37bc5633a2278c21328b62220849e",
+      "signature": "get_fin_presentation_socios(date,date,date,date,date,date,text,integer)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "cfce5d838e494cfab3df40ea82a5f420",
+      "signature": "orcamento_execucao_mensal(text)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "b29d48e10615226410dfa9cd834c443c",
+      "signature": "copiar_orcamento_mes(text,text)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "03da197147c7f3c70bf5fd57c922a5c5",
+      "signature": "refresh_saldo_cache(uuid)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "72149303ca5433d113d4aa5339852b18",
+      "signature": "trg_refresh_saldo_cache_lancamento()"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "09460fc6f3071ee11cebb13a29349ed7",
+      "signature": "aplicar_regras_categorizacao()"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "0dbc395f943cc47e8d5901b539f78037",
+      "signature": "preview_regra_categorizacao(text,text)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "e19de1efb884cd8c7fd08944b295a25c",
+      "signature": "rpc_upsert_fechamento_caixa(date,numeric,numeric,numeric,text,timestamp with time zone)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "dc5dc6f74f8afa04639e52161b520048",
+      "signature": "rpc_delete_fechamento_caixa(uuid)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "c6f64775068599839132ae42a75865ed",
+      "signature": "get_all_saldos_contas()"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "d2f22845b71d289db70e55262ef728b4",
+      "signature": "validate_stock_movement()"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "76f3bf50c98884a801c762ca62dc1757",
+      "signature": "validate_requisicao_item_status()"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "01f845d1f73fa9f8ee9fba51c830a8a1",
+      "signature": "edit_purchase_order_atomic(uuid,jsonb)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "0e10d7a34dcd49104b32554d233008f9",
+      "signature": "compute_requisicao_status_agregado(uuid)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "20d91f739832af307f0680d836f75cbf",
+      "signature": "rbac_sql_lint_report()"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "0a254b542f113ed0705e36243f34cb83",
+      "signature": "attend_requisicao_item_atomic(uuid,uuid,numeric)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "b93addea8a750814736e1a1690c11ab5",
+      "signature": "create_purchase_order_atomic(jsonb,uuid)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "48cbb3eb1eb1d4665c09bc7a3582c980",
+      "signature": "list_purchase_orders_cursor(integer,timestamp with time zone,uuid,text,text,text,text,text)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "b472edc24fdc843d4f9b3cd0df5d5692",
+      "signature": "assert_requisicao_estoque_movement_consistency()"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "19f734caa816e1d20ee8803d1847da38",
+      "signature": "get_stock_top_consumed(date,date,text,integer,text)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "71251a90c519a961dc9e1cfcf1991f5b",
+      "signature": "count_requisicoes_with_pending_items()"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "5ffd0359143156ffd40187f2df07cc4a",
+      "signature": "admin_set_super_admin(uuid,boolean,text,text)"
+    },
+    {
+      "acl": [
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "60f3df4510560a80f9c757e1bb78c6ad",
+      "signature": "_planning_spend_summary_inner(uuid,integer,integer,text,text)"
+    },
+    {
+      "acl": [
+        "postgres=X/postgres"
+      ],
+      "md5": "1e2d099b3ae7a6f746162c3ef55a7a71",
+      "signature": "fn_recompute_product_saldo(uuid,uuid)"
+    },
+    {
+      "acl": [
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "a8f0c7e4a2d8941fd4541552986c3322",
+      "signature": "get_consumo_por_produto(uuid,date,text[],uuid[])"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "4e351f8c65051fd3da9c94977b8be830",
+      "signature": "is_company_member(uuid,uuid)"
+    },
+    {
+      "acl": [
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "3d525d50884f5330721625ce2db97c0b",
+      "signature": "get_company_permissions(uuid,uuid)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres"
+      ],
+      "md5": "b72d64cebde74504429b9acd3352eb79",
+      "signature": "get_my_company_context()"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres"
+      ],
+      "md5": "bf98e746f2660558f709a5747ed01e17",
+      "signature": "list_my_companies()"
+    },
+    {
+      "acl": null,
+      "md5": "fa71367acebf0058ce52a4312526c68c",
+      "signature": "protect_profile_identity_scope()"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "ed653b8b9fc10348da2fcc0c0fc89b30",
+      "signature": "get_current_company_id_strict()"
+    },
+    {
+      "acl": null,
+      "md5": "9b2ae02b990ea48366eacc08056b19e4",
+      "signature": "fn_update_product_stock()"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "a5e5953a3980f3cf00479ae0f66ed90f",
+      "signature": "get_current_company_id()"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "e2cd02acb98d4bfb7f381d91c6020cc4",
+      "signature": "has_permission(uuid,text)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "b1d1a621e0f177f6160ee0e0df97829b",
+      "signature": "has_permission_quick(uuid,text)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "35af5bb5b31f60e825831ff8c790cb3d",
+      "signature": "list_fin_lancamentos_cursor(date,date,text,text,uuid,text,integer,date,uuid,text,uuid,boolean)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "2abfacdd232762bbdc2dc6ffbc762350",
+      "signature": "get_fin_presentation_category_metadata()"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "51bfee6d3f51f2e2469a51ebba878254",
+      "signature": "get_effective_permissions(uuid)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "84630fcc172b14aa5499a7077c66626f",
+      "signature": "get_catalog_counts()"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres"
+      ],
+      "md5": "c9ad5b642ab6215407a42149df4a77a4",
+      "signature": "can_access_company_document(text,text)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "3041d45c94a0fa33e46fb877a6150a52",
+      "signature": "trg_po_block_post_approval_changes()"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "3daae02376fe172ac6b93a02e64fb886",
+      "signature": "receive_conta_receber(uuid,text,date)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "31573595e0f98f7ab0ea17d1d1a3b446",
+      "signature": "get_fin_presentation_detail_series(date,date,text,text,uuid,text)"
+    },
+    {
+      "acl": [
+        "postgres=X/postgres"
+      ],
+      "md5": "b80c0639687967d9e42844b0b8f34c7f",
+      "signature": "fin_prepare_category_reporting_class()"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "59dd6ba1978f7a54b368811c9cd12910",
+      "signature": "admin_checkup_suite()"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "3fa25cef36350f868e0a6e5691a9986d",
+      "signature": "admin_has_permission(uuid,text)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "71a4b90f8bd0bc465bba847bab710ade",
+      "signature": "_salmon_cancel_manipulation_guarded(uuid,text)"
+    },
+    {
+      "acl": [
+        "postgres=X/postgres"
+      ],
+      "md5": "95b0d7c93bfaa1f101c528a6bdedecb3",
+      "signature": "fin_protect_system_category()"
+    },
+    {
+      "acl": [
+        "postgres=X/postgres"
+      ],
+      "md5": "673d00e02de36210ea7c78d6f07eda89",
+      "signature": "fin_ensure_non_operational_categories(uuid)"
+    },
+    {
+      "acl": [
+        "postgres=X/postgres"
+      ],
+      "md5": "6654aaf507d77ea3e97603a58dd4081e",
+      "signature": "trg_fin_ensure_non_operational_categories()"
+    },
+    {
+      "acl": [
+        "postgres=X/postgres"
+      ],
+      "md5": "da570623c93e2e3ae11365b85a04e799",
+      "signature": "fin_category_is_excluded(uuid,uuid)"
+    },
+    {
+      "acl": [
+        "postgres=X/postgres"
+      ],
+      "md5": "a03e5b0304cffdc787dc0157061931e9",
+      "signature": "fin_entity_has_category(uuid,uuid,uuid)"
+    },
+    {
+      "acl": [
+        "postgres=X/postgres"
+      ],
+      "md5": "71465123fdb923dfe4d41c014de1f402",
+      "signature": "fin_set_entity_report_exclusion()"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "5d9c6bdb408b62e7814923a4f37185b3",
+      "signature": "get_fin_dfc_summary(date,date)"
+    },
+    {
+      "acl": [
+        "postgres=X/postgres"
+      ],
+      "md5": "b19577d50b43143343ca47678303070f",
+      "signature": "trg_fin_rateio_report_exclusion()"
+    },
+    {
+      "acl": [
+        "postgres=X/postgres"
+      ],
+      "md5": "21b9925ec4803ee3e832a60ff56f9040",
+      "signature": "trg_fin_category_propagate_reporting_class()"
+    },
+    {
+      "acl": [
+        "postgres=X/postgres"
+      ],
+      "md5": "8145fb1172bf7b2a381429a353b195d8",
+      "signature": "trg_fin_require_category_on_reconciliation()"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "b261b20bbd5a377cbde150c92e0cd5d3",
+      "signature": "reconcile_batch_lancamentos(uuid[])"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "eed07f96311fc7ed59f72fab57fb8c45",
+      "signature": "get_fin_counts_by_status(date,date)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "92238a9ace1329ee611ed97d510778b2",
+      "signature": "get_fin_kpis(integer)"
+    },
+    {
+      "acl": [
+        "postgres=X/postgres"
+      ],
+      "md5": "68efee32a857307de4ee76515531b1b6",
+      "signature": "fin_recompute_entity_report_exclusion(uuid,uuid)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "be8274b844199c8c5dfdecd5f0fc3c57",
+      "signature": "reconcile_create_transfer(date,numeric,text,uuid,uuid,uuid)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres"
+      ],
+      "md5": "84cb5dcfe4a9347ceaca4f4146dfefb6",
+      "signature": "delete_transfer(uuid)"
+    },
+    {
+      "acl": [
+        "postgres=X/postgres"
+      ],
+      "md5": "6a2674fd3524a1043dba8e1799a876d7",
+      "signature": "fin_validate_orcamento_scope()"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "1c2e2d3981f78ff85ff8e89a06d07dbd",
+      "signature": "_guarded_upsert_orcamento(uuid,text,numeric,timestamp with time zone)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "f11cf0ebe803be32832bc7327b57e9cf",
+      "signature": "update_transfer(uuid,numeric,date,text,uuid,uuid)"
+    },
+    {
+      "acl": null,
+      "md5": "90721d88bc1f276e12e7aba6582c7427",
+      "signature": "cotacao_force_company_id()"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "019c7c4f1755f5b0b69e462831418974",
+      "signature": "reconcile_bind_extrato(uuid,text,text,uuid)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "02550da5610f75fcc778ea47ef09663b",
+      "signature": "get_fin_presentation_plan(date,date,text,text,text,uuid,integer,integer)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres"
+      ],
+      "md5": "c2f2e028b29308a9cf694487d83ff5a8",
+      "signature": "create_cotacao_atomic(text,text,date,text,uuid,jsonb,jsonb)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "013dc1b6cc03b1cbb5ce22ed17b56b5c",
+      "signature": "trg_fin_contas_pagar_aprovado_em()"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres"
+      ],
+      "md5": "904131d694a928bc37ff807c0348282f",
+      "signature": "update_cotacao_atomic(uuid,text,text,date,jsonb,jsonb,timestamp with time zone)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres"
+      ],
+      "md5": "8ad793e95b4c1eebe53afe129ffd5b80",
+      "signature": "soft_delete_cotacao(uuid,timestamp with time zone)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres"
+      ],
+      "md5": "43bf3fd01d66deb7d7ffb84e4e837603",
+      "signature": "save_cotacao_respostas_atomic(uuid,jsonb,jsonb)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres"
+      ],
+      "md5": "f7de01ed360379f18b2b1d50e86a1e22",
+      "signature": "save_cotacao_sugestao(uuid,text,numeric,numeric,jsonb,jsonb)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres"
+      ],
+      "md5": "7a783cc28dd7f67627a881ee6a55068c",
+      "signature": "create_purchase_orders_from_cotacao_atomic(uuid,timestamp with time zone)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "97b18c472ae57ce661647aa489767002",
+      "signature": "list_fin_presentation_decisions(date,date,text,uuid,text,text,integer,integer)"
+    },
+    {
+      "acl": [
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "91e1ae4b27f73abc9dcbfebc819c7f9c",
+      "signature": "_validate_fin_presentation_decision_snapshot(jsonb,date,date,text,text)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "ea6a0af0117d0843934816148a4da139",
+      "signature": "reconcile_auto_bind_transfer_counterparts(uuid,jsonb)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres"
+      ],
+      "md5": "7d3c1c972da1f3c34cce991a6621b1dd",
+      "signature": "get_cotacao_ia_config()"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres"
+      ],
+      "md5": "196b61411e3ffc7022009459255470a4",
+      "signature": "get_cotacao_zapi_config()"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres"
+      ],
+      "md5": "2f3f0e881c099c9a80aae02f5a0d2331",
+      "signature": "save_cotacao_zapi_config(text,text,text,text,text,boolean)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres"
+      ],
+      "md5": "3905a234ef84b3227c95e5498e157cd9",
+      "signature": "save_cotacao_ia_config(text,text,text,boolean)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "7ab61d41da7c7430905d2a43416cb2f2",
+      "signature": "get_fin_presentation_decision(uuid)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "38354e6ec1a1143b2efffb91ace90420",
+      "signature": "_guarded_update_presentation_decision_draft(uuid,text,text,uuid,timestamp with time zone)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "e9bac99fbc42925391650fbd33971317",
+      "signature": "_guarded_add_presentation_decision_revision(uuid,text,jsonb,text,text,timestamp with time zone)"
+    },
+    {
+      "acl": null,
+      "md5": "1e82055372159f1239eb2bf1f5eed10f",
+      "signature": "fin_get_limite_aprovacao_atual()"
+    },
+    {
+      "acl": null,
+      "md5": "872a1e95cd4e66a99e8e95cc81ed4cca",
+      "signature": "fin_set_limite_aprovacao(numeric)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "ee88920698bae7d48e349322f25eef3b",
+      "signature": "_guarded_transition_presentation_decision(uuid,text,text,text,timestamp with time zone)"
+    },
+    {
+      "acl": [
+        "postgres=X/postgres"
+      ],
+      "md5": "5f7bdf9ef7fb6dd4aa24101e5f09b57f",
+      "signature": "fin_get_limite_aprovacao(uuid)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "fe69330a99b5ef40bec875aa27a57ec0",
+      "signature": "_guarded_create_conta_pagar(text,numeric,text,uuid,date,date,uuid,uuid,uuid,text,text,jsonb,jsonb)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "3e0deec7ad857d200e6063a616dcb90b",
+      "signature": "rpc_upsert_fechamento_caixa(date,numeric,numeric,numeric,text)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "c4b153e5633ba6c0c64d4990bbe20442",
+      "signature": "_guarded_create_presentation_decision_action(uuid,text,uuid,text,timestamp with time zone,date,text)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "41db611f6f10a4752a959cd19a640ff0",
+      "signature": "_guarded_update_presentation_decision_action(uuid,text,uuid,date,text,text,timestamp with time zone)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "1efe5859a5b20306a72e4124d552eb0e",
+      "signature": "_guarded_transition_presentation_decision_action(uuid,text,text,text,timestamp with time zone)"
+    },
+    {
+      "acl": null,
+      "md5": "c0d2f14706d467cbde1376ec9de5a4a5",
+      "signature": "pay_conta_pagar(uuid,text,date,uuid)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "a126e95ebd0503a516c7b8d24bb36d96",
+      "signature": "set_stock_movement_direction()"
+    },
+    {
+      "acl": null,
+      "md5": "d9bb9d8766f0ca6eee4a3c8ebad08f32",
+      "signature": "list_fin_contas_pagar_abertas(text,numeric,date,integer)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "a85d0a48b349fc2d0844823fbd6ab320",
+      "signature": "batch_reorder_fin_categorias(jsonb)"
+    },
+    {
+      "acl": [
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "b28217e8948904d08f6c0ea3ab33f9ef",
+      "signature": "_validate_fin_presentation_meeting_snapshot(jsonb,uuid,date,date,text)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "02ce55c1da12ed7043f1631a8642a8f1",
+      "signature": "list_fin_contas_receber_cursor(text,text,text,integer,date,uuid,date,date,uuid,uuid,boolean)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "247b56de5c537cb41bace34d34444b9b",
+      "signature": "list_stock_transfers(date,date,uuid,text,integer,integer)"
+    },
+    {
+      "acl": [
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "a30c16aa24597ceb91e480ca52183c4b",
+      "signature": "_replace_fin_presentation_session_content(uuid,uuid,uuid,text,uuid[],jsonb)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "38ad18689c2124f4f756bbeb9e53dc65",
+      "signature": "_guarded_create_presentation_session(text,text,date,date,text,date,uuid,uuid[],uuid,jsonb)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "da470bd7d79b3993796473b507e10d3c",
+      "signature": "_guarded_save_presentation_session(uuid,text,text,date,uuid,uuid[],uuid,jsonb,text,timestamp with time zone)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "36f5ba42e73cde1f143c12ba4ca0e2a1",
+      "signature": "_guarded_create_presentation_decision(text,text,date,date,text,text,jsonb,uuid)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "42bb52e69e5bef239146712c9cb43d8a",
+      "signature": "soft_delete_inventory(uuid,text)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "9b0fb56d173d272047bc466604c0d8a1",
+      "signature": "reorder_fin_categoria(uuid,text)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres"
+      ],
+      "md5": "efa637048fd9d678f3d427e0dbf97995",
+      "signature": "can_receive_company_change(uuid,text[])"
+    },
+    {
+      "acl": [
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "96c1007ab4194fe600de7f5d33d2cf03",
+      "signature": "reserve_company_invitation(uuid,uuid,text)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "3a17aa4892e0a10e1da20550195543ff",
+      "signature": "list_profiles_minimal(text,integer)"
+    },
+    {
+      "acl": [
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "6fe47187abeff4bfff8432905f7e4edd",
+      "signature": "find_auth_user_by_email(text)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "65bdb728f7511c38ee06e506ee0951bf",
+      "signature": "list_fin_lancamentos_cursor(date,date,text,text,uuid,text,integer,date,uuid)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres"
+      ],
+      "md5": "051dac1afd188899e1fea13d3efaced8",
+      "signature": "get_fin_saldo_atual(uuid,date)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "664387d3b1d568071b174f002783ba23",
+      "signature": "get_fin_kpis(date,date)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "a8fb3d64813880e07a717aac62f92c52",
+      "signature": "unreconcile_lancamento(uuid)"
+    },
+    {
+      "acl": null,
+      "md5": "9432a5cb427aae5eab203ca3ad6ed2d3",
+      "signature": "reconcile_link_existing_lancamento(uuid,uuid,text,text,date)"
+    },
+    {
+      "acl": [
+        "authenticated=X/postgres",
+        "postgres=X/postgres"
+      ],
+      "md5": "29b33e4a2ed3d01a45531143853a5d26",
+      "signature": "reconcile_ignorar_lancamento(uuid,date,numeric,text,text,uuid)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "310c494442e33f499c3dc55394414af9",
+      "signature": "get_relatorios_score(date,date)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "53163bb1ef1e3dd7c7dec35e1d3a2d7c",
+      "signature": "simulate_relatorios_score(date,date,jsonb)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "87279c2b17e67eb516142fd8d456628e",
+      "signature": "get_report_item_detail(uuid,date,date)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "ea5e790b1608da95c56d2731f8ddb9ac",
+      "signature": "upsert_supplier(text)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "b6cecd23c7303fd4bf3e1ab6f3857f92",
+      "signature": "get_supplier_ranking(uuid,text,integer,integer,text)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "adcd98fb0e9cc75fa4331df5df27658a",
+      "signature": "list_solic_compra_mercado_cursor(integer,timestamp with time zone,uuid,text,text,uuid,text,date,date)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "ddb806614e9d97e4a68a3a4b2c8df0d2",
+      "signature": "storno_purchase_order_stock(uuid)"
+    },
+    {
+      "acl": [
+        "=X/postgres",
+        "authenticated=X/postgres",
+        "postgres=X/postgres",
+        "service_role=X/postgres"
+      ],
+      "md5": "0ce1ab02f1ee4889c724f1a5025acc56",
+      "signature": "upsert_salmon_leftover_atomic(date,numeric,text)"
+    }
+  ]
+}

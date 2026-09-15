@@ -1,0 +1,42 @@
+[
+  {
+    "log_table": "audit_log",
+    "reason": "identity_or_global_unproven",
+    "records": 73
+  },
+  {
+    "log_table": "audit_log",
+    "reason": "legacy_resource_correlated",
+    "records": 34
+  },
+  {
+    "log_table": "audit_log",
+    "reason": "resource_absent_or_unsupported",
+    "records": 6
+  },
+  {
+    "log_table": "audit_logs",
+    "reason": "identity_or_global_unproven",
+    "records": 9
+  },
+  {
+    "log_table": "audit_logs",
+    "reason": "invalid_or_missing_resource_id",
+    "records": 4
+  },
+  {
+    "log_table": "audit_logs",
+    "reason": "invalid_resource_company",
+    "records": 3
+  },
+  {
+    "log_table": "audit_logs",
+    "reason": "legacy_resource_correlated",
+    "records": 32414
+  },
+  {
+    "log_table": "audit_logs",
+    "reason": "resource_absent_or_unsupported",
+    "records": 2921
+  }
+]

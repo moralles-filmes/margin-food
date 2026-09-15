@@ -1,0 +1,40 @@
+{
+  "production": {
+    "id": "dpl_BKSLbqzyKxgEsnfhdthKheMQGWvP",
+    "url": "moralles-food-4x5c32569-moralles-filmes-projects.vercel.app",
+    "state": "READY",
+    "created": 1789398108097,
+    "commit": "1fdea27e69e3d687b49fdd04e91069b25cc70850"
+  },
+  "edges": [
+    {
+      "slug": "inventario",
+      "version": 15,
+      "updated_at": 1788996434894,
+      "verify_jwt": false,
+      "ezbr_sha256": "df334230202613c86d8864c4382fee6aa8f6727fcf38d7a2cc4f8a6bdbf876ae"
+    },
+    {
+      "slug": "requisicao-estoque",
+      "version": 14,
+      "updated_at": 1788996434894,
+      "verify_jwt": false,
+      "ezbr_sha256": "4aa1a03e851549c6322e6ba432063c0087944c51b06db23f9e4f8a2aed529445"
+    },
+    {
+      "slug": "ficha-tecnica",
+      "version": 10,
+      "updated_at": 1788996434894,
+      "verify_jwt": false,
+      "ezbr_sha256": "cae2dd69e2b24ad3ff876f80ab45fa11a57d5f22347d4427e1514a0e19afed73"
+    },
+    {
+      "slug": "scheduled-jobs",
+      "version": 7,
+      "updated_at": 1782999924516,
+      "verify_jwt": false,
+      "ezbr_sha256": "e70b6bf47eec1df55dd9a45760a71cdf8f447ca24e36913fe42315a334a8e5da"
+    }
+  ],
+  "phase2MigrationPresent": false
+}

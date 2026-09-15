@@ -1,0 +1,16 @@
+{
+  "counts": {
+    "INFO": 1,
+    "WARN": 6
+  },
+  "kinds": [
+    "rls_enabled_no_policy",
+    "function_search_path_mutable",
+    "extension_in_public",
+    "materialized_view_in_api",
+    "anon_security_definer_function_executable",
+    "authenticated_security_definer_function_executable",
+    "auth_leaked_password_protection"
+  ],
+  "scope": "production before Phase3 application; not a Phase3 post-check"
+}
