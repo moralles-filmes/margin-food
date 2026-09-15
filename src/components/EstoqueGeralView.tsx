@@ -1,6 +1,7 @@
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { includesNormalized } from '@/lib/utils';
+import { sortNames } from '@/lib/sortByName';
 import { usePersistedTab } from '@/hooks/usePersistedTab';
 import { TenantError } from '@/lib/tenant';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
@@ -120,7 +121,7 @@ export default function EstoqueGeralView() {
   const [dbLocais, setDbLocais] = useState<string[]>([]);
   const fetchCadastros = useCallback(async () => {
     const [catRes, locRes] = await Promise.all([
-      supabase.from('stock_categories').select('name').eq('is_active', true).order('sort_order').order('name'),
+      supabase.from('stock_categories').select('name').eq('is_active', true).order('name'),
       supabase.from('stock_locations').select('name').eq('is_active', true).order('name'),
     ]);
     setDbCategorias((catRes.data || []).map((c: { name: string }) => c.name));
@@ -129,7 +130,7 @@ export default function EstoqueGeralView() {
   useEffect(() => { fetchCadastros(); }, [fetchCadastros]);
 
   // Merge DB categories with any legacy categories from products
-  const allCategorias = useMemo(() => [...new Set([...dbCategorias, ...categorias])].sort(), [dbCategorias, categorias]);
+  const allCategorias = useMemo(() => sortNames([...new Set([...dbCategorias, ...categorias])]), [dbCategorias, categorias]);
 
   // Produto form
   const [showProdForm, setShowProdForm] = useState(false);
@@ -166,7 +167,7 @@ export default function EstoqueGeralView() {
   const [catalogSearchInput, setCatalogSearchInput] = useState('');
   const [catalogCatFilter, setCatalogCatFilter] = useState('');
   const [catalogStatusFilter, setCatalogStatusFilter] = useState<'active' | 'inactive' | 'all'>('active');
-  const [catalogSortBy, setCatalogSortBy] = useState<import('@/hooks/useEstoqueGeralStore').ProdSortBy>('recent');
+  const [catalogSortBy, setCatalogSortBy] = useState<import('@/hooks/useEstoqueGeralStore').ProdSortBy>('name_asc');
   const catalogDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const ESTOQUE_PAGE = 50;
@@ -223,13 +224,13 @@ export default function EstoqueGeralView() {
     setCatalogSearchInput('');
     setCatalogCatFilter('');
     setCatalogStatusFilter('active');
-    setCatalogSortBy('recent');
+    setCatalogSortBy('name_asc');
     setCatalogStockFilter('all');
     if (catalogDebounceRef.current) clearTimeout(catalogDebounceRef.current);
-    store.updateProdFilters(buildCatalogFilters('', '', 'active', 'recent'));
+    store.updateProdFilters(buildCatalogFilters('', '', 'active', 'name_asc'));
   }, [store, buildCatalogFilters]);
 
-  const hasActiveFilters = catalogSearchInput || catalogCatFilter || catalogStatusFilter !== 'active' || catalogSortBy !== 'recent' || catalogStockFilter !== 'all';
+  const hasActiveFilters = catalogSearchInput || catalogCatFilter || catalogStatusFilter !== 'active' || catalogSortBy !== 'name_asc' || catalogStockFilter !== 'all';
 
   // Duplicate item handler
   const handleDuplicate = useCallback((p: ProdutoExtended) => {
@@ -840,9 +841,9 @@ export default function EstoqueGeralView() {
               {catalogStatusFilter !== 'active' && (
                 <Badge variant="secondary" className="text-[10px] gap-1 h-5">Status: {catalogStatusFilter === 'inactive' ? 'Inativos' : 'Todos'}</Badge>
               )}
-              {catalogSortBy !== 'recent' && (
+              {catalogSortBy !== 'name_asc' && (
                 <Badge variant="secondary" className="text-[10px] gap-1 h-5">Ordenação: {{
-                  oldest: 'Mais antigos', name_asc: 'Nome A→Z', name_desc: 'Nome Z→A',
+                  recent: 'Mais recentes', oldest: 'Mais antigos', name_asc: 'Nome A→Z', name_desc: 'Nome Z→A',
                   sku_asc: 'SKU ↑', sku_desc: 'SKU ↓', cat_asc: 'Categoria A→Z',
                 }[catalogSortBy]}</Badge>
               )}

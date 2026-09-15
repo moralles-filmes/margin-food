@@ -19,6 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { Settings2, Plus, Trash2, Search, X, ArrowUp, ArrowDown } from 'lucide-react';
 import type { ProdutoExtended } from '@/types/estoque';
 import { toRequisitionDisplayProduct } from '@/domain/estoque/requisition';
+import { sortByName } from '@/lib/sortByName';
 
 interface ListaFixa {
   id: string;
@@ -51,7 +52,7 @@ export default function ListaFixaSetorAdmin({ produtos }: Props) {
   const [setores, setSetores] = useState<string[]>([]);
   const [selectedSetor, setSelectedSetor] = useState('');
   useEffect(() => {
-    supabase.from('stock_sectors').select('name').eq('is_active', true).order('sort_order').order('name')
+    supabase.from('stock_sectors').select('name').eq('is_active', true).order('name')
       .then(({ data }) => {
         const nomes = (data || []).map((s: { name: string }) => s.name);
         setSetores(nomes);
@@ -111,7 +112,7 @@ export default function ListaFixaSetorAdmin({ produtos }: Props) {
       const term = productSearch.trim();
       list = list.filter(p => includesNormalized(p.nomeProduto, term) || (p.sku && includesNormalized(p.sku, term)));
     }
-    return list;
+    return sortByName(list, p => p.nomeProduto);
   }, [produtos, items, productSearch]);
 
   // Create list for sector

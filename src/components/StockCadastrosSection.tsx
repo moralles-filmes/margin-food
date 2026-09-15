@@ -85,7 +85,6 @@ export default function StockCadastrosSection() {
       .from('stock_categories')
       .select('id, name, description, is_active, sort_order, created_at')
       .eq('company_id', profile?.company_id ?? '')
-      .order('sort_order', { ascending: true })
       .order('name', { ascending: true });
     setCategories((data as StockCategory[]) || []);
     setLoadingCat(false);
@@ -110,7 +109,6 @@ export default function StockCadastrosSection() {
       .from('stock_sectors')
       .select('id, name, is_active, sort_order, created_at')
       .eq('company_id', profile?.company_id ?? '')
-      .order('sort_order', { ascending: true })
       .order('name', { ascending: true });
     setSectors((data as StockSector[]) || []);
     setLoadingSec(false);
@@ -423,7 +421,6 @@ export default function StockCadastrosSection() {
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-semibold text-foreground">{cat.name}</p>
                       {!cat.is_active && <Badge variant="outline" className="text-[9px] h-4">Inativa</Badge>}
-                      {cat.sort_order > 0 && <span className="text-[9px] text-muted-foreground">#{cat.sort_order}</span>}
                     </div>
                     {cat.description && <p className="text-[11px] text-muted-foreground mt-0.5">{cat.description}</p>}
                   </div>

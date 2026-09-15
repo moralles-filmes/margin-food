@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils';
 import KpiCard from '@/components/ui/KpiCard';
 
 import { useCan } from '@/permissions/hooks';
+import { sortByName } from '@/lib/sortByName';
 interface Colaborador {
   id: string;
   nome: string;
@@ -482,7 +483,7 @@ export default function FeriasAfastamentosSection({
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {saldos.map(s => {
+                      {sortByName(saldos, s => getColabNome(s.colaborador_id)).map(s => {
                         const vencProximo = (() => {
                           try {
                             return differenceInBusinessDays(parseISO(s.vencimento), new Date()) <= 60;

@@ -82,7 +82,7 @@ export default function MovimentacoesSection({
   const [filterSetor, setFilterSetor] = useState('all');
   const [setores, setSetores] = useState<string[]>([]);
   useEffect(() => {
-    supabase.from('stock_sectors').select('name').eq('is_active', true).order('sort_order').order('name')
+    supabase.from('stock_sectors').select('name').eq('is_active', true).order('name')
       .then(({ data }) => setSetores((data || []).map((s: { name: string }) => s.name)));
   }, [supabase]);
   const [filterDateFrom, setFilterDateFrom] = useState('');

@@ -112,6 +112,7 @@ export default function CmvTabs({ cmvData, visibleSubtabs, ranking, errorRanking
                   {(cmvData.cmvPorSetor || []).map((s: any) => (
                     <TableRow key={s.setor}>
                       <TableCell className="text-sm font-medium">{s.setor}</TableCell>
+                      <TableCell className="text-right text-sm">{fmtBRL(s.custo)}</TableCell>
                       <TableCell className="text-right text-sm font-medium">{formatPercentBR(s.percentCmv)}</TableCell>
                     </TableRow>
                   ))}

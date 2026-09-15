@@ -49,7 +49,7 @@ export default function RequisicaoListaFixa({ produtos, saldos, onSuccess, onCan
   const [setores, setSetores] = useState<string[]>([]);
   useEffect(() => {
     if (!canCreate) return;
-    supabase.from('stock_sectors').select('name').eq('is_active', true).order('sort_order').order('name')
+    supabase.from('stock_sectors').select('name').eq('is_active', true).order('name')
       .then(({ data, error }) => {
         if (error) { toast.error('Erro ao carregar setores. Tente novamente.'); return; }
         const nomes = (data || []).map((s: { name: string }) => s.name);

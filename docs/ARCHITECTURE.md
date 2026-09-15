@@ -344,7 +344,7 @@ CREATE POLICY "select_own_company" ON tabela
 - Score Operacional — Classificação da operação com simulação
 - Itens — Análise detalhada por item
 
-**RPCs:** `get_relatorios_kpis`, `get_relatorios_compras`, `get_relatorios_score`, `get_relatorios_tendencia`, `get_report_items_summary`, `get_report_item_detail`, `list_report_items_cursor`, `_simulate_relatorios_guarded`
+**RPCs:** `get_relatorios_kpis`, `get_relatorios_compras`, `get_relatorios_score`, `get_relatorios_tendencia`, `get_report_items_summary`, `get_report_item_detail`, `list_report_items_page`, `_simulate_relatorios_guarded`
 
 ### 4.12 Configurações (`configuracoes`)
 **Objetivo:** Administração de usuários, permissões e configurações do sistema.
@@ -614,7 +614,7 @@ CREATE POLICY "select_own_company" ON tabela
 | `get_relatorios_tendencia(...)` | Tendências |
 | `get_report_items_summary(...)` | Resumo por item |
 | `get_report_item_detail(...)` | Detalhe de item |
-| `list_report_items_cursor(...)` | Itens paginados |
+| `list_report_items_page(...)` | Itens paginados (offset, ordenação e % CMV no banco) |
 | `simulate_relatorios_score(...)` | Simulação de score |
 | `get_spend_by_sector(...)` | Gastos por setor |
 

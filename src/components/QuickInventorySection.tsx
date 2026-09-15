@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { Search, Loader2, ClipboardCheck, Package, CheckCircle, AlertTriangle, Zap, RotateCcw } from 'lucide-react';
 import { fmtBRL } from '@/lib/formatters';
 import { normalizeSearchText } from '@/lib/utils';
+import { sortByName, sortNames } from '@/lib/sortByName';
 import QuickInventoryCountList from './inventario/QuickInventoryCountList';
 
 import { useCan } from '@/permissions/hooks';
@@ -54,7 +55,7 @@ export default function QuickInventorySection() {
   useEffect(() => {
     supabase.from('stock_categories').select('name').eq('is_active', true).order('name')
       .then(({ data }) => {
-        if (data) setCategories(data.map((c: any) => c.name));
+        if (data) setCategories(sortNames(data.map((c: any) => c.name)));
       });
   }, [supabase]);
 
@@ -85,7 +86,7 @@ export default function QuickInventorySection() {
     const { data } = await query;
     // Filter out already-counted items
     const countedIds = new Set(countedItems.map(c => c.productId));
-    setSearchResults((data || []).filter(p => !countedIds.has(p.id)));
+    setSearchResults(sortByName((data || []).filter(p => !countedIds.has(p.id)), p => p.nome_produto));
     setSearchLoading(false);
   }, [countedItems, supabase]);
 
@@ -114,14 +115,14 @@ export default function QuickInventorySection() {
       if (error) throw error;
       const saldo = data?.[0]?.saldo ?? 0;
 
-      setCountedItems(prev => prev.some(item => item.productId === product.id) ? prev : [...prev, {
+      setCountedItems(prev => prev.some(item => item.productId === product.id) ? prev : sortByName([...prev, {
         productId: product.id,
         nomeProduto: product.nome_produto,
         categoria: product.categoria,
         unidadeMedida: product.unidade_medida,
         countedQty: '',
         saldoTeorico: Number(saldo),
-      }]);
+      }], item => item.nomeProduto));
       // Remove from search results
       setSearchResults(prev => prev.filter(p => p.id !== product.id));
       setFocusProductId(product.id);

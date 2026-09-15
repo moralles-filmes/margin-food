@@ -19,6 +19,7 @@ import { toast } from 'sonner';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
+import { sortByName } from '@/lib/sortByName';
 import {
   AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle,
   AlertDialogDescription, AlertDialogFooter, AlertDialogCancel,
@@ -164,7 +165,7 @@ export default function AdminUsersView() {
     try {
       const data = await invoke({ action: 'list' });
       clearTimeout(timeout);
-      setUsers(data.users || []);
+      setUsers(sortByName<UserRecord>(data.users || [], u => u.nome || u.email));
     } catch (err: any) {
       clearTimeout(timeout);
       setLoadError(err.message);
