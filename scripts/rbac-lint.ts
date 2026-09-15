@@ -29,8 +29,9 @@ const CRITICAL_TABLES = [
   'rh_colaboradores', 'rh_folha_pagamento',
 ];
 const ADMIN_RPC_ALLOWLIST = [
+  // Exclusiva de service_role; ator validado pela Edge e membership/recurso revalidados no SQL.
+  'service_write_audit',
   'has_permission', 'admin_has_permission', 'has_any_permission',
-  'audit_log_write', 'log_audit',
 ];
 
 const ROOT = process.cwd();

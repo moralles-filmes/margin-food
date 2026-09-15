@@ -31,6 +31,8 @@ interface AuditLog {
   after: Record<string, unknown> | null;
   metadata: Record<string, unknown> | null;
   success: boolean;
+  log_scope: string;
+  scope_reason: string;
 }
 
 const PAGE_SIZE = 50;
@@ -83,11 +85,15 @@ const ACTION_COLORS: Record<string, string> = {
 export default function GlobalAuditView() {
   const supabase = useSupabase();
   const canViewRbac = useCan('configuracoes:auditoria-sistema:view');
+  const canGlobal = useCan('system:global:manage');
+  const [logScope, setLogScope] = useState('TENANT');
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
   const [profiles, setProfiles] = useState<Record<string, string>>({});
   const cursorRef = useRef<CursorState | null>(null);
+  const requestRef = useRef(0);
+  const invalidateRequest = useCallback(() => { requestRef.current++; }, []);
 
   // Filters
   const [dateFrom, setDateFrom] = useState(format(subDays(new Date(), 7), 'yyyy-MM-dd'));
@@ -100,9 +106,14 @@ export default function GlobalAuditView() {
   const [detail, setDetail] = useState<AuditLog | null>(null);
 
   const buildQuery = useCallback((cursor: CursorState | null) => {
+    if (logScope !== 'TENANT') {
+      return supabase.rpc('list_restricted_logs', { p_table: 'audit_logs', p_scope: logScope, p_limit: PAGE_SIZE + 1,
+        ...(cursor ? { p_cursor_at: cursor.created_at, p_cursor_id: cursor.id } : {}) });
+    }
     let query = supabase
       .from('audit_logs')
-      .select('id, created_at, actor_user_id, actor_email, actor_role, source, module, entity, entity_id, action, before, after, metadata, success')
+      .select('id, created_at, actor_user_id, actor_email, actor_role, source, module, entity, entity_id, action, before, after, metadata, success, log_scope, scope_reason')
+      .eq('log_scope', 'TENANT')
       .gte('created_at', `${dateFrom}T00:00:00`)
       .lte('created_at', `${dateTo}T23:59:59`)
       .order('created_at', { ascending: false })
@@ -125,14 +136,17 @@ export default function GlobalAuditView() {
     }
 
     return query;
-  }, [supabase, dateFrom, dateTo, moduleFilter, actionFilter, search]);
+  }, [supabase, logScope, dateFrom, dateTo, moduleFilter, actionFilter, search]);
 
   const fetchLogs = useCallback(async (cursor: CursorState | null, append: boolean) => {
+    const request = ++requestRef.current;
+    if (!canViewRbac || (logScope !== 'TENANT' && !canGlobal)) { setLogs([]); setLoading(false); return; }
     setLoading(true);
     const { data, error } = await buildQuery(cursor);
+    if (request !== requestRef.current) return;
     if (error) { console.error(error); setLoading(false); return; }
 
-    const all = (data || []) as AuditLog[];
+    const all = (data || []) as unknown as AuditLog[];
     const hasNext = all.length > PAGE_SIZE;
     const pageData = hasNext ? all.slice(0, PAGE_SIZE) : all;
 
@@ -150,6 +164,7 @@ export default function GlobalAuditView() {
     const missing = userIds.filter(id => !profiles[id]);
     if (missing.length > 0) {
       const { data: profs } = await supabase.rpc('list_profiles_minimal', { p_search: '', p_limit: 200 });
+      if (request !== requestRef.current) return;
       if (profs) {
         const newProfiles = { ...profiles };
         const rows = profs as Array<{ id: string; nome?: string; email?: string }>;
@@ -159,25 +174,32 @@ export default function GlobalAuditView() {
     }
 
     setLoading(false);
-  }, [buildQuery, profiles, supabase]);
+  }, [buildQuery, profiles, supabase, canViewRbac, canGlobal, logScope]);
 
   const resetAndFetch = useCallback(() => {
     cursorRef.current = null;
     fetchLogs(null, false);
   }, [fetchLogs]);
 
-  useEffect(() => { resetAndFetch(); }, [dateFrom, dateTo, moduleFilter, actionFilter]);
+  useEffect(() => {
+    setDetail(null);
+    setLogs([]);
+    setProfiles({});
+    resetAndFetch();
+    return invalidateRequest;
+  }, [supabase, dateFrom, dateTo, moduleFilter, actionFilter, logScope, canViewRbac, canGlobal, invalidateRequest]);
 
   const handleSearch = () => resetAndFetch();
   const loadMore = () => { if (hasMore && !loading) fetchLogs(cursorRef.current, true); };
 
   const exportCSV = () => {
-    const headers = ['Data', 'Módulo', 'Ação', 'Entidade', 'ID', 'Usuário', 'Source', 'Sucesso'];
+    const headers = ['Data', 'Módulo', 'Ação', 'Entidade', 'ID', 'Usuário', 'Source', 'Sucesso', 'Procedência'];
     const rows = logs.map(l => [
       format(new Date(l.created_at), 'dd/MM/yyyy HH:mm:ss'),
       l.module, l.action, l.entity, l.entity_id || '',
       profiles[l.actor_user_id || ''] || l.actor_user_id || 'Sistema',
       l.source, l.success ? 'Sim' : 'Não',
+      l.scope_reason === 'legacy_resource_correlated' ? 'Histórico: autoria não verificada' : l.scope_reason,
     ]);
     const csv = [headers, ...rows].map(r => r.map(c => `"${c}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -197,15 +219,19 @@ export default function GlobalAuditView() {
           <h2 className="text-lg font-display font-bold text-foreground flex items-center gap-2">
             <ShieldCheck className="w-5 h-5 text-primary" /> Auditoria do Sistema
           </h2>
-          <p className="text-xs text-muted-foreground">Trilha de auditoria global (cursor pagination) — {logs.length} registros</p>
+          <p className="text-xs text-muted-foreground">{logScope === 'TENANT' ? 'Auditoria da unidade' : logScope === 'GLOBAL' ? 'Eventos globais' : 'Histórico sem atribuição comprovada'} — {logs.length} registros</p>
         </div>
         <Button onClick={exportCSV} size="sm" variant="outline" className="gap-1.5 text-xs">
           <Download className="w-3.5 h-3.5" /> CSV
         </Button>
       </div>
 
+      {canGlobal && <SearchableSelect value={logScope} onValueChange={setLogScope} options={[
+        { value: 'TENANT', label: 'Unidade atual' }, { value: 'GLOBAL', label: 'Eventos globais' },
+        { value: 'AMBIGUOUS', label: 'Histórico ambíguo (restrito)' },
+      ]} placeholder="Escopo da auditoria" />}
       {/* Filters */}
-      <Card>
+      {logScope === 'TENANT' && <Card>
         <CardContent className="pt-4">
           <div className="flex items-center gap-1.5 mb-3">
             <Filter className="w-3.5 h-3.5 text-muted-foreground" />
@@ -253,7 +279,7 @@ export default function GlobalAuditView() {
             </div>
           </div>
         </CardContent>
-      </Card>
+      </Card>}
 
       {/* Table */}
       <Card>
@@ -306,6 +332,7 @@ export default function GlobalAuditView() {
                         </TableCell>
                         <TableCell>
                           <Badge variant="secondary" className="text-[9px]">{log.source}</Badge>
+                          {log.scope_reason === 'legacy_resource_correlated' && <span className="block text-[9px] text-muted-foreground">Histórico não verificado</span>}
                         </TableCell>
                         <TableCell>
                           <Eye className="w-3.5 h-3.5 text-muted-foreground" />
@@ -345,6 +372,8 @@ export default function GlobalAuditView() {
                 <InfoRow label="ID" value={detail.entity_id || '—'} mono />
                 <InfoRow label="Usuário" value={profiles[detail.actor_user_id || ''] || detail.actor_user_id || 'Sistema'} />
                 <InfoRow label="Source" value={detail.source} />
+                <InfoRow label="Escopo" value={detail.log_scope} />
+                <InfoRow label="Evidência de atribuição" value={detail.scope_reason} />
                 <InfoRow label="Sucesso" value={detail.success ? '✅ Sim' : '❌ Não'} />
               </div>
 

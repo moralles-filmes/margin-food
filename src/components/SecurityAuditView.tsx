@@ -1,6 +1,6 @@
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useMemo } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useCan } from '@/permissions/hooks';
 import { ShieldAlert, Download, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,6 +18,7 @@ interface AuditEntry {
   valor_anterior: string | null;
   valor_novo: string | null;
   created_at: string;
+  scope_reason: string;
 }
 
 const ACTION_LABELS: Record<string, { label: string; color: string }> = {
@@ -30,25 +31,32 @@ const ACTION_LABELS: Record<string, { label: string; color: string }> = {
 
 export default function SecurityAuditView() {
   const supabase = useSupabase();
-  const { hasAnyRole } = useAuth();
+  const canView = useCan('configuracoes:auditoria-seguranca:view');
   const [entries, setEntries] = useState<AuditEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterAction, setFilterAction] = useState('');
   const [filterSearch, setFilterSearch] = useState('');
 
   useEffect(() => {
+    let active = true;
     const loadAudit = async () => {
+      if (!canView) { setEntries([]); setLoading(false); return; }
+      setEntries([]);
       setLoading(true);
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('audit_log')
-        .select('id, user_id, acao, tabela, registro_id, campo, valor_anterior, valor_novo, created_at')
+        .select('id, user_id, acao, tabela, registro_id, campo, valor_anterior, valor_novo, created_at, scope_reason')
+        .eq('log_scope', 'TENANT')
         .order('created_at', { ascending: false })
         .limit(500);
+      if (!active) return;
+      if (error) console.error('Falha ao ler auditoria de segurança:', error);
       setEntries(data || []);
       setLoading(false);
     };
     loadAudit();
-  }, [supabase]);
+    return () => { active = false; };
+  }, [supabase, canView]);
 
   const filtered = useMemo(() => {
     let list = entries;
@@ -64,12 +72,12 @@ export default function SecurityAuditView() {
     return list;
   }, [entries, filterAction, filterSearch]);
 
-  if (!hasAnyRole('admin')) {
+  if (!canView) {
     return (
       <div className="bg-card border border-border rounded-xl p-8 text-center">
         <ShieldAlert className="w-12 h-12 mx-auto text-destructive/30 mb-3" />
         <p className="text-sm font-medium text-foreground">Acesso Negado</p>
-        <p className="text-xs text-muted-foreground">Apenas administradores podem acessar o log de auditoria.</p>
+        <p className="text-xs text-muted-foreground">É necessária permissão para consultar a auditoria desta unidade.</p>
       </div>
     );
   }
@@ -86,6 +94,7 @@ export default function SecurityAuditView() {
         { header: 'Registro', key: 'registro_id' },
         { header: 'Anterior', key: 'valor_anterior' },
         { header: 'Novo', key: 'valor_novo' },
+        { header: 'Procedência', key: 'scope_reason', format: (v) => v === 'legacy_resource_correlated' ? 'Histórico: autoria não verificada' : String(v) },
       ],
       rows: filtered as unknown as Record<string, unknown>[],
     });
@@ -139,6 +148,7 @@ export default function SecurityAuditView() {
                       {actionInfo.label}
                     </span>
                     <span className="text-xs text-muted-foreground truncate">{entry.tabela}</span>
+                    {entry.scope_reason === 'legacy_resource_correlated' && <span className="text-[10px] text-muted-foreground">Histórico não verificado</span>}
                   </div>
                   <span className="text-[10px] text-muted-foreground whitespace-nowrap ml-2">
                     {formatDateBR(new Date(entry.created_at))}

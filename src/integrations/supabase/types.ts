@@ -407,6 +407,9 @@ export type Database = {
       }
       audit_log: {
         Row: {
+          log_scope: string
+          scope_reason: string
+          company_id: string | null
           acao: string
           campo: string | null
           created_at: string
@@ -418,6 +421,9 @@ export type Database = {
           valor_novo: string | null
         }
         Insert: {
+          log_scope?: string
+          scope_reason?: string
+          company_id?: string | null
           acao: string
           campo?: string | null
           created_at?: string
@@ -429,6 +435,9 @@ export type Database = {
           valor_novo?: string | null
         }
         Update: {
+          log_scope?: string
+          scope_reason?: string
+          company_id?: string | null
           acao?: string
           campo?: string | null
           created_at?: string
@@ -443,6 +452,8 @@ export type Database = {
       }
       audit_logs: {
         Row: {
+          log_scope: string
+          scope_reason: string
           action: string
           actor_email: string | null
           actor_role: string | null
@@ -462,6 +473,8 @@ export type Database = {
           success: boolean
         }
         Insert: {
+          log_scope?: string
+          scope_reason?: string
           action: string
           actor_email?: string | null
           actor_role?: string | null
@@ -481,6 +494,8 @@ export type Database = {
           success?: boolean
         }
         Update: {
+          log_scope?: string
+          scope_reason?: string
           action?: string
           actor_email?: string | null
           actor_role?: string | null
@@ -3841,6 +3856,10 @@ export type Database = {
       }
       integration_logs: {
         Row: {
+          log_scope: string
+          scope_reason: string
+          company_id: string | null
+          actor_user_id: string | null
           action: string
           created_at: string
           error_message: string | null
@@ -3851,6 +3870,10 @@ export type Database = {
           status: string
         }
         Insert: {
+          log_scope?: string
+          scope_reason?: string
+          company_id?: string | null
+          actor_user_id?: string | null
           action: string
           created_at?: string
           error_message?: string | null
@@ -3861,6 +3884,10 @@ export type Database = {
           status?: string
         }
         Update: {
+          log_scope?: string
+          scope_reason?: string
+          company_id?: string | null
+          actor_user_id?: string | null
           action?: string
           created_at?: string
           error_message?: string | null
@@ -9501,6 +9528,10 @@ export type Database = {
       }
     }
     Functions: {
+      list_restricted_logs: {
+        Args: { p_table: string; p_scope?: string; p_limit?: number; p_cursor_at?: string; p_cursor_id?: string; p_module?: string; p_action?: string; p_entity?: string }
+        Returns: Json[]
+      }
       get_fin_orcamento_arvore: { Args: { p_mes: string }; Returns: Json }
       _guarded_bulk_upsert_orcamento: { Args: { p_mes_ano: string; p_items: Json }; Returns: Json }
       list_my_companies: { Args: Record<PropertyKey, never>; Returns: { id: string; nome: string }[] }

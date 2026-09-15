@@ -122,7 +122,7 @@ function toSerializableJson(value: unknown): unknown {
 }
 
 async function writeAudit(
-  userClient: SupabaseClient,
+  adminClient: SupabaseClient, companyId: string, actorId: string,
   payload: {
     p_source?: string;
     p_module: string;
@@ -139,16 +139,17 @@ async function writeAudit(
       ? { source: payload.p_source ?? 'edge', ...(payload.p_metadata as Record<string, unknown>) }
       : payload.p_metadata ?? (payload.p_source ? { source: payload.p_source } : null);
 
-    await userClient.rpc('audit_log_write', {
-      _module: payload.p_module,
-      _action: payload.p_action,
-      _entity_type: payload.p_entity,
-      _entity_id: payload.p_entity_id,
-      _before: toSerializableJson(payload.p_before),
-      _after: toSerializableJson(payload.p_after),
-      _metadata: toSerializableJson(metadata),
-      _severity: 'info',
+    const { error } = await adminClient.rpc('service_write_audit', {
+      p_company_id: companyId, p_actor_id: actorId,
+      p_module: payload.p_module,
+      p_action: payload.p_action,
+      p_entity: payload.p_entity,
+      p_entity_id: payload.p_entity_id,
+      p_before: toSerializableJson(payload.p_before),
+      p_after: toSerializableJson(payload.p_after),
+      p_metadata: toSerializableJson(metadata),
     });
+    if (error) throw error;
   } catch (error) {
     console.error('Audit write failed (non-blocking):', error);
   }
@@ -279,7 +280,7 @@ serve(async (req) => {
       if (updateErr) throw updateErr;
       if (!updated) return forbidden("FORBIDDEN_TENANT", "Movimentação não pertence ao tenant");
 
-      await writeAudit(supabaseUser, {
+      await writeAudit(adminClient, companyId, userId, {
         p_source: "edge",
         p_module: "estoque",
         p_entity: "movimentacoes_estoque",
@@ -415,7 +416,7 @@ serve(async (req) => {
       }
 
       // 4) Audit
-      await writeAudit(supabaseUser, {
+      await writeAudit(adminClient, companyId, userId, {
         p_source: "edge",
         p_module: "estoque",
         p_entity: "movimentacoes_estoque",
@@ -523,7 +524,7 @@ serve(async (req) => {
         const { error: itensError } = await supabaseUser.from("requisicao_estoque_itens").insert(reqItens);
         if (itensError) throw itensError;
 
-        await writeAudit(supabaseUser, {
+        await writeAudit(adminClient, companyId, userId, {
           p_source: "edge",
           p_module: "estoque",
           p_entity: "requisicoes_estoque",
@@ -590,7 +591,7 @@ serve(async (req) => {
         }
 
         // Audit
-        await writeAudit(supabaseUser, {
+        await writeAudit(adminClient, companyId, userId, {
           p_source: "edge",
           p_module: "compras",
           p_entity: "alertas_falta_estoque",
@@ -780,7 +781,7 @@ serve(async (req) => {
 
       await syncRequisicaoStatus(requisicao_id, companyId, userId, supabaseUser);
 
-      await writeAudit(supabaseUser, {
+      await writeAudit(adminClient, companyId, userId, {
         p_source: "edge",
         p_module: "estoque",
         p_entity: "requisicao_estoque_itens",
@@ -929,7 +930,7 @@ serve(async (req) => {
         });
       }
 
-      await writeAudit(supabaseUser, {
+      await writeAudit(adminClient, companyId, userId, {
         p_source: "edge",
         p_module: "estoque",
         p_entity: "requisicoes_estoque",
@@ -1001,7 +1002,7 @@ serve(async (req) => {
       if (negErr) throw negErr;
       if (!negada) return notFound("Requisição");
 
-      await writeAudit(supabaseUser, {
+      await writeAudit(adminClient, companyId, userId, {
         p_source: "edge",
         p_module: "estoque",
         p_entity: "requisicoes_estoque",
@@ -1105,7 +1106,7 @@ serve(async (req) => {
       if (delErr) throw delErr;
       if (!deleted) return forbidden("FORBIDDEN_TENANT", "Requisição não pertence ao tenant");
 
-      await writeAudit(supabaseUser, {
+      await writeAudit(adminClient, companyId, userId, {
         p_source: "edge",
         p_module: "estoque",
         p_entity: "requisicoes_estoque",

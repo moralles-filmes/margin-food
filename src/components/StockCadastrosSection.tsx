@@ -144,11 +144,6 @@ export default function StockCadastrosSection() {
           .update({ name: catForm.name.trim(), description: catForm.description || null })
           .eq('id', editCat.id);
         if (error) throw error;
-        // Audit log
-        await supabase.from('audit_log').insert({
-          acao: 'UPDATE_CATEGORY', tabela: 'stock_categories', registro_id: editCat.id,
-          user_id: user?.id, valor_anterior: editCat.name, valor_novo: catForm.name.trim(),
-        });
         toast.success('Categoria atualizada!');
       } else {
         // Auto sort_order: max + 1
@@ -159,10 +154,6 @@ export default function StockCadastrosSection() {
           .select('id')
           .single();
         if (error) throw error;
-        await supabase.from('audit_log').insert({
-          acao: 'CREATE_CATEGORY', tabela: 'stock_categories', registro_id: data.id,
-          user_id: user?.id, valor_novo: catForm.name.trim(),
-        });
         toast.success('Categoria criada!');
       }
       setCatDialog(false);
@@ -181,10 +172,6 @@ export default function StockCadastrosSection() {
     const newActive = !cat.is_active;
     const { error } = await supabase.from('stock_categories').update({ is_active: newActive }).eq('id', cat.id);
     if (error) { toast.error('Erro ao alterar status'); return; }
-    await supabase.from('audit_log').insert({
-      acao: newActive ? 'ACTIVATE_CATEGORY' : 'INACTIVATE_CATEGORY', tabela: 'stock_categories', registro_id: cat.id,
-      user_id: user?.id, valor_anterior: String(!newActive), valor_novo: String(newActive),
-    });
     toast.success(newActive ? 'Categoria ativada' : 'Categoria inativada');
     fetchCategories();
   };
@@ -211,10 +198,6 @@ export default function StockCadastrosSection() {
           .update({ name: locForm.name.trim(), type: locForm.type || null, notes: locForm.notes || null })
           .eq('id', editLoc.id);
         if (error) throw error;
-        await supabase.from('audit_log').insert({
-          acao: 'UPDATE_LOCATION', tabela: 'stock_locations', registro_id: editLoc.id,
-          user_id: user?.id, valor_anterior: editLoc.name, valor_novo: locForm.name.trim(),
-        });
         toast.success('Local atualizado!');
       } else {
         const { data, error } = await supabase
@@ -223,10 +206,6 @@ export default function StockCadastrosSection() {
           .select('id')
           .single();
         if (error) throw error;
-        await supabase.from('audit_log').insert({
-          acao: 'CREATE_LOCATION', tabela: 'stock_locations', registro_id: data.id,
-          user_id: user?.id, valor_novo: locForm.name.trim(),
-        });
         toast.success('Local criado!');
       }
       setLocDialog(false);
@@ -245,10 +224,6 @@ export default function StockCadastrosSection() {
     const newActive = !loc.is_active;
     const { error } = await supabase.from('stock_locations').update({ is_active: newActive }).eq('id', loc.id);
     if (error) { toast.error('Erro ao alterar status'); return; }
-    await supabase.from('audit_log').insert({
-      acao: newActive ? 'ACTIVATE_LOCATION' : 'INACTIVATE_LOCATION', tabela: 'stock_locations', registro_id: loc.id,
-      user_id: user?.id, valor_anterior: String(!newActive), valor_novo: String(newActive),
-    });
     toast.success(newActive ? 'Local ativado' : 'Local inativado');
     fetchLocations();
   };
@@ -265,10 +240,6 @@ export default function StockCadastrosSection() {
       }
       return;
     }
-    await supabase.from('audit_log').insert({
-      acao: 'DELETE_CATEGORY', tabela: 'stock_categories', registro_id: cat.id,
-      user_id: user?.id, valor_anterior: cat.name,
-    });
     toast.success('Categoria excluída');
     fetchCategories();
   };
@@ -295,10 +266,6 @@ export default function StockCadastrosSection() {
           .update({ name: secForm.name.trim() })
           .eq('id', editSec.id);
         if (error) throw error;
-        await supabase.from('audit_log').insert({
-          acao: 'UPDATE_SECTOR', tabela: 'stock_sectors', registro_id: editSec.id,
-          user_id: user?.id, valor_anterior: editSec.name, valor_novo: secForm.name.trim(),
-        });
         toast.success('Setor atualizado!');
       } else {
         const maxOrder = sectors.reduce((max, s) => Math.max(max, s.sort_order), 0);
@@ -308,10 +275,6 @@ export default function StockCadastrosSection() {
           .select('id')
           .single();
         if (error) throw error;
-        await supabase.from('audit_log').insert({
-          acao: 'CREATE_SECTOR', tabela: 'stock_sectors', registro_id: data.id,
-          user_id: user?.id, valor_novo: secForm.name.trim(),
-        });
         toast.success('Setor criado!');
       }
       setSecDialog(false);
@@ -330,10 +293,6 @@ export default function StockCadastrosSection() {
     const newActive = !sec.is_active;
     const { error } = await supabase.from('stock_sectors').update({ is_active: newActive }).eq('id', sec.id);
     if (error) { toast.error('Erro ao alterar status'); return; }
-    await supabase.from('audit_log').insert({
-      acao: newActive ? 'ACTIVATE_SECTOR' : 'INACTIVATE_SECTOR', tabela: 'stock_sectors', registro_id: sec.id,
-      user_id: user?.id, valor_anterior: String(!newActive), valor_novo: String(newActive),
-    });
     toast.success(newActive ? 'Setor ativado' : 'Setor inativado');
     fetchSectors();
   };
@@ -350,10 +309,6 @@ export default function StockCadastrosSection() {
       }
       return;
     }
-    await supabase.from('audit_log').insert({
-      acao: 'DELETE_SECTOR', tabela: 'stock_sectors', registro_id: sec.id,
-      user_id: user?.id, valor_anterior: sec.name,
-    });
     toast.success('Setor excluído');
     fetchSectors();
   };
@@ -370,10 +325,6 @@ export default function StockCadastrosSection() {
       }
       return;
     }
-    await supabase.from('audit_log').insert({
-      acao: 'DELETE_LOCATION', tabela: 'stock_locations', registro_id: loc.id,
-      user_id: user?.id, valor_anterior: loc.name,
-    });
     toast.success('Local excluído');
     fetchLocations();
   };

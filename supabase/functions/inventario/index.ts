@@ -401,16 +401,7 @@ serve(async (req) => {
         if (scoreErr) console.error('Failed to update score_risco/flag_risco:', scoreErr)
       }
 
-      // Global audit log entry
-      await adminClient.from('audit_log').insert({
-        acao: 'INVENTARIO_FINALIZADO', tabela: 'inventarios', registro_id: id,
-        user_id: user.id,
-        valor_novo: JSON.stringify({
-          acuracia: rpcResult.acuracia, driftTotal: rpcResult.driftTotal,
-          adjustments: rpcResult.adjustments_inserted, scoreRisco, flagRisco,
-        }),
-      })
-
+      // A finalização e o score são auditados pelos triggers do recurso.
       return json({
         success: true,
         already_finalized: rpcResult.already_finalized || false,

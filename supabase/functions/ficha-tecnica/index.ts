@@ -16,22 +16,24 @@ function structuredLog(data: Record<string, any>) {
   console.log(JSON.stringify(data))
 }
 
-// ─── AUDIT HELPER (via userClient RPC) ───
+// ─── AUDIT HELPER (via serviço; identidade validada no handler) ───
 async function writeAudit(
-  userClient: any,
+  adminClient: any, companyId: string, actorId: string,
   module: string, action: string, entityType: string,
   entityId: string | null, before: any, after: any, metadata: any
 ) {
   try {
-    await userClient.rpc('audit_log_write', {
-      _module: module,
-      _action: action,
-      _entity_type: entityType,
-      _entity_id: entityId,
-      _before: before ? JSON.parse(JSON.stringify(before)) : null,
-      _after: after ? JSON.parse(JSON.stringify(after)) : null,
-      _metadata: metadata ? JSON.parse(JSON.stringify(metadata)) : null,
+    const { error } = await adminClient.rpc('service_write_audit', {
+      p_company_id: companyId, p_actor_id: actorId,
+      p_module: module,
+      p_action: action,
+      p_entity: entityType,
+      p_entity_id: entityId,
+      p_before: before ? JSON.parse(JSON.stringify(before)) : null,
+      p_after: after ? JSON.parse(JSON.stringify(after)) : null,
+      p_metadata: metadata ? JSON.parse(JSON.stringify(metadata)) : null,
     })
+    if (error) throw error
   } catch (e: any) {
     console.error('Audit write failed (non-blocking):', e.message)
   }
@@ -149,7 +151,7 @@ serve(async (req) => {
       const result = await salvarComponente(adminClient, companyId, user.id, payload)
       const resultBody = await result.clone().json()
 
-      await writeAudit(userClient, 'ficha_tecnica', payload.id ? 'UPDATE' : 'CREATE', 'ficha_componentes',
+      if (result.ok) await writeAudit(adminClient, companyId, user.id, 'ficha_tecnica', payload.id ? 'UPDATE' : 'CREATE', 'ficha_componentes',
         payload.id || resultBody?.id, beforeData, resultBody, auditMeta({ tipo }))
 
       structuredLog({ request_id: requestId, action, company_id: companyId, user_id: user.id, status: 200, entity_id: payload.id || resultBody?.id, is_update: !!payload.id, duration_ms: Date.now() - startTime })
@@ -160,7 +162,7 @@ serve(async (req) => {
       await requirePerm(`ficha:${subtab}:edit`)
       const result = await salvarComponenteItens(userClient, companyId, payload)
 
-      await writeAudit(userClient, 'ficha_tecnica', 'UPDATE_ITENS', 'ficha_componente_itens',
+      if (result.ok) await writeAudit(adminClient, companyId, user.id, 'ficha_tecnica', 'UPDATE_ITENS', 'ficha_componentes',
         payload.componente_pai_id, null, { itens_count: payload.itens?.length || 0 }, auditMeta())
 
       structuredLog({ request_id: requestId, action, company_id: companyId, user_id: user.id, status: 200, entity_id: payload.componente_pai_id, itens_count: payload.itens?.length || 0, duration_ms: Date.now() - startTime })
@@ -175,7 +177,7 @@ serve(async (req) => {
 
       const result = await deletarComponente(adminClient, companyId, user.id, payload)
 
-      await writeAudit(userClient, 'ficha_tecnica', 'SOFT_DELETE', 'ficha_componentes',
+      if (result.ok) await writeAudit(adminClient, companyId, user.id, 'ficha_tecnica', 'SOFT_DELETE', 'ficha_componentes',
         payload.id, beforeData, { deleted: true }, auditMeta())
 
       structuredLog({ request_id: requestId, action, company_id: companyId, user_id: user.id, status: 200, entity_id: payload.id, duration_ms: Date.now() - startTime })
@@ -201,7 +203,7 @@ serve(async (req) => {
       const result = await salvarCanal(adminClient, companyId, payload)
       const resultBody = await result.clone().json()
 
-      await writeAudit(userClient, 'ficha_tecnica', payload.id ? 'UPDATE' : 'CREATE', 'canais_venda',
+      if (result.ok) await writeAudit(adminClient, companyId, user.id, 'ficha_tecnica', payload.id ? 'UPDATE' : 'CREATE', 'canais_venda',
         payload.id || resultBody?.id, beforeData, resultBody, auditMeta())
 
       structuredLog({ request_id: requestId, action, company_id: companyId, user_id: user.id, status: 200, entity_id: payload.id, duration_ms: Date.now() - startTime })
@@ -214,7 +216,7 @@ serve(async (req) => {
 
       const result = await deletarCanal(adminClient, companyId, user.id, payload)
 
-      await writeAudit(userClient, 'ficha_tecnica', 'SOFT_DELETE', 'canais_venda',
+      if (result.ok) await writeAudit(adminClient, companyId, user.id, 'ficha_tecnica', 'SOFT_DELETE', 'canais_venda',
         payload.id, beforeData, { deleted: true }, auditMeta())
 
       structuredLog({ request_id: requestId, action, company_id: companyId, user_id: user.id, status: 200, entity_id: payload.id, duration_ms: Date.now() - startTime })
@@ -226,7 +228,7 @@ serve(async (req) => {
       await requirePerm('ficha:markup:manage')
       const result = await salvarPrecificacao(adminClient, companyId, payload)
 
-      await writeAudit(userClient, 'ficha_tecnica', 'UPDATE', 'precificacao_canal',
+      if (result.ok) await writeAudit(adminClient, companyId, user.id, 'ficha_tecnica', 'UPDATE_PRICING', 'ficha_componentes',
         payload.componente_id, null, { precos_count: payload.precos?.length || 0 }, auditMeta())
 
       structuredLog({ request_id: requestId, action, company_id: companyId, user_id: user.id, status: 200, entity_id: payload.componente_id, duration_ms: Date.now() - startTime })
@@ -242,7 +244,7 @@ serve(async (req) => {
       await requirePerm('ficha:markup:manage')
       const result = await recalcularTodosCustos(adminClient, companyId)
 
-      await writeAudit(userClient, 'ficha_tecnica', 'RECALCULATE_ALL', 'ficha_componentes',
+      if (result.ok) await writeAudit(adminClient, companyId, user.id, 'ficha_tecnica', 'RECALCULATE_ALL', 'ficha_componentes',
         null, null, null, auditMeta({ severity: 'WARN' }))
 
       structuredLog({ request_id: requestId, action, company_id: companyId, user_id: user.id, status: 200, duration_ms: Date.now() - startTime })
@@ -261,7 +263,7 @@ serve(async (req) => {
       const result = await salvarCenario(adminClient, companyId, user.id, payload)
       const resultBody = await result.clone().json()
 
-      await writeAudit(userClient, 'ficha_tecnica', 'CREATE', 'cenarios_simulacao',
+      if (result.ok) await writeAudit(adminClient, companyId, user.id, 'ficha_tecnica', 'CREATE', 'cenarios_simulacao',
         resultBody?.id, null, { nome: payload.nome, componente_id: payload.componente_id }, auditMeta())
 
       structuredLog({ request_id: requestId, action, company_id: companyId, user_id: user.id, status: 200, duration_ms: Date.now() - startTime })
@@ -282,7 +284,7 @@ serve(async (req) => {
 
       const result = await setPrecoReferenciaSalmao(adminClient, companyId, user.id, payload)
 
-      await writeAudit(userClient, 'ficha_tecnica', 'UPDATE', 'config_precificacao',
+      if (result.ok) await writeAudit(adminClient, companyId, user.id, 'ficha_tecnica', 'UPDATE', 'config_precificacao',
         null, { preco_manual: beforeData?.preco_referencia_salmao_manual }, { preco_manual: payload.preco_manual }, auditMeta())
 
       structuredLog({ request_id: requestId, action, company_id: companyId, user_id: user.id, status: 200, duration_ms: Date.now() - startTime })
@@ -292,7 +294,7 @@ serve(async (req) => {
       await requirePerm('ficha:markup:manage')
       const result = await syncPrecoSalmaoAuto(adminClient, companyId, user.id, payload)
 
-      await writeAudit(userClient, 'ficha_tecnica', 'SYNC_AUTO', 'config_precificacao',
+      if (result.ok) await writeAudit(adminClient, companyId, user.id, 'ficha_tecnica', 'SYNC_AUTO', 'config_precificacao',
         null, null, { preco_kg_limpo: payload.preco_kg_limpo }, auditMeta())
 
       structuredLog({ request_id: requestId, action, company_id: companyId, user_id: user.id, status: 200, duration_ms: Date.now() - startTime })

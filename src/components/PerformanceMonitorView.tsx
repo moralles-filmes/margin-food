@@ -1,5 +1,5 @@
 import { useSupabase } from '@/contexts/CompanyScopeContext';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -23,39 +23,47 @@ interface MvStatus {
 export default function PerformanceMonitorView() {
   const supabase = useSupabase();
   const canViewRbac = useCan('configuracoes:performance:view');
+  const canGlobal = useCan('system:global:manage');
   const [slowEvents, setSlowEvents] = useState<SlowEvent[]>([]);
   const [lastRefresh, setLastRefresh] = useState<MvStatus[]>([]);
   const [loading, setLoading] = useState(true);
+  const requestRef = useRef(0);
+  const invalidateRequest = useCallback(() => { requestRef.current++; }, []);
 
   const fetchData = async () => {
+    const request = ++requestRef.current;
+    if (!canViewRbac) { setLoading(false); return; }
     setLoading(true);
     // Fetch last 50 slow query events
-    const { data: slow } = await supabase
+    const { data: slow, error: slowError } = await supabase
       .from('audit_logs')
       .select('id, created_at, entity, metadata')
+      .eq('log_scope', 'TENANT')
       .eq('module', 'perf')
       .eq('action', 'SLOW_QUERY')
       .order('created_at', { ascending: false })
       .limit(50);
+    if (request !== requestRef.current) return;
+    if (slowError) console.error('Falha ao ler performance:', slowError);
     setSlowEvents((slow || []) as SlowEvent[]);
 
-    // Fetch last MV refresh job
-    const { data: jobs } = await supabase
-      .from('audit_logs')
-      .select('metadata')
-      .eq('module', 'system')
-      .eq('entity', 'materialized_views')
-      .eq('action', 'JOB_RUN')
-      .order('created_at', { ascending: false })
-      .limit(1);
-
-    if (jobs && jobs.length > 0 && Array.isArray(jobs[0].metadata)) {
-      setLastRefresh(jobs[0].metadata as unknown as MvStatus[]);
+    setLastRefresh([]);
+    if (canGlobal) {
+      const { data: jobs, error } = await supabase.rpc('list_restricted_logs', { p_table: 'audit_logs', p_scope: 'GLOBAL', p_limit: 1, p_module: 'system', p_action: 'JOB_RUN', p_entity: 'materialized_views' });
+      if (request !== requestRef.current) return;
+      if (error) console.error('Falha ao ler manutenção global:', error);
+      const job = (jobs || []).find(value => value && typeof value === 'object' && !Array.isArray(value) && value.entity === 'materialized_views' && value.action === 'JOB_RUN');
+      if (job && typeof job === 'object' && !Array.isArray(job) && Array.isArray(job.metadata)) setLastRefresh(job.metadata as unknown as MvStatus[]);
     }
     setLoading(false);
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => {
+    setSlowEvents([]);
+    setLastRefresh([]);
+    fetchData();
+    return invalidateRequest;
+  }, [supabase, canViewRbac, canGlobal, invalidateRequest]);
 
   if (loading) {
     return <div className="flex items-center justify-center py-12"><div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>;
@@ -79,7 +87,7 @@ export default function PerformanceMonitorView() {
       </div>
 
       {/* MV Status */}
-      <Card>
+      {canGlobal && <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-sm flex items-center gap-2">
             <Database className="w-4 h-4 text-primary" /> Materialized Views — Último Refresh
@@ -101,7 +109,7 @@ export default function PerformanceMonitorView() {
             </div>
           )}
         </CardContent>
-      </Card>
+      </Card>}
 
       {/* Slow Queries */}
       <Card>

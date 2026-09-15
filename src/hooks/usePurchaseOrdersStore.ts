@@ -374,10 +374,6 @@ export function usePurchaseOrdersStore() {
       });
     }
 
-    await supabase.from('audit_log').insert({
-      tabela: 'purchase_orders', registro_id: orderId,
-      acao: 'SHOPPING_CONCLUIDO', user_id: user.id,
-    });
 
     await fetchOrders();
     toast.success('Compra confirmada! Pedido enviado para Recebimento.');
@@ -530,10 +526,6 @@ export function usePurchaseOrdersStore() {
       status: 'CANCELLED',
     }).eq('id', orderId);
 
-    await supabase.from('audit_log').insert({
-      tabela: 'purchase_orders', registro_id: orderId,
-      acao: 'CANCELAMENTO', user_id: user.id,
-    });
 
     await fetchOrders();
     toast.success('Pedido cancelado.');
@@ -640,10 +632,6 @@ export function usePurchaseOrdersStore() {
 
     if (error) { toast.error('Erro ao excluir: ' + error.message); return false; }
 
-    await supabase.from('audit_log').insert({
-      tabela: 'purchase_orders', registro_id: orderId,
-      acao: 'DELETE_SOFT', user_id: user.id,
-    });
 
     await fetchOrders();
     toast.success(hasReceived ? 'Pedido excluído (arquivado) e estoque estornado.' : 'Pedido excluído (arquivado).');
