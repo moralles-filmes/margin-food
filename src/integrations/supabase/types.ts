@@ -10286,6 +10286,10 @@ export type Database = {
         Returns: string[]
       }
       get_fin_alertas: { Args: never; Returns: Json }
+      get_fin_bordero: {
+        Args: { p_fim: string; p_inicio: string }
+        Returns: Json
+      }
       get_fin_cashflow: {
         Args: { p_fim: string; p_inicio: string }
         Returns: Json

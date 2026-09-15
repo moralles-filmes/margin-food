@@ -451,7 +451,8 @@ export const MODULE_MANIFESTS: ModuleManifest[] = [
         { action: 'delete', label: 'Excluir Regra' },
         { action: 'manage', label: 'Aplicar Categorização' },
       ]},
-      { key: 'relatorio-socios', label: 'Relatório Sócios', actions: [
+      // Chave única para Borderô (antigo Relatório Sócios) e Apresentação Sócios.
+      { key: 'relatorio-socios', label: 'Borderô e Apresentação Sócios', actions: [
         ...VIEW_EXPORT,
         { action: 'manage', label: 'Gerenciar decisões e ações' },
         { action: 'approve', label: 'Aprovar e encerrar decisões' },

@@ -27,7 +27,7 @@ import {
 
 // ── Types ──
 
-type FinSubTab = 'dashboard' | 'cadastros' | 'contas' | 'lancamentos' | 'pagar' | 'receber' | 'fluxo' | 'dre' | 'orcamento' | 'conciliacao' | 'alertas' | 'recorrencias' | 'categorizacao' | 'relatorio_socios' | 'projecao' | 'kpis' | 'auditoria' | 'comparativo' | 'fechamento';
+type FinSubTab = 'dashboard' | 'cadastros' | 'contas' | 'lancamentos' | 'pagar' | 'receber' | 'fluxo' | 'dre' | 'orcamento' | 'conciliacao' | 'alertas' | 'recorrencias' | 'categorizacao' | 'bordero' | 'projecao' | 'kpis' | 'auditoria' | 'comparativo' | 'fechamento';
 
 interface DashboardSummary {
   saldoCaixa: number;

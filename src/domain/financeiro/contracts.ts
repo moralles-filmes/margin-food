@@ -22,7 +22,7 @@ export interface FinancialPeriod {
 
 // ── Core summary ──
 
-/** Official financial summary — used by Dashboard, Relatório Sócios, KPIs */
+/** Official financial summary — used by Dashboard, KPIs */
 export interface FinancialSummary {
   receita: number;
   despesa: number;

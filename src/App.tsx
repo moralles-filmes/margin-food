@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { GlobalCompanyBoundary } from "@/contexts/CompanyScopeProvider";
 import { NotificationsProvider } from "@/contexts/NotificationsContext";
@@ -170,7 +170,9 @@ const App = () => {
                   <Route path="/recebimentos" element={<Index />} />
                   <Route path="/mercados-sazonais" element={<Index />} />
                   <Route path="/confirmacoes-recebimento" element={<Index />} />
-                  <Route path="/financeiro/relatorio-socios" element={<Index />} />
+                  <Route path="/financeiro/bordero" element={<Index />} />
+                  {/* Relatório Sócios virou Borderô: bookmark antigo continua funcionando. */}
+                  <Route path="/financeiro/relatorio-socios" element={<Navigate to="/financeiro/bordero" replace />} />
                   <Route path="/financeiro/relatorio-socios/:detail" element={<LegacyPresentationRedirect />} />
                   <Route path="/financeiro/apresentacao-socios" element={<Index />} />
                   <Route path="/financeiro/apresentacao-socios/:detail" element={<Index />} />

@@ -35,7 +35,7 @@ export const RULES: Record<string, DomainRule> = {
     statusExcluded: ['CANCELADO'],
     tipoExcluded: ['TRANSFERENCIA'],
     sourceOfTruth: 'RPC get_fin_dashboard_summary / get_fin_presentation_socios / get_fin_dre_summary',
-    consumers: ['Dashboard', 'DRE', 'Relatório Sócios', 'KPIs', 'Comparativo'],
+    consumers: ['Dashboard', 'DRE', 'KPIs', 'Comparativo'],
   },
   'FIN-DESPESA': {
     id: 'FIN-DESPESA',
@@ -46,7 +46,7 @@ export const RULES: Record<string, DomainRule> = {
     statusExcluded: ['CANCELADO'],
     tipoExcluded: ['TRANSFERENCIA'],
     sourceOfTruth: 'RPC get_fin_dashboard_summary / get_fin_presentation_socios / get_fin_dre_summary',
-    consumers: ['Dashboard', 'DRE', 'Relatório Sócios', 'KPIs', 'Comparativo'],
+    consumers: ['Dashboard', 'DRE', 'KPIs', 'Comparativo'],
   },
   'FIN-RESULTADO': {
     id: 'FIN-RESULTADO',
@@ -54,7 +54,7 @@ export const RULES: Record<string, DomainRule> = {
     description: 'Receita Oficial − Despesa Oficial.',
     formula: 'Receita − Despesa',
     sourceOfTruth: 'calcResultado() em domain/financeiro/selectors.ts',
-    consumers: ['Dashboard', 'DRE', 'Relatório Sócios', 'KPIs', 'Comparativo'],
+    consumers: ['Dashboard', 'DRE', 'KPIs', 'Comparativo'],
   },
   'FIN-MARGEM': {
     id: 'FIN-MARGEM',
@@ -62,14 +62,14 @@ export const RULES: Record<string, DomainRule> = {
     description: 'Resultado / Receita × 100. Zero quando Receita = 0.',
     formula: 'receita === 0 ? 0 : (resultado / receita) * 100',
     sourceOfTruth: 'calcMargem() em domain/financeiro/selectors.ts',
-    consumers: ['Dashboard', 'Relatório Sócios', 'KPIs', 'Comparativo'],
+    consumers: ['Dashboard', 'KPIs', 'Comparativo'],
   },
   'FIN-SALDO': {
     id: 'FIN-SALDO',
     name: 'Saldo em Caixa Oficial',
     description: 'Saldo inicial + entradas realizadas − saídas realizadas, consolidado por conta bancária ativa.',
     sourceOfTruth: 'RPC get_fin_dashboard_summary (saldo_caixa) / fin_contas_saldo_cache',
-    consumers: ['Dashboard', 'Fluxo de Caixa', 'Projeção'],
+    consumers: ['Dashboard', 'Fluxo de Caixa', 'Projeção', 'Borderô'],
   },
   'FIN-INADIMPLENCIA': {
     id: 'FIN-INADIMPLENCIA',
@@ -109,6 +109,16 @@ export const RULES: Record<string, DomainRule> = {
     description: 'Saldo inicial + entradas projetadas − saídas projetadas ao longo do horizonte. Expande recorrências via generate_series.',
     sourceOfTruth: 'RPC get_fin_projecao',
     consumers: ['Projeção de Fluxo'],
+  },
+  'FIN-BORDERO': {
+    id: 'FIN-BORDERO',
+    name: 'Borderô — Contas a Vencer e Saldo Final Provisionado',
+    description: 'Contas a pagar em aberto (AGUARDANDO_APROVACAO, APROVADO, VENCIDO) filtradas EXCLUSIVAMENTE por data_vencimento, com as duas pontas inclusivas; agrupadas pela árvore de categorias do DRE/DFC com FIN-RATEIO. Saldo das contas = fin_contas_saldo_cache das contas ativas. Valores em centavos inteiros.',
+    formula: 'saldoFinalProvisionado = saldoDasContas - contasAVencer',
+    statusIncluded: ['AGUARDANDO_APROVACAO', 'APROVADO', 'VENCIDO'],
+    statusExcluded: ['RASCUNHO', 'PAGO', 'CANCELADO'],
+    sourceOfTruth: 'RPC get_fin_bordero / buildBorderoReport() em domain/financeiro/bordero',
+    consumers: ['Borderô', 'PDF do Borderô'],
   },
   'FIN-ORCAMENTO': {
     id: 'FIN-ORCAMENTO',
