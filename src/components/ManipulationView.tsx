@@ -44,7 +44,7 @@ const emptyWizard: WizardData = {
 };
 
 export default function ManipulationView({ store, preSelectedEntryId, onClearPreSelected }: ManipulationViewProps) {
-  const { manipulations, addManipulation, updateManipulation, deleteManipulation, recordLeftover, stock, availableLots, suppliers, fifoLot, entries, stockConfig, smartSuggestion } = store;
+  const { manipulations, addManipulation, updateManipulation, deleteManipulation, recordLeftover, stock, availableLots, suppliers, suggestedLot, entries, stockConfig, smartSuggestion } = store;
   const canCreate = useCan('salmon:manipulacao:create');
   const canDelete = useCan('salmon:manipulacao:delete');
   const [period, setPeriod] = useState<PeriodRange>(getDefaultRange());
@@ -123,7 +123,7 @@ export default function ManipulationView({ store, preSelectedEntryId, onClearPre
   };
 
   const startNewWizard = (preEntryId?: string) => {
-    const targetId = preEntryId || fifoLot?.entryId;
+    const targetId = preEntryId || suggestedLot?.entryId;
     const initialWizard = { ...emptyWizard };
     if (targetId) {
       const lot = availableLots.find(l => l.entryId === targetId);
@@ -270,8 +270,21 @@ export default function ManipulationView({ store, preSelectedEntryId, onClearPre
 
   const supplierObj = selectedLot ? suppliers.find(s => s.name === selectedLot.supplier) : null;
   const isSupplierInactive = supplierObj ? !supplierObj.active : false;
-  const isFifo = (entryId: string) => fifoLot?.entryId === entryId;
-  const selectedIsNotFifo = wizard.entryId && fifoLot && wizard.entryId !== fifoLot.entryId;
+  const isSuggested = (entryId: string) => suggestedLot?.entryId === entryId;
+  const selectedIsNotSuggested = wizard.entryId && suggestedLot && wizard.entryId !== suggestedLot.entryId;
+
+  const expirationLabel = (lot: { expirationDate?: string; daysToExpire?: number }) => {
+    if (!lot.expirationDate) return 'Sem validade';
+    const d = lot.daysToExpire;
+    if (d === undefined) return `Val. ${formatDateBR(parseLocalDate(lot.expirationDate))}`;
+    if (d < 0) return `Vencido há ${Math.abs(d)}d`;
+    if (d === 0) return 'Vence hoje';
+    return `Vence em ${d}d`;
+  };
+  const expirationTone = (lot: { expirationStatus?: 'VENCIDO' | 'VENCE_EM_BREVE' | 'OK' }) =>
+    lot.expirationStatus === 'VENCIDO' ? 'text-destructive'
+      : lot.expirationStatus === 'VENCE_EM_BREVE' ? 'text-warning'
+      : 'text-muted-foreground';
 
   return (
     <div className="space-y-4">
@@ -329,18 +342,22 @@ export default function ManipulationView({ store, preSelectedEntryId, onClearPre
                     </div>
                   ) : (
                     <>
-                      {fifoLot && (
-                        <button onClick={() => handleLotSelect(fifoLot.entryId)} className="w-full p-2.5 rounded-lg bg-success/10 border border-success/30 text-left text-sm hover:bg-success/20 transition-all flex items-center gap-2">
+                      {suggestedLot && (
+                        <button onClick={() => handleLotSelect(suggestedLot.entryId)} className="w-full p-2.5 rounded-lg bg-success/10 border border-success/30 text-left text-sm hover:bg-success/20 transition-all flex items-center gap-2">
                           <Zap className="w-4 h-4 text-success shrink-0" />
                           <div className="flex-1">
-                            <span className="text-xs font-bold text-success">Usar FIFO (recomendado)</span>
-                            <p className="text-[10px] text-muted-foreground">{fifoLot.lot || 'Sem lote'} • {fifoLot.supplier} • {formatFixedBR(fifoLot.balanceKg, 1)} kg</p>
+                            <span className="text-xs font-bold text-success">
+                              {suggestedLot.expirationDate ? 'Usar o que vence primeiro (recomendado)' : 'Usar o lote mais antigo (recomendado)'}
+                            </span>
+                            <p className="text-[10px] text-muted-foreground">
+                              {suggestedLot.lot || 'Sem lote'} • {suggestedLot.supplier} • {formatFixedBR(suggestedLot.balanceKg, 1)} kg • {expirationLabel(suggestedLot)}
+                            </p>
                           </div>
                         </button>
                       )}
-                      {selectedIsNotFifo && (
+                      {selectedIsNotSuggested && (
                         <div className="flex items-center gap-2 p-2 rounded-lg bg-warning/10 border border-warning/20 text-[11px] text-warning">
-                          <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> Lote mais novo que o FIFO.
+                          <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> Existe outro lote que vence antes deste.
                         </div>
                       )}
                       <div className="space-y-1.5 max-h-52 overflow-y-auto">
@@ -349,14 +366,18 @@ export default function ManipulationView({ store, preSelectedEntryId, onClearPre
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
                                 <span className="font-semibold text-foreground">{lot.lot || 'Sem lote'}</span>
-                                {isFifo(lot.entryId) && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-success/15 text-success font-bold">FIFO</span>}
+                                {isSuggested(lot.entryId) && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-success/15 text-success font-bold">1º a sair</span>}
+                                {lot.expirationStatus === 'VENCIDO' && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-destructive/15 text-destructive font-bold">Vencido</span>}
+                                {lot.expirationStatus === 'VENCE_EM_BREVE' && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-warning/15 text-warning font-bold">{expirationLabel(lot)}</span>}
                                 {lot.isStale && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-destructive/15 text-destructive">Parado {lot.daysSinceMovement}d</span>}
                               </div>
                               <span className="text-xs font-bold text-primary">{formatFixedBR(lot.balanceKg, 1)} kg</span>
                             </div>
                             <div className="flex items-center gap-2 mt-1 text-[11px] text-muted-foreground">
                               <span>SIF: {lot.sif || '—'}</span><span>•</span><span>{lot.supplier || '—'}</span><span>•</span>
-                              <span>{formatDateBR(parseLocalDate(lot.entryDate))}</span><span>•</span>
+                              <span className={expirationTone(lot)}>
+                                {lot.expirationDate ? `Val. ${formatDateBR(parseLocalDate(lot.expirationDate))}` : `Ent. ${formatDateBR(parseLocalDate(lot.entryDate))}`}
+                              </span><span>•</span>
                               <span className="text-warning">{fmtBRL(lot.costPerKgBruto)}/kg</span>
                             </div>
                             {lot.avgYield !== undefined && <div className="text-[10px] text-warning mt-1">Rend. histórico: {formatPercentBR(lot.avgYield)}</div>}
@@ -378,7 +399,18 @@ export default function ManipulationView({ store, preSelectedEntryId, onClearPre
                         <span className="text-muted-foreground">Saldo:</span><span className="text-primary font-bold">{formatFixedBR(selectedLot.balanceKg, 1)} kg</span>
                         <span className="text-muted-foreground">Custo/kg:</span><span className="text-warning font-bold">{fmtBRL(selectedLot.costPerKgBruto)}</span>
                         <span className="text-muted-foreground">Entrada:</span><span className="text-foreground">{formatDateBR(parseLocalDate(selectedLot.entryDate))}</span>
+                        <span className="text-muted-foreground">Validade:</span>
+                        <span className={`font-medium ${expirationTone(selectedLot)}`}>
+                          {selectedLot.expirationDate
+                            ? `${formatDateBR(parseLocalDate(selectedLot.expirationDate))} (${expirationLabel(selectedLot)})`
+                            : 'Não informada'}
+                        </span>
                       </div>
+                      {selectedLot.expirationStatus === 'VENCIDO' && (
+                        <p className="text-[10px] text-destructive mt-1 flex items-center gap-1">
+                          <AlertTriangle className="w-3 h-3" /> Lote vencido — confirme com a chefia antes de manipular.
+                        </p>
+                      )}
                       {supplierHistory && (
                         <p className="text-[10px] text-warning mt-1">📊 Fornecedor: {formatPercentBR(supplierHistory.avgYield)} rendimento ({supplierHistory.count} manip.)</p>
                       )}
