@@ -24,9 +24,12 @@ for migration in \
   20260909193057_company_scope_legacy_consumers \
   20260909193257_company_membership_administration \
   20260909195048_company_scope_security_backstops \
-  20260909195238_company_scope_validation; do
+  20260909195238_company_scope_validation \
+  20260910003448_fix_membership_legacy_admin_delegation \
+  20260915120000_restore_admin_delegation_guard_pos_rbac_granular; do
   run_sql "supabase/migrations/$migration.sql"
 done
 run_sql supabase/tests/database/multiunit_security.sql
+run_sql supabase/tests/database/multiunit_admin_delegation.sql
 run_sql supabase/tests/database/multiunit_rollback.sql
 printf 'Security and rollback checks passed in local database %s.\n' "$test_database"

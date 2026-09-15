@@ -408,7 +408,24 @@ export default function CadastroBaseTree() {
   useDataEvent('financeiro:cadastros', load);
 
   const tree = buildTree(items);
-  const hasRegularCategories = items.some(item => item.system_key === null);
+  // Categorias de sistema (raízes NÃO OPERACIONAIS) têm filhos lazy-criados
+  // (Descontos Obtidos/Concedidos) com system_key NULL — contá-los como
+  // "categoria regular" bloqueava o Modelo Padrão mesmo sem nada cadastrado.
+  const systemSubtreeIds = new Set<string>();
+  for (const item of items) {
+    if (item.system_key !== null) systemSubtreeIds.add(item.id);
+  }
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const item of items) {
+      if (item.parent_id && systemSubtreeIds.has(item.parent_id) && !systemSubtreeIds.has(item.id)) {
+        systemSubtreeIds.add(item.id);
+        grew = true;
+      }
+    }
+  }
+  const hasRegularCategories = items.some(item => item.system_key === null && !systemSubtreeIds.has(item.id));
   const filteredTree = filterTree(tree, search);
   // Leaves currently visible/selectable — used to prune stale selection (search filter, background reload).
   const visibleLeafIds = new Set(collectLeafIds(filteredTree));

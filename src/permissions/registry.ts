@@ -393,6 +393,7 @@ export const MODULE_MANIFESTS: ModuleManifest[] = [
         { action: 'view', label: 'Ver' },
         { action: 'create', label: 'Criar' },
         { action: 'edit', label: 'Editar' },
+        { action: 'delete', label: 'Excluir' },
         { action: 'close', label: 'Fechar' },
       ]},
       { key: 'cadastros', label: 'Cadastros Base', actions: [
@@ -619,5 +620,10 @@ export const LEGACY_PERMISSION_MAP: Record<string, string[]> = {
   'finance:export': ['financeiro:lancamentos:export', 'financeiro:fluxo:export', 'financeiro:dre:export', 'financeiro:relatorio-socios:export', 'financeiro:pagar:export', 'financeiro:receber:export', 'financeiro:contas:export', 'financeiro:cadastros:export', 'financeiro:projecao:export', 'financeiro:kpis:export', 'financeiro:auditoria:export', 'financeiro:comparativo:export', 'financeiro:orcamento:export'],
   'users:manage': ['configuracoes:usuarios:view', 'configuracoes:usuarios:create', 'configuracoes:usuarios:edit', 'configuracoes:usuarios:delete', 'configuracoes:usuarios:manage'],
   'settings:manage': ['configuracoes:geral:view', 'configuracoes:geral:manage', 'configuracoes:integracoes:view', 'configuracoes:integracoes:manage', 'configuracoes:salmon:view', 'configuracoes:salmon:manage'],
-  'system:admin': ['system:global:manage', 'configuracoes:auditoria-sistema:view', 'configuracoes:performance:view', 'configuracoes:auditoria-seguranca:view', 'configuracoes:auditoria-compras:view'],
+  // NÃO expandir para 'system:global:manage': system:admin é chave legada de
+  // administração de módulo e está em role_permissions de admin/diretor/gerente_geral,
+  // então a expansão transformava todo admin de unidade em super-admin na UI
+  // (useCan('system:global:manage') = true → AdminPanel liberado) enquanto o banco
+  // continuava negando. Super-admin é concedido só por ALLOW direto em user_permissions.
+  'system:admin': ['configuracoes:auditoria-sistema:view', 'configuracoes:performance:view', 'configuracoes:auditoria-seguranca:view', 'configuracoes:auditoria-compras:view'],
 };
