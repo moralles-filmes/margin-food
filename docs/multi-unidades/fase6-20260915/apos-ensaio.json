@@ -1,0 +1,434 @@
+{
+  "database": "moralles_phase6_test_final",
+  "captured_at": "2026-09-15T20:47:01.164165-03:00",
+  "product_table": {
+    "acl": "{postgres=arwdDxtm/postgres,authenticated=arwd/postgres,service_role=arwdDxtm/postgres}",
+    "rls": true,
+    "force": true,
+    "owner": "postgres"
+  },
+  "product_triggers": [
+    [
+      "trg_aa_produtos_force_company_id",
+      "CREATE TRIGGER trg_aa_produtos_force_company_id BEFORE INSERT OR UPDATE ON public.produtos FOR EACH ROW EXECUTE FUNCTION produtos_force_company_id()",
+      "O"
+    ],
+    [
+      "trg_audit_produtos",
+      "CREATE TRIGGER trg_audit_produtos AFTER INSERT OR DELETE OR UPDATE ON public.produtos FOR EACH ROW EXECUTE FUNCTION audit_trigger_fn('estoque', 'produtos')",
+      "O"
+    ],
+    [
+      "trg_block_placeholder_company",
+      "CREATE TRIGGER trg_block_placeholder_company BEFORE INSERT OR UPDATE ON public.produtos FOR EACH ROW EXECUTE FUNCTION trg_block_placeholder_company()",
+      "O"
+    ]
+  ],
+  "product_indexes": [
+    "CREATE INDEX idx_produtos_ativo ON public.produtos USING btree (ativo)",
+    "CREATE INDEX idx_produtos_categoria ON public.produtos USING btree (categoria)",
+    "CREATE INDEX idx_produtos_company_id ON public.produtos USING btree (company_id)",
+    "CREATE INDEX idx_produtos_company_nome ON public.produtos USING btree (company_id, nome_produto)",
+    "CREATE INDEX idx_produtos_created_at ON public.produtos USING btree (created_at DESC)",
+    "CREATE INDEX idx_produtos_nome_unaccent_trgm ON public.produtos USING gin (nome_produto_unaccent gin_trgm_ops)",
+    "CREATE INDEX idx_produtos_sku_unaccent_trgm ON public.produtos USING gin (sku_unaccent gin_trgm_ops)",
+    "CREATE UNIQUE INDEX produtos_company_sku_unique ON public.produtos USING btree (company_id, sku) WHERE ((sku IS NOT NULL) AND (sku <> ''::text))",
+    "CREATE UNIQUE INDEX produtos_id_company_price_fk ON public.produtos USING btree (id, company_id)",
+    "CREATE UNIQUE INDEX produtos_one_active_salmon_raw ON public.produtos USING btree (company_id) WHERE (ativo AND is_salmon_raw_linked)",
+    "CREATE UNIQUE INDEX produtos_pkey ON public.produtos USING btree (id)"
+  ],
+  "product_constraints": [
+    [
+      "alertas_falta_estoque_produto_id_fkey",
+      "alertas_falta_estoque",
+      "FOREIGN KEY (produto_id) REFERENCES produtos(id)",
+      true
+    ],
+    [
+      "cotacao_itens_produto_id_fkey",
+      "cotacao_itens",
+      "FOREIGN KEY (produto_id) REFERENCES produtos(id) ON DELETE SET NULL",
+      true
+    ],
+    [
+      "ficha_componente_itens_produto_id_fkey",
+      "ficha_componente_itens",
+      "FOREIGN KEY (produto_id) REFERENCES produtos(id)",
+      true
+    ],
+    [
+      "fk_mov_produto",
+      "movimentacoes_estoque",
+      "FOREIGN KEY (produto_id) REFERENCES produtos(id) ON DELETE RESTRICT",
+      true
+    ],
+    [
+      "inventario_itens_produto_id_fkey",
+      "inventario_itens",
+      "FOREIGN KEY (produto_id) REFERENCES produtos(id)",
+      true
+    ],
+    [
+      "listas_fixas_setor_itens_produto_id_fkey",
+      "listas_fixas_setor_itens",
+      "FOREIGN KEY (produto_id) REFERENCES produtos(id)",
+      true
+    ],
+    [
+      "produtos_company_fk",
+      "produtos",
+      "FOREIGN KEY (company_id) REFERENCES companies(id)",
+      true
+    ],
+    [
+      "produtos_pkey",
+      "produtos",
+      "PRIMARY KEY (id)",
+      true
+    ],
+    [
+      "purchase_ignored_rules_produto_id_fkey",
+      "purchase_ignored_rules",
+      "FOREIGN KEY (produto_id) REFERENCES produtos(id) ON DELETE CASCADE",
+      true
+    ],
+    [
+      "purchase_order_items_stock_item_id_fkey",
+      "purchase_order_items",
+      "FOREIGN KEY (stock_item_id) REFERENCES produtos(id)",
+      true
+    ],
+    [
+      "purchase_requisition_items_produto_id_fkey",
+      "purchase_requisition_items",
+      "FOREIGN KEY (produto_id) REFERENCES produtos(id) ON DELETE SET NULL",
+      true
+    ],
+    [
+      "recebimento_itens_produto_id_fkey",
+      "recebimento_itens",
+      "FOREIGN KEY (produto_id) REFERENCES produtos(id)",
+      true
+    ],
+    [
+      "requisicao_estoque_itens_produto_id_fkey",
+      "requisicao_estoque_itens",
+      "FOREIGN KEY (produto_id) REFERENCES produtos(id)",
+      true
+    ],
+    [
+      "solic_compra_mercado_item_produto_id_fkey",
+      "solic_compra_mercado_item",
+      "FOREIGN KEY (produto_id) REFERENCES produtos(id)",
+      true
+    ],
+    [
+      "solicitacoes_compra_produto_id_fkey",
+      "solicitacoes_compra",
+      "FOREIGN KEY (produto_id) REFERENCES produtos(id)",
+      true
+    ],
+    [
+      "supplier_item_prices_stock_item_id_fkey",
+      "supplier_item_prices",
+      "FOREIGN KEY (stock_item_id) REFERENCES produtos(id)",
+      true
+    ],
+    [
+      "supplier_prices_product_tenant_fk",
+      "supplier_item_prices",
+      "FOREIGN KEY (stock_item_id, company_id) REFERENCES produtos(id, company_id)",
+      true
+    ]
+  ],
+  "policies": [
+    {
+      "cmd": "SELECT",
+      "qual": "can_receive_company_change(company_id, ARRAY['estoque:catalogo:view'::text, 'stock:read'::text, 'system:global:manage'::text])",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "produtos",
+      "permissive": "PERMISSIVE",
+      "policyname": "company_realtime_read",
+      "schemaname": "public",
+      "with_check": null
+    },
+    {
+      "cmd": "ALL",
+      "qual": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) OR (( SELECT (NULLIF(current_setting('request.headers'::text, true), ''::text) IS NULL)) AND is_company_member(( SELECT auth.uid() AS uid), company_id)))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "produtos",
+      "permissive": "RESTRICTIVE",
+      "policyname": "multiunit_scope_boundary",
+      "schemaname": "public",
+      "with_check": "(company_id = ( SELECT get_current_company_id() AS get_current_company_id))"
+    },
+    {
+      "cmd": "SELECT",
+      "qual": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND ( SELECT has_any_permission(auth.uid(), ARRAY['estoque:catalogo:create'::text, 'estoque:cadastros:create'::text, 'estoque:cadastros:manage'::text, 'stock:edit'::text, 'stock:write'::text, 'system:global:manage'::text, 'estoque:catalogo:edit'::text, 'estoque:cadastros:edit'::text, 'cmv:precos:edit'::text, 'estoque:catalogo:delete'::text, 'estoque:cadastros:delete'::text, 'stock:delete'::text]) AS has_any_permission))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "produtos",
+      "permissive": "PERMISSIVE",
+      "policyname": "produtos_action_read",
+      "schemaname": "public",
+      "with_check": null
+    },
+    {
+      "cmd": "DELETE",
+      "qual": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND ( SELECT has_any_permission(auth.uid(), ARRAY['stock:delete'::text, 'estoque:cadastros:delete'::text, 'estoque:cadastros:manage'::text, 'system:global:manage'::text]) AS has_any_permission))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "produtos",
+      "permissive": "PERMISSIVE",
+      "policyname": "produtos_delete",
+      "schemaname": "public",
+      "with_check": null
+    },
+    {
+      "cmd": "INSERT",
+      "qual": null,
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "produtos",
+      "permissive": "PERMISSIVE",
+      "policyname": "produtos_insert",
+      "schemaname": "public",
+      "with_check": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND ( SELECT has_any_permission(auth.uid(), ARRAY['estoque:catalogo:create'::text, 'estoque:cadastros:create'::text, 'estoque:cadastros:manage'::text, 'stock:edit'::text, 'stock:write'::text, 'system:global:manage'::text]) AS has_any_permission))"
+    },
+    {
+      "cmd": "SELECT",
+      "qual": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND ( SELECT has_any_permission(auth.uid(), ARRAY['stock:read'::text, 'estoque:geral:view'::text, 'estoque:cadastros:view'::text, 'estoque:catalogo:view'::text, 'estoque:saldo:view'::text, 'estoque:requisicoes:view'::text, 'estoque:requisicoes:create'::text, 'estoque:dashboard:view'::text, 'estoque:movimentacoes:view'::text, 'estoque:consumo:view'::text, 'estoque:ranking:view'::text, 'estoque:perdas:view'::text, 'estoque:transferencias:view'::text, 'estoque:preditivo:view'::text, 'estoque:simulador:view'::text, 'cmv:categoria:view'::text, 'cmv:top-itens:view'::text, 'cmv:setor:view'::text, 'cmv:semanal:view'::text, 'cmv:precos:view'::text, 'cmv:simulador:view'::text, 'system:global:manage'::text]) AS has_any_permission))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "produtos",
+      "permissive": "PERMISSIVE",
+      "policyname": "produtos_select",
+      "schemaname": "public",
+      "with_check": null
+    },
+    {
+      "cmd": "UPDATE",
+      "qual": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND ( SELECT has_any_permission(auth.uid(), ARRAY['estoque:catalogo:edit'::text, 'estoque:cadastros:edit'::text, 'estoque:cadastros:manage'::text, 'cmv:precos:edit'::text, 'stock:edit'::text, 'system:global:manage'::text]) AS has_any_permission))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "produtos",
+      "permissive": "PERMISSIVE",
+      "policyname": "produtos_update",
+      "schemaname": "public",
+      "with_check": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND ( SELECT has_any_permission(auth.uid(), ARRAY['estoque:catalogo:edit'::text, 'estoque:cadastros:edit'::text, 'estoque:cadastros:manage'::text, 'cmv:precos:edit'::text, 'stock:edit'::text, 'system:global:manage'::text]) AS has_any_permission))"
+    },
+    {
+      "cmd": "SELECT",
+      "qual": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND (( SELECT has_permission_quick(auth.uid(), 'stock:read'::text) AS has_permission_quick) OR ( SELECT has_permission_quick(auth.uid(), 'admin'::text) AS has_permission_quick)))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "produtos",
+      "permissive": "PERMISSIVE",
+      "policyname": "tenant_read",
+      "schemaname": "public",
+      "with_check": null
+    }
+  ],
+  "changedFunctions": [
+    {
+      "acl": "{postgres=X/postgres,authenticated=X/postgres}",
+      "md5": "944cc9966adbcf0e66035e568edf79c9",
+      "anon": false,
+      "name": "deactivate_produto",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "definer": true,
+      "service": false,
+      "signature": "deactivate_produto(uuid)",
+      "definition": "CREATE OR REPLACE FUNCTION public.deactivate_produto(p_produto_id uuid)\n RETURNS uuid\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE v_company uuid; v_active boolean;\nBEGIN\n v_company:=public.assert_tenant();\n IF auth.uid() IS NULL OR NOT public.has_any_permission(auth.uid(),ARRAY['estoque:catalogo:delete','estoque:cadastros:delete','estoque:cadastros:manage','stock:delete','system:global:manage']) THEN RAISE EXCEPTION 'PERMISSION_DENIED' USING ERRCODE='42501'; END IF;\n SELECT ativo INTO v_active FROM public.produtos WHERE id=p_produto_id AND company_id=v_company FOR UPDATE;\n IF NOT FOUND THEN RAISE EXCEPTION 'PRODUCT_NOT_FOUND' USING ERRCODE='42501'; END IF;\n IF v_active THEN UPDATE public.produtos SET ativo=false WHERE id=p_produto_id AND company_id=v_company; END IF;\n RETURN p_produto_id;\nEND $function$\n",
+      "authenticated": true
+    },
+    {
+      "acl": "{postgres=X/postgres,authenticated=X/postgres}",
+      "md5": "e7af7e17722277a2492141771a20b6fe",
+      "anon": false,
+      "name": "generate_next_sku",
+      "owner": "postgres",
+      "config": [
+        "search_path=public"
+      ],
+      "definer": true,
+      "service": false,
+      "signature": "generate_next_sku(text)",
+      "definition": "CREATE OR REPLACE FUNCTION public.generate_next_sku(p_prefix text DEFAULT 'MP'::text)\n RETURNS text\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\nDECLARE\n  v_company_id uuid;\n  v_next bigint;\n  v_pad integer;\n  v_candidate text;\n  v_attempts integer := 0;\n  v_max_attempts integer := 1000;\nBEGIN\n  v_company_id := public.assert_tenant();\n  -- Salmão cria seu produto internamente; mantém caller/corpo/lock da Fase 4.\n  IF auth.uid() IS NULL OR NOT (public.has_any_permission(auth.uid(),ARRAY['estoque:catalogo:create','estoque:cadastros:create','estoque:cadastros:manage','stock:edit','stock:write','system:global:manage']) OR (p_prefix='SALM' AND public.has_any_permission(auth.uid(),ARRAY['salmon:entradas:create','salmon:entries:create','salmon:write','system:global:manage']))) THEN RAISE EXCEPTION 'PERMISSION_DENIED' USING ERRCODE='42501'; END IF;\n  IF p_prefix IS NULL OR length(p_prefix) NOT BETWEEN 1 AND 32 THEN RAISE EXCEPTION 'INVALID_SKU_PREFIX' USING ERRCODE='22023'; END IF;\n\n  INSERT INTO public.stock_sku_counter (company_id, prefix, next_value, pad_length, updated_at)\n  VALUES (v_company_id, p_prefix, 0, 4, now())\n  ON CONFLICT (company_id, prefix) DO NOTHING;\n\n  LOOP\n    v_attempts := v_attempts + 1;\n    IF v_attempts > v_max_attempts THEN\n      RAISE EXCEPTION\n        'generate_next_sku: nao foi possivel gerar SKU unico apos % tentativas (company=%, prefix=%)',\n        v_max_attempts, v_company_id, p_prefix;\n    END IF;\n\n    UPDATE public.stock_sku_counter\n       SET next_value = next_value + 1,\n           updated_at = now()\n     WHERE company_id = v_company_id\n       AND prefix = p_prefix\n    RETURNING next_value, pad_length INTO v_next, v_pad;\n\n    v_candidate := p_prefix || '-' || lpad(v_next::text, GREATEST(COALESCE(v_pad, 4), 1), '0');\n\n    IF NOT EXISTS (\n      SELECT 1\n      FROM public.produtos\n      WHERE company_id = v_company_id\n        AND sku = v_candidate\n    ) THEN\n      RETURN v_candidate;\n    END IF;\n  END LOOP;\nEND;\n$function$\n",
+      "authenticated": true
+    },
+    {
+      "acl": "{postgres=X/postgres}",
+      "md5": "8292a48327d2f9e39620cf58912523e8",
+      "anon": false,
+      "name": "produtos_force_company_id",
+      "owner": "postgres",
+      "config": [
+        "search_path=\"\""
+      ],
+      "definer": false,
+      "service": false,
+      "signature": "produtos_force_company_id()",
+      "definition": "CREATE OR REPLACE FUNCTION public.produtos_force_company_id()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO ''\nAS $function$\nDECLARE v_company uuid;\nBEGIN\n IF TG_OP='INSERT' THEN\n  v_company:=public.assert_tenant();\n  IF NEW.company_id IS DISTINCT FROM v_company THEN RAISE EXCEPTION 'PRODUCT_COMPANY_MISMATCH' USING ERRCODE='42501'; END IF;\n ELSIF TG_OP='UPDATE' THEN\n  IF NEW.company_id IS DISTINCT FROM OLD.company_id THEN RAISE EXCEPTION 'PRODUCT_COMPANY_IMMUTABLE' USING ERRCODE='42501'; END IF;\n  IF current_user='authenticated' AND NEW.ativo IS DISTINCT FROM OLD.ativo AND NEW.ativo IS NOT TRUE THEN\n   RAISE EXCEPTION 'USE_DEACTIVATE_PRODUTO' USING ERRCODE='42501';\n  END IF;\n END IF;\n RETURN NEW;\nEND $function$\n",
+      "authenticated": false
+    },
+    {
+      "acl": "{postgres=X/postgres}",
+      "md5": "567e550b359c25dafc83771d6e4f1b03",
+      "anon": false,
+      "name": "recalc_product_costs",
+      "owner": "postgres",
+      "config": [
+        "search_path=public"
+      ],
+      "definer": true,
+      "service": false,
+      "signature": "recalc_product_costs(uuid)",
+      "definition": "CREATE OR REPLACE FUNCTION public.recalc_product_costs(p_produto_id uuid)\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\nDECLARE\n  v_last RECORD;\n  v_avg30 RECORD;\nBEGIN\n  SELECT m.custo_unitario, m.data, \n         CASE \n           WHEN m.reference_type = 'SALMON_ENTRY' THEN (SELECT supplier_name FROM salmon_entries WHERE id = m.reference_id::uuid AND status = 'ACTIVE' LIMIT 1)\n           WHEN m.reference_type = 'PURCHASE_ORDER_ITEM' THEN (\n             SELECT po.supplier_name FROM purchase_orders po\n             JOIN purchase_order_items poi ON poi.order_id = po.id\n             WHERE 'POI:' || poi.id::text = m.reference_id AND poi.deleted_at IS NULL\n             LIMIT 1\n           )\n           ELSE NULL\n         END as supplier_name\n  INTO v_last\n  FROM movimentacoes_estoque m\n  WHERE m.produto_id = p_produto_id\n    AND m.status = 'ATIVO'\n    AND m.cancelado_em IS NULL\n    AND m.direction = 'IN'\n    AND m.tipo = 'ENTRADA'\n    AND m.custo_unitario > 0\n  ORDER BY m.data DESC, m.created_at DESC\n  LIMIT 1;\n\n  SELECT \n    COALESCE(AVG(m.custo_unitario), 0) as avg_cost,\n    COUNT(*) as cnt\n  INTO v_avg30\n  FROM movimentacoes_estoque m\n  WHERE m.produto_id = p_produto_id\n    AND m.status = 'ATIVO'\n    AND m.cancelado_em IS NULL\n    AND m.direction = 'IN'\n    AND m.tipo = 'ENTRADA'\n    AND m.custo_unitario > 0\n    AND m.data >= (CURRENT_DATE - interval '30 days')::date;\n\n  UPDATE produtos SET\n    last_cost_base_unit = COALESCE(v_last.custo_unitario, 0),\n    last_cost_purchase_unit = COALESCE(v_last.custo_unitario, 0),\n    last_purchase_date = CASE WHEN v_last.data IS NOT NULL THEN v_last.data::text ELSE NULL END,\n    last_supplier = v_last.supplier_name,\n    custo_ultima_compra = COALESCE(v_last.custo_unitario, 0),\n    avg30_cost_base_unit = CASE WHEN v_avg30.cnt > 0 THEN ROUND(v_avg30.avg_cost::numeric, 4) ELSE 0 END,\n    avg30_cost_purchase_unit = CASE WHEN v_avg30.cnt > 0 THEN ROUND(v_avg30.avg_cost::numeric, 4) ELSE 0 END,\n    custo_medio_30d = CASE WHEN v_avg30.cnt > 0 THEN ROUND(v_avg30.avg_cost::numeric, 4) ELSE 0 END,\n    avg30_variation_percent = CASE \n      WHEN v_avg30.cnt > 0 AND COALESCE(v_last.custo_unitario, 0) > 0 \n      THEN ROUND(((v_avg30.avg_cost - v_last.custo_unitario) / v_last.custo_unitario * 100)::numeric, 2)\n      ELSE 0 \n    END\n  WHERE id = p_produto_id;\nEND;\n$function$\n",
+      "authenticated": false
+    }
+  ],
+  "stockReadFunctions": [
+    {
+      "signature": "fn_recompute_product_saldo(uuid,uuid)",
+      "md5": "1e2d099b3ae7a6f746162c3ef55a7a71",
+      "unchanged": true
+    },
+    {
+      "signature": "get_relatorios_kpis(date,date)",
+      "md5": "4c1c6a7e2095ad0afb86e2a56566f605",
+      "unchanged": true
+    },
+    {
+      "signature": "get_relatorios_kpis(text,text)",
+      "md5": "c106b5573ea94176651a3a2afca2da5d",
+      "unchanged": true
+    },
+    {
+      "signature": "get_stock_dashboard(integer)",
+      "md5": "d2dd42ac4f445cec81a604a997808f8e",
+      "unchanged": true
+    },
+    {
+      "signature": "get_stock_predictive_analysis_v2(text,uuid,integer,boolean,boolean)",
+      "md5": "141c76c4c973257fd7e181bf55d72120",
+      "unchanged": true
+    },
+    {
+      "signature": "get_stock_summary()",
+      "md5": "f37bd25e3a70c6f7ca89f45cbcdc4f5e",
+      "unchanged": true
+    }
+  ],
+  "salmonFunctions": [
+    {
+      "signature": "_salmon_cancel_entry_guarded(uuid,text)",
+      "md5": "045b38d1eda8ffc5de48fe22ee6811c7",
+      "acl": "{postgres=X/postgres,authenticated=X/postgres}",
+      "unchanged": true
+    },
+    {
+      "signature": "_salmon_cancel_manipulation_guarded(uuid,text)",
+      "md5": "0c0f9dc74c32a18a834f214818a1397a",
+      "acl": "{postgres=X/postgres,authenticated=X/postgres}",
+      "unchanged": true
+    },
+    {
+      "signature": "_salmon_create_entry_guarded(text,text,text,text,integer,integer,numeric,numeric,text,text)",
+      "md5": "883b6917b7dac65b2e3f4308057c04d1",
+      "acl": "{postgres=X/postgres,authenticated=X/postgres}",
+      "unchanged": true
+    },
+    {
+      "signature": "_salmon_create_manipulation_guarded(uuid,text,integer,numeric,numeric,numeric,text)",
+      "md5": "837161e7a9949b5491dfcecb64537bc3",
+      "acl": "{postgres=X/postgres,authenticated=X/postgres}",
+      "unchanged": true
+    },
+    {
+      "signature": "_salmon_dashboard_guarded(text,text)",
+      "md5": "46cc87e4198bd9a46fd787f36f916fa1",
+      "acl": "{postgres=X/postgres,authenticated=X/postgres}",
+      "unchanged": true
+    },
+    {
+      "signature": "cancel_salmon_entry_atomic(uuid,text)",
+      "md5": "c0c99b604995995ebe3ad2cea18d08bd",
+      "acl": "{postgres=X/postgres}",
+      "unchanged": true
+    },
+    {
+      "signature": "cancel_salmon_manipulation_atomic(uuid,text)",
+      "md5": "f3d7429102b5238297156e5b02c69407",
+      "acl": "{postgres=X/postgres}",
+      "unchanged": true
+    },
+    {
+      "signature": "create_salmon_entry_atomic(date,text,text,text,integer,integer,numeric,numeric,text,date)",
+      "md5": "62a5133da10830bf03db8386c22c3db3",
+      "acl": "{postgres=X/postgres}",
+      "unchanged": true
+    },
+    {
+      "signature": "create_salmon_manipulation_atomic(uuid,date,integer,numeric,numeric,numeric,text)",
+      "md5": "cc97629d6b24bd0d9c5a671fb9c1c01f",
+      "acl": "{postgres=X/postgres}",
+      "unchanged": true
+    },
+    {
+      "signature": "ensure_salmon_raw_product()",
+      "md5": "8226da5a523b0965590318410796570f",
+      "acl": "{postgres=X/postgres}",
+      "unchanged": true
+    },
+    {
+      "signature": "get_salmon_dashboard_summary(date,date)",
+      "md5": "bc1e7723566cbeef8fb1e231b2cbed80",
+      "acl": "{postgres=X/postgres}",
+      "unchanged": true
+    },
+    {
+      "signature": "get_salmon_inventory_adjustment_kg()",
+      "md5": "be809426fbdb462daac9e8bffca7b50d",
+      "acl": "{postgres=X/postgres,authenticated=X/postgres}",
+      "unchanged": true
+    },
+    {
+      "signature": "get_salmon_reconciliation_kpis()",
+      "md5": "dc150f0b70de3327b18036c1bdda979a",
+      "acl": "{postgres=X/postgres,authenticated=X/postgres}",
+      "unchanged": true
+    },
+    {
+      "signature": "upsert_salmon_leftover_atomic(date,numeric,text)",
+      "md5": "f761757bc82d5f8646b57ee0b8aabb30",
+      "acl": "{postgres=X/postgres,authenticated=X/postgres}",
+      "unchanged": true
+    },
+    {
+      "signature": "validate_salmon_entry()",
+      "md5": "556ec046d4477d301fcc80e2235f091b",
+      "acl": "{postgres=X/postgres}",
+      "unchanged": true
+    },
+    {
+      "signature": "validate_salmon_manipulation()",
+      "md5": "00eda507d2eb6461a3937df6dea790e7",
+      "acl": "{postgres=X/postgres}",
+      "unchanged": true
+    }
+  ]
+}

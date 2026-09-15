@@ -1,0 +1,45 @@
+{
+  "database": "moralles_phase6_test_final",
+  "template": "moralles_phase5_test_phase6_current",
+  "postgres": "17.10",
+  "host": "127.0.0.1:15440",
+  "phase6_sql_assertions": 80,
+  "regression_assertions": {
+    "phase3": 175,
+    "phase4": 146,
+    "phase5": 67
+  },
+  "phase6_drift_refusals": 13,
+  "prior_drift_regressions": {
+    "phase4": 8,
+    "phase5": 10
+  },
+  "concurrency_and_containment": {
+    "phase6": 12,
+    "phase4": 15,
+    "phase5": 13
+  },
+  "unit": {
+    "passed": 776,
+    "files": 98
+  },
+  "lint": {
+    "errors": 0,
+    "warnings": 1355
+  },
+  "typescript": [
+    "app PASS",
+    "node PASS"
+  ],
+  "build": "PASS",
+  "rbac": "PASS; 0 blockers; 2 important",
+  "security_check": "static PASS; SQL skipped because service configuration absent",
+  "deno": "No Edge changed",
+  "http_gateway_tested": false,
+  "authenticated_browser_tested": false,
+  "production_writes": 0,
+  "code_commit": "05d71e2",
+  "tests_commit": "f22b65b",
+  "migration_sha256": "e6557452c9c809e4320fae08412f5beeb426f8a5c7ab5f18a155044b35a8dc49",
+  "inventory_deterministic": true
+}

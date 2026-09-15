@@ -1,0 +1,1938 @@
+{
+  "local": "moralles_phase5_test_committed",
+  "live": "2026-09-15T23:27:40.069027+00:00",
+  "functions": [
+    {
+      "signature": "_fin_bordero_payload(uuid,date,date)",
+      "live": "fde3f6966e02e68546002d30e720e86d",
+      "local": "fde3f6966e02e68546002d30e720e86d",
+      "equal": true
+    },
+    {
+      "signature": "_fin_dfc_effective_allocations(uuid,date,date)",
+      "live": "415e8c5bbd57f9d1c18548a538ec4119",
+      "local": "415e8c5bbd57f9d1c18548a538ec4119",
+      "equal": true
+    },
+    {
+      "signature": "_guarded_add_presentation_decision_revision(uuid,text,jsonb,text,text,timestamp with time zone)",
+      "live": "e9bac99fbc42925391650fbd33971317",
+      "local": "e9bac99fbc42925391650fbd33971317",
+      "equal": true
+    },
+    {
+      "signature": "_guarded_aprovar_conta_pagar(uuid,timestamp with time zone)",
+      "live": "fecd92b959247d7db8580432dc200067",
+      "local": "fecd92b959247d7db8580432dc200067",
+      "equal": true
+    },
+    {
+      "signature": "_guarded_bulk_upsert_orcamento(text,jsonb)",
+      "live": "a2d27549d0a1fc2cf93deaf65ad5d5ba",
+      "local": "a2d27549d0a1fc2cf93deaf65ad5d5ba",
+      "equal": true
+    },
+    {
+      "signature": "_guarded_create_conta_pagar(text,numeric,text,uuid,date,date,uuid,uuid,uuid,text,text,jsonb,jsonb)",
+      "live": "fe69330a99b5ef40bec875aa27a57ec0",
+      "local": "fe69330a99b5ef40bec875aa27a57ec0",
+      "equal": true
+    },
+    {
+      "signature": "_guarded_create_conta_receber(text,text,numeric,date,date,uuid,uuid,uuid,text,text,jsonb,jsonb,uuid)",
+      "live": "ac4928ba28130533ab3534cce054c2d0",
+      "local": "ac4928ba28130533ab3534cce054c2d0",
+      "equal": true
+    },
+    {
+      "signature": "_guarded_create_presentation_decision_action(uuid,text,uuid,text,timestamp with time zone,date,text)",
+      "live": "c4b153e5633ba6c0c64d4990bbe20442",
+      "local": "c4b153e5633ba6c0c64d4990bbe20442",
+      "equal": true
+    },
+    {
+      "signature": "_guarded_create_presentation_decision(text,text,date,date,text,text,jsonb,uuid)",
+      "live": "36f5ba42e73cde1f143c12ba4ca0e2a1",
+      "local": "36f5ba42e73cde1f143c12ba4ca0e2a1",
+      "equal": true
+    },
+    {
+      "signature": "_guarded_create_presentation_session(text,text,date,date,text,date,uuid,uuid[],uuid,jsonb)",
+      "live": "38ad18689c2124f4f756bbeb9e53dc65",
+      "local": "38ad18689c2124f4f756bbeb9e53dc65",
+      "equal": true
+    },
+    {
+      "signature": "_guarded_delete_categoria(uuid)",
+      "live": "159cdce81ea1a4aebf9a482d320f2e1f",
+      "local": "159cdce81ea1a4aebf9a482d320f2e1f",
+      "equal": true
+    },
+    {
+      "signature": "_guarded_delete_centro_custo(uuid)",
+      "live": "bb48bf3354219466bcb7d9134022bb74",
+      "local": "bb48bf3354219466bcb7d9134022bb74",
+      "equal": true
+    },
+    {
+      "signature": "_guarded_delete_conta_pagar(uuid,timestamp with time zone)",
+      "live": "e8e86a8d90a67508d058f31b0cac330e",
+      "local": "e8e86a8d90a67508d058f31b0cac330e",
+      "equal": true
+    },
+    {
+      "signature": "_guarded_delete_conta_receber(uuid,timestamp with time zone)",
+      "live": "a743fb9bcd2d5b05f53e933a4ab761ac",
+      "local": "a743fb9bcd2d5b05f53e933a4ab761ac",
+      "equal": true
+    },
+    {
+      "signature": "_guarded_delete_conta(uuid)",
+      "live": "f6417e8c81790052cadcb92067963e4b",
+      "local": "f6417e8c81790052cadcb92067963e4b",
+      "equal": true
+    },
+    {
+      "signature": "_guarded_delete_lancamento(uuid,timestamp with time zone)",
+      "live": "3566bf0fbeb7534c197c5befa1f05fe0",
+      "local": "3566bf0fbeb7534c197c5befa1f05fe0",
+      "equal": true
+    },
+    {
+      "signature": "_guarded_delete_orcamento(uuid,timestamp with time zone)",
+      "live": "f10f1a615c795420dfdd2c6f8dd49eb4",
+      "local": "f10f1a615c795420dfdd2c6f8dd49eb4",
+      "equal": true
+    },
+    {
+      "signature": "_guarded_delete_plano_contas(uuid)",
+      "live": "a59dbe31a41605521f394a6574d23047",
+      "local": "a59dbe31a41605521f394a6574d23047",
+      "equal": true
+    },
+    {
+      "signature": "_guarded_estornar_conta_pagar(uuid,text)",
+      "live": "b20da8d8b69f6644d47c08e49711e3c4",
+      "local": "b20da8d8b69f6644d47c08e49711e3c4",
+      "equal": true
+    },
+    {
+      "signature": "_guarded_estornar_conta_receber(uuid,text)",
+      "live": "a3eb3a116a7a45c767b3f970fdb6a5e0",
+      "local": "a3eb3a116a7a45c767b3f970fdb6a5e0",
+      "equal": true
+    },
+    {
+      "signature": "_guarded_list_fin_audit_logs(text,text,text,integer,timestamp with time zone,uuid,integer)",
+      "live": "f25c4d8650f6f2486f2e9d6dda9661fd",
+      "local": "585f3910864ff6bff2b991b99837501e",
+      "equal": false
+    },
+    {
+      "signature": "_guarded_list_recorrencias(timestamp with time zone,uuid,integer,text)",
+      "live": "fe05cc8f47e1f02660def9b21ead576b",
+      "local": "fe05cc8f47e1f02660def9b21ead576b",
+      "equal": true
+    },
+    {
+      "signature": "_guarded_save_presentation_session(uuid,text,text,date,uuid,uuid[],uuid,jsonb,text,timestamp with time zone)",
+      "live": "da470bd7d79b3993796473b507e10d3c",
+      "local": "da470bd7d79b3993796473b507e10d3c",
+      "equal": true
+    },
+    {
+      "signature": "_guarded_start_presentation_session(uuid,jsonb,text,timestamp with time zone)",
+      "live": "c6f3114de446efb5318d3e5dc111dc79",
+      "local": "c6f3114de446efb5318d3e5dc111dc79",
+      "equal": true
+    },
+    {
+      "signature": "_guarded_submit_presentation_minutes(uuid,text,text,timestamp with time zone)",
+      "live": "609154e2b17accf3e5a86a7e52457036",
+      "local": "609154e2b17accf3e5a86a7e52457036",
+      "equal": true
+    },
+    {
+      "signature": "_guarded_transition_presentation_decision_action(uuid,text,text,text,timestamp with time zone)",
+      "live": "1efe5859a5b20306a72e4124d552eb0e",
+      "local": "1efe5859a5b20306a72e4124d552eb0e",
+      "equal": true
+    },
+    {
+      "signature": "_guarded_transition_presentation_decision(uuid,text,text,text,timestamp with time zone)",
+      "live": "ee88920698bae7d48e349322f25eef3b",
+      "local": "ee88920698bae7d48e349322f25eef3b",
+      "equal": true
+    },
+    {
+      "signature": "_guarded_transition_presentation_session(uuid,text,text,text,timestamp with time zone)",
+      "live": "a0ed9a437f69ea04e39ae3b29e2f0b27",
+      "local": "a0ed9a437f69ea04e39ae3b29e2f0b27",
+      "equal": true
+    },
+    {
+      "signature": "_guarded_update_categoria(uuid,text,text,text,text,uuid,timestamp with time zone)",
+      "live": "e47a693e2206d8deb55d046770b3294b",
+      "local": "e47a693e2206d8deb55d046770b3294b",
+      "equal": true
+    },
+    {
+      "signature": "_guarded_update_centro_custo(uuid,text,text,timestamp with time zone)",
+      "live": "6c4b68f90e4195c31c8bacdb64f92d8a",
+      "local": "6c4b68f90e4195c31c8bacdb64f92d8a",
+      "equal": true
+    },
+    {
+      "signature": "_guarded_update_conta_pagar(uuid,text,numeric,text,uuid,date,date,uuid,uuid,uuid,text,text,jsonb,jsonb,timestamp with time zone)",
+      "live": "20077f93e748a02ae7571120997de8ce",
+      "local": "20077f93e748a02ae7571120997de8ce",
+      "equal": true
+    },
+    {
+      "signature": "_guarded_update_conta_receber(uuid,text,text,numeric,date,date,uuid,uuid,uuid,text,text,jsonb,jsonb,uuid,timestamp with time zone)",
+      "live": "6dfd3a1ee692628dbc359f2eca01f839",
+      "local": "6dfd3a1ee692628dbc359f2eca01f839",
+      "equal": true
+    },
+    {
+      "signature": "_guarded_update_conta(uuid,text,text,text,text,text,numeric,timestamp with time zone)",
+      "live": "70c36cd98e58fa8fa346e4ad14619b49",
+      "local": "70c36cd98e58fa8fa346e4ad14619b49",
+      "equal": true
+    },
+    {
+      "signature": "_guarded_update_plano_contas(uuid,text,text,text,text,text,timestamp with time zone)",
+      "live": "ca16a7422ee1c0a8fe37ccb19a64e3af",
+      "local": "ca16a7422ee1c0a8fe37ccb19a64e3af",
+      "equal": true
+    },
+    {
+      "signature": "_guarded_update_presentation_decision_action(uuid,text,uuid,date,text,text,timestamp with time zone)",
+      "live": "41db611f6f10a4752a959cd19a640ff0",
+      "local": "41db611f6f10a4752a959cd19a640ff0",
+      "equal": true
+    },
+    {
+      "signature": "_guarded_update_presentation_decision_draft(uuid,text,text,uuid,timestamp with time zone)",
+      "live": "38354e6ec1a1143b2efffb91ace90420",
+      "local": "38354e6ec1a1143b2efffb91ace90420",
+      "equal": true
+    },
+    {
+      "signature": "_guarded_update_reconciled_classification(uuid,uuid,uuid,text,jsonb,timestamp with time zone,text)",
+      "live": "8e4ca971dc17c1488c4463f1aa14c2da",
+      "local": "8e4ca971dc17c1488c4463f1aa14c2da",
+      "equal": true
+    },
+    {
+      "signature": "_guarded_upsert_lancamento(uuid,text,text,numeric,uuid,uuid,uuid,date,date,date,text,text,text,text,boolean,jsonb,jsonb,timestamp with time zone,text)",
+      "live": "d39cf69b0036aa5c8b09ad562e8fc7ce",
+      "local": "d39cf69b0036aa5c8b09ad562e8fc7ce",
+      "equal": true
+    },
+    {
+      "signature": "_guarded_upsert_orcamento(uuid,text,numeric,timestamp with time zone)",
+      "live": "1c2e2d3981f78ff85ff8e89a06d07dbd",
+      "local": "1c2e2d3981f78ff85ff8e89a06d07dbd",
+      "equal": true
+    },
+    {
+      "signature": "_planning_delete_meta_guarded(uuid)",
+      "live": "a66c6f1ebd30f72118e64f71aeb2ef85",
+      "local": "a66c6f1ebd30f72118e64f71aeb2ef85",
+      "equal": true
+    },
+    {
+      "signature": "_planning_spend_summary_guarded(integer,integer,text,text)",
+      "live": "476a3d480ddf8bc1b72489ab207104ce",
+      "local": "476a3d480ddf8bc1b72489ab207104ce",
+      "equal": true
+    },
+    {
+      "signature": "_planning_spend_summary_inner(uuid,integer,integer,text,text)",
+      "live": "60f3df4510560a80f9c757e1bb78c6ad",
+      "local": "60f3df4510560a80f9c757e1bb78c6ad",
+      "equal": true
+    },
+    {
+      "signature": "_planning_upsert_meta_guarded(integer,integer,text,numeric,numeric,numeric)",
+      "live": "900f7f1babdec4b985ceef8c805bfe74",
+      "local": "900f7f1babdec4b985ceef8c805bfe74",
+      "equal": true
+    },
+    {
+      "signature": "_relatorios_compras_guarded(text,text)",
+      "live": "a236b183faa3992e2f1f87957311d427",
+      "local": "a236b183faa3992e2f1f87957311d427",
+      "equal": true
+    },
+    {
+      "signature": "_relatorios_kpis_guarded(text,text)",
+      "live": "03a4de928f183605cfbbe94a749f0dc1",
+      "local": "03a4de928f183605cfbbe94a749f0dc1",
+      "equal": true
+    },
+    {
+      "signature": "_relatorios_score_guarded(text,text)",
+      "live": "c9c5e45e48e082d011d470ec54e204be",
+      "local": "c9c5e45e48e082d011d470ec54e204be",
+      "equal": true
+    },
+    {
+      "signature": "_relatorios_tendencia_guarded(text,text)",
+      "live": "df99903e20e9ccc50d411261938ee097",
+      "local": "df99903e20e9ccc50d411261938ee097",
+      "equal": true
+    },
+    {
+      "signature": "_replace_fin_presentation_session_content(uuid,uuid,uuid,text,uuid[],jsonb)",
+      "live": "a30c16aa24597ceb91e480ca52183c4b",
+      "local": "a30c16aa24597ceb91e480ca52183c4b",
+      "equal": true
+    },
+    {
+      "signature": "_salmon_cancel_entry_guarded(uuid,text)",
+      "live": "0c12273e1b367bcd5cb9bc561bdecd5b",
+      "local": "045b38d1eda8ffc5de48fe22ee6811c7",
+      "equal": false
+    },
+    {
+      "signature": "_salmon_cancel_manipulation_guarded(uuid,text)",
+      "live": "71a4b90f8bd0bc465bba847bab710ade",
+      "local": "0c0f9dc74c32a18a834f214818a1397a",
+      "equal": false
+    },
+    {
+      "signature": "_salmon_create_entry_guarded(text,text,text,text,integer,integer,numeric,numeric,text,text)",
+      "live": "9a9c6a84d4b6920e8f7c655edfa537aa",
+      "local": "883b6917b7dac65b2e3f4308057c04d1",
+      "equal": false
+    },
+    {
+      "signature": "_salmon_create_manipulation_guarded(uuid,text,integer,numeric,numeric,numeric,text)",
+      "live": "ada0ccfb00c35163e19c8e3593238cf8",
+      "local": "837161e7a9949b5491dfcecb64537bc3",
+      "equal": false
+    },
+    {
+      "signature": "_salmon_dashboard_guarded(text,text)",
+      "live": "46cc87e4198bd9a46fd787f36f916fa1",
+      "local": "46cc87e4198bd9a46fd787f36f916fa1",
+      "equal": true
+    },
+    {
+      "signature": "_simulate_relatorios_guarded(text,text,jsonb)",
+      "live": "706743368e161f3754aa2e75e22b99eb",
+      "local": "706743368e161f3754aa2e75e22b99eb",
+      "equal": true
+    },
+    {
+      "signature": "_validate_fin_presentation_decision_snapshot(jsonb,date,date,text,text)",
+      "live": "91e1ae4b27f73abc9dcbfebc819c7f9c",
+      "local": "91e1ae4b27f73abc9dcbfebc819c7f9c",
+      "equal": true
+    },
+    {
+      "signature": "_validate_fin_presentation_meeting_snapshot(jsonb,uuid,date,date,text)",
+      "live": "b28217e8948904d08f6c0ea3ab33f9ef",
+      "local": "b28217e8948904d08f6c0ea3ab33f9ef",
+      "equal": true
+    },
+    {
+      "signature": "admin_checkup_suite()",
+      "live": "59dd6ba1978f7a54b368811c9cd12910",
+      "local": "59dd6ba1978f7a54b368811c9cd12910",
+      "equal": true
+    },
+    {
+      "signature": "admin_has_permission(uuid,text)",
+      "live": "3fa25cef36350f868e0a6e5691a9986d",
+      "local": "3fa25cef36350f868e0a6e5691a9986d",
+      "equal": true
+    },
+    {
+      "signature": "admin_health_counts()",
+      "live": "cb1bf9e86003e0286fa7894e7d43bfa9",
+      "local": "cb1bf9e86003e0286fa7894e7d43bfa9",
+      "equal": true
+    },
+    {
+      "signature": "admin_list_users()",
+      "live": "95e874889013abffeb7426e14aa3580b",
+      "local": "95e874889013abffeb7426e14aa3580b",
+      "equal": true
+    },
+    {
+      "signature": "admin_set_super_admin(uuid,boolean,text,text)",
+      "live": "5ffd0359143156ffd40187f2df07cc4a",
+      "local": "5ffd0359143156ffd40187f2df07cc4a",
+      "equal": true
+    },
+    {
+      "signature": "admin_upsert_company_membership(uuid,uuid,uuid,app_role,text[],text,uuid,text,boolean)",
+      "live": "353ed3cb9f163776b94a8ef322845915",
+      "local": "353ed3cb9f163776b94a8ef322845915",
+      "equal": true
+    },
+    {
+      "signature": "aplicar_regras_categorizacao()",
+      "live": "09460fc6f3071ee11cebb13a29349ed7",
+      "local": "09460fc6f3071ee11cebb13a29349ed7",
+      "equal": true
+    },
+    {
+      "signature": "aprovar_ferias(uuid,uuid)",
+      "live": "cc921267a0d38e524db4e623341881b2",
+      "local": "cc921267a0d38e524db4e623341881b2",
+      "equal": true
+    },
+    {
+      "signature": "assert_requisicao_estoque_movement_consistency()",
+      "live": "b472edc24fdc843d4f9b3cd0df5d5692",
+      "local": "b472edc24fdc843d4f9b3cd0df5d5692",
+      "equal": true
+    },
+    {
+      "signature": "assert_tenant()",
+      "live": "749e660df028d5848d78bcaa1ca6b75d",
+      "local": "749e660df028d5848d78bcaa1ca6b75d",
+      "equal": true
+    },
+    {
+      "signature": "attend_requisicao_item_atomic(uuid,uuid,numeric)",
+      "live": "0a254b542f113ed0705e36243f34cb83",
+      "local": "0a254b542f113ed0705e36243f34cb83",
+      "equal": true
+    },
+    {
+      "signature": "audit_log_write(text,text,text,text,jsonb,jsonb,jsonb,text)",
+      "live": "f2c3a9bd7c29b8488eaa82d64d5fba3f",
+      "local": "5334eb25e4e4e9ee62c75e3bf1c54c01",
+      "equal": false
+    },
+    {
+      "signature": "audit_trigger_fn()",
+      "live": "7050f2c7eaebfc670d7ff12476e1d71b",
+      "local": "2c8e96a4f8e6d8afb6e06cced6656b7e",
+      "equal": false
+    },
+    {
+      "signature": "batch_reorder_fin_categorias(jsonb)",
+      "live": "a85d0a48b349fc2d0844823fbd6ab320",
+      "local": "a85d0a48b349fc2d0844823fbd6ab320",
+      "equal": true
+    },
+    {
+      "signature": "block_categoria_pai_vinculada_a_marca()",
+      "live": "727ef10af2118b564e80f0c70fa95d46",
+      "local": "727ef10af2118b564e80f0c70fa95d46",
+      "equal": true
+    },
+    {
+      "signature": "can_access_company_document(text,text)",
+      "live": "c9ad5b642ab6215407a42149df4a77a4",
+      "local": "c9ad5b642ab6215407a42149df4a77a4",
+      "equal": true
+    },
+    {
+      "signature": "can_receive_company_change(uuid,text[])",
+      "live": "efa637048fd9d678f3d427e0dbf97995",
+      "local": "efa637048fd9d678f3d427e0dbf97995",
+      "equal": true
+    },
+    {
+      "signature": "cancel_salmon_entry_atomic(uuid,text)",
+      "live": "75b37ebb797f45d8924e206d4ae1eaa8",
+      "local": "c0c99b604995995ebe3ad2cea18d08bd",
+      "equal": false
+    },
+    {
+      "signature": "cancel_salmon_manipulation_atomic(uuid,text)",
+      "live": "552d4b9896921dce796328c2beaf5e08",
+      "local": "f3d7429102b5238297156e5b02c69407",
+      "equal": false
+    },
+    {
+      "signature": "cleanup_old_audit_logs(integer)",
+      "live": "6675cad966ebc41b38198dd29052f002",
+      "local": "57971aba4dd2ce311147b2c442b0ad53",
+      "equal": false
+    },
+    {
+      "signature": "comparativo_periodos(text,text)",
+      "live": "e16aad8a248e6649ccd477572c3365f1",
+      "local": "e16aad8a248e6649ccd477572c3365f1",
+      "equal": true
+    },
+    {
+      "signature": "compute_requisicao_status_agregado(uuid)",
+      "live": "0e10d7a34dcd49104b32554d233008f9",
+      "local": "0e10d7a34dcd49104b32554d233008f9",
+      "equal": true
+    },
+    {
+      "signature": "contar_lancamentos_sem_categoria()",
+      "live": "7c8450d492c55b93c96650e7645dc061",
+      "local": "7c8450d492c55b93c96650e7645dc061",
+      "equal": true
+    },
+    {
+      "signature": "copiar_orcamento_mes(text,text)",
+      "live": "b29d48e10615226410dfa9cd834c443c",
+      "local": "b29d48e10615226410dfa9cd834c443c",
+      "equal": true
+    },
+    {
+      "signature": "cotacao_force_company_id()",
+      "live": "90721d88bc1f276e12e7aba6582c7427",
+      "local": "90721d88bc1f276e12e7aba6582c7427",
+      "equal": true
+    },
+    {
+      "signature": "count_requisicoes_with_pending_items()",
+      "live": "71251a90c519a961dc9e1cfcf1991f5b",
+      "local": "71251a90c519a961dc9e1cfcf1991f5b",
+      "equal": true
+    },
+    {
+      "signature": "create_cotacao_atomic(text,text,date,text,uuid,jsonb,jsonb)",
+      "live": "c2f2e028b29308a9cf694487d83ff5a8",
+      "local": "c2f2e028b29308a9cf694487d83ff5a8",
+      "equal": true
+    },
+    {
+      "signature": "create_inventory_atomic(text,date,text,uuid,text[],text,text)",
+      "live": "bb6597b5e7b1929eed98a3f8f6a8e309",
+      "local": "bb6597b5e7b1929eed98a3f8f6a8e309",
+      "equal": true
+    },
+    {
+      "signature": "create_purchase_order_atomic(jsonb,uuid)",
+      "live": "b93addea8a750814736e1a1690c11ab5",
+      "local": "b93addea8a750814736e1a1690c11ab5",
+      "equal": true
+    },
+    {
+      "signature": "create_purchase_orders_from_cotacao_atomic(uuid,timestamp with time zone)",
+      "live": "7a783cc28dd7f67627a881ee6a55068c",
+      "local": "7a783cc28dd7f67627a881ee6a55068c",
+      "equal": true
+    },
+    {
+      "signature": "create_quick_inventory_atomic(jsonb,text,text)",
+      "live": "6fddbb29af31218709522eaaf7a6b5a5",
+      "local": "1c6fe17d690943a36020fc89bc3d3754",
+      "equal": false
+    },
+    {
+      "signature": "create_salmon_entry_atomic(date,text,text,text,integer,integer,numeric,numeric,text,date)",
+      "live": "1b4ea77aedd68b928f83b4b0f21a16bd",
+      "local": "62a5133da10830bf03db8386c22c3db3",
+      "equal": false
+    },
+    {
+      "signature": "create_salmon_manipulation_atomic(uuid,date,integer,numeric,numeric,numeric,text)",
+      "live": "cc97629d6b24bd0d9c5a671fb9c1c01f",
+      "local": "cc97629d6b24bd0d9c5a671fb9c1c01f",
+      "equal": true
+    },
+    {
+      "signature": "create_transfer(uuid,uuid,numeric,date,text,uuid)",
+      "live": "5e17e4e96fd79fcf08d0f53c5b9b7269",
+      "local": "5e17e4e96fd79fcf08d0f53c5b9b7269",
+      "equal": true
+    },
+    {
+      "signature": "debug_company_inventory()",
+      "live": "530ad6660a4133486e3c76d3596e3d17",
+      "local": "530ad6660a4133486e3c76d3596e3d17",
+      "equal": true
+    },
+    {
+      "signature": "debug_stock_last_movements(integer)",
+      "live": "aa7de5d059b88f7bed1c1f86cc85e9c7",
+      "local": "aa7de5d059b88f7bed1c1f86cc85e9c7",
+      "equal": true
+    },
+    {
+      "signature": "debug_tenant()",
+      "live": "abbc0da28271e539280dd2208929fa13",
+      "local": "abbc0da28271e539280dd2208929fa13",
+      "equal": true
+    },
+    {
+      "signature": "delete_transfer(uuid)",
+      "live": "84cb5dcfe4a9347ceaca4f4146dfefb6",
+      "local": "84cb5dcfe4a9347ceaca4f4146dfefb6",
+      "equal": true
+    },
+    {
+      "signature": "edit_purchase_order_atomic(uuid,jsonb)",
+      "live": "01f845d1f73fa9f8ee9fba51c830a8a1",
+      "local": "01f845d1f73fa9f8ee9fba51c830a8a1",
+      "equal": true
+    },
+    {
+      "signature": "ensure_salmon_raw_product()",
+      "live": "69331eb6003fa0b0af91ad858f31f1d2",
+      "local": "8226da5a523b0965590318410796570f",
+      "equal": false
+    },
+    {
+      "signature": "ficha_salvar_componente_itens_atomic(uuid,jsonb)",
+      "live": "a0ebf725819019c0d5d0747a732d6342",
+      "local": "a0ebf725819019c0d5d0747a732d6342",
+      "equal": true
+    },
+    {
+      "signature": "fin_audit_integrity_check()",
+      "live": "e59f91afba890131c8752b9211ddb360",
+      "local": "e59f91afba890131c8752b9211ddb360",
+      "equal": true
+    },
+    {
+      "signature": "fin_block_contamax_ledger_entry()",
+      "live": "66fe2d75e4a3c5da5eabfee79eadd5c1",
+      "local": "66fe2d75e4a3c5da5eabfee79eadd5c1",
+      "equal": true
+    },
+    {
+      "signature": "fin_categoria_fora_do_resultado(uuid,uuid)",
+      "live": "a88b795dfe2b9792cec84553b6bd7cca",
+      "local": "a88b795dfe2b9792cec84553b6bd7cca",
+      "equal": true
+    },
+    {
+      "signature": "fin_category_is_excluded(uuid,uuid)",
+      "live": "da570623c93e2e3ae11365b85a04e799",
+      "local": "da570623c93e2e3ae11365b85a04e799",
+      "equal": true
+    },
+    {
+      "signature": "fin_ensure_non_operational_categories(uuid)",
+      "live": "673d00e02de36210ea7c78d6f07eda89",
+      "local": "673d00e02de36210ea7c78d6f07eda89",
+      "equal": true
+    },
+    {
+      "signature": "fin_entity_has_category(uuid,uuid,uuid)",
+      "live": "a03e5b0304cffdc787dc0157061931e9",
+      "local": "a03e5b0304cffdc787dc0157061931e9",
+      "equal": true
+    },
+    {
+      "signature": "fin_get_categoria_desconto_baixa(uuid)",
+      "live": "f6663a1f5b07dd4021d22769e45a87ac",
+      "local": "f6663a1f5b07dd4021d22769e45a87ac",
+      "equal": true
+    },
+    {
+      "signature": "fin_get_categoria_desconto_concedido(uuid)",
+      "live": "f8d59cabb5f2c73d6067afae47ed6ffd",
+      "local": "f8d59cabb5f2c73d6067afae47ed6ffd",
+      "equal": true
+    },
+    {
+      "signature": "fin_get_limite_aprovacao_atual()",
+      "live": "1e82055372159f1239eb2bf1f5eed10f",
+      "local": "1e82055372159f1239eb2bf1f5eed10f",
+      "equal": true
+    },
+    {
+      "signature": "fin_get_limite_aprovacao(uuid)",
+      "live": "5f7bdf9ef7fb6dd4aa24101e5f09b57f",
+      "local": "5f7bdf9ef7fb6dd4aa24101e5f09b57f",
+      "equal": true
+    },
+    {
+      "signature": "fin_prepare_category_reporting_class()",
+      "live": "b80c0639687967d9e42844b0b8f34c7f",
+      "local": "b80c0639687967d9e42844b0b8f34c7f",
+      "equal": true
+    },
+    {
+      "signature": "fin_preserve_materialized_recurrence()",
+      "live": "343fc2c43eb8972a49d90bee400e9458",
+      "local": "343fc2c43eb8972a49d90bee400e9458",
+      "equal": true
+    },
+    {
+      "signature": "fin_protect_system_category()",
+      "live": "95b0d7c93bfaa1f101c528a6bdedecb3",
+      "local": "95b0d7c93bfaa1f101c528a6bdedecb3",
+      "equal": true
+    },
+    {
+      "signature": "fin_recompute_entity_report_exclusion(uuid,uuid)",
+      "live": "68efee32a857307de4ee76515531b1b6",
+      "local": "68efee32a857307de4ee76515531b1b6",
+      "equal": true
+    },
+    {
+      "signature": "fin_recorrencia_config_valida(jsonb)",
+      "live": "ba858d95d090e7e2fec29303a09d4845",
+      "local": "ba858d95d090e7e2fec29303a09d4845",
+      "equal": true
+    },
+    {
+      "signature": "fin_set_entity_report_exclusion()",
+      "live": "71465123fdb923dfe4d41c014de1f402",
+      "local": "71465123fdb923dfe4d41c014de1f402",
+      "equal": true
+    },
+    {
+      "signature": "fin_set_limite_aprovacao(numeric)",
+      "live": "872a1e95cd4e66a99e8e95cc81ed4cca",
+      "local": "872a1e95cd4e66a99e8e95cc81ed4cca",
+      "equal": true
+    },
+    {
+      "signature": "fin_validate_orcamento_scope()",
+      "live": "6a2674fd3524a1043dba8e1799a876d7",
+      "local": "6a2674fd3524a1043dba8e1799a876d7",
+      "equal": true
+    },
+    {
+      "signature": "fin_validate_recorrencia_config(jsonb)",
+      "live": "5b54668998306c6fea8010b3c79f15f1",
+      "local": "5b54668998306c6fea8010b3c79f15f1",
+      "equal": true
+    },
+    {
+      "signature": "finalize_inventory_atomic(uuid,text)",
+      "live": "9910efed51cbc89a3e3afa57da095fae",
+      "local": "9910efed51cbc89a3e3afa57da095fae",
+      "equal": true
+    },
+    {
+      "signature": "find_auth_user_by_email(text)",
+      "live": "6fe47187abeff4bfff8432905f7e4edd",
+      "local": "6fe47187abeff4bfff8432905f7e4edd",
+      "equal": true
+    },
+    {
+      "signature": "fn_recompute_product_saldo(uuid,uuid)",
+      "live": "1e2d099b3ae7a6f746162c3ef55a7a71",
+      "local": "1e2d099b3ae7a6f746162c3ef55a7a71",
+      "equal": true
+    },
+    {
+      "signature": "fn_update_product_stock()",
+      "live": "9b2ae02b990ea48366eacc08056b19e4",
+      "local": "9b2ae02b990ea48366eacc08056b19e4",
+      "equal": true
+    },
+    {
+      "signature": "generate_next_sku(text)",
+      "live": "5c0fba787bd586068c6d8ffc2d3035bf",
+      "local": "5c0fba787bd586068c6d8ffc2d3035bf",
+      "equal": true
+    },
+    {
+      "signature": "generate_requisition_code()",
+      "live": "560596d8ad4a59c51c1421f079e2615e",
+      "local": "560596d8ad4a59c51c1421f079e2615e",
+      "equal": true
+    },
+    {
+      "signature": "gerar_parcela_recorrente(uuid)",
+      "live": "0180f7b3661e4352f5e5539304dc3ae3",
+      "local": "0180f7b3661e4352f5e5539304dc3ae3",
+      "equal": true
+    },
+    {
+      "signature": "get_all_saldos_contas()",
+      "live": "c6f64775068599839132ae42a75865ed",
+      "local": "c6f64775068599839132ae42a75865ed",
+      "equal": true
+    },
+    {
+      "signature": "get_beneficios_masked(uuid)",
+      "live": "cfbad7ad42af7900978cdcdd47404428",
+      "local": "cfbad7ad42af7900978cdcdd47404428",
+      "equal": true
+    },
+    {
+      "signature": "get_catalog_counts()",
+      "live": "84630fcc172b14aa5499a7077c66626f",
+      "local": "84630fcc172b14aa5499a7077c66626f",
+      "equal": true
+    },
+    {
+      "signature": "get_company_permissions(uuid,uuid)",
+      "live": "3d525d50884f5330721625ce2db97c0b",
+      "local": "3d525d50884f5330721625ce2db97c0b",
+      "equal": true
+    },
+    {
+      "signature": "get_consumo_por_produto(uuid,date,text[],uuid[])",
+      "live": "a8f0c7e4a2d8941fd4541552986c3322",
+      "local": "a8f0c7e4a2d8941fd4541552986c3322",
+      "equal": true
+    },
+    {
+      "signature": "get_cotacao_ia_config()",
+      "live": "7d3c1c972da1f3c34cce991a6621b1dd",
+      "local": "7d3c1c972da1f3c34cce991a6621b1dd",
+      "equal": true
+    },
+    {
+      "signature": "get_cotacao_zapi_config()",
+      "live": "196b61411e3ffc7022009459255470a4",
+      "local": "196b61411e3ffc7022009459255470a4",
+      "equal": true
+    },
+    {
+      "signature": "get_current_company_id_strict()",
+      "live": "ed653b8b9fc10348da2fcc0c0fc89b30",
+      "local": "ed653b8b9fc10348da2fcc0c0fc89b30",
+      "equal": true
+    },
+    {
+      "signature": "get_current_company_id()",
+      "live": "a5e5953a3980f3cf00479ae0f66ed90f",
+      "local": "a5e5953a3980f3cf00479ae0f66ed90f",
+      "equal": true
+    },
+    {
+      "signature": "get_effective_permissions(uuid)",
+      "live": "51bfee6d3f51f2e2469a51ebba878254",
+      "local": "51bfee6d3f51f2e2469a51ebba878254",
+      "equal": true
+    },
+    {
+      "signature": "get_fin_alertas()",
+      "live": "3f599ded9b07f7b184141d7643eeae31",
+      "local": "3f599ded9b07f7b184141d7643eeae31",
+      "equal": true
+    },
+    {
+      "signature": "get_fin_bordero(date,date)",
+      "live": "b5bf55a3a7b46ca8c1b40c5a41d66efb",
+      "local": "b5bf55a3a7b46ca8c1b40c5a41d66efb",
+      "equal": true
+    },
+    {
+      "signature": "get_fin_cashflow(date,date)",
+      "live": "214c4d0e728a9b3baa01ce7d760cb38a",
+      "local": "214c4d0e728a9b3baa01ce7d760cb38a",
+      "equal": true
+    },
+    {
+      "signature": "get_fin_counts_by_status(date,date)",
+      "live": "eed07f96311fc7ed59f72fab57fb8c45",
+      "local": "eed07f96311fc7ed59f72fab57fb8c45",
+      "equal": true
+    },
+    {
+      "signature": "get_fin_dashboard_charts(date,date)",
+      "live": "3276d35365038be4430c72e3ffaf1000",
+      "local": "3276d35365038be4430c72e3ffaf1000",
+      "equal": true
+    },
+    {
+      "signature": "get_fin_dashboard_summary(date,date)",
+      "live": "948a167d0e1c1f7602c9111934bc5064",
+      "local": "948a167d0e1c1f7602c9111934bc5064",
+      "equal": true
+    },
+    {
+      "signature": "get_fin_dfc_summary(date,date)",
+      "live": "5d9c6bdb408b62e7814923a4f37185b3",
+      "local": "5d9c6bdb408b62e7814923a4f37185b3",
+      "equal": true
+    },
+    {
+      "signature": "get_fin_dre_summary(date,date)",
+      "live": "3f27ae9e6194a699076dd2847a4f7957",
+      "local": "3f27ae9e6194a699076dd2847a4f7957",
+      "equal": true
+    },
+    {
+      "signature": "get_fin_fluxo_projecao(integer,numeric)",
+      "live": "9109abd609aab3b99c573e3410d133e3",
+      "local": "9109abd609aab3b99c573e3410d133e3",
+      "equal": true
+    },
+    {
+      "signature": "get_fin_kpis(date,date)",
+      "live": "664387d3b1d568071b174f002783ba23",
+      "local": "664387d3b1d568071b174f002783ba23",
+      "equal": true
+    },
+    {
+      "signature": "get_fin_kpis(integer)",
+      "live": "92238a9ace1329ee611ed97d510778b2",
+      "local": "92238a9ace1329ee611ed97d510778b2",
+      "equal": true
+    },
+    {
+      "signature": "get_fin_lancamentos_totais(date,date,text,uuid,text,uuid,boolean)",
+      "live": "5e277952caf96ea0d46d83b7e699a015",
+      "local": "5e277952caf96ea0d46d83b7e699a015",
+      "equal": true
+    },
+    {
+      "signature": "get_fin_orcamento_arvore(text)",
+      "live": "188ec83efacf6da8534fe21b9343a974",
+      "local": "188ec83efacf6da8534fe21b9343a974",
+      "equal": true
+    },
+    {
+      "signature": "get_fin_presentation_category_metadata()",
+      "live": "2abfacdd232762bbdc2dc6ffbc762350",
+      "local": "2abfacdd232762bbdc2dc6ffbc762350",
+      "equal": true
+    },
+    {
+      "signature": "get_fin_presentation_decision(uuid)",
+      "live": "7ab61d41da7c7430905d2a43416cb2f2",
+      "local": "7ab61d41da7c7430905d2a43416cb2f2",
+      "equal": true
+    },
+    {
+      "signature": "get_fin_presentation_detail_rows(date,date,text,text,uuid,text,integer,integer)",
+      "live": "a87ea8e1089fdcc7601a59a954521a8e",
+      "local": "a87ea8e1089fdcc7601a59a954521a8e",
+      "equal": true
+    },
+    {
+      "signature": "get_fin_presentation_detail_series(date,date,text,text,uuid,text)",
+      "live": "31573595e0f98f7ab0ea17d1d1a3b446",
+      "local": "31573595e0f98f7ab0ea17d1d1a3b446",
+      "equal": true
+    },
+    {
+      "signature": "get_fin_presentation_expense_details(text,uuid,jsonb,integer)",
+      "live": "00b4135e8a282ba6fb845be03c4df01b",
+      "local": "00b4135e8a282ba6fb845be03c4df01b",
+      "equal": true
+    },
+    {
+      "signature": "get_fin_presentation_expenses(text,integer[])",
+      "live": "6b13ef4e428317e9d3ce3bcabebb1083",
+      "local": "6b13ef4e428317e9d3ce3bcabebb1083",
+      "equal": true
+    },
+    {
+      "signature": "get_fin_presentation_minutes_export(uuid)",
+      "live": "1e69dcc235cc6952b268483deffae0c6",
+      "local": "1e69dcc235cc6952b268483deffae0c6",
+      "equal": true
+    },
+    {
+      "signature": "get_fin_presentation_plan(date,date,text,text,text,uuid,integer,integer)",
+      "live": "02550da5610f75fcc778ea47ef09663b",
+      "local": "02550da5610f75fcc778ea47ef09663b",
+      "equal": true
+    },
+    {
+      "signature": "get_fin_presentation_revenue(text,integer[])",
+      "live": "0f0d33e6edc7ae3f0acb13bfe6e15848",
+      "local": "0f0d33e6edc7ae3f0acb13bfe6e15848",
+      "equal": true
+    },
+    {
+      "signature": "get_fin_presentation_session(uuid)",
+      "live": "52131adb07921e15a0e07bd2d81ccdde",
+      "local": "52131adb07921e15a0e07bd2d81ccdde",
+      "equal": true
+    },
+    {
+      "signature": "get_fin_presentation_socios(date,date,date,date,date,date,text,integer)",
+      "live": "9ef37bc5633a2278c21328b62220849e",
+      "local": "9ef37bc5633a2278c21328b62220849e",
+      "equal": true
+    },
+    {
+      "signature": "get_fin_saldo_atual(uuid,date)",
+      "live": "051dac1afd188899e1fea13d3efaced8",
+      "local": "051dac1afd188899e1fea13d3efaced8",
+      "equal": true
+    },
+    {
+      "signature": "get_fin_saldo_conta_em(uuid,date)",
+      "live": "5ee001b6b7829ff3199ab8c493f28996",
+      "local": "5ee001b6b7829ff3199ab8c493f28996",
+      "equal": true
+    },
+    {
+      "signature": "get_inactive_stock_items()",
+      "live": "7460f912e47f4c5194d4e5dd55e5ba58",
+      "local": "7460f912e47f4c5194d4e5dd55e5ba58",
+      "equal": true
+    },
+    {
+      "signature": "get_movimentacoes_kpis(uuid,text,date,date,boolean)",
+      "live": "a3624f5bf19985f171b514eb8c9be14e",
+      "local": "a3624f5bf19985f171b514eb8c9be14e",
+      "equal": true
+    },
+    {
+      "signature": "get_my_company_context()",
+      "live": "b72d64cebde74504429b9acd3352eb79",
+      "local": "b72d64cebde74504429b9acd3352eb79",
+      "equal": true
+    },
+    {
+      "signature": "get_or_set_cache(text,integer)",
+      "live": "5c7a4f72996ee96bafbbbd943b87c88e",
+      "local": "5c7a4f72996ee96bafbbbd943b87c88e",
+      "equal": true
+    },
+    {
+      "signature": "get_relatorios_compras(date,date)",
+      "live": "e393ea7557a7db7cc555356f8d4ec402",
+      "local": "e393ea7557a7db7cc555356f8d4ec402",
+      "equal": true
+    },
+    {
+      "signature": "get_relatorios_compras(text,text)",
+      "live": "ec04b7063749edd85b108a3f579a85d2",
+      "local": "ec04b7063749edd85b108a3f579a85d2",
+      "equal": true
+    },
+    {
+      "signature": "get_relatorios_kpis(date,date)",
+      "live": "4c1c6a7e2095ad0afb86e2a56566f605",
+      "local": "4c1c6a7e2095ad0afb86e2a56566f605",
+      "equal": true
+    },
+    {
+      "signature": "get_relatorios_kpis(text,text)",
+      "live": "c106b5573ea94176651a3a2afca2da5d",
+      "local": "c106b5573ea94176651a3a2afca2da5d",
+      "equal": true
+    },
+    {
+      "signature": "get_relatorios_score(date,date)",
+      "live": "310c494442e33f499c3dc55394414af9",
+      "local": "310c494442e33f499c3dc55394414af9",
+      "equal": true
+    },
+    {
+      "signature": "get_relatorios_score(text,text)",
+      "live": "a09e281e07094942e78b24bfabd558fe",
+      "local": "a09e281e07094942e78b24bfabd558fe",
+      "equal": true
+    },
+    {
+      "signature": "get_relatorios_tendencia(date,date)",
+      "live": "11056f95e933acae2a42f390ba6951c5",
+      "local": "11056f95e933acae2a42f390ba6951c5",
+      "equal": true
+    },
+    {
+      "signature": "get_relatorios_tendencia(text,text)",
+      "live": "cd2a85dde5a24418fbec8b48cffe2307",
+      "local": "cd2a85dde5a24418fbec8b48cffe2307",
+      "equal": true
+    },
+    {
+      "signature": "get_report_item_detail(uuid,date,date)",
+      "live": "87279c2b17e67eb516142fd8d456628e",
+      "local": "87279c2b17e67eb516142fd8d456628e",
+      "equal": true
+    },
+    {
+      "signature": "get_report_items_summary(date,date)",
+      "live": "a6b56019942bcef2d98afdffb340a419",
+      "local": "a6b56019942bcef2d98afdffb340a419",
+      "equal": true
+    },
+    {
+      "signature": "get_rh_beneficios_total()",
+      "live": "dd907ec136ad561ea35bcdd0bdc35817",
+      "local": "dd907ec136ad561ea35bcdd0bdc35817",
+      "equal": true
+    },
+    {
+      "signature": "get_saldo_conta(uuid)",
+      "live": "8af960ebb4b1ad76a1ddbf1cd84a45a9",
+      "local": "8af960ebb4b1ad76a1ddbf1cd84a45a9",
+      "equal": true
+    },
+    {
+      "signature": "get_saldo_produto(uuid)",
+      "live": "1df9e419d06f54452e9ab78030a6ea5c",
+      "local": "1df9e419d06f54452e9ab78030a6ea5c",
+      "equal": true
+    },
+    {
+      "signature": "get_saldo_produtos(uuid[])",
+      "live": "79c2ba6ea9b1030db7927135f8001da3",
+      "local": "79c2ba6ea9b1030db7927135f8001da3",
+      "equal": true
+    },
+    {
+      "signature": "get_salmon_dashboard_summary(date,date)",
+      "live": "bc1e7723566cbeef8fb1e231b2cbed80",
+      "local": "bc1e7723566cbeef8fb1e231b2cbed80",
+      "equal": true
+    },
+    {
+      "signature": "get_salmon_inventory_adjustment_kg()",
+      "live": "be809426fbdb462daac9e8bffca7b50d",
+      "local": "be809426fbdb462daac9e8bffca7b50d",
+      "equal": true
+    },
+    {
+      "signature": "get_salmon_reconciliation_kpis()",
+      "live": "dc150f0b70de3327b18036c1bdda979a",
+      "local": "dc150f0b70de3327b18036c1bdda979a",
+      "equal": true
+    },
+    {
+      "signature": "get_spend_by_sector(date,date,boolean)",
+      "live": "1bad08007419d0225a8bd915fefd9fda",
+      "local": "1bad08007419d0225a8bd915fefd9fda",
+      "equal": true
+    },
+    {
+      "signature": "get_stock_consumption_history(date,date,text,uuid,text)",
+      "live": "d1992f315fbb4b3cf17876f9893940f2",
+      "local": "d1992f315fbb4b3cf17876f9893940f2",
+      "equal": true
+    },
+    {
+      "signature": "get_stock_dashboard(integer)",
+      "live": "d2dd42ac4f445cec81a604a997808f8e",
+      "local": "d2dd42ac4f445cec81a604a997808f8e",
+      "equal": true
+    },
+    {
+      "signature": "get_stock_losses_report(date,date,text,uuid,text,text,text)",
+      "live": "00d7ed3117c468d07d1ea4ac54599e4e",
+      "local": "00d7ed3117c468d07d1ea4ac54599e4e",
+      "equal": true
+    },
+    {
+      "signature": "get_stock_predictive_analysis_v2(text,uuid,integer,boolean,boolean)",
+      "live": "141c76c4c973257fd7e181bf55d72120",
+      "local": "141c76c4c973257fd7e181bf55d72120",
+      "equal": true
+    },
+    {
+      "signature": "get_stock_predictive_analysis(text,uuid,integer,integer,boolean)",
+      "live": "6a024687b56a75a5192a7a5f6a11eaa0",
+      "local": "6a024687b56a75a5192a7a5f6a11eaa0",
+      "equal": true
+    },
+    {
+      "signature": "get_stock_summary()",
+      "live": "f37bd25e3a70c6f7ca89f45cbcdc4f5e",
+      "local": "f37bd25e3a70c6f7ca89f45cbcdc4f5e",
+      "equal": true
+    },
+    {
+      "signature": "get_stock_top_consumed(date,date,text,integer,text)",
+      "live": "19f734caa816e1d20ee8803d1847da38",
+      "local": "19f734caa816e1d20ee8803d1847da38",
+      "equal": true
+    },
+    {
+      "signature": "get_supplier_ranking(uuid,text,integer,integer,text)",
+      "live": "b6cecd23c7303fd4bf3e1ab6f3857f92",
+      "local": "b6cecd23c7303fd4bf3e1ab6f3857f92",
+      "equal": true
+    },
+    {
+      "signature": "handle_first_admin()",
+      "live": "a7993d7d01db461da9d08767bb06baff",
+      "local": "a7993d7d01db461da9d08767bb06baff",
+      "equal": true
+    },
+    {
+      "signature": "handle_new_user()",
+      "live": "8824142c9fc88fa476de0073df520a1c",
+      "local": "8824142c9fc88fa476de0073df520a1c",
+      "equal": true
+    },
+    {
+      "signature": "has_any_permission(uuid,text[])",
+      "live": "339332a1bbd079c914ea377c93974dc1",
+      "local": "339332a1bbd079c914ea377c93974dc1",
+      "equal": true
+    },
+    {
+      "signature": "has_compras_view(uuid)",
+      "live": "660a1208f0f1ccd7b749c5f9e9d88d86",
+      "local": "660a1208f0f1ccd7b749c5f9e9d88d86",
+      "equal": true
+    },
+    {
+      "signature": "has_permission_quick(uuid,text)",
+      "live": "b1d1a621e0f177f6160ee0e0df97829b",
+      "local": "b1d1a621e0f177f6160ee0e0df97829b",
+      "equal": true
+    },
+    {
+      "signature": "has_permission(text)",
+      "live": "0e016b55669c0a24f661f86e00424cfd",
+      "local": "0e016b55669c0a24f661f86e00424cfd",
+      "equal": true
+    },
+    {
+      "signature": "has_permission(uuid,text)",
+      "live": "e2cd02acb98d4bfb7f381d91c6020cc4",
+      "local": "e2cd02acb98d4bfb7f381d91c6020cc4",
+      "equal": true
+    },
+    {
+      "signature": "has_role(uuid,app_role)",
+      "live": "7c270e176323672f0bef11e7e85726e5",
+      "local": "7c270e176323672f0bef11e7e85726e5",
+      "equal": true
+    },
+    {
+      "signature": "immutable_unaccent(text)",
+      "live": "e6cb61f7a5b63a6f696dce1f75fe3a15",
+      "local": "e6cb61f7a5b63a6f696dce1f75fe3a15",
+      "equal": true
+    },
+    {
+      "signature": "is_company_member(uuid,uuid)",
+      "live": "4e351f8c65051fd3da9c94977b8be830",
+      "local": "4e351f8c65051fd3da9c94977b8be830",
+      "equal": true
+    },
+    {
+      "signature": "list_companies()",
+      "live": "bd2071c2534a9aec4f6aba719594ae08",
+      "local": "bd2071c2534a9aec4f6aba719594ae08",
+      "equal": true
+    },
+    {
+      "signature": "list_fin_contas_pagar_abertas(text,numeric,date,integer)",
+      "live": "d9bb9d8766f0ca6eee4a3c8ebad08f32",
+      "local": "d9bb9d8766f0ca6eee4a3c8ebad08f32",
+      "equal": true
+    },
+    {
+      "signature": "list_fin_contas_pagar_cursor(text,text,text,integer,date,uuid,date,date,uuid,uuid,boolean)",
+      "live": "1798b6981e81ac454d006fdf64c69662",
+      "local": "1798b6981e81ac454d006fdf64c69662",
+      "equal": true
+    },
+    {
+      "signature": "list_fin_contas_receber_cursor(text,text,text,integer,date,uuid,date,date,uuid,uuid,boolean)",
+      "live": "02ce55c1da12ed7043f1631a8642a8f1",
+      "local": "02ce55c1da12ed7043f1631a8642a8f1",
+      "equal": true
+    },
+    {
+      "signature": "list_fin_lancamentos_cursor(date,date,text,text,uuid,text,integer,date,uuid,text,uuid,boolean)",
+      "live": "35af5bb5b31f60e825831ff8c790cb3d",
+      "local": "35af5bb5b31f60e825831ff8c790cb3d",
+      "equal": true
+    },
+    {
+      "signature": "list_fin_lancamentos_cursor(date,date,text,text,uuid,text,integer,date,uuid)",
+      "live": "65bdb728f7511c38ee06e506ee0951bf",
+      "local": "65bdb728f7511c38ee06e506ee0951bf",
+      "equal": true
+    },
+    {
+      "signature": "list_fin_presentation_decisions(date,date,text,uuid,text,text,integer,integer)",
+      "live": "97b18c472ae57ce661647aa489767002",
+      "local": "97b18c472ae57ce661647aa489767002",
+      "equal": true
+    },
+    {
+      "signature": "list_fin_presentation_sessions(date,date,text,uuid,uuid,text,integer,integer)",
+      "live": "c6864b7e309694af3cf3aefb2a0b8011",
+      "local": "c6864b7e309694af3cf3aefb2a0b8011",
+      "equal": true
+    },
+    {
+      "signature": "list_movimentacoes_cursor(text,uuid,text,text,date,date,boolean,timestamp with time zone,uuid,integer)",
+      "live": "ef93cbd481c120212e1a3a831bdbe04a",
+      "local": "ef93cbd481c120212e1a3a831bdbe04a",
+      "equal": true
+    },
+    {
+      "signature": "list_my_companies()",
+      "live": "bf98e746f2660558f709a5747ed01e17",
+      "local": "bf98e746f2660558f709a5747ed01e17",
+      "equal": true
+    },
+    {
+      "signature": "list_profiles_minimal(text,integer)",
+      "live": "3a17aa4892e0a10e1da20550195543ff",
+      "local": "3a17aa4892e0a10e1da20550195543ff",
+      "equal": true
+    },
+    {
+      "signature": "list_purchase_orders_cursor(integer,timestamp with time zone,uuid,text,text,text,text,text)",
+      "live": "48cbb3eb1eb1d4665c09bc7a3582c980",
+      "local": "48cbb3eb1eb1d4665c09bc7a3582c980",
+      "equal": true
+    },
+    {
+      "signature": "list_report_items_cursor(date,date,integer,timestamp with time zone,uuid,text,text,text,boolean)",
+      "live": "f684ce488c02880a6a7b45091fe7604e",
+      "local": "f684ce488c02880a6a7b45091fe7604e",
+      "equal": true
+    },
+    {
+      "signature": "list_report_items_page(date,date,integer,integer,text,text,text,boolean)",
+      "live": "aa80d6a6cac292550d1fb73dfd3ef3f2",
+      "local": "aa80d6a6cac292550d1fb73dfd3ef3f2",
+      "equal": true
+    },
+    {
+      "signature": "list_solic_compra_mercado_cursor(integer,timestamp with time zone,uuid,text,text,uuid,text,date,date)",
+      "live": "adcd98fb0e9cc75fa4331df5df27658a",
+      "local": "adcd98fb0e9cc75fa4331df5df27658a",
+      "equal": true
+    },
+    {
+      "signature": "list_stock_transfers(date,date,uuid,text,integer,integer)",
+      "live": "247b56de5c537cb41bace34d34444b9b",
+      "local": "247b56de5c537cb41bace34d34444b9b",
+      "equal": true
+    },
+    {
+      "signature": "log_audit(text,text,text,text,text,jsonb,jsonb,jsonb)",
+      "live": "841885508b2f38ec2336bcfd0cc10e5d",
+      "local": "144db59764fda78ccb81d3cff2d15d36",
+      "equal": false
+    },
+    {
+      "signature": "log_audit(text,text,text,uuid,text,jsonb,jsonb,jsonb)",
+      "live": "b26eb4adf9e4f1a2422dafb90ba98734",
+      "local": "cc1dac531033feb7d48b2be90fe8d129",
+      "equal": false
+    },
+    {
+      "signature": "log_integration_error(text,text,text,text,jsonb)",
+      "live": "f745050252d9dfa10754d24ab3aada97",
+      "local": "4e803f038e693b268de4f3d8238f3dcf",
+      "equal": false
+    },
+    {
+      "signature": "mark_all_notifications_read()",
+      "live": "2593645c43be89341a97b3a047733216",
+      "local": "2593645c43be89341a97b3a047733216",
+      "equal": true
+    },
+    {
+      "signature": "onboard_new_company(text,text,uuid)",
+      "live": "b8fc02fccc0e24b383a9a9ebde368871",
+      "local": "b8fc02fccc0e24b383a9a9ebde368871",
+      "equal": true
+    },
+    {
+      "signature": "orcamento_execucao_mensal(text)",
+      "live": "cfce5d838e494cfab3df40ea82a5f420",
+      "local": "cfce5d838e494cfab3df40ea82a5f420",
+      "equal": true
+    },
+    {
+      "signature": "pay_conta_pagar(uuid,text,date,uuid)",
+      "live": "c0d2f14706d467cbde1376ec9de5a4a5",
+      "local": "c0d2f14706d467cbde1376ec9de5a4a5",
+      "equal": true
+    },
+    {
+      "signature": "preview_regra_categorizacao(text,text)",
+      "live": "0dbc395f943cc47e8d5901b539f78037",
+      "local": "0dbc395f943cc47e8d5901b539f78037",
+      "equal": true
+    },
+    {
+      "signature": "produtos_force_company_id()",
+      "live": "01d04fbe3a259c85242cb15e2a1b7c8d",
+      "local": "01d04fbe3a259c85242cb15e2a1b7c8d",
+      "equal": true
+    },
+    {
+      "signature": "protect_profile_identity_scope()",
+      "live": "fa71367acebf0058ce52a4312526c68c",
+      "local": "fa71367acebf0058ce52a4312526c68c",
+      "equal": true
+    },
+    {
+      "signature": "rbac_permissions_diff(jsonb)",
+      "live": "9776713b87b6554b975f84cc76d992b6",
+      "local": "9776713b87b6554b975f84cc76d992b6",
+      "equal": true
+    },
+    {
+      "signature": "rbac_sql_lint_report_admin(uuid)",
+      "live": "a6e3b9a643625a32b2a57f3e5fec02d9",
+      "local": "a6e3b9a643625a32b2a57f3e5fec02d9",
+      "equal": true
+    },
+    {
+      "signature": "rbac_sql_lint_report_internal()",
+      "live": "b47d5408b5f843bb7d5fbeb9690e56dc",
+      "local": "b47d5408b5f843bb7d5fbeb9690e56dc",
+      "equal": true
+    },
+    {
+      "signature": "rbac_sql_lint_report_quick(uuid)",
+      "live": "6252597bf4472eb7180370a2d3928477",
+      "local": "6252597bf4472eb7180370a2d3928477",
+      "equal": true
+    },
+    {
+      "signature": "rbac_sql_lint_report()",
+      "live": "20d91f739832af307f0680d836f75cbf",
+      "local": "20d91f739832af307f0680d836f75cbf",
+      "equal": true
+    },
+    {
+      "signature": "rbac_top_legacy_usage(integer,integer)",
+      "live": "c7fa75346512d347f7256ae29c553a71",
+      "local": "c7fa75346512d347f7256ae29c553a71",
+      "equal": true
+    },
+    {
+      "signature": "recalc_product_costs(uuid)",
+      "live": "567e550b359c25dafc83771d6e4f1b03",
+      "local": "567e550b359c25dafc83771d6e4f1b03",
+      "equal": true
+    },
+    {
+      "signature": "receive_conta_receber(uuid,text,date)",
+      "live": "3daae02376fe172ac6b93a02e64fb886",
+      "local": "3daae02376fe172ac6b93a02e64fb886",
+      "equal": true
+    },
+    {
+      "signature": "receive_market_order_atomic(uuid,jsonb,text)",
+      "live": "362a129ee109b27ed135af0299c3f8ec",
+      "local": "362a129ee109b27ed135af0299c3f8ec",
+      "equal": true
+    },
+    {
+      "signature": "receive_purchase_order_atomic(uuid,jsonb,jsonb)",
+      "live": "26322b53f62d1d1ccc824c759300cc39",
+      "local": "2532768bddc2d5b2ff4bab2c0ad72f75",
+      "equal": false
+    },
+    {
+      "signature": "reconcile_auto_bind_transfer_counterparts(uuid,jsonb)",
+      "live": "ea6a0af0117d0843934816148a4da139",
+      "local": "ea6a0af0117d0843934816148a4da139",
+      "equal": true
+    },
+    {
+      "signature": "reconcile_batch_lancamentos(uuid[])",
+      "live": "b261b20bbd5a377cbde150c92e0cd5d3",
+      "local": "b261b20bbd5a377cbde150c92e0cd5d3",
+      "equal": true
+    },
+    {
+      "signature": "reconcile_bind_extrato(uuid,text,text,uuid)",
+      "live": "019c7c4f1755f5b0b69e462831418974",
+      "local": "019c7c4f1755f5b0b69e462831418974",
+      "equal": true
+    },
+    {
+      "signature": "reconcile_create_transfer_from_extrato(date,numeric,text,uuid,uuid,text,text)",
+      "live": "bee0f27014043120abc68188d8b5ff8a",
+      "local": "bee0f27014043120abc68188d8b5ff8a",
+      "equal": true
+    },
+    {
+      "signature": "reconcile_create_transfer(date,numeric,text,uuid,uuid,uuid)",
+      "live": "be8274b844199c8c5dfdecd5f0fc3c57",
+      "local": "be8274b844199c8c5dfdecd5f0fc3c57",
+      "equal": true
+    },
+    {
+      "signature": "reconcile_ignorar_lancamento(uuid,date,numeric,text,text,uuid)",
+      "live": "29b33e4a2ed3d01a45531143853a5d26",
+      "local": "29b33e4a2ed3d01a45531143853a5d26",
+      "equal": true
+    },
+    {
+      "signature": "reconcile_import_lancamento(date,text,numeric,text,uuid,uuid,jsonb,text,boolean,integer)",
+      "live": "977d26ca6f02e34a00d500dce874c320",
+      "local": "977d26ca6f02e34a00d500dce874c320",
+      "equal": true
+    },
+    {
+      "signature": "reconcile_link_existing_lancamento(uuid,uuid,text,text,date)",
+      "live": "9432a5cb427aae5eab203ca3ad6ed2d3",
+      "local": "9432a5cb427aae5eab203ca3ad6ed2d3",
+      "equal": true
+    },
+    {
+      "signature": "reconcile_neutralize_contamax(uuid,jsonb)",
+      "live": "17d3f76cc30a5f3438f3a7802a6563f0",
+      "local": "17d3f76cc30a5f3438f3a7802a6563f0",
+      "equal": true
+    },
+    {
+      "signature": "reconcile_pay_conta_pagar(uuid,uuid,date,uuid,numeric,text,uuid)",
+      "live": "bc34c29b3de9ef8ee29c333076304bf9",
+      "local": "bc34c29b3de9ef8ee29c333076304bf9",
+      "equal": true
+    },
+    {
+      "signature": "reconcile_receive_conta_receber(uuid,uuid,date,uuid,numeric,text,uuid)",
+      "live": "92588da8c1b57feb9a956bbcb248eb15",
+      "local": "92588da8c1b57feb9a956bbcb248eb15",
+      "equal": true
+    },
+    {
+      "signature": "reconcile_reconsiderar_ignorada(uuid)",
+      "live": "609bdd1dc3430c912ddaaceb8cba14ee",
+      "local": "609bdd1dc3430c912ddaaceb8cba14ee",
+      "equal": true
+    },
+    {
+      "signature": "refresh_materialized_views()",
+      "live": "6c3cf0451140358d1e54543ed021c2c5",
+      "local": "614d5e9e773186567f7486548bb4068d",
+      "equal": false
+    },
+    {
+      "signature": "refresh_saldo_cache(uuid)",
+      "live": "03da197147c7f3c70bf5fd57c922a5c5",
+      "local": "03da197147c7f3c70bf5fd57c922a5c5",
+      "equal": true
+    },
+    {
+      "signature": "reject_ponto_record(uuid,text)",
+      "live": "db6c364c2274c5e2513166afca5abc25",
+      "local": "db6c364c2274c5e2513166afca5abc25",
+      "equal": true
+    },
+    {
+      "signature": "relatorio_socios_resumo(text)",
+      "live": "525c1c8b66522fdf5936e0bc0421764b",
+      "local": "525c1c8b66522fdf5936e0bc0421764b",
+      "equal": true
+    },
+    {
+      "signature": "reopen_inventory(uuid,text)",
+      "live": "796a741cc4b39fbb8aa1a6edfbb355b4",
+      "local": "796a741cc4b39fbb8aa1a6edfbb355b4",
+      "equal": true
+    },
+    {
+      "signature": "reorder_fin_categoria(uuid,text)",
+      "live": "9b0fb56d173d272047bc466604c0d8a1",
+      "local": "9b0fb56d173d272047bc466604c0d8a1",
+      "equal": true
+    },
+    {
+      "signature": "reserve_company_invitation(uuid,uuid,text)",
+      "live": "96c1007ab4194fe600de7f5d33d2cf03",
+      "local": "96c1007ab4194fe600de7f5d33d2cf03",
+      "equal": true
+    },
+    {
+      "signature": "rpc_confirmacoes_approve(uuid)",
+      "live": "d64c67853334d6c6e8b1aaf0fb61755d",
+      "local": "d64c67853334d6c6e8b1aaf0fb61755d",
+      "equal": true
+    },
+    {
+      "signature": "rpc_create_company(text,text)",
+      "live": "99eb617eecda215482d743a246aa5df1",
+      "local": "f130c6d7281b0e51f7b18da1e1e94e44",
+      "equal": false
+    },
+    {
+      "signature": "rpc_delete_fechamento_caixa(uuid)",
+      "live": "dc5dc6f74f8afa04639e52161b520048",
+      "local": "dc5dc6f74f8afa04639e52161b520048",
+      "equal": true
+    },
+    {
+      "signature": "rpc_recebimentos_close(uuid,boolean,text)",
+      "live": "641fde95377056d579e71abb1233830b",
+      "local": "f5770b5bd8592766918f8ec285a7f4a8",
+      "equal": false
+    },
+    {
+      "signature": "rpc_set_user_company(uuid,uuid)",
+      "live": "cc8d9fcdb578e088d1cc01f202200ead",
+      "local": "cc8d9fcdb578e088d1cc01f202200ead",
+      "equal": true
+    },
+    {
+      "signature": "rpc_upsert_fechamento_caixa_com_marcas(date,numeric,numeric,numeric,text,jsonb,timestamp with time zone)",
+      "live": "706c7f1fed23ff923e932bda01b5a883",
+      "local": "706c7f1fed23ff923e932bda01b5a883",
+      "equal": true
+    },
+    {
+      "signature": "rpc_upsert_fechamento_caixa(date,numeric,numeric,numeric,text,timestamp with time zone)",
+      "live": "e19de1efb884cd8c7fd08944b295a25c",
+      "local": "e19de1efb884cd8c7fd08944b295a25c",
+      "equal": true
+    },
+    {
+      "signature": "rpc_upsert_fechamento_caixa(date,numeric,numeric,numeric,text)",
+      "live": "3e0deec7ad857d200e6063a616dcb90b",
+      "local": "3e0deec7ad857d200e6063a616dcb90b",
+      "equal": true
+    },
+    {
+      "signature": "save_cotacao_ia_config(text,text,text,boolean)",
+      "live": "3905a234ef84b3227c95e5498e157cd9",
+      "local": "3905a234ef84b3227c95e5498e157cd9",
+      "equal": true
+    },
+    {
+      "signature": "save_cotacao_respostas_atomic(uuid,jsonb,jsonb)",
+      "live": "43bf3fd01d66deb7d7ffb84e4e837603",
+      "local": "43bf3fd01d66deb7d7ffb84e4e837603",
+      "equal": true
+    },
+    {
+      "signature": "save_cotacao_sugestao(uuid,text,numeric,numeric,jsonb,jsonb)",
+      "live": "f7de01ed360379f18b2b1d50e86a1e22",
+      "local": "f7de01ed360379f18b2b1d50e86a1e22",
+      "equal": true
+    },
+    {
+      "signature": "save_cotacao_zapi_config(text,text,text,text,text,boolean)",
+      "live": "2f3f0e881c099c9a80aae02f5a0d2331",
+      "local": "2f3f0e881c099c9a80aae02f5a0d2331",
+      "equal": true
+    },
+    {
+      "signature": "seed_default_categories()",
+      "live": "f78669e546bc52a40a9653471483b5a8",
+      "local": "f78669e546bc52a40a9653471483b5a8",
+      "equal": true
+    },
+    {
+      "signature": "set_cache(text,jsonb,integer)",
+      "live": "dc7ed22cecfd6744e6b73eba0f846be3",
+      "local": "dc7ed22cecfd6744e6b73eba0f846be3",
+      "equal": true
+    },
+    {
+      "signature": "set_stock_movement_direction()",
+      "live": "a126e95ebd0503a516c7b8d24bb36d96",
+      "local": "a126e95ebd0503a516c7b8d24bb36d96",
+      "equal": true
+    },
+    {
+      "signature": "set_updated_at()",
+      "live": "a475bd8584c23f5ef44cf6bf1ad40d01",
+      "local": "a475bd8584c23f5ef44cf6bf1ad40d01",
+      "equal": true
+    },
+    {
+      "signature": "simulate_relatorios_score(date,date,jsonb)",
+      "live": "53163bb1ef1e3dd7c7dec35e1d3a2d7c",
+      "local": "53163bb1ef1e3dd7c7dec35e1d3a2d7c",
+      "equal": true
+    },
+    {
+      "signature": "simulate_relatorios_score(text,text,jsonb)",
+      "live": "bd8813a4a2c073eaec7fe51b7929616b",
+      "local": "bd8813a4a2c073eaec7fe51b7929616b",
+      "equal": true
+    },
+    {
+      "signature": "soft_delete_cotacao(uuid,timestamp with time zone)",
+      "live": "8ad793e95b4c1eebe53afe129ffd5b80",
+      "local": "8ad793e95b4c1eebe53afe129ffd5b80",
+      "equal": true
+    },
+    {
+      "signature": "soft_delete_inventory(uuid,text)",
+      "live": "42bb52e69e5bef239146712c9cb43d8a",
+      "local": "42bb52e69e5bef239146712c9cb43d8a",
+      "equal": true
+    },
+    {
+      "signature": "stock_insert_movement_atomic(uuid,numeric,text,text,text,text,text,text,text,jsonb)",
+      "live": "56774860b7bf79dfb2eff0186f87d083",
+      "local": "56774860b7bf79dfb2eff0186f87d083",
+      "equal": true
+    },
+    {
+      "signature": "stock_transfer_between_locations(uuid,text,text,numeric,text)",
+      "live": "612a69553ba0f7e02fee09fb9b684069",
+      "local": "f4fb8b9a42fc4586462cef50b71a4403",
+      "equal": false
+    },
+    {
+      "signature": "storno_purchase_order_stock(uuid)",
+      "live": "ddb806614e9d97e4a68a3a4b2c8df0d2",
+      "local": "ddb806614e9d97e4a68a3a4b2c8df0d2",
+      "equal": true
+    },
+    {
+      "signature": "strip_html(text)",
+      "live": "5debc9bf8fed27807f821863eec49791",
+      "local": "5debc9bf8fed27807f821863eec49791",
+      "equal": true
+    },
+    {
+      "signature": "sync_permissions_from_registry(jsonb)",
+      "live": "41129d1f143180f31bbfcae499b4ea3e",
+      "local": "41129d1f143180f31bbfcae499b4ea3e",
+      "equal": true
+    },
+    {
+      "signature": "trg_block_placeholder_company()",
+      "live": "8c477702989856a5740ce082cdcf8d7f",
+      "local": "8c477702989856a5740ce082cdcf8d7f",
+      "equal": true
+    },
+    {
+      "signature": "trg_ficha_itens_invalidate_parent()",
+      "live": "05b6988120237cf0cca102a7d9af4fe4",
+      "local": "05b6988120237cf0cca102a7d9af4fe4",
+      "equal": true
+    },
+    {
+      "signature": "trg_fin_category_propagate_reporting_class()",
+      "live": "21b9925ec4803ee3e832a60ff56f9040",
+      "local": "21b9925ec4803ee3e832a60ff56f9040",
+      "equal": true
+    },
+    {
+      "signature": "trg_fin_contas_pagar_aprovado_em()",
+      "live": "013dc1b6cc03b1cbb5ce22ed17b56b5c",
+      "local": "013dc1b6cc03b1cbb5ce22ed17b56b5c",
+      "equal": true
+    },
+    {
+      "signature": "trg_fin_ensure_non_operational_categories()",
+      "live": "6654aaf507d77ea3e97603a58dd4081e",
+      "local": "6654aaf507d77ea3e97603a58dd4081e",
+      "equal": true
+    },
+    {
+      "signature": "trg_fin_rateio_report_exclusion()",
+      "live": "b19577d50b43143343ca47678303070f",
+      "local": "b19577d50b43143343ca47678303070f",
+      "equal": true
+    },
+    {
+      "signature": "trg_fin_require_category_on_reconciliation()",
+      "live": "8145fb1172bf7b2a381429a353b195d8",
+      "local": "8145fb1172bf7b2a381429a353b195d8",
+      "equal": true
+    },
+    {
+      "signature": "trg_force_company_alertas_falta()",
+      "live": "5ab4437194d70dea9f9da5393b390d95",
+      "local": "5ab4437194d70dea9f9da5393b390d95",
+      "equal": true
+    },
+    {
+      "signature": "trg_mask_numero_cartao()",
+      "live": "d1e11b5fa574a7acd1f58b21fa74d702",
+      "local": "d1e11b5fa574a7acd1f58b21fa74d702",
+      "equal": true
+    },
+    {
+      "signature": "trg_po_block_post_approval_changes()",
+      "live": "3041d45c94a0fa33e46fb877a6150a52",
+      "local": "3041d45c94a0fa33e46fb877a6150a52",
+      "equal": true
+    },
+    {
+      "signature": "trg_refresh_saldo_cache_conta()",
+      "live": "38cd41ddcfc07fc8dc3021531f437c04",
+      "local": "38cd41ddcfc07fc8dc3021531f437c04",
+      "equal": true
+    },
+    {
+      "signature": "trg_refresh_saldo_cache_lancamento()",
+      "live": "72149303ca5433d113d4aa5339852b18",
+      "local": "72149303ca5433d113d4aa5339852b18",
+      "equal": true
+    },
+    {
+      "signature": "trg_set_updated_at()",
+      "live": "1425f5178264da995326ee8c0846e3ff",
+      "local": "1425f5178264da995326ee8c0846e3ff",
+      "equal": true
+    },
+    {
+      "signature": "trg_validate_fin_lancamento_update()",
+      "live": "d790487b7115b468512cee3b9e683ea5",
+      "local": "d790487b7115b468512cee3b9e683ea5",
+      "equal": true
+    },
+    {
+      "signature": "trg_validate_rateio_sum()",
+      "live": "492ef56cff30dfa95fd1844a911a71d9",
+      "local": "492ef56cff30dfa95fd1844a911a71d9",
+      "equal": true
+    },
+    {
+      "signature": "unreconcile_lancamento(uuid)",
+      "live": "a8fb3d64813880e07a717aac62f92c52",
+      "local": "a8fb3d64813880e07a717aac62f92c52",
+      "equal": true
+    },
+    {
+      "signature": "update_company(uuid,text,text,boolean)",
+      "live": "1e83056ea4386049deeba4c1030bd7cc",
+      "local": "1e83056ea4386049deeba4c1030bd7cc",
+      "equal": true
+    },
+    {
+      "signature": "update_cotacao_atomic(uuid,text,text,date,jsonb,jsonb,timestamp with time zone)",
+      "live": "904131d694a928bc37ff807c0348282f",
+      "local": "904131d694a928bc37ff807c0348282f",
+      "equal": true
+    },
+    {
+      "signature": "update_produto_last_movement()",
+      "live": "8db8af53cd48ec3a587cdc129d2f7206",
+      "local": "8db8af53cd48ec3a587cdc129d2f7206",
+      "equal": true
+    },
+    {
+      "signature": "update_transfer(uuid,numeric,date,text,uuid,uuid)",
+      "live": "f11cf0ebe803be32832bc7327b57e9cf",
+      "local": "f11cf0ebe803be32832bc7327b57e9cf",
+      "equal": true
+    },
+    {
+      "signature": "update_updated_at_column()",
+      "live": "3210625d1c794f6db7b3c3defc5984dd",
+      "local": "3210625d1c794f6db7b3c3defc5984dd",
+      "equal": true
+    },
+    {
+      "signature": "upsert_salmon_leftover_atomic(date,numeric,text)",
+      "live": "0ce1ab02f1ee4889c724f1a5025acc56",
+      "local": "f761757bc82d5f8646b57ee0b8aabb30",
+      "equal": false
+    },
+    {
+      "signature": "upsert_supplier(text)",
+      "live": "ea5e790b1608da95c56d2731f8ddb9ac",
+      "local": "cbc71b5e54a97dca203a58e4cbd443c9",
+      "equal": false
+    },
+    {
+      "signature": "validate_cp_valor()",
+      "live": "5154dc6839e86dde1929ceb58843c615",
+      "local": "5154dc6839e86dde1929ceb58843c615",
+      "equal": true
+    },
+    {
+      "signature": "validate_cr_valor()",
+      "live": "352da65c783fa65e54450fceebc966e2",
+      "local": "352da65c783fa65e54450fceebc966e2",
+      "equal": true
+    },
+    {
+      "signature": "validate_estorno_movement()",
+      "live": "1185b9d20417713f9c8b7ee0a27f0dc3",
+      "local": "1185b9d20417713f9c8b7ee0a27f0dc3",
+      "equal": true
+    },
+    {
+      "signature": "validate_fechamento_marca_total()",
+      "live": "0744e699bc9293ab945404c5c816e2bf",
+      "local": "0744e699bc9293ab945404c5c816e2bf",
+      "equal": true
+    },
+    {
+      "signature": "validate_fin_lancamento()",
+      "live": "18cabcba86ac8f5786e4f0881703a941",
+      "local": "18cabcba86ac8f5786e4f0881703a941",
+      "equal": true
+    },
+    {
+      "signature": "validate_marca_categoria_vinculo()",
+      "live": "011359351c565848df48cd12d8bba65f",
+      "local": "011359351c565848df48cd12d8bba65f",
+      "equal": true
+    },
+    {
+      "signature": "validate_ponto_ferias()",
+      "live": "28011c7f19412ab6df7dc90fe35b0654",
+      "local": "28011c7f19412ab6df7dc90fe35b0654",
+      "equal": true
+    },
+    {
+      "signature": "validate_ponto_registro()",
+      "live": "cbaaa4ebf390b6b7d31562ee23bac517",
+      "local": "cbaaa4ebf390b6b7d31562ee23bac517",
+      "equal": true
+    },
+    {
+      "signature": "validate_ponto_update()",
+      "live": "008e1c127743eaac3ae2a9cbfb0271d7",
+      "local": "008e1c127743eaac3ae2a9cbfb0271d7",
+      "equal": true
+    },
+    {
+      "signature": "validate_purchase_order_item()",
+      "live": "60c68353649f99479fc172aa49ff1733",
+      "local": "60c68353649f99479fc172aa49ff1733",
+      "equal": true
+    },
+    {
+      "signature": "validate_requisicao_item_status()",
+      "live": "76f3bf50c98884a801c762ca62dc1757",
+      "local": "76f3bf50c98884a801c762ca62dc1757",
+      "equal": true
+    },
+    {
+      "signature": "validate_rh_banco_horas_numeric()",
+      "live": "0e12197e2c406cb3cbfb5b46a1fc47ea",
+      "local": "0e12197e2c406cb3cbfb5b46a1fc47ea",
+      "equal": true
+    },
+    {
+      "signature": "validate_rh_beneficios_numeric()",
+      "live": "6ce3825750724ab567cbd6c0a5ac801f",
+      "local": "6ce3825750724ab567cbd6c0a5ac801f",
+      "equal": true
+    },
+    {
+      "signature": "validate_rh_colaboradores_numeric()",
+      "live": "b572144ccf74b2ba9afb41d0932791e2",
+      "local": "b572144ccf74b2ba9afb41d0932791e2",
+      "equal": true
+    },
+    {
+      "signature": "validate_rh_folha_numeric()",
+      "live": "4419a87f1499bd3be02749f12f4a1ec3",
+      "local": "4419a87f1499bd3be02749f12f4a1ec3",
+      "equal": true
+    },
+    {
+      "signature": "validate_salmon_entry()",
+      "live": "556ec046d4477d301fcc80e2235f091b",
+      "local": "556ec046d4477d301fcc80e2235f091b",
+      "equal": true
+    },
+    {
+      "signature": "validate_salmon_manipulation()",
+      "live": "00eda507d2eb6461a3937df6dea790e7",
+      "local": "00eda507d2eb6461a3937df6dea790e7",
+      "equal": true
+    },
+    {
+      "signature": "validate_stock_movement()",
+      "live": "d2f22845b71d289db70e55262ef728b4",
+      "local": "d2f22845b71d289db70e55262ef728b4",
+      "equal": true
+    },
+    {
+      "signature": "validate_supplier_item_price()",
+      "live": "136331a3edc3c3a053dc9920933e8b8f",
+      "local": "b6599438b2fc3d66b9531e50a5be86a9",
+      "equal": false
+    }
+  ],
+  "added": [
+    "backfill_log_scope(text,integer,boolean)",
+    "list_restricted_logs(text,text,integer,timestamp with time zone,uuid,text,text,text)",
+    "service_write_audit(uuid,uuid,text,text,text,uuid,jsonb,jsonb,jsonb)",
+    "upsert_supplier_price(text,uuid,numeric,text)"
+  ]
+}

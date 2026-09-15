@@ -1,0 +1,68 @@
+# Fase 7: tabelas, INSERTs, RLS, views e SECURITY DEFINER
+
+Continue a estabilização multi-tenant do margin.food. Execute **somente a Fase 7 (tabelas, INSERTs, RLS, views e SECURITY DEFINER)** do plano em `docs/multi-unidades/03-AUDITORIA-POS-IMPLANTACAO.md`. Ao terminar, entregue resultados e o prompt completo copiável da Fase 8 (Edges, Storage, Realtime, integrações e jobs). **Não inicie a Fase 8.**
+
+## Contexto obrigatório
+
+Sistema funcional em produção. Preserve memberships, identidade Auth compartilhada, CompanyScopeProvider/useSupabase, header x-company-id validado, clientes imutáveis, caches/cancelamento de escopo, saldos, custos, históricos e contratos existentes. Não refaça arquitetura, não faça rollback geral, não limpe/una/mova dados reais automaticamente.
+
+Antes de editar: git status; ler AGENTS.md/CLAUDE.md (espelhados), docs/multi-unidades/00-AUDITORIA.md, 01-INVENTARIO.md, 02-ARQUITETURA-E-OPERACAO.md, 03-AUDITORIA-POS-IMPLANTACAO.md, resultados das Fases 2/3/4/5/6 nas pastas faseN-20260915 e docs/ARCHITECTURE.md. Fazer fetch e incorporar alterações posteriores com segurança, preservando trabalho local. Revalidar código, schema vivo, overloads, índices/constraints, ACLs efetivas, triggers, callers e deployments; nome/versão de migration isolada não comprova publicação equivalente.
+
+Projeto Supabase: `wuzxpbixprrgssoeeaez`. Em **15/09/2026 às 23:45 UTC**, Fases 2 (`20260915140812`), 3 (`20260915144030/20260915144031`), 4 (`20260915200818`), 5 (`20260915225538`) e 6 (`20260915232846`) não estavam aplicadas em produção. Vercel estava READY em `80dcf4ec527d1a7e86ed3509496638b71219ab43`; scheduled-jobs v7, inventario v15, ficha-tecnica v11, requisicao-estoque v14, purchase-requisitions v10. Revalidar publicação posterior. Não aplicar fases anteriores silenciosamente nem declarar C01/C02/H01/H02/H03/H04/H05/M01 resolvidos pelo código local.
+
+**Dependência de release:** o preflight histórico da Fase 3 espera assinatura/corpos antigos de Salmão e aborta no banco vivo atual. Fases 4/5/6 não contornaram o guard nem editaram migrations históricas. A Fase 6 também recusa produção com `PHASE6_PREREQUISITES_REQUIRED`. Reconciliação de release é pendência separada. `20260910003448` reapareceu no Git e no histórico remoto; rastreabilidade ampla continua na Fase 9.
+
+Salmão já tem validade, FEFO, wizard com Enter e ordem estorno antes de cancelamento. A assinatura de create_salmon_entry_atomic inclui `p_expiration_date date`; wrapper usa text. Preserve corpos, índice `produtos_one_active_salmon_raw`, lock por empresa e grants internos da Fase 4. Não presumir `_salmon_*_atomic`, não conceder EXECUTE genérico ou serviço para fazer testes passarem.
+
+Fase 5: mesma identidade de fornecedor por nome exato+empresa, UUIDs independentes entre empresas, RPC manual de fornecedor+preço atômica, FKs compostas de preço/cotação, escrita direta de preço fechada para authenticated, cadastro com empresa explícita, recebimento corrigido para colunas/conflito/tenant reais. Não trocar supplier_id textual/snapshots por UUID indiscriminadamente; supplier_uuid identifica fornecedor canônico no preço. Identidade de preço existente não pode ser retargetada. Não deduplicar nomes/case/acento/whitespace automaticamente.
+
+Fase 6: Catálogo create/edit reconhecidos na RLS; políticas de escrita legadas redundantes removidas. **Inativar usa `deactivate_produto(uuid)`**, operação atômica/idempotente que só altera ativo; catalogo:delete não concede UPDATE genérico nem DELETE físico. Reativar exige edit; UPDATE direto de ativo para false é recusado para authenticated. Cadastros/stock:delete conservam DELETE físico sujeito às FKs. Cadastro manda empresa explícita; trigger recusa empresa arbitrária ou alteração de tenant. SKU exige create; entrada de Salmão pode reservar prefixo SALM com sua permissão própria, sem alterar corpos internos. `recalc_product_costs(uuid)` teve EXECUTE público removido localmente: em produção ainda é definer público sem tenant/guard, capaz de atualizar custos por UUID. Preserve a contenção e o caller interno `storno_purchase_order_stock`, sem mudar fórmulas. Detalhes em `fase6-20260915/RESULTADOS.md`.
+
+## 1. Inventário atualizado e classificação de todos os objetos
+
+- Reexecutar catálogo vivo READ ONLY de tabelas, colunas, defaults, constraints/FKs (incluindo direção de entrada), índices, triggers, owners, grants diretos/herdados/por coluna, policies permissivas/restritivas, funções/overloads e views/materialized views nos schemas expostos e dependências pertinentes.
+- Classificar cada tabela/view como **tenant operacional**, **global real**, **mista/legada** ou **indeterminada**, com evidência de consumidores, dados agregados e regra de negócio. Logs mistos não recebem tenant obrigatório por conveniência. Não adicionar company_id/NOT NULL/FORCE RLS indiscriminadamente a catálogos globais ou logs.
+- Comparar a cobertura viva com o catálogo e inventário automático da Fase 6. Gerador: `bun scripts/audit-permission-inventory.ts`; artefatos `fase6-20260915/permissoes.json` e `.md`. As seis classes descrevem ocorrências/localizadores, não vereditos: VÁLIDA/LEGADA/FANTASMA/NÃO ENCONTRADA/DIVERGENTE/GLOBAL. Preservar fonte, objeto/assinatura, localização, operação, caller e evidência. Snapshot indisponível é limitação, não ausência comprovada.
+- Corpos das Edges publicadas não foram baixados na Fase 6: o inventário cobre fonte local e versões. Inspecionar os callers necessários à segurança de SQL nesta fase; auditoria completa de Edges/Storage/Realtime/jobs é Fase 8.
+- Separar problemas comprovados de hipóteses, diferenças de bytes/CRLF de diferenças semânticas, funções de trigger de RPCs públicas, helpers internos de APIs funcionais. Não inferir segurança por comentários ou presence de `assert_tenant`/`has_permission` no texto.
+
+## 2. INSERTs, relações e integridade entre unidades
+
+- Enumerar writers reais de INSERT/UPSERT/UPDATE, diretos e transitivos, frontend, RPCs, triggers e Edges. Validar origem de company_id e de cada recurso relacionado. Em INSERT operacional direto, usar a empresa contextualizada explícita de useCompanyId/useSupabase; servidor valida o contexto. Profiles.company_id é origem/compatibilidade, nunca preferência de navegação.
+- Revisar defaults que mascaram omissão, upserts com conflito incompatível, coluna inexistente, troca de identidade/tenant, operações em lote/parciais e efeitos de ON DELETE/UPDATE. FKs por ID isolado não asseguram que ambos os lados pertencem à mesma empresa.
+- Antes de novas constraints, consultar apenas agregados para nulos/órfãos/cruzados/duplicatas e classificar exceções legítimas. Sem saneamento automático nem dados reais como fixtures; divergência bloqueia DDL e exige plano reversível separado. Preservar UUIDs, snapshots, histórico, unidades, fatores, custos e saldos.
+- Corrigir caminhos comprovadamente inseguros ou quebrados dentro deste escopo com mudanças mínimas e pré-requisitos claros. Não aproveitar para refatorar fórmulas, fluxos distribuídos ou outras features.
+
+## 3. Policies, permissões e grants
+
+- Avaliar a combinação completa: grants efetivos e herdados; OR de policies permissivas; AND de restritivas; SELECT exigido por UPDATE/RETURNING; TO/PUBLIC/anon/authenticated/service_role; default privileges e herança de papéis. FORCE RLS não contém owner com BYPASSRLS.
+- Chaves funcionais vêm de `src/permissions/registry.ts` e ações de `src/permissions/actions.ts`: view/create/edit/delete/export/manage/approve/close/reconcile/cancel/simulate. Banco não expande LEGACY_PERMISSION_MAP. Testar ALLOW granular com DENY legado e outros caminhos OR. `system:admin` não implica `system:global:manage`.
+- Priorizar fantasmas/gates divergentes vivos apontados pela Fase 6, especialmente categorias/locais/setores/turnos e consumers que ficam vazios apesar da permissão da tela. Antes de corrigir, confirmar intenção, chaves existentes, todos os callers e contratos. Chave fora do registry não autoriza inventar submódulo/ação para acomodar string antiga.
+- Policies novas embrulham resolvers/permissões em `(select ...)`, com USING/WITH CHECK apropriados. Não conceder permissões em massa, converter todas as policies, apagar chaves/grants históricos ou rodar sync destrutivo. Remoção de grants exige conferir helpers/triggers/serviços legítimos e ensaiar compatibilidade.
+
+## 4. Views, materialized views e SECURITY DEFINER
+
+- Inventariar views expostas, security_invoker/barrier, owner, ACLs, dependências e caches/materialized views globais. Confirmar como tenant é propagado na consulta e se o owner contorna RLS. Não converter tudo mecanicamente para invoker sem verificar permissão dos readers e planos.
+- Revisar cada função privilegiada: assinatura e overloads, defaults, return type, owner/search_path, EXECUTE efetivo, identity/tenant/permissão, SQL dinâmico/injection, recurso/tenant validado, ordenação de locks, writers transitivos e efeitos de falha. Gate no frontend/Edge não protege RPC pública diretamente.
+- Serviço é papel real autorizado, não string `role` em JSON/body/metadata. Administração global e operação tenant são distintas; mesmo super deve respeitar o escopo operacional definido pelo contrato. Placeholder é proibido para operações comuns.
+- Função interna sem caller público legítimo não deve continuar exposta por PUBLIC; wrapper precisa impor autorização real. Nunca resolver erro concedendo EXECUTE genérico a authenticated/service_role nem reabrir log_audit uuid/text, audit_log_write ou log_integration_error. service_write_audit é exclusivo de serviço real. Correlação de histórico não prova autoria.
+- Preservar `produtos.saldo_atual` como fonte única de leitura, conferindo `pg_get_functiondef` nas RPCs pertinentes. Não recalcular ledger/ajustar saldos ou custos para satisfazer teste. Revisar sobrecargas mortas/quebradas somente com análise de callers e compatibilidade; mudança de assinatura definer requer plano explícito, não criar overload por acidente.
+
+## Implementação e testes
+
+- Migrations novas pequenas, transacionais quando cabível, preflight de drift atualizado, captura de definições/ACLs anteriores e recuo de contenção que preserve dados sem reabrir exposição. Não editar migrations históricas. Guards devem recusar esquema inesperado; não atualizar hashes para contornar diferenças sem revisão.
+- PostgreSQL/Supabase real e isolado com schema atual e fixtures próprias; sem mock de banco. Não reaplicar seis migrations multiunidade em schema já migrado. Pré-requisitos das Fases 2–6 somente em descartável e documentados; isso não autoriza produção.
+- Matriz: anon, A, B, admin A, multi A/B, super, sem permissão, granular-only/legado DENY e serviço nos caminhos pertinentes. Sem herança acidental de grants; headers inválidos/forjados/placeholder, membership revogado/inativo, empresa inativa, recurso cruzado e JSON de serviço falsificado. Demonstrar autorização dentro da unidade sem efeito na outra.
+- Testar escrita direta, RPCs/overloads, views, políticas paralelas, SQL dinâmico pertinente, falhas intermediárias e transações, concorrência/idempotência, referências existentes, NULL e payloads mistos. Comparar recursos/vínculos/saldos/custos/logs antes/depois de sucesso, falha e recuo.
+- Testes Fase 6: 80 assertions SQL, 13 recusas de drift, 12 checks de concorrência/recuo. Regressões Fase 3:175, Fase 4:146/oito recusas/15 checks, Fase 5:67/dez recusas/13 checks. Runners exigem banco local descartável, nunca produção. Reexecutar regressões afetadas e incluir consumers de ponta a ponta relevantes.
+- TypeScript app/node, lint, RBAC, build, unitários e Deno nas Edges alteradas. Baseline Fase 6: **776/776 unitários, 98 arquivos; lint 0 erros/1.355 warnings**. security:check pode retornar 0 pulando SQL sem configuração de serviço: registrar cobertura real. Não pedir segredos no chat.
+- Gateway/JWT/PostgREST/browser autenticado do Catálogo não foram certificados na Fase 6. Diferenciar testes SQL de autorização, testes unitários de transporte/UI e integração real. A→B com resposta atrasada se alterar estado/cache; preserve provider/clientes imutáveis.
+- Limites anteriores: planejamento com conflito/coluna inválidos, inventário rápido com tipo incompatível, edição de Salmão em duas chamadas, cancelamento externo em múltiplas requisições, estorno de Compras com ordem incorreta, recebimento após aprovação exige compras:lista:approve, itens livres parciais sem idempotência geral certificada. Só incluir correção se houver ligação demonstrada ao escopo e mudança mínima justificada; não declarar esses fluxos aprovados por testes de outras rotinas.
+
+## Entrega e publicação
+
+Atualizar relatório com matriz revisável de todas as tabelas/views/funções/INSERTs, classificação global/tenant/mista, grants/policies/guards/callers antes/depois, achados resolvidos localmente versus vivos, cobertura/limitações, dados agregados de integridade, migrations, testes, riscos e dependências. Manter AGENTS/CLAUDE idênticos e enxutos, acrescentando só regra operacional necessária para evitar erro caro. Commits pequenos, verificação de segredos antes de git add/commit/push.
+
+Produção exige projeto confirmado, backup restaurável, preflight atualizado e ensaio aprovado. Não fazer push automático em main nem publicar fases anteriores silenciosamente. Se faltar integração/publicação/evidência, concluir o trabalho local seguro e registrar dependência exata; não declarar os achados resolvidos no banco vivo.
+
+Entregar resumo curto, arquivos/migrations, testes reais e limites, pendências, commits e sequência exata de publicação/recuo. Encerrar na Fase 7 e fornecer o prompt completo copiável da Fase 8, **sem iniciá-la**.

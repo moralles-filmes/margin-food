@@ -1,6 +1,6 @@
 # Auditoria pós-implantação multiunidade
 
-Data: 2026-09-15. **Fase 1 concluída; Fases 2, 3, 4 e 5 implementadas e ensaiadas localmente, com publicação pendente. Estabilização ainda em andamento.**
+Data: 2026-09-15. **Fase 1 concluída; Fases 2, 3, 4, 5 e 6 implementadas e ensaiadas localmente, com publicação pendente. Estabilização ainda em andamento.**
 
 Atualização Fase 2: [resultados, testes e sequência de produção](fase2-20260915/RESULTADOS.md). C01/C02 foram corrigidos no código e testados com 82 assertions SQL reais, cinco casos de drift e rollback de contenção; **continuam abertos em produção**, que recebeu somente leituras. A baseline e os achados abaixo preservam a auditoria da Fase 1.
 
@@ -11,6 +11,8 @@ Base: `main`, commit `1fdea27e69e3d687b49fdd04e91069b25cc70850`. Diretório inic
 Atualização Fase 4: [resultados, ACLs, testes e publicação](fase4-20260915/RESULTADOS.md). Main atualizada até `80dcf4e` foi integrada, preservando validade/FEFO e correção de estorno do Salmão. H04 corrigido localmente com 146 assertions SQL, oito recusas de drift e 15 checks de concorrência/recuo; regressão de 175 assertions de logs e 773 unitários aprovada. **Às 20:28 UTC, Fases 2/3/4 ainda ausentes do banco vivo.** O preflight histórico da Fase 3 precisa ser reconciliado com as assinaturas/corpos de Salmão já publicados; não foi contornado. `20260910003448` reapareceu no Git e histórico remoto, sem encerrar a revisão histórica da Fase 9. Próximo prompt: [Fase 5 — fornecedores](07-PROMPT-FASE-5.md).
 
 ## 1. Resumo executivo
+
+Atualização Fase 6: [resultados, matriz e inventário automático](fase6-20260915/RESULTADOS.md). Catálogo create/edit reconhecidos; inativação por RPC UUID-only e helper de custo restrito a callers internos. 80 assertions SQL, 13 recusas de drift, 12 checks concorrência/recuo; regressões 175/146/67 SQL, 8/10 drift e 15/13 concorrência aprovadas; 776 unitários. Inventário reproduzível de 515 arquivos, 861 migrations, 321 funções e 595 policies. **Às 23:45 UTC, Fases 2–6 ausentes de produção; M01 e exposição do helper de custo continuam abertos.** Preflight vivo recusa pré-requisitos ausentes. Próximo prompt: [Fase 7 — tabelas, INSERTs, RLS, views e SECURITY DEFINER](09-PROMPT-FASE-7.md); não iniciada.
 
 Atualização Fase 5: [resultados, consumers e operação](fase5-20260915/RESULTADOS.md). Fornecedor/preço manual atômico, FKs por empresa e recebimento corrigidos localmente; 67 assertions SQL, dez recusas de drift, 13 checks concorrência/recuo e regressões de 175/146 assertions + 15 checks Salmão aprovados. **Às 23:16 UTC, Fases 2/3/4/5 ainda ausentes do banco vivo; H05 aberto em produção.** Nenhum saneamento automático. Próximo prompt: [Fase 6 — produtos e permissões](08-PROMPT-FASE-6.md).
 
@@ -150,6 +152,8 @@ Todos os itens abaixo estão **ABERTOS em produção**. C01/C02 possuem correç�
 
 ### M01 — MEDIUM — Produtos: catálogo × cadastros
 
+**Fase 6:** correção/ensaio local em `20260915232846`; DELETE-only usa `deactivate_produto(uuid)` sem UPDATE genérico ou DELETE físico. Inativar/Reativar na UI atual foi alinhado a delete/edit. Contenção adicional do helper público sem tenant `recalc_product_costs(uuid)`, mantendo fórmula/caller interno. [Matriz, evidências, limites e publicação](fase6-20260915/RESULTADOS.md). Nenhuma aplicação em produção; baseline histórica abaixo mantida.
+
 - `produtos_insert/update/delete` usam estoque:cadastros e legadas; faltam estoque:catalogo:create/edit/delete usados por EstoqueGeralView.
 - Existem ainda policies tenant_insert/update/delete paralelas com has_permission_quick e chaves legadas. Avaliar a combinação completa, não só três nomes.
 - Excluir no catálogo é UPDATE ativo=false. Conceder genericamente UPDATE por permissão de delete pode liberar edição indevida de outras colunas: distinguir ação e payload no desenho da correção.
@@ -247,7 +251,7 @@ A numeração abaixo é a deste trabalho; agrupa as 20 frentes do pedido origina
 | 3 | Logs completos: escrita, leitura, histórico e escopo global | Implementado e ensaiado localmente; publicação/backfill pendentes ([resultados](fase3-20260915/RESULTADOS.md)) |
 | 4 | RPCs de Salmão, funções internas e grants | Implementada e ensaiada localmente; publicação pendente ([resultados](fase4-20260915/RESULTADOS.md)) |
 | 5 | Fornecedores e preço por item | Implementada e ensaiada localmente; publicação pendente ([resultados](fase5-20260915/RESULTADOS.md)) |
-| 6 | Produtos e inventário automático de permissões | Comparar backend vivo, migrations, Edges e frontend com registry; classificar VÁLIDA/LEGADA/FANTASMA/NÃO ENCONTRADA/DIVERGENTE/GLOBAL |
+| 6 | Produtos e inventário automático de permissões | Implementada e ensaiada localmente; publicação pendente ([resultados](fase6-20260915/RESULTADOS.md)) |
 | 7 | Todas as tabelas, INSERTs, RLS, views e SECURITY DEFINER | Classificação global/tenant, FKs/índices, guard/grant por função e testes reais dos achados |
 | 8 | Edges, Storage, Realtime, integrações e jobs | Tenant explícito/autorizado, revogação, isolamento de arquivos e canais e ausência de mistura em jobs |
 | 9 | Drift de schema/histórico | Diferenças explicadas, definições esperadas comparadas ao vivo e migration nova somente se necessária |
