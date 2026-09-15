@@ -1,0 +1,46 @@
+{
+  "date": "2026-09-15",
+  "environment": "PostgreSQL 17.10 local, 127.0.0.1:15440, sem dados de produção",
+  "database": "moralles_phase3_test_acceptance",
+  "schema_sha256": "89360CDC5F0213FF9ECA374F0295AD2D29128474BA6762CB959DEDE00F05BD5B",
+  "sql_assertions": { "passed": 175, "failed": 0, "fixture_transaction": "ROLLBACK" },
+  "negative_drift_cases": { "passed": 9, "failed": 0 },
+  "concurrency": {
+    "distinct_rows_skip_locked": "PASS",
+    "new_writer_while_backfill_open": "PASS",
+    "resource_lock_blocks_reassignment": "PASS",
+    "backfill_reexecution": "PASS",
+    "rollback_full_row_digests_preserved": "PASS",
+    "rollback_readers_and_backfill_closed": "PASS",
+    "rollback_service_writers_and_phase2_maintenance_preserved": "PASS",
+    "disposable_fixtures_retained_for_inspection": true
+  },
+  "pagination": { "fixture_events": 10000, "returned_rows": 50, "index": "audit_logs_tenant_page", "execution_ms": 8.947, "planning_ms": 5.022, "production_benchmark": false },
+  "vitest": { "files_passed": 91, "tests_passed": 719, "failed": 0 },
+  "typecheck": { "tsconfig.app.json": "PASS", "tsconfig.node.json": "PASS" },
+  "lint": { "errors": 0, "warnings": 1349 },
+  "rbac": { "blockers": 0, "important_warnings": 2, "status": "PASS" },
+  "security_check": { "static": "PASS", "sql": "SKIPPED: configuração de serviço ausente" },
+  "build": "PASS",
+  "deno_check": { "inventario": "PASS", "ficha-tecnica": "PASS", "requisicao-estoque": "PASS" },
+  "production_write_tests": "NOT RUN",
+  "published_edge_http_integration": "NOT RUN",
+  "authenticated_browser_verification": "NOT RUN",
+  "known_baseline_operation_failures": [
+    "planning upsert: ON CONFLICT incompatível (42P10), assertado como limite preexistente",
+    "planning delete: coluna deleted_at inexistente (42703), assertado como limite preexistente",
+    "inventário rápido: tipo rapido incompatível com CHECK atual; fluxo completo não coberto"
+  ],
+  "local_raw_outputs": [
+    ".phase3.local/acceptance.log",
+    ".phase3.local/concurrency-acceptance.log",
+    ".phase3.local/unit-acceptance.log",
+    ".phase3.local/typecheck-app-final.log",
+    ".phase3.local/typecheck-node-final.log",
+    ".phase3.local/lint-final-delivery.log",
+    ".phase3.local/build-final-delivery.log",
+    ".phase3.local/deno-final.log",
+    ".phase3.local/security-final.log",
+    ".phase3.local/rbac-final.log"
+  ]
+}
