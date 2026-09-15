@@ -18,7 +18,7 @@ import ContasReceberSection from '@/components/financeiro/ContasReceberSection';
 import FluxoCaixaSection, { type FluxoNavigateParams } from '@/components/financeiro/FluxoCaixaSection';
 import DRESection from '@/components/financeiro/DRESection';
 import DFCSection from '@/components/financeiro/DFCSection';
-import DashboardFinanceiroSection from '@/components/financeiro/DashboardFinanceiroSection';
+import DashboardFinanceiroSection, { type DashboardNavigateParams } from '@/components/financeiro/DashboardFinanceiroSection';
 const OrcamentoSection = lazy(() => import('@/components/financeiro/OrcamentoSection'));
 const ConciliacaoBancariaSection = lazy(() => import('@/components/financeiro/ConciliacaoBancariaSection'));
 import AlertasSection from '@/components/financeiro/AlertasSection';
@@ -65,7 +65,7 @@ function CadastrosBase() {
 // ContasBancarias extracted to src/components/financeiro/ContasBancariasSection.tsx
 
 // LancamentosSection wrapper - LivroRazaoSection extracted to src/components/financeiro/LivroRazaoSection.tsx
-function LancamentosSection({ initialContaId, initialDateFrom, initialDateTo }: { initialContaId?: string; initialDateFrom?: string; initialDateTo?: string }) {
+function LancamentosSection({ initialContaId, initialDateFrom, initialDateTo, initialTipo }: { initialContaId?: string; initialDateFrom?: string; initialDateTo?: string; initialTipo?: string }) {
   const [innerTab, setInnerTab] = useState<'razao' | 'conciliacao'>('razao');
   return (
     <div className="space-y-4">
@@ -73,7 +73,7 @@ function LancamentosSection({ initialContaId, initialDateFrom, initialDateTo }: 
         <Button variant={innerTab === 'razao' ? 'default' : 'outline'} size="sm" onClick={() => setInnerTab('razao')}>Livro Razão</Button>
         <Button variant={innerTab === 'conciliacao' ? 'default' : 'outline'} size="sm" onClick={() => setInnerTab('conciliacao')}>Conciliação Bancária</Button>
       </div>
-      {innerTab === 'razao' ? <LivroRazaoSection initialContaId={initialContaId} initialDateFrom={initialDateFrom} initialDateTo={initialDateTo} /> : <Suspense fallback={<FinSpinner />}><ConciliacaoBancariaSection /></Suspense>}
+      {innerTab === 'razao' ? <LivroRazaoSection initialContaId={initialContaId} initialDateFrom={initialDateFrom} initialDateTo={initialDateTo} initialTipo={initialTipo} /> : <Suspense fallback={<FinSpinner />}><ConciliacaoBancariaSection /></Suspense>}
     </div>
   );
 }
@@ -167,6 +167,9 @@ export default function FinanceiroView() {
   const [extratoContaId, setExtratoContaId] = useState<string | undefined>(undefined);
   const [fluxoDateFrom, setFluxoDateFrom] = useState<string | undefined>(undefined);
   const [fluxoDateTo, setFluxoDateTo] = useState<string | undefined>(undefined);
+  const [lancamentosInitialTipo, setLancamentosInitialTipo] = useState<string | undefined>(undefined);
+  const [pagarInitialStatus, setPagarInitialStatus] = useState<string | undefined>(undefined);
+  const [receberInitialStatus, setReceberInitialStatus] = useState<string | undefined>(undefined);
   const { visibleSubtabs } = useModuleAccess('financeiro');
   const location = useLocation();
   const navigate = useNavigate();
@@ -214,13 +217,26 @@ export default function FinanceiroView() {
     setActiveTab(params.tab as FinSubTab);
   }, [setActiveTab]);
 
+  // Handle navigation from cards do Dashboard Financeiro, levando o filtro do card ao sub-módulo
+  const handleDashboardNavigate = useCallback((params: DashboardNavigateParams) => {
+    setFluxoDateFrom(params.dateFrom);
+    setFluxoDateTo(params.dateTo);
+    setLancamentosInitialTipo(params.tipo);
+    setPagarInitialStatus(params.tab === 'pagar' ? params.status : undefined);
+    setReceberInitialStatus(params.tab === 'receber' ? params.status : undefined);
+    setActiveTab(params.tab as FinSubTab);
+  }, [setActiveTab]);
+
   // Clear filters when navigating away
   useEffect(() => {
     if (activeTab !== 'lancamentos') {
       setExtratoContaId(undefined);
       setFluxoDateFrom(undefined);
       setFluxoDateTo(undefined);
+      setLancamentosInitialTipo(undefined);
     }
+    if (activeTab !== 'pagar') setPagarInitialStatus(undefined);
+    if (activeTab !== 'receber') setReceberInitialStatus(undefined);
   }, [activeTab]);
 
   const allTabs = useMemo<FinTab[]>(() => [
@@ -319,13 +335,13 @@ export default function FinanceiroView() {
       <ModuleNav items={moduleNavItems} value={effectiveTab} onChange={handleTabSelect} />
 
       {/* ── Conteúdo ── */}
-      {effectiveTab === 'dashboard' && <DashboardFinanceiroSection onNavigate={setActiveTab} />}
+      {effectiveTab === 'dashboard' && <DashboardFinanceiroSection onNavigate={handleDashboardNavigate} />}
       {effectiveTab === 'fechamento' && <FechamentoCaixaSection />}
       {effectiveTab === 'cadastros' && <CadastrosBase />}
       {effectiveTab === 'contas' && <ContasBancariasSection onNavigateExtrato={handleNavigateExtrato} />}
-      {effectiveTab === 'lancamentos' && <LancamentosSection initialContaId={extratoContaId} initialDateFrom={fluxoDateFrom} initialDateTo={fluxoDateTo} />}
-      {effectiveTab === 'pagar' && <ContasPagarSection />}
-      {effectiveTab === 'receber' && <ContasReceberSection />}
+      {effectiveTab === 'lancamentos' && <LancamentosSection initialContaId={extratoContaId} initialDateFrom={fluxoDateFrom} initialDateTo={fluxoDateTo} initialTipo={lancamentosInitialTipo} />}
+      {effectiveTab === 'pagar' && <ContasPagarSection initialStatus={pagarInitialStatus} />}
+      {effectiveTab === 'receber' && <ContasReceberSection initialStatus={receberInitialStatus} />}
       {effectiveTab === 'fluxo' && <FluxoCaixaSection onNavigate={handleFluxoNavigate} />}
       {effectiveTab === 'dre' && <DREDFCSection />}
       {effectiveTab === 'orcamento' && <Suspense fallback={<FinSpinner />}><OrcamentoSection /></Suspense>}

@@ -103,6 +103,7 @@ interface LivroRazaoProps {
   initialContaId?: string;
   initialDateFrom?: string;
   initialDateTo?: string;
+  initialTipo?: string;
 }
 
 const dayHeaderFormatter = new Intl.DateTimeFormat('pt-BR', { weekday: 'short', day: 'numeric', month: 'long' });
@@ -113,7 +114,7 @@ function capitalizeFirst(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-export default function LivroRazaoSection({ initialContaId, initialDateFrom, initialDateTo }: LivroRazaoProps = {}) {
+export default function LivroRazaoSection({ initialContaId, initialDateFrom, initialDateTo, initialTipo }: LivroRazaoProps = {}) {
   const supabase = useSupabase();
   const callUntypedRpc = supabase.rpc.bind(supabase) as unknown as UntypedRpc;
   const { user } = useAuth();
@@ -135,7 +136,7 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
   const [editPrevStatus, setEditPrevStatus] = useState<string | null>(null);
   const [editClassificationOnly, setEditClassificationOnly] = useState(false);
   const [justificativa, setJustificativa] = useState('');
-  const [filtroTipo, setFiltroTipo] = useState('todos');
+  const [filtroTipo, setFiltroTipo] = useState(initialTipo || 'todos');
   const [filtroOrigem, setFiltroOrigem] = useState('todos');
   const [filtroConta, setFiltroConta] = useState(initialContaId || 'todos');
   const [filtroCategoria, setFiltroCategoria] = useState(CATEGORIA_FILTRO_TODOS);
