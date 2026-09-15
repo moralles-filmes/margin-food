@@ -78,7 +78,11 @@ function NoAccess() {
   );
 }
 
-export default function ContasPagarSection() {
+interface ContasPagarSectionProps {
+  initialStatus?: string;
+}
+
+export default function ContasPagarSection({ initialStatus }: ContasPagarSectionProps = {}) {
   const supabase = useSupabase();
   const canView = useCan('financeiro:pagar:view');
   const canCreate = useCan('financeiro:pagar:create');
@@ -94,7 +98,7 @@ export default function ContasPagarSection() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showForm, setShowForm] = useState(false);
-  const [filtroStatus, setFiltroStatus] = useState('todos');
+  const [filtroStatus, setFiltroStatus] = useState(initialStatus || 'todos');
   const [filtroDataDe, setFiltroDataDe] = useState('');
   const [filtroDataAte, setFiltroDataAte] = useState('');
   const [mesFiltro, setMesFiltro] = useState(() => formatInBR(new Date(), 'yyyy-MM'));
