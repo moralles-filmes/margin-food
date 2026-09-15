@@ -57,6 +57,10 @@ export function useBordero({ companyId, period, enabled }: UseBorderoOptions) {
     queryKey: [...BORDERO_QUERY_ROOT, companyId ?? 'unresolved', period?.start ?? null, period?.end ?? null],
     queryFn: ({ signal }) => fetchBorderoReport(supabase, period!, signal),
     enabled: enabled && Boolean(companyId) && period !== null,
+    // Relatório de decisão: o evento de invalidação só chega com a tela montada, então
+    // um pagamento/exclusão feito em Contas a Pagar deixava números antigos no cache.
+    staleTime: 0,
+    refetchOnMount: 'always',
     retry: (failureCount, error) => failureCount < 1
       && !isBorderoPermissionError(error)
       && !(error instanceof BorderoContractError),

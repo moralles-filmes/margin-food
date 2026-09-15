@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { formatDateValueBR } from '@/lib/datetime';
 import {
-  BORDERO_STATUS_LABEL,
+  borderoEntrySituation,
   flattenBorderoCategories,
   formatBorderoMoney,
   type BorderoCategoryNode,
@@ -24,7 +24,9 @@ function collectExpandableIds(nodes: BorderoCategoryNode[], into: Set<string>): 
   return into;
 }
 
-export default function BorderoCategoryTable({ report }: { report: BorderoReport }) {
+const MONEY_CELL = 'text-right font-mono tabular-nums';
+
+export default function BorderoCategoryTable({ report, todayISO }: { report: BorderoReport; todayISO: string }) {
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [showEmpty, setShowEmpty] = useState(false);
 
@@ -43,22 +45,22 @@ export default function BorderoCategoryTable({ report }: { report: BorderoReport
     });
   };
 
-  const isEmpty = report.items.length === 0;
+  const isEmpty = report.entries.length === 0;
 
   return (
     <Card>
       <CardContent className="p-0">
         <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-border">
           <div>
-            <h3 className="text-sm font-bold uppercase tracking-wider text-foreground">Contas a vencer</h3>
+            <h3 className="text-sm font-bold uppercase tracking-wider text-foreground">Despesas do período</h3>
             <p className="text-xs text-muted-foreground">
-              Agrupadas pelas categorias financeiras do DRE/DFC • {report.payableCount} conta(s) no período
+              Agrupadas pelas categorias financeiras do DRE/DFC • {report.paidCount} paga(s) • {report.payableCount} a vencer
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2">
               <Switch id="bordero-show-empty" checked={showEmpty} onCheckedChange={setShowEmpty} />
-              <Label htmlFor="bordero-show-empty" className="text-xs text-muted-foreground">Mostrar categorias sem vencimentos</Label>
+              <Label htmlFor="bordero-show-empty" className="text-xs text-muted-foreground">Mostrar categorias sem despesas</Label>
             </div>
             {allExpandable.size > 0 && (
               <Button
@@ -76,7 +78,7 @@ export default function BorderoCategoryTable({ report }: { report: BorderoReport
         {isEmpty && (
           <div className="flex items-center gap-3 px-4 py-4 border-b border-border text-sm text-muted-foreground" role="status">
             <Inbox className="w-5 h-5 shrink-0" />
-            Não existem contas a vencer para este período.
+            Não existem despesas para este período.
           </div>
         )}
 
@@ -84,14 +86,18 @@ export default function BorderoCategoryTable({ report }: { report: BorderoReport
           <TableHeader>
             <TableRow>
               <TableHead>Categoria / Fornecedor ou descrição</TableHead>
-              <TableHead className="w-[120px]">Vencimento</TableHead>
-              <TableHead className="text-right w-[170px]">Valor</TableHead>
+              <TableHead className="w-[110px]">Data</TableHead>
+              <TableHead className="text-right w-[140px]">Pagas</TableHead>
+              <TableHead className="text-right w-[140px]">A vencer</TableHead>
+              <TableHead className="text-right w-[150px]">Total</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {rows.map(({ node, depth, hasChildren }) => {
               const open = expanded.has(node.id);
               const showItems = open && node.items.length > 0;
+              const weight = depth === 0 ? 'font-bold' : 'font-medium';
+              const muted = node.itemCount === 0 && 'text-muted-foreground';
               return (
                 <Fragment key={node.id}>
                   <TableRow className={cn(depth === 0 && 'bg-background-subtle')}>
@@ -112,7 +118,7 @@ export default function BorderoCategoryTable({ report }: { report: BorderoReport
                         )}
                         <span className={cn(
                           depth === 0 ? 'font-bold text-sm uppercase tracking-wide' : 'font-medium text-sm',
-                          node.itemCount === 0 && 'text-muted-foreground',
+                          muted,
                         )}>
                           {node.name}
                         </span>
@@ -121,43 +127,45 @@ export default function BorderoCategoryTable({ report }: { report: BorderoReport
                       </div>
                     </TableCell>
                     <TableCell />
-                    <TableCell className={cn(
-                      'text-right font-mono tabular-nums',
-                      depth === 0 ? 'font-bold' : 'font-medium',
-                      node.itemCount === 0 && 'text-muted-foreground',
-                    )}>
-                      {formatBorderoMoney(node.amountCents)}
-                    </TableCell>
+                    <TableCell className={cn(MONEY_CELL, weight, 'text-muted-foreground')}>{formatBorderoMoney(node.paidCents)}</TableCell>
+                    <TableCell className={cn(MONEY_CELL, weight, 'text-muted-foreground')}>{formatBorderoMoney(node.openCents)}</TableCell>
+                    <TableCell className={cn(MONEY_CELL, weight, muted)}>{formatBorderoMoney(node.amountCents)}</TableCell>
                   </TableRow>
-                  {showItems && node.items.map(item => (
-                    <TableRow key={item.allocationId}>
-                      <TableCell style={{ paddingLeft: `${(depth + 1) * 20 + 32}px` }}>
-                        <div className="text-sm text-foreground">
-                          {item.supplier && item.supplier !== item.description ? (
-                            <><span className="font-medium">{item.supplier}</span><span className="text-muted-foreground"> — {item.description}</span></>
-                          ) : (
-                            <span>{item.description}</span>
-                          )}
-                          {item.status === 'AGUARDANDO_APROVACAO' && (
-                            <Badge variant="info" className="ml-2 text-[10px]">{BORDERO_STATUS_LABEL[item.status]}</Badge>
-                          )}
-                          {item.split && <Badge variant="neutral" className="ml-2 text-[10px]">Rateio</Badge>}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground tabular-nums">{formatDateValueBR(item.dueDate)}</TableCell>
-                      <TableCell className="text-right font-mono text-sm tabular-nums">{formatBorderoMoney(item.amountCents)}</TableCell>
-                    </TableRow>
-                  ))}
+                  {showItems && node.items.map(item => {
+                    const situation = borderoEntrySituation(item, todayISO);
+                    const amount = formatBorderoMoney(item.amountCents);
+                    return (
+                      <TableRow key={`${item.settlement}:${item.allocationId}`}>
+                        <TableCell style={{ paddingLeft: `${(depth + 1) * 20 + 32}px` }}>
+                          <div className="text-sm text-foreground">
+                            {item.supplier && item.supplier !== item.description ? (
+                              <><span className="font-medium">{item.supplier}</span><span className="text-muted-foreground"> — {item.description}</span></>
+                            ) : (
+                              <span>{item.description}</span>
+                            )}
+                            <Badge variant={situation.tone} className="ml-2 text-[10px]">{situation.label}</Badge>
+                            {item.split && <Badge variant="neutral" className="ml-2 text-[10px]">Rateio</Badge>}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground tabular-nums">{formatDateValueBR(item.referenceDate)}</TableCell>
+                        <TableCell className={cn(MONEY_CELL, 'text-sm')}>{item.settlement === 'paid' ? amount : ''}</TableCell>
+                        <TableCell className={cn(MONEY_CELL, 'text-sm')}>{item.settlement === 'open' ? amount : ''}</TableCell>
+                        <TableCell className={cn(MONEY_CELL, 'text-sm')}>{amount}</TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </Fragment>
               );
             })}
           </TableBody>
           <TableFooter>
             <TableRow>
-              <TableCell className="font-bold uppercase tracking-wide">Total a pagar</TableCell>
+              <TableCell className="font-bold uppercase tracking-wide">Total de contas</TableCell>
               <TableCell />
-              <TableCell className="text-right font-mono font-bold text-base tabular-nums" data-testid="bordero-table-total">
-                {formatBorderoMoney(report.totalPayableCents)}
+              <TableCell className={cn(MONEY_CELL, 'font-bold')} data-testid="bordero-table-paid">{formatBorderoMoney(report.totalPaidCents)}</TableCell>
+              <TableCell className={cn(MONEY_CELL, 'font-bold')} data-testid="bordero-table-open">{formatBorderoMoney(report.totalPayableCents)}</TableCell>
+              <TableCell className={cn(MONEY_CELL, 'font-bold text-base')} data-testid="bordero-table-total">
+                {formatBorderoMoney(report.totalExpenseCents)}
               </TableCell>
             </TableRow>
           </TableFooter>

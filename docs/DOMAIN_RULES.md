@@ -124,16 +124,17 @@
 | **Fonte** | RPC `get_fin_projecao` |
 | **Consumidores** | Projeção de Fluxo |
 
-### FIN-BORDERO — Borderô (contas a vencer e saldo final provisionado)
+### FIN-BORDERO — Borderô (despesa completa do período e saldo final provisionado)
 
 | Campo | Valor |
 |-------|-------|
-| **Descrição** | Previsão de pagamento do período: contas a pagar em aberto agrupadas pelas categorias do DRE/DFC |
-| **Filtro de data** | EXCLUSIVAMENTE `fin_contas_pagar.data_vencimento`, início e fim inclusivos (nunca competência, lançamento ou pagamento) |
-| **Status** | AGUARDANDO_APROVACAO, APROVADO, VENCIDO (RASCUNHO, PAGO e CANCELADO ficam fora) |
-| **Valor** | `fin_contas_pagar.valor` — não existe pagamento parcial; rateio prevalece sobre a categoria do cabeçalho (FIN-RATEIO) |
+| **Descrição** | Despesa completa do período — contas já pagas + contas a vencer — agrupada pelas categorias do DRE/DFC |
+| **Contas a vencer** | `fin_contas_pagar` AGUARDANDO_APROVACAO, APROVADO, VENCIDO por `data_vencimento` (pontas inclusivas); inclui as que já venceram dentro do período |
+| **Contas já pagas** | Todas as despesas do razão pela regra de caixa do DFC (`_fin_dfc_effective_allocations`: REALIZADO/CONCILIADO, sem transferência, sem conciliação pendente, data efetiva `COALESCE(data_pagamento, conciliado_em, data_competencia)`) — baixas de boleto, conciliação, manuais e juros/tarifa. Bate com as saídas do Livro Razão e o DFC no mesmo período |
+| **Sem duplicidade** | A baixa do boleto (lançamento com `referencia_modulo = 'contas_pagar'`) é a despesa paga; a CP só identifica a linha (fornecedor, vencimento) e nunca é somada. CP `PAGO` sem baixa no razão não entra (não saiu do caixa) |
+| **Valor** | `fin_contas_pagar.valor` / `fin_lancamentos.valor` — rateio prevalece sobre a categoria do cabeçalho (FIN-RATEIO) |
 | **Saldo das contas** | `fin_contas_saldo_cache` das contas ativas (FIN-SALDO) |
-| **Fórmula** | Saldo final provisionado = saldo das contas − contas a vencer |
+| **Fórmula** | Total de contas = já pagas + a vencer; saldo final provisionado = saldo das contas − contas a vencer (o que já foi pago já saiu do saldo) |
 | **Precisão** | Centavos inteiros do banco ao PDF; tela e PDF usam o mesmo `BorderoReport` |
 | **Informativo** | Contas em aberto vencidas antes do período são exibidas em aviso e não entram nos totais |
 | **Fonte** | RPC `get_fin_bordero` (tenant por `assert_tenant()`, permissão `financeiro:relatorio-socios:view`) |

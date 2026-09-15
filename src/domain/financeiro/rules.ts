@@ -112,9 +112,9 @@ export const RULES: Record<string, DomainRule> = {
   },
   'FIN-BORDERO': {
     id: 'FIN-BORDERO',
-    name: 'Borderô — Contas a Vencer e Saldo Final Provisionado',
-    description: 'Contas a pagar em aberto (AGUARDANDO_APROVACAO, APROVADO, VENCIDO) filtradas EXCLUSIVAMENTE por data_vencimento, com as duas pontas inclusivas; agrupadas pela árvore de categorias do DRE/DFC com FIN-RATEIO. Saldo das contas = fin_contas_saldo_cache das contas ativas. Valores em centavos inteiros.',
-    formula: 'saldoFinalProvisionado = saldoDasContas - contasAVencer',
+    name: 'Borderô — Despesa Completa do Período e Saldo Final Provisionado',
+    description: 'Contas a vencer = CP em aberto (AGUARDANDO_APROVACAO, APROVADO, VENCIDO) por data_vencimento inclusiva. Contas já pagas = todas as despesas do razão pela regra de caixa do DFC (data efetiva de pagamento; inclui baixas de boleto, que só são enriquecidas pela CP — nunca somadas de novo) — bate com as saídas do Livro Razão. Agrupadas pela árvore do DRE/DFC com FIN-RATEIO. Saldo das contas = fin_contas_saldo_cache das contas ativas. Valores em centavos inteiros.',
+    formula: 'totalDeContas = contasJaPagas + contasAVencer; saldoFinalProvisionado = saldoDasContas - contasAVencer',
     statusIncluded: ['AGUARDANDO_APROVACAO', 'APROVADO', 'VENCIDO'],
     statusExcluded: ['RASCUNHO', 'PAGO', 'CANCELADO'],
     sourceOfTruth: 'RPC get_fin_bordero / buildBorderoReport() em domain/financeiro/bordero',
