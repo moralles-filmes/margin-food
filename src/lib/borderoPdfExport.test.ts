@@ -29,8 +29,14 @@ describe('Borderô — exportação PDF', () => {
     expect(text).toContain('R$2.320,34');
     expect(text).toContain('R$60.635,24');
     expect(text).toContain('R$813,46');
-    expect(text).toContain('TOTAL A PAGAR');
-    expect(text).toContain('R$131.823,59');
+    expect(text).toContain('CONTAS J');
+    expect(text).toContain('R$15.045,90'); // pagas
+    expect(text).toContain('R$131.823,59'); // a vencer
+    expect(text).toContain('TOTAL DE CONTAS');
+    expect(text).toContain('R$146.869,49'); // pagas + a vencer
+    expect(text).toContain('R$52.991,09'); // Peixes: 15.000,00 pagas + 37.991,09 a vencer
+    expect(text).toContain('Paga');
+    expect(text).toContain('TARIFA PIX');
     expect(text).toContain('SALDO DAS CONTAS');
     expect(text).toContain('R$188.609,27');
     expect(text).toContain('SALDO FINAL PROVISIONADO');
@@ -40,8 +46,8 @@ describe('Borderô — exportação PDF', () => {
     expect(totalPages).toBeGreaterThanOrEqual(1);
     expect(text).toMatch(new RegExp(`P.gina ${totalPages} de ${totalPages}`));
     expect(text).not.toMatch(/NaN|Infinity|undefined/);
-    expect(text).toContain('(TOTAL A PAGAR) Tj');
-    expect(text).not.toContain('(TOTAL A) Tj');
+    expect(text).toContain('(TOTAL DE CONTAS) Tj');
+    expect(text).not.toContain('(TOTAL DE) Tj');
     expect(model.fileName).toBe('bordero-barbados-villagio-31-08-2026-a-06-09-2026.pdf');
   });
 
@@ -50,17 +56,21 @@ describe('Borderô — exportação PDF', () => {
     const model = buildBorderoPdfModel(report, { mode: 'week', exportedAt });
     expect(model.storeName).toBe(report.store.name);
     expect(model.periodLabel).toBe(formatBorderoPeriod(report.period));
+    expect(model.summary.paid).toBe(formatBorderoMoney(report.totalPaidCents));
     expect(model.summary.payable).toBe(formatBorderoMoney(report.totalPayableCents));
+    expect(model.summary.total).toBe(formatBorderoMoney(report.totalExpenseCents));
     expect(model.summary.balance).toBe(formatBorderoMoney(report.totalAccountBalanceCents));
     expect(model.summary.final).toBe(formatBorderoMoney(report.projectedFinalBalanceCents));
     expect(model.totals).toEqual([
-      { label: 'TOTAL A PAGAR', value: 'R$131.823,59' },
-      { label: 'SALDO DAS CONTAS', value: 'R$188.609,27' },
-      { label: 'SALDO FINAL PROVISIONADO', value: 'R$56.785,68' },
+      { label: 'TOTAL DE CONTAS', paid: 'R$15.045,90', open: 'R$131.823,59', value: 'R$146.869,49' },
+      { label: 'SALDO DAS CONTAS', paid: '', open: '', value: 'R$188.609,27' },
+      { label: 'SALDO FINAL PROVISIONADO', paid: '', open: '', value: 'R$56.785,68' },
     ]);
     const rootRows = model.categoryRows.filter(row => row.depth === 0);
-    expect(rootRows.map(row => [row.label, row.value])).toEqual(report.tree.map(node => [node.name, formatBorderoMoney(node.amountCents)]));
-    expect(model.itemRows).toHaveLength(report.items.length);
+    expect(rootRows.map(row => [row.label, row.paid, row.open, row.value])).toEqual(report.tree.map(node => [
+      node.name, formatBorderoMoney(node.paidCents), formatBorderoMoney(node.openCents), formatBorderoMoney(node.amountCents),
+    ]));
+    expect(model.itemRows).toHaveLength(report.entries.length);
   });
 
   it('mês usa o nome do mês no arquivo e sinaliza saldo negativo sem depender de cor', async () => {
@@ -77,7 +87,8 @@ describe('Borderô — exportação PDF', () => {
     expect(text).toContain('01/09/2026 a 30/09/2026');
     expect(text).toContain('-R$30.000,00');
     expect(text).toContain('NEGATIVO');
-    expect(text).toContain('Saldo insuficiente para cobrir os vencimentos do');
+    expect(text).toContain('Saldo insuficiente para cobrir');
+    expect(model.summary.finalMessage).toBe('Saldo insuficiente para cobrir as contas a vencer do período');
     expect(model.overdueNote).toContain('R$1.500,00');
   });
 
@@ -97,7 +108,7 @@ describe('Borderô — exportação PDF', () => {
   });
 
   it('período vazio exporta zero a pagar e saldo final igual ao saldo', async () => {
-    const report = buildBorderoReport(createBorderoPayload({ items: [], accounts: [borderoAccount('Banco', 2_000_000)] }));
+    const report = buildBorderoReport(createBorderoPayload({ items: [], paidItems: [], accounts: [borderoAccount('Banco', 2_000_000)] }));
     const text = await readPdfText(createBorderoPdfBlob(report, { mode: 'week', exportedAt }).blob);
     expect(text).toContain('R$0,00');
     expect(text).toContain('R$20.000,00');

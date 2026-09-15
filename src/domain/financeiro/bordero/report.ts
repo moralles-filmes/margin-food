@@ -2,11 +2,13 @@
  * Borderô — estrutura única consumida pela tela e pelo PDF.
  *
  * O backend (`get_fin_bordero`) já devolve tudo em centavos inteiros e aplica as
- * regras (data_vencimento, status em aberto, FIN-RATEIO, saldo por cache). Aqui só:
+ * regras (CP por data_vencimento, despesas do razão pela regra de caixa do DFC sem
+ * baixas de CP, FIN-RATEIO, saldo por cache). Aqui só:
  *  1. validamos o contrato de transporte;
- *  2. montamos a árvore com o mesmo `buildTree` do DRE/DFC (ordem → código);
- *  3. somamos subárvores em centavos inteiros (nunca float);
- *  4. conferimos as invariantes — divergência vira erro, nunca número exibido.
+ *  2. juntamos contas já pagas e a vencer numa lista única de despesas do período;
+ *  3. montamos a árvore com o mesmo `buildTree` do DRE/DFC (ordem → código);
+ *  4. somamos subárvores em centavos inteiros (nunca float);
+ *  5. conferimos as invariantes — divergência vira erro, nunca número exibido.
  */
 import { buildTree, type CatNode } from '@/components/financeiro/CadastroBaseTree';
 import { fmtBRL } from '@/lib/formatters';
@@ -28,6 +30,7 @@ export interface BorderoCategory {
   synthetic: boolean;
 }
 
+/** Conta a pagar em aberto (contrato `items`). */
 export interface BorderoItem {
   allocationId: string;
   payableId: string;
@@ -36,6 +39,27 @@ export interface BorderoItem {
   supplier: string | null;
   dueDate: string;
   status: string;
+  amountCents: number;
+  split: boolean;
+}
+
+export type BorderoPaidSource = 'conta_pagar' | 'lancamento';
+
+/** Despesa já paga (contrato `paidItems`): CP paga ou lançamento do razão. */
+export interface BorderoPaidItem {
+  allocationId: string;
+  sourceId: string;
+  source: BorderoPaidSource;
+  /** `fin_lancamentos.origem` (manual, conciliacao, ajuste_pagamento…); null para CP. */
+  origin: string | null;
+  categoryId: string;
+  description: string;
+  supplier: string | null;
+  /** Vencimento — só existe para conta a pagar. */
+  dueDate: string | null;
+  paidDate: string | null;
+  /** Data que coloca a despesa no período: vencimento da CP ou pagamento do lançamento. */
+  referenceDate: string;
   amountCents: number;
   split: boolean;
 }
@@ -59,10 +83,35 @@ export interface BorderoPayload {
   items: BorderoItem[];
   totalPayableCents: number;
   payableCount: number;
+  paidItems: BorderoPaidItem[];
+  totalPaidCents: number;
+  paidCount: number;
+  totalExpenseCents: number;
   accounts: BorderoAccount[];
   totalAccountBalanceCents: number;
   projectedFinalBalanceCents: number;
   overdueBeforePeriod: { count: number; amountCents: number };
+}
+
+export type BorderoSettlement = 'paid' | 'open';
+
+/** Linha de despesa do período — paga ou a vencer — como exibida na tela e no PDF. */
+export interface BorderoEntry {
+  allocationId: string;
+  settlement: BorderoSettlement;
+  source: BorderoPaidSource;
+  sourceId: string;
+  origin: string | null;
+  categoryId: string;
+  description: string;
+  supplier: string | null;
+  dueDate: string | null;
+  paidDate: string | null;
+  referenceDate: string;
+  /** Status da conta a pagar; `PAGO` para toda despesa paga. */
+  status: string;
+  amountCents: number;
+  split: boolean;
 }
 
 export interface BorderoCategoryNode {
@@ -73,12 +122,14 @@ export interface BorderoCategoryNode {
   active: boolean;
   nonOperational: boolean;
   synthetic: boolean;
-  /** Soma da subárvore (categoria + descendentes), em centavos. */
+  /** Soma da subárvore (pagas + a vencer), em centavos. */
   amountCents: number;
+  paidCents: number;
+  openCents: number;
   /** Quantidade de alocações na subárvore. */
   itemCount: number;
-  /** Alocações lançadas diretamente nesta categoria. */
-  items: BorderoItem[];
+  /** Despesas lançadas diretamente nesta categoria. */
+  items: BorderoEntry[];
   children: BorderoCategoryNode[];
 }
 
@@ -89,9 +140,13 @@ export interface BorderoReport {
   store: { id: string; name: string };
   generatedAt: string;
   tree: BorderoCategoryNode[];
-  items: BorderoItem[];
+  /** Pagas e a vencer, na ordem da data de referência. */
+  entries: BorderoEntry[];
+  totalPaidCents: number;
+  paidCount: number;
   totalPayableCents: number;
   payableCount: number;
+  totalExpenseCents: number;
   accounts: BorderoAccount[];
   totalAccountBalanceCents: number;
   projectedFinalBalanceCents: number;
@@ -138,6 +193,10 @@ function readIsoDate(value: unknown, path: string): string {
   return text;
 }
 
+function readNullableIsoDate(value: unknown, path: string): string | null {
+  return value === null || value === undefined ? null : readIsoDate(value, path);
+}
+
 function readCents(value: unknown, path: string): number {
   if (typeof value !== 'number' || !Number.isSafeInteger(value)) {
     throw new BorderoContractError(`${path} deve ser um valor inteiro em centavos.`);
@@ -153,6 +212,11 @@ function readInteger(value: unknown, path: string): number {
 
 function readBoolean(value: unknown, path: string): boolean {
   if (typeof value !== 'boolean') throw new BorderoContractError(`${path} inválido.`);
+  return value;
+}
+
+function readPaidSource(value: unknown, path: string): BorderoPaidSource {
+  if (value !== 'conta_pagar' && value !== 'lancamento') throw new BorderoContractError(`${path} inválido.`);
   return value;
 }
 
@@ -208,6 +272,27 @@ export function parseBorderoPayload(value: unknown): BorderoPayload {
     }),
     totalPayableCents: readCents(root.totalPayableCents, 'bordero.totalPayableCents'),
     payableCount: readInteger(root.payableCount, 'bordero.payableCount'),
+    paidItems: readArray(root.paidItems, 'bordero.paidItems').map((entry, index) => {
+      const path = `bordero.paidItems[${index}]`;
+      const item = readRecord(entry, path);
+      return {
+        allocationId: readString(item.allocationId, `${path}.allocationId`),
+        sourceId: readString(item.sourceId, `${path}.sourceId`),
+        source: readPaidSource(item.source, `${path}.source`),
+        origin: readNullableString(item.origin, `${path}.origin`),
+        categoryId: readString(item.categoryId, `${path}.categoryId`),
+        description: readString(item.description, `${path}.description`),
+        supplier: readNullableString(item.supplier, `${path}.supplier`),
+        dueDate: readNullableIsoDate(item.dueDate, `${path}.dueDate`),
+        paidDate: readNullableIsoDate(item.paidDate, `${path}.paidDate`),
+        referenceDate: readIsoDate(item.referenceDate, `${path}.referenceDate`),
+        amountCents: readCents(item.amountCents, `${path}.amountCents`),
+        split: readBoolean(item.split, `${path}.split`),
+      };
+    }),
+    totalPaidCents: readCents(root.totalPaidCents, 'bordero.totalPaidCents'),
+    paidCount: readInteger(root.paidCount, 'bordero.paidCount'),
+    totalExpenseCents: readCents(root.totalExpenseCents, 'bordero.totalExpenseCents'),
     accounts: readArray(root.accounts, 'bordero.accounts').map((entry, index) => {
       const path = `bordero.accounts[${index}]`;
       const account = readRecord(entry, path);
@@ -238,16 +323,43 @@ export function borderoFinalBalanceState(cents: number): BorderoFinalBalanceStat
   return 'zero';
 }
 
+function toEntries(payload: BorderoPayload): BorderoEntry[] {
+  const open: BorderoEntry[] = payload.items.map(item => ({
+    allocationId: item.allocationId,
+    settlement: 'open',
+    source: 'conta_pagar',
+    sourceId: item.payableId,
+    origin: null,
+    categoryId: item.categoryId,
+    description: item.description,
+    supplier: item.supplier,
+    dueDate: item.dueDate,
+    paidDate: null,
+    referenceDate: item.dueDate,
+    status: item.status,
+    amountCents: item.amountCents,
+    split: item.split,
+  }));
+  const paid: BorderoEntry[] = payload.paidItems.map(item => ({
+    ...item,
+    settlement: 'paid',
+    status: 'PAGO',
+  }));
+  // Ordem estável: data de referência, depois pagas antes das a vencer no mesmo dia.
+  return [...paid, ...open].sort((a, b) => a.referenceDate.localeCompare(b.referenceDate));
+}
+
 export function buildBorderoReport(payload: BorderoPayload): BorderoReport {
   const categoryIds = new Set(payload.categories.map(category => category.id));
-  const itemsByCategory = new Map<string, BorderoItem[]>();
-  for (const item of payload.items) {
-    if (!categoryIds.has(item.categoryId)) {
-      throw new BorderoContractError(`Conta ${item.payableId} aponta para categoria ausente na árvore.`);
+  const entries = toEntries(payload);
+  const entriesByCategory = new Map<string, BorderoEntry[]>();
+  for (const entry of entries) {
+    if (!categoryIds.has(entry.categoryId)) {
+      throw new BorderoContractError(`Despesa ${entry.sourceId} aponta para categoria ausente na árvore.`);
     }
-    const list = itemsByCategory.get(item.categoryId) ?? [];
-    list.push(item);
-    itemsByCategory.set(item.categoryId, list);
+    const list = entriesByCategory.get(entry.categoryId) ?? [];
+    list.push(entry);
+    entriesByCategory.set(entry.categoryId, list);
   }
 
   const byId = new Map(payload.categories.map(category => [category.id, category]));
@@ -268,13 +380,17 @@ export function buildBorderoReport(payload: BorderoPayload): BorderoReport {
     updated_at: '',
   })));
 
+  const sumBy = (list: BorderoEntry[], settlement: BorderoSettlement) =>
+    list.reduce((sum, entry) => (entry.settlement === settlement ? sum + entry.amountCents : sum), 0);
+
   const toNode = (node: CatNode, depth: number, visiting: Set<string>): BorderoCategoryNode => {
     if (visiting.has(node.id)) throw new BorderoContractError(`Ciclo na árvore de categorias (${node.id}).`);
     const nextVisiting = new Set(visiting).add(node.id);
     const source = byId.get(node.id)!;
-    const items = itemsByCategory.get(node.id) ?? [];
+    const items = entriesByCategory.get(node.id) ?? [];
     const children = node.children.map(child => toNode(child, depth + 1, nextVisiting));
-    const ownCents = items.reduce((sum, item) => sum + item.amountCents, 0);
+    const paidCents = children.reduce((sum, child) => sum + child.paidCents, sumBy(items, 'paid'));
+    const openCents = children.reduce((sum, child) => sum + child.openCents, sumBy(items, 'open'));
     return {
       id: node.id,
       name: source.name,
@@ -283,7 +399,9 @@ export function buildBorderoReport(payload: BorderoPayload): BorderoReport {
       active: source.active,
       nonOperational: source.nonOperational,
       synthetic: source.synthetic,
-      amountCents: children.reduce((sum, child) => sum + child.amountCents, ownCents),
+      amountCents: paidCents + openCents,
+      paidCents,
+      openCents,
       itemCount: children.reduce((sum, child) => sum + child.itemCount, items.length),
       items,
       children,
@@ -292,13 +410,21 @@ export function buildBorderoReport(payload: BorderoPayload): BorderoReport {
 
   const tree = catNodes.map(node => toNode(node, 0, new Set()));
 
-  const categoriesCents = tree.reduce((sum, node) => sum + node.amountCents, 0);
-  const itemsCents = payload.items.reduce((sum, item) => sum + item.amountCents, 0);
-  const accountsCents = payload.accounts.reduce((sum, account) => sum + account.balanceCents, 0);
+  const treePaid = tree.reduce((sum, node) => sum + node.paidCents, 0);
+  const treeOpen = tree.reduce((sum, node) => sum + node.openCents, 0);
   const placedItems = tree.reduce((sum, node) => sum + node.itemCount, 0);
+  const openItemsCents = payload.items.reduce((sum, item) => sum + item.amountCents, 0);
+  const paidItemsCents = payload.paidItems.reduce((sum, item) => sum + item.amountCents, 0);
+  const accountsCents = payload.accounts.reduce((sum, account) => sum + account.balanceCents, 0);
 
-  if (placedItems !== payload.items.length || categoriesCents !== itemsCents || itemsCents !== payload.totalPayableCents) {
-    throw new BorderoContractError('Soma das categorias diverge do total a pagar.');
+  if (placedItems !== entries.length || treeOpen !== openItemsCents || openItemsCents !== payload.totalPayableCents) {
+    throw new BorderoContractError('Soma das categorias diverge do total a vencer.');
+  }
+  if (treePaid !== paidItemsCents || paidItemsCents !== payload.totalPaidCents) {
+    throw new BorderoContractError('Soma das categorias diverge do total já pago.');
+  }
+  if (payload.totalPaidCents + payload.totalPayableCents !== payload.totalExpenseCents) {
+    throw new BorderoContractError('Total de contas diverge de contas já pagas + contas a vencer.');
   }
   if (accountsCents !== payload.totalAccountBalanceCents) {
     throw new BorderoContractError('Soma das contas diverge do saldo das contas.');
@@ -312,9 +438,12 @@ export function buildBorderoReport(payload: BorderoPayload): BorderoReport {
     store: payload.store,
     generatedAt: payload.generatedAt,
     tree,
-    items: payload.items,
+    entries,
+    totalPaidCents: payload.totalPaidCents,
+    paidCount: payload.paidCount,
     totalPayableCents: payload.totalPayableCents,
     payableCount: payload.payableCount,
+    totalExpenseCents: payload.totalExpenseCents,
     accounts: payload.accounts,
     totalAccountBalanceCents: payload.totalAccountBalanceCents,
     projectedFinalBalanceCents: payload.projectedFinalBalanceCents,
@@ -322,6 +451,18 @@ export function buildBorderoReport(payload: BorderoPayload): BorderoReport {
     overdueBeforePeriod: payload.overdueBeforePeriod,
     hasUnavailableBalances: payload.accounts.some(account => !account.balanceAvailable),
   };
+}
+
+/** Contas em aberto do período com vencimento anterior a hoje (quantidade de contas, não de rateios). */
+export function borderoOverdueInPeriod(report: BorderoReport, todayISO: string): { count: number; amountCents: number } {
+  const sources = new Set<string>();
+  let amountCents = 0;
+  for (const entry of report.entries) {
+    if (entry.settlement !== 'open' || !entry.dueDate || entry.dueDate >= todayISO) continue;
+    sources.add(entry.sourceId);
+    amountCents += entry.amountCents;
+  }
+  return { count: sources.size, amountCents };
 }
 
 // ─── Apresentação compartilhada (tela e PDF) ────────────────────────────────
@@ -340,7 +481,7 @@ export interface BorderoCategoryRow {
 
 /**
  * Linhas de categoria na ordem da árvore. Raízes sempre aparecem (inclusive com
- * R$0,00, como no borderô de referência); descendentes sem nenhum vencimento só
+ * R$0,00, como no borderô de referência); descendentes sem nenhuma despesa só
  * aparecem com `includeEmpty`. `isExpanded` controla a abertura (PDF: tudo aberto).
  */
 export function flattenBorderoCategories(
@@ -362,16 +503,47 @@ export function flattenBorderoCategories(
 }
 
 export const BORDERO_FINAL_BALANCE_MESSAGE: Record<BorderoFinalBalanceState, string> = {
-  positive: 'Saldo suficiente para cobrir os vencimentos do período',
-  zero: 'Saldo exatamente igual aos vencimentos do período',
-  negative: 'Saldo insuficiente para cobrir os vencimentos do período',
+  positive: 'Saldo suficiente para cobrir as contas a vencer do período',
+  zero: 'Saldo exatamente igual às contas a vencer do período',
+  negative: 'Saldo insuficiente para cobrir as contas a vencer do período',
 };
 
 export const BORDERO_STATUS_LABEL: Record<string, string> = {
   AGUARDANDO_APROVACAO: 'Aguardando aprovação',
   APROVADO: 'Aprovada',
   VENCIDO: 'Vencida',
+  PAGO: 'Paga',
 };
+
+export type BorderoSituationTone = 'success' | 'warning' | 'danger' | 'info';
+
+const PAID_ORIGIN_LABEL: Record<string, string> = {
+  conciliacao: 'Paga · conciliação',
+  manual: 'Paga · lançamento manual',
+  ajuste_pagamento: 'Paga · juros/tarifa',
+};
+
+/** Situação de uma despesa — mesmo texto na tela e no PDF. */
+export function borderoEntrySituation(entry: BorderoEntry, todayISO: string): { label: string; tone: BorderoSituationTone } {
+  if (entry.settlement === 'paid') {
+    const label = entry.source === 'conta_pagar'
+      ? 'Paga'
+      : PAID_ORIGIN_LABEL[entry.origin ?? ''] ?? 'Paga · lançamento';
+    return { label, tone: 'success' };
+  }
+  if (entry.status === 'VENCIDO' || (entry.dueDate !== null && entry.dueDate < todayISO)) {
+    return { label: 'Vencida', tone: 'danger' };
+  }
+  if (entry.status === 'AGUARDANDO_APROVACAO') return { label: 'Aguardando aprovação', tone: 'info' };
+  return { label: 'A vencer', tone: 'warning' };
+}
+
+/** "Fornecedor — Descrição" (ou só a descrição). */
+export function borderoEntryParty(entry: BorderoEntry): string {
+  return entry.supplier && entry.supplier !== entry.description
+    ? `${entry.supplier} — ${entry.description}`
+    : entry.description;
+}
 
 /** Caminho "Raiz › Categoria" usado no detalhamento. */
 export function borderoCategoryPaths(tree: BorderoCategoryNode[], separator = ' › '): Map<string, string> {

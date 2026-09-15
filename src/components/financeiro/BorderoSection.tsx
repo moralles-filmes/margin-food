@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { AlertTriangle, CheckCircle2, FileDown, Landmark, Loader2, MinusCircle, RefreshCw, ShieldX, Wallet, CalendarClock } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, CircleCheckBig, FileDown, Landmark, Loader2, MinusCircle, RefreshCw, ShieldX, Sigma, Wallet, CalendarClock } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCan } from '@/permissions';
 import { useAuth } from '@/contexts/AuthContext';
@@ -17,6 +17,7 @@ import BorderoPeriodFilter from '@/components/financeiro/bordero/BorderoPeriodFi
 import BorderoCategoryTable from '@/components/financeiro/bordero/BorderoCategoryTable';
 import {
   BORDERO_FINAL_BALANCE_MESSAGE,
+  borderoOverdueInPeriod,
   createInitialBorderoFilter,
   formatBorderoMoney,
   resolveBorderoPeriod,
@@ -25,7 +26,7 @@ import {
   type BorderoReport,
 } from '@/domain/financeiro/bordero';
 
-export const BORDERO_PAGE_SUBTITLE = 'Previsão financeira de contas a vencer e disponibilidade de caixa.';
+export const BORDERO_PAGE_SUBTITLE = 'Despesas do período — já pagas e a vencer — e disponibilidade de caixa.';
 
 const FINAL_STATE_VIEW: Record<BorderoFinalBalanceState, { variant: KpiVariant; icon: typeof CheckCircle2; tag: string }> = {
   positive: { variant: 'success', icon: CheckCircle2, tag: 'Positivo' },
@@ -46,8 +47,8 @@ function NoAccess() {
 function LoadingState() {
   return (
     <div className="space-y-4" role="status" aria-label="Carregando borderô">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        {Array.from({ length: 3 }).map((_, index) => <Skeleton key={index} className="h-[108px] w-full rounded-xl" />)}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+        {Array.from({ length: 5 }).map((_, index) => <Skeleton key={index} className="h-[108px] w-full rounded-xl" />)}
       </div>
       <div className="space-y-2">
         {Array.from({ length: 6 }).map((_, index) => <Skeleton key={index} className="h-9 w-full" />)}
@@ -141,6 +142,7 @@ export default function BorderoSection() {
   if (!canView) return <NoAccess />;
 
   const finalView = report ? FINAL_STATE_VIEW[report.finalBalanceState] : null;
+  const overdueInPeriod = report ? borderoOverdueInPeriod(report, todayISO) : { count: 0, amountCents: 0 };
   const showLoading = resolution.ok && (query.isPending || (query.isFetching && !report));
 
   return (
@@ -179,13 +181,29 @@ export default function BorderoSection() {
         </Alert>
       ) : report && finalView ? (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+            <KpiCard
+              label="Contas já pagas"
+              value={formatBorderoMoney(report.totalPaidCents)}
+              sub={`${report.paidCount} despesa(s) paga(s) no período`}
+              icon={CircleCheckBig}
+              variant="success"
+            />
             <KpiCard
               label="Contas a vencer"
               value={formatBorderoMoney(report.totalPayableCents)}
-              sub={`${report.payableCount} conta(s) com vencimento no período`}
+              sub={overdueInPeriod.count > 0
+                ? `${report.payableCount} em aberto · ${overdueInPeriod.count} vencida(s)`
+                : `${report.payableCount} conta(s) em aberto no período`}
               icon={CalendarClock}
               variant="warning"
+            />
+            <KpiCard
+              label="Total de contas"
+              value={formatBorderoMoney(report.totalExpenseCents)}
+              sub="Já pagas + a vencer no período"
+              icon={Sigma}
+              variant="default"
             />
             <KpiCard
               label="Saldo das contas"
@@ -205,9 +223,13 @@ export default function BorderoSection() {
             />
           </div>
 
-          <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-            <Wallet className="w-3.5 h-3.5" />
-            Saldo final provisionado = saldo das contas − contas a vencer. Contas filtradas pela data de vencimento.
+          <p className="text-xs text-muted-foreground flex items-start gap-1.5">
+            <Wallet className="w-3.5 h-3.5 mt-px shrink-0" />
+            <span>
+              Saldo final provisionado = saldo das contas − contas a vencer (o que já foi pago já saiu do saldo).
+              Contas já pagas pela data do pagamento (boletos, conciliação e lançamentos manuais — igual ao Livro
+              Razão); contas a vencer pela data de vencimento. A baixa de um boleto nunca é somada duas vezes.
+            </span>
           </p>
 
           {report.overdueBeforePeriod.count > 0 && (
@@ -231,7 +253,7 @@ export default function BorderoSection() {
             </Alert>
           )}
 
-          <BorderoCategoryTable report={report} />
+          <BorderoCategoryTable report={report} todayISO={todayISO} />
 
           <AccountsDialog report={report} open={accountsOpen} onOpenChange={setAccountsOpen} />
         </>

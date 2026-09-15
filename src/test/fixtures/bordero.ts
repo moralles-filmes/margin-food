@@ -1,4 +1,4 @@
-import type { BorderoAccount, BorderoCategory, BorderoItem, BorderoPayload } from '@/domain/financeiro/bordero';
+import type { BorderoAccount, BorderoCategory, BorderoItem, BorderoPaidItem, BorderoPayload } from '@/domain/financeiro/bordero';
 
 const cat = (
   id: string,
@@ -29,7 +29,31 @@ export const borderoItem = (categoryId: string, amountCents: number, extra: Part
   };
 };
 
-export const borderoAccount = (name: string, balanceCents: number, extra: Partial<BorderoAccount> = {}): BorderoAccount => ({
+export const borderoPaidItem = (
+  categoryId: string,
+  amountCents: number,
+  extra: Partial<BorderoPaidItem> = {},
+): BorderoPaidItem => {
+  allocationSeq += 1;
+  const id = `b0000000-0000-4000-8000-${String(allocationSeq).padStart(12, '0')}`;
+  return {
+    allocationId: id,
+    sourceId: id,
+    source: 'conta_pagar',
+    origin: null,
+    categoryId,
+    description: `Paga ${allocationSeq}`,
+    supplier: `Fornecedor ${allocationSeq}`,
+    dueDate: '2026-09-01',
+    paidDate: '2026-09-01',
+    referenceDate: '2026-09-01',
+    amountCents,
+    split: false,
+    ...extra,
+  };
+};
+
+export const borderoAccount =(name: string, balanceCents: number, extra: Partial<BorderoAccount> = {}): BorderoAccount => ({
   id: `f-${name}`,
   name,
   kind: 'corrente',
@@ -72,7 +96,15 @@ export function createBorderoPayload(overrides: Partial<BorderoPayload> = {}): B
     borderoAccount('Banco B', 7_000_000),
     borderoAccount('Caixa', 1_860_927, { kind: 'caixa', bank: null }),
   ];
+  const paidItems = overrides.paidItems ?? [
+    borderoPaidItem('c-peixes', 1_500_000, { supplier: 'Peixaria Atlantico', description: 'Camarão', dueDate: '2026-08-31', referenceDate: '2026-08-31' }),
+    borderoPaidItem('c-tarifas', 4_590, {
+      source: 'lancamento', origin: 'conciliacao', supplier: null, description: 'TARIFA PIX',
+      dueDate: null, paidDate: '2026-09-01', referenceDate: '2026-09-01',
+    }),
+  ];
   const totalPayableCents = items.reduce((sum, item) => sum + item.amountCents, 0);
+  const totalPaidCents = paidItems.reduce((sum, item) => sum + item.amountCents, 0);
   const totalAccountBalanceCents = accounts.reduce((sum, account) => sum + account.balanceCents, 0);
   return {
     contractVersion: '1.0',
@@ -83,6 +115,10 @@ export function createBorderoPayload(overrides: Partial<BorderoPayload> = {}): B
     items,
     totalPayableCents,
     payableCount: new Set(items.map(item => item.payableId)).size,
+    paidItems,
+    totalPaidCents,
+    paidCount: new Set(paidItems.map(item => `${item.source}:${item.sourceId}`)).size,
+    totalExpenseCents: totalPaidCents + totalPayableCents,
     accounts,
     totalAccountBalanceCents,
     projectedFinalBalanceCents: totalAccountBalanceCents - totalPayableCents,

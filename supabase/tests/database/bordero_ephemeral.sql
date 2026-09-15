@@ -72,6 +72,24 @@ CREATE TABLE public.fin_lancamento_rateios (
   company_id uuid NOT NULL
 );
 
+CREATE TABLE public.fin_lancamentos (
+  id uuid PRIMARY KEY,
+  tipo text NOT NULL,
+  valor numeric NOT NULL,
+  data_competencia date,
+  data_pagamento date,
+  categoria_id uuid,
+  status text NOT NULL,
+  descricao text,
+  referencia_modulo text,
+  referencia_id text,
+  conciliado boolean NOT NULL DEFAULT false,
+  conciliado_em timestamptz,
+  origem text,
+  excluir_dos_relatorios boolean NOT NULL DEFAULT false,
+  company_id uuid NOT NULL
+);
+
 CREATE TABLE public.fin_contas (
   id uuid PRIMARY KEY,
   nome text NOT NULL,
@@ -148,12 +166,85 @@ AS $$
     AND p_keys && pg_catalog.string_to_array(COALESCE(current_setting('test.permissions', true), ''), ',')
 $$;
 
+-- Regra de caixa do DFC, idêntica à de produção (pg_get_functiondef em 2026-09-15).
+CREATE FUNCTION public._fin_dfc_effective_allocations(p_company_id uuid, p_start date, p_end_inclusive date)
+ RETURNS TABLE(allocation_id uuid, allocation_source text, lancamento_id uuid, categoria_id uuid, valor numeric, tipo text, effective_date date, descricao text, status text, origem text, entry_excluded_from_reports boolean)
+ LANGUAGE sql
+ STABLE
+ SET search_path TO ''
+AS $function$
+  SELECT
+    allocation.id AS allocation_id,
+    'allocation'::text AS allocation_source,
+    ledger.id AS lancamento_id,
+    allocation.categoria_id,
+    allocation.valor,
+    ledger.tipo,
+    COALESCE(ledger.data_pagamento, ledger.conciliado_em::date, ledger.data_competencia) AS effective_date,
+    COALESCE(NULLIF(pg_catalog.btrim(ledger.descricao), ''), 'Lançamento sem descrição') AS descricao,
+    ledger.status,
+    ledger.origem,
+    ledger.excluir_dos_relatorios AS entry_excluded_from_reports
+  FROM public.fin_lancamento_rateios AS allocation
+  JOIN public.fin_lancamentos AS ledger
+    ON ledger.id = allocation.lancamento_id
+   AND ledger.company_id = p_company_id
+  WHERE allocation.company_id = p_company_id
+    AND ledger.status IN ('REALIZADO', 'CONCILIADO')
+    AND ledger.tipo <> 'TRANSFERENCIA'
+    AND NOT (ledger.origem = 'conciliacao' AND ledger.conciliado IS NOT TRUE)
+    AND (
+      p_start IS NULL
+      OR COALESCE(ledger.data_pagamento, ledger.conciliado_em::date, ledger.data_competencia) >= p_start
+    )
+    AND (
+      p_end_inclusive IS NULL
+      OR COALESCE(ledger.data_pagamento, ledger.conciliado_em::date, ledger.data_competencia) <= p_end_inclusive
+    )
+
+  UNION ALL
+
+  SELECT
+    ledger.id AS allocation_id,
+    'entry'::text AS allocation_source,
+    ledger.id AS lancamento_id,
+    ledger.categoria_id,
+    ledger.valor,
+    ledger.tipo,
+    COALESCE(ledger.data_pagamento, ledger.conciliado_em::date, ledger.data_competencia) AS effective_date,
+    COALESCE(NULLIF(pg_catalog.btrim(ledger.descricao), ''), 'Lançamento sem descrição') AS descricao,
+    ledger.status,
+    ledger.origem,
+    ledger.excluir_dos_relatorios AS entry_excluded_from_reports
+  FROM public.fin_lancamentos AS ledger
+  WHERE ledger.company_id = p_company_id
+    AND ledger.status IN ('REALIZADO', 'CONCILIADO')
+    AND ledger.tipo <> 'TRANSFERENCIA'
+    AND NOT (ledger.origem = 'conciliacao' AND ledger.conciliado IS NOT TRUE)
+    AND (
+      p_start IS NULL
+      OR COALESCE(ledger.data_pagamento, ledger.conciliado_em::date, ledger.data_competencia) >= p_start
+    )
+    AND (
+      p_end_inclusive IS NULL
+      OR COALESCE(ledger.data_pagamento, ledger.conciliado_em::date, ledger.data_competencia) <= p_end_inclusive
+    )
+    AND NOT EXISTS (
+      SELECT 1
+      FROM public.fin_lancamento_rateios AS allocation
+      WHERE allocation.lancamento_id = ledger.id
+        AND allocation.company_id = p_company_id
+    );
+$function$;
+
 GRANT USAGE ON SCHEMA public, auth TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION auth.uid() TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.assert_tenant() TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.has_any_permission(uuid, text[]) TO authenticated, service_role;
 
 \ir ../../migrations/20260915190000_fin_bordero.sql
+\ir ../../migrations/20260915210000_fin_bordero_despesa_completa.sql
+\ir ../../migrations/20260915220000_fin_bordero_pagas_por_pagamento.sql
 
 -- ── Unidades e usuários ──────────────────────────────────────────────────────
 -- A = Loja A (principal), B = Loja B, C/D/E = cenários de saldo final.
@@ -223,13 +314,45 @@ INSERT INTO public.fin_contas_pagar (id, descricao, fornecedor, valor, data_comp
   ('a0000000-0000-4000-8000-000000000013', 'Vencida', 'Fornecedor U', 500.00, NULL, '2026-09-01', 'c0000000-0000-4000-8000-000000000002', 'VENCIDO', '11111111-1111-4111-8111-111111111111'),
   -- Em aberto e vencida antes do período → só no aviso informativo
   ('a0000000-0000-4000-8000-000000000014', 'Atrasada', 'Fornecedor T', 70.00, NULL, '2026-08-20', 'c0000000-0000-4000-8000-000000000002', 'APROVADO', '11111111-1111-4111-8111-111111111111'),
-  ('a0000000-0000-4000-8000-000000000015', 'Atrasada paga', 'Fornecedor T', 80.00, NULL, '2026-08-20', 'c0000000-0000-4000-8000-000000000002', 'PAGO', '11111111-1111-4111-8111-111111111111');
+  ('a0000000-0000-4000-8000-000000000015', 'Atrasada paga', 'Fornecedor T', 80.00, NULL, '2026-08-20', 'c0000000-0000-4000-8000-000000000002', 'PAGO', '11111111-1111-4111-8111-111111111111'),
+  -- PAGO no período sem baixa no razão: não saiu do caixa → fora das pagas
+  ('a0000000-0000-4000-8000-000000000016', 'Paga sem baixa', 'Fornecedor S', 4444.00, NULL, '2026-09-04', 'c0000000-0000-4000-8000-000000000002', 'PAGO', '11111111-1111-4111-8111-111111111111');
 
 INSERT INTO public.fin_lancamento_rateios (id, lancamento_id, categoria_id, valor, company_id) VALUES
   ('e0000000-0000-4000-8000-000000000001', 'a0000000-0000-4000-8000-000000000009', 'c0000000-0000-4000-8000-000000000002', 400.40, '11111111-1111-4111-8111-111111111111'),
   ('e0000000-0000-4000-8000-000000000002', 'a0000000-0000-4000-8000-000000000009', NULL, 599.60, '11111111-1111-4111-8111-111111111111'),
   -- Rateio de outra unidade apontando para a CP da Loja A: ignorado
   ('e0000000-0000-4000-8000-000000000003', 'a0000000-0000-4000-8000-000000000009', 'd0000000-0000-4000-8000-000000000001', 123456.00, '22222222-2222-4222-8222-222222222222');
+
+-- ── Razão da Loja A (despesas já pagas) ──────────────────────────────────────
+-- Semana 31/08 a 06/09 (pela data do pagamento): pagas = 9.991,00 + 80,00 + 12,34 + 300,00 + 150,50 + 200,00 = 10.733,84.
+INSERT INTO public.fin_lancamentos (id, tipo, valor, data_competencia, data_pagamento, categoria_id, status, descricao, referencia_modulo, referencia_id, conciliado, conciliado_em, origem, company_id) VALUES
+  -- TESTE 14: baixa da CP "Já paga" → entra uma vez, identificada pela CP
+  ('70000000-0000-4000-8000-000000000001', 'DESPESA', 9991.00, '2026-09-01', '2026-09-03', 'c0000000-0000-4000-8000-000000000005', 'REALIZADO', 'Espelho já paga', 'contas_pagar', 'a0000000-0000-4000-8000-000000000006', true, '2026-09-03 12:00+00', 'espelho_cp', '11111111-1111-4111-8111-111111111111'),
+  -- TESTE 15: CP vencida 20/08 e paga 02/09 pela conciliação → entra na semana do pagamento
+  ('70000000-0000-4000-8000-000000000002', 'DESPESA', 80.00, NULL, '2026-09-02', 'c0000000-0000-4000-8000-000000000002', 'REALIZADO', 'Baixa via extrato', 'contas_pagar', 'a0000000-0000-4000-8000-000000000015', true, '2026-09-02 12:00+00', 'conciliacao', '11111111-1111-4111-8111-111111111111'),
+  -- Juros da divergência boleto × extrato → entra (dinheiro fora do valor da CP)
+  ('70000000-0000-4000-8000-000000000003', 'DESPESA', 12.34, NULL, '2026-09-03', 'c0000000-0000-4000-8000-000000000002', 'REALIZADO', 'Juros boleto', 'contas_pagar', 'a0000000-0000-4000-8000-000000000006', true, '2026-09-03 12:00+00', 'ajuste_pagamento', '11111111-1111-4111-8111-111111111111'),
+  -- Lançamento manual → entra
+  ('70000000-0000-4000-8000-000000000004', 'DESPESA', 300.00, '2026-09-04', NULL, 'c0000000-0000-4000-8000-000000000003', 'REALIZADO', 'Panfletos', NULL, NULL, false, NULL, 'manual', '11111111-1111-4111-8111-111111111111'),
+  -- Conciliação já conciliada → entra
+  ('70000000-0000-4000-8000-000000000005', 'DESPESA', 150.50, '2026-08-20', '2026-09-05', NULL, 'REALIZADO', 'PIX ENVIADO GAS', '', NULL, true, '2026-09-05 12:00+00', 'conciliacao', '11111111-1111-4111-8111-111111111111'),
+  -- Conciliação pendente → fora
+  ('70000000-0000-4000-8000-000000000006', 'DESPESA', 999.00, '2026-09-02', '2026-09-02', NULL, 'REALIZADO', 'Pendente', NULL, NULL, false, NULL, 'conciliacao', '11111111-1111-4111-8111-111111111111'),
+  -- Transferência, receita e cancelado → fora
+  ('70000000-0000-4000-8000-000000000007', 'TRANSFERENCIA', 5000.00, '2026-09-02', '2026-09-02', NULL, 'REALIZADO', 'Transferência', NULL, NULL, true, '2026-09-02 12:00+00', 'transferencia', '11111111-1111-4111-8111-111111111111'),
+  ('70000000-0000-4000-8000-000000000008', 'RECEITA', 800.00, '2026-09-02', '2026-09-02', NULL, 'REALIZADO', 'Venda', NULL, NULL, true, '2026-09-02 12:00+00', 'conciliacao', '11111111-1111-4111-8111-111111111111'),
+  ('70000000-0000-4000-8000-000000000009', 'DESPESA', 700.00, '2026-09-02', '2026-09-02', NULL, 'CANCELADO', 'Cancelado', NULL, NULL, false, NULL, 'manual', '11111111-1111-4111-8111-111111111111'),
+  -- Manual rateado (120 Marketing + 80 Peixes) → entra com rateio
+  ('70000000-0000-4000-8000-000000000010', 'DESPESA', 200.00, '2026-09-01', '2026-09-01', 'c0000000-0000-4000-8000-000000000006', 'REALIZADO', 'Compra rateada', NULL, NULL, false, NULL, 'manual', '11111111-1111-4111-8111-111111111111'),
+  -- Pago depois da semana → fora
+  ('70000000-0000-4000-8000-000000000011', 'DESPESA', 450.00, '2026-09-01', '2026-09-07', NULL, 'REALIZADO', 'Pago dia 07', NULL, NULL, false, NULL, 'manual', '11111111-1111-4111-8111-111111111111'),
+  -- Loja B → nunca aparece na A
+  ('70000000-0000-4000-8000-000000000012', 'DESPESA', 6000.00, '2026-09-02', '2026-09-02', NULL, 'REALIZADO', 'Despesa Loja B', NULL, NULL, false, NULL, 'manual', '22222222-2222-4222-8222-222222222222');
+
+INSERT INTO public.fin_lancamento_rateios (id, lancamento_id, categoria_id, valor, company_id) VALUES
+  ('e0000000-0000-4000-8000-000000000011', '70000000-0000-4000-8000-000000000010', 'c0000000-0000-4000-8000-000000000003', 120.00, '11111111-1111-4111-8111-111111111111'),
+  ('e0000000-0000-4000-8000-000000000012', '70000000-0000-4000-8000-000000000010', 'c0000000-0000-4000-8000-000000000005', 80.00, '11111111-1111-4111-8111-111111111111');
 
 -- ── Contas a pagar das outras unidades ───────────────────────────────────────
 INSERT INTO public.fin_contas_pagar (id, descricao, fornecedor, valor, data_vencimento, categoria_id, status, company_id) VALUES
@@ -384,6 +507,74 @@ BEGIN
     RAISE EXCEPTION 'TEST_FAILED: projected final balance %', v_payload->>'projectedFinalBalanceCents';
   END IF;
 
+  -- TESTE 14/15: despesas já pagas = razão pela regra de caixa do DFC (data do pagamento),
+  -- baixa de boleto uma única vez e enriquecida pela CP, ajuste de pagamento e rateio.
+  SELECT array_agg(paid->>'allocationId' ORDER BY paid->>'allocationId')
+  INTO v_ids
+  FROM jsonb_array_elements(v_payload->'paidItems') AS paid;
+  IF v_ids IS DISTINCT FROM ARRAY[
+    '70000000-0000-4000-8000-000000000001',
+    '70000000-0000-4000-8000-000000000002',
+    '70000000-0000-4000-8000-000000000003',
+    '70000000-0000-4000-8000-000000000004',
+    '70000000-0000-4000-8000-000000000005',
+    'e0000000-0000-4000-8000-000000000011',
+    'e0000000-0000-4000-8000-000000000012'
+  ] THEN
+    RAISE EXCEPTION 'TEST_FAILED: paid items selection returned %', v_ids;
+  END IF;
+
+  SELECT sum((paid->>'amountCents')::bigint) INTO v_sum
+  FROM jsonb_array_elements(v_payload->'paidItems') AS paid;
+  IF (v_payload->>'totalPaidCents')::bigint <> 1073384
+     OR v_sum <> 1073384
+     OR (v_payload->>'paidCount')::integer <> 6
+     OR (v_payload->>'totalExpenseCents')::bigint <> 1073384 + 1000000 THEN
+    RAISE EXCEPTION 'TEST_FAILED: paid total % / sum % / count % / expense %',
+      v_payload->>'totalPaidCents', v_sum, v_payload->>'paidCount', v_payload->>'totalExpenseCents';
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM jsonb_array_elements(v_payload->'paidItems') AS paid
+      WHERE paid->>'allocationId' = '70000000-0000-4000-8000-000000000001'
+        AND paid->>'sourceId' = 'a0000000-0000-4000-8000-000000000006'
+        AND paid->>'source' = 'conta_pagar' AND paid->>'supplier' = 'Fornecedor Z'
+        AND paid->>'dueDate' = '2026-09-03' AND paid->>'referenceDate' = '2026-09-03'
+        AND (paid->>'amountCents')::bigint = 999100)
+     OR NOT EXISTS (SELECT 1 FROM jsonb_array_elements(v_payload->'paidItems') AS paid
+      WHERE paid->>'allocationId' = '70000000-0000-4000-8000-000000000002'
+        AND paid->>'sourceId' = 'a0000000-0000-4000-8000-000000000015'
+        AND paid->>'source' = 'conta_pagar' AND paid->>'dueDate' = '2026-08-20'
+        AND paid->>'paidDate' = '2026-09-02' AND paid->>'referenceDate' = '2026-09-02')
+     OR NOT EXISTS (SELECT 1 FROM jsonb_array_elements(v_payload->'paidItems') AS paid
+      WHERE paid->>'allocationId' = '70000000-0000-4000-8000-000000000003'
+        AND paid->>'source' = 'lancamento' AND paid->>'origin' = 'ajuste_pagamento'
+        AND paid->'dueDate' = 'null'::jsonb)
+     OR NOT EXISTS (SELECT 1 FROM jsonb_array_elements(v_payload->'paidItems') AS paid
+      WHERE paid->>'allocationId' = '70000000-0000-4000-8000-000000000005'
+        AND paid->>'source' = 'lancamento' AND paid->>'origin' = 'conciliacao'
+        AND paid->>'paidDate' = '2026-09-05' AND paid->'dueDate' = 'null'::jsonb
+        AND paid->>'categoryId' = '00000000-0000-0000-0000-000000000102')
+     OR NOT EXISTS (SELECT 1 FROM jsonb_array_elements(v_payload->'paidItems') AS paid
+      WHERE paid->>'allocationId' = 'e0000000-0000-4000-8000-000000000011'
+        AND paid->>'sourceId' = '70000000-0000-4000-8000-000000000010'
+        AND paid->>'categoryId' = 'c0000000-0000-4000-8000-000000000003'
+        AND (paid->>'split')::boolean AND (paid->>'amountCents')::bigint = 12000)
+     OR v_payload::text LIKE '%Despesa Loja B%'
+     OR v_payload::text LIKE '%Paga sem baixa%' THEN
+    RAISE EXCEPTION 'TEST_FAILED: paid item details %', v_payload->'paidItems';
+  END IF;
+
+  -- Contas já pagas = saídas do Livro Razão no mesmo período (get_fin_lancamentos_totais)
+  IF (v_payload->>'totalPaidCents')::bigint <> (
+    SELECT (sum(l.valor) * 100)::bigint FROM public.fin_lancamentos AS l
+    WHERE l.company_id = '11111111-1111-4111-8111-111111111111'
+      AND l.tipo = 'DESPESA' AND l.status <> 'CANCELADO'
+      AND NOT (l.origem = 'conciliacao' AND l.conciliado IS NOT TRUE)
+      AND COALESCE(l.data_pagamento, l.conciliado_em::date, l.data_competencia) BETWEEN '2026-08-31' AND '2026-09-06'
+  ) THEN
+    RAISE EXCEPTION 'TEST_FAILED: paid total differs from ledger outflows';
+  END IF;
+
   -- Vencidas antes do período: aviso informativo, fora dos totais
   IF (v_payload#>>'{overdueBeforePeriod,count}')::integer <> 1
      OR (v_payload#>>'{overdueBeforePeriod,amountCents}')::bigint <> 7000 THEN
@@ -502,6 +693,8 @@ BEGIN
   IF (v_payload->>'totalPayableCents')::bigint <> 0
      OR (v_payload->>'payableCount')::integer <> 0
      OR jsonb_array_length(v_payload->'items') <> 0
+     OR jsonb_array_length(v_payload->'paidItems') <> 0
+     OR (v_payload->>'totalPaidCents')::bigint <> 0
      OR (v_payload->>'totalAccountBalanceCents')::bigint <> 2000000
      OR (v_payload->>'projectedFinalBalanceCents')::bigint <> 2000000 THEN
     RAISE EXCEPTION 'TEST_FAILED: empty period %', v_payload;

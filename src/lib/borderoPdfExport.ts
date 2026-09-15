@@ -9,10 +9,12 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { APP_NAME } from '@/lib/brand';
-import { formatDateTimeBR, formatDateValueBR } from '@/lib/datetime';
+import { formatDateTimeBR, formatDateValueBR, todayBR } from '@/lib/datetime';
 import {
   BORDERO_FINAL_BALANCE_MESSAGE,
   borderoCategoryPaths,
+  borderoEntryParty,
+  borderoEntrySituation,
   buildBorderoPdfFileName,
   flattenBorderoCategories,
   formatBorderoMoney,
@@ -27,6 +29,8 @@ export interface BorderoPdfOptions {
   mode: BorderoPeriodMode;
   /** Momento da exportação (injetável para teste). */
   exportedAt?: Date;
+  /** Hoje em yyyy-MM-dd, para marcar contas vencidas (injetável para teste). */
+  todayISO?: string;
 }
 
 export interface BorderoPdfModel {
@@ -38,22 +42,24 @@ export interface BorderoPdfModel {
   exportedAtLabel: string;
   dataPositionLabel: string;
   summary: {
+    paid: string;
     payable: string;
+    total: string;
     balance: string;
     final: string;
     finalState: BorderoFinalBalanceState;
     finalMessage: string;
   };
-  categoryRows: Array<{ label: string; value: string; depth: number; nonOperational: boolean }>;
-  totals: Array<{ label: string; value: string }>;
+  categoryRows: Array<{ label: string; paid: string; open: string; value: string; depth: number; nonOperational: boolean }>;
+  totals: Array<{ label: string; paid: string; open: string; value: string }>;
   accountRows: Array<{ name: string; bank: string; value: string; unavailable: boolean }>;
-  itemRows: Array<{ dueDate: string; party: string; category: string; value: string }>;
+  itemRows: Array<{ date: string; situation: string; party: string; category: string; value: string }>;
   overdueNote: string | null;
   fileName: string;
 }
 
 export const BORDERO_TITLE = 'BORDERÔ';
-export const BORDERO_SUBTITLE = 'Previsão financeira de contas a vencer e disponibilidade de caixa.';
+export const BORDERO_SUBTITLE = 'Despesas do período — já pagas e a vencer — e disponibilidade de caixa.';
 
 const PERIOD_CAPTION: Record<BorderoPeriodMode, string> = {
   week: 'Semana (segunda a domingo)',
@@ -64,6 +70,7 @@ const PERIOD_CAPTION: Record<BorderoPeriodMode, string> = {
 export function buildBorderoPdfModel(report: BorderoReport, options: BorderoPdfOptions): BorderoPdfModel {
   const paths = borderoCategoryPaths(report.tree, ' / ');
   const generatedAt = new Date(report.generatedAt);
+  const todayISO = options.todayISO ?? todayBR();
   return {
     storeName: report.store.name,
     title: BORDERO_TITLE,
@@ -75,7 +82,9 @@ export function buildBorderoPdfModel(report: BorderoReport, options: BorderoPdfO
     exportedAtLabel: formatDateTimeBR(options.exportedAt ?? new Date()),
     dataPositionLabel: Number.isNaN(generatedAt.getTime()) ? '—' : formatDateTimeBR(generatedAt),
     summary: {
+      paid: formatBorderoMoney(report.totalPaidCents),
       payable: formatBorderoMoney(report.totalPayableCents),
+      total: formatBorderoMoney(report.totalExpenseCents),
       balance: formatBorderoMoney(report.totalAccountBalanceCents),
       final: formatBorderoMoney(report.projectedFinalBalanceCents),
       finalState: report.finalBalanceState,
@@ -84,14 +93,21 @@ export function buildBorderoPdfModel(report: BorderoReport, options: BorderoPdfO
     categoryRows: flattenBorderoCategories(report.tree, { includeEmpty: false, isExpanded: () => true })
       .map(row => ({
         label: row.node.name,
+        paid: formatBorderoMoney(row.node.paidCents),
+        open: formatBorderoMoney(row.node.openCents),
         value: formatBorderoMoney(row.node.amountCents),
         depth: row.depth,
         nonOperational: row.node.nonOperational,
       })),
     totals: [
-      { label: 'TOTAL A PAGAR', value: formatBorderoMoney(report.totalPayableCents) },
-      { label: 'SALDO DAS CONTAS', value: formatBorderoMoney(report.totalAccountBalanceCents) },
-      { label: 'SALDO FINAL PROVISIONADO', value: formatBorderoMoney(report.projectedFinalBalanceCents) },
+      {
+        label: 'TOTAL DE CONTAS',
+        paid: formatBorderoMoney(report.totalPaidCents),
+        open: formatBorderoMoney(report.totalPayableCents),
+        value: formatBorderoMoney(report.totalExpenseCents),
+      },
+      { label: 'SALDO DAS CONTAS', paid: '', open: '', value: formatBorderoMoney(report.totalAccountBalanceCents) },
+      { label: 'SALDO FINAL PROVISIONADO', paid: '', open: '', value: formatBorderoMoney(report.projectedFinalBalanceCents) },
     ],
     accountRows: report.accounts.map(account => ({
       name: account.name,
@@ -99,17 +115,13 @@ export function buildBorderoPdfModel(report: BorderoReport, options: BorderoPdfO
       value: formatBorderoMoney(account.balanceCents),
       unavailable: !account.balanceAvailable,
     })),
-    itemRows: report.items.map(item => {
-      const base = item.supplier && item.supplier !== item.description
-        ? `${item.supplier} — ${item.description}`
-        : item.description;
-      return {
-        dueDate: formatDateValueBR(item.dueDate),
-        party: item.status === 'AGUARDANDO_APROVACAO' ? `${base} (aguardando aprovação)` : base,
-        category: paths.get(item.categoryId) ?? '—',
-        value: formatBorderoMoney(item.amountCents),
-      };
-    }),
+    itemRows: report.entries.map(entry => ({
+      date: formatDateValueBR(entry.referenceDate),
+      situation: borderoEntrySituation(entry, todayISO).label,
+      party: borderoEntryParty(entry),
+      category: paths.get(entry.categoryId) ?? '—',
+      value: formatBorderoMoney(entry.amountCents),
+    })),
     overdueNote: report.overdueBeforePeriod.count > 0
       ? `Atenção: ${report.overdueBeforePeriod.count} conta(s) em aberto com vencimento anterior ao período `
         + `(${formatBorderoMoney(report.overdueBeforePeriod.amountCents)}) não compõem este borderô.`
@@ -214,13 +226,16 @@ function drawFirstPageHeader(doc: jsPDF, model: BorderoPdfModel): number {
 }
 
 function drawSummary(doc: jsPDF, model: BorderoPdfModel, top: number): number {
-  const gap = 4;
-  const width = (CONTENT_WIDTH - gap * 2) / 3;
-  const height = 26;
+  const gap = 3;
+  const width = (CONTENT_WIDTH - gap * 4) / 5;
+  const height = 28;
   const tone = FINAL_TONE[model.summary.finalState];
+  const plain = { color: COLOR.ink, fill: COLOR.surface, border: COLOR.border, note: '' };
   const cards = [
-    { label: 'CONTAS A VENCER', value: model.summary.payable, color: COLOR.ink, fill: COLOR.surface, border: COLOR.border, note: '' },
-    { label: 'SALDO DAS CONTAS', value: model.summary.balance, color: COLOR.ink, fill: COLOR.surface, border: COLOR.border, note: '' },
+    { label: 'CONTAS JÁ PAGAS', value: model.summary.paid, ...plain },
+    { label: 'CONTAS A VENCER', value: model.summary.payable, ...plain },
+    { label: 'TOTAL DE CONTAS', value: model.summary.total, ...plain },
+    { label: 'SALDO DAS CONTAS', value: model.summary.balance, ...plain },
     {
       label: `SALDO FINAL PROVISIONADO · ${FINAL_STATE_TAG[model.summary.finalState]}`,
       value: model.summary.final,
@@ -239,18 +254,18 @@ function drawSummary(doc: jsPDF, model: BorderoPdfModel, top: number): number {
     doc.roundedRect(x, top, width, height, 2, 2, 'FD');
 
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(6.5);
+    doc.setFontSize(6);
     doc.setTextColor(COLOR.muted);
-    doc.text(card.label, x + 3, top + 6, { maxWidth: width - 6 });
+    doc.text(doc.splitTextToSize(card.label, width - 5) as string[], x + 2.5, top + 5);
 
-    doc.setFontSize(13);
+    doc.setFontSize(10.5);
     doc.setTextColor(card.color);
-    doc.text(card.value, x + 3, top + 14, { maxWidth: width - 6 });
+    doc.text(card.value, x + 2.5, top + 15, { maxWidth: width - 5 });
 
     if (card.note) {
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(6.5);
-      doc.text(doc.splitTextToSize(card.note, width - 6) as string[], x + 3, top + 19);
+      doc.setFontSize(5.5);
+      doc.text(doc.splitTextToSize(card.note, width - 5) as string[], x + 2.5, top + 20);
     }
   });
   return top + height + 6;
@@ -281,7 +296,7 @@ function drawFooters(doc: jsPDF, model: BorderoPdfModel): void {
     doc.setFontSize(7);
     doc.setTextColor(COLOR.muted);
     doc.text(
-      `${APP_NAME} · Borderô · Posição dos dados: ${model.dataPositionLabel} · Vencimentos por data de vencimento`,
+      `${APP_NAME} · Borderô · Posição dos dados: ${model.dataPositionLabel} · Pagas por data de pagamento; a vencer por vencimento`,
       PAGE.margin,
       PAGE.height - 7,
       { maxWidth: 150 },
@@ -304,7 +319,7 @@ export function createBorderoPdfDocument(model: BorderoPdfModel): jsPDF {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   doc.setProperties({
     title: `Borderô — ${model.storeName} — ${model.periodLabel}`,
-    subject: `Contas a vencer, saldo das contas e saldo final provisionado — ${model.periodLabel}`,
+    subject: `Contas já pagas, contas a vencer, saldo das contas e saldo final provisionado — ${model.periodLabel}`,
     creator: APP_NAME,
   });
 
@@ -315,13 +330,22 @@ export function createBorderoPdfDocument(model: BorderoPdfModel): jsPDF {
   autoTable(doc, {
     ...TABLE_BASE,
     startY: y,
-    head: [['CONTAS A VENCER', 'R$']],
-    body: model.categoryRows.map(row => [row.nonOperational ? `${row.label} (não operacional)` : row.label, row.value]),
-    foot: model.totals.map(total => [total.label, total.value]),
+    head: [['DESPESAS DO PERÍODO', 'PAGAS', 'A VENCER', 'TOTAL']],
+    body: model.categoryRows.map(row => [
+      row.nonOperational ? `${row.label} (não operacional)` : row.label,
+      row.paid,
+      row.open,
+      row.value,
+    ]),
+    foot: model.totals.map(total => [total.label, total.paid, total.open, total.value]),
     showFoot: 'lastPage',
-    columnStyles: { 1: { halign: 'right', cellWidth: 48 } },
+    columnStyles: {
+      1: { halign: 'right', cellWidth: 32 },
+      2: { halign: 'right', cellWidth: 32 },
+      3: { halign: 'right', cellWidth: 36 },
+    },
     didParseCell: data => {
-      if (data.column.index === 1) data.cell.styles.halign = 'right';
+      if (data.column.index > 0) data.cell.styles.halign = 'right';
       if (data.section === 'body') {
         const row = model.categoryRows[data.row.index];
         if (!row) return;
@@ -370,27 +394,28 @@ export function createBorderoPdfDocument(model: BorderoPdfModel): jsPDF {
   });
   y = lastTableY(doc) + 4;
 
-  y = sectionTitle(doc, 'DETALHAMENTO DOS VENCIMENTOS', y + 4, 50);
+  y = sectionTitle(doc, 'DETALHAMENTO DAS DESPESAS', y + 4, 50);
   if (model.itemRows.length === 0) {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
     doc.setTextColor(COLOR.muted);
-    doc.text('Não existem contas a vencer para este período.', PAGE.margin, y + 4);
+    doc.text('Não existem despesas para este período.', PAGE.margin, y + 4);
   } else {
     autoTable(doc, {
       ...TABLE_BASE,
       startY: y,
-      head: [['Vencimento', 'Fornecedor / Descrição', 'Categoria', 'Valor']],
-      body: model.itemRows.map(row => [row.dueDate, row.party, row.category, row.value]),
-      foot: [[{ content: 'TOTAL A PAGAR', colSpan: 3 }, model.summary.payable]],
+      head: [['Data', 'Situação', 'Fornecedor / Descrição', 'Categoria', 'Valor']],
+      body: model.itemRows.map(row => [row.date, row.situation, row.party, row.category, row.value]),
+      foot: [[{ content: 'TOTAL DE CONTAS', colSpan: 4 }, model.summary.total]],
       showFoot: 'lastPage',
-      styles: { ...TABLE_BASE.styles, fontSize: 8 },
+      styles: { ...TABLE_BASE.styles, fontSize: 7.5 },
       columnStyles: {
-        0: { cellWidth: 22 },
-        2: { cellWidth: 52 },
-        3: { halign: 'right', cellWidth: 30 },
+        0: { cellWidth: 19 },
+        1: { cellWidth: 30 },
+        3: { cellWidth: 46 },
+        4: { halign: 'right', cellWidth: 26 },
       },
-      didParseCell: data => { if (data.column.index === 3) data.cell.styles.halign = 'right'; },
+      didParseCell: data => { if (data.column.index === 4) data.cell.styles.halign = 'right'; },
     });
   }
 

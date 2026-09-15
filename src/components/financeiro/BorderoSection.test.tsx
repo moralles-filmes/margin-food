@@ -95,16 +95,21 @@ describe('Borderô — tela', () => {
     render(<BorderoSection />);
     const model = buildBorderoPdfModel(report, { mode: 'week' });
 
+    expect(kpiValue(/^Contas já pagas$/i)).toBe(model.summary.paid);
     expect(kpiValue(/^Contas a vencer$/i)).toBe(model.summary.payable);
+    expect(kpiValue(/^Total de contas$/i)).toBe(model.summary.total);
     expect(kpiValue(/^Saldo das contas$/i)).toBe(model.summary.balance);
     expect(kpiValue(/Saldo final provisionado/i)).toBe(model.summary.final);
     expect(screen.getByTestId('bordero-table-total')).toHaveTextContent(model.totals[0].value);
+    expect(screen.getByTestId('bordero-table-paid')).toHaveTextContent(model.totals[0].paid);
+    expect(screen.getByTestId('bordero-table-open')).toHaveTextContent(model.totals[0].open);
     expect(screen.getByTestId('bordero-period-label')).toHaveTextContent(model.periodLabel);
-    expect([model.summary.payable, model.summary.balance, model.summary.final]).toEqual(['R$131.823,59', 'R$188.609,27', 'R$56.785,68']);
+    expect([model.summary.paid, model.summary.payable, model.summary.total, model.summary.balance, model.summary.final])
+      .toEqual(['R$15.045,90', 'R$131.823,59', 'R$146.869,49', 'R$188.609,27', 'R$56.785,68']);
 
     for (const row of model.categoryRows.filter(entry => entry.depth === 0)) {
       const cell = screen.getByText(row.label);
-      expect(within(cell.closest('tr') as HTMLElement).getByText(row.value)).toBeInTheDocument();
+      expect(within(cell.closest('tr') as HTMLElement).getAllByText(row.value).length).toBeGreaterThan(0);
     }
   });
 
@@ -150,16 +155,18 @@ describe('Borderô — tela', () => {
     }))));
     render(<BorderoSection />);
     expect(kpiValue(/Saldo final provisionado · Negativo/i)).toBe('-R$30.000,00');
-    expect(screen.getByText('Saldo insuficiente para cobrir os vencimentos do período')).toBeInTheDocument();
+    expect(screen.getByText('Saldo insuficiente para cobrir as contas a vencer do período')).toBeInTheDocument();
   });
 
   it('TESTE 9 — período sem contas mostra estado vazio e saldo final = saldo', () => {
     state.responses.set(WEEK, ready(buildBorderoReport(createBorderoPayload({
       items: [],
+      paidItems: [],
       accounts: [borderoAccount('Banco', 2_000_000)],
     }))));
     render(<BorderoSection />);
-    expect(screen.getByText('Não existem contas a vencer para este período.')).toBeInTheDocument();
+    expect(screen.getByText('Não existem despesas para este período.')).toBeInTheDocument();
+    expect(kpiValue(/^Contas já pagas$/i)).toBe('R$0,00');
     expect(kpiValue(/^Contas a vencer$/i)).toBe('R$0,00');
     expect(kpiValue(/Saldo final provisionado/i)).toBe('R$20.000,00');
   });
@@ -216,8 +223,20 @@ describe('Borderô — tela', () => {
     render(<BorderoSection />);
     fireEvent.click(screen.getByRole('button', { name: 'Expandir CMV' }));
     fireEvent.click(screen.getByRole('button', { name: 'Expandir Peixes e frutos do mar' }));
-    const row = screen.getAllByText('Peixaria Atlantico', { selector: 'span' })[0].closest('tr') as HTMLElement;
+    const row = screen.getByText('— Salmao', { exact: false }).closest('tr') as HTMLElement;
+    expect(within(row).getByText('Peixaria Atlantico')).toBeInTheDocument();
     expect(within(row).getByText('31/08/2026')).toBeInTheDocument();
-    expect(within(row).getByText('R$20.000,00')).toBeInTheDocument();
+    expect(within(row).getAllByText('R$20.000,00')).toHaveLength(2); // coluna A vencer + Total
+    const paidRow = screen.getByText('Camarão', { exact: false }).closest('tr') as HTMLElement;
+    expect(within(paidRow).getByText('Paga')).toBeInTheDocument();
+    expect(within(paidRow).getAllByText('R$15.000,00')).toHaveLength(2); // coluna Pagas + Total
+  });
+
+  it('contas a vencer mostra quantas já venceram dentro do período', () => {
+    state.responses.set(WEEK, ready(buildBorderoReport(createBorderoPayload({
+      items: [borderoItem('c-adm', 100, { dueDate: '2026-09-01' }), borderoItem('c-adm', 200, { dueDate: '2026-09-04' })],
+    }))));
+    render(<BorderoSection />);
+    expect(screen.getByText('2 em aberto · 1 vencida(s)')).toBeInTheDocument();
   });
 });
