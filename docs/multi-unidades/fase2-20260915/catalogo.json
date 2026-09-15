@@ -1,0 +1,961 @@
+{
+  "capturedAt": "2026-09-15",
+  "project": "wuzxpbixprrgssoeeaez",
+  "definitions": [
+    {
+      "signature": "cleanup_old_audit_logs(integer)",
+      "owner": "postgres",
+      "proacl": "{=X/postgres,postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+      "proconfig": [
+        "search_path=public"
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.cleanup_old_audit_logs(p_months integer DEFAULT 24)\n RETURNS integer\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\nDECLARE v_deleted int;\nBEGIN\n  DELETE FROM audit_logs WHERE created_at < now() - (p_months || ' months')::interval;\n  GET DIAGNOSTICS v_deleted = ROW_COUNT;\n  INSERT INTO audit_logs (source, module, entity, action, metadata, success)\n  VALUES ('db', 'system', 'audit_logs', 'JOB_CLEANUP', jsonb_build_object('deleted_count', v_deleted, 'retention_months', p_months), true);\n  RETURN v_deleted;\nEND; $function$\n"
+    },
+    {
+      "signature": "list_companies()",
+      "owner": "postgres",
+      "proacl": "{=X/postgres,postgres=X/postgres,authenticated=X/postgres}",
+      "proconfig": [
+        "search_path=public"
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.list_companies()\n RETURNS jsonb\n LANGUAGE plpgsql\n STABLE SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\nDECLARE\n  v_caller_uid uuid;\n  v_result jsonb;\nBEGIN\n  v_caller_uid := auth.uid();\n  IF v_caller_uid IS NULL THEN\n    RAISE EXCEPTION '403: Não autenticado';\n  END IF;\n\n  IF NOT has_permission(v_caller_uid, 'system:global:manage') THEN\n    RAISE EXCEPTION '403: Sem permissão';\n  END IF;\n\n  SELECT jsonb_agg(row_to_json(t)::jsonb ORDER BY t.created_at)\n  INTO v_result\n  FROM (\n    SELECT\n      c.id,\n      c.nome,\n      c.cnpj,\n      c.ativo,\n      c.created_at,\n      c.updated_at,\n      (SELECT count(*) FROM public.company_memberships p WHERE p.company_id = c.id AND p.status='active') AS total_usuarios\n    FROM companies c\n    WHERE c.id <> '00000000-0000-0000-0000-000000000001'::uuid\n    ORDER BY c.created_at\n  ) t;\n\n  RETURN COALESCE(v_result, '[]'::jsonb);\nEND;\n$function$\n"
+    },
+    {
+      "signature": "list_my_companies()",
+      "owner": "postgres",
+      "proacl": "{postgres=X/postgres,authenticated=X/postgres}",
+      "proconfig": [
+        "search_path=\"\""
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.list_my_companies()\n RETURNS TABLE(id uuid, nome text)\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO ''\nAS $function$\n SELECT c.id,c.nome FROM public.company_memberships m JOIN public.companies c ON c.id=m.company_id\n WHERE m.user_id=auth.uid() AND m.status='active' AND c.ativo ORDER BY c.nome,c.id;\n$function$\n"
+    },
+    {
+      "signature": "onboard_new_company(text,text,uuid)",
+      "owner": "postgres",
+      "proacl": "{=X/postgres,postgres=X/postgres,authenticated=X/postgres}",
+      "proconfig": [
+        "search_path=public"
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.onboard_new_company(p_company_name text, p_cnpj text DEFAULT NULL::text, p_admin_user_id uuid DEFAULT NULL::uuid)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\nDECLARE\n  v_caller_uid uuid;\n  v_new_company_id uuid;\n  v_result jsonb;\nBEGIN\n  v_caller_uid := auth.uid();\n  IF v_caller_uid IS NULL THEN\n    RAISE EXCEPTION '403: Não autenticado';\n  END IF;\n\n  IF NOT has_permission(v_caller_uid, 'system:global:manage') THEN\n    RAISE EXCEPTION '403: Sem permissão (system:global:manage)';\n  END IF;\n\n  IF p_company_name IS NULL OR trim(p_company_name) = '' THEN\n    RAISE EXCEPTION '400: Nome da empresa é obrigatório';\n  END IF;\n\n  IF p_cnpj IS NOT NULL AND trim(p_cnpj) <> '' THEN\n    IF EXISTS (SELECT 1 FROM companies WHERE cnpj = trim(p_cnpj)) THEN\n      RAISE EXCEPTION '409: CNPJ já cadastrado';\n    END IF;\n  END IF;\n\n  INSERT INTO companies (nome, cnpj, ativo)\n  VALUES (trim(p_company_name), NULLIF(trim(p_cnpj), ''), true)\n  RETURNING id INTO v_new_company_id;\n\n  INSERT INTO public.turnos (company_id, nome, hora_inicio, hora_fim, ativo)\n  VALUES\n    (v_new_company_id, 'Manhã', '07:00:00'::time, '15:00:00'::time, true),\n    (v_new_company_id, 'Tarde', '15:00:00'::time, '23:00:00'::time, true),\n    (v_new_company_id, 'Noite', '23:00:00'::time, '07:00:00'::time, true),\n    (v_new_company_id, 'Geral', '00:00:00'::time, '23:59:59'::time, true);\n\n  -- Plano de contas fixo: raízes NÃO OPERACIONAIS sempre presentes, mesmo\n  -- padrão de Ren Sushi/Moralles, desde a criação da empresa.\n  PERFORM public.fin_get_categoria_desconto_baixa(v_new_company_id);\n  PERFORM public.fin_get_categoria_desconto_concedido(v_new_company_id);\n\n  INSERT INTO public.company_memberships(user_id, company_id) VALUES(v_caller_uid, v_new_company_id)\n    ON CONFLICT(user_id, company_id) DO UPDATE SET status='active', updated_at=now();\n\n  INSERT INTO user_roles (user_id, company_id, role)\n  VALUES (v_caller_uid, v_new_company_id, 'admin')\n  ON CONFLICT (user_id, company_id, role) DO NOTHING;\n\n  IF p_admin_user_id IS NOT NULL THEN\n    IF NOT EXISTS (SELECT 1 FROM profiles WHERE id = p_admin_user_id) THEN\n      RAISE EXCEPTION '404: Usuário admin não encontrado';\n    END IF;\n\n    INSERT INTO public.company_memberships(user_id,company_id) VALUES(p_admin_user_id,v_new_company_id) ON CONFLICT(user_id,company_id) DO UPDATE SET status='active',updated_at=now();\n\n    INSERT INTO user_roles (user_id, company_id, role)\n    VALUES (p_admin_user_id, v_new_company_id, 'admin')\n    ON CONFLICT (user_id, company_id, role) DO NOTHING;\n  END IF;\n\n  INSERT INTO job_roles (company_id, nome, descricao)\n  VALUES\n    (v_new_company_id, 'Gerente Geral', 'Responsável geral pela operação'),\n    (v_new_company_id, 'Chef de Cozinha', 'Responsável pela cozinha e fichas técnicas'),\n    (v_new_company_id, 'Estoquista', 'Responsável pelo controle de estoque'),\n    (v_new_company_id, 'Comprador', 'Responsável pelas compras e fornecedores'),\n    (v_new_company_id, 'Financeiro', 'Responsável pelo módulo financeiro'),\n    (v_new_company_id, 'Operador', 'Operação geral do dia a dia')\n  ON CONFLICT (company_id, nome) DO NOTHING;\n\n  INSERT INTO admin_actions_log (actor_user_id, company_id, action, details)\n  VALUES (\n    v_caller_uid,\n    v_new_company_id,\n    'COMPANY_CREATED',\n    jsonb_build_object(\n      'company_name', trim(p_company_name),\n      'cnpj', p_cnpj,\n      'admin_user_id', p_admin_user_id\n    )\n  );\n\n  v_result := jsonb_build_object(\n    'success', true,\n    'company_id', v_new_company_id,\n    'company_name', trim(p_company_name)\n  );\n\n  RETURN v_result;\nEND;\n$function$\n"
+    },
+    {
+      "signature": "refresh_materialized_views()",
+      "owner": "postgres",
+      "proacl": "{=X/postgres,postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+      "proconfig": [
+        "search_path=public"
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.refresh_materialized_views()\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\nDECLARE\n  v_start timestamptz; \n  v_results jsonb := '[]'::jsonb; \n  v_mv text; \n  v_elapsed numeric;\n  -- List now includes schema prefix\n  v_views text[] := ARRAY[\n    'reporting.mv_fin_dre_mensal',\n    'reporting.mv_fin_fluxo_caixa_diario',\n    'reporting.mv_consumo_itens_semana',\n    'reporting.mv_giro_estoque',\n    'reporting.mv_pedidos_status_resumo'\n  ];\nBEGIN\n  FOREACH v_mv IN ARRAY v_views LOOP\n    v_start := clock_timestamp();\n    -- Dynamic SQL needs fully qualified names, which we provided in the array\n    EXECUTE 'REFRESH MATERIALIZED VIEW ' || v_mv;\n    v_elapsed := EXTRACT(EPOCH FROM clock_timestamp() - v_start) * 1000;\n    \n    v_results := v_results || jsonb_build_object('view', v_mv, 'ms', round(v_elapsed::numeric, 1));\n    \n    -- Log slow refreshes (>800ms)\n    IF v_elapsed > 800 THEN\n      INSERT INTO audit_logs (source, module, entity, action, metadata, success)\n      VALUES ('db', 'perf', v_mv, 'SLOW_QUERY', jsonb_build_object('type', 'mv_refresh', 'duration_ms', round(v_elapsed::numeric, 1)), true);\n    END IF;\n  END LOOP;\n\n  -- Clear cache\n  DELETE FROM dashboard_cache WHERE expires_at < now();\n  \n  -- Log job completion\n  INSERT INTO audit_logs (source, module, entity, action, metadata, success)\n  VALUES ('db', 'system', 'materialized_views', 'JOB_RUN', v_results, true);\n  \n  RETURN v_results;\nEND; \n$function$\n"
+    },
+    {
+      "signature": "rpc_create_company(text,text)",
+      "owner": "postgres",
+      "proacl": "{=X/postgres,postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+      "proconfig": [
+        "search_path=public"
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.rpc_create_company(p_nome text, p_cnpj text DEFAULT NULL::text)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\nDECLARE\n  v_id uuid;\nBEGIN\n  IF NOT has_permission(auth.uid(), 'system:admin') THEN\n    RAISE EXCEPTION 'Sem permissão (system:admin).';\n  END IF;\n\n  INSERT INTO public.companies (nome, cnpj)\n  VALUES (p_nome, p_cnpj)\n  RETURNING id INTO v_id;\n\n  INSERT INTO public.audit_logs (module, action, entity, entity_id, actor_user_id, source, success, after)\n  VALUES (\n    'system', 'create_company', 'companies', v_id, auth.uid(), 'rpc', true,\n    jsonb_build_object('nome', p_nome, 'cnpj', p_cnpj)\n  );\n\n  RETURN jsonb_build_object('id', v_id);\nEND;\n$function$\n"
+    },
+    {
+      "signature": "rpc_set_user_company(uuid,uuid)",
+      "owner": "postgres",
+      "proacl": "{=X/postgres,postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+      "proconfig": [
+        "search_path=\"\""
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.rpc_set_user_company(p_user_id uuid, p_company_id uuid)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nBEGIN\n PERFORM public.assert_tenant();\n IF NOT public.has_permission(auth.uid(),'system:global:manage') THEN RAISE EXCEPTION USING ERRCODE='42501',MESSAGE='PERMISSION_DENIED'; END IF;\n RETURN public.admin_upsert_company_membership(auth.uid(),p_company_id,p_user_id,'operador',NULL,'active',NULL,NULL,true);\nEND;\n$function$\n"
+    },
+    {
+      "signature": "update_company(uuid,text,text,boolean)",
+      "owner": "postgres",
+      "proacl": "{=X/postgres,postgres=X/postgres,authenticated=X/postgres}",
+      "proconfig": [
+        "search_path=public"
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.update_company(p_company_id uuid, p_nome text DEFAULT NULL::text, p_cnpj text DEFAULT NULL::text, p_ativo boolean DEFAULT NULL::boolean)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\nDECLARE\n  v_caller_uid uuid;\n  v_old record;\nBEGIN\n  v_caller_uid := auth.uid();\n  IF v_caller_uid IS NULL THEN\n    RAISE EXCEPTION '403: Não autenticado';\n  END IF;\n\n  IF NOT has_permission(v_caller_uid, 'system:global:manage') THEN\n    RAISE EXCEPTION '403: Sem permissão';\n  END IF;\n\n  IF p_company_id = '00000000-0000-0000-0000-000000000001'::uuid THEN\n    RAISE EXCEPTION '400: Não é possível editar a empresa placeholder';\n  END IF;\n\n  SELECT * INTO v_old FROM companies WHERE id = p_company_id;\n  IF NOT FOUND THEN\n    RAISE EXCEPTION '404: Empresa não encontrada';\n  END IF;\n\n  IF p_cnpj IS NOT NULL AND trim(p_cnpj) <> '' AND trim(p_cnpj) <> COALESCE(v_old.cnpj, '') THEN\n    IF EXISTS (SELECT 1 FROM companies WHERE cnpj = trim(p_cnpj) AND id <> p_company_id) THEN\n      RAISE EXCEPTION '409: CNPJ já cadastrado em outra empresa';\n    END IF;\n  END IF;\n\n  UPDATE companies SET\n    nome       = COALESCE(NULLIF(trim(p_nome), ''), v_old.nome),\n    cnpj       = CASE WHEN p_cnpj IS NOT NULL THEN NULLIF(trim(p_cnpj), '') ELSE v_old.cnpj END,\n    ativo      = COALESCE(p_ativo, v_old.ativo),\n    updated_at = now()\n  WHERE id = p_company_id;\n\n  INSERT INTO audit_logs (actor_user_id, company_id, action, module, entity, entity_id, metadata)\n  VALUES (v_caller_uid, p_company_id, 'COMPANY_UPDATED', 'admin', 'companies', p_company_id, jsonb_build_object(\n    'old_nome', v_old.nome, 'new_nome', COALESCE(NULLIF(trim(p_nome), ''), v_old.nome),\n    'old_ativo', v_old.ativo, 'new_ativo', COALESCE(p_ativo, v_old.ativo)\n  ));\n\n  RETURN jsonb_build_object('success', true);\nEND;\n$function$\n"
+    }
+  ],
+  "helpers": [
+    {
+      "signature": "assert_tenant()",
+      "definition": "CREATE OR REPLACE FUNCTION public.assert_tenant()\n RETURNS uuid\n LANGUAGE plpgsql\n STABLE SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE v_company uuid := public.get_current_company_id();\nBEGIN\n IF v_company IS NULL THEN RAISE EXCEPTION USING ERRCODE='42501',MESSAGE='COMPANY_ACCESS_DENIED'; END IF;\n RETURN v_company;\nEND;\n$function$\n",
+      "proacl": "{postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}"
+    },
+    {
+      "signature": "get_company_permissions(uuid,uuid)",
+      "definition": "CREATE OR REPLACE FUNCTION public.get_company_permissions(p_user_id uuid, p_company_id uuid)\n RETURNS text[]\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO ''\nAS $function$\n SELECT COALESCE(array_agg(k.permission_key ORDER BY k.permission_key),ARRAY[]::text[])\n FROM (\n   SELECT rp.permission_key FROM public.user_roles ur JOIN public.role_permissions rp ON rp.role=ur.role::text\n   WHERE ur.user_id=p_user_id AND ur.company_id=p_company_id\n   UNION\n   SELECT permission_key FROM public.user_permissions WHERE user_id=p_user_id AND company_id=p_company_id AND effect='ALLOW'\n ) k\n WHERE public.is_company_member(p_user_id,p_company_id)\n AND NOT EXISTS(SELECT 1 FROM public.user_permissions d WHERE d.user_id=p_user_id AND d.company_id=p_company_id\n   AND d.permission_key=k.permission_key AND d.effect='DENY');\n$function$\n",
+      "proacl": "{postgres=X/postgres,service_role=X/postgres}"
+    },
+    {
+      "signature": "get_current_company_id()",
+      "definition": "CREATE OR REPLACE FUNCTION public.get_current_company_id()\n RETURNS uuid\n LANGUAGE plpgsql\n STABLE SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE v_user uuid := auth.uid(); v_company uuid; v_requested text;\nBEGIN\n IF v_user IS NULL THEN RETURN NULL; END IF;\n v_requested := NULLIF(current_setting('request.headers',true),'')::jsonb->>'x-company-id';\n IF v_requested IS NOT NULL THEN\n   BEGIN v_company := v_requested::uuid;\n   EXCEPTION WHEN invalid_text_representation THEN RAISE EXCEPTION USING ERRCODE='42501',MESSAGE='COMPANY_ACCESS_DENIED'; END;\n ELSE\n   SELECT company_id INTO v_company FROM public.profiles WHERE id=v_user;\n END IF;\n IF NOT public.is_company_member(v_user,v_company) THEN\n   IF v_requested IS NULL THEN RETURN NULL; END IF;\n   RAISE EXCEPTION USING ERRCODE='42501',MESSAGE='COMPANY_ACCESS_DENIED';\n END IF;\n RETURN v_company;\nEND;\n$function$\n",
+      "proacl": "{postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}"
+    },
+    {
+      "signature": "get_effective_permissions(uuid)",
+      "definition": "CREATE OR REPLACE FUNCTION public.get_effective_permissions(_user_id uuid)\n RETURNS text[]\n LANGUAGE plpgsql\n STABLE SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE v_company uuid; v_requested text;\nBEGIN\n IF auth.uid() IS NOT NULL THEN v_company:=public.get_current_company_id();\n ELSIF (NULLIF(current_setting('request.jwt.claims',true),'')::jsonb->>'role')='service_role' THEN\n   v_requested:=NULLIF(current_setting('request.headers',true),'')::jsonb->>'x-company-id';\n   IF v_requested IS NOT NULL THEN v_company:=v_requested::uuid;\n   ELSE SELECT company_id INTO v_company FROM public.profiles WHERE id=_user_id; END IF;\n ELSE RETURN ARRAY[]::text[];\n END IF;\n RETURN public.get_company_permissions(_user_id,v_company);\nEND;\n$function$\n",
+      "proacl": "{postgres=X/postgres,service_role=X/postgres,authenticated=X/postgres}"
+    },
+    {
+      "signature": "has_permission(text)",
+      "definition": "CREATE OR REPLACE FUNCTION public.has_permission(_permission text)\n RETURNS boolean\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\n  SELECT public.has_permission(auth.uid(), _permission);\n$function$\n",
+      "proacl": null
+    },
+    {
+      "signature": "has_permission(uuid,text)",
+      "definition": "CREATE OR REPLACE FUNCTION public.has_permission(_user_id uuid, _permission text)\n RETURNS boolean\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO ''\nAS $function$\n SELECT COALESCE(_permission=ANY(public.get_effective_permissions(_user_id)),false);\n$function$\n",
+      "proacl": "{postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}"
+    },
+    {
+      "signature": "is_company_member(uuid,uuid)",
+      "definition": "CREATE OR REPLACE FUNCTION public.is_company_member(p_user_id uuid, p_company_id uuid)\n RETURNS boolean\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO ''\nAS $function$\n SELECT EXISTS(SELECT 1 FROM public.company_memberships m JOIN public.companies c ON c.id=m.company_id\n   WHERE m.user_id=p_user_id AND m.company_id=p_company_id AND m.status='active' AND c.ativo);\n$function$\n",
+      "proacl": "{postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}"
+    }
+  ],
+  "extras": [
+    {
+      "signature": "admin_upsert_company_membership(uuid,uuid,uuid,app_role,text[],text,uuid,text,boolean)",
+      "definition": "CREATE OR REPLACE FUNCTION public.admin_upsert_company_membership(p_actor_user_id uuid, p_company_id uuid, p_user_id uuid, p_role app_role DEFAULT NULL::app_role, p_permissions text[] DEFAULT NULL::text[], p_status text DEFAULT 'active'::text, p_job_role_id uuid DEFAULT NULL::uuid, p_sector text DEFAULT NULL::text, p_if_not_exists boolean DEFAULT false)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\r\nDECLARE v_actor_permissions text[]; v_id uuid; v_existed boolean; v_previous_status text;\r\nBEGIN\r\n v_actor_permissions:=public.get_company_permissions(p_actor_user_id,p_company_id);\r\n -- Cross-company provisioning is reserved for the platform permission in the\r\n -- actor's original company. It does not grant operational access to the actor.\r\n IF NOT v_actor_permissions && ARRAY['configuracoes:usuarios:manage','users:manage','system:global:manage'] THEN\r\n   SELECT public.get_company_permissions(p_actor_user_id,p.company_id) INTO v_actor_permissions\r\n   FROM public.profiles p WHERE p.id=p_actor_user_id;\r\n   IF NOT COALESCE('system:global:manage'=ANY(v_actor_permissions),false) THEN\r\n     RAISE EXCEPTION USING ERRCODE='42501',MESSAGE='PERMISSION_DENIED';\r\n   END IF;\r\n END IF;\r\n IF p_status NOT IN ('active','inactive','revoked') THEN RAISE EXCEPTION 'INVALID_MEMBERSHIP_STATUS'; END IF;\r\n IF NOT EXISTS(SELECT 1 FROM public.companies WHERE id=p_company_id AND ativo\r\n   AND id<>'00000000-0000-0000-0000-000000000001'::uuid) THEN RAISE EXCEPTION 'COMPANY_INACTIVE'; END IF;\r\n IF p_job_role_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM public.job_roles WHERE id=p_job_role_id AND company_id=p_company_id) THEN\r\n   RAISE EXCEPTION 'JOB_ROLE_COMPANY_MISMATCH';\r\n END IF;\r\n -- Serialize retries/concurrent creation for the same identity and unit.\r\n PERFORM pg_advisory_xact_lock(hashtextextended(p_user_id::text||':'||p_company_id::text,0));\r\n SELECT id,status INTO v_id,v_previous_status FROM public.company_memberships WHERE user_id=p_user_id AND company_id=p_company_id FOR UPDATE;\r\n v_existed:=v_id IS NOT NULL;\r\n IF v_existed AND p_if_not_exists THEN\r\n   IF v_previous_status<>'revoked' THEN RETURN jsonb_build_object('membership_id',v_id,'already_exists',true); END IF;\r\n   -- Explicitly adding a removed user restores only the newly selected grants.\r\n   DELETE FROM public.user_roles WHERE user_id=p_user_id AND company_id=p_company_id;\r\n   DELETE FROM public.user_permissions WHERE user_id=p_user_id AND company_id=p_company_id;\r\n END IF;\r\n -- Só system:global:manage confere super-admin (no banco e, após a remoção da\r\n -- expansão legada, também na UI). system:admin é chave legada de módulo, faz\r\n -- parte do role admin e não pode bloquear a atribuição do perfil.\r\n IF NOT COALESCE('system:global:manage'=ANY(v_actor_permissions),false) AND\r\n   (COALESCE(p_permissions,ARRAY[]::text[]) && ARRAY['system:global:manage']\r\n     OR EXISTS(SELECT 1 FROM public.role_permissions WHERE role=p_role::text AND permission_key='system:global:manage')) THEN\r\n   RAISE EXCEPTION USING ERRCODE='42501',MESSAGE='PRIVILEGE_ESCALATION_DENIED';\r\n END IF;\r\n IF p_permissions IS NOT NULL AND EXISTS(SELECT 1 FROM unnest(p_permissions) k WHERE NOT EXISTS(SELECT 1 FROM public.permissions WHERE key=k)) THEN\r\n   RAISE EXCEPTION 'UNKNOWN_PERMISSION';\r\n END IF;\r\n INSERT INTO public.company_memberships(user_id,company_id,status,job_role_id,sector)\r\n VALUES(p_user_id,p_company_id,p_status,p_job_role_id,p_sector)\r\n ON CONFLICT(user_id,company_id) DO UPDATE SET status=EXCLUDED.status,job_role_id=EXCLUDED.job_role_id,\r\n   sector=EXCLUDED.sector,updated_at=now() RETURNING id INTO v_id;\r\n IF p_role IS NOT NULL THEN\r\n   DELETE FROM public.user_roles WHERE user_id=p_user_id AND company_id=p_company_id;\r\n   INSERT INTO public.user_roles(user_id,company_id,role) VALUES(p_user_id,p_company_id,p_role);\r\n END IF;\r\n IF p_permissions IS NOT NULL THEN\r\n   DELETE FROM public.user_permissions WHERE user_id=p_user_id AND company_id=p_company_id;\r\n   INSERT INTO public.user_permissions(user_id,company_id,permission_key,effect,granted_by)\r\n   SELECT p_user_id,p_company_id,p.key,\r\n     CASE WHEN p.key=ANY(p_permissions) THEN 'ALLOW' ELSE 'DENY' END,p_actor_user_id\r\n   FROM public.permissions p WHERE p.key=ANY(p_permissions) OR EXISTS(\r\n     SELECT 1 FROM public.user_roles ur JOIN public.role_permissions rp ON rp.role=ur.role::text\r\n     WHERE ur.user_id=p_user_id AND ur.company_id=p_company_id AND rp.permission_key=p.key);\r\n END IF;\r\n INSERT INTO public.admin_actions_log(actor_user_id,company_id,action,target_user_id,details)\r\n VALUES(p_actor_user_id,p_company_id,CASE WHEN v_existed THEN 'MEMBERSHIP_UPDATED' ELSE 'MEMBERSHIP_CREATED' END,p_user_id,\r\n   jsonb_build_object('status',p_status,'role',p_role,'permissions_count',cardinality(p_permissions)));\r\n RETURN jsonb_build_object('membership_id',v_id,'already_exists',false);\r\nEND;\r\n$function$\n",
+      "proacl": "{postgres=X/postgres,service_role=X/postgres}"
+    },
+    {
+      "signature": "fin_get_categoria_desconto_baixa(uuid)",
+      "definition": "CREATE OR REPLACE FUNCTION public.fin_get_categoria_desconto_baixa(p_company_id uuid)\n RETURNS uuid\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE\n  v_id uuid;\n  v_raiz uuid;\nBEGIN\n  SELECT id INTO v_raiz\n  FROM public.fin_categorias\n  WHERE company_id = p_company_id AND system_key = 'receitas_nao_operacionais'\n  LIMIT 1;\n\n  IF v_raiz IS NULL THEN\n    INSERT INTO public.fin_categorias (system_key, nome, tipo, codigo, ordem, company_id)\n    VALUES ('receitas_nao_operacionais', 'RECEITAS NÃO OPERACIONAIS', 'receita', 'NO-R', 9990, p_company_id)\n    RETURNING id INTO v_raiz;\n  END IF;\n\n  SELECT id INTO v_id\n  FROM public.fin_categorias\n  WHERE company_id = p_company_id\n    AND parent_id = v_raiz\n    AND lower(nome) = 'descontos obtidos'\n  ORDER BY ativo DESC, created_at\n  LIMIT 1;\n\n  IF v_id IS NOT NULL THEN\n    UPDATE public.fin_categorias\n    SET ativo = true\n    WHERE id = v_id AND company_id = p_company_id AND ativo = false;\n    RETURN v_id;\n  END IF;\n\n  INSERT INTO public.fin_categorias\n    (nome, tipo, codigo, parent_id, ordem, ativo, company_id)\n  VALUES\n    ('Descontos Obtidos', 'receita', 'NO-R.90', v_raiz, 9991, true, p_company_id)\n  RETURNING id INTO v_id;\n\n  RETURN v_id;\nEND;\n$function$\n",
+      "proacl": "{postgres=X/postgres,service_role=X/postgres}"
+    },
+    {
+      "signature": "fin_get_categoria_desconto_concedido(uuid)",
+      "definition": "CREATE OR REPLACE FUNCTION public.fin_get_categoria_desconto_concedido(p_company_id uuid)\n RETURNS uuid\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nDECLARE\n  v_id uuid;\n  v_raiz uuid;\nBEGIN\n  SELECT id INTO v_raiz\n  FROM public.fin_categorias\n  WHERE company_id = p_company_id AND system_key = 'despesas_nao_operacionais'\n  LIMIT 1;\n\n  IF v_raiz IS NULL THEN\n    INSERT INTO public.fin_categorias (system_key, nome, tipo, codigo, ordem, company_id)\n    VALUES ('despesas_nao_operacionais', 'DESPESAS NÃO OPERACIONAIS', 'despesa', 'NO-D', 9991, p_company_id)\n    RETURNING id INTO v_raiz;\n  END IF;\n\n  SELECT id INTO v_id\n  FROM public.fin_categorias\n  WHERE company_id = p_company_id\n    AND parent_id = v_raiz\n    AND lower(nome) = 'descontos concedidos'\n  ORDER BY ativo DESC, created_at\n  LIMIT 1;\n\n  IF v_id IS NOT NULL THEN\n    UPDATE public.fin_categorias\n    SET ativo = true\n    WHERE id = v_id AND company_id = p_company_id AND ativo = false;\n    RETURN v_id;\n  END IF;\n\n  INSERT INTO public.fin_categorias\n    (nome, tipo, codigo, parent_id, ordem, ativo, company_id)\n  VALUES\n    ('Descontos Concedidos', 'despesa', 'NO-D.90', v_raiz, 9991, true, p_company_id)\n  RETURNING id INTO v_id;\n\n  RETURN v_id;\nEND;\n$function$\n",
+      "proacl": "{postgres=X/postgres,service_role=X/postgres}"
+    },
+    {
+      "signature": "protect_profile_identity_scope()",
+      "definition": "CREATE OR REPLACE FUNCTION public.protect_profile_identity_scope()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO ''\nAS $function$\nBEGIN\n IF current_user NOT IN ('postgres','service_role','supabase_admin') AND\n   (NEW.id IS DISTINCT FROM OLD.id OR NEW.company_id IS DISTINCT FROM OLD.company_id OR\n    NEW.email IS DISTINCT FROM OLD.email OR NEW.job_role_id IS DISTINCT FROM OLD.job_role_id OR NEW.sector IS DISTINCT FROM OLD.sector) THEN\n   RAISE EXCEPTION USING ERRCODE='42501',MESSAGE='PROFILE_IDENTITY_PROTECTED';\n END IF;\n RETURN NEW;\nEND;\n$function$\n",
+      "proacl": null
+    },
+    {
+      "signature": "trg_fin_ensure_non_operational_categories()",
+      "definition": "CREATE OR REPLACE FUNCTION public.trg_fin_ensure_non_operational_categories()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nBEGIN\n  PERFORM public.fin_ensure_non_operational_categories(NEW.id);\n  RETURN NEW;\nEND;\n$function$\n",
+      "proacl": "{postgres=X/postgres}"
+    },
+    {
+      "signature": "auth.uid()",
+      "definition": "CREATE OR REPLACE FUNCTION auth.uid()\n RETURNS uuid\n LANGUAGE sql\n STABLE\nAS $function$\n  select \n  coalesce(\n    nullif(current_setting('request.jwt.claim.sub', true), ''),\n    (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub')\n  )::uuid\n$function$\n",
+      "proacl": "{=X/supabase_auth_admin,supabase_auth_admin=X/supabase_auth_admin,dashboard_user=X/supabase_auth_admin}"
+    }
+  ],
+  "catalog": [
+    {
+      "jsonb_build_object": {
+        "table": {
+          "acl": "{postgres=arwdDxtm/postgres,authenticated=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+          "rls": true,
+          "force": false
+        },
+        "callers": null,
+        "execute": [
+          {
+            "role": "authenticated",
+            "execute": true,
+            "function": "refresh_materialized_views()"
+          },
+          {
+            "role": "anon",
+            "execute": true,
+            "function": "refresh_materialized_views()"
+          },
+          {
+            "role": "service_role",
+            "execute": true,
+            "function": "refresh_materialized_views()"
+          },
+          {
+            "role": "authenticated",
+            "execute": true,
+            "function": "cleanup_old_audit_logs(integer)"
+          },
+          {
+            "role": "anon",
+            "execute": true,
+            "function": "cleanup_old_audit_logs(integer)"
+          },
+          {
+            "role": "service_role",
+            "execute": true,
+            "function": "cleanup_old_audit_logs(integer)"
+          },
+          {
+            "role": "authenticated",
+            "execute": true,
+            "function": "rpc_create_company(text,text)"
+          },
+          {
+            "role": "anon",
+            "execute": true,
+            "function": "rpc_create_company(text,text)"
+          },
+          {
+            "role": "service_role",
+            "execute": true,
+            "function": "rpc_create_company(text,text)"
+          }
+        ],
+        "policies": [
+          {
+            "cmd": "ALL",
+            "qual": "( SELECT has_permission(auth.uid(), 'system:admin'::text) AS has_permission)",
+            "roles": [
+              "authenticated"
+            ],
+            "tablename": "companies",
+            "permissive": "PERMISSIVE",
+            "policyname": "companies_admin",
+            "schemaname": "public",
+            "with_check": null
+          },
+          {
+            "cmd": "SELECT",
+            "qual": "(id = ( SELECT get_current_company_id() AS get_current_company_id))",
+            "roles": [
+              "authenticated"
+            ],
+            "tablename": "companies",
+            "permissive": "PERMISSIVE",
+            "policyname": "companies_read",
+            "schemaname": "public",
+            "with_check": null
+          }
+        ],
+        "cron_exists": null
+      }
+    }
+  ],
+  "jobs": [
+    {
+      "jsonb_build_object": {
+        "relations": [
+          {
+            "kind": "m",
+            "name": "reporting.mv_fin_dre_mensal"
+          },
+          {
+            "kind": "m",
+            "name": "reporting.mv_fin_fluxo_caixa_diario"
+          },
+          {
+            "kind": "m",
+            "name": "reporting.mv_consumo_itens_semana"
+          },
+          {
+            "kind": "m",
+            "name": "reporting.mv_giro_estoque"
+          }
+        ],
+        "extensions": [
+          "plpgsql",
+          "pg_stat_statements",
+          "uuid-ossp",
+          "pgcrypto",
+          "supabase_vault",
+          "pg_net",
+          "unaccent",
+          "pg_trgm"
+        ],
+        "server_version": "17.6",
+        "maintenance_logs": null
+      }
+    }
+  ],
+  "fixtureCatalog": {
+    "views": [
+      {
+        "name": "reporting.mv_fin_dre_mensal",
+        "definition": " SELECT company_id,\n    to_char((data_competencia)::timestamp with time zone, 'YYYY-MM'::text) AS mes,\n    tipo,\n    categoria_id,\n    count(*) AS qtd,\n    sum(valor) AS total\n   FROM fin_lancamentos\n  WHERE ((status = 'REALIZADO'::text) AND (tipo <> 'TRANSFERENCIA'::text))\n  GROUP BY company_id, (to_char((data_competencia)::timestamp with time zone, 'YYYY-MM'::text)), tipo, categoria_id;"
+      },
+      {
+        "name": "reporting.mv_fin_fluxo_caixa_diario",
+        "definition": " SELECT company_id,\n    data_competencia AS dia,\n    conta_id,\n    tipo,\n    sum(valor) AS total\n   FROM fin_lancamentos\n  WHERE ((status = 'REALIZADO'::text) AND (tipo <> 'TRANSFERENCIA'::text))\n  GROUP BY company_id, data_competencia, conta_id, tipo;"
+      },
+      {
+        "name": "reporting.mv_consumo_itens_semana",
+        "definition": " SELECT company_id,\n    produto_id,\n    (date_trunc('week'::text, (data)::timestamp with time zone))::date AS semana,\n    sum(quantidade) AS total_saida,\n    sum(custo_total) AS custo_total\n   FROM movimentacoes_estoque\n  WHERE ((status = 'ATIVO'::text) AND (tipo !~~ 'ENTRADA%'::text) AND (tipo <> ALL (ARRAY['AJUSTE'::text, 'ENTRADA_ESTORNO'::text, 'SAIDA_ESTORNO'::text])))\n  GROUP BY company_id, produto_id, ((date_trunc('week'::text, (data)::timestamp with time zone))::date);"
+      },
+      {
+        "name": "reporting.mv_giro_estoque",
+        "definition": " SELECT p.company_id,\n    p.id AS produto_id,\n    p.nome_produto,\n    p.categoria,\n    COALESCE(sum(\n        CASE\n            WHEN ((m.tipo ~~ 'ENTRADA%'::text) AND (m.tipo <> 'ENTRADA_ESTORNO'::text)) THEN m.quantidade\n            ELSE (0)::numeric\n        END), (0)::numeric) AS entradas,\n    COALESCE(sum(\n        CASE\n            WHEN ((m.tipo !~~ 'ENTRADA%'::text) AND (m.tipo <> ALL (ARRAY['AJUSTE'::text, 'ENTRADA_ESTORNO'::text, 'SAIDA_ESTORNO'::text]))) THEN m.quantidade\n            ELSE (0)::numeric\n        END), (0)::numeric) AS saidas,\n    COALESCE(( SELECT sum(\n                CASE\n                    WHEN (ms.tipo = ANY (ARRAY['ENTRADA_ESTORNO'::text, 'SAIDA_ESTORNO'::text])) THEN (0)::numeric\n                    WHEN (ms.direction = 'IN'::text) THEN ms.quantidade\n                    ELSE (- ms.quantidade)\n                END) AS sum\n           FROM movimentacoes_estoque ms\n          WHERE ((ms.produto_id = p.id) AND (ms.status = 'ATIVO'::text))), (0)::numeric) AS saldo_atual\n   FROM (produtos p\n     LEFT JOIN movimentacoes_estoque m ON (((m.produto_id = p.id) AND (m.status = 'ATIVO'::text) AND (m.data >= (CURRENT_DATE - '90 days'::interval)))))\n  WHERE (p.ativo = true)\n  GROUP BY p.company_id, p.id, p.nome_produto, p.categoria;"
+      }
+    ],
+    "tables": [
+      {
+        "table": "audit_logs",
+        "columns": [
+          {
+            "name": "id",
+            "type": "uuid",
+            "default": "gen_random_uuid()",
+            "notnull": true
+          },
+          {
+            "name": "created_at",
+            "type": "timestamp with time zone",
+            "default": "now()",
+            "notnull": true
+          },
+          {
+            "name": "actor_user_id",
+            "type": "uuid",
+            "default": null,
+            "notnull": false
+          },
+          {
+            "name": "actor_email",
+            "type": "text",
+            "default": null,
+            "notnull": false
+          },
+          {
+            "name": "actor_role",
+            "type": "text",
+            "default": null,
+            "notnull": false
+          },
+          {
+            "name": "source",
+            "type": "text",
+            "default": "'db'::text",
+            "notnull": true
+          },
+          {
+            "name": "module",
+            "type": "text",
+            "default": null,
+            "notnull": true
+          },
+          {
+            "name": "entity",
+            "type": "text",
+            "default": null,
+            "notnull": true
+          },
+          {
+            "name": "entity_id",
+            "type": "uuid",
+            "default": null,
+            "notnull": false
+          },
+          {
+            "name": "action",
+            "type": "text",
+            "default": null,
+            "notnull": true
+          },
+          {
+            "name": "before",
+            "type": "jsonb",
+            "default": null,
+            "notnull": false
+          },
+          {
+            "name": "after",
+            "type": "jsonb",
+            "default": null,
+            "notnull": false
+          },
+          {
+            "name": "metadata",
+            "type": "jsonb",
+            "default": null,
+            "notnull": false
+          },
+          {
+            "name": "success",
+            "type": "boolean",
+            "default": "true",
+            "notnull": true
+          },
+          {
+            "name": "company_id",
+            "type": "uuid",
+            "default": null,
+            "notnull": false
+          },
+          {
+            "name": "severity",
+            "type": "text",
+            "default": "'INFO'::text",
+            "notnull": true
+          },
+          {
+            "name": "entity_unaccent",
+            "type": "text",
+            "default": "lower(immutable_unaccent(entity))",
+            "notnull": false
+          }
+        ],
+        "triggers": null,
+        "constraints": [
+          {
+            "name": "audit_logs_company_id_fkey",
+            "type": "f",
+            "definition": "FOREIGN KEY (company_id) REFERENCES companies(id)"
+          },
+          {
+            "name": "audit_logs_pkey",
+            "type": "p",
+            "definition": "PRIMARY KEY (id)"
+          }
+        ]
+      },
+      {
+        "table": "companies",
+        "columns": [
+          {
+            "name": "id",
+            "type": "uuid",
+            "default": "gen_random_uuid()",
+            "notnull": true
+          },
+          {
+            "name": "nome",
+            "type": "text",
+            "default": null,
+            "notnull": true
+          },
+          {
+            "name": "cnpj",
+            "type": "text",
+            "default": null,
+            "notnull": false
+          },
+          {
+            "name": "ativo",
+            "type": "boolean",
+            "default": "true",
+            "notnull": true
+          },
+          {
+            "name": "created_at",
+            "type": "timestamp with time zone",
+            "default": "now()",
+            "notnull": true
+          },
+          {
+            "name": "updated_at",
+            "type": "timestamp with time zone",
+            "default": "now()",
+            "notnull": true
+          }
+        ],
+        "triggers": [
+          {
+            "function": "trg_fin_ensure_non_operational_categories()",
+            "definition": "CREATE TRIGGER trg_fin_ensure_non_operational_categories AFTER INSERT ON public.companies FOR EACH ROW EXECUTE FUNCTION trg_fin_ensure_non_operational_categories()"
+          }
+        ],
+        "constraints": [
+          {
+            "name": "companies_pkey",
+            "type": "p",
+            "definition": "PRIMARY KEY (id)"
+          }
+        ]
+      },
+      {
+        "table": "company_memberships",
+        "columns": [
+          {
+            "name": "id",
+            "type": "uuid",
+            "default": "gen_random_uuid()",
+            "notnull": true
+          },
+          {
+            "name": "user_id",
+            "type": "uuid",
+            "default": null,
+            "notnull": true
+          },
+          {
+            "name": "company_id",
+            "type": "uuid",
+            "default": null,
+            "notnull": true
+          },
+          {
+            "name": "status",
+            "type": "text",
+            "default": "'active'::text",
+            "notnull": true
+          },
+          {
+            "name": "job_role_id",
+            "type": "uuid",
+            "default": null,
+            "notnull": false
+          },
+          {
+            "name": "sector",
+            "type": "text",
+            "default": null,
+            "notnull": false
+          },
+          {
+            "name": "created_at",
+            "type": "timestamp with time zone",
+            "default": "now()",
+            "notnull": true
+          },
+          {
+            "name": "updated_at",
+            "type": "timestamp with time zone",
+            "default": "now()",
+            "notnull": true
+          }
+        ],
+        "triggers": null,
+        "constraints": [
+          {
+            "name": "company_memberships_company_id_fkey",
+            "type": "f",
+            "definition": "FOREIGN KEY (company_id) REFERENCES companies(id)"
+          },
+          {
+            "name": "company_memberships_job_role_id_fkey",
+            "type": "f",
+            "definition": "FOREIGN KEY (job_role_id) REFERENCES job_roles(id)"
+          },
+          {
+            "name": "company_memberships_pkey",
+            "type": "p",
+            "definition": "PRIMARY KEY (id)"
+          },
+          {
+            "name": "company_memberships_real_company",
+            "type": "c",
+            "definition": "CHECK ((company_id <> '00000000-0000-0000-0000-000000000001'::uuid))"
+          },
+          {
+            "name": "company_memberships_status_check",
+            "type": "c",
+            "definition": "CHECK ((status = ANY (ARRAY['active'::text, 'inactive'::text, 'revoked'::text])))"
+          },
+          {
+            "name": "company_memberships_user_company_key",
+            "type": "u",
+            "definition": "UNIQUE (user_id, company_id)"
+          },
+          {
+            "name": "company_memberships_user_id_fkey",
+            "type": "f",
+            "definition": "FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE"
+          }
+        ]
+      },
+      {
+        "table": "dashboard_cache",
+        "columns": [
+          {
+            "name": "key",
+            "type": "text",
+            "default": null,
+            "notnull": true
+          },
+          {
+            "name": "payload",
+            "type": "jsonb",
+            "default": "'{}'::jsonb",
+            "notnull": true
+          },
+          {
+            "name": "created_at",
+            "type": "timestamp with time zone",
+            "default": "now()",
+            "notnull": true
+          },
+          {
+            "name": "expires_at",
+            "type": "timestamp with time zone",
+            "default": "(now() + '00:02:00'::interval)",
+            "notnull": true
+          }
+        ],
+        "triggers": null,
+        "constraints": [
+          {
+            "name": "dashboard_cache_pkey",
+            "type": "p",
+            "definition": "PRIMARY KEY (key)"
+          }
+        ]
+      },
+      {
+        "table": "permissions",
+        "columns": [
+          {
+            "name": "key",
+            "type": "text",
+            "default": null,
+            "notnull": true
+          },
+          {
+            "name": "description",
+            "type": "text",
+            "default": "''::text",
+            "notnull": true
+          },
+          {
+            "name": "module",
+            "type": "text",
+            "default": null,
+            "notnull": true
+          },
+          {
+            "name": "submodule",
+            "type": "text",
+            "default": null,
+            "notnull": false
+          },
+          {
+            "name": "action",
+            "type": "text",
+            "default": "'read'::text",
+            "notnull": true
+          }
+        ],
+        "triggers": null,
+        "constraints": [
+          {
+            "name": "permissions_pkey",
+            "type": "p",
+            "definition": "PRIMARY KEY (key)"
+          }
+        ]
+      },
+      {
+        "table": "profiles",
+        "columns": [
+          {
+            "name": "id",
+            "type": "uuid",
+            "default": null,
+            "notnull": true
+          },
+          {
+            "name": "nome",
+            "type": "text",
+            "default": "''::text",
+            "notnull": true
+          },
+          {
+            "name": "email",
+            "type": "text",
+            "default": "''::text",
+            "notnull": true
+          },
+          {
+            "name": "avatar_url",
+            "type": "text",
+            "default": "''::text",
+            "notnull": false
+          },
+          {
+            "name": "created_at",
+            "type": "timestamp with time zone",
+            "default": "now()",
+            "notnull": true
+          },
+          {
+            "name": "updated_at",
+            "type": "timestamp with time zone",
+            "default": "now()",
+            "notnull": true
+          },
+          {
+            "name": "sector",
+            "type": "text",
+            "default": null,
+            "notnull": false
+          },
+          {
+            "name": "job_role_id",
+            "type": "uuid",
+            "default": null,
+            "notnull": false
+          },
+          {
+            "name": "company_id",
+            "type": "uuid",
+            "default": "'00000000-0000-0000-0000-000000000001'::uuid",
+            "notnull": true
+          }
+        ],
+        "triggers": [
+          {
+            "function": "protect_profile_identity_scope()",
+            "definition": "CREATE TRIGGER protect_profile_identity_scope BEFORE UPDATE ON public.profiles FOR EACH ROW EXECUTE FUNCTION protect_profile_identity_scope()"
+          }
+        ],
+        "constraints": [
+          {
+            "name": "profiles_company_fk",
+            "type": "f",
+            "definition": "FOREIGN KEY (company_id) REFERENCES companies(id)"
+          },
+          {
+            "name": "profiles_id_fkey",
+            "type": "f",
+            "definition": "FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE"
+          },
+          {
+            "name": "profiles_job_role_id_fkey",
+            "type": "f",
+            "definition": "FOREIGN KEY (job_role_id) REFERENCES job_roles(id)"
+          },
+          {
+            "name": "profiles_pkey",
+            "type": "p",
+            "definition": "PRIMARY KEY (id)"
+          }
+        ]
+      },
+      {
+        "table": "role_permissions",
+        "columns": [
+          {
+            "name": "id",
+            "type": "uuid",
+            "default": "gen_random_uuid()",
+            "notnull": true
+          },
+          {
+            "name": "role",
+            "type": "text",
+            "default": null,
+            "notnull": true
+          },
+          {
+            "name": "permission_key",
+            "type": "text",
+            "default": null,
+            "notnull": true
+          }
+        ],
+        "triggers": null,
+        "constraints": [
+          {
+            "name": "role_permissions_permission_key_fkey",
+            "type": "f",
+            "definition": "FOREIGN KEY (permission_key) REFERENCES permissions(key) ON DELETE CASCADE"
+          },
+          {
+            "name": "role_permissions_pkey",
+            "type": "p",
+            "definition": "PRIMARY KEY (id)"
+          },
+          {
+            "name": "role_permissions_role_permission_key_key",
+            "type": "u",
+            "definition": "UNIQUE (role, permission_key)"
+          }
+        ]
+      },
+      {
+        "table": "user_permissions",
+        "columns": [
+          {
+            "name": "id",
+            "type": "uuid",
+            "default": "gen_random_uuid()",
+            "notnull": true
+          },
+          {
+            "name": "user_id",
+            "type": "uuid",
+            "default": null,
+            "notnull": true
+          },
+          {
+            "name": "permission_key",
+            "type": "text",
+            "default": null,
+            "notnull": true
+          },
+          {
+            "name": "effect",
+            "type": "text",
+            "default": "'ALLOW'::text",
+            "notnull": true
+          },
+          {
+            "name": "granted_by",
+            "type": "uuid",
+            "default": null,
+            "notnull": false
+          },
+          {
+            "name": "created_at",
+            "type": "timestamp with time zone",
+            "default": "now()",
+            "notnull": true
+          },
+          {
+            "name": "company_id",
+            "type": "uuid",
+            "default": "get_current_company_id()",
+            "notnull": true
+          }
+        ],
+        "triggers": null,
+        "constraints": [
+          {
+            "name": "user_permissions_effect_check",
+            "type": "c",
+            "definition": "CHECK ((effect = ANY (ARRAY['ALLOW'::text, 'DENY'::text])))"
+          },
+          {
+            "name": "user_permissions_granted_by_fkey",
+            "type": "f",
+            "definition": "FOREIGN KEY (granted_by) REFERENCES auth.users(id) ON DELETE SET NULL"
+          },
+          {
+            "name": "user_permissions_membership_fk",
+            "type": "f",
+            "definition": "FOREIGN KEY (user_id, company_id) REFERENCES company_memberships(user_id, company_id)"
+          },
+          {
+            "name": "user_permissions_permission_key_fkey",
+            "type": "f",
+            "definition": "FOREIGN KEY (permission_key) REFERENCES permissions(key) ON DELETE CASCADE"
+          },
+          {
+            "name": "user_permissions_pkey",
+            "type": "p",
+            "definition": "PRIMARY KEY (id)"
+          },
+          {
+            "name": "user_permissions_user_company_permission_key",
+            "type": "u",
+            "definition": "UNIQUE (user_id, company_id, permission_key)"
+          },
+          {
+            "name": "user_permissions_user_id_fkey",
+            "type": "f",
+            "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE"
+          }
+        ]
+      },
+      {
+        "table": "user_roles",
+        "columns": [
+          {
+            "name": "id",
+            "type": "uuid",
+            "default": "gen_random_uuid()",
+            "notnull": true
+          },
+          {
+            "name": "user_id",
+            "type": "uuid",
+            "default": null,
+            "notnull": true
+          },
+          {
+            "name": "role",
+            "type": "app_role",
+            "default": null,
+            "notnull": true
+          },
+          {
+            "name": "created_at",
+            "type": "timestamp with time zone",
+            "default": "now()",
+            "notnull": true
+          },
+          {
+            "name": "company_id",
+            "type": "uuid",
+            "default": "get_current_company_id()",
+            "notnull": true
+          }
+        ],
+        "triggers": null,
+        "constraints": [
+          {
+            "name": "user_roles_membership_fk",
+            "type": "f",
+            "definition": "FOREIGN KEY (user_id, company_id) REFERENCES company_memberships(user_id, company_id)"
+          },
+          {
+            "name": "user_roles_pkey",
+            "type": "p",
+            "definition": "PRIMARY KEY (id)"
+          },
+          {
+            "name": "user_roles_user_company_role_key",
+            "type": "u",
+            "definition": "UNIQUE (user_id, company_id, role)"
+          },
+          {
+            "name": "user_roles_user_id_fkey",
+            "type": "f",
+            "definition": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE"
+          }
+        ]
+      }
+    ]
+  },
+  "matviews": [
+    {
+      "name": "public.mv_fin_dre_mensal",
+      "definition": " SELECT to_char((data_competencia)::timestamp with time zone, 'YYYY-MM'::text) AS mes,\n    tipo,\n    categoria_id,\n    count(*) AS qtd,\n    sum(valor) AS total\n   FROM fin_lancamentos\n  WHERE ((status = 'REALIZADO'::text) AND (tipo <> 'TRANSFERENCIA'::text))\n  GROUP BY (to_char((data_competencia)::timestamp with time zone, 'YYYY-MM'::text)), tipo, categoria_id;"
+    },
+    {
+      "name": "public.mv_fin_fluxo_caixa_diario",
+      "definition": " SELECT data_competencia AS dia,\n    conta_id,\n    tipo,\n    sum(valor) AS total\n   FROM fin_lancamentos\n  WHERE ((status = 'REALIZADO'::text) AND (tipo <> 'TRANSFERENCIA'::text))\n  GROUP BY data_competencia, conta_id, tipo;"
+    },
+    {
+      "name": "public.mv_consumo_itens_semana",
+      "definition": " SELECT produto_id,\n    (date_trunc('week'::text, (data)::timestamp with time zone))::date AS semana,\n    sum(quantidade) AS total_saida,\n    sum(custo_total) AS custo_total\n   FROM movimentacoes_estoque\n  WHERE ((status = 'ATIVO'::text) AND (tipo !~~ 'ENTRADA%'::text) AND (tipo <> ALL (ARRAY['AJUSTE'::text, 'ENTRADA_ESTORNO'::text, 'SAIDA_ESTORNO'::text])))\n  GROUP BY produto_id, ((date_trunc('week'::text, (data)::timestamp with time zone))::date);"
+    },
+    {
+      "name": "public.mv_giro_estoque",
+      "definition": " SELECT p.id AS produto_id,\n    p.nome_produto,\n    p.categoria,\n    COALESCE(sum(\n        CASE\n            WHEN ((m.tipo ~~ 'ENTRADA%'::text) AND (m.tipo <> 'ENTRADA_ESTORNO'::text)) THEN m.quantidade\n            ELSE (0)::numeric\n        END), (0)::numeric) AS entradas,\n    COALESCE(sum(\n        CASE\n            WHEN ((m.tipo !~~ 'ENTRADA%'::text) AND (m.tipo <> ALL (ARRAY['AJUSTE'::text, 'ENTRADA_ESTORNO'::text, 'SAIDA_ESTORNO'::text]))) THEN m.quantidade\n            ELSE (0)::numeric\n        END), (0)::numeric) AS saidas,\n    ( SELECT COALESCE(sum(\n                CASE\n                    WHEN (m2.tipo = ANY (ARRAY['ENTRADA_ESTORNO'::text, 'SAIDA_ESTORNO'::text])) THEN (0)::numeric\n                    WHEN (m2.direction = 'IN'::text) THEN m2.quantidade\n                    ELSE (- m2.quantidade)\n                END), (0)::numeric) AS \"coalesce\"\n           FROM movimentacoes_estoque m2\n          WHERE ((m2.produto_id = p.id) AND (m2.status = 'ATIVO'::text))) AS saldo_atual\n   FROM (produtos p\n     LEFT JOIN movimentacoes_estoque m ON (((m.produto_id = p.id) AND (m.status = 'ATIVO'::text) AND (m.data >= (CURRENT_DATE - '90 days'::interval)))))\n  WHERE (p.ativo = true)\n  GROUP BY p.id, p.nome_produto, p.categoria;"
+    },
+    {
+      "name": "public.mv_pedidos_status_resumo",
+      "definition": " SELECT to_char(created_at, 'YYYY-MM'::text) AS mes,\n    status,\n    count(*) AS qtd,\n    sum(total_estimated) AS valor_total\n   FROM purchase_orders\n  GROUP BY (to_char(created_at, 'YYYY-MM'::text)), status;"
+    },
+    {
+      "name": "reporting.mv_fin_dre_mensal",
+      "definition": " SELECT company_id,\n    to_char((data_competencia)::timestamp with time zone, 'YYYY-MM'::text) AS mes,\n    tipo,\n    categoria_id,\n    count(*) AS qtd,\n    sum(valor) AS total\n   FROM fin_lancamentos\n  WHERE ((status = 'REALIZADO'::text) AND (tipo <> 'TRANSFERENCIA'::text))\n  GROUP BY company_id, (to_char((data_competencia)::timestamp with time zone, 'YYYY-MM'::text)), tipo, categoria_id;"
+    },
+    {
+      "name": "reporting.mv_fin_fluxo_caixa_diario",
+      "definition": " SELECT company_id,\n    data_competencia AS dia,\n    conta_id,\n    tipo,\n    sum(valor) AS total\n   FROM fin_lancamentos\n  WHERE ((status = 'REALIZADO'::text) AND (tipo <> 'TRANSFERENCIA'::text))\n  GROUP BY company_id, data_competencia, conta_id, tipo;"
+    },
+    {
+      "name": "reporting.mv_consumo_itens_semana",
+      "definition": " SELECT company_id,\n    produto_id,\n    (date_trunc('week'::text, (data)::timestamp with time zone))::date AS semana,\n    sum(quantidade) AS total_saida,\n    sum(custo_total) AS custo_total\n   FROM movimentacoes_estoque\n  WHERE ((status = 'ATIVO'::text) AND (tipo !~~ 'ENTRADA%'::text) AND (tipo <> ALL (ARRAY['AJUSTE'::text, 'ENTRADA_ESTORNO'::text, 'SAIDA_ESTORNO'::text])))\n  GROUP BY company_id, produto_id, ((date_trunc('week'::text, (data)::timestamp with time zone))::date);"
+    },
+    {
+      "name": "reporting.mv_giro_estoque",
+      "definition": " SELECT p.company_id,\n    p.id AS produto_id,\n    p.nome_produto,\n    p.categoria,\n    COALESCE(sum(\n        CASE\n            WHEN ((m.tipo ~~ 'ENTRADA%'::text) AND (m.tipo <> 'ENTRADA_ESTORNO'::text)) THEN m.quantidade\n            ELSE (0)::numeric\n        END), (0)::numeric) AS entradas,\n    COALESCE(sum(\n        CASE\n            WHEN ((m.tipo !~~ 'ENTRADA%'::text) AND (m.tipo <> ALL (ARRAY['AJUSTE'::text, 'ENTRADA_ESTORNO'::text, 'SAIDA_ESTORNO'::text]))) THEN m.quantidade\n            ELSE (0)::numeric\n        END), (0)::numeric) AS saidas,\n    COALESCE(( SELECT sum(\n                CASE\n                    WHEN (ms.tipo = ANY (ARRAY['ENTRADA_ESTORNO'::text, 'SAIDA_ESTORNO'::text])) THEN (0)::numeric\n                    WHEN (ms.direction = 'IN'::text) THEN ms.quantidade\n                    ELSE (- ms.quantidade)\n                END) AS sum\n           FROM movimentacoes_estoque ms\n          WHERE ((ms.produto_id = p.id) AND (ms.status = 'ATIVO'::text))), (0)::numeric) AS saldo_atual\n   FROM (produtos p\n     LEFT JOIN movimentacoes_estoque m ON (((m.produto_id = p.id) AND (m.status = 'ATIVO'::text) AND (m.data >= (CURRENT_DATE - '90 days'::interval)))))\n  WHERE (p.ativo = true)\n  GROUP BY p.company_id, p.id, p.nome_produto, p.categoria;"
+    }
+  ],
+  "advisors": {
+    "counts": {
+      "INFO": 1,
+      "WARN": 6
+    },
+    "kinds": [
+      "rls_enabled_no_policy",
+      "function_search_path_mutable",
+      "extension_in_public",
+      "materialized_view_in_api",
+      "anon_security_definer_function_executable",
+      "authenticated_security_definer_function_executable",
+      "auth_leaked_password_protection"
+    ],
+    "phase": "production before migration; not a phase2 post-check"
+  }
+}

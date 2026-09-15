@@ -6,7 +6,6 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Activity, RefreshCw, Zap, Database, Clock } from 'lucide-react';
 import { format } from 'date-fns';
-import { toast } from 'sonner';
 
 import { useCan } from '@/permissions/hooks';
 interface SlowEvent {
@@ -27,7 +26,6 @@ export default function PerformanceMonitorView() {
   const [slowEvents, setSlowEvents] = useState<SlowEvent[]>([]);
   const [lastRefresh, setLastRefresh] = useState<MvStatus[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -59,19 +57,6 @@ export default function PerformanceMonitorView() {
 
   useEffect(() => { fetchData(); }, []);
 
-  const handleRefreshMVs = async () => {
-    setRefreshing(true);
-    try {
-      const { data, error } = await supabase.rpc('refresh_materialized_views');
-      if (error) { toast.error('Erro: ' + error.message); return; }
-      toast.success('Views atualizadas!');
-      if (Array.isArray(data)) setLastRefresh(data as unknown as MvStatus[]);
-      fetchData();
-    } finally {
-      setRefreshing(false);
-    }
-  };
-
   if (loading) {
     return <div className="flex items-center justify-center py-12"><div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>;
   }
@@ -88,8 +73,8 @@ export default function PerformanceMonitorView() {
           </h2>
           <p className="text-xs text-muted-foreground">Observabilidade de queries e materialized views</p>
         </div>
-        <Button onClick={handleRefreshMVs} size="sm" variant="outline" className="gap-1.5 text-xs" disabled={refreshing}>
-          <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} /> Refresh MVs
+        <Button onClick={fetchData} size="sm" variant="outline" className="gap-1.5 text-xs" disabled={loading}>
+          <RefreshCw className="w-3.5 h-3.5" /> Atualizar indicadores
         </Button>
       </div>
 
