@@ -47,7 +47,7 @@ export type Regime = typeof REGIMES[number];
 
 /**
  * INV-01: Resultado = Receita − Despesa
- * Must hold in Dashboard, DRE, Relatório Sócios, KPIs, Comparativo.
+ * Must hold in Dashboard, DRE, KPIs, Comparativo.
  */
 export function assertResultado(receita: number, despesa: number, resultado: number): boolean {
   return Math.abs((receita - despesa) - resultado) < 0.01;
@@ -55,7 +55,7 @@ export function assertResultado(receita: number, despesa: number, resultado: num
 
 /**
  * INV-02: Margem = Resultado / Receita × 100 (0 when receita = 0)
- * Must hold in Dashboard, Relatório Sócios, KPIs, Comparativo.
+ * Must hold in Dashboard, KPIs, Comparativo.
  */
 export function assertMargem(resultado: number, receita: number, margem: number): boolean {
   const expected = receita === 0 ? 0 : (resultado / receita) * 100;

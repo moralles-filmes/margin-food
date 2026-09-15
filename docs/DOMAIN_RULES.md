@@ -25,7 +25,7 @@
 | **Regime** | Competência para DRE/KPIs; caixa pela data efetiva para Dashboard e Apresentação Sócios — Resultados |
 | **Rateio** | Se houver rateio, usar itens de rateio. Se não, categoria do pai |
 | **Fonte** | RPCs `get_fin_dashboard_summary`, `get_fin_presentation_socios`, `get_fin_dre_summary` |
-| **Consumidores** | Dashboard, DRE, Relatório Sócios, KPIs, Comparativo |
+| **Consumidores** | Dashboard, DRE, KPIs, Comparativo |
 | **Selector** | `isElegivelParaReceita()` |
 
 ### FIN-DESPESA — Despesa Oficial
@@ -38,7 +38,7 @@
 | **Regime** | Competência para DRE/KPIs; caixa pela data efetiva para Dashboard e Apresentação Sócios — Resultados |
 | **Rateio** | Se houver rateio, usar itens de rateio. Se não, categoria do pai |
 | **Fonte** | RPCs `get_fin_dashboard_summary`, `get_fin_presentation_socios`, `get_fin_dre_summary` |
-| **Consumidores** | Dashboard, DRE, Relatório Sócios, KPIs, Comparativo |
+| **Consumidores** | Dashboard, DRE, KPIs, Comparativo |
 | **Selector** | `isElegivelParaDespesa()` |
 
 ### FIN-RESULTADO — Resultado Oficial
@@ -49,7 +49,7 @@
 | **Fórmula** | `receita - despesa` |
 | **Invariante** | `assertResultado(receita, despesa, resultado)` deve ser `true` |
 | **Fonte** | `calcResultado()` em `domain/financeiro/selectors.ts` |
-| **Consumidores** | Dashboard, DRE, Relatório Sócios, KPIs, Comparativo |
+| **Consumidores** | Dashboard, DRE, KPIs, Comparativo |
 
 ### FIN-MARGEM — Margem Oficial
 
@@ -59,7 +59,7 @@
 | **Fórmula** | `receita === 0 ? 0 : (resultado / receita) * 100` |
 | **Invariante** | `assertMargem(resultado, receita, margem)` deve ser `true` |
 | **Fonte** | `calcMargem()` em `domain/financeiro/selectors.ts` |
-| **Consumidores** | Dashboard, Relatório Sócios, KPIs, Comparativo |
+| **Consumidores** | Dashboard, KPIs, Comparativo |
 
 ### FIN-SALDO — Saldo em Caixa Oficial
 
@@ -69,7 +69,7 @@
 | **Inclui** | TRANSFERENCIA (movimentação entre contas) |
 | **Status** | REALIZADO, CONCILIADO |
 | **Fonte** | `fin_contas_saldo_cache` / RPC `get_fin_dashboard_summary` |
-| **Consumidores** | Dashboard, Fluxo de Caixa, Projeção |
+| **Consumidores** | Dashboard, Fluxo de Caixa, Projeção, Borderô |
 
 ### FIN-INADIMPLENCIA — Inadimplência Oficial
 
@@ -123,6 +123,21 @@
 | **Saldo inicial** | Pode ser sobreposto por valor manual para simulação |
 | **Fonte** | RPC `get_fin_projecao` |
 | **Consumidores** | Projeção de Fluxo |
+
+### FIN-BORDERO — Borderô (contas a vencer e saldo final provisionado)
+
+| Campo | Valor |
+|-------|-------|
+| **Descrição** | Previsão de pagamento do período: contas a pagar em aberto agrupadas pelas categorias do DRE/DFC |
+| **Filtro de data** | EXCLUSIVAMENTE `fin_contas_pagar.data_vencimento`, início e fim inclusivos (nunca competência, lançamento ou pagamento) |
+| **Status** | AGUARDANDO_APROVACAO, APROVADO, VENCIDO (RASCUNHO, PAGO e CANCELADO ficam fora) |
+| **Valor** | `fin_contas_pagar.valor` — não existe pagamento parcial; rateio prevalece sobre a categoria do cabeçalho (FIN-RATEIO) |
+| **Saldo das contas** | `fin_contas_saldo_cache` das contas ativas (FIN-SALDO) |
+| **Fórmula** | Saldo final provisionado = saldo das contas − contas a vencer |
+| **Precisão** | Centavos inteiros do banco ao PDF; tela e PDF usam o mesmo `BorderoReport` |
+| **Informativo** | Contas em aberto vencidas antes do período são exibidas em aviso e não entram nos totais |
+| **Fonte** | RPC `get_fin_bordero` (tenant por `assert_tenant()`, permissão `financeiro:relatorio-socios:view`) |
+| **Consumidores** | Borderô, PDF do Borderô |
 
 ### FIN-ORCAMENTO — Orçamento vs Realizado
 
@@ -198,7 +213,7 @@
 
 ## Regra de TRANSFERENCIA
 
-- **EXCLUÍDA** de Receita e Despesa (FIN-RECEITA, FIN-DESPESA, DRE, Relatório Sócios)
+- **EXCLUÍDA** de Receita e Despesa (FIN-RECEITA, FIN-DESPESA, DRE)
 - **INCLUÍDA** em DFC e Fluxo de Caixa (movimentação entre contas)
 - **INCLUÍDA** no cálculo de Saldo (afeta saldo por conta)
 
