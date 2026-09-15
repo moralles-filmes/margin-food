@@ -13,6 +13,7 @@ import {
 import TableActions from '@/components/ui/TableActions';
 import { Building2, Plus, Loader2, Users, RefreshCw, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
+import { sortByName } from '@/lib/sortByName';
 
 interface Company {
   id: string;
@@ -65,7 +66,7 @@ export default function AdminCompaniesView() {
     try {
       const { data, error: rpcError } = await (supabase.rpc as any)('list_companies');
       if (rpcError) throw rpcError;
-      setCompanies(data || []);
+      setCompanies(sortByName<Company>(data || [], c => c.nome));
     } catch (e: any) {
       const msg = e?.message || 'Erro ao carregar empresas';
       setError(msg);

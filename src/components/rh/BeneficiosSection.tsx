@@ -22,6 +22,7 @@ import { todayBR } from '@/lib/datetime';
 import { formatFixedBR, normalizeBRLMoneyToNumber } from '@/lib/formatters';
 
 import { useCan } from '@/permissions/hooks';
+import { compareNames } from '@/lib/sortByName';
 interface Colaborador {
   id: string;
   nome: string;
@@ -244,7 +245,7 @@ export default function BeneficiosSection({
     if (filterTipo !== 'todos' && b.tipo !== filterTipo) return false;
     if (filterColab !== 'todos' && b.colaborador_id !== filterColab) return false;
     return true;
-  });
+  }).sort((a, b) => compareNames(getColabNome(a.colaborador_id), getColabNome(b.colaborador_id)) || compareNames(a.nome, b.nome));
 
   if (!canViewRbac) return null;
 

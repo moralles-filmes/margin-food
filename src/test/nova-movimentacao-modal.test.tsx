@@ -15,9 +15,7 @@ vi.mock('@/integrations/supabase/client', () => ({
     from: () => ({
       select: () => ({
         eq: () => ({
-          order: () => ({
-            order: () => Promise.resolve({ data: [], error: null }),
-          }),
+          order: () => Promise.resolve({ data: [], error: null }),
         }),
       }),
     }),

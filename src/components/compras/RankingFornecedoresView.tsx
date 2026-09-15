@@ -16,7 +16,8 @@ import { fmtBRL, formatDateBR, normalizeBRLMoneyToNumber } from '@/lib/formatter
 import { Crown, Award, Medal, Search, Plus, Inbox, ArrowUp, BarChart3, Loader2, ChevronDown } from 'lucide-react';
 
 import { useCan } from '@/permissions/hooks';
-const CATEGORIAS = ['Peixe', 'Oriental', 'Bebidas', 'Limpeza', 'Embalagens', 'Cozinha', 'Descartáveis', 'Proteínas', 'Hortifruti', 'Outros'];
+import { sortByName } from '@/lib/sortByName';
+const CATEGORIAS = ['Bebidas', 'Cozinha', 'Descartáveis', 'Embalagens', 'Hortifruti', 'Limpeza', 'Oriental', 'Peixe', 'Proteínas', 'Outros'];
 const PAGE_SIZE = 20;
 
 interface RankingRow {
@@ -119,7 +120,7 @@ export default function RankingFornecedoresView() {
   const getProdName = (id: string) => produtos.find(p => p.id === id)?.nomeProduto || id.slice(0, 8);
 
   const filteredProducts = useMemo(() => {
-    return produtos.filter(p => p.ativo && includesNormalized(p.nomeProduto, searchItem)).slice(0, 30);
+    return sortByName(produtos.filter(p => p.ativo && includesNormalized(p.nomeProduto, searchItem)), p => p.nomeProduto).slice(0, 30);
   }, [produtos, searchItem]);
 
   const tabs: { id: RankingTab; label: string; icon: typeof Crown }[] = [

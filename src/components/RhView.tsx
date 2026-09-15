@@ -49,8 +49,10 @@ import ComunicacaoInternaSection from '@/components/rh/ComunicacaoInternaSection
 import ControleCustosRhSection from '@/components/rh/ControleCustosRhSection';
 import GestaoDisciplinarSection from '@/components/rh/GestaoDisciplinarSection';
 import { BookOpen, DollarSign, Heart, BarChart3, HardHat, Megaphone, Wallet, ShieldAlert } from 'lucide-react';
+import { sortByName } from '@/lib/sortByName';
 
 const PAGE_SIZE = 50;
+const COLAB_BATCH_SIZE = 1000;
 
 type RhSubTab = 'prontuario' | 'ponto' | 'banco-horas' | 'escalas' | 'tarefas' | 'onboarding' | 'treinamento' | 'ferias' | 'documentos' | 'folha' | 'beneficios' | 'dashboard' | 'sst' | 'comunicados' | 'custos' | 'disciplinar';
 
@@ -164,8 +166,6 @@ function RhViewInner({ visibleSubtabs, user }: {
 
   const [subTab, setSubTab] = usePersistedTab<RhSubTab>('app:tab:rh', defaultTab);
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
-  const [colabPage, setColabPage] = useState(0);
-  const [colabHasMore, setColabHasMore] = useState(true);
   const [pontos, setPontos] = useState<PontoRegistro[]>([]);
   const [bancoHoras, setBancoHoras] = useState<BancoHoras[]>([]);
   const [bhPage, setBhPage] = useState(0);
@@ -214,21 +214,24 @@ function RhViewInner({ visibleSubtabs, user }: {
     setProfiles((data || []) as Profile[]);
   }, [supabase]);
 
-  const fetchColaboradores = useCallback(async (page = 0, append = false) => {
-    let query = supabase.from('rh_colaboradores').select('id, user_id, nome, cpf, telefone, email, cargo, funcao, setor, data_admissao, tipo_contrato, status, carga_horaria_semanal, salario, valor_hora, created_at, adicional_noturno_percent').order('nome')
-      .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
-    if (!showInativos) query = query.eq('status', 'ativo');
-    const { data, error } = await query;
-    if (error) { console.error(error); return; }
-    const newData = data || [];
-    if (append) {
-      setColaboradores(prev => [...prev, ...newData]);
-    } else {
-      setColaboradores(newData);
+  // Carrega TODOS os colaboradores (em lotes): as subseções (Escalas, Folha, Férias,
+  // Benefícios…) recebem esta lista para seletores e para resolver nomes — uma lista
+  // truncada fazia colaboradores sumirem dos selects e aparecerem como "Desconhecido".
+  const fetchColaboradores = useCallback(async () => {
+    const all: Colaborador[] = [];
+    for (let from = 0; ; from += COLAB_BATCH_SIZE) {
+      let query = supabase.from('rh_colaboradores').select('id, user_id, nome, cpf, telefone, email, cargo, funcao, setor, data_admissao, tipo_contrato, status, carga_horaria_semanal, salario, valor_hora, created_at, adicional_noturno_percent')
+        .order('nome').order('id')
+        .range(from, from + COLAB_BATCH_SIZE - 1);
+      if (!showInativos) query = query.eq('status', 'ativo');
+      const { data, error } = await query;
+      if (error) { console.error(error); return; }
+      all.push(...((data || []) as Colaborador[]));
+      if (!data || data.length < COLAB_BATCH_SIZE) break;
     }
-    setColabHasMore(newData.length === PAGE_SIZE);
-    if (user && !append) {
-      const mine = newData.find(c => c.user_id === user.id);
+    setColaboradores(sortByName(all, c => c.nome));
+    if (user) {
+      const mine = all.find(c => c.user_id === user.id);
       setMyColaboradorId(mine?.id || null);
     }
   }, [supabase, showInativos, user]);
@@ -259,7 +262,6 @@ function RhViewInner({ visibleSubtabs, user }: {
 
   // Reset pagination on filter change
   useEffect(() => {
-    setColabPage(0);
     setColaboradores([]);
   }, [showInativos]);
 
@@ -270,7 +272,7 @@ function RhViewInner({ visibleSubtabs, user }: {
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([fetchColaboradores(0), fetchPontos(), fetchBancoHoras(0), fetchProfiles()]).finally(() => setLoading(false));
+    Promise.all([fetchColaboradores(), fetchPontos(), fetchBancoHoras(0), fetchProfiles()]).finally(() => setLoading(false));
   }, [fetchColaboradores, fetchPontos, fetchBancoHoras, fetchProfiles]);
 
   const handleCreateColab = async () => {
@@ -294,7 +296,7 @@ function RhViewInner({ visibleSubtabs, user }: {
       toast.success('Colaborador criado com sucesso!');
       setShowNewColab(false);
       setFormColab({ nome: '', email: '', telefone: '', cpf: '', cargo: 'Colaborador', funcao: 'Geral', setor: 'salao', tipo_contrato: 'CLT', carga_horaria_semanal: '44', salario: '0', valor_hora: '0', user_id: '', data_admissao: todayBR() });
-      fetchColaboradores(0);
+      fetchColaboradores();
     } finally {
       setSavingColab(false);
     }
@@ -332,7 +334,7 @@ function RhViewInner({ visibleSubtabs, user }: {
       toast.success('Colaborador atualizado!');
       setShowEditColab(false);
       setEditingColab(null);
-      fetchColaboradores(0);
+      fetchColaboradores();
     } finally {
       setSavingEditColab(false);
     }
@@ -344,14 +346,14 @@ function RhViewInner({ visibleSubtabs, user }: {
     const { error } = await supabase.from('rh_colaboradores').update({ status: 'inativo' }).eq('id', id);
     if (error) { toast.error('Erro: ' + error.message); return; }
     toast.success('Colaborador desativado.');
-    fetchColaboradores(0);
+    fetchColaboradores();
   };
 
   const handleReativar = async (id: string) => {
     const { error } = await supabase.from('rh_colaboradores').update({ status: 'ativo' }).eq('id', id);
     if (error) { toast.error('Erro: ' + error.message); return; }
     toast.success('Colaborador reativado.');
-    fetchColaboradores(0);
+    fetchColaboradores();
   };
 
   const handleRegistrarPonto = async (tipo: string) => {
@@ -649,13 +651,6 @@ function RhViewInner({ visibleSubtabs, user }: {
                   </TableBody>
                 </Table>
               </div>
-              {colabHasMore && (
-                <div className="p-2 text-center">
-                  <Button variant="ghost" size="sm" className="text-xs" onClick={() => { const next = colabPage + 1; setColabPage(next); fetchColaboradores(next, true); }}>
-                    Carregar mais...
-                  </Button>
-                </div>
-              )}
             </CardContent>
           </Card>
 
@@ -822,7 +817,7 @@ function RhViewInner({ visibleSubtabs, user }: {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {bancoHoras.map(bh => (
+                      {sortByName(bancoHoras, bh => getColabNome(bh.colaborador_id)).map(bh => (
                         <TableRow key={bh.id}>
                           <TableCell className="text-xs font-medium">{getColabNome(bh.colaborador_id)}</TableCell>
                           <TableCell className="text-xs text-right">{bh.horas_trabalhadas}h</TableCell>

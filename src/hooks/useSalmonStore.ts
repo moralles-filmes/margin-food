@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { emitDataEvent } from '@/lib/dataEvents';
 import { todayBR } from '@/lib/datetime';
+import { sortByName } from '@/lib/sortByName';
 
 const defaultStockConfig: StockConfig = {
   minGrossKg: 50, minCleanKg: 30, staleDaysLimit: 7,
@@ -96,7 +97,8 @@ export function useSalmonStore() {
   const [manipulations, setManipulations] = useState<Manipulation[]>([]);
   const [dailyRecords, setDailyRecords] = useState<DailyRecord[]>([]);
   const [stockConfig, setStockConfigState] = useState<StockConfig>(defaultStockConfig);
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [suppliersRaw, setSuppliers] = useState<Supplier[]>([]);
+  const suppliers = useMemo(() => sortByName(suppliersRaw, s => s.name), [suppliersRaw]);
   const [metasCompra, setMetasCompra] = useState<MetaCompraMensal[]>([]);
   const [auditorias, setAuditorias] = useState<AuditoriaCompra[]>([]);
   const [metasProvisionadas, setMetasProvisionadas] = useState<MetaProvisionadaSalmao[]>([]);
@@ -124,7 +126,7 @@ export function useSalmonStore() {
           supabase.from('salmon_manipulations').select('*').eq('status', 'ACTIVE').order('manipulation_date', { ascending: false }),
           supabase.from('salmon_config').select('*').limit(1).maybeSingle(),
           supabase.from('salmon_daily_records').select('*').order('record_date', { ascending: false }),
-          supabase.from('suppliers').select('*').order('created_at', { ascending: false }),
+          supabase.from('suppliers').select('*').order('name', { ascending: true }),
           supabase.from('planning_metas_compra').select('*').eq('ativo', true).order('year', { ascending: false }).order('month', { ascending: false }),
           supabase.from('salmon_metas_provisionadas').select('*').order('created_at', { ascending: false }),
           supabase.from('salmon_auditorias_compra').select('*').order('created_at', { ascending: false }),

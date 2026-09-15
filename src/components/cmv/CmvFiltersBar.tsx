@@ -32,7 +32,7 @@ export default function CmvFiltersBar({
   const [setores, setSetores] = useState<string[]>([]);
   useEffect(() => {
     if (!canViewCmv) return;
-    supabase.from('stock_sectors').select('name').eq('is_active', true).order('sort_order').order('name')
+    supabase.from('stock_sectors').select('name').eq('is_active', true).order('name')
       .then(({ data }) => setSetores((data || []).map((s: { name: string }) => s.name)));
   }, [canViewCmv, supabase]);
 

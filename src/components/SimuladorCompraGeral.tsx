@@ -45,6 +45,7 @@ interface SimResumo {
 }
 
 import { formatFixedBR } from '@/lib/formatters';
+import { compareNames } from '@/lib/sortByName';
 const fmt = (v: number) => formatFixedBR(v, 2);
 
 export default function SimuladorCompraGeral() {
@@ -80,7 +81,10 @@ export default function SimuladorCompraGeral() {
         },
       });
       if (error) throw error;
-      setItems(data?.items || []);
+      // Mantém a prioridade do servidor (ruptura → atenção → ok) e ordena por nome dentro de cada grupo
+      const statusOrder: Record<string, number> = { ruptura: 0, atencao: 1, ok: 2 };
+      setItems([...(data?.items || [])].sort((a: SimItem, b: SimItem) =>
+        (statusOrder[a.status] ?? 2) - (statusOrder[b.status] ?? 2) || compareNames(a.nome, b.nome)));
       setResumo(data?.resumo || null);
       setQtdOverrides({});
     } catch (e: any) {
@@ -157,7 +161,7 @@ export default function SimuladorCompraGeral() {
               <SearchableSelect
                 value={categoria || 'all'}
                 onValueChange={v => setCategoria(v === 'all' ? '' : v)}
-                options={[{ value: 'all', label: 'Todas' }, ...['Oriental', 'Bebidas', 'Limpeza', 'Embalagens', 'Cozinha', 'Descartáveis', 'Proteínas', 'Hortifruti', 'Outros'].map(c => ({ value: c, label: c }))]}
+                options={[{ value: 'all', label: 'Todas' }, ...['Bebidas', 'Cozinha', 'Descartáveis', 'Embalagens', 'Hortifruti', 'Limpeza', 'Oriental', 'Proteínas', 'Outros'].map(c => ({ value: c, label: c }))]}
                 placeholder="Todas"
                 searchPlaceholder="Buscar categoria..."
                 className="bg-secondary border-border text-foreground"

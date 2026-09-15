@@ -10,6 +10,7 @@ import { ArrowUpDown, Package, Loader2, AlertTriangle, Search, TrendingUp, Trend
 import { format } from 'date-fns';
 
 import { fmtBRL, formatPercentBR, formatFixedBR } from '@/lib/formatters';
+import { normalizeSearchText } from '@/lib/utils';
 import { useCan } from '@/permissions/hooks';
 import { axisProps, gridProps, tooltipProps, makeActiveDot } from '@/lib/chartTheme';
 import { ChartTooltip } from '@/components/ui/ChartTooltip';
@@ -107,24 +108,25 @@ export default function AnaliseItemView({
   }, [search]);
 
   // Fetch list
-  const fetchItems = useCallback(async (append = false, cursorAt?: string, cursorId?: string) => {
+  // Ordenação, % CMV e cobertura são calculados no banco sobre TODOS os itens
+  // (`list_report_items_page`); a tela só pagina por offset.
+  const fetchItems = useCallback(async (append = false, offset = 0) => {
     if (append) setLoadingMore(true); else setLoading(true);
     setError(null);
 
-    const { data, error: err } = await supabase.rpc('list_report_items_cursor', {
+    const { data, error: err } = await (supabase.rpc as any)('list_report_items_page', {
       p_start: pStart,
       p_end: pEnd,
       p_limit: PAGE_SIZE,
-      p_cursor_created_at: cursorAt || null,
-      p_cursor_id: cursorId || null,
-      p_search: searchDebounced || null,
+      p_offset: offset,
+      p_search: searchDebounced ? normalizeSearchText(searchDebounced) : null,
       p_categoria: null,
       p_sort_key: sortKey,
       p_sort_asc: sortAsc,
     });
 
     if (err) {
-      console.error('list_report_items_cursor error:', err);
+      console.error('list_report_items_page error:', err);
       setError(err.message);
     } else if (data) {
       const d = data as { items?: Record<string, unknown>[]; has_more?: boolean; total_count?: number };
@@ -145,18 +147,10 @@ export default function AnaliseItemView({
         desperdicio_percent: Number(r.desperdicio_percent ?? 0),
         giro: Number(r.giro ?? 0),
         perdas_qtd: Number(r.perdas_qtd ?? 0),
-        // Derived fields not in RPC — compute safely
-        cobertura_semanas: Number(r.giro ?? 0) > 0
-          ? Number(formatFixedBR(Number(r.saldo ?? r.saldo_atual ?? 0) / (Number(r.consumo_periodo ?? 0) / 4 || 1), 1).replace(',', '.'))
-          : 0,
-        percent_cmv: 0,
-        last_movement_at: String(r.cursor_created_at ?? r.last_movement_at ?? ''),
+        cobertura_semanas: Number(r.cobertura_semanas ?? 0),
+        percent_cmv: Number(r.percent_cmv ?? 0),
+        last_movement_at: String(r.last_movement_at ?? ''),
       }));
-      // Compute percent_cmv relative to total
-      const totalCusto = newItems.reduce((s, i) => s + i.custo_consumido, 0);
-      if (totalCusto > 0) {
-        newItems.forEach(i => { i.percent_cmv = (i.custo_consumido / totalCusto) * 100; });
-      }
       setItems(prev => append ? [...prev, ...newItems] : newItems);
       setHasMore(d.has_more ?? false);
       setTotalCount(d.total_count ?? newItems.length);
@@ -189,8 +183,7 @@ export default function AnaliseItemView({
   // Load more
   const loadMore = () => {
     if (items.length === 0 || !hasMore) return;
-    const last = items[items.length - 1];
-    fetchItems(true, last.last_movement_at, last.produto_id);
+    fetchItems(true, items.length);
   };
 
   // Fetch detail
@@ -209,7 +202,8 @@ export default function AnaliseItemView({
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) setSortAsc(!sortAsc);
-    else { setSortKey(key); setSortAsc(false); }
+    // Nome começa em A→Z; métricas começam do maior para o menor.
+    else { setSortKey(key); setSortAsc(key === 'nome'); }
   };
 
   const SortHeader = ({ label, k }: { label: string; k: SortKey }) => (
