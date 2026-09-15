@@ -242,7 +242,7 @@ export default function ManipulationView({ store, preSelectedEntryId, onClearPre
   const [leftoverSaving, setLeftoverSaving] = useState(false);
 
   const handleLeftoverSave = async () => {
-    if (!leftoverForm || leftoverSaving) return;
+    if (!canCreate || !leftoverForm || leftoverSaving) return;
     const kg = parseDecimal(leftoverForm.kg) ?? 0;
     const m = manipulations.find(x => x.id === leftoverForm.id);
     if (!m) return;
@@ -644,17 +644,17 @@ export default function ManipulationView({ store, preSelectedEntryId, onClearPre
                 {m.leftoverRecorded && <span className="text-warning">🧊 Sobra: {m.leftoverKg} kg</span>}
                 {!m.leftoverRecorded && <span className="text-muted-foreground text-[10px]">📦 Em estoque limpo</span>}
               </div>
-              {leftoverForm?.id === m.id ? (
+              {canCreate && (leftoverForm?.id === m.id ? (
                 <div className="flex items-center gap-1.5 animate-scale-in">
                   <DecimalInput value={leftoverForm.kg} onValueChange={(raw) => setLeftoverForm({ ...leftoverForm, kg: raw })} maxDecimals={1} placeholder="kg sobra" className="h-7 w-20 text-xs bg-secondary border-border text-foreground" autoFocus />
-                  <Button size="sm" className="h-7 text-[10px] bg-primary-strong text-primary-foreground border-0 px-2" onClick={handleLeftoverSave} disabled={leftoverSaving}>{leftoverSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}</Button>
+                  <Button size="sm" className="h-7 text-[10px] bg-primary-strong text-primary-foreground border-0 px-2" onClick={handleLeftoverSave} disabled={!canCreate || leftoverSaving}>{leftoverSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}</Button>
                   <Button size="sm" variant="ghost" className="h-7 text-[10px] px-2" onClick={() => setLeftoverForm(null)}>✕</Button>
                 </div>
               ) : (
                 <Button size="sm" variant="outline" className="h-7 text-[10px] border-warning/30 text-warning hover:bg-warning/10 gap-1" onClick={() => setLeftoverForm({ id: m.id, kg: String(m.leftoverKg || '') })}>
                   <Snowflake className="w-3 h-3" /> Sobra do dia
                 </Button>
-              )}
+              ))}
             </div>
           </div>
         ))}

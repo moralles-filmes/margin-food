@@ -1,0 +1,21 @@
+-- Contenção: suspende RPCs de Salmão; preserva dados, índice e logs.
+BEGIN;
+SET LOCAL lock_timeout='5s';
+REVOKE ALL ON FUNCTION public._salmon_cancel_entry_guarded(uuid,text) FROM PUBLIC,anon,authenticated,service_role;
+REVOKE ALL ON FUNCTION public._salmon_cancel_manipulation_guarded(uuid,text) FROM PUBLIC,anon,authenticated,service_role;
+REVOKE ALL ON FUNCTION public._salmon_create_entry_guarded(text,text,text,text,integer,integer,numeric,numeric,text,text) FROM PUBLIC,anon,authenticated,service_role;
+REVOKE ALL ON FUNCTION public._salmon_create_manipulation_guarded(uuid,text,integer,numeric,numeric,numeric,text) FROM PUBLIC,anon,authenticated,service_role;
+REVOKE ALL ON FUNCTION public._salmon_dashboard_guarded(text,text) FROM PUBLIC,anon,authenticated,service_role;
+REVOKE ALL ON FUNCTION public.cancel_salmon_entry_atomic(uuid,text) FROM PUBLIC,anon,authenticated,service_role;
+REVOKE ALL ON FUNCTION public.cancel_salmon_manipulation_atomic(uuid,text) FROM PUBLIC,anon,authenticated,service_role;
+REVOKE ALL ON FUNCTION public.create_salmon_entry_atomic(date,text,text,text,integer,integer,numeric,numeric,text,date) FROM PUBLIC,anon,authenticated,service_role;
+REVOKE ALL ON FUNCTION public.create_salmon_manipulation_atomic(uuid,date,integer,numeric,numeric,numeric,text) FROM PUBLIC,anon,authenticated,service_role;
+REVOKE ALL ON FUNCTION public.ensure_salmon_raw_product() FROM PUBLIC,anon,authenticated,service_role;
+REVOKE ALL ON FUNCTION public.get_salmon_dashboard_summary(date,date) FROM PUBLIC,anon,authenticated,service_role;
+REVOKE ALL ON FUNCTION public.get_salmon_inventory_adjustment_kg() FROM PUBLIC,anon,authenticated,service_role;
+REVOKE ALL ON FUNCTION public.get_salmon_reconciliation_kpis() FROM PUBLIC,anon,authenticated,service_role;
+REVOKE ALL ON FUNCTION public.upsert_salmon_leftover_atomic(date,numeric,text) FROM PUBLIC,anon,authenticated,service_role;
+REVOKE ALL ON FUNCTION public.validate_salmon_entry() FROM PUBLIC,anon,authenticated,service_role;
+REVOKE ALL ON FUNCTION public.validate_salmon_manipulation() FROM PUBLIC,anon,authenticated,service_role;
+NOTIFY pgrst,'reload schema';
+COMMIT;
