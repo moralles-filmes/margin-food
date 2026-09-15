@@ -285,7 +285,7 @@ Todas as Edge Functions usam CORS compartilhado via `supabase/functions/_shared/
 - [ ] `produtos_insert`/`produtos_update`/`produtos_delete` não têm `estoque:catalogo:create/edit/delete` (só `estoque:cadastros:*`), enquanto `EstoqueGeralView.tsx` gateia o Catálogo por `estoque:catalogo:*` — sem impacto vivo hoje (quem tem `catalogo:*` também tem `cadastros:*`), mas é o mesmo padrão de bug; CLAUDE.md já registra 2 regressões nessa RLS, não mexer sem conferir o banco vivo primeiro. Nota: o botão "Excluir" do Catálogo faz `UPDATE ativo=false`, não `DELETE` — `estoque:catalogo:delete` precisaria entrar no array do UPDATE
 - [ ] `get_relatorios_compras/kpis/score(text,text)` e `simulate_relatorios_score(text,text,jsonb)` são sobrecargas mortas e quebradas — delegam a `public._get_relatorios_*_impl`, que não existe no banco (erro 42883 em qualquer chamada real); `src/integrations/supabase/types.ts` declara as duas sobrecargas com `Args` idênticos, risco de uma chamada futura resolver para a quebrada. Avaliar dropar essas sobrecargas
 - [ ] `upsert_supplier` usa `ON CONFLICT(name)`, mas o banco já tem UNIQUE(name,company_id); corrigir RPC e consumer de preços sem recriar a constraint existente
-- [ ] CRÍTICO: `companies_admin`/rpc_create_company usam system:admin como gate global; cleanup_old_audit_logs/refresh_materialized_views permitem EXECUTE efetivo de anon sem guard — conter conforme fase 2 em `docs/multi-unidades/04-PROMPT-FASE-2.md`
+- [ ] Publicar e pós-validar a contenção C01/C02 da Fase 2 (migration `20260915140812`, ensaiada localmente); produção ainda vulnerável até aplicação — pré-requisitos, scheduler e ordem em `docs/multi-unidades/fase2-20260915/RESULTADOS.md`
 
 ---
 

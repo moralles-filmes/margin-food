@@ -1,6 +1,8 @@
 # Auditoria pós-implantação multiunidade
 
-Data: 2026-09-15. **Fase 1: auditoria inicial e inventário concluídos. Estabilização ainda em andamento.**
+Data: 2026-09-15. **Fase 1 concluída; Fase 2 implementada e ensaiada localmente, com publicação pendente. Estabilização ainda em andamento.**
+
+Atualização Fase 2: [resultados, testes e sequência de produção](fase2-20260915/RESULTADOS.md). C01/C02 foram corrigidos no código e testados com 82 assertions SQL reais, cinco casos de drift e rollback de contenção; **continuam abertos em produção**, que recebeu somente leituras. A baseline e os achados abaixo preservam a auditoria da Fase 1. Próximo prompt: [Fase 3 — logs](05-PROMPT-FASE-3.md).
 
 Base: `main`, commit `1fdea27e69e3d687b49fdd04e91069b25cc70850`. Diretório inicialmente limpo. Projeto consultado: `wuzxpbixprrgssoeeaez`. Produção recebeu apenas consultas de leitura; nenhuma RPC de escrita foi executada, nenhuma migration, deploy ou reparação de histórico foi aplicada.
 
@@ -22,7 +24,7 @@ O relatório anterior não representa integralmente o banco atual:
 - `suppliers` **já tem** UNIQUE `(name, company_id)`. A RPC ainda usa `ON CONFLICT(name)`, sem índice compatível.
 - As 844 versões locais e remotas coincidem. Isso não resolve a rastreabilidade da migration desaparecida nem prova equivalência do schema.
 
-Nenhum achado de segurança foi marcado como corrigido nesta fase.
+Nenhum achado foi marcado como resolvido no banco vivo. As correções locais de C01/C02 da Fase 2 estão documentadas separadamente acima.
 
 ## 2. Evidências e reprodução
 
@@ -53,9 +55,11 @@ Lidos AGENTS/CLAUDE e os documentos 00/01/02/ARCHITECTURE; examinadas as seis mi
 
 ## 3. Achados por severidade
 
-Todos os itens abaixo estão **ABERTOS**, sem migration corretiva nesta fase.
+Todos os itens abaixo estão **ABERTOS em produção**. C01/C02 possuem migration corretiva nova ensaiada na Fase 2; os demais permanecem para as etapas seguintes.
 
 ### C01 — CRITICAL — Limpeza global de auditoria chamável por anon
+
+**Fase 2:** contenção local na migration `20260915140812`; service_role-only, guard da conexão, retenção 24–120 meses, callers/Edge ajustados e teste real aprovado. Aplicação/pós-validação em produção pendentes.
 
 - Objeto vivo: `public.cleanup_old_audit_logs(integer)`, SECURITY DEFINER, owner postgres, `search_path=public`.
 - `has_function_privilege('anon', ..., 'EXECUTE')` e authenticated retornaram true.
@@ -67,6 +71,8 @@ Todos os itens abaixo estão **ABERTOS**, sem migration corretiva nesta fase.
 - Teste exigido: banco real isolado, anon/usuário comum/admin local recusados antes de efeitos; scheduler autorizado continua funcionando; parâmetros inválidos recusados; conferir ACL efetiva, não só grants diretos.
 
 ### C02 — CRITICAL — Admin de unidade consegue atravessar cadastro de empresas
+
+**Fase 2:** policy/RPC legada exigem permissão global no código corrigido; removidos grants TRUNCATE/REFERENCES/TRIGGER/MAINTAIN de authenticated. Ensaio A/B/global aprovado; sondagem viva ainda reproduz duas empresas reais sem membership até publicação.
 
 - Policy viva `companies_admin`: PERMISSIVE, ALL, TO authenticated, `USING ((SELECT has_permission(auth.uid(),'system:admin')))`, sem restrição por linha.
 - authenticated possui SELECT/INSERT/UPDATE/DELETE na tabela. Não há fronteira restritiva em `companies`; único trigger de negócio é inicialização de categorias após INSERT.
@@ -223,7 +229,7 @@ A numeração abaixo é a deste trabalho; agrupa as 20 frentes do pedido origina
 | Fase | Entrega e limite | Aceite mínimo |
 |---|---|---|
 | **1 — concluída** | Auditoria inicial, inventário vivo, baseline e plano | Evidências salvas e nenhuma mudança operacional |
-| **2 — próxima** | Contenção crítica: companies_admin/rpc_create_company e RPCs globais de manutenção | Admin local não atravessa empresas; anon não executa manutenção; capacidades globais e scheduler preservados |
+| **2 — implementada/testada localmente; publicação pendente** | Contenção crítica: companies_admin/rpc_create_company e RPCs globais de manutenção | 82 assertions SQL e recuo seguro aprovados; faltam publicação, validação do scheduler externo e pós-validação viva |
 | 3 | Logs completos: escrita, leitura, histórico e escopo global | audit_log/audit_logs/integration_logs isolados, backfill justificável e testes A/B/rejeição de forja |
 | 4 | RPCs de Salmão, funções internas e grants | Tenant + permissão funcional; espelhos/cancelamento preservados |
 | 5 | Fornecedores e preço por item | Mesmo nome em A/B sem conflito, identidade correta no consumer |
