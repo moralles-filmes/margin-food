@@ -8,7 +8,7 @@ const migration = readFileSync(
     'supabase/migrations/20260901000000_presentation_revenue_by_store_net.sql',
   ),
   'utf8',
-);
+).replace(/\r\n/g, '\n');
 
 function section(start: string, end: string): string {
   const startIndex = migration.indexOf(start);
