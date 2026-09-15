@@ -44,7 +44,7 @@ const emptyWizard: WizardData = {
 };
 
 export default function ManipulationView({ store, preSelectedEntryId, onClearPreSelected }: ManipulationViewProps) {
-  const { manipulations, addManipulation, updateManipulation, deleteManipulation, recordLeftover, stock, availableLots, suppliers, fifoLot, entries, stockConfig, smartSuggestion } = store;
+  const { manipulations, addManipulation, updateManipulation, deleteManipulation, recordLeftover, stock, availableLots, suppliers, suggestedLot, entries, stockConfig, smartSuggestion } = store;
   const canCreate = useCan('salmon:manipulacao:create');
   const canDelete = useCan('salmon:manipulacao:delete');
   const [period, setPeriod] = useState<PeriodRange>(getDefaultRange());
@@ -123,7 +123,7 @@ export default function ManipulationView({ store, preSelectedEntryId, onClearPre
   };
 
   const startNewWizard = (preEntryId?: string) => {
-    const targetId = preEntryId || fifoLot?.entryId;
+    const targetId = preEntryId || suggestedLot?.entryId;
     const initialWizard = { ...emptyWizard };
     if (targetId) {
       const lot = availableLots.find(l => l.entryId === targetId);
@@ -180,6 +180,16 @@ export default function ManipulationView({ store, preSelectedEntryId, onClearPre
     newConfirmed[step] = true;
     setConfirmed(newConfirmed);
     if (step < 5) setStep(step + 1);
+  };
+
+  const handleStepInputEnter = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    if (step === 5 && confirmed[step]) {
+      handleSave();
+    } else {
+      confirmStep();
+    }
   };
 
   const goBack = () => {
@@ -270,8 +280,21 @@ export default function ManipulationView({ store, preSelectedEntryId, onClearPre
 
   const supplierObj = selectedLot ? suppliers.find(s => s.name === selectedLot.supplier) : null;
   const isSupplierInactive = supplierObj ? !supplierObj.active : false;
-  const isFifo = (entryId: string) => fifoLot?.entryId === entryId;
-  const selectedIsNotFifo = wizard.entryId && fifoLot && wizard.entryId !== fifoLot.entryId;
+  const isSuggested = (entryId: string) => suggestedLot?.entryId === entryId;
+  const selectedIsNotSuggested = wizard.entryId && suggestedLot && wizard.entryId !== suggestedLot.entryId;
+
+  const expirationLabel = (lot: { expirationDate?: string; daysToExpire?: number }) => {
+    if (!lot.expirationDate) return 'Sem validade';
+    const d = lot.daysToExpire;
+    if (d === undefined) return `Val. ${formatDateBR(parseLocalDate(lot.expirationDate))}`;
+    if (d < 0) return `Vencido há ${Math.abs(d)}d`;
+    if (d === 0) return 'Vence hoje';
+    return `Vence em ${d}d`;
+  };
+  const expirationTone = (lot: { expirationStatus?: 'VENCIDO' | 'VENCE_EM_BREVE' | 'OK' }) =>
+    lot.expirationStatus === 'VENCIDO' ? 'text-destructive'
+      : lot.expirationStatus === 'VENCE_EM_BREVE' ? 'text-warning'
+      : 'text-muted-foreground';
 
   return (
     <div className="space-y-4">
@@ -300,10 +323,10 @@ export default function ManipulationView({ store, preSelectedEntryId, onClearPre
           <div className="bg-card border border-primary/30 rounded-xl p-4 glow-salmon">
             <div className="flex items-center justify-between mb-3">
               <div>
-                <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Manipulação do dia</p>
+                <p className="text-sm text-muted-foreground uppercase tracking-wider font-medium">Manipulação do dia</p>
                 <DateInput value={selectedDate} onValueChange={setSelectedDate} className="h-8 w-auto text-sm bg-secondary border-border text-foreground mt-1" />
               </div>
-              <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={() => setShowWizard(false)}>Cancelar</Button>
+              <Button variant="ghost" size="sm" className="text-sm text-muted-foreground" onClick={() => setShowWizard(false)}>Cancelar</Button>
             </div>
 
             <div className="flex gap-1 mb-4">
@@ -314,11 +337,11 @@ export default function ManipulationView({ store, preSelectedEntryId, onClearPre
 
             <div className="bg-secondary/50 rounded-xl p-4 space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Pergunta {step + 1}/6</span>
-                {confirmed[step] && <span className="text-[10px] text-success flex items-center gap-1"><Check className="w-3 h-3" /> Confirmado</span>}
+                <span className="text-xs text-muted-foreground uppercase tracking-wider">Pergunta {step + 1}/6</span>
+                {confirmed[step] && <span className="text-xs text-success flex items-center gap-1"><Check className="w-3 h-3" /> Confirmado</span>}
               </div>
 
-              <p className="text-sm font-semibold text-foreground">{stepLabels[step]}</p>
+              <p className="text-base font-semibold text-foreground">{stepLabels[step]}</p>
 
               {/* STEP 0: Lot Select */}
               {step === 0 && (
@@ -329,37 +352,45 @@ export default function ManipulationView({ store, preSelectedEntryId, onClearPre
                     </div>
                   ) : (
                     <>
-                      {fifoLot && (
-                        <button onClick={() => handleLotSelect(fifoLot.entryId)} className="w-full p-2.5 rounded-lg bg-success/10 border border-success/30 text-left text-sm hover:bg-success/20 transition-all flex items-center gap-2">
+                      {suggestedLot && (
+                        <button onClick={() => handleLotSelect(suggestedLot.entryId)} className="w-full p-2.5 rounded-lg bg-success/10 border border-success/30 text-left text-sm hover:bg-success/20 transition-all flex items-center gap-2">
                           <Zap className="w-4 h-4 text-success shrink-0" />
                           <div className="flex-1">
-                            <span className="text-xs font-bold text-success">Usar FIFO (recomendado)</span>
-                            <p className="text-[10px] text-muted-foreground">{fifoLot.lot || 'Sem lote'} • {fifoLot.supplier} • {formatFixedBR(fifoLot.balanceKg, 1)} kg</p>
+                            <span className="text-sm font-bold text-success">
+                              {suggestedLot.expirationDate ? 'Usar o que vence primeiro (recomendado)' : 'Usar o lote mais antigo (recomendado)'}
+                            </span>
+                            <p className="text-xs text-muted-foreground">
+                              {suggestedLot.lot || 'Sem lote'} • {suggestedLot.supplier} • {formatFixedBR(suggestedLot.balanceKg, 1)} kg • {expirationLabel(suggestedLot)}
+                            </p>
                           </div>
                         </button>
                       )}
-                      {selectedIsNotFifo && (
-                        <div className="flex items-center gap-2 p-2 rounded-lg bg-warning/10 border border-warning/20 text-[11px] text-warning">
-                          <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> Lote mais novo que o FIFO.
+                      {selectedIsNotSuggested && (
+                        <div className="flex items-center gap-2 p-2 rounded-lg bg-warning/10 border border-warning/20 text-xs text-warning">
+                          <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> Existe outro lote que vence antes deste.
                         </div>
                       )}
                       <div className="space-y-1.5 max-h-52 overflow-y-auto">
                         {availableLots.map(lot => (
                           <button key={lot.entryId} onClick={() => handleLotSelect(lot.entryId)} className={`w-full text-left p-3 rounded-lg border transition-all text-sm ${wizard.entryId === lot.entryId ? 'border-primary bg-primary/10' : 'border-border bg-card hover:border-primary/50'}`}>
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex flex-wrap items-center gap-2 min-w-0">
                                 <span className="font-semibold text-foreground">{lot.lot || 'Sem lote'}</span>
-                                {isFifo(lot.entryId) && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-success/15 text-success font-bold">FIFO</span>}
-                                {lot.isStale && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-destructive/15 text-destructive">Parado {lot.daysSinceMovement}d</span>}
+                                {isSuggested(lot.entryId) && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-success/15 text-success font-bold">1º a sair</span>}
+                                {lot.expirationStatus === 'VENCIDO' && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-destructive/15 text-destructive font-bold">Vencido</span>}
+                                {lot.expirationStatus === 'VENCE_EM_BREVE' && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-warning/15 text-warning font-bold">{expirationLabel(lot)}</span>}
+                                {lot.isStale && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-destructive/15 text-destructive">Parado {lot.daysSinceMovement}d</span>}
                               </div>
-                              <span className="text-xs font-bold text-primary">{formatFixedBR(lot.balanceKg, 1)} kg</span>
+                              <span className="text-sm font-bold text-primary shrink-0">{formatFixedBR(lot.balanceKg, 1)} kg</span>
                             </div>
-                            <div className="flex items-center gap-2 mt-1 text-[11px] text-muted-foreground">
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1 text-xs text-muted-foreground">
                               <span>SIF: {lot.sif || '—'}</span><span>•</span><span>{lot.supplier || '—'}</span><span>•</span>
-                              <span>{formatDateBR(parseLocalDate(lot.entryDate))}</span><span>•</span>
+                              <span className={expirationTone(lot)}>
+                                {lot.expirationDate ? `Val. ${formatDateBR(parseLocalDate(lot.expirationDate))}` : `Ent. ${formatDateBR(parseLocalDate(lot.entryDate))}`}
+                              </span><span>•</span>
                               <span className="text-warning">{fmtBRL(lot.costPerKgBruto)}/kg</span>
                             </div>
-                            {lot.avgYield !== undefined && <div className="text-[10px] text-warning mt-1">Rend. histórico: {formatPercentBR(lot.avgYield)}</div>}
+                            {lot.avgYield !== undefined && <div className="text-xs text-warning mt-1">Rend. histórico: {formatPercentBR(lot.avgYield)}</div>}
                           </button>
                         ))}
                       </div>
@@ -367,20 +398,31 @@ export default function ManipulationView({ store, preSelectedEntryId, onClearPre
                   )}
                   {selectedLot && (
                     <div className="mt-2 p-3 rounded-lg bg-primary/5 border border-primary/20 space-y-1">
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Detalhes do lote</p>
-                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider">Detalhes do lote</p>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
                         <span className="text-muted-foreground">Fornecedor:</span>
-                        <span className="text-foreground font-medium flex items-center gap-1">
+                        <span className="text-foreground font-medium flex flex-wrap items-center gap-1">
                           {selectedLot.supplier}
-                          {isSupplierInactive && <span className="text-[9px] px-1 py-0.5 rounded bg-destructive/10 text-destructive">Inativo</span>}
+                          {isSupplierInactive && <span className="text-[10px] px-1 py-0.5 rounded bg-destructive/10 text-destructive">Inativo</span>}
                         </span>
                         <span className="text-muted-foreground">SIF:</span><span className="text-foreground">{selectedLot.sif || '—'}</span>
                         <span className="text-muted-foreground">Saldo:</span><span className="text-primary font-bold">{formatFixedBR(selectedLot.balanceKg, 1)} kg</span>
                         <span className="text-muted-foreground">Custo/kg:</span><span className="text-warning font-bold">{fmtBRL(selectedLot.costPerKgBruto)}</span>
                         <span className="text-muted-foreground">Entrada:</span><span className="text-foreground">{formatDateBR(parseLocalDate(selectedLot.entryDate))}</span>
+                        <span className="text-muted-foreground">Validade:</span>
+                        <span className={`font-medium ${expirationTone(selectedLot)}`}>
+                          {selectedLot.expirationDate
+                            ? `${formatDateBR(parseLocalDate(selectedLot.expirationDate))} (${expirationLabel(selectedLot)})`
+                            : 'Não informada'}
+                        </span>
                       </div>
+                      {selectedLot.expirationStatus === 'VENCIDO' && (
+                        <p className="text-xs text-destructive mt-1 flex items-center gap-1">
+                          <AlertTriangle className="w-3 h-3 shrink-0" /> Lote vencido — confirme com a chefia antes de manipular.
+                        </p>
+                      )}
                       {supplierHistory && (
-                        <p className="text-[10px] text-warning mt-1">📊 Fornecedor: {formatPercentBR(supplierHistory.avgYield)} rendimento ({supplierHistory.count} manip.)</p>
+                        <p className="text-xs text-warning mt-1">📊 Fornecedor: {formatPercentBR(supplierHistory.avgYield)} rendimento ({supplierHistory.count} manip.)</p>
                       )}
                     </div>
                   )}
@@ -390,62 +432,62 @@ export default function ManipulationView({ store, preSelectedEntryId, onClearPre
               {step === 1 && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <Input value={wizard.sif} readOnly className="bg-secondary border-border text-foreground opacity-70" />
+                    <Input value={wizard.sif} readOnly className="bg-secondary border-border text-foreground opacity-70 text-base md:text-base" />
                     <Lock className="w-4 h-4 text-muted-foreground" />
                   </div>
-                  <p className="text-[10px] text-muted-foreground">Vinculado ao lote selecionado</p>
-                  {!wizard.sif && <p className="text-[10px] text-destructive flex items-center gap-1"><AlertCircle className="w-3 h-3" /> Lote sem SIF.</p>}
+                  <p className="text-xs text-muted-foreground">Vinculado ao lote selecionado</p>
+                  {!wizard.sif && <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="w-3 h-3" /> Lote sem SIF.</p>}
                 </div>
               )}
 
               {step === 2 && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <Input value={wizard.supplier} readOnly className="bg-secondary border-border text-foreground opacity-70" />
+                    <Input value={wizard.supplier} readOnly className="bg-secondary border-border text-foreground opacity-70 text-base md:text-base" />
                     <Lock className="w-4 h-4 text-muted-foreground" />
                   </div>
-                  {isSupplierInactive && <p className="text-[10px] text-destructive flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Fornecedor inativo.</p>}
-                  <p className="text-[10px] text-muted-foreground">Vinculado ao lote</p>
+                  {isSupplierInactive && <p className="text-xs text-destructive flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Fornecedor inativo.</p>}
+                  <p className="text-xs text-muted-foreground">Vinculado ao lote</p>
                 </div>
               )}
 
               {step === 3 && (
-                <DecimalInput value={wizard.fishCount} onValueChange={(raw) => setWizard(w => ({ ...w, fishCount: raw }))} maxDecimals={0} placeholder="0" className="bg-card border-border text-foreground" autoFocus />
+                <DecimalInput value={wizard.fishCount} onValueChange={(raw) => setWizard(w => ({ ...w, fishCount: raw }))} onKeyDown={handleStepInputEnter} maxDecimals={0} placeholder="0" className="bg-card border-border text-foreground h-12 text-lg md:text-lg" autoFocus />
               )}
 
               {step === 4 && (
                 <div className="space-y-2">
-                  <DecimalInput value={wizard.grossKg} onValueChange={(raw) => setWizard(w => ({ ...w, grossKg: raw }))} maxDecimals={1} placeholder="0,0" className={`bg-card border-border text-foreground ${exceedsLotStock ? 'border-destructive' : ''}`} autoFocus />
-                  {exceedsLotStock && <p className="text-[10px] text-destructive flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Excede saldo ({formatFixedBR(effectiveLotBalance, 1)} kg)</p>}
-                  <p className="text-[10px] text-muted-foreground">Saldo: {formatFixedBR(effectiveLotBalance, 1)} kg • Custo: {fmtBRL(lotCostPerKg)}/kg</p>
+                  <DecimalInput value={wizard.grossKg} onValueChange={(raw) => setWizard(w => ({ ...w, grossKg: raw }))} onKeyDown={handleStepInputEnter} maxDecimals={1} placeholder="0,0" className={`bg-card border-border text-foreground h-12 text-lg md:text-lg ${exceedsLotStock ? 'border-destructive' : ''}`} autoFocus />
+                  {exceedsLotStock && <p className="text-xs text-destructive flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Excede saldo ({formatFixedBR(effectiveLotBalance, 1)} kg)</p>}
+                  <p className="text-xs text-muted-foreground">Saldo: {formatFixedBR(effectiveLotBalance, 1)} kg • Custo: {fmtBRL(lotCostPerKg)}/kg</p>
                 </div>
               )}
 
               {step === 5 && (
                 <div className="space-y-2">
-                  <DecimalInput value={wizard.cleanKg} onValueChange={(raw) => setWizard(w => ({ ...w, cleanKg: raw }))} maxDecimals={1} placeholder="0,0" className={`bg-card border-border text-foreground ${cleanKg > grossKg ? 'border-destructive' : ''}`} autoFocus />
-                  {cleanKg > grossKg && <p className="text-[10px] text-destructive flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Kg limpo não pode ser maior que bruto</p>}
+                  <DecimalInput value={wizard.cleanKg} onValueChange={(raw) => setWizard(w => ({ ...w, cleanKg: raw }))} onKeyDown={handleStepInputEnter} maxDecimals={1} placeholder="0,0" className={`bg-card border-border text-foreground h-12 text-lg md:text-lg ${cleanKg > grossKg ? 'border-destructive' : ''}`} autoFocus />
+                  {cleanKg > grossKg && <p className="text-xs text-destructive flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Kg limpo não pode ser maior que bruto</p>}
                 </div>
               )}
 
               {step > 0 && (
                 <div className="flex flex-wrap gap-1.5 pt-1">
-                  {confirmed[0] && <span className="text-[9px] px-1.5 py-0.5 rounded bg-primary/10 text-primary">Lote: {wizard.lot || '—'}</span>}
-                  {step > 1 && confirmed[1] && <span className="text-[9px] px-1.5 py-0.5 rounded bg-primary/10 text-primary">SIF: {wizard.sif || '—'}</span>}
-                  {step > 2 && confirmed[2] && <span className="text-[9px] px-1.5 py-0.5 rounded bg-primary/10 text-primary">Forn: {wizard.supplier || '—'}</span>}
-                  {step > 3 && confirmed[3] && <span className="text-[9px] px-1.5 py-0.5 rounded bg-primary/10 text-primary">Peixes: {wizard.fishCount}</span>}
-                  {step > 4 && confirmed[4] && <span className="text-[9px] px-1.5 py-0.5 rounded bg-primary/10 text-primary">Bruto: {wizard.grossKg} kg</span>}
+                  {confirmed[0] && <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary">Lote: {wizard.lot || '—'}</span>}
+                  {step > 1 && confirmed[1] && <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary">SIF: {wizard.sif || '—'}</span>}
+                  {step > 2 && confirmed[2] && <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary">Forn: {wizard.supplier || '—'}</span>}
+                  {step > 3 && confirmed[3] && <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary">Peixes: {wizard.fishCount}</span>}
+                  {step > 4 && confirmed[4] && <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary">Bruto: {wizard.grossKg} kg</span>}
                 </div>
               )}
 
               <div className="flex items-center justify-between pt-2">
-                <Button variant="ghost" size="sm" onClick={goBack} disabled={step === 0} className="text-xs gap-1">
+                <Button variant="ghost" size="sm" onClick={goBack} disabled={step === 0} className="text-sm gap-1">
                   <ChevronLeft className="w-3.5 h-3.5" /> Voltar
                 </Button>
                 {step === 5 && confirmed[step] ? (
-                  <Button size="sm" className="bg-primary-strong text-primary-foreground border-0 text-xs" onClick={handleSave}>Salvar Manipulação</Button>
+                  <Button size="sm" className="bg-primary-strong text-primary-foreground border-0 text-sm" onClick={handleSave}>Salvar Manipulação</Button>
                 ) : (
-                  <Button size="sm" className="bg-primary-strong text-primary-foreground border-0 text-xs gap-1" onClick={confirmStep} disabled={step === 0 && availableLots.length === 0}>
+                  <Button size="sm" className="bg-primary-strong text-primary-foreground border-0 text-sm gap-1" onClick={confirmStep} disabled={step === 0 && availableLots.length === 0}>
                     Confirmar <ChevronRight className="w-3.5 h-3.5" />
                   </Button>
                 )}
@@ -455,27 +497,27 @@ export default function ManipulationView({ store, preSelectedEntryId, onClearPre
             {/* Live preview */}
             {grossKg > 0 && cleanKg > 0 && (
               <div className="mt-3 p-2.5 rounded-lg bg-secondary/30 space-y-2">
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">📦 Dados Operacionais</p>
+                <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">📦 Dados Operacionais</p>
                 <div className="grid grid-cols-2 gap-2">
-                  <div className="text-center"><p className="text-[10px] text-muted-foreground">Kg Bruto</p><p className="text-sm font-bold text-foreground">{formatFixedBR(grossKg, 1)} kg</p></div>
-                  <div className="text-center"><p className="text-[10px] text-muted-foreground">Kg Limpo</p><p className="text-sm font-bold text-success">{formatFixedBR(cleanKg, 1)} kg</p></div>
-                  <div className="text-center"><p className="text-[10px] text-muted-foreground">Perda</p><p className="text-sm font-bold text-destructive">{formatFixedBR(lossKg, 1)} kg ({formatPercentBR(lossPercent)})</p></div>
-                  <div className="text-center"><p className="text-[10px] text-muted-foreground">Aproveitamento</p><p className="text-sm font-bold text-success">{formatPercentBR(yieldPercent)}</p></div>
+                  <div className="text-center"><p className="text-xs text-muted-foreground">Kg Bruto</p><p className="text-base font-bold text-foreground">{formatFixedBR(grossKg, 1)} kg</p></div>
+                  <div className="text-center"><p className="text-xs text-muted-foreground">Kg Limpo</p><p className="text-base font-bold text-success">{formatFixedBR(cleanKg, 1)} kg</p></div>
+                  <div className="text-center"><p className="text-xs text-muted-foreground">Perda</p><p className="text-base font-bold text-destructive">{formatFixedBR(lossKg, 1)} kg ({formatPercentBR(lossPercent)})</p></div>
+                  <div className="text-center"><p className="text-xs text-muted-foreground">Aproveitamento</p><p className="text-base font-bold text-success">{formatPercentBR(yieldPercent)}</p></div>
                 </div>
 
                 <div className="border-t border-border/30 pt-2">
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">💰 Dados Financeiros</p>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">💰 Dados Financeiros</p>
                   <div className="grid grid-cols-3 gap-2 mt-1">
-                    <div className="text-center"><p className="text-[10px] text-muted-foreground">Valor bruto</p><p className="text-sm font-bold text-foreground">{fmtBRL(valorTotalBrutoPreview)}</p></div>
-                    <div className="text-center"><p className="text-[10px] text-muted-foreground">Aproveitado</p><p className="text-sm font-bold text-success">{fmtBRL(valorTotalLimpoPreview)}</p></div>
-                    <div className="text-center"><p className="text-[10px] text-muted-foreground">Perda R$</p>
+                    <div className="text-center"><p className="text-xs text-muted-foreground">Valor bruto</p><p className="text-sm font-bold text-foreground">{fmtBRL(valorTotalBrutoPreview)}</p></div>
+                    <div className="text-center"><p className="text-xs text-muted-foreground">Aproveitado</p><p className="text-sm font-bold text-success">{fmtBRL(valorTotalLimpoPreview)}</p></div>
+                    <div className="text-center"><p className="text-xs text-muted-foreground">Perda R$</p>
                       <p className={`text-sm font-bold ${(lossPercent > perdaPercentAlerta || perdaValorPreview > perdaValorAlerta) ? 'text-destructive animate-pulse' : 'text-destructive'}`}>
                         {fmtBRL(perdaValorPreview)}
                       </p>
                     </div>
                   </div>
                   {(lossPercent > perdaPercentAlerta || perdaValorPreview > perdaValorAlerta) && (
-                    <div className="mt-1.5 p-1.5 rounded-lg bg-destructive/10 border border-destructive/20 text-[10px] text-destructive flex items-center gap-1">
+                    <div className="mt-1.5 p-1.5 rounded-lg bg-destructive/10 border border-destructive/20 text-xs text-destructive flex items-center gap-1">
                       <AlertTriangle className="w-3 h-3 shrink-0" />
                       Perda acima do limite
                     </div>
@@ -483,20 +525,20 @@ export default function ManipulationView({ store, preSelectedEntryId, onClearPre
                 </div>
 
                 <div className="border-t border-border/30 pt-2 grid grid-cols-2 gap-2">
-                  <div className="text-center"><p className="text-[10px] text-muted-foreground">Custo manipulação</p><p className="text-sm font-bold text-warning">{fmtBRL(custoManipulacao)}</p></div>
-                  <div className="text-center"><p className="text-[10px] text-muted-foreground">Custo/kg limpo</p><p className="text-sm font-bold text-warning">{fmtBRL(custoKgLimpo)}</p></div>
+                  <div className="text-center"><p className="text-xs text-muted-foreground">Custo manipulação</p><p className="text-base font-bold text-warning">{fmtBRL(custoManipulacao)}</p></div>
+                  <div className="text-center"><p className="text-xs text-muted-foreground">Custo/kg limpo</p><p className="text-base font-bold text-warning">{fmtBRL(custoKgLimpo)}</p></div>
                 </div>
 
                 {/* Validity preview */}
                 <div className="border-t border-border/30 pt-2 text-center">
-                  <p className="text-[10px] text-muted-foreground">📅 Validade estimada</p>
-                  <p className="text-sm font-bold text-warning">{formatDateBR(parseLocalDate(getDataValidade(selectedDate)))}</p>
+                  <p className="text-xs text-muted-foreground">📅 Validade estimada</p>
+                  <p className="text-base font-bold text-warning">{formatDateBR(parseLocalDate(getDataValidade(selectedDate)))}</p>
                 </div>
               </div>
             )}
 
             {wizard.divergenciaLote && (
-              <div className="mt-2 p-2 rounded-lg bg-destructive/10 border border-destructive/20 text-[11px] text-destructive flex items-start gap-2">
+              <div className="mt-2 p-2 rounded-lg bg-destructive/10 border border-destructive/20 text-xs text-destructive flex items-start gap-2">
                 <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
                 <div><p className="font-medium">Divergência registrada</p><p>{wizard.divergenciaMotivo}</p></div>
               </div>

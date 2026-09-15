@@ -16,7 +16,11 @@ cd "$project_root"
 createdb -h /tmp -p "$test_port" -U postgres "$test_database"
 run_sql() { psql -X -q -h /tmp -p "$test_port" -U postgres -d "$test_database" -v ON_ERROR_STOP=1 -f "$1"; }
 run_sql supabase/tests/fixtures/multiunit_postgres_prerequisites.sql
-run_sql "$schema_file"
+# O dump declara CREATE SCHEMA public, mas o banco novo já nasce com ele e as
+# extensões dos prerequisites moram lá — as extensões têm que vir antes porque
+# immutable_unaccent resolve 'public.unaccent'::regdictionary já no CREATE.
+grep -vFx -e 'CREATE SCHEMA public;' -e 'ALTER SCHEMA public OWNER TO postgres;' "$schema_file" |
+  psql -X -q -h /tmp -p "$test_port" -U postgres -d "$test_database" -v ON_ERROR_STOP=1 -f -
 run_sql supabase/tests/fixtures/multiunit_before.sql
 for migration in \
   20260909192644_company_memberships \
@@ -24,9 +28,12 @@ for migration in \
   20260909193057_company_scope_legacy_consumers \
   20260909193257_company_membership_administration \
   20260909195048_company_scope_security_backstops \
-  20260909195238_company_scope_validation; do
+  20260909195238_company_scope_validation \
+  20260910003448_fix_membership_legacy_admin_delegation \
+  20260915120000_restore_admin_delegation_guard_pos_rbac_granular; do
   run_sql "supabase/migrations/$migration.sql"
 done
 run_sql supabase/tests/database/multiunit_security.sql
+run_sql supabase/tests/database/multiunit_admin_delegation.sql
 run_sql supabase/tests/database/multiunit_rollback.sql
 printf 'Security and rollback checks passed in local database %s.\n' "$test_database"

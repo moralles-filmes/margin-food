@@ -5,6 +5,7 @@ import { PackageX, ClipboardList, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import type { CotacaoItemInput } from '@/hooks/useCotacoesStore';
+import { sortByName } from '@/lib/sortByName';
 
 
 type Source = 'alertas' | 'checklist';
@@ -38,7 +39,7 @@ export default function ImportItensDialog({ open, onOpenChange, onImport }: Impo
           .eq('status', 'PENDENTE')
           .order('created_at', { ascending: false });
         if (error) throw error;
-        setRows((data ?? []).map((a: any) => ({
+        setRows(sortByName((data ?? []).map((a: any) => ({
           _key: `a:${a.id}`,
           _label: `${a.produto_nome} — ${Number(a.quantidade_solicitada) || 0} ${a.unidade || 'UN'}`,
           produto_id: a.produto_id ?? null,
@@ -47,7 +48,7 @@ export default function ImportItensDialog({ open, onOpenChange, onImport }: Impo
           purchase_unit_snapshot: a.unidade || 'UN',
           conversion_factor_snapshot: 1,
           quantidade: Number(a.quantidade_solicitada) || 0,
-        })));
+        })), r => r.produto_nome_snapshot));
       } else {
         // Checklist (Mercado): itens de pedidos MERCADO/SAZONAL pendentes
         const { data: orders, error: oErr } = await db
@@ -65,7 +66,7 @@ export default function ImportItensDialog({ open, onOpenChange, onImport }: Impo
           .in('order_id', ids)
           .eq('shopping_status', 'PENDING');
         if (iErr) throw iErr;
-        setRows((items ?? []).map((it: any) => ({
+        setRows(sortByName((items ?? []).map((it: any) => ({
           _key: `c:${it.id}`,
           _label: `${it.name_snapshot} — ${Number(it.qty_requested) || 0} ${it.purchase_unit_snapshot || it.unit_snapshot || 'UN'}`,
           produto_id: it.stock_item_id ?? null,
@@ -74,7 +75,7 @@ export default function ImportItensDialog({ open, onOpenChange, onImport }: Impo
           purchase_unit_snapshot: it.purchase_unit_snapshot || it.unit_snapshot || 'UN',
           conversion_factor_snapshot: Number(it.conversion_factor_snapshot) || 1,
           quantidade: Number(it.qty_requested) || 0,
-        })));
+        })), r => r.produto_nome_snapshot));
       }
     } catch (err: any) {
       console.error('[ImportItensDialog.load]', err);

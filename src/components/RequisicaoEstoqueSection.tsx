@@ -29,6 +29,7 @@ import RequisicaoListaFixa from './estoque/RequisicaoListaFixa';
 import RequisicaoToolbar from './estoque/RequisicaoToolbar';
 import RequisicaoCardHeader from './estoque/RequisicaoCardHeader';
 import RequisicaoProductPicker, { type ManualRequisitionItem } from './estoque/RequisicaoProductPicker';
+import { sortByName } from '@/lib/sortByName';
 
 interface Props {
   produtos: ProdutoExtended[];
@@ -106,7 +107,7 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
   const [setor, setSetor] = useState(profile?.sector || '');
   const [setores, setSetores] = useState<string[]>([]);
   useEffect(() => {
-    supabase.from('stock_sectors').select('name').eq('is_active', true).order('sort_order').order('name')
+    supabase.from('stock_sectors').select('name').eq('is_active', true).order('name')
       .then(({ data, error }) => {
         if (error) { toast.error('Erro ao carregar setores. Tente novamente.'); return; }
         const nomes = (data || []).map((s: { name: string }) => s.name);
@@ -651,7 +652,7 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
 
                       {/* Item list with per-item actions */}
                       <div className="space-y-1">
-                        {(req.requisicao_estoque_itens || []).map(item => {
+                        {sortByName(req.requisicao_estoque_itens || [], item => item.produtos?.nome_produto || getProdNome(item.produto_id)).map(item => {
                           const listedItemDisplay = resolveListedRequisitionItemDisplay(item);
                           const isItemPending = canAttendItem(item.status);
                           const isItemRejectable = canRejectItem(item.status);
@@ -932,7 +933,7 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
 
                       {isExpanded && (
                         <div className="px-3 pb-3 space-y-1 border-t border-border pt-2">
-                          {(req.requisicao_estoque_itens || []).map(item => {
+                          {sortByName(req.requisicao_estoque_itens || [], item => item.produtos?.nome_produto || getProdNome(item.produto_id)).map(item => {
                             const listedItemDisplay = resolveListedRequisitionItemDisplay(item);
                             const isPartiallyFulfilled = item.status === 'ATENDIDO' && item.quantidade_atendida > 0 && item.quantidade_atendida < item.quantidade_solicitada;
 

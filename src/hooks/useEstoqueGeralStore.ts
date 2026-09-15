@@ -6,6 +6,7 @@ import type { ProdutoExtended, MovimentacaoExtended } from '@/types/estoque';
 import { resolveCompanyIdOrThrow } from '@/lib/tenant';
 import { narrowRows } from '@/lib/guards';
 import { normalizeSearchText } from '@/lib/utils';
+import { sortByName, sortNames } from '@/lib/sortByName';
 
 // ── DB → Frontend mappers ──
 
@@ -320,7 +321,8 @@ export function useEstoqueGeralStore() {
         .from('produtos')
         .select(PRODUTO_SELECT_COLUMNS)
         .eq('ativo', true)
-        .order('created_at', { ascending: false })
+        .order('nome_produto', { ascending: true })
+        .order('id', { ascending: true })
         .range(from, from + MAX_FETCH - 1);
 
       if (error) {
@@ -340,7 +342,7 @@ export function useEstoqueGeralStore() {
     }
     // Only update produtos state if we got data — never overwrite catalog with empty on error
     if (!hadError) {
-      const mapped = allData.map(dbToProduto);
+      const mapped = sortByName(allData.map(dbToProduto), p => p.nomeProduto);
       setProdutos(mapped);
       setProdTotalCount(mapped.length);
       setProdHasMore(false);
@@ -370,10 +372,10 @@ export function useEstoqueGeralStore() {
       .select(PRODUTO_SELECT_COLUMNS); // Removido count: 'exact' para evitar timeout RLS
 
     // Server-side ordering
-    const sort = f.sortBy || 'recent';
+    const sort = f.sortBy || 'name_asc';
     switch (sort) {
       case 'oldest': query = query.order('created_at', { ascending: true }); break;
-      case 'name_asc': query = query.order('nome_produto', { ascending: true }); break;
+      case 'name_asc': query = query.order('nome_produto', { ascending: true }).order('id', { ascending: true }); break;
       case 'name_desc': query = query.order('nome_produto', { ascending: false }); break;
       case 'sku_asc': query = query.order('sku', { ascending: true }); break;
       case 'sku_desc': query = query.order('sku', { ascending: false }); break;
@@ -643,7 +645,7 @@ export function useEstoqueGeralStore() {
       throw error;
     }
     const newProd = dbToProduto(data as unknown as ProdutoRow);
-    setProdutos(prev => [newProd, ...prev]);
+    setProdutos(prev => sortByName([newProd, ...prev], p => p.nomeProduto));
     setSaldos(prev => ({ ...prev, [newProd.id]: { saldo: 0 } }));
     fetchProdutoGlobalCounts();
     emitDataEvent('estoque:produtos');
@@ -758,7 +760,7 @@ export function useEstoqueGeralStore() {
   }, [supabase, fetchMovimentacoes, movFilters, fetchSaldos]);
 
   // Categorias derived from produtos
-  const categorias = useMemo(() => [...new Set(produtos.map(p => p.categoria).filter(Boolean))], [produtos]);
+  const categorias = useMemo(() => sortNames([...new Set(produtos.map(p => p.categoria).filter(Boolean))]), [produtos]);
 
   return {
     produtos, movimentacoes, saldos, saldosLoading, categorias, loading,

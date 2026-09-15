@@ -187,8 +187,8 @@ export function useCotacoesStore() {
     respostas: CotacaoResposta[];
   }> => {
     const [itensRes, fornRes] = await Promise.all([
-      db.from('cotacao_itens').select('id, cotacao_id, company_id, produto_id, produto_nome_snapshot, unidade_snapshot, purchase_unit_snapshot, quantidade, observacao, created_at, updated_at').eq('cotacao_id', cotacaoId).order('created_at', { ascending: true }),
-      db.from('cotacao_fornecedores').select('id, cotacao_id, company_id, supplier_id, supplier_nome_snapshot, whatsapp_snapshot, pedido_minimo_snapshot, status, prazo_entrega_dias, condicao_pagamento, frete, observacao, mensagem_enviada_em, respondido_em, created_at, updated_at').eq('cotacao_id', cotacaoId).order('created_at', { ascending: true }),
+      db.from('cotacao_itens').select('id, cotacao_id, company_id, produto_id, produto_nome_snapshot, unidade_snapshot, purchase_unit_snapshot, quantidade, observacao, created_at, updated_at').eq('cotacao_id', cotacaoId).order('produto_nome_snapshot', { ascending: true }).order('created_at', { ascending: true }),
+      db.from('cotacao_fornecedores').select('id, cotacao_id, company_id, supplier_id, supplier_nome_snapshot, whatsapp_snapshot, pedido_minimo_snapshot, status, prazo_entrega_dias, condicao_pagamento, frete, observacao, mensagem_enviada_em, respondido_em, created_at, updated_at').eq('cotacao_id', cotacaoId).order('supplier_nome_snapshot', { ascending: true }).order('created_at', { ascending: true }),
     ]);
     if (itensRes.error) throw itensRes.error;
     if (fornRes.error) throw fornRes.error;

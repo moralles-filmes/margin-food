@@ -115,7 +115,6 @@ export default function PedidosComprasMercadoView() {
       .from('stock_categories')
       .select('name')
       .eq('is_active', true)
-      .order('sort_order', { ascending: true })
       .order('name', { ascending: true })
       .then(({ data }) => {
         if (data) setDbCategorias(data.map((c: { name: string }) => c.name));

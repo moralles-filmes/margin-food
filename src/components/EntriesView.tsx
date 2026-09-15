@@ -35,6 +35,7 @@ interface EntriesViewProps {
 
 const emptyForm = () => ({
   date: todayBR(),
+  expirationDate: '',
   lot: '', sif: '', supplier: '', totalValue: '', pricePerKg: '',
   boxes: '', units: '', grossKg: '', notes: '',
 });
@@ -138,9 +139,13 @@ export default function EntriesView({ store }: EntriesViewProps) {
     const grossKg = normalizeBRLMoneyToNumber(form.grossKg);
     const totalValue = normalizeBRLMoneyToNumber(form.totalValue);
     if (!grossKg || !totalValue) { toast.error('Preencha kg bruto e valor total'); return; }
+    if (form.expirationDate && form.expirationDate < form.date) {
+      toast.error('A validade não pode ser anterior à data de entrada');
+      return;
+    }
 
     const data = {
-      date: form.date, lot: form.lot, sif: form.sif, supplier: form.supplier,
+      date: form.date, expirationDate: form.expirationDate, lot: form.lot, sif: form.sif, supplier: form.supplier,
       totalValue, pricePerKg: form.pricePerKg ? normalizeBRLMoneyToNumber(form.pricePerKg) ?? undefined : undefined,
       boxes: parseInt(form.boxes) || 0, units: parseInt(form.units) || 0, grossKg, notes: form.notes,
     };
@@ -196,7 +201,7 @@ export default function EntriesView({ store }: EntriesViewProps) {
 
   const startEdit = (entry: typeof entries[0]) => {
     setForm({
-      date: entry.date, lot: entry.lot, sif: entry.sif, supplier: entry.supplier,
+      date: entry.date, expirationDate: entry.expirationDate || '', lot: entry.lot, sif: entry.sif, supplier: entry.supplier,
       totalValue: String(entry.totalValue), pricePerKg: entry.pricePerKg ? String(entry.pricePerKg) : '',
       boxes: String(entry.boxes), units: String(entry.units), grossKg: String(entry.grossKg), notes: entry.notes,
     });
@@ -207,7 +212,8 @@ export default function EntriesView({ store }: EntriesViewProps) {
 
   const duplicateEntry = (entry: typeof entries[0]) => {
     setForm({
-      date: todayBR(), lot: entry.lot, sif: entry.sif, supplier: entry.supplier,
+      // Validade não é duplicada: é uma compra nova, com lote e validade próprios.
+      date: todayBR(), expirationDate: '', lot: entry.lot, sif: entry.sif, supplier: entry.supplier,
       totalValue: String(entry.totalValue), pricePerKg: entry.pricePerKg ? String(entry.pricePerKg) : '',
       boxes: String(entry.boxes), units: String(entry.units), grossKg: String(entry.grossKg), notes: entry.notes,
     });
@@ -292,6 +298,11 @@ export default function EntriesView({ store }: EntriesViewProps) {
               <DateInput value={form.date} onValueChange={v => setForm(f => ({ ...f, date: v }))} className="bg-secondary border-border text-foreground" />
             </div>
             <div>
+              <Label className="text-[11px] text-muted-foreground">Validade</Label>
+              <DateInput value={form.expirationDate} onValueChange={v => setForm(f => ({ ...f, expirationDate: v }))} className="bg-secondary border-border text-foreground" />
+              <p className="text-[10px] text-muted-foreground mt-1">Define a ordem de uso na Manipulação (vence primeiro, sai primeiro)</p>
+            </div>
+            <div>
               <Label className="text-[11px] text-muted-foreground">Lote</Label>
               <Input value={form.lot} onChange={e => setForm(f => ({ ...f, lot: e.target.value }))} list="lots" placeholder="Lote" className="bg-secondary border-border text-foreground" />
               <datalist id="lots">{lots.map(l => <option key={l} value={String(l)} />)}</datalist>
@@ -360,6 +371,11 @@ export default function EntriesView({ store }: EntriesViewProps) {
                 </div>
                 <div className="flex items-center gap-3 mt-1">
                   <span className="text-xs text-muted-foreground">{formatDateBR(parseLocalDate(entry.date))}</span>
+                  {entry.expirationDate && (
+                    <span className={`text-xs font-medium ${entry.expirationDate < todayBR() ? 'text-destructive' : 'text-muted-foreground'}`}>
+                      Val. {formatDateBR(parseLocalDate(entry.expirationDate))}
+                    </span>
+                  )}
                   <span className="text-xs text-primary font-medium">{formatFixedBR(entry.grossKg, 1)} kg</span>
                   <span className="text-xs text-warning font-medium">{fmtBRL(entry.totalValue)}</span>
                 </div>
@@ -369,6 +385,12 @@ export default function EntriesView({ store }: EntriesViewProps) {
             {expandedId === entry.id && (
               <div className="px-3 pb-3 border-t border-border/50 pt-2 space-y-2 animate-scale-in">
                 <div className="grid grid-cols-3 gap-2 text-[11px]">
+                  <div>
+                    <span className="text-muted-foreground">Validade:</span>{' '}
+                    <span className={entry.expirationDate && entry.expirationDate < todayBR() ? 'text-destructive font-medium' : 'text-foreground'}>
+                      {entry.expirationDate ? formatDateBR(parseLocalDate(entry.expirationDate)) : '—'}
+                    </span>
+                  </div>
                   <div><span className="text-muted-foreground">SIF:</span> <span className="text-foreground">{entry.sif || '—'}</span></div>
                   <div><span className="text-muted-foreground">Caixas:</span> <span className="text-foreground">{formatFixedBR(entry.boxes, 0)}</span></div>
                   <div><span className="text-muted-foreground">Peixes:</span> <span className="text-foreground">{formatFixedBR(entry.units, 0)}</span></div>

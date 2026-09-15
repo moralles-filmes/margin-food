@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { emitDataEvent } from '@/lib/dataEvents';
 import { todayBR } from '@/lib/datetime';
+import { sortByName } from '@/lib/sortByName';
 
 const defaultStockConfig: StockConfig = {
   minGrossKg: 50, minCleanKg: 30, staleDaysLimit: 7,
@@ -25,7 +26,11 @@ async function getCurrentUserId(): Promise<string | null> {
 // Nesse caso a exclusão no Salmão é um no-op idempotente: o registro já não é
 // mais válido, então removemos da lista em vez de tratar como erro.
 function isAlreadyCancelledError(message?: string | null): boolean {
-  return !!message && /j[áa]\s+cancelad[ao]/i.test(message);
+  // Cobre tanto "Entrada/Manipulação já cancelada." quanto "Movimentação
+  // original já foi cancelada." (trg_validate_estorno) — o "foi" entre "já" e
+  // "cancelad[ao]" quebrava o regex antigo e a exclusão idempotente nunca era
+  // acionada, virando um erro visível pro usuário.
+  return !!message && /j[áa]\s+(foi\s+)?cancelad[ao]/i.test(message);
 }
 
 // Map DB row → frontend SalmonEntry
@@ -33,6 +38,7 @@ function mapDbEntry(row: any): SalmonEntry {
   return {
     id: row.id,
     date: row.entry_date,
+    expirationDate: row.expiration_date || '',
     lot: row.lot,
     sif: row.sif,
     supplier: row.supplier_name,
@@ -79,13 +85,20 @@ function mapDbManipulation(row: any): Manipulation {
   };
 }
 
+// Chave de ordenação FEFO (first expired, first out): a validade manda quando
+// informada; sem validade o lote cai na data de entrada (FIFO legado).
+function sortKey(lot: { expirationDate?: string; entryDate: string }): string {
+  return lot.expirationDate || lot.entryDate;
+}
+
 export function useSalmonStore() {
   const supabase = useSupabase();
   const [entries, setEntries] = useState<SalmonEntry[]>([]);
   const [manipulations, setManipulations] = useState<Manipulation[]>([]);
   const [dailyRecords, setDailyRecords] = useState<DailyRecord[]>([]);
   const [stockConfig, setStockConfigState] = useState<StockConfig>(defaultStockConfig);
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [suppliersRaw, setSuppliers] = useState<Supplier[]>([]);
+  const suppliers = useMemo(() => sortByName(suppliersRaw, s => s.name), [suppliersRaw]);
   const [metasCompra, setMetasCompra] = useState<MetaCompraMensal[]>([]);
   const [auditorias, setAuditorias] = useState<AuditoriaCompra[]>([]);
   const [metasProvisionadas, setMetasProvisionadas] = useState<MetaProvisionadaSalmao[]>([]);
@@ -113,7 +126,7 @@ export function useSalmonStore() {
           supabase.from('salmon_manipulations').select('*').eq('status', 'ACTIVE').order('manipulation_date', { ascending: false }),
           supabase.from('salmon_config').select('*').limit(1).maybeSingle(),
           supabase.from('salmon_daily_records').select('*').order('record_date', { ascending: false }),
-          supabase.from('suppliers').select('*').order('created_at', { ascending: false }),
+          supabase.from('suppliers').select('*').order('name', { ascending: true }),
           supabase.from('planning_metas_compra').select('*').eq('ativo', true).order('year', { ascending: false }).order('month', { ascending: false }),
           supabase.from('salmon_metas_provisionadas').select('*').order('created_at', { ascending: false }),
           supabase.from('salmon_auditorias_compra').select('*').order('created_at', { ascending: false }),
@@ -408,6 +421,7 @@ export function useSalmonStore() {
       p_gross_kg: entry.grossKg,
       p_total_value: entry.totalValue,
       p_notes: entry.notes || '',
+      p_expiration_date: entry.expirationDate || null,
     });
 
     if (error) {
@@ -460,6 +474,7 @@ export function useSalmonStore() {
       p_gross_kg: updated.grossKg,
       p_total_value: updated.totalValue,
       p_notes: updated.notes || '',
+      p_expiration_date: updated.expirationDate || null,
     });
 
     if (createError) {
@@ -705,6 +720,7 @@ export function useSalmonStore() {
   }, [entries, manipulations, inventoryAdjustmentKg]);
 
   // Lot-level stock
+  const alertaVencimentoDias = stockConfig.alertaVencimentoDias ?? 1;
   const lotStocks: LotStock[] = useMemo(() => {
     const todayStr = todayBR();
     const [ty, tm, td] = todayStr.split('-').map(Number);
@@ -724,19 +740,41 @@ export function useSalmonStore() {
       const lastMovementDate = lastManipDate || entry.date;
       const daysSinceMovement = Math.floor((today.getTime() - new Date(lastMovementDate).getTime()) / (1000 * 60 * 60 * 24));
       const isStale = balanceKg > 0 && daysSinceMovement >= (stockConfig.staleDaysLimit || 7);
+
+      const expirationDate = entry.expirationDate || '';
+      let daysToExpire: number | undefined;
+      let expirationStatus: LotStock['expirationStatus'];
+      if (expirationDate) {
+        const [ey, em, ed] = expirationDate.split('-').map(Number);
+        daysToExpire = Math.floor((new Date(ey, em - 1, ed).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        expirationStatus = daysToExpire < 0
+          ? 'VENCIDO'
+          : daysToExpire <= alertaVencimentoDias ? 'VENCE_EM_BREVE' : 'OK';
+      }
+
       return {
         entryId: entry.id, lot: entry.lot, sif: entry.sif, supplier: entry.supplier,
         supplierActive: sup ? sup.active : true,
-        entryDate: entry.date, entryGrossKg: entry.grossKg, entryTotalValue: entry.totalValue,
+        entryDate: entry.date, expirationDate, daysToExpire, expirationStatus,
+        entryGrossKg: entry.grossKg, entryTotalValue: entry.totalValue,
         costPerKgBruto, manipulatedKg, balanceKg, avgYield,
         lastMovementDate, daysSinceMovement, isStale,
       };
-    }).sort((a, b) => new Date(a.entryDate).getTime() - new Date(b.entryDate).getTime());
-  }, [entries, manipulations, suppliers, stockConfig.staleDaysLimit]);
+    }).sort((a, b) => {
+      // FEFO: o lote que vence primeiro sai primeiro. Lote sem validade informada
+      // (legado) usa a data de entrada como chave — mantém o comportamento FIFO
+      // anterior e o posiciona antes de lotes recém-comprados.
+      const keyA = sortKey(a);
+      const keyB = sortKey(b);
+      if (keyA !== keyB) return keyA < keyB ? -1 : 1;
+      return a.entryDate < b.entryDate ? -1 : a.entryDate > b.entryDate ? 1 : 0;
+    });
+  }, [entries, manipulations, suppliers, stockConfig.staleDaysLimit, alertaVencimentoDias]);
 
   const availableLots = useMemo(() => lotStocks.filter(l => l.balanceKg > 0), [lotStocks]);
   const staleLots = useMemo(() => lotStocks.filter(l => l.isStale), [lotStocks]);
-  const fifoLot = useMemo(() => availableLots.length > 0 ? availableLots[0] : null, [availableLots]);
+  // Lote recomendado: 1º da fila FEFO (vence primeiro; sem validade, o mais antigo).
+  const suggestedLot = useMemo(() => availableLots.length > 0 ? availableLots[0] : null, [availableLots]);
 
   // Lotes Limpos
   const lotesLimpos: LoteSalmaoLimpo[] = useMemo(() => {
@@ -967,7 +1005,7 @@ export function useSalmonStore() {
     entries, manipulations, dailyRecords, stockConfig, stock,
     avgDailyConsumption, daysRemaining, supplierStats,
     suppliers, activeSuppliers, lotStocks, availableLots,
-    staleLots, fifoLot, metasCompra, auditorias,
+    staleLots, suggestedLot, metasCompra, auditorias,
     lotesLimpos, metasProvisionadas, smartSuggestion,
     addEntry, updateEntry, deleteEntry,
     addManipulation, updateManipulation, deleteManipulation, recordLeftover,

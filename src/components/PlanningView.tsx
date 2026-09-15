@@ -16,6 +16,7 @@ import PurchaseRadar from './PurchaseRadar';
 import SimuladorCompra from './SimuladorCompra';
 import PlanningProjecaoCard from './PlanningProjecaoCard';
 import BudgetPressure from './BudgetPressure';
+import { sortNames } from '@/lib/sortByName';
 
 interface PlanningViewProps {
   store: ReturnType<typeof useSalmonStore>;
@@ -111,11 +112,11 @@ export default function PlanningView({ store, estoqueStore }: PlanningViewProps)
   const availableCategories = useMemo(() => {
     if (planningStore.spendSummary?.realizado_por_categoria?.length) {
       const cats = planningStore.spendSummary.realizado_por_categoria.map(r => r.categoria);
-      return ['todas', ...cats.sort()];
+      return ['todas', ...sortNames(cats)];
     }
     const cats = new Set<string>();
     generalEntries.forEach(e => { const cat = (e as SalmonEntry & { _categoria?: string })._categoria; if (cat) cats.add(cat); });
-    return ['todas', ...Array.from(cats).sort()];
+    return ['todas', ...sortNames(Array.from(cats))];
   }, [generalEntries, planningStore.spendSummary]);
 
   const activeCategoria = useMemo(() => {

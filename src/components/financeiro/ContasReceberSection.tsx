@@ -75,7 +75,11 @@ function NoAccess() {
   );
 }
 
-export default function ContasReceberSection() {
+interface ContasReceberSectionProps {
+  initialStatus?: string;
+}
+
+export default function ContasReceberSection({ initialStatus }: ContasReceberSectionProps = {}) {
   const supabase = useSupabase();
   const canView = useCan('financeiro:receber:view');
   const canCreate = useCan('financeiro:receber:create');
@@ -89,7 +93,7 @@ export default function ContasReceberSection() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showForm, setShowForm] = useState(false);
-  const [filtroStatus, setFiltroStatus] = useState('todos');
+  const [filtroStatus, setFiltroStatus] = useState(initialStatus || 'todos');
   const [filtroDataDe, setFiltroDataDe] = useState('');
   const [filtroDataAte, setFiltroDataAte] = useState('');
   const [mesFiltro, setMesFiltro] = useState(() => formatInBR(new Date(), 'yyyy-MM'));

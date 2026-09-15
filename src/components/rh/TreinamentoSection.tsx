@@ -17,6 +17,7 @@ import { Plus, Award, ChevronRight, Users, GraduationCap, FileText, Video, HelpC
 import KpiCard from '@/components/ui/KpiCard';
 
 import { useCan } from '@/permissions/hooks';
+import { sortByName } from '@/lib/sortByName';
 interface Colaborador {
   id: string;
   nome: string;
@@ -268,7 +269,7 @@ export default function TreinamentoSection({
 
   // Detail view
   if (selected) {
-    const trilhaProgressos = progressos.filter(p => p.trilha_id === selected.id);
+    const trilhaProgressos = sortByName(progressos.filter(p => p.trilha_id === selected.id), p => getColabNome(p.colaborador_id));
 
     return (
       <div className="space-y-4">
@@ -448,7 +449,7 @@ export default function TreinamentoSection({
         </Card>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {trilhas.map(t => {
+          {sortByName(trilhas, t => t.titulo).map(t => {
             const inscritos = progressos.filter(p => p.trilha_id === t.id).length;
             const concluidos = progressos.filter(p => p.trilha_id === t.id && p.status === 'CONCLUIDO').length;
             return (

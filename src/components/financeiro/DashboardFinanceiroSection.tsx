@@ -27,7 +27,16 @@ import {
 
 // ── Types ──
 
-type FinSubTab = 'dashboard' | 'cadastros' | 'contas' | 'lancamentos' | 'pagar' | 'receber' | 'fluxo' | 'dre' | 'orcamento' | 'conciliacao' | 'alertas' | 'recorrencias' | 'categorizacao' | 'relatorio_socios' | 'projecao' | 'kpis' | 'auditoria' | 'comparativo' | 'fechamento';
+type FinSubTab = 'dashboard' | 'cadastros' | 'contas' | 'lancamentos' | 'pagar' | 'receber' | 'fluxo' | 'dre' | 'orcamento' | 'conciliacao' | 'alertas' | 'recorrencias' | 'categorizacao' | 'bordero' | 'projecao' | 'kpis' | 'auditoria' | 'comparativo' | 'fechamento';
+
+/** Parâmetros de navegação de um card do dashboard para o sub-módulo de destino, com filtro aplicado */
+export interface DashboardNavigateParams {
+  tab: FinSubTab;
+  status?: string;
+  tipo?: 'RECEITA' | 'DESPESA';
+  dateFrom?: string;
+  dateTo?: string;
+}
 
 interface DashboardSummary {
   saldoCaixa: number;
@@ -70,7 +79,7 @@ function buildDelta(current: number, previous: number, invert = false): KpiCardD
 
 // ── Component ──
 
-export default function DashboardFinanceiroSection({ onNavigate }: { onNavigate?: (tab: FinSubTab) => void }) {
+export default function DashboardFinanceiroSection({ onNavigate }: { onNavigate?: (params: DashboardNavigateParams) => void }) {
   const supabase = useSupabase();
   const canView = useCan('financeiro:dashboard:view');
   const canExport = useCan('financeiro:dashboard:export');
@@ -237,13 +246,23 @@ export default function DashboardFinanceiroSection({ onNavigate }: { onNavigate?
 
   if (!canView) return <NoAccess />;
 
-  const cards: { label: string; value: number; icon: typeof DollarSign; variant: KpiVariant; target?: FinSubTab; delta?: KpiCardDelta; sub?: string }[] = [
+  // Período aplicado no dashboard, para levar junto ao navegar para Lançamentos (data inclusiva)
+  const rangeDateFrom = appliedRange?.start;
+  const rangeDateTo = appliedRange
+    ? (() => {
+        const d = new Date(appliedRange.endExclusive + 'T12:00:00');
+        d.setDate(d.getDate() - 1);
+        return formatDateISO(d);
+      })()
+    : undefined;
+
+  const cards: { label: string; value: number; icon: typeof DollarSign; variant: KpiVariant; target?: FinSubTab; delta?: KpiCardDelta; sub?: string; status?: string; tipo?: 'RECEITA' | 'DESPESA'; dateFrom?: string; dateTo?: string }[] = [
     { label: 'Saldo em Caixa', value: resumo.saldoCaixa, icon: DollarSign, variant: 'success', target: 'fluxo' },
-    { label: 'Contas a Receber', value: resumo.aReceber, icon: ArrowUpRight, variant: 'primary', target: 'receber' },
+    { label: 'Contas a Receber', value: resumo.aReceber, icon: ArrowUpRight, variant: 'primary', target: 'receber', status: 'A_RECEBER' },
     { label: 'Contas a Pagar', value: resumo.aPagar, icon: ArrowDownRight, variant: 'warning', target: 'pagar' },
-    { label: 'Contas Vencidas', value: resumo.aPagarVencido, icon: AlertTriangle, variant: 'danger', target: 'pagar', sub: resumo.aPagarVencidoQtd > 0 ? `${resumo.aPagarVencidoQtd} boleto${resumo.aPagarVencidoQtd > 1 ? 's' : ''}` : undefined },
-    { label: 'Receita do Período', value: resumo.receita, icon: TrendingUp, variant: 'success', target: 'lancamentos', delta: buildDelta(resumo.receita, resumo.receitaPrev) },
-    { label: 'Despesa Realizada', value: resumo.despesa, icon: TrendingDown, variant: 'danger', target: 'lancamentos', delta: buildDelta(resumo.despesa, resumo.despesaPrev, true) },
+    { label: 'Contas Vencidas', value: resumo.aPagarVencido, icon: AlertTriangle, variant: 'danger', target: 'pagar', status: 'VENCIDO', sub: resumo.aPagarVencidoQtd > 0 ? `${resumo.aPagarVencidoQtd} boleto${resumo.aPagarVencidoQtd > 1 ? 's' : ''}` : undefined },
+    { label: 'Receita do Período', value: resumo.receita, icon: TrendingUp, variant: 'success', target: 'lancamentos', tipo: 'RECEITA', dateFrom: rangeDateFrom, dateTo: rangeDateTo, delta: buildDelta(resumo.receita, resumo.receitaPrev) },
+    { label: 'Despesa Realizada', value: resumo.despesa, icon: TrendingDown, variant: 'danger', target: 'lancamentos', tipo: 'DESPESA', dateFrom: rangeDateFrom, dateTo: rangeDateTo, delta: buildDelta(resumo.despesa, resumo.despesaPrev, true) },
     { label: 'Despesas Provisionadas', value: despesasProvisionadas, icon: DollarSign, variant: 'warning', target: 'pagar' },
     { label: 'Resultado', value: resumo.resultado, icon: DollarSign, variant: resumo.resultado >= 0 ? 'success' : 'danger', target: 'dre', delta: buildDelta(resumo.resultado, resumo.resultadoPrev) },
   ];
@@ -331,7 +350,7 @@ export default function DashboardFinanceiroSection({ onNavigate }: { onNavigate?
               variant={c.variant}
               sub={c.sub}
               delta={c.delta}
-              onClick={c.target && onNavigate ? () => onNavigate(c.target!) : undefined}
+              onClick={c.target && onNavigate ? () => onNavigate({ tab: c.target!, status: c.status, tipo: c.tipo, dateFrom: c.dateFrom, dateTo: c.dateTo }) : undefined}
             />
           ))}
         </div>

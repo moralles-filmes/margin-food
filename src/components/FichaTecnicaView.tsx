@@ -1,6 +1,7 @@
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { includesNormalized } from '@/lib/utils';
+import { sortByName } from '@/lib/sortByName';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 
 import { useCan, useModuleAccess } from '@/permissions/hooks';
@@ -269,24 +270,37 @@ export default function FichaTecnicaView({ lotesLimpos = [] }: { lotesLimpos?: L
   const [showPrecificacao, setShowPrecificacao] = useState(false);
   const [precifComp, setPrecifComp] = useState<Componente | null>(null);
 
+  // `listar_componentes` pagina no servidor (máx. 500 por chamada): segue o cursor
+  // até o fim, senão fichas além da 1ª página simplesmente não aparecem.
+  const listarTodosComponentes = useCallback(async (): Promise<Componente[]> => {
+    const all: Componente[] = [];
+    let cursor: { nome: string; id: string } | null = null;
+    do {
+      const res = await invokeApi(supabase, 'listar_componentes', { ativo: true, limit: 500, cursor });
+      all.push(...(res.componentes || []));
+      cursor = res.has_more ? res.next_cursor : null;
+    } while (cursor);
+    return all;
+  }, [supabase]);
+
   const loadAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [compRes, canaisRes, prodsRes, salmonRefRes] = await Promise.all([
-        invokeApi(supabase, 'listar_componentes', { ativo: true }),
+      const [componentesAll, canaisRes, prodsRes, salmonRefRes] = await Promise.all([
+        listarTodosComponentes(),
         invokeApi(supabase, 'listar_canais'),
         supabase.from('produtos').select('id, nome_produto, custo_ultima_compra, custo_padrao, unidade_medida, categoria').eq('ativo', true).order('nome_produto'),
         invokeApi(supabase, 'get_preco_referencia_salmao'),
       ]);
-      setComponentes(compRes.componentes || []);
-      setCanais(canaisRes.canais || []);
-      setProdutos(prodsRes.data || []);
+      setComponentes(sortByName<Componente>(componentesAll, c => c.nome));
+      setCanais(sortByName<any>(canaisRes.canais || [], c => c.nome));
+      setProdutos(sortByName<any>(prodsRes.data || [], p => p.nome_produto));
       setSalmonRef(salmonRefRes);
     } catch (e: any) {
       toast.error(e.message);
     }
     setLoading(false);
-  }, [supabase]);
+  }, [supabase, listarTodosComponentes]);
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
@@ -1058,7 +1072,7 @@ function PrecificacaoDialog({ open, onClose, componente, canais, onSaved }: {
       (res.precos || []).forEach((p: any) => { map[p.canal_id] = String(p.preco_venda); });
       canais.forEach(c => { if (!map[c.id]) map[c.id] = '0'; });
       setPrecos(map);
-      setAnalise(res.analise || []);
+      setAnalise(sortByName<any>(res.analise || [], a => a.canalNome));
     }).catch(e => toast.error(e.message));
   }, [componente, canais, supabase]);
 
@@ -1074,7 +1088,7 @@ function PrecificacaoDialog({ open, onClose, componente, canais, onSaved }: {
       });
       toast.success('Precificação salva');
       const res = await invokeApi(supabase, 'get_precificacao', { componente_id: componente.id });
-      setAnalise(res.analise || []);
+      setAnalise(sortByName<any>(res.analise || [], a => a.canalNome));
       onSaved();
     } catch (e: any) { toast.error(e.message); }
     setSaving(false);
@@ -1162,7 +1176,7 @@ function SimuladorDialog({ open, onClose, componente, canais }: {
         ajuste_preco_final: precoFinal ? normalizeBRLMoneyToNumber(precoFinal) ?? undefined : undefined,
         volume_vendas_mensal: parseDecimal(volumeMensal) || 0,
       });
-      setResultado(res);
+      setResultado(res?.resultadoCanais ? { ...res, resultadoCanais: sortByName<any>(res.resultadoCanais, r => r.canal) } : res);
     } catch (e: any) { toast.error(e.message); }
     setLoading(false);
   };

@@ -234,7 +234,9 @@ export function usePurchaseOrdersStore() {
       .from('purchase_order_items')
       .select('id, order_id, stock_item_id, name_snapshot, unit_snapshot, estimated_unit_value, qty_requested, qty_received, received_status, not_delivered_reason, received_at, received_by, shopping_status, shopping_note, purchase_unit_snapshot, purchase_unit_cost_snapshot, conversion_factor_snapshot, created_at, updated_at')
       .eq('order_id', orderId)
-      .is('deleted_at', null);
+      .is('deleted_at', null)
+      .order('name_snapshot', { ascending: true })
+      .order('created_at', { ascending: true });
     return (data || []) as unknown as PurchaseOrderItem[];
   }, [supabase]);
 

@@ -611,7 +611,11 @@ async function listarComponentes(client: any, companyId: string, payload: any) {
 
   // Cursor-based pagination (cursor = last component name + id)
   if (cursor?.nome && cursor?.id) {
-    query = query.or(`nome.gt.${cursor.nome},and(nome.eq.${cursor.nome},id.gt.${cursor.id})`)
+    // Valores entre aspas: nome com vírgula/parênteses/ponto quebraria a sintaxe do `or` do PostgREST.
+    const quote = (v: unknown) => `"${String(v).replace(/[\\"]/g, '\\$&')}"`
+    const nome = quote(cursor.nome)
+    const id = quote(cursor.id)
+    query = query.or(`nome.gt.${nome},and(nome.eq.${nome},id.gt.${id})`)
   }
 
   const { data, error, count } = await query.order('nome').order('id').limit(limit)

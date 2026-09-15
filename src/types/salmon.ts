@@ -1,6 +1,8 @@
 export interface SalmonEntry {
   id: string;
   date: string;
+  /** Validade do lote bruto (yyyy-MM-dd). Vazio = não informada (lote legado). */
+  expirationDate?: string;
   lot: string;
   sif: string;
   supplier: string;
@@ -47,6 +49,11 @@ export interface LotStock {
   supplier: string;
   supplierActive: boolean;
   entryDate: string;
+  /** Validade do lote bruto (yyyy-MM-dd); vazio quando não informada na entrada. */
+  expirationDate?: string;
+  /** Dias até a validade (negativo = vencido). undefined quando não há validade. */
+  daysToExpire?: number;
+  expirationStatus?: 'VENCIDO' | 'VENCE_EM_BREVE' | 'OK';
   entryGrossKg: number;
   entryTotalValue: number;
   costPerKgBruto: number;

@@ -11,20 +11,20 @@ import {
   LayoutDashboard, FolderTree, Landmark, Receipt,
   DollarSign, TrendingUp, LayoutGrid, Settings,
   Building2, RefreshCw, CreditCard, ArrowDownToLine, Activity, BarChart3,
-  Target, Bell
+  Target, Bell, ClipboardList
 } from 'lucide-react';
 import ContasPagarSection from '@/components/financeiro/ContasPagarSection';
 import ContasReceberSection from '@/components/financeiro/ContasReceberSection';
 import FluxoCaixaSection, { type FluxoNavigateParams } from '@/components/financeiro/FluxoCaixaSection';
 import DRESection from '@/components/financeiro/DRESection';
 import DFCSection from '@/components/financeiro/DFCSection';
-import DashboardFinanceiroSection from '@/components/financeiro/DashboardFinanceiroSection';
+import DashboardFinanceiroSection, { type DashboardNavigateParams } from '@/components/financeiro/DashboardFinanceiroSection';
 const OrcamentoSection = lazy(() => import('@/components/financeiro/OrcamentoSection'));
 const ConciliacaoBancariaSection = lazy(() => import('@/components/financeiro/ConciliacaoBancariaSection'));
 import AlertasSection from '@/components/financeiro/AlertasSection';
 import RecorrenciasSection from '@/components/financeiro/RecorrenciasSection';
 import CategorizacaoSection from '@/components/financeiro/CategorizacaoSection';
-const RelatorioSociosSection = lazy(() => import('@/components/financeiro/RelatorioSociosSection'));
+const BorderoSection = lazy(() => import('@/components/financeiro/BorderoSection'));
 const ApresentacaoSociosSection = lazy(() => import('@/components/financeiro/ApresentacaoSociosSection'));
 const ProjecaoFluxoSection = lazy(() => import('@/components/financeiro/ProjecaoFluxoSection'));
 const KPIsSection = lazy(() => import('@/components/financeiro/KPIsSection'));
@@ -37,7 +37,7 @@ import LivroRazaoSection from '@/components/financeiro/LivroRazaoSection';
 import PlanoContasFinSection from '@/components/financeiro/PlanoContasFinSection';
 import CentrosCustoFinSection from '@/components/financeiro/CentrosCustoFinSection';
 
-type FinSubTab = 'dashboard' | 'cadastros' | 'contas' | 'lancamentos' | 'pagar' | 'receber' | 'fluxo' | 'dre' | 'orcamento' | 'conciliacao' | 'alertas' | 'recorrencias' | 'categorizacao' | 'relatorio_socios' | 'apresentacao_socios' | 'projecao' | 'kpis' | 'auditoria' | 'comparativo' | 'fechamento';
+type FinSubTab = 'dashboard' | 'cadastros' | 'contas' | 'lancamentos' | 'pagar' | 'receber' | 'fluxo' | 'dre' | 'orcamento' | 'conciliacao' | 'alertas' | 'recorrencias' | 'categorizacao' | 'bordero' | 'apresentacao_socios' | 'projecao' | 'kpis' | 'auditoria' | 'comparativo' | 'fechamento';
 
 // DashboardFinanceiro extracted to src/components/financeiro/DashboardFinanceiroSection.tsx
 
@@ -65,7 +65,7 @@ function CadastrosBase() {
 // ContasBancarias extracted to src/components/financeiro/ContasBancariasSection.tsx
 
 // LancamentosSection wrapper - LivroRazaoSection extracted to src/components/financeiro/LivroRazaoSection.tsx
-function LancamentosSection({ initialContaId, initialDateFrom, initialDateTo }: { initialContaId?: string; initialDateFrom?: string; initialDateTo?: string }) {
+function LancamentosSection({ initialContaId, initialDateFrom, initialDateTo, initialTipo }: { initialContaId?: string; initialDateFrom?: string; initialDateTo?: string; initialTipo?: string }) {
   const [innerTab, setInnerTab] = useState<'razao' | 'conciliacao'>('razao');
   return (
     <div className="space-y-4">
@@ -73,7 +73,7 @@ function LancamentosSection({ initialContaId, initialDateFrom, initialDateTo }: 
         <Button variant={innerTab === 'razao' ? 'default' : 'outline'} size="sm" onClick={() => setInnerTab('razao')}>Livro Razão</Button>
         <Button variant={innerTab === 'conciliacao' ? 'default' : 'outline'} size="sm" onClick={() => setInnerTab('conciliacao')}>Conciliação Bancária</Button>
       </div>
-      {innerTab === 'razao' ? <LivroRazaoSection initialContaId={initialContaId} initialDateFrom={initialDateFrom} initialDateTo={initialDateTo} /> : <Suspense fallback={<FinSpinner />}><ConciliacaoBancariaSection /></Suspense>}
+      {innerTab === 'razao' ? <LivroRazaoSection initialContaId={initialContaId} initialDateFrom={initialDateFrom} initialDateTo={initialDateTo} initialTipo={initialTipo} /> : <Suspense fallback={<FinSpinner />}><ConciliacaoBancariaSection /></Suspense>}
     </div>
   );
 }
@@ -151,8 +151,8 @@ const TAB_REGISTRY_MAP: Record<FinSubTab, string> = {
   alertas: 'alertas',
   recorrencias: 'recorrencias',
   categorizacao: 'categorizacao',
-  relatorio_socios: 'relatorio-socios',
-  // As duas entradas compartilham o mesmo contrato RBAC durante a migração.
+  // Borderô (antigo Relatório Sócios) e Apresentação Sócios compartilham o mesmo contrato RBAC.
+  bordero: 'relatorio-socios',
   apresentacao_socios: 'relatorio-socios',
   projecao: 'projecao',
   kpis: 'kpis',
@@ -167,6 +167,9 @@ export default function FinanceiroView() {
   const [extratoContaId, setExtratoContaId] = useState<string | undefined>(undefined);
   const [fluxoDateFrom, setFluxoDateFrom] = useState<string | undefined>(undefined);
   const [fluxoDateTo, setFluxoDateTo] = useState<string | undefined>(undefined);
+  const [lancamentosInitialTipo, setLancamentosInitialTipo] = useState<string | undefined>(undefined);
+  const [pagarInitialStatus, setPagarInitialStatus] = useState<string | undefined>(undefined);
+  const [receberInitialStatus, setReceberInitialStatus] = useState<string | undefined>(undefined);
   const { visibleSubtabs } = useModuleAccess('financeiro');
   const location = useLocation();
   const navigate = useNavigate();
@@ -176,15 +179,16 @@ export default function FinanceiroView() {
   useEffect(() => {
     if (location.pathname.startsWith('/financeiro/apresentacao-socios')) {
       setActiveTab('apresentacao_socios');
-    } else if (location.pathname === '/financeiro/relatorio-socios') {
-      setActiveTab('relatorio_socios');
+    } else if (location.pathname === '/financeiro/bordero') {
+      setActiveTab('bordero');
     }
   }, [location.pathname, setActiveTab]);
 
   const handleTabSelect = useCallback((tab: FinSubTab) => {
-    const sociosRoute = location.pathname.startsWith('/financeiro/relatorio-socios')
+    const sociosRoute = location.pathname.startsWith('/financeiro/bordero')
+      || location.pathname.startsWith('/financeiro/relatorio-socios')
       || location.pathname.startsWith('/financeiro/apresentacao-socios');
-    if (tab === 'relatorio_socios') navigate('/financeiro/relatorio-socios');
+    if (tab === 'bordero') navigate('/financeiro/bordero');
     else if (tab === 'apresentacao_socios') navigate('/financeiro/apresentacao-socios');
     else if (sociosRoute) navigate('/');
     setActiveTab(tab);
@@ -213,13 +217,26 @@ export default function FinanceiroView() {
     setActiveTab(params.tab as FinSubTab);
   }, [setActiveTab]);
 
+  // Handle navigation from cards do Dashboard Financeiro, levando o filtro do card ao sub-módulo
+  const handleDashboardNavigate = useCallback((params: DashboardNavigateParams) => {
+    setFluxoDateFrom(params.dateFrom);
+    setFluxoDateTo(params.dateTo);
+    setLancamentosInitialTipo(params.tipo);
+    setPagarInitialStatus(params.tab === 'pagar' ? params.status : undefined);
+    setReceberInitialStatus(params.tab === 'receber' ? params.status : undefined);
+    setActiveTab(params.tab as FinSubTab);
+  }, [setActiveTab]);
+
   // Clear filters when navigating away
   useEffect(() => {
     if (activeTab !== 'lancamentos') {
       setExtratoContaId(undefined);
       setFluxoDateFrom(undefined);
       setFluxoDateTo(undefined);
+      setLancamentosInitialTipo(undefined);
     }
+    if (activeTab !== 'pagar') setPagarInitialStatus(undefined);
+    if (activeTab !== 'receber') setReceberInitialStatus(undefined);
   }, [activeTab]);
 
   const allTabs = useMemo<FinTab[]>(() => [
@@ -241,7 +258,7 @@ export default function FinanceiroView() {
     { id: 'orcamento',        label: 'Orçamento',            icon: Target,          group: 'relatorios' },
     { id: 'projecao',         label: 'Projeção',             icon: TrendingUp,      group: 'relatorios' },
     { id: 'kpis',             label: 'KPIs',                 icon: BarChart3,       group: 'relatorios' },
-    { id: 'relatorio_socios', label: 'Relatório Sócios',     icon: BarChart3,       group: 'relatorios' },
+    { id: 'bordero',          label: 'Borderô',              icon: ClipboardList,   group: 'relatorios' },
     { id: 'apresentacao_socios', label: 'Apresentação Sócios', icon: BarChart3,     group: 'relatorios' },
     { id: 'comparativo',      label: 'Comparativo',          icon: Activity,        group: 'relatorios' },
     { id: 'auditoria',        label: 'Auditoria',            icon: Building2,       group: 'relatorios' },
@@ -271,7 +288,9 @@ export default function FinanceiroView() {
 
   // If active tab is not visible, switch to first visible
   const effectiveTab = useMemo(() => {
-    if (tabs.some(t => t.id === activeTab)) return activeTab;
+    // Aba persistida antes do rename Relatório Sócios → Borderô.
+    const current = (activeTab as string) === 'relatorio_socios' ? 'bordero' : activeTab;
+    if (tabs.some(t => t.id === current)) return current;
     return tabs[0]?.id || 'dashboard';
   }, [tabs, activeTab]);
 
@@ -316,13 +335,13 @@ export default function FinanceiroView() {
       <ModuleNav items={moduleNavItems} value={effectiveTab} onChange={handleTabSelect} />
 
       {/* ── Conteúdo ── */}
-      {effectiveTab === 'dashboard' && <DashboardFinanceiroSection onNavigate={setActiveTab} />}
+      {effectiveTab === 'dashboard' && <DashboardFinanceiroSection onNavigate={handleDashboardNavigate} />}
       {effectiveTab === 'fechamento' && <FechamentoCaixaSection />}
       {effectiveTab === 'cadastros' && <CadastrosBase />}
       {effectiveTab === 'contas' && <ContasBancariasSection onNavigateExtrato={handleNavigateExtrato} />}
-      {effectiveTab === 'lancamentos' && <LancamentosSection initialContaId={extratoContaId} initialDateFrom={fluxoDateFrom} initialDateTo={fluxoDateTo} />}
-      {effectiveTab === 'pagar' && <ContasPagarSection />}
-      {effectiveTab === 'receber' && <ContasReceberSection />}
+      {effectiveTab === 'lancamentos' && <LancamentosSection initialContaId={extratoContaId} initialDateFrom={fluxoDateFrom} initialDateTo={fluxoDateTo} initialTipo={lancamentosInitialTipo} />}
+      {effectiveTab === 'pagar' && <ContasPagarSection initialStatus={pagarInitialStatus} />}
+      {effectiveTab === 'receber' && <ContasReceberSection initialStatus={receberInitialStatus} />}
       {effectiveTab === 'fluxo' && <FluxoCaixaSection onNavigate={handleFluxoNavigate} />}
       {effectiveTab === 'dre' && <DREDFCSection />}
       {effectiveTab === 'orcamento' && <Suspense fallback={<FinSpinner />}><OrcamentoSection /></Suspense>}
@@ -330,7 +349,7 @@ export default function FinanceiroView() {
       {effectiveTab === 'alertas' && <AlertasSection onNavigate={(t) => setActiveTab(t as FinSubTab)} />}
       {effectiveTab === 'recorrencias' && <RecorrenciasSection onNavigate={(t) => setActiveTab(t as FinSubTab)} />}
       {effectiveTab === 'categorizacao' && <CategorizacaoSection />}
-      {effectiveTab === 'relatorio_socios' && <Suspense fallback={<FinSpinner />}><RelatorioSociosSection /></Suspense>}
+      {effectiveTab === 'bordero' && <Suspense fallback={<FinSpinner />}><BorderoSection /></Suspense>}
       {effectiveTab === 'apresentacao_socios' && (
         <Suspense fallback={<FinSpinner />}>
           <ApresentacaoSociosSection

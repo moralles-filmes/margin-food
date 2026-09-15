@@ -15,6 +15,7 @@ import { formatInBR } from '@/lib/datetime';
 import { formatFixedBR } from '@/lib/formatters';
 
 import { useCan } from '@/permissions/hooks';
+import { sortByName } from '@/lib/sortByName';
 interface Colaborador {
   id: string;
   nome: string;
@@ -381,7 +382,7 @@ export default function FolhaPagamentoSection({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {folhas.map(f => {
+                  {sortByName(folhas, f => getColabNome(f.colaborador_id)).map(f => {
                     const status = STATUS_CONFIG[f.status] || STATUS_CONFIG.RASCUNHO;
                     return (
                       <TableRow key={f.id} className="cursor-pointer hover:bg-surface-hover" onClick={() => setSelectedFolha(f)}>

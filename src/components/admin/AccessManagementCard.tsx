@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Users, ShieldCheck, ShieldOff, History, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { parseUTCToBR } from '@/lib/datetime';
+import { sortByName } from '@/lib/sortByName';
 
 interface UserItem {
   id: string;
@@ -56,7 +57,7 @@ export default function AccessManagementCard() {
       if (error) {
         toast.error('Erro ao carregar usuários: ' + error.message);
       } else {
-        setUsers(data as UserItem[]);
+        setUsers(sortByName(data as UserItem[], u => u.name || u.email));
       }
     } catch (e: any) {
       toast.error(e?.message ?? String(e));

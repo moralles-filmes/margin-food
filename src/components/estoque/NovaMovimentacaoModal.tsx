@@ -115,7 +115,7 @@ export default function NovaMovimentacaoModal({
   const [setores, setSetores] = useState<string[]>([]);
   useEffect(() => {
     if (!open) return;
-    supabase.from('stock_sectors').select('name').eq('is_active', true).order('sort_order').order('name')
+    supabase.from('stock_sectors').select('name').eq('is_active', true).order('name')
       .then(({ data }) => setSetores((data || []).map((s: { name: string }) => s.name)));
   }, [open, supabase]);
 

@@ -19,8 +19,9 @@ import UserMentionSelect from '@/components/UserMentionSelect';
 import { todayBR } from '@/lib/datetime';
 
 import { useCan } from '@/permissions/hooks';
+import { sortByName } from '@/lib/sortByName';
 const DIAS = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
-const CATEGORIAS = ['Peixe', 'Oriental', 'Bebidas', 'Limpeza', 'Embalagens', 'Cozinha', 'Descartáveis', 'Proteínas', 'Hortifruti', 'Outros'];
+const CATEGORIAS = ['Bebidas', 'Cozinha', 'Descartáveis', 'Embalagens', 'Hortifruti', 'Limpeza', 'Oriental', 'Peixe', 'Proteínas', 'Outros'];
 
 interface Reminder {
   id: string;
@@ -338,7 +339,7 @@ export default function CalendarioLembretesView() {
             <div>
               <Label className="text-xs">Itens específicos (opcional)</Label>
               <div className="max-h-32 overflow-y-auto border rounded-lg p-2 mt-1 space-y-1">
-                {produtos.filter(p => p.ativo).slice(0, 50).map(p => (
+                {sortByName(produtos.filter(p => p.ativo), p => p.nomeProduto).slice(0, 50).map(p => (
                   <label key={p.id} className="flex items-start gap-2 text-[10px] cursor-pointer">
                     <input type="checkbox" checked={form.item_ids.includes(p.id)} onChange={() => toggleItem(p.id)} className="rounded mt-0.5 shrink-0" />
                     <span className="flex-1 min-w-0 break-words">{p.nomeProduto}</span>

@@ -29,6 +29,7 @@ import InventarioAuditView from './inventario/InventarioAuditView';
 import ExportListaContagemModal from './inventario/ExportListaContagemModal';
 import { narrowRows } from '@/lib/guards';
 import { includesNormalized } from '@/lib/utils';
+import { sortByName, sortNames } from '@/lib/sortByName';
 
 type SubView = 'list' | 'create' | 'detail' | 'dashboard' | 'audit' | 'conferentes' | 'rapido';
 
@@ -506,17 +507,17 @@ export default function InventarioView() {
   // ===== DETAIL VIEW =====
   if (subView === 'detail' && store.currentInventario) {
     const inv = store.currentInventario;
-    const itens = store.currentItens;
+    const itens = sortByName(store.currentItens, i => i.produtos?.nome_produto);
     const isFinalizado = inv.status === 'FINALIZADO';
     const isSobAnalise = inv.status === 'SOB_ANALISE';
 
-    const categoriaOptions = Array.from(
+    const categoriaOptions = sortNames(Array.from(
       new Set(itens.map(i => i.produtos?.categoria).filter(Boolean) as string[])
-    ).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    ));
 
-    const localOptions = Array.from(
+    const localOptions = sortNames(Array.from(
       new Set(itens.map(i => i.produtos?.local_estoque).filter(Boolean) as string[])
-    ).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    ));
 
     const filteredItems = itens.filter(i => {
       const nome = i.produtos?.nome_produto || '';
