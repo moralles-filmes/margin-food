@@ -7,6 +7,7 @@ import { resolveCompanyIdOrThrow } from '@/lib/tenant';
 import { narrowRows } from '@/lib/guards';
 import { normalizeSearchText } from '@/lib/utils';
 import { sortByName, sortNames } from '@/lib/sortByName';
+import { useCompanyId } from '@/hooks/useCompanyId';
 
 // ── DB → Frontend mappers ──
 
@@ -231,6 +232,7 @@ interface SaldoRow { produto_id: string; saldo: number }
 
 export function useEstoqueGeralStore() {
   const supabase = useSupabase();
+  const { companyId } = useCompanyId();
   const [produtos, setProdutos] = useState<ProdutoExtended[]>([]);
   const [movimentacoes, setMovimentacoes] = useState<MovimentacaoExtended[]>([]);
   const [loading, setLoading] = useState(true);
@@ -602,7 +604,7 @@ export function useEstoqueGeralStore() {
 
   // === Produto CRUD (DB) ===
   const addProduto = useCallback(async (p: ProdutoCreateInput) => {
-    await resolveCompanyIdOrThrow(supabase);
+    if (!companyId) throw new Error('Selecione uma unidade para cadastrar o produto.');
     let sku: string | null = p.sku || null;
     if (!sku) {
       const { data: skuData, error: skuError } = await supabase.rpc('generate_next_sku', { p_prefix: 'MP' });
@@ -617,6 +619,7 @@ export function useEstoqueGeralStore() {
     const { data, error } = await supabase
       .from('produtos')
       .insert({
+        company_id: companyId,
         nome_produto: p.nomeProduto,
         sku,
         categoria: p.categoria || 'Outros',
@@ -650,7 +653,7 @@ export function useEstoqueGeralStore() {
     fetchProdutoGlobalCounts();
     emitDataEvent('estoque:produtos');
     return newProd;
-  }, [fetchProdutoGlobalCounts, supabase]);
+  }, [companyId, fetchProdutoGlobalCounts, supabase]);
 
   const updateProduto = useCallback(async (id: string, updates: ProdutoUpdateInput) => {
     const dbUpdates: Record<string, unknown> = {};
@@ -700,15 +703,12 @@ export function useEstoqueGeralStore() {
   }, [fetchProdutoGlobalCounts, supabase]);
 
   const deleteProduto = useCallback(async (id: string) => {
-    const { data: updatedRows, error } = await supabase.from('produtos')
-      .update({ ativo: false })
-      .eq('id', id)
-      .select('id');
+    const { data: deactivatedId, error } = await supabase.rpc('deactivate_produto', { p_produto_id: id });
     if (error) {
-      console.error('[useEstoqueGeralStore.deleteProduto] update(ativo=false) error', error);
+      console.error('[useEstoqueGeralStore.deleteProduto] deactivate_produto error', error);
       throw error;
     }
-    if (!updatedRows || updatedRows.length === 0) {
+    if (deactivatedId !== id) {
       const notFoundError = new Error('Produto não encontrado ou você não tem permissão para excluí-lo.');
       console.error('[useEstoqueGeralStore.deleteProduto] no rows affected', { id });
       throw notFoundError;

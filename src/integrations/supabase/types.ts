@@ -10259,6 +10259,7 @@ export type Database = {
         Returns: undefined
       }
       generate_next_sku: { Args: { p_prefix?: string }; Returns: string }
+      deactivate_produto: { Args: { p_produto_id: string }; Returns: string }
       gerar_parcela_recorrente: {
         Args: { p_lancamento_pai_id: string }
         Returns: Json

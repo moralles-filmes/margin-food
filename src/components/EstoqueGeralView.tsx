@@ -269,6 +269,7 @@ export default function EstoqueGeralView() {
   // Toggle ativo/inativo
   const handleToggleAtivo = useCallback(async (p: ProdutoExtended) => {
     const newStatus = !p.ativo;
+    if (newStatus ? !canEditCatalogo : !canDeleteCatalogo) return;
     const ok = await confirm({
       title: newStatus ? 'Reativar produto' : 'Inativar produto',
       description: `Tem certeza que deseja ${newStatus ? 'reativar' : 'inativar'} "${p.nomeProduto}"?`,
@@ -276,11 +277,17 @@ export default function EstoqueGeralView() {
       variant: newStatus ? 'default' : 'destructive',
     });
     if (ok) {
-      await store.updateProduto(p.id, { ativo: newStatus });
-      toast.success(newStatus ? 'Produto reativado' : 'Produto inativado');
-      if (activeView === 'produtos') applyCatalogFilters(catalogSearchInput, catalogCatFilter);
+      try {
+        if (newStatus) await store.updateProduto(p.id, { ativo: true });
+        else await store.deleteProduto(p.id);
+        toast.success(newStatus ? 'Produto reativado' : 'Produto inativado');
+        if (activeView === 'produtos') applyCatalogFilters(catalogSearchInput, catalogCatFilter);
+      } catch (error) {
+        console.error('[EstoqueGeralView.handleToggleAtivo]', error);
+        toast.error('Não foi possível alterar o status do produto.');
+      }
     }
-  }, [confirm, store, activeView, applyCatalogFilters, catalogSearchInput, catalogCatFilter]);
+  }, [canEditCatalogo, canDeleteCatalogo, confirm, store, activeView, applyCatalogFilters, catalogSearchInput, catalogCatFilter]);
 
 
   // Filtered catalog products (stock filter is client-side since saldos are already loaded)
@@ -999,7 +1006,7 @@ export default function EstoqueGeralView() {
                               <button className="p-1.5 rounded-lg text-muted-foreground hover:bg-secondary"><MoreVertical className="w-3.5 h-3.5" /></button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="text-xs">
-                              {canEditCatalogo && (
+                              {(p.ativo ? canDeleteCatalogo : canEditCatalogo) && (
                                 <DropdownMenuItem onClick={() => handleToggleAtivo(p)} className="gap-2">
                                   {p.ativo ? <PowerOff className="w-3.5 h-3.5" /> : <Power className="w-3.5 h-3.5" />}
                                   {p.ativo ? 'Inativar' : 'Reativar'}
