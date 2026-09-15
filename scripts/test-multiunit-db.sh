@@ -16,7 +16,11 @@ cd "$project_root"
 createdb -h /tmp -p "$test_port" -U postgres "$test_database"
 run_sql() { psql -X -q -h /tmp -p "$test_port" -U postgres -d "$test_database" -v ON_ERROR_STOP=1 -f "$1"; }
 run_sql supabase/tests/fixtures/multiunit_postgres_prerequisites.sql
-run_sql "$schema_file"
+# O dump declara CREATE SCHEMA public, mas o banco novo já nasce com ele e as
+# extensões dos prerequisites moram lá — as extensões têm que vir antes porque
+# immutable_unaccent resolve 'public.unaccent'::regdictionary já no CREATE.
+grep -vFx -e 'CREATE SCHEMA public;' -e 'ALTER SCHEMA public OWNER TO postgres;' "$schema_file" |
+  psql -X -q -h /tmp -p "$test_port" -U postgres -d "$test_database" -v ON_ERROR_STOP=1 -f -
 run_sql supabase/tests/fixtures/multiunit_before.sql
 for migration in \
   20260909192644_company_memberships \
