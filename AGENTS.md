@@ -95,6 +95,7 @@ margin-food/
 - Apresentação Sócios usa escopo independente no parâmetro `presentationUnit`; queries, permissões, detalhes e exports herdam o provider local. Implantação e rollback: `docs/multi-unidades/02-ARQUITETURA-E-OPERACAO.md`.
 
 ### RLS (Row-Level Security)
+- RLS não protege `TRUNCATE` nem materialized views; clientes não recebem privilégios de DDL/manutenção, e caches globais ficam atrás de APIs autorizadas. Chaves de conflito de recursos por período incluem `company_id`.
 - **Catálogo: inativar é `deactivate_produto(uuid)`, reativar é edição** — `catalogo:delete` nunca autoriza UPDATE genérico/DELETE físico; não reabrir `recalc_product_costs` nem conceder create de catálogo ao operador de Salmão para liberar SKU (usa seu gate de entrada com prefixo SALM).
 - Tabelas novas exigem RLS e FORCE RLS; há exceções legadas no banco vivo, inventariadas em `docs/multi-unidades/03-AUDITORIA-POS-IMPLANTACAO.md`. FORCE RLS não protege contra funções de owner com BYPASSRLS.
 - `has_permission(user_id, key)` / `has_any_permission(user_id, keys[])` / `get_effective_permissions(user_id)` são as RPCs de checagem.
@@ -175,7 +176,7 @@ Todas as Edge Functions usam CORS compartilhado via `supabase/functions/_shared/
 - **Commits**: `tipo(escopo): descrição` — ex: `fix(estoque): corrige timeout no catálogo`.
 - **Idioma do código**: inglês para variáveis/funções, português para UI e comentários de negócio.
 - **Migrações**: novo arquivo em `supabase/migrations/` com timestamp `YYYYMMDDHHMMSS_nome.sql`.
-- **GRANTs obrigatórios em toda nova tabela**: `GRANT ALL ON TABLE public.<tabela> TO authenticated, service_role;` — sem isso o PostgREST nega SELECT direto do cliente mesmo com RLS permissiva (RPCs `SECURITY DEFINER` mascaram o problema; leitura direta falha em silêncio).
+- **GRANTs obrigatórios em toda nova tabela**: conceder a `authenticated` apenas o DML necessário (`SELECT, INSERT, UPDATE, DELETE`) e `ALL` a `service_role`; não usar `ALL` para clientes, pois inclui `TRUNCATE` e outros privilégios fora da RLS. Sem o GRANT de leitura, PostgREST nega SELECT mesmo com policy permissiva.
 - **Aplicação de migrations**: preferir `supabase db push` (registra `version` = nome do arquivo). O CLI v2.75 quebra qualquer migration com `CREATE FUNCTION` seguido de outro statement (ex.: `GRANT`) — nesse caso usar MCP `apply_migration` + `supabase migration repair`, **sempre na mesma sessão**: o MCP grava a versão com timestamp próprio (não o do nome do arquivo local), e sem o repair imediato o histórico do CLI diverge do arquivo local em silêncio — só aparece rodando `supabase migration list` (já aconteceu em 8 migrations sem ninguém notar). Repair de cada divergência: `supabase migration repair --status applied <versão do arquivo local> --yes` + `supabase migration repair --status reverted <versão gerada pelo MCP> --yes`.
 - **Alterar parâmetros de função `SECURITY DEFINER` já em produção**: `DROP FUNCTION IF EXISTS` da assinatura antiga antes do `CREATE OR REPLACE` — assinatura de parâmetros diferente cria overload, não substitui.
 - **Permissões novas**: adicionar em `src/permissions/registry.ts` + rodar `rpc_sync_permissions_from_registry()`.

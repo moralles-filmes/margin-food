@@ -1,0 +1,39 @@
+{
+  "before": {
+    "sources": 515,
+    "migrations": 861,
+    "liveAvailable": true,
+    "liveCapturedAt": "2026-09-15T23:27:40.069027+00:00",
+    "liveFunctions": 321,
+    "livePolicies": 595,
+    "edgeDeployedBodies": "unavailable-in-this-artifact; local source only",
+    "secretsOrPrivateRowsRead": false
+  },
+  "after": {
+    "sources": 517,
+    "migrations": 867,
+    "liveAvailable": true,
+    "liveCapturedAt": "2026-09-16T13:31:22.000971+00:00",
+    "liveFunctions": 356,
+    "livePolicies": 595,
+    "edgeDeployedBodies": "unavailable-in-this-artifact; local source only",
+    "secretsOrPrivateRowsRead": false
+  },
+  "countsBefore": {
+    "VÁLIDA": 3214,
+    "LEGADA": 1602,
+    "FANTASMA": 688,
+    "NÃO ENCONTRADA": 1022,
+    "DIVERGENTE": 9,
+    "GLOBAL": 1657
+  },
+  "countsAfter": {
+    "VÁLIDA": 3302,
+    "LEGADA": 1674,
+    "FANTASMA": 717,
+    "NÃO ENCONTRADA": 1024,
+    "DIVERGENTE": 9,
+    "GLOBAL": 1714
+  },
+  "warning": "Classes são ocorrências, não vereditos; inclui novas migrations com guards que citam as expressões antigas. Corpos Edge publicados estão no artefato separado edge-sql-callers.json."
+}

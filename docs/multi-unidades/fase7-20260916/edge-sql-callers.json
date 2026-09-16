@@ -1,0 +1,1784 @@
+{
+  "scope": "Callers SQL somente. Não é auditoria da Fase 8.",
+  "edges": [
+    {
+      "slug": "admin-users",
+      "version": 32,
+      "sha256": "beac051bbd778dae235737c1f06443881761c8676382828a4ed3e78c38636791",
+      "files": [
+        {
+          "name": "functions/admin-users/index.ts",
+          "calls": [
+            {
+              "method": "rpc",
+              "target": "get_effective_permissions",
+              "line": 19
+            },
+            {
+              "method": "from",
+              "target": "admin_actions_log",
+              "line": 29
+            },
+            {
+              "method": "from",
+              "target": "company_memberships",
+              "line": 34
+            },
+            {
+              "method": "rpc",
+              "target": "admin_upsert_company_membership",
+              "line": 41
+            },
+            {
+              "method": "from",
+              "target": "profiles",
+              "line": 53
+            },
+            {
+              "method": "from",
+              "target": "company_memberships",
+              "line": 54
+            },
+            {
+              "method": "from",
+              "target": "company_memberships",
+              "line": 68
+            },
+            {
+              "method": "from",
+              "target": "user_roles",
+              "line": 71
+            },
+            {
+              "method": "from",
+              "target": "user_permissions",
+              "line": 72
+            },
+            {
+              "method": "from",
+              "target": "job_roles",
+              "line": 73
+            },
+            {
+              "method": "from",
+              "target": "profiles",
+              "line": 104
+            },
+            {
+              "method": "from",
+              "target": "job_roles",
+              "line": 127
+            },
+            {
+              "method": "from",
+              "target": "job_roles",
+              "line": 132
+            }
+          ],
+          "sensitiveSQLReferences": []
+        },
+        {
+          "name": "functions/_shared/cors.ts",
+          "calls": [],
+          "sensitiveSQLReferences": []
+        },
+        {
+          "name": "functions/_shared/company-scope.ts",
+          "calls": [
+            {
+              "method": "rpc",
+              "target": "assert_tenant",
+              "line": 10
+            }
+          ],
+          "sensitiveSQLReferences": []
+        },
+        {
+          "name": "functions/_shared/company-users.ts",
+          "calls": [
+            {
+              "method": "rpc",
+              "target": "find_auth_user_by_email",
+              "line": 14
+            },
+            {
+              "method": "rpc",
+              "target": "reserve_company_invitation",
+              "line": 22
+            },
+            {
+              "method": "rpc",
+              "target": "find_auth_user_by_email",
+              "line": 34
+            },
+            {
+              "method": "rpc",
+              "target": "admin_upsert_company_membership",
+              "line": 39
+            }
+          ],
+          "sensitiveSQLReferences": []
+        }
+      ]
+    },
+    {
+      "slug": "ai-chat",
+      "version": 9,
+      "sha256": "f69cc84332fb772248af091ac1e98ba041e47bb4d0ec5a1f0da97b71b8723fb7",
+      "files": [
+        {
+          "name": "functions/ai-chat/index.ts",
+          "calls": [
+            {
+              "method": "rpc",
+              "target": "has_permission",
+              "line": 135
+            },
+            {
+              "method": "from",
+              "target": "ai_logs",
+              "line": 154
+            },
+            {
+              "method": "from",
+              "target": "ai_logs",
+              "line": 191
+            },
+            {
+              "method": "from",
+              "target": "ai_logs",
+              "line": 237
+            },
+            {
+              "method": "from",
+              "target": "ai_logs",
+              "line": 268
+            },
+            {
+              "method": "from",
+              "target": "financeiro_fechamento_caixa",
+              "line": 381
+            },
+            {
+              "method": "from",
+              "target": "metas_cmv",
+              "line": 391
+            },
+            {
+              "method": "from",
+              "target": "produtos",
+              "line": 397
+            },
+            {
+              "method": "from",
+              "target": "movimentacoes_estoque",
+              "line": 406
+            },
+            {
+              "method": "from",
+              "target": "solic_compra_mercado",
+              "line": 431
+            },
+            {
+              "method": "from",
+              "target": "ficha_componentes",
+              "line": 441
+            },
+            {
+              "method": "from",
+              "target": "config_precificacao",
+              "line": 452
+            },
+            {
+              "method": "from",
+              "target": "inventarios",
+              "line": 460
+            },
+            {
+              "method": "from",
+              "target": "fin_lancamentos",
+              "line": 469
+            },
+            {
+              "method": "from",
+              "target": "fin_contas_pagar",
+              "line": 496
+            },
+            {
+              "method": "from",
+              "target": "fin_contas_receber",
+              "line": 504
+            },
+            {
+              "method": "from",
+              "target": "fin_contas",
+              "line": 512
+            },
+            {
+              "method": "from",
+              "target": "fin_orcamentos",
+              "line": 518
+            },
+            {
+              "method": "from",
+              "target": "rh_colaboradores",
+              "line": 527
+            },
+            {
+              "method": "from",
+              "target": "rh_banco_horas",
+              "line": 549
+            },
+            {
+              "method": "from",
+              "target": "rh_ferias_afastamentos",
+              "line": 561
+            },
+            {
+              "method": "from",
+              "target": "rh_treinamentos",
+              "line": 567
+            }
+          ],
+          "sensitiveSQLReferences": []
+        },
+        {
+          "name": "functions/_shared/company-scope.ts",
+          "calls": [
+            {
+              "method": "rpc",
+              "target": "assert_tenant",
+              "line": 10
+            }
+          ],
+          "sensitiveSQLReferences": []
+        },
+        {
+          "name": "functions/_shared/cors.ts",
+          "calls": [],
+          "sensitiveSQLReferences": []
+        }
+      ]
+    },
+    {
+      "slug": "inventario",
+      "version": 15,
+      "sha256": "df334230202613c86d8864c4382fee6aa8f6727fcf38d7a2cc4f8a6bdbf876ae",
+      "files": [
+        {
+          "name": "functions/inventario/index.ts",
+          "calls": [
+            {
+              "method": "rpc",
+              "target": "has_permission",
+              "line": 39
+            },
+            {
+              "method": "from",
+              "target": "user_roles",
+              "line": 58
+            },
+            {
+              "method": "from",
+              "target": "audit_inventario_log",
+              "line": 65
+            },
+            {
+              "method": "from",
+              "target": "inventarios",
+              "line": 84
+            },
+            {
+              "method": "from",
+              "target": "turnos",
+              "line": 126
+            },
+            {
+              "method": "from",
+              "target": "inventarios",
+              "line": 136
+            },
+            {
+              "method": "from",
+              "target": "inventario_itens",
+              "line": 137
+            },
+            {
+              "method": "from",
+              "target": "audit_inventario_log",
+              "line": 142
+            },
+            {
+              "method": "rpc",
+              "target": "create_inventory_atomic",
+              "line": 168
+            },
+            {
+              "method": "from",
+              "target": "inventarios",
+              "line": 184
+            },
+            {
+              "method": "from",
+              "target": "inventario_itens",
+              "line": 188
+            },
+            {
+              "method": "from",
+              "target": "inventarios",
+              "line": 207
+            },
+            {
+              "method": "from",
+              "target": "inventarios",
+              "line": 212
+            },
+            {
+              "method": "from",
+              "target": "inventario_itens",
+              "line": 226
+            },
+            {
+              "method": "from",
+              "target": "inventario_itens",
+              "line": 257
+            },
+            {
+              "method": "from",
+              "target": "inventarios",
+              "line": 281
+            },
+            {
+              "method": "from",
+              "target": "inventario_itens",
+              "line": 285
+            },
+            {
+              "method": "from",
+              "target": "inventarios",
+              "line": 303
+            },
+            {
+              "method": "from",
+              "target": "inventarios",
+              "line": 317
+            },
+            {
+              "method": "rpc",
+              "target": "finalize_inventory_atomic",
+              "line": 332
+            },
+            {
+              "method": "from",
+              "target": "inventario_itens",
+              "line": 342
+            },
+            {
+              "method": "from",
+              "target": "inventarios",
+              "line": 398
+            },
+            {
+              "method": "from",
+              "target": "audit_log",
+              "line": 405
+            },
+            {
+              "method": "from",
+              "target": "inventarios",
+              "line": 433
+            },
+            {
+              "method": "from",
+              "target": "inventarios",
+              "line": 436
+            },
+            {
+              "method": "from",
+              "target": "inventarios",
+              "line": 453
+            },
+            {
+              "method": "from",
+              "target": "produtos",
+              "line": 456
+            },
+            {
+              "method": "from",
+              "target": "inventario_itens",
+              "line": 459
+            },
+            {
+              "method": "from",
+              "target": "movimentacoes_estoque",
+              "line": 470
+            },
+            {
+              "method": "from",
+              "target": "inventarios",
+              "line": 491
+            },
+            {
+              "method": "from",
+              "target": "inventario_itens",
+              "line": 509
+            },
+            {
+              "method": "from",
+              "target": "inventario_itens",
+              "line": 517
+            },
+            {
+              "method": "from",
+              "target": "inventario_itens",
+              "line": 533
+            },
+            {
+              "method": "from",
+              "target": "profiles",
+              "line": 538
+            },
+            {
+              "method": "rpc",
+              "target": "reopen_inventory",
+              "line": 569
+            },
+            {
+              "method": "rpc",
+              "target": "soft_delete_inventory",
+              "line": 591
+            },
+            {
+              "method": "from",
+              "target": "audit_inventario_log",
+              "line": 608
+            },
+            {
+              "method": "from",
+              "target": "inventario_conferentes",
+              "line": 621
+            },
+            {
+              "method": "from",
+              "target": "profiles",
+              "line": 629
+            },
+            {
+              "method": "from",
+              "target": "company_memberships",
+              "line": 648
+            },
+            {
+              "method": "from",
+              "target": "inventario_conferentes",
+              "line": 651
+            },
+            {
+              "method": "from",
+              "target": "inventario_conferentes",
+              "line": 672
+            },
+            {
+              "method": "from",
+              "target": "inventario_conferentes",
+              "line": 675
+            },
+            {
+              "method": "from",
+              "target": "inventarios",
+              "line": 690
+            },
+            {
+              "method": "from",
+              "target": "inventario_conferentes",
+              "line": 695
+            },
+            {
+              "method": "from",
+              "target": "inventarios",
+              "line": 699
+            },
+            {
+              "method": "from",
+              "target": "notifications",
+              "line": 706
+            }
+          ],
+          "sensitiveSQLReferences": []
+        },
+        {
+          "name": "functions/_shared/company-scope.ts",
+          "calls": [
+            {
+              "method": "rpc",
+              "target": "assert_tenant",
+              "line": 10
+            }
+          ],
+          "sensitiveSQLReferences": []
+        },
+        {
+          "name": "functions/_shared/cors.ts",
+          "calls": [],
+          "sensitiveSQLReferences": []
+        }
+      ]
+    },
+    {
+      "slug": "check-password",
+      "version": 8,
+      "sha256": "20d1d0558eac3627c7521efe47532d298310d31257d5e8812364cf09156e657f",
+      "files": [
+        {
+          "name": "functions/check-password/index.ts",
+          "calls": [],
+          "sensitiveSQLReferences": []
+        },
+        {
+          "name": "functions/_shared/company-scope.ts",
+          "calls": [
+            {
+              "method": "rpc",
+              "target": "assert_tenant",
+              "line": 10
+            }
+          ],
+          "sensitiveSQLReferences": []
+        },
+        {
+          "name": "functions/_shared/cors.ts",
+          "calls": [],
+          "sensitiveSQLReferences": []
+        }
+      ]
+    },
+    {
+      "slug": "purchase-requisitions",
+      "version": 10,
+      "sha256": "12b9ec51451add1cd015ffa065129dc3042550f72a5e36bfc91b187ae833b67c",
+      "files": [
+        {
+          "name": "functions/purchase-requisitions/index.ts",
+          "calls": [
+            {
+              "method": "rpc",
+              "target": "has_permission",
+              "line": 33
+            },
+            {
+              "method": "rpc",
+              "target": "has_permission",
+              "line": 41
+            },
+            {
+              "method": "from",
+              "target": "user_roles",
+              "line": 50
+            },
+            {
+              "method": "from",
+              "target": "purchase_requisitions",
+              "line": 122
+            },
+            {
+              "method": "from",
+              "target": "profiles",
+              "line": 134
+            },
+            {
+              "method": "from",
+              "target": "purchase_requisitions",
+              "line": 161
+            },
+            {
+              "method": "from",
+              "target": "purchase_requisition_audit",
+              "line": 169
+            },
+            {
+              "method": "from",
+              "target": "profiles",
+              "line": 178
+            },
+            {
+              "method": "from",
+              "target": "profiles",
+              "line": 190
+            },
+            {
+              "method": "from",
+              "target": "purchase_requisitions",
+              "line": 219
+            },
+            {
+              "method": "from",
+              "target": "purchase_requisition_items",
+              "line": 245
+            },
+            {
+              "method": "from",
+              "target": "purchase_requisition_audit",
+              "line": 251
+            },
+            {
+              "method": "from",
+              "target": "purchase_requisitions",
+              "line": 272
+            },
+            {
+              "method": "from",
+              "target": "purchase_requisitions",
+              "line": 291
+            },
+            {
+              "method": "from",
+              "target": "purchase_requisition_items",
+              "line": 303
+            },
+            {
+              "method": "from",
+              "target": "purchase_requisition_items",
+              "line": 308
+            },
+            {
+              "method": "from",
+              "target": "purchase_requisitions",
+              "line": 313
+            },
+            {
+              "method": "from",
+              "target": "purchase_requisition_audit",
+              "line": 317
+            },
+            {
+              "method": "from",
+              "target": "purchase_requisition_items",
+              "line": 347
+            },
+            {
+              "method": "from",
+              "target": "purchase_requisition_items",
+              "line": 351
+            },
+            {
+              "method": "from",
+              "target": "purchase_requisition_items",
+              "line": 355
+            },
+            {
+              "method": "from",
+              "target": "purchase_requisitions",
+              "line": 360
+            },
+            {
+              "method": "from",
+              "target": "purchase_requisition_audit",
+              "line": 363
+            },
+            {
+              "method": "from",
+              "target": "purchase_requisitions",
+              "line": 385
+            },
+            {
+              "method": "from",
+              "target": "purchase_requisition_audit",
+              "line": 389
+            }
+          ],
+          "sensitiveSQLReferences": []
+        },
+        {
+          "name": "functions/_shared/company-scope.ts",
+          "calls": [
+            {
+              "method": "rpc",
+              "target": "assert_tenant",
+              "line": 10
+            }
+          ],
+          "sensitiveSQLReferences": []
+        },
+        {
+          "name": "functions/_shared/cors.ts",
+          "calls": [],
+          "sensitiveSQLReferences": []
+        }
+      ]
+    },
+    {
+      "slug": "requisicao-estoque",
+      "version": 14,
+      "sha256": "4aa1a03e851549c6322e6ba432063c0087944c51b06db23f9e4f8a2aed529445",
+      "files": [
+        {
+          "name": "functions/requisicao-estoque/index.ts",
+          "calls": [
+            {
+              "method": "rpc",
+              "target": "has_permission",
+              "line": 100
+            },
+            {
+              "method": "rpc",
+              "target": "audit_log_write",
+              "line": 142
+            },
+            {
+              "method": "from",
+              "target": "movimentacoes_estoque",
+              "line": 223
+            },
+            {
+              "method": "from",
+              "target": "inventarios",
+              "line": 237
+            },
+            {
+              "method": "from",
+              "target": "movimentacoes_estoque",
+              "line": 272
+            },
+            {
+              "method": "from",
+              "target": "movimentacoes_estoque",
+              "line": 312
+            },
+            {
+              "method": "from",
+              "target": "movimentacoes_estoque",
+              "line": 324
+            },
+            {
+              "method": "from",
+              "target": "inventarios",
+              "line": 336
+            },
+            {
+              "method": "from",
+              "target": "movimentacoes_estoque",
+              "line": 351
+            },
+            {
+              "method": "from",
+              "target": "movimentacoes_estoque",
+              "line": 378
+            },
+            {
+              "method": "from",
+              "target": "salmon_entries",
+              "line": 400
+            },
+            {
+              "method": "from",
+              "target": "salmon_manipulations",
+              "line": 408
+            },
+            {
+              "method": "from",
+              "target": "produtos",
+              "line": 455
+            },
+            {
+              "method": "rpc",
+              "target": "get_saldo_produto",
+              "line": 479
+            },
+            {
+              "method": "from",
+              "target": "requisicoes_estoque",
+              "line": 498
+            },
+            {
+              "method": "from",
+              "target": "requisicao_estoque_itens",
+              "line": 523
+            },
+            {
+              "method": "from",
+              "target": "produtos",
+              "line": 543
+            },
+            {
+              "method": "from",
+              "target": "requisicao_estoque_itens",
+              "line": 554
+            },
+            {
+              "method": "from",
+              "target": "alertas_falta_estoque",
+              "line": 584
+            },
+            {
+              "method": "rpc",
+              "target": "compute_requisicao_status_agregado",
+              "line": 628
+            },
+            {
+              "method": "from",
+              "target": "requisicoes_estoque",
+              "line": 644
+            },
+            {
+              "method": "from",
+              "target": "requisicoes_estoque",
+              "line": 655
+            },
+            {
+              "method": "from",
+              "target": "notifications",
+              "line": 679
+            },
+            {
+              "method": "rpc",
+              "target": "attend_requisicao_item_atomic",
+              "line": 710
+            },
+            {
+              "method": "from",
+              "target": "requisicoes_estoque",
+              "line": 747
+            },
+            {
+              "method": "from",
+              "target": "requisicao_estoque_itens",
+              "line": 757
+            },
+            {
+              "method": "from",
+              "target": "requisicao_estoque_itens",
+              "line": 769
+            },
+            {
+              "method": "from",
+              "target": "requisicoes_estoque",
+              "line": 859
+            },
+            {
+              "method": "from",
+              "target": "produtos",
+              "line": 881
+            },
+            {
+              "method": "from",
+              "target": "alertas_falta_estoque",
+              "line": 899
+            },
+            {
+              "method": "from",
+              "target": "requisicao_estoque_itens",
+              "line": 981
+            },
+            {
+              "method": "from",
+              "target": "requisicoes_estoque",
+              "line": 994
+            },
+            {
+              "method": "from",
+              "target": "requisicoes_estoque",
+              "line": 1027
+            },
+            {
+              "method": "from",
+              "target": "requisicoes_estoque",
+              "line": 1042
+            },
+            {
+              "method": "from",
+              "target": "notifications",
+              "line": 1050
+            },
+            {
+              "method": "from",
+              "target": "requisicoes_estoque",
+              "line": 1069
+            },
+            {
+              "method": "from",
+              "target": "requisicoes_estoque",
+              "line": 1092
+            },
+            {
+              "method": "from",
+              "target": "requisicao_estoque_itens",
+              "line": 1134
+            },
+            {
+              "method": "from",
+              "target": "requisicoes_estoque",
+              "line": 1147
+            },
+            {
+              "method": "from",
+              "target": "requisicoes_estoque",
+              "line": 1158
+            },
+            {
+              "method": "from",
+              "target": "produtos",
+              "line": 1184
+            },
+            {
+              "method": "rpc",
+              "target": "get_saldo_produto",
+              "line": 1192
+            }
+          ],
+          "sensitiveSQLReferences": []
+        },
+        {
+          "name": "functions/_shared/company-scope.ts",
+          "calls": [
+            {
+              "method": "rpc",
+              "target": "assert_tenant",
+              "line": 10
+            }
+          ],
+          "sensitiveSQLReferences": []
+        },
+        {
+          "name": "functions/_shared/cors.ts",
+          "calls": [],
+          "sensitiveSQLReferences": []
+        },
+        {
+          "name": "functions/requisicao-estoque/stock-reversal.ts",
+          "calls": [],
+          "sensitiveSQLReferences": []
+        }
+      ]
+    },
+    {
+      "slug": "cmv",
+      "version": 10,
+      "sha256": "9a21b79cd79af3ebab068741326f29feba01c1da4a4afd6ca088c4dbc2101626",
+      "files": [
+        {
+          "name": "functions/cmv/index.ts",
+          "calls": [
+            {
+              "method": "rpc",
+              "target": "has_permission",
+              "line": 59
+            },
+            {
+              "method": "from",
+              "target": "produtos",
+              "line": 127
+            },
+            {
+              "method": "from",
+              "target": "produtos",
+              "line": 163
+            },
+            {
+              "method": "from",
+              "target": "financeiro_fechamento_caixa",
+              "line": 174
+            },
+            {
+              "method": "from",
+              "target": "movimentacoes_estoque",
+              "line": 183
+            },
+            {
+              "method": "from",
+              "target": "inventario_itens",
+              "line": 225
+            },
+            {
+              "method": "from",
+              "target": "inventario_itens",
+              "line": 231
+            },
+            {
+              "method": "from",
+              "target": "financeiro_fechamento_caixa",
+              "line": 346
+            },
+            {
+              "method": "from",
+              "target": "financeiro_fechamento_caixa",
+              "line": 363
+            },
+            {
+              "method": "from",
+              "target": "metas_cmv",
+              "line": 382
+            },
+            {
+              "method": "from",
+              "target": "metas_cmv",
+              "line": 395
+            },
+            {
+              "method": "from",
+              "target": "movimentacoes_estoque",
+              "line": 424
+            },
+            {
+              "method": "from",
+              "target": "produtos",
+              "line": 433
+            },
+            {
+              "method": "from",
+              "target": "produtos",
+              "line": 490
+            },
+            {
+              "method": "from",
+              "target": "movimentacoes_estoque",
+              "line": 502
+            },
+            {
+              "method": "from",
+              "target": "produtos",
+              "line": 532
+            },
+            {
+              "method": "from",
+              "target": "produtos",
+              "line": 564
+            },
+            {
+              "method": "from",
+              "target": "movimentacoes_estoque",
+              "line": 590
+            },
+            {
+              "method": "from",
+              "target": "produtos",
+              "line": 613
+            },
+            {
+              "method": "rpc",
+              "target": "get_consumo_por_produto",
+              "line": 628
+            },
+            {
+              "method": "from",
+              "target": "movimentacoes_estoque",
+              "line": 647
+            }
+          ],
+          "sensitiveSQLReferences": []
+        },
+        {
+          "name": "functions/_shared/company-scope.ts",
+          "calls": [
+            {
+              "method": "rpc",
+              "target": "assert_tenant",
+              "line": 10
+            }
+          ],
+          "sensitiveSQLReferences": []
+        },
+        {
+          "name": "functions/_shared/cors.ts",
+          "calls": [],
+          "sensitiveSQLReferences": []
+        }
+      ]
+    },
+    {
+      "slug": "rh",
+      "version": 10,
+      "sha256": "acf1ee3ab4c1e959f82b1341bc25fd4e8c4aac4e88179a8674fcfaebde4ed8cc",
+      "files": [
+        {
+          "name": "functions/rh/index.ts",
+          "calls": [
+            {
+              "method": "rpc",
+              "target": "has_permission",
+              "line": 47
+            },
+            {
+              "method": "from",
+              "target": "rh_colaboradores",
+              "line": 64
+            },
+            {
+              "method": "from",
+              "target": "rh_ponto_registros",
+              "line": 82
+            },
+            {
+              "method": "from",
+              "target": "rh_banco_horas",
+              "line": 132
+            },
+            {
+              "method": "from",
+              "target": "rh_audit_log",
+              "line": 158
+            }
+          ],
+          "sensitiveSQLReferences": []
+        },
+        {
+          "name": "functions/_shared/company-scope.ts",
+          "calls": [
+            {
+              "method": "rpc",
+              "target": "assert_tenant",
+              "line": 10
+            }
+          ],
+          "sensitiveSQLReferences": []
+        },
+        {
+          "name": "functions/_shared/cors.ts",
+          "calls": [],
+          "sensitiveSQLReferences": []
+        }
+      ]
+    },
+    {
+      "slug": "ficha-tecnica",
+      "version": 11,
+      "sha256": "8ae014771f544d9305b585f2cef7738dbd9e4496e84d91f8dbfff56deb5a0a6e",
+      "files": [
+        {
+          "name": "functions/ficha-tecnica/index.ts",
+          "calls": [
+            {
+              "method": "rpc",
+              "target": "audit_log_write",
+              "line": 26
+            },
+            {
+              "method": "rpc",
+              "target": "has_permission",
+              "line": 77
+            },
+            {
+              "method": "rpc",
+              "target": "has_any_permission",
+              "line": 82
+            },
+            {
+              "method": "from",
+              "target": "ficha_componentes",
+              "line": 87
+            },
+            {
+              "method": "from",
+              "target": "ficha_componentes",
+              "line": 138
+            },
+            {
+              "method": "from",
+              "target": "ficha_componentes",
+              "line": 145
+            },
+            {
+              "method": "from",
+              "target": "ficha_componentes",
+              "line": 174
+            },
+            {
+              "method": "from",
+              "target": "canais_venda",
+              "line": 197
+            },
+            {
+              "method": "from",
+              "target": "canais_venda",
+              "line": 213
+            },
+            {
+              "method": "from",
+              "target": "config_precificacao",
+              "line": 281
+            },
+            {
+              "method": "from",
+              "target": "ficha_componentes",
+              "line": 371
+            },
+            {
+              "method": "from",
+              "target": "ficha_componente_itens",
+              "line": 378
+            },
+            {
+              "method": "from",
+              "target": "produtos",
+              "line": 385
+            },
+            {
+              "method": "from",
+              "target": "ficha_componentes",
+              "line": 467
+            },
+            {
+              "method": "from",
+              "target": "ficha_componentes",
+              "line": 482
+            },
+            {
+              "method": "from",
+              "target": "ficha_componentes",
+              "line": 524
+            },
+            {
+              "method": "from",
+              "target": "ficha_componentes",
+              "line": 532
+            },
+            {
+              "method": "rpc",
+              "target": "ficha_salvar_componente_itens_atomic",
+              "line": 543
+            },
+            {
+              "method": "from",
+              "target": "ficha_componente_itens",
+              "line": 564
+            },
+            {
+              "method": "from",
+              "target": "ficha_componentes",
+              "line": 572
+            },
+            {
+              "method": "from",
+              "target": "ficha_componentes",
+              "line": 591
+            },
+            {
+              "method": "from",
+              "target": "ficha_componentes",
+              "line": 634
+            },
+            {
+              "method": "from",
+              "target": "ficha_componente_itens",
+              "line": 638
+            },
+            {
+              "method": "from",
+              "target": "produtos",
+              "line": 644
+            },
+            {
+              "method": "from",
+              "target": "ficha_componentes",
+              "line": 653
+            },
+            {
+              "method": "from",
+              "target": "canais_venda",
+              "line": 701
+            },
+            {
+              "method": "from",
+              "target": "canais_venda",
+              "line": 708
+            },
+            {
+              "method": "from",
+              "target": "canais_venda",
+              "line": 715
+            },
+            {
+              "method": "from",
+              "target": "canais_venda",
+              "line": 725
+            },
+            {
+              "method": "from",
+              "target": "ficha_componentes",
+              "line": 744
+            },
+            {
+              "method": "from",
+              "target": "canais_venda",
+              "line": 749
+            },
+            {
+              "method": "from",
+              "target": "precificacao_canal",
+              "line": 753
+            },
+            {
+              "method": "from",
+              "target": "precificacao_canal",
+              "line": 770
+            },
+            {
+              "method": "from",
+              "target": "ficha_componentes",
+              "line": 775
+            },
+            {
+              "method": "from",
+              "target": "ficha_componentes",
+              "line": 823
+            },
+            {
+              "method": "from",
+              "target": "precificacao_canal",
+              "line": 841
+            },
+            {
+              "method": "from",
+              "target": "ficha_componentes",
+              "line": 882
+            },
+            {
+              "method": "from",
+              "target": "cenarios_simulacao",
+              "line": 886
+            },
+            {
+              "method": "from",
+              "target": "ficha_componentes",
+              "line": 903
+            },
+            {
+              "method": "from",
+              "target": "ficha_componentes",
+              "line": 919
+            },
+            {
+              "method": "from",
+              "target": "config_precificacao",
+              "line": 943
+            },
+            {
+              "method": "from",
+              "target": "config_precificacao",
+              "line": 960
+            },
+            {
+              "method": "from",
+              "target": "config_precificacao",
+              "line": 977
+            },
+            {
+              "method": "from",
+              "target": "config_precificacao",
+              "line": 991
+            }
+          ],
+          "sensitiveSQLReferences": [
+            {
+              "line": 543,
+              "text": "  const { data, error } = await userClient.rpc('ficha_salvar_componente_itens_atomic', {"
+            }
+          ]
+        },
+        {
+          "name": "functions/_shared/company-scope.ts",
+          "calls": [
+            {
+              "method": "rpc",
+              "target": "assert_tenant",
+              "line": 10
+            }
+          ],
+          "sensitiveSQLReferences": []
+        },
+        {
+          "name": "functions/_shared/cors.ts",
+          "calls": [],
+          "sensitiveSQLReferences": []
+        }
+      ]
+    },
+    {
+      "slug": "admin-companies",
+      "version": 11,
+      "sha256": "bab1714730d66d532588f252a4de63885f1019282b5cf282cba49cfd5920561b",
+      "files": [
+        {
+          "name": "functions/admin-companies/index.ts",
+          "calls": [
+            {
+              "method": "rpc",
+              "target": "has_permission",
+              "line": 34
+            },
+            {
+              "method": "from",
+              "target": "companies",
+              "line": 57
+            }
+          ],
+          "sensitiveSQLReferences": []
+        },
+        {
+          "name": "functions/_shared/company-users.ts",
+          "calls": [
+            {
+              "method": "rpc",
+              "target": "find_auth_user_by_email",
+              "line": 14
+            },
+            {
+              "method": "rpc",
+              "target": "reserve_company_invitation",
+              "line": 22
+            },
+            {
+              "method": "rpc",
+              "target": "find_auth_user_by_email",
+              "line": 34
+            },
+            {
+              "method": "rpc",
+              "target": "admin_upsert_company_membership",
+              "line": 39
+            }
+          ],
+          "sensitiveSQLReferences": []
+        },
+        {
+          "name": "functions/_shared/company-scope.ts",
+          "calls": [
+            {
+              "method": "rpc",
+              "target": "assert_tenant",
+              "line": 10
+            }
+          ],
+          "sensitiveSQLReferences": []
+        },
+        {
+          "name": "functions/_shared/cors.ts",
+          "calls": [],
+          "sensitiveSQLReferences": []
+        }
+      ]
+    },
+    {
+      "slug": "scheduled-jobs",
+      "version": 7,
+      "sha256": "e70b6bf47eec1df55dd9a45760a71cdf8f447ca24e36913fe42315a334a8e5da",
+      "files": [
+        {
+          "name": "user_fn_wuzxpbixprrgssoeeaez_ba34b74b-b3eb-47e9-8116-2aa3eedf41f8_7/source/index.ts",
+          "calls": [
+            {
+              "method": "rpc",
+              "target": "refresh_materialized_views",
+              "line": 39
+            },
+            {
+              "method": "rpc",
+              "target": "cleanup_old_audit_logs",
+              "line": 44
+            },
+            {
+              "method": "from",
+              "target": "audit_logs",
+              "line": 49
+            }
+          ],
+          "sensitiveSQLReferences": []
+        },
+        {
+          "name": "user_fn_wuzxpbixprrgssoeeaez_ba34b74b-b3eb-47e9-8116-2aa3eedf41f8_7/_shared/cors.ts",
+          "calls": [],
+          "sensitiveSQLReferences": []
+        }
+      ]
+    },
+    {
+      "slug": "admin-create-user",
+      "version": 6,
+      "sha256": "9da8c84e0495ae75cacfd520fcb23762b90917eab9db2cbf1fb79008f444f68d",
+      "files": [
+        {
+          "name": "functions/admin-create-user/index.ts",
+          "calls": [
+            {
+              "method": "rpc",
+              "target": "has_permission",
+              "line": 34
+            }
+          ],
+          "sensitiveSQLReferences": []
+        },
+        {
+          "name": "functions/_shared/company-users.ts",
+          "calls": [
+            {
+              "method": "rpc",
+              "target": "find_auth_user_by_email",
+              "line": 14
+            },
+            {
+              "method": "rpc",
+              "target": "reserve_company_invitation",
+              "line": 22
+            },
+            {
+              "method": "rpc",
+              "target": "find_auth_user_by_email",
+              "line": 34
+            },
+            {
+              "method": "rpc",
+              "target": "admin_upsert_company_membership",
+              "line": 39
+            }
+          ],
+          "sensitiveSQLReferences": []
+        },
+        {
+          "name": "functions/_shared/company-scope.ts",
+          "calls": [
+            {
+              "method": "rpc",
+              "target": "assert_tenant",
+              "line": 10
+            }
+          ],
+          "sensitiveSQLReferences": []
+        },
+        {
+          "name": "functions/_shared/cors.ts",
+          "calls": [],
+          "sensitiveSQLReferences": []
+        }
+      ]
+    },
+    {
+      "slug": "rbac-lint",
+      "version": 6,
+      "sha256": "e2cea0024ca37021f4f8bbe3c5e547dd5b7f42c4da0c1f292f686826086ea36e",
+      "files": [
+        {
+          "name": "functions/rbac-lint/index.ts",
+          "calls": [
+            {
+              "method": "rpc",
+              "target": "admin_has_permission",
+              "line": 47
+            },
+            {
+              "method": "rpc",
+              "target": "rbac_sql_lint_report_quick",
+              "line": 61
+            }
+          ],
+          "sensitiveSQLReferences": []
+        },
+        {
+          "name": "functions/_shared/company-scope.ts",
+          "calls": [
+            {
+              "method": "rpc",
+              "target": "assert_tenant",
+              "line": 10
+            }
+          ],
+          "sensitiveSQLReferences": []
+        },
+        {
+          "name": "functions/_shared/cors.ts",
+          "calls": [],
+          "sensitiveSQLReferences": []
+        }
+      ]
+    },
+    {
+      "slug": "rbac-lint-quick",
+      "version": 6,
+      "sha256": "770028b3413cbe0474b1617993817fd005527aacf09a406ed15d6570d22bc121",
+      "files": [
+        {
+          "name": "functions/rbac-lint-quick/index.ts",
+          "calls": [
+            {
+              "method": "rpc",
+              "target": "admin_has_permission",
+              "line": 47
+            },
+            {
+              "method": "rpc",
+              "target": "rbac_sql_lint_report_quick",
+              "line": 61
+            }
+          ],
+          "sensitiveSQLReferences": []
+        },
+        {
+          "name": "functions/_shared/company-scope.ts",
+          "calls": [
+            {
+              "method": "rpc",
+              "target": "assert_tenant",
+              "line": 10
+            }
+          ],
+          "sensitiveSQLReferences": []
+        },
+        {
+          "name": "functions/_shared/cors.ts",
+          "calls": [],
+          "sensitiveSQLReferences": []
+        }
+      ]
+    },
+    {
+      "slug": "rbac-lint-full",
+      "version": 6,
+      "sha256": "e0ccebeb6b67c1cfc5110f335d55357339f511d187041d83941fece37f048d17",
+      "files": [
+        {
+          "name": "functions/rbac-lint-full/index.ts",
+          "calls": [
+            {
+              "method": "rpc",
+              "target": "admin_has_permission",
+              "line": 47
+            },
+            {
+              "method": "rpc",
+              "target": "rbac_sql_lint_report_admin",
+              "line": 61
+            }
+          ],
+          "sensitiveSQLReferences": []
+        },
+        {
+          "name": "functions/_shared/company-scope.ts",
+          "calls": [
+            {
+              "method": "rpc",
+              "target": "assert_tenant",
+              "line": 10
+            }
+          ],
+          "sensitiveSQLReferences": []
+        },
+        {
+          "name": "functions/_shared/cors.ts",
+          "calls": [],
+          "sensitiveSQLReferences": []
+        }
+      ]
+    },
+    {
+      "slug": "send-whatsapp-zapi",
+      "version": 5,
+      "sha256": "7ca435f3f03b188d8ec8f0517759636b221e1af354fd43bcbdd4fef23291e728",
+      "files": [
+        {
+          "name": "functions/send-whatsapp-zapi/index.ts",
+          "calls": [
+            {
+              "method": "rpc",
+              "target": "has_permission",
+              "line": 71
+            },
+            {
+              "method": "from",
+              "target": "cotacoes",
+              "line": 135
+            },
+            {
+              "method": "from",
+              "target": "cotacao_zapi_config",
+              "line": 144
+            },
+            {
+              "method": "from",
+              "target": "cotacao_whatsapp_logs",
+              "line": 182
+            },
+            {
+              "method": "from",
+              "target": "cotacao_fornecedores",
+              "line": 201
+            }
+          ],
+          "sensitiveSQLReferences": []
+        },
+        {
+          "name": "functions/_shared/company-scope.ts",
+          "calls": [
+            {
+              "method": "rpc",
+              "target": "assert_tenant",
+              "line": 10
+            }
+          ],
+          "sensitiveSQLReferences": []
+        },
+        {
+          "name": "functions/_shared/cors.ts",
+          "calls": [],
+          "sensitiveSQLReferences": []
+        }
+      ]
+    },
+    {
+      "slug": "cotacao-ia",
+      "version": 4,
+      "sha256": "b6067da96c980e6507283ef781950fc7a784feed40ce67482df3b31315b1c1de",
+      "files": [
+        {
+          "name": "functions/cotacao-ia/index.ts",
+          "calls": [
+            {
+              "method": "rpc",
+              "target": "has_permission",
+              "line": 63
+            },
+            {
+              "method": "from",
+              "target": "cotacao_ia_config",
+              "line": 147
+            },
+            {
+              "method": "from",
+              "target": "cotacoes",
+              "line": 159
+            },
+            {
+              "method": "from",
+              "target": "cotacao_itens",
+              "line": 164
+            },
+            {
+              "method": "from",
+              "target": "cotacao_fornecedores",
+              "line": 165
+            },
+            {
+              "method": "from",
+              "target": "cotacao_respostas",
+              "line": 172
+            }
+          ],
+          "sensitiveSQLReferences": []
+        },
+        {
+          "name": "functions/_shared/company-scope.ts",
+          "calls": [
+            {
+              "method": "rpc",
+              "target": "assert_tenant",
+              "line": 10
+            }
+          ],
+          "sensitiveSQLReferences": []
+        },
+        {
+          "name": "functions/_shared/cors.ts",
+          "calls": [],
+          "sensitiveSQLReferences": []
+        }
+      ]
+    }
+  ]
+}

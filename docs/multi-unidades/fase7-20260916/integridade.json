@@ -1,0 +1,1770 @@
+{
+  "counts": [
+    {
+      "rows": 6,
+      "tenants": 3,
+      "relation": "admin_actions_log",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "ai_insights",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 2,
+      "tenants": 2,
+      "relation": "ai_logs",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "ai_score_historico",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 35,
+      "tenants": 2,
+      "relation": "alertas_falta_estoque",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": null,
+      "relation": "app_config",
+      "placeholder": null,
+      "tenant_null": null
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "aprovacoes_solic_compra_mercado",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 1160,
+      "tenants": 2,
+      "relation": "audit_inventario_log",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 114,
+      "tenants": null,
+      "relation": "audit_log",
+      "placeholder": null,
+      "tenant_null": null
+    },
+    {
+      "rows": 37339,
+      "tenants": 3,
+      "relation": "audit_logs",
+      "placeholder": 0,
+      "tenant_null": 35811
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "canais_venda",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "cenarios_simulacao",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "cmv_cache",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 4,
+      "tenants": null,
+      "relation": "companies",
+      "placeholder": null,
+      "tenant_null": null
+    },
+    {
+      "rows": 19,
+      "tenants": 3,
+      "relation": "company_memberships",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 1,
+      "tenants": 1,
+      "relation": "config_precificacao",
+      "placeholder": 1,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "confirmacoes_recebimento",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 2,
+      "tenants": 1,
+      "relation": "cotacao_fornecedores",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "cotacao_ia_config",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 2,
+      "tenants": 1,
+      "relation": "cotacao_itens",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "cotacao_respostas",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "cotacao_sugestoes",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "cotacao_whatsapp_logs",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "cotacao_zapi_config",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 1,
+      "tenants": 1,
+      "relation": "cotacoes",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": null,
+      "relation": "dashboard_cache",
+      "placeholder": null,
+      "tenant_null": null
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "faturamento_periodos_legacy",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "faturamento_periodos_legacy_bkp_reset_20260301",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "ficha_componente_itens",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "ficha_componentes",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 5382,
+      "tenants": 3,
+      "relation": "fin_audit_logs",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 270,
+      "tenants": 3,
+      "relation": "fin_categorias",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 8,
+      "tenants": 1,
+      "relation": "fin_centros_custo",
+      "placeholder": 8,
+      "tenant_null": 0
+    },
+    {
+      "rows": 43,
+      "tenants": 1,
+      "relation": "fin_conciliacao_ignoradas",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 3225,
+      "tenants": 1,
+      "relation": "fin_conciliacao_vinculos",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 1,
+      "tenants": 1,
+      "relation": "fin_config",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 13,
+      "tenants": 3,
+      "relation": "fin_contas",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 717,
+      "tenants": 2,
+      "relation": "fin_contas_pagar",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "fin_contas_pagar_bkp_reset_20260301",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "fin_contas_receber",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "fin_contas_receber_bkp_reset_20260301",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 13,
+      "tenants": 3,
+      "relation": "fin_contas_saldo_cache",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 12,
+      "tenants": 1,
+      "relation": "fin_dre_linhas",
+      "placeholder": 12,
+      "tenant_null": 0
+    },
+    {
+      "rows": 3521,
+      "tenants": 2,
+      "relation": "fin_lancamento_rateios",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 3648,
+      "tenants": 2,
+      "relation": "fin_lancamentos",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "fin_lancamentos_bkp_reset_20260301",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "fin_orcamentos",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 1,
+      "tenants": 1,
+      "relation": "fin_plano_contas",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "fin_presentation_agenda_items",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "fin_presentation_decision_actions",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "fin_presentation_decision_revisions",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "fin_presentation_decisions",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "fin_presentation_minutes_revisions",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "fin_presentation_session_participants",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "fin_presentation_sessions",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "fin_rateios",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "fin_regras_categorizacao",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 31,
+      "tenants": 1,
+      "relation": "financeiro_fechamento_caixa",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "financeiro_fechamento_caixa_bkp_reset_20260301",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 186,
+      "tenants": 1,
+      "relation": "financeiro_fechamento_marca_valores",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 6,
+      "tenants": 1,
+      "relation": "financeiro_fechamento_marcas",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": null,
+      "relation": "integration_logs",
+      "placeholder": null,
+      "tenant_null": null
+    },
+    {
+      "rows": 2,
+      "tenants": 2,
+      "relation": "inventario_conferentes",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 5834,
+      "tenants": 2,
+      "relation": "inventario_itens",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "inventario_itens_bkp_reset_20260301",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 22,
+      "tenants": 2,
+      "relation": "inventarios",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "inventarios_bkp_reset_20260301",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 23,
+      "tenants": 2,
+      "relation": "job_roles",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 5,
+      "tenants": 2,
+      "relation": "listas_fixas_setor",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 71,
+      "tenants": 2,
+      "relation": "listas_fixas_setor_itens",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "metas_cmv",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 2655,
+      "tenants": 2,
+      "relation": "movimentacoes_estoque",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "movimentacoes_estoque_bkp_reset_20260301",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 9,
+      "tenants": 2,
+      "relation": "notifications",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 14384,
+      "tenants": null,
+      "relation": "permissions",
+      "placeholder": null,
+      "tenant_null": null
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "planning_metas_compra",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "precificacao_canal",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 628,
+      "tenants": 4,
+      "relation": "produtos",
+      "placeholder": 1,
+      "tenant_null": 0
+    },
+    {
+      "rows": 1,
+      "tenants": 1,
+      "relation": "produtos_bkp_reset_20260301",
+      "placeholder": 1,
+      "tenant_null": 0
+    },
+    {
+      "rows": 15,
+      "tenants": 3,
+      "relation": "profiles",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "purchase_ignored_rules",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 9,
+      "tenants": 1,
+      "relation": "purchase_order_items",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "purchase_order_items_bkp_reset_20260301",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 3,
+      "tenants": 1,
+      "relation": "purchase_orders",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "purchase_orders_bkp_reset_20260301",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "purchase_reminders",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "purchase_requisition_audit",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "purchase_requisition_items",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "purchase_requisitions",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 136,
+      "tenants": 3,
+      "relation": "rbac_legacy_usage",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "recebimento_itens",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "recebimento_itens_bkp_reset_20260301",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "recebimentos",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "recebimentos_bkp_reset_20260301",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 43,
+      "tenants": 2,
+      "relation": "requisicao_estoque_itens",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 13,
+      "tenants": 2,
+      "relation": "requisicoes_estoque",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "rh_audit_log",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "rh_banco_horas",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "rh_beneficios",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "rh_colaboradores",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "rh_comunicados",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "rh_custos_mensais",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "rh_disponibilidade",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "rh_documentos",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "rh_epis",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "rh_escala_slots",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "rh_escalas",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "rh_exames",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "rh_ferias_afastamentos",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "rh_ferias_saldo",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "rh_folha_pagamento",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "rh_incidentes",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "rh_ocorrencias_disciplinares",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "rh_onboarding",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "rh_ponto_ajustes",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "rh_ponto_registros",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "rh_progresso_treinamento",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "rh_tarefas",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "rh_trilhas_treinamento",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "rh_trocas_turno",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 43123,
+      "tenants": null,
+      "relation": "role_permissions",
+      "placeholder": null,
+      "tenant_null": null
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "salmon_auditorias_compra",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 1,
+      "tenants": 1,
+      "relation": "salmon_config",
+      "placeholder": 1,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "salmon_daily_records",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "salmon_daily_records_bkp_reset_20260301",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 5,
+      "tenants": 2,
+      "relation": "salmon_entries",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "salmon_entries_bkp_reset_20260301",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 3,
+      "tenants": 2,
+      "relation": "salmon_manipulations",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "salmon_manipulations_bkp_reset_20260301",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "salmon_metas_provisionadas",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "salmon_purchase_targets",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 1,
+      "tenants": null,
+      "relation": "security_risk_register",
+      "placeholder": null,
+      "tenant_null": null
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "solic_compra_mercado",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "solic_compra_mercado_bkp_reset_20260301",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "solic_compra_mercado_item",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "solicitacoes_compra",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 51,
+      "tenants": 3,
+      "relation": "stock_categories",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 18,
+      "tenants": 3,
+      "relation": "stock_locations",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 28,
+      "tenants": 3,
+      "relation": "stock_sectors",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 7,
+      "tenants": 4,
+      "relation": "stock_sku_counter",
+      "placeholder": 2,
+      "tenant_null": 0
+    },
+    {
+      "rows": 4,
+      "tenants": 2,
+      "relation": "supplier_item_prices",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 54,
+      "tenants": 2,
+      "relation": "suppliers",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "suppliers_bkp_reset_20260301",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": 0,
+      "relation": "system_bugs",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 15,
+      "tenants": 4,
+      "relation": "turnos",
+      "placeholder": 3,
+      "tenant_null": 0
+    },
+    {
+      "rows": 16,
+      "tenants": null,
+      "relation": "unidades_medida",
+      "placeholder": null,
+      "tenant_null": null
+    },
+    {
+      "rows": 29065,
+      "tenants": 3,
+      "relation": "user_permissions",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 19,
+      "tenants": 3,
+      "relation": "user_roles",
+      "placeholder": 0,
+      "tenant_null": 0
+    },
+    {
+      "rows": 0,
+      "tenants": null,
+      "relation": "z_canary_test",
+      "placeholder": null,
+      "tenant_null": null
+    }
+  ],
+  "captured_at": "2026-09-16T13:33:56.188815+00:00",
+  "foreign_keys": [
+    {
+      "orphans": 0,
+      "relation": "alertas_falta_estoque.alertas_falta_estoque_produto_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 35
+    },
+    {
+      "orphans": 0,
+      "relation": "alertas_falta_estoque.alertas_falta_estoque_requisicao_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 35
+    },
+    {
+      "orphans": 0,
+      "relation": "aprovacoes_solic_compra_mercado.aprovacoes_solic_compra_mercado_solicitacao_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "audit_inventario_log.audit_inventario_log_inventario_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 1160
+    },
+    {
+      "orphans": 0,
+      "relation": "cenarios_simulacao.cenarios_simulacao_componente_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "company_memberships.company_memberships_job_role_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 5
+    },
+    {
+      "orphans": 0,
+      "relation": "company_memberships.company_memberships_user_id_fkey",
+      "cross_tenant": 4,
+      "references_present": 19
+    },
+    {
+      "orphans": 0,
+      "relation": "confirmacoes_recebimento.confirmacoes_recebimento_recebimento_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "confirmacoes_recebimento.confirmacoes_recebimento_solicitacao_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "cotacao_fornecedores.cotacao_fornecedores_cotacao_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 2
+    },
+    {
+      "orphans": 0,
+      "relation": "cotacao_fornecedores.cotacao_fornecedores_supplier_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 2
+    },
+    {
+      "orphans": 0,
+      "relation": "cotacao_itens.cotacao_itens_cotacao_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 2
+    },
+    {
+      "orphans": 0,
+      "relation": "cotacao_itens.cotacao_itens_produto_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 2
+    },
+    {
+      "orphans": 0,
+      "relation": "cotacao_respostas.cotacao_respostas_cotacao_fornecedor_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "cotacao_respostas.cotacao_respostas_cotacao_item_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "cotacao_sugestoes.cotacao_sugestoes_cotacao_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "cotacao_whatsapp_logs.cotacao_whatsapp_logs_cotacao_fornecedor_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "cotacao_whatsapp_logs.cotacao_whatsapp_logs_cotacao_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "ficha_componente_itens.ficha_componente_itens_componente_pai_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "ficha_componente_itens.ficha_componente_itens_produto_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "fin_categorias.fin_categorias_centro_custo_padrao_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "fin_categorias.fin_categorias_parent_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 249
+    },
+    {
+      "orphans": 0,
+      "relation": "fin_categorias.fin_categorias_plano_contas_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "fin_conciliacao_ignoradas.fin_conciliacao_ignoradas_conta_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 43
+    },
+    {
+      "orphans": 0,
+      "relation": "fin_conciliacao_ignoradas.fin_conciliacao_ignoradas_lancamento_origem_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 20
+    },
+    {
+      "orphans": 0,
+      "relation": "fin_conciliacao_vinculos.fin_conciliacao_vinculos_conta_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 3225
+    },
+    {
+      "orphans": 0,
+      "relation": "fin_conciliacao_vinculos.fin_conciliacao_vinculos_lancamento_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 3225
+    },
+    {
+      "orphans": 0,
+      "relation": "fin_contas_pagar.fin_contas_pagar_categoria_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 643
+    },
+    {
+      "orphans": 0,
+      "relation": "fin_contas_pagar.fin_contas_pagar_centro_custo_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "fin_contas_pagar.fin_contas_pagar_conta_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 642
+    },
+    {
+      "orphans": 0,
+      "relation": "fin_contas_pagar.fin_contas_pagar_lancamento_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 156
+    },
+    {
+      "orphans": 0,
+      "relation": "fin_contas_pagar.fin_contas_pagar_lancamento_pai_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 105
+    },
+    {
+      "orphans": 0,
+      "relation": "fin_contas_pagar.fin_contas_pagar_plano_contas_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "fin_contas_pagar.fin_contas_pagar_supplier_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 351
+    },
+    {
+      "orphans": 0,
+      "relation": "fin_contas_receber.fin_contas_receber_categoria_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "fin_contas_receber.fin_contas_receber_centro_custo_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "fin_contas_receber.fin_contas_receber_conta_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "fin_contas_receber.fin_contas_receber_lancamento_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "fin_contas_receber.fin_contas_receber_lancamento_pai_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "fin_contas_receber.fin_contas_receber_plano_contas_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "fin_contas_receber.fin_contas_receber_supplier_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "fin_contas_saldo_cache.fin_contas_saldo_cache_conta_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 13
+    },
+    {
+      "orphans": 0,
+      "relation": "fin_lancamento_rateios.fin_lancamento_rateios_categoria_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 3519
+    },
+    {
+      "orphans": 0,
+      "relation": "fin_lancamento_rateios.fin_lancamento_rateios_centro_custo_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "fin_lancamentos.fin_lancamentos_categoria_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 3564
+    },
+    {
+      "orphans": 0,
+      "relation": "fin_lancamentos.fin_lancamentos_centro_custo_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "fin_lancamentos.fin_lancamentos_conta_destino_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 40
+    },
+    {
+      "orphans": 0,
+      "relation": "fin_lancamentos.fin_lancamentos_conta_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 3647
+    },
+    {
+      "orphans": 0,
+      "relation": "fin_lancamentos.fin_lancamentos_lancamento_pai_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "fin_lancamentos.fin_lancamentos_plano_contas_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "fin_orcamentos.fin_orcamentos_categoria_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "fin_plano_contas.fin_plano_contas_pai_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "fin_presentation_agenda_items.fin_presentation_agenda_items_session_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "fin_presentation_decision_actions.fin_presentation_decision_actions_decision_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "fin_presentation_decision_revisions.fin_presentation_decision_revisions_decision_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "fin_presentation_decisions.fin_presentation_decisions_current_revision_fk",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "fin_presentation_minutes_revisions.fin_presentation_minutes_revisions_session_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "fin_presentation_session_participants.fin_presentation_session_participants_session_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "fin_presentation_sessions.fin_presentation_sessions_current_revision_fk",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "fin_presentation_sessions.fin_presentation_sessions_previous_session_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "fin_rateios.fin_rateios_centro_custo_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "fin_rateios.fin_rateios_lancamento_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "fin_regras_categorizacao.fin_regras_categorizacao_categoria_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "fin_regras_categorizacao.fin_regras_categorizacao_centro_custo_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "financeiro_fechamento_marca_valores.financeiro_fechamento_marca_valores_fechamento_fk",
+      "cross_tenant": 0,
+      "references_present": 186
+    },
+    {
+      "orphans": 0,
+      "relation": "financeiro_fechamento_marca_valores.financeiro_fechamento_marca_valores_marca_fk",
+      "cross_tenant": 0,
+      "references_present": 186
+    },
+    {
+      "orphans": 0,
+      "relation": "financeiro_fechamento_marcas.financeiro_fechamento_marcas_categoria_fk",
+      "cross_tenant": 0,
+      "references_present": 6
+    },
+    {
+      "orphans": 0,
+      "relation": "inventario_itens.inventario_itens_inventario_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 5834
+    },
+    {
+      "orphans": 0,
+      "relation": "inventario_itens.inventario_itens_produto_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 5834
+    },
+    {
+      "orphans": 0,
+      "relation": "inventarios.inventarios_turno_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 22
+    },
+    {
+      "orphans": 0,
+      "relation": "listas_fixas_setor_itens.listas_fixas_setor_itens_lista_fixa_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 71
+    },
+    {
+      "orphans": 0,
+      "relation": "listas_fixas_setor_itens.listas_fixas_setor_itens_produto_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 71
+    },
+    {
+      "orphans": 0,
+      "relation": "movimentacoes_estoque.fk_mov_estorno",
+      "cross_tenant": 0,
+      "references_present": 30
+    },
+    {
+      "orphans": 0,
+      "relation": "movimentacoes_estoque.fk_mov_produto",
+      "cross_tenant": 0,
+      "references_present": 2655
+    },
+    {
+      "orphans": 0,
+      "relation": "precificacao_canal.precificacao_canal_canal_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "precificacao_canal.precificacao_canal_componente_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "profiles.profiles_job_role_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 3
+    },
+    {
+      "orphans": 0,
+      "relation": "purchase_ignored_rules.purchase_ignored_rules_produto_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "purchase_order_items.purchase_order_items_order_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 9
+    },
+    {
+      "orphans": 0,
+      "relation": "purchase_order_items.purchase_order_items_stock_item_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 9
+    },
+    {
+      "orphans": 0,
+      "relation": "purchase_requisition_audit.purchase_requisition_audit_requisition_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "purchase_requisition_items.purchase_requisition_items_produto_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "purchase_requisition_items.purchase_requisition_items_requisition_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "recebimento_itens.recebimento_itens_item_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "recebimento_itens.recebimento_itens_produto_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "recebimento_itens.recebimento_itens_recebimento_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "recebimentos.recebimentos_solicitacao_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "requisicao_estoque_itens.requisicao_estoque_itens_produto_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 43
+    },
+    {
+      "orphans": 0,
+      "relation": "requisicao_estoque_itens.requisicao_estoque_itens_requisicao_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 43
+    },
+    {
+      "orphans": 0,
+      "relation": "rh_banco_horas.rh_banco_horas_colaborador_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "rh_beneficios.rh_beneficios_colaborador_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "rh_disponibilidade.rh_disponibilidade_colaborador_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "rh_documentos.rh_documentos_colaborador_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "rh_epis.rh_epis_colaborador_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "rh_escala_slots.rh_escala_slots_colaborador_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "rh_escala_slots.rh_escala_slots_escala_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "rh_exames.rh_exames_colaborador_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "rh_ferias_afastamentos.rh_ferias_afastamentos_colaborador_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "rh_ferias_saldo.rh_ferias_saldo_colaborador_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "rh_folha_pagamento.rh_folha_pagamento_colaborador_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "rh_incidentes.rh_incidentes_colaborador_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "rh_ocorrencias_disciplinares.rh_ocorrencias_disciplinares_colaborador_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "rh_onboarding.rh_onboarding_colaborador_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "rh_onboarding.rh_onboarding_mentor_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "rh_ponto_ajustes.rh_ponto_ajustes_ponto_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "rh_ponto_registros.rh_ponto_registros_colaborador_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "rh_progresso_treinamento.rh_progresso_treinamento_colaborador_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "rh_progresso_treinamento.rh_progresso_treinamento_trilha_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "rh_tarefas.rh_tarefas_responsavel_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "rh_trocas_turno.rh_trocas_turno_slot_original_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "rh_trocas_turno.rh_trocas_turno_solicitante_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "rh_trocas_turno.rh_trocas_turno_substituto_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "salmon_entries.salmon_entries_supplier_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "salmon_manipulations.salmon_manipulations_entry_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 3
+    },
+    {
+      "orphans": 0,
+      "relation": "solic_compra_mercado_item.solic_compra_mercado_item_produto_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "solic_compra_mercado_item.solic_compra_mercado_item_solicitacao_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "solicitacoes_compra.solicitacoes_compra_produto_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 0
+    },
+    {
+      "orphans": 0,
+      "relation": "supplier_item_prices.supplier_item_prices_stock_item_id_fkey",
+      "cross_tenant": 0,
+      "references_present": 4
+    },
+    {
+      "orphans": 0,
+      "relation": "user_permissions.user_permissions_membership_fk",
+      "cross_tenant": 0,
+      "references_present": 29065
+    },
+    {
+      "orphans": 0,
+      "relation": "user_roles.user_roles_membership_fk",
+      "cross_tenant": 0,
+      "references_present": 19
+    }
+  ]
+}

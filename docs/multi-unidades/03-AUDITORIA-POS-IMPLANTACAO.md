@@ -252,7 +252,7 @@ A numeração abaixo é a deste trabalho; agrupa as 20 frentes do pedido origina
 | 4 | RPCs de Salmão, funções internas e grants | Implementada e ensaiada localmente; publicação pendente ([resultados](fase4-20260915/RESULTADOS.md)) |
 | 5 | Fornecedores e preço por item | Implementada e ensaiada localmente; publicação pendente ([resultados](fase5-20260915/RESULTADOS.md)) |
 | 6 | Produtos e inventário automático de permissões | Implementada e ensaiada localmente; publicação pendente ([resultados](fase6-20260915/RESULTADOS.md)) |
-| 7 | Todas as tabelas, INSERTs, RLS, views e SECURITY DEFINER | Classificação global/tenant, FKs/índices, guard/grant por função e testes reais dos achados |
+| 7 | Tabelas, INSERTs, RLS, views e SECURITY DEFINER | Inventário completo e correções ensaiadas localmente; aceite integral/publicação pendentes por dependências e contratos SQL residuais ([resultados](fase7-20260916/RESULTADOS.md)) |
 | 8 | Edges, Storage, Realtime, integrações e jobs | Tenant explícito/autorizado, revogação, isolamento de arquivos e canais e ausência de mistura em jobs |
 | 9 | Drift de schema/histórico | Diferenças explicadas, definições esperadas comparadas ao vivo e migration nova somente se necessária |
 | 10 | Frontend/cache e jornada multiunidade | A/B/multi/admin/global; troca, revogação, identidade existente e respostas atrasadas |
