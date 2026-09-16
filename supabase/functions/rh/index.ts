@@ -61,11 +61,12 @@ serve(withRequestCors(async (req) => {
       }
 
       // Get all active colaboradores — FILTERED BY TENANT
-      const { data: colabs } = await adminClient
+      const { data: colabs, error: colabsError } = await adminClient
         .from("rh_colaboradores")
         .select("*")
         .eq("company_id", companyId)
         .eq("status", "ativo");
+      if (colabsError) throw colabsError;
       if (!colabs || colabs.length === 0) {
         return jsonResp({ message: "Nenhum colaborador ativo" });
       }
@@ -77,9 +78,10 @@ serve(withRequestCors(async (req) => {
       const endDate = `${periodo}-${String(lastDay).padStart(2, '0')}`;
 
       const results = [];
+      const rowsToPersist = [];
 
       for (const colab of colabs) {
-        const { data: pontos } = await adminClient
+        const { data: pontos, error: pontosError } = await adminClient
           .from("rh_ponto_registros")
           .select("*")
           .eq("company_id", companyId)
@@ -87,6 +89,7 @@ serve(withRequestCors(async (req) => {
           .gte("data", startDate)
           .lte("data", endDate)
           .order("hora", { ascending: true });
+        if (pontosError) throw pontosError;
 
         const registros = pontos || [];
         
@@ -130,10 +133,8 @@ serve(withRequestCors(async (req) => {
         const bancoSaldo = horasTrabalhadas - horasEscaladas;
         const faltas = Math.max(0, diasUteisMes - diasTrabalhados);
 
-        const { error: upsertError } = await adminClient.from("rh_banco_horas").upsert({
+        rowsToPersist.push({
           colaborador_id: colab.id,
-          company_id: companyId,
-          periodo,
           horas_trabalhadas: Math.round(horasTrabalhadas * 10) / 10,
           horas_escaladas: Math.round(horasEscaladas * 10) / 10,
           horas_extras: Math.round(horasExtras * 10) / 10,
@@ -141,10 +142,7 @@ serve(withRequestCors(async (req) => {
           atrasos_min: atrasosTotalMin,
           faltas,
           dias_trabalhados: diasTrabalhados,
-          calculado_por: callerId,
-        }, { onConflict: "colaborador_id,periodo" });
-
-        if (upsertError) console.error("Upsert error:", upsertError);
+        });
 
         results.push({
           colaborador: colab.nome,
@@ -155,14 +153,12 @@ serve(withRequestCors(async (req) => {
         });
       }
 
-      // Audit — with tenant
-      await adminClient.from("rh_audit_log").insert({
-        acao: "calcular_banco_horas",
-        entidade: "banco_horas",
-        company_id: companyId,
-        depois: { periodo, resultados: results.length },
-        user_id: callerId,
+      // Persistência e auditoria compartilham a mesma transação no banco.
+      const { error: persistError } = await userClient.rpc("replace_rh_banco_horas_period_atomic", {
+        p_periodo: periodo,
+        p_rows: rowsToPersist,
       });
+      if (persistError) throw persistError;
 
       return jsonResp({ success: true, results });
     }

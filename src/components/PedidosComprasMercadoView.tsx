@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { includesNormalized, normalizeSearchText } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCan } from '@/permissions/hooks';
-import { PurchaseOrder, PurchaseOrderItem } from '@/hooks/usePurchaseOrdersStore';
+import { PurchaseOrder, PurchaseOrderItem, ReceivingDecision } from '@/hooks/usePurchaseOrdersStore';
 import { usePurchaseOrdersStoreContext } from '@/contexts/PurchaseOrdersStoreContext';
 import { useEstoqueGeralStoreContext } from '@/contexts/EstoqueGeralStoreContext';
 import { useSalmonStoreContext } from '@/contexts/SalmonStoreContext';
@@ -432,13 +432,25 @@ export default function PedidosComprasMercadoView() {
   const handleConfirmReceiving = async () => {
     if (!selectedOrder) return;
     const pendingItems = orderItems.filter(i => i.received_status === 'PENDING');
+    const decisions: ReceivingDecision[] = [];
     for (const item of pendingItems) {
       const r = receivingQtds[item.id];
       if (!r) { toast.error('Confira todos os itens'); return; }
-      await store.receiveItem(item.id, parseFloat(r.qty) || 0, r.status, r.reason);
+      const qty = r.status === 'NOT_DELIVERED' ? 0 : parseFloat(r.qty);
+      if (r.status === 'RECEIVED' && (!Number.isFinite(qty) || qty <= 0)) {
+        toast.error(`Informe uma quantidade válida para ${item.name_snapshot}`);
+        return;
+      }
+      decisions.push({
+        order_item_id: item.id,
+        status: r.status,
+        qty_received: qty || 0,
+        unit_cost: item.estimated_unit_value,
+        reason: r.reason || undefined,
+      });
     }
-    await store.confirmReceiving(selectedOrder.id);
-    setSelectedOrder(null);
+    const success = await store.confirmReceiving(selectedOrder.id, decisions);
+    if (success) setSelectedOrder(null);
   };
 
   const handleFinalizeItem = async (itemId: string) => {

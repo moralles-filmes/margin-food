@@ -1,5 +1,4 @@
-import { useSupabase } from '@/contexts/CompanyScopeContext';
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { fmtBRL } from '@/lib/money';
 import { ShoppingCart, Check, X, RefreshCw, Inbox, ChevronRight, Send, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -18,7 +17,6 @@ interface Props {
 
 export default function ShoppingChecklistView({ onNavigateToOrder }: Props) {
   const toast = useScopedToast();
-  const supabase = useSupabase();
   const { user } = useAuth();
   const store = usePurchaseOrdersStoreContext();
   const isAdmin = useCan('system:global:manage');
@@ -31,6 +29,7 @@ export default function ShoppingChecklistView({ onNavigateToOrder }: Props) {
   const [loadingItems, setLoadingItems] = useState(false);
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  const loadGenerationRef = useRef(0);
 
   // Filter: only MERCADO/SAZONAL orders where user is responsible and status is PENDING
   const myOrders = useMemo(() => {
@@ -44,8 +43,10 @@ export default function ShoppingChecklistView({ onNavigateToOrder }: Props) {
 
   const fetchItemsFn = store.fetchItems;
   const loadItems = useCallback(async (orderId: string) => {
+    const generation = ++loadGenerationRef.current;
     setLoadingItems(true);
     const data = await fetchItemsFn(orderId);
+    if (generation !== loadGenerationRef.current) return;
     setItems(data);
     const n: Record<string, string> = {};
     data.forEach(i => { n[i.id] = i.shopping_note || ''; });
@@ -58,7 +59,6 @@ export default function ShoppingChecklistView({ onNavigateToOrder }: Props) {
   }, [selectedOrderId, loadItems]);
 
   const handleMarkItem = async (itemId: string, status: 'OK' | 'NOT_AVAILABLE') => {
-    await store.updateShoppingItem(itemId, status, notes[itemId] || '');
     setItems(prev => prev.map(i => i.id === itemId ? { ...i, shopping_status: status, shopping_note: notes[itemId] || '' } : i));
   };
 
@@ -70,9 +70,13 @@ export default function ShoppingChecklistView({ onNavigateToOrder }: Props) {
       return;
     }
     setSubmitting(true);
-    await store.confirmShopping(selectedOrderId);
+    const success = await store.confirmShopping(selectedOrderId, items.map(item => ({
+      order_item_id: item.id,
+      shopping_status: item.shopping_status as 'OK' | 'NOT_AVAILABLE',
+      note: notes[item.id] || '',
+    })));
     setSubmitting(false);
-    setSelectedOrderId(null);
+    if (success) setSelectedOrderId(null);
   };
 
   const selectedOrder = myOrders.find(o => o.id === selectedOrderId);
@@ -168,8 +172,7 @@ export default function ShoppingChecklistView({ onNavigateToOrder }: Props) {
 
                   {item.shopping_status !== 'PENDING' && (
                     <Button size="sm" variant="ghost" className="h-7 px-2 text-[10px] text-muted-foreground"
-                      onClick={async () => {
-                        await supabase.from('purchase_order_items').update({ shopping_status: 'PENDING', shopping_note: '' }).eq('id', item.id);
+                      onClick={() => {
                         setItems(prev => prev.map(i => i.id === item.id ? { ...i, shopping_status: 'PENDING' as PurchaseOrderItem['shopping_status'], shopping_note: '' } : i));
                       }}>
                       Desfazer
@@ -186,7 +189,6 @@ export default function ShoppingChecklistView({ onNavigateToOrder }: Props) {
                         const val = e.target.value;
                         setNotes(prev => ({ ...prev, [item.id]: val }));
                       }}
-                      onBlur={() => store.updateShoppingItem(item.id, 'NOT_AVAILABLE', notes[item.id] || '')}
                       placeholder="Motivo (opcional)..."
                       className="text-xs h-7"
                     />

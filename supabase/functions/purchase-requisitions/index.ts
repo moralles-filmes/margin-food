@@ -114,6 +114,24 @@ serve(withRequestCors(async (req) => {
       });
     }
 
+    if (["criar", "editar", "ignorar_item", "converter"].includes(action)) {
+      const { data, error } = await supabaseUser.rpc("mutate_purchase_requisition_atomic", {
+        p_action: action,
+        p_payload: body,
+      });
+      if (error) throw error;
+
+      const messages: Record<string, string> = {
+        criar: "Requisição criada.",
+        editar: "Requisição atualizada.",
+        ignorar_item: "Item atualizado.",
+        converter: "Requisição convertida em pedido.",
+      };
+      return new Response(JSON.stringify({ ...data, mensagem: messages[action] }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // ========== LISTAR ==========
     if (action === "listar") {
       const { data, error } = await supabaseUser

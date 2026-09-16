@@ -462,19 +462,10 @@ export function useSalmonStore() {
       updated.pricePerKg = updated.grossKg > 0 ? updated.totalValue / updated.grossKg : 0;
     }
 
-    // Cancel old entry
-    const { error: cancelError } = await supabase.rpc('_salmon_cancel_entry_guarded' as any, {
+    // Cancelamento + recriação acontecem na mesma transação. Se a nova entrada
+    // falhar, o cancelamento anterior também é revertido pelo Postgres.
+    const { data: newData, error: replaceError } = await supabase.rpc('_salmon_replace_entry_guarded' as any, {
       p_entry_id: id,
-      p_reason: 'Edição de entrada',
-    });
-
-    if (cancelError) {
-      toast.error('Falha ao editar entrada: ' + cancelError.message, { duration: 6000 });
-      throw new Error(cancelError.message);
-    }
-
-    // Create new one
-    const { data: newData, error: createError } = await supabase.rpc('_salmon_create_entry_guarded' as any, {
       p_entry_date: updated.date,
       p_lot: updated.lot || '',
       p_sif: updated.sif || '',
@@ -487,10 +478,9 @@ export function useSalmonStore() {
       p_expiration_date: updated.expirationDate || null,
     });
 
-    if (createError) {
-      toast.error('Entrada cancelada mas falha ao recriar: ' + createError.message, { duration: 8000 });
-      setEntries(prev => prev.filter(e => e.id !== id));
-      throw new Error(createError.message);
+    if (replaceError) {
+      toast.error('Falha ao editar entrada: ' + replaceError.message, { duration: 8000 });
+      throw new Error(replaceError.message);
     }
 
     const result = newData as any;
@@ -563,18 +553,8 @@ export function useSalmonStore() {
   }, [supabase, emitDataEvent, toast]);
 
   const updateManipulation = useCallback(async (id: string, m: Omit<Manipulation, 'id' | 'createdAt' | 'lossKg' | 'lossPercent' | 'yieldKg' | 'yieldPercent' | 'perdaValor' | 'valorTotalBruto' | 'valorTotalLimpo'>) => {
-    // Cancel + recreate
-    const { error: cancelError } = await supabase.rpc('_salmon_cancel_manipulation_guarded' as any, {
+    const { data, error: replaceError } = await supabase.rpc('_salmon_replace_manipulation_guarded' as any, {
       p_manip_id: id,
-      p_reason: 'Edição de manipulação',
-    });
-
-    if (cancelError) {
-      toast.error('Falha ao editar manipulação: ' + cancelError.message, { duration: 6000 });
-      throw new Error(cancelError.message);
-    }
-
-    const { data, error: createError } = await supabase.rpc('_salmon_create_manipulation_guarded' as any, {
       p_entry_id: m.entryId,
       p_manipulation_date: m.date,
       p_fish_count: m.fishCount || 0,
@@ -584,10 +564,9 @@ export function useSalmonStore() {
       p_notes: '',
     });
 
-    if (createError) {
-      toast.error('Manipulação cancelada mas falha ao recriar: ' + createError.message, { duration: 8000 });
-      setManipulations(prev => prev.filter(x => x.id !== id));
-      throw new Error(createError.message);
+    if (replaceError) {
+      toast.error('Falha ao editar manipulação: ' + replaceError.message, { duration: 8000 });
+      throw new Error(replaceError.message);
     }
 
     const result = data as any;

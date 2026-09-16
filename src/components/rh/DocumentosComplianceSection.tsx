@@ -45,6 +45,7 @@ interface Documento {
   dias_alerta_antes: number;
   uploaded_by: string;
   created_at: string;
+  storage_state: 'ACTIVE' | 'PENDING_UPLOAD' | 'DELETING';
 }
 
 interface Props {
@@ -104,7 +105,7 @@ export default function DocumentosComplianceSection({
   const fetchData = useCallback(async (p = 0, append = false) => {
     if (!append) setLoading(true);
     try {
-      const { data, error } = await supabase.from('rh_documentos').select('id, colaborador_id, tipo, nome, descricao, arquivo_path, arquivo_nome, arquivo_tamanho, data_emissao, data_vencimento, status, obrigatorio, alertar_vencimento, dias_alerta_antes, uploaded_by, created_at').order('created_at', { ascending: false })
+      const { data, error } = await supabase.from('rh_documentos').select('id, colaborador_id, tipo, nome, descricao, arquivo_path, arquivo_nome, arquivo_tamanho, data_emissao, data_vencimento, status, obrigatorio, alertar_vencimento, dias_alerta_antes, uploaded_by, created_at, storage_state').order('created_at', { ascending: false })
         .range(p * PAGE_SIZE, (p + 1) * PAGE_SIZE - 1);
       if (error) throw error;
       const newItems = (data || []) as Documento[];
@@ -134,29 +135,29 @@ export default function DocumentosComplianceSection({
   };
 
   const handleUpload = async () => {
+    if (!companyId || !user) {
+      toast.error('Unidade ou usuário não identificado'); return;
+    }
     if (!form.colaborador_id || !form.nome.trim()) {
       toast.error('Preencha colaborador e nome do documento'); return;
     }
 
     setUploading(true);
     try {
+      const documentId = crypto.randomUUID();
       let arquivo_path: string | null = null;
       let arquivo_nome = '';
       let arquivo_tamanho = 0;
 
       if (selectedFile) {
         const ext = selectedFile.name.split('.').pop();
-        const path = `${form.colaborador_id}/${Date.now()}_${form.tipo}.${ext}`;
-        const { error: uploadError } = await supabase.storage
-          .from('rh-documentos')
-          .upload(path, selectedFile);
-        if (uploadError) { toast.error('Erro no upload: ' + uploadError.message); setUploading(false); return; }
-        arquivo_path = path;
+        arquivo_path = `${companyId}/${form.colaborador_id}/${documentId}_${form.tipo}.${ext}`;
         arquivo_nome = selectedFile.name;
         arquivo_tamanho = selectedFile.size;
       }
 
-      const { error } = await supabase.from('rh_documentos').insert(withCompanyId(companyId, {
+      const metadata = withCompanyId(companyId, {
+        id: documentId,
         colaborador_id: form.colaborador_id,
         tipo: form.tipo,
         nome: form.nome,
@@ -170,15 +171,40 @@ export default function DocumentosComplianceSection({
         alertar_vencimento: form.alertar_vencimento,
         dias_alerta_antes: form.dias_alerta_antes,
         uploaded_by: user?.id ?? null,
-      }));
-      if (error) { toast.error('Erro: ' + error.message); setUploading(false); return; }
+        storage_state: selectedFile ? 'PENDING_UPLOAD' : 'ACTIVE',
+      });
+      const { error: metadataError } = await supabase.from('rh_documentos').insert(metadata as any);
+      if (metadataError) throw metadataError;
+
+      if (selectedFile && arquivo_path) {
+        const { error: uploadError } = await supabase.storage.from('rh-documentos').upload(arquivo_path, selectedFile);
+        if (uploadError) {
+          await supabase.from('rh_documentos').delete().eq('id', documentId).eq('storage_state', 'PENDING_UPLOAD');
+          throw uploadError;
+        }
+
+        const { error: activateError } = await supabase
+          .from('rh_documentos')
+          .update({ storage_state: 'ACTIVE' } as any)
+          .eq('id', documentId)
+          .eq('storage_state', 'PENDING_UPLOAD');
+        if (activateError) {
+          const { error: cleanupError } = await supabase.storage.from('rh-documentos').remove([arquivo_path]);
+          if (!cleanupError) {
+            await supabase.from('rh_documentos').delete().eq('id', documentId).eq('storage_state', 'PENDING_UPLOAD');
+          }
+          throw new Error(cleanupError
+            ? `Metadado pendente e limpeza do arquivo falhou: ${activateError.message}; ${cleanupError.message}`
+            : activateError.message);
+        }
+      }
       toast.success('Documento registrado!');
       setShowNew(false);
       resetForm();
       fetchData();
     } catch (e) {
       console.error(e);
-      toast.error('Erro inesperado');
+      toast.error(e instanceof Error ? e.message : 'Erro inesperado');
     }
     setUploading(false);
   };
@@ -208,17 +234,33 @@ export default function DocumentosComplianceSection({
     }
   };
 
-  const handleDelete = async (id: string, path: string | null) => {
+  const handleDelete = async (doc: Documento) => {
     try {
-      if (path) {
-        await supabase.storage.from('rh-documentos').remove([path]);
+      if (doc.storage_state !== 'DELETING') {
+        const { error: beginError } = await supabase
+          .from('rh_documentos')
+          .update({ storage_state: 'DELETING' } as any)
+          .eq('id', doc.id)
+          .eq('storage_state', 'ACTIVE');
+        if (beginError) throw beginError;
       }
-      const { error } = await supabase.from('rh_documentos').delete().eq('id', id);
-      if (error) { toast.error('Erro: ' + error.message); return; }
+
+      if (doc.arquivo_path) {
+        const { error: storageError } = await supabase.storage.from('rh-documentos').remove([doc.arquivo_path]);
+        if (storageError) {
+          await supabase.from('rh_documentos').update({ storage_state: 'ACTIVE' } as any).eq('id', doc.id).eq('storage_state', 'DELETING');
+          throw storageError;
+        }
+      }
+
+      const { error } = await supabase.from('rh_documentos').delete().eq('id', doc.id).eq('storage_state', 'DELETING');
+      if (error) throw new Error(`Arquivo removido; finalize a exclusão novamente: ${error.message}`);
       toast.success('Documento excluído');
       fetchData();
     } catch (e) {
       console.error(e);
+      toast.error(e instanceof Error ? e.message : 'Erro ao excluir documento');
+      fetchData();
     }
   };
 
@@ -441,7 +483,9 @@ export default function DocumentosComplianceSection({
                 </TableHeader>
                 <TableBody>
                   {filtered.map(doc => {
-                    const status = STATUS_CONFIG[doc.status] || STATUS_CONFIG.VIGENTE;
+                    const status = doc.storage_state === 'ACTIVE'
+                      ? (STATUS_CONFIG[doc.status] || STATUS_CONFIG.VIGENTE)
+                      : { label: doc.storage_state === 'DELETING' ? 'Exclusão pendente' : 'Upload pendente', variant: 'outline' as const, icon: Clock };
                     const vencInfo = getVencimentoInfo(doc);
                     const StatusIcon = status.icon;
                     return (
@@ -472,13 +516,13 @@ export default function DocumentosComplianceSection({
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-1">
-                            {doc.arquivo_path && (
+                            {doc.arquivo_path && doc.storage_state === 'ACTIVE' && (
                               <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => handleDownload(doc)}>
                                 <Download className="w-3 h-3" />
                               </Button>
                             )}
                             <TableActions
-                              onDelete={() => handleDelete(doc.id, doc.arquivo_path)}
+                              onDelete={() => handleDelete(doc)}
                               canDeleteOverride={canManage}
                               deleteConfirmTitle="Excluir documento"
                               deleteConfirmDescription="Tem certeza que deseja excluir este documento? Esta ação não pode ser desfeita."

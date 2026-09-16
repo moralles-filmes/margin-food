@@ -64,6 +64,8 @@ export function usePlanningStore() {
   const [spendLoading, setSpendLoading] = useState(false);
   const [spendError, setSpendError] = useState<string | null>(null);
   const mounted = useRef(true);
+  const metasGenerationRef = useRef(0);
+  const spendGenerationRef = useRef(0);
 
   useEffect(() => {
     mounted.current = true;
@@ -72,6 +74,7 @@ export function usePlanningStore() {
 
   // ── Fetch metas from DB ──
   const fetchMetas = useCallback(async (year?: number, month?: number) => {
+    const generation = ++metasGenerationRef.current;
     setLoading(true);
     try {
       let query = supabase
@@ -87,11 +90,13 @@ export function usePlanningStore() {
 
       const { data, error } = await query;
       if (error) throw error;
-      if (mounted.current) setMetas((data || []).map(dbToMeta));
+      if (mounted.current && generation === metasGenerationRef.current) {
+        setMetas((data || []).map(dbToMeta));
+      }
     } catch (err: any) {
       console.error('Error fetching planning metas:', err);
     } finally {
-      if (mounted.current) setLoading(false);
+      if (mounted.current && generation === metasGenerationRef.current) setLoading(false);
     }
   }, [supabase]);
 
@@ -160,6 +165,7 @@ export function usePlanningStore() {
 
   // ── Fetch aggregated spend summary (guarded RPC) ──
   const fetchSpendSummary = useCallback(async (year: number, month: number, source?: string | null, categoria?: string | null) => {
+    const generation = ++spendGenerationRef.current;
     setSpendLoading(true);
     setSpendError(null);
     try {
@@ -170,14 +176,16 @@ export function usePlanningStore() {
         p_categoria: categoria || null,
       });
       if (error) throw error;
-      if (mounted.current && data) {
+      if (mounted.current && generation === spendGenerationRef.current && data) {
         setSpendSummary(data as unknown as SpendSummary);
       }
     } catch (err: any) {
       console.error('Error fetching spend summary:', err);
-      if (mounted.current) setSpendError(err.message || 'Erro ao carregar resumo');
+      if (mounted.current && generation === spendGenerationRef.current) {
+        setSpendError(err.message || 'Erro ao carregar resumo');
+      }
     } finally {
-      if (mounted.current) setSpendLoading(false);
+      if (mounted.current && generation === spendGenerationRef.current) setSpendLoading(false);
     }
   }, [supabase]);
 

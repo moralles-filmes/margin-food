@@ -43,6 +43,7 @@ export default function QuickInventorySection() {
   const [focusProductId, setFocusProductId] = useState<string | null>(null);
   const addingIds = useRef(new Set<string>());
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchGenerationRef = useRef(0);
 
   // Counted items
   const [countedItems, setCountedItems] = useState<CountedItem[]>([]);
@@ -62,8 +63,10 @@ export default function QuickInventorySection() {
 
   // Search products server-side
   const searchProducts = useCallback(async (term: string, cat: string) => {
+    const generation = ++searchGenerationRef.current;
     if (!term.trim() && !cat) {
       setSearchResults([]);
+      setSearchLoading(false);
       return;
     }
     setSearchLoading(true);
@@ -84,12 +87,24 @@ export default function QuickInventorySection() {
       query = query.eq('categoria', cat);
     }
 
-    const { data } = await query;
+    const { data, error } = await query;
+    if (generation !== searchGenerationRef.current) return;
+    if (error) {
+      setSearchResults([]);
+      setSearchLoading(false);
+      toast.error('Não foi possível buscar os produtos agora.');
+      return;
+    }
     // Filter out already-counted items
     const countedIds = new Set(countedItems.map(c => c.productId));
     setSearchResults(sortByName((data || []).filter(p => !countedIds.has(p.id)), p => p.nome_produto));
     setSearchLoading(false);
-  }, [countedItems, supabase]);
+  }, [countedItems, supabase, toast]);
+
+  useEffect(() => () => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    searchGenerationRef.current += 1;
+  }, []);
 
   // Debounced search
   const handleSearchChange = useCallback((value: string) => {

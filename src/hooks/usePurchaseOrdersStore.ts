@@ -1,5 +1,4 @@
 import { useCompanyId } from '@/hooks/useCompanyId';
-import { withCompanyId } from '@/lib/companyPayload';
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -54,6 +53,20 @@ export interface PurchaseOrderItem {
   conversion_factor_snapshot: number | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface ShoppingDecision {
+  order_item_id: string;
+  shopping_status: 'OK' | 'NOT_AVAILABLE';
+  note?: string;
+}
+
+export interface ReceivingDecision {
+  order_item_id: string;
+  status: 'RECEIVED' | 'NOT_DELIVERED';
+  qty_received: number;
+  unit_cost: number;
+  reason?: string;
 }
 
 const PO_PAGE_SIZE = 50;
@@ -114,8 +127,11 @@ export function usePurchaseOrdersStore() {
   const [hasMore, setHasMore] = useState(true);
   const [filters, setFilters] = useState<PurchaseOrderFilters>({});
   const cursorRef = useRef<{ created_at: string | null; id: string | null }>({ created_at: null, id: null });
+  const fetchGenerationRef = useRef(0);
+  const receiptKeysRef = useRef(new Map<string, string>());
 
   const fetchOrders = useCallback(async (append = false, currentFilters?: PurchaseOrderFilters) => {
+    const generation = ++fetchGenerationRef.current;
     if (!user) {
       cursorRef.current = { created_at: null, id: null };
       setOrders([]);
@@ -169,13 +185,19 @@ export function usePurchaseOrdersStore() {
         if (f.type) fallbackQuery = fallbackQuery.eq('type', f.type);
         if (f.priority) fallbackQuery = fallbackQuery.eq('priority', f.priority);
         if (f.responsible) fallbackQuery = fallbackQuery.eq('responsible_user_id', f.responsible);
-        if (append && cursor_created_at) fallbackQuery = fallbackQuery.lt('created_at', cursor_created_at);
+        if (append && cursor_created_at && cursor_id) {
+          fallbackQuery = fallbackQuery.or(
+            `created_at.lt.${cursor_created_at},and(created_at.eq.${cursor_created_at},id.lt.${cursor_id})`
+          );
+        }
 
         const { data: fallbackData, error: fallbackError } = await fallbackQuery;
         if (fallbackError) {
           console.error('purchase_orders fallback failed', fallbackError);
-          setHasMore(false);
-          setErrorMessage('Não foi possível carregar os pedidos agora.');
+          if (generation === fetchGenerationRef.current) {
+            setHasMore(false);
+            setErrorMessage('Não foi possível carregar os pedidos agora.');
+          }
           return;
         }
 
@@ -183,6 +205,8 @@ export function usePurchaseOrdersStore() {
         rows = f.search ? fallbackRows.filter((order) => matchesPurchaseOrderSearch(order, f.search!)) : fallbackRows;
         hasMoreFlag = !f.search && fallbackRows.length === PO_PAGE_SIZE;
       }
+
+      if (generation !== fetchGenerationRef.current) return;
 
       setHasMore(hasMoreFlag);
 
@@ -196,7 +220,7 @@ export function usePurchaseOrdersStore() {
 
       setOrders((prev) => (append ? dedupePurchaseOrders([...prev, ...rows]) : rows));
     } finally {
-      setLoading(false);
+      if (generation === fetchGenerationRef.current) setLoading(false);
     }
   }, [filters, supabase, user]);
 
@@ -208,8 +232,7 @@ export function usePurchaseOrdersStore() {
     setFilters(newFilters);
     cursorRef.current.created_at = null;
     cursorRef.current.id = null;
-    fetchOrders(false, newFilters);
-  }, [fetchOrders]);
+  }, []);
 
   useEffect(() => {
     if (user) fetchOrders();
@@ -289,24 +312,6 @@ export function usePurchaseOrdersStore() {
       const res = result as any;
       const orderId = res?.order_id;
 
-      // Notification for responsible (fire-and-forget, outside transaction)
-      if (orderData.responsible_user_id && orderData.responsible_user_id !== user.id && orderId) {
-        const isMercadoSazonal = orderData.type === 'MERCADO' || orderData.type === 'SAZONAL';
-        const { data: profile } = await supabase.from('profiles').select('nome').eq('id', user.id).maybeSingle();
-        const senderName = profile?.nome || 'Alguém';
-        await supabase.from('notifications').insert(withCompanyId(companyId, {
-          recipient_user_id: orderData.responsible_user_id,
-          type: 'MENTION',
-          module: 'purchases',
-          title: isMercadoSazonal ? 'Checklist de compra atribuído a você' : 'Você foi mencionado em um pedido/compra',
-          message: `@${senderName} atribuiu você como responsável: "${orderData.title}"`,
-          entity_type: 'purchase_order',
-          entity_id: orderId,
-          link_path: '/compras?subtab=pedidos-compras&order=' + orderId,
-          created_by: user.id,
-        }));
-      }
-
       await fetchOrders();
       if (res?.status === 'idempotent') {
         toast.info('Pedido já criado (operação duplicada ignorada).');
@@ -315,175 +320,56 @@ export function usePurchaseOrdersStore() {
     } finally {
       setSaving(false);
     }
-  }, [companyId, user, saving, supabase, fetchOrders, toast]);
+  }, [user, saving, supabase, fetchOrders, toast]);
 
   // ===== SHOPPING CHECKLIST FUNCTIONS =====
-  const updateShoppingItem = useCallback(async (
-    itemId: string,
-    shoppingStatus: 'OK' | 'NOT_AVAILABLE',
-    note?: string
-  ) => {
-    if (!user) return;
-    await supabase.from('purchase_order_items').update({
-      shopping_status: shoppingStatus,
-      shopping_note: note || '',
-      // W5: updated_at handled by server trigger
-    }).eq('id', itemId);
-  }, [supabase, user]);
+  const confirmShopping = useCallback(async (orderId: string, decisions: ShoppingDecision[]) => {
+    if (!user) return false;
 
-  const confirmShopping = useCallback(async (orderId: string) => {
-    if (!user) return;
-
-    const items = await fetchItems(orderId);
-    const pendingItems = items.filter(i => i.shopping_status === 'PENDING');
-    if (pendingItems.length > 0) {
-      toast.error('Marque todos os itens antes de enviar para recebimento.');
-      return;
+    const { error } = await supabase.rpc('confirm_purchase_shopping_atomic' as any, {
+      p_order_id: orderId,
+      p_items: decisions as any,
+    });
+    if (error) {
+      toast.error('Erro ao confirmar a compra: ' + error.message);
+      return false;
     }
-
-    const okItems = items.filter(i => i.shopping_status === 'OK');
-    const notAvailableItems = items.filter(i => i.shopping_status === 'NOT_AVAILABLE');
-
-    if (okItems.length === 0) {
-      toast.error('Nenhum item marcado como comprado.');
-      return;
-    }
-
-    // Items NOT_AVAILABLE → set received_status = NOT_DELIVERED immediately
-    for (const item of notAvailableItems) {
-      await supabase.from('purchase_order_items').update({
-        received_status: 'NOT_DELIVERED',
-        not_delivered_reason: item.shopping_note || 'Indisponível na compra',
-      }).eq('id', item.id);
-    }
-
-    await supabase.from('purchase_orders').update({
-      status: 'IN_RECEIVING',
-      shopping_done_at: new Date().toISOString(),
-      shopping_done_by: user.id,
-    }).eq('id', orderId);
-
-    // Notify the order creator
-    const order = orders.find(o => o.id === orderId);
-    if (order && order.created_by !== user.id) {
-      const { data: profile } = await supabase.from('profiles').select('nome').eq('id', user.id).maybeSingle();
-      const senderName = profile?.nome || 'Responsável';
-      await supabase.from('notifications').insert(withCompanyId(companyId, {
-        recipient_user_id: order.created_by,
-        type: 'MENTION',
-        module: 'purchases',
-        title: 'Compra realizada — pronto para conferência',
-        message: `@${senderName} concluiu a compra de "${order.title}". ${notAvailableItems.length > 0 ? `${notAvailableItems.length} item(ns) indisponível(is).` : 'Todos os itens OK.'}`,
-        entity_type: 'purchase_order',
-        entity_id: orderId,
-        link_path: '/compras',
-        created_by: user.id,
-      }));
-    }
-
 
     await fetchOrders();
     toast.success('Compra confirmada! Pedido enviado para Recebimento.');
     emitDataEvent('compras:pedidos');
-  }, [companyId, user, fetchItems, supabase, orders, fetchOrders, emitDataEvent, toast]);
+    return true;
+  }, [user, supabase, fetchOrders, emitDataEvent, toast]);
 
   // ===== RECEIVING FUNCTIONS =====
-  const receiveItem = useCallback(async (
-    itemId: string,
-    qtyReceived: number,
-    status: 'RECEIVED' | 'NOT_DELIVERED',
-    reason?: string
-  ) => {
-    if (!user) return;
-    await supabase.from('purchase_order_items').update({
-      qty_received: qtyReceived,
-      received_status: status,
-      not_delivered_reason: reason || null,
-      received_at: new Date().toISOString(),
-      received_by: user.id,
-      // W5: updated_at handled by server trigger
-    }).eq('id', itemId);
-  }, [supabase, user]);
-
-  const confirmReceiving = useCallback(async (orderId: string) => {
-    if (!user) return;
-
-    const items = await fetchItems(orderId);
-    const receivableItems = items.filter(i => i.shopping_status === 'OK');
-    const pending = receivableItems.filter(i => i.received_status === 'PENDING');
-
-    if (pending.length > 0) {
-      toast.error('Confira todos os itens antes de confirmar.');
-      return;
-    }
-
-    // Include NOT_AVAILABLE items (from shopping) as NOT_DELIVERED in the RPC call
-    // so the RPC can correctly determine the order status
-    const notAvailableItems = items.filter(i => i.shopping_status === 'NOT_AVAILABLE');
-
-    const rpcItems = [
-      ...receivableItems.map(i => ({
-        order_item_id: i.id,
-        status: i.received_status === 'NOT_DELIVERED' ? 'NOT_DELIVERED' : 'RECEIVED',
-        qty_received: i.qty_received,
-        unit_cost: i.estimated_unit_value,
-        reason: i.not_delivered_reason || undefined,
-      })),
-      ...notAvailableItems.map(i => ({
-        order_item_id: i.id,
-        status: 'NOT_DELIVERED' as const,
-        qty_received: 0,
-        unit_cost: i.estimated_unit_value,
-        reason: i.not_delivered_reason || i.shopping_note || 'Indisponível na compra',
-      })),
-    ];
+  const confirmReceiving = useCallback(async (orderId: string, rpcItems: ReceivingDecision[]) => {
+    if (!user) return false;
+    const keyName = `order:${orderId}`;
+    const idempotencyKey = receiptKeysRef.current.get(keyName) ?? crypto.randomUUID();
+    receiptKeysRef.current.set(keyName, idempotencyKey);
 
     const { data: result, error } = await supabase.rpc('receive_purchase_order_atomic', {
       p_order_id: orderId,
       p_items: rpcItems as any,
-      p_metadata: { source: 'confirmReceiving' } as any,
+      p_metadata: { source: 'confirmReceiving', idempotency_key: idempotencyKey } as any,
     });
 
     if (error) {
       toast.error('Erro no recebimento: ' + error.message);
-      return;
+      return false;
     }
+
+    receiptKeysRef.current.delete(keyName);
 
     const res = result as any;
     const newStatus = res?.status || 'COMPLETED';
-
-    if (newStatus === 'PARTIAL') {
-      const order = orders.find(o => o.id === orderId);
-      if (order) {
-        const { data: existing } = await supabase.from('notifications')
-          .select('id')
-          .eq('entity_id', orderId)
-          .eq('type', 'NOT_DELIVERED_ACK_REQUIRED')
-          .eq('recipient_user_id', order.created_by)
-          .is('read_at', null)
-          .limit(1);
-
-        if (!existing || existing.length === 0) {
-          await supabase.from('notifications').insert(withCompanyId(companyId, {
-            recipient_user_id: order.created_by,
-            type: 'NOT_DELIVERED_ACK_REQUIRED',
-            module: 'purchases',
-            title: 'Confirmação necessária',
-            message: `Há itens não entregues no pedido "${order.title}". Confirme ciência.`,
-            entity_type: 'purchase_order',
-            entity_id: orderId,
-            link_path: '/compras',
-            created_by: user.id,
-          }));
-        }
-      }
-    }
 
     await fetchOrders();
     toast.success(newStatus === 'COMPLETED' ? 'Pedido concluído! Estoque atualizado.' : 'Recebimento parcial registrado. Itens não entregues pendentes.');
     emitDataEvent('compras:pedidos');
     emitDataEvent('estoque:movimentacoes');
-  }, [companyId, user, fetchItems, supabase, fetchOrders, orders, emitDataEvent, toast]);
+    return true;
+  }, [user, supabase, fetchOrders, emitDataEvent, toast]);
 
   const finalizePartialItem = useCallback(async (itemId: string, qtyReceived: number) => {
     if (!user) return;
@@ -499,16 +385,21 @@ export function usePurchaseOrdersStore() {
       unit_cost: typedItem.estimated_unit_value,
     }];
 
+    const keyName = `item:${itemId}`;
+    const idempotencyKey = receiptKeysRef.current.get(keyName) ?? crypto.randomUUID();
+    receiptKeysRef.current.set(keyName, idempotencyKey);
     const { data: result, error } = await supabase.rpc('receive_purchase_order_atomic', {
       p_order_id: typedItem.order_id,
       p_items: rpcItems as any,
-      p_metadata: { source: 'finalizePartialItem' } as any,
+      p_metadata: { source: 'finalizePartialItem', idempotency_key: idempotencyKey } as any,
     });
 
     if (error) {
       toast.error('Erro ao receber item: ' + error.message);
       return;
     }
+
+    receiptKeysRef.current.delete(keyName);
 
     const res = result as any;
     const newStatus = res?.status || 'PARTIAL';
@@ -582,24 +473,6 @@ export function usePurchaseOrdersStore() {
 
       if (error) { toast.error('Erro ao editar: ' + error.message); return false; }
 
-      // Notification for responsible (fire-and-forget)
-      if (updates.responsible_user_id && updates.responsible_user_id !== user.id) {
-        const { data: orderData } = await supabase.from('purchase_orders').select('title').eq('id', orderId).single();
-        const { data: profile } = await supabase.from('profiles').select('nome').eq('id', user.id).maybeSingle();
-        const senderName = profile?.nome || 'Alguém';
-        await supabase.from('notifications').insert(withCompanyId(companyId, {
-          recipient_user_id: updates.responsible_user_id,
-          type: 'MENTION',
-          module: 'purchases',
-          title: 'Você foi mencionado em um pedido/compra',
-          message: `@${senderName} atualizou e atribuiu você como responsável: "${orderData?.title || ''}"`,
-          entity_type: 'purchase_order',
-          entity_id: orderId,
-          link_path: '/compras?subtab=pedidos-compras&order=' + orderId,
-          created_by: user.id,
-        }));
-      }
-
       await fetchOrders();
       toast.success('Pedido atualizado!');
       emitDataEvent('compras:pedidos');
@@ -607,45 +480,23 @@ export function usePurchaseOrdersStore() {
     } finally {
       setSaving(false);
     }
-  }, [companyId, user, saving, supabase, fetchOrders, emitDataEvent, toast]);
+  }, [user, saving, supabase, fetchOrders, emitDataEvent, toast]);
 
   const deleteOrder = useCallback(async (orderId: string) => {
     if (!user) return false;
-
-    const items = await fetchItems(orderId);
-    const hasReceived = items.some(i => i.qty_received > 0);
-
-    if (hasReceived) {
-      const { error: stornoErr } = await supabase.rpc('storno_purchase_order_stock', {
-        p_order_id: orderId,
-      });
-      if (stornoErr) {
-        toast.error('Erro ao estornar estoque: ' + stornoErr.message);
-        return false;
-      }
-    }
-
-    // W4: Soft-delete items (already uses deleted_at/deleted_by)
-    await supabase.from('purchase_order_items').update({
-      deleted_at: new Date().toISOString(),
-      deleted_by: user.id,
-    }).eq('order_id', orderId).is('deleted_at', null);
-
-    const { error } = await supabase.from('purchase_orders').update({
-      deleted_at: new Date().toISOString(),
-      deleted_by: user.id,
-      status: 'CANCELLED',
-    }).eq('id', orderId);
+    const { data, error } = await supabase.rpc('delete_purchase_order_atomic' as any, {
+      p_order_id: orderId,
+    });
 
     if (error) { toast.error('Erro ao excluir: ' + error.message); return false; }
-
+    const reversedCount = Number((data as any)?.reversed_count) || 0;
 
     await fetchOrders();
-    toast.success(hasReceived ? 'Pedido excluído (arquivado) e estoque estornado.' : 'Pedido excluído (arquivado).');
+    toast.success(reversedCount > 0 ? 'Pedido excluído (arquivado) e estoque estornado.' : 'Pedido excluído (arquivado).');
     emitDataEvent('compras:pedidos');
-    if (hasReceived) emitDataEvent('estoque:movimentacoes');
+    if (reversedCount > 0) emitDataEvent('estoque:movimentacoes');
     return true;
-  }, [user, fetchItems, supabase, fetchOrders, emitDataEvent, toast]);
+  }, [user, supabase, fetchOrders, emitDataEvent, toast]);
 
   // Counts
   const pendingCount = orders.filter(o => o.status === 'PENDING').length;
@@ -684,9 +535,9 @@ export function usePurchaseOrdersStore() {
     openCount, receivingCount, partialCount, completedCount, pendingCount, shoppingCount, unackedPartialCount,
     fetchOrders, fetchItems,
     createOrder, editOrder, deleteOrder,
-    receiveItem, confirmReceiving,
+    confirmReceiving,
     finalizePartialItem, updateOrderStatus, cancelOrder,
-    updateShoppingItem, confirmShopping,
+    confirmShopping,
     acknowledgeNotDelivered,
   };
 }

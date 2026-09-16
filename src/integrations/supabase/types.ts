@@ -5590,6 +5590,44 @@ export type Database = {
         }
         Relationships: []
       }
+      purchase_receipt_batches: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string
+          id: string
+          idempotency_key: string
+          order_id: string
+          response: Json
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by: string
+          id?: string
+          idempotency_key: string
+          order_id: string
+          response: Json
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          idempotency_key?: string
+          order_id?: string
+          response?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_receipt_batches_order_tenant_fk"
+            columns: ["company_id", "order_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["company_id", "id"]
+          },
+        ]
+      }
       purchase_reminders: {
         Row: {
           active: boolean
@@ -6770,6 +6808,7 @@ export type Database = {
           nome: string
           obrigatorio: boolean
           status: string
+          storage_state: string
           tipo: string
           updated_at: string
           uploaded_by: string
@@ -6790,6 +6829,7 @@ export type Database = {
           nome: string
           obrigatorio?: boolean
           status?: string
+          storage_state?: string
           tipo?: string
           updated_at?: string
           uploaded_by: string
@@ -6810,6 +6850,7 @@ export type Database = {
           nome?: string
           obrigatorio?: boolean
           status?: string
+          storage_state?: string
           tipo?: string
           updated_at?: string
           uploaded_by?: string
@@ -9528,6 +9569,35 @@ export type Database = {
       }
     }
     Functions: {
+      _salmon_replace_entry_guarded: {
+        Args: {
+          p_boxes: number
+          p_entry_date: string
+          p_entry_id: string
+          p_expiration_date?: string
+          p_gross_kg: number
+          p_lot: string
+          p_notes?: string
+          p_sif: string
+          p_supplier_name: string
+          p_total_value: number
+          p_units: number
+        }
+        Returns: Json
+      }
+      _salmon_replace_manipulation_guarded: {
+        Args: {
+          p_clean_in_kg: number
+          p_entry_id: string
+          p_fish_count: number
+          p_gross_out_kg: number
+          p_leftover_kg: number
+          p_manip_id: string
+          p_manipulation_date: string
+          p_notes?: string
+        }
+        Returns: Json
+      }
       list_restricted_logs: {
         Args: { p_table: string; p_scope?: string; p_limit?: number; p_cursor_at?: string; p_cursor_id?: string; p_module?: string; p_action?: string; p_entity?: string }
         Returns: Json[]
@@ -10087,6 +10157,10 @@ export type Database = {
         Args: { p_manip_id: string; p_reason?: string }
         Returns: Json
       }
+      cancel_stock_movement_atomic: {
+        Args: { p_movement_id: string; p_reason: string }
+        Returns: Json
+      }
       cleanup_old_audit_logs: { Args: { p_months?: number }; Returns: number }
       comparativo_periodos: {
         Args: { p_mes_a: string; p_mes_b: string }
@@ -10095,6 +10169,10 @@ export type Database = {
       compute_requisicao_status_agregado: {
         Args: { p_requisicao_id: string }
         Returns: string
+      }
+      confirm_purchase_shopping_atomic: {
+        Args: { p_items: Json; p_order_id: string }
+        Returns: Json
       }
       contar_lancamentos_sem_categoria: { Args: never; Returns: number }
       copiar_orcamento_mes: {
@@ -10146,6 +10224,7 @@ export type Database = {
         Args: {
           p_boxes: number
           p_entry_date: string
+          p_expiration_date?: string
           p_gross_kg: number
           p_lot: string
           p_notes?: string
@@ -10182,9 +10261,17 @@ export type Database = {
       debug_company_inventory: { Args: never; Returns: Json }
       debug_stock_last_movements: { Args: { p_limit?: number }; Returns: Json }
       debug_tenant: { Args: never; Returns: Json }
+      delete_purchase_order_atomic: {
+        Args: { p_order_id: string; p_reason?: string }
+        Returns: Json
+      }
       delete_transfer: { Args: { p_lancamento_id: string }; Returns: Json }
       edit_purchase_order_atomic: {
         Args: { p_order_id: string; p_payload: Json }
+        Returns: Json
+      }
+      mutate_purchase_requisition_atomic: {
+        Args: { p_action: string; p_payload: Json }
         Returns: Json
       }
       ensure_salmon_raw_product: { Args: never; Returns: string }
@@ -10960,6 +11047,10 @@ export type Database = {
       }
       receive_purchase_order_atomic: {
         Args: { p_items: Json; p_metadata?: Json; p_order_id: string }
+        Returns: Json
+      }
+      replace_rh_banco_horas_period_atomic: {
+        Args: { p_periodo: string; p_rows: Json }
         Returns: Json
       }
       reconcile_auto_bind_transfer_counterparts: {

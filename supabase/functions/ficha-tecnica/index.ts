@@ -23,21 +23,17 @@ async function writeAudit(
   module: string, action: string, entityType: string,
   entityId: string | null, before: any, after: any, metadata: any
 ) {
-  try {
-    const { error } = await adminClient.rpc('service_write_audit', {
-      p_company_id: companyId, p_actor_id: actorId,
-      p_module: module,
-      p_action: action,
-      p_entity: entityType,
-      p_entity_id: entityId,
-      p_before: before ? JSON.parse(JSON.stringify(before)) : null,
-      p_after: after ? JSON.parse(JSON.stringify(after)) : null,
-      p_metadata: metadata ? JSON.parse(JSON.stringify(metadata)) : null,
-    })
-    if (error) throw error
-  } catch (e: any) {
-    console.error('Audit write failed (non-blocking):', e.message)
-  }
+  const { error } = await adminClient.rpc('service_write_audit', {
+    p_company_id: companyId, p_actor_id: actorId,
+    p_module: module,
+    p_action: action,
+    p_entity: entityType,
+    p_entity_id: entityId,
+    p_before: before ? JSON.parse(JSON.stringify(before)) : null,
+    p_after: after ? JSON.parse(JSON.stringify(after)) : null,
+    p_metadata: metadata ? JSON.parse(JSON.stringify(metadata)) : null,
+  })
+  if (error) throw error
 }
 
 serve(withRequestCors(async (req) => {

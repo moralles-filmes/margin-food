@@ -3,7 +3,7 @@ import { companyHeaders, requestCompanyProfile } from "../_shared/company-scope.
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
-import { isEstornoMovement, isOriginalEntradaForReversal, getReversalTipo } from "./stock-reversal.ts";
+import { isEstornoMovement } from "./stock-reversal.ts";
 
 const corsHeaders = getCorsHeaders();
 
@@ -135,25 +135,21 @@ async function writeAudit(
     p_metadata?: unknown;
   }
 ) {
-  try {
-    const metadata = payload.p_metadata && typeof payload.p_metadata === 'object' && !Array.isArray(payload.p_metadata)
-      ? { source: payload.p_source ?? 'edge', ...(payload.p_metadata as Record<string, unknown>) }
-      : payload.p_metadata ?? (payload.p_source ? { source: payload.p_source } : null);
+  const metadata = payload.p_metadata && typeof payload.p_metadata === 'object' && !Array.isArray(payload.p_metadata)
+    ? { source: payload.p_source ?? 'edge', ...(payload.p_metadata as Record<string, unknown>) }
+    : payload.p_metadata ?? (payload.p_source ? { source: payload.p_source } : null);
 
-    const { error } = await adminClient.rpc('service_write_audit', {
-      p_company_id: companyId, p_actor_id: actorId,
-      p_module: payload.p_module,
-      p_action: payload.p_action,
-      p_entity: payload.p_entity,
-      p_entity_id: payload.p_entity_id,
-      p_before: toSerializableJson(payload.p_before),
-      p_after: toSerializableJson(payload.p_after),
-      p_metadata: toSerializableJson(metadata),
-    });
-    if (error) throw error;
-  } catch (error) {
-    console.error('Audit write failed (non-blocking):', error);
-  }
+  const { error } = await adminClient.rpc('service_write_audit', {
+    p_company_id: companyId, p_actor_id: actorId,
+    p_module: payload.p_module,
+    p_action: payload.p_action,
+    p_entity: payload.p_entity,
+    p_entity_id: payload.p_entity_id,
+    p_before: toSerializableJson(payload.p_before),
+    p_after: toSerializableJson(payload.p_after),
+    p_metadata: toSerializableJson(metadata),
+  });
+  if (error) throw error;
 }
 
 // ─── Main Handler ───────────────────────────────────────────────────────────
@@ -309,123 +305,20 @@ serve(withRequestCors(async (req) => {
       ]);
       if (!hasAccess) return forbidden("FORBIDDEN_RBAC", "Sem permissão para cancelar movimentações");
 
-      // Tenant-scoped select
-      const { data: mov, error: movErr } = await adminClient
-        .from("movimentacoes_estoque")
-        .select("id, produto_id, tipo, quantidade, custo_unitario, custo_total, data, observacao, status, origem, referencia_id, setor, source_module, reference_type, reference_id, estorno_de_id")
-        .eq("id", movement_id)
-        .eq("company_id", companyId)
-        .single();
-
-      if (movErr || !mov) return notFound("Movimentação");
-      if (mov.status !== "ATIVO") return badRequest("Movimentação já está cancelada");
-      if (isEstornoMovement(mov)) return badRequest("Movimentações de estorno não podem ser canceladas novamente.");
-
-      // Prevent double cancellation (tenant-scoped)
-      const { data: existingReversal } = await adminClient
-        .from("movimentacoes_estoque")
-        .select("id")
-        .eq("estorno_de_id", movement_id)
-        .eq("company_id", companyId)
-        .eq("status", "ATIVO")
-        .limit(1);
-
-      if (existingReversal && existingReversal.length > 0) return conflict("Movimentação já cancelada. Estorno já existe.");
-
-      // Block if linked to closed inventory (tenant-scoped)
-      if (mov.origem === "INVENTARIO" && mov.referencia_id) {
-        const { data: inv } = await adminClient
-          .from("inventarios")
-          .select("status")
-          .eq("id", mov.referencia_id)
-          .eq("company_id", companyId)
-          .single();
-        if (inv?.status === "FINALIZADO") return badRequest("Movimentação vinculada a inventário fechado não pode ser cancelada.");
-      }
-
-      // 1) Create reversal movement FIRST (before marking original as CANCELADO)
-      //    The trg_validate_estorno trigger checks that the original is NOT already CANCELADO,
-      //    so the reversal must be inserted while the original is still ATIVO.
-      const isOriginalEntrada = isOriginalEntradaForReversal(mov.tipo);
-      const reversalTipo = getReversalTipo(mov.tipo);
-
-      const { error: reversalErr } = await adminClient
-        .from("movimentacoes_estoque")
-        .insert({
-          produto_id: mov.produto_id,
-          tipo: reversalTipo,
-          direction: isOriginalEntrada ? "OUT" : "IN",
-          quantidade: mov.quantidade,
-          custo_unitario: mov.custo_unitario,
-          custo_total: mov.custo_total,
-          data: mov.data,
-          origem: "ESTORNO",
-          referencia_id: movement_id,
-          observacao: `Estorno de ${mov.tipo} #${movement_id.slice(0, 8)} — ${justificativa}`,
-          created_by: userId,
-          status: "ATIVO",
-          estorno_de_id: movement_id,
-          setor: mov.setor || null,
-          company_id: companyId,
-        });
-      if (reversalErr) {
-        // 23505 = unique_violation — outra requisição concorrente já criou o estorno
-        // (uq_movimentacoes_estorno_de_id_ativo). Trata como conflito, não como erro 500.
-        if (reversalErr.code === "23505") return conflict("Movimentação já cancelada. Estorno já existe.");
-        throw reversalErr;
-      }
-
-      // 2) Mark original as CANCELADO (after reversal is safely inserted)
-      const { data: cancelled, error: cancelErr } = await adminClient
-        .from("movimentacoes_estoque")
-        .update({
-          status: "CANCELADO",
-          cancelado_por: userId,
-          cancelado_em: new Date().toISOString(),
-          justificativa_cancelamento: justificativa,
-        })
-        .eq("id", movement_id)
-        .eq("company_id", companyId)
-        .select("id")
-        .maybeSingle();
-
-      if (cancelErr) throw cancelErr;
-      if (!cancelled) return forbidden("FORBIDDEN_TENANT", "Movimentação não pertence ao tenant");
-
-      // 3) Cascade cancel to salmon module if source_module = 'salmon'
-      if (mov.source_module === "salmon" && mov.reference_type && mov.reference_id) {
-        const refType = mov.reference_type as string;
-        const refId = mov.reference_id as string;
-
-        if (refType === "SALMON_ENTRY" && refId && !refId.endsWith("_ESTORNO")) {
-          const { error: salmonErr } = await adminClient
-            .from("salmon_entries")
-            .update({ status: "CANCELLED", updated_at: new Date().toISOString() })
-            .eq("id", refId)
-            .eq("company_id", companyId);
-
-          if (salmonErr) console.error("Cascade cancel salmon entry failed:", salmonErr);
-        } else if (refType === "SALMON_MANIPULATION" && refId && !refId.endsWith("_ESTORNO")) {
-          const { error: salmonErr } = await adminClient
-            .from("salmon_manipulations")
-            .update({ status: "CANCELLED", updated_at: new Date().toISOString() })
-            .eq("id", refId)
-            .eq("company_id", companyId);
-
-          if (salmonErr) console.error("Cascade cancel salmon manipulation failed:", salmonErr);
-        }
-      }
-
-      // 4) Audit
-      await writeAudit(adminClient, companyId, userId, {
-        p_source: "edge",
-        p_module: "estoque",
-        p_entity: "movimentacoes_estoque",
-        p_entity_id: movement_id,
-        p_action: "CANCEL_MOVEMENT",
-        p_before: { tipo: mov.tipo, quantidade: mov.quantidade, custo_total: mov.custo_total, status: "ATIVO" },
-        p_after: { status: "CANCELADO", justificativa, estorno_tipo: reversalTipo, cascade_salmon: mov.source_module === "salmon" },
+      const { error: cancelError } = await supabaseUser.rpc("cancel_stock_movement_atomic", {
+        p_movement_id: movement_id,
+        p_reason: justificativa.trim(),
       });
+      if (cancelError) {
+        if (cancelError.code === "23505" || cancelError.message.includes("ALREADY_CANCELLED")) {
+          return conflict("Movimentação já cancelada. Estorno já existe.");
+        }
+        if (cancelError.message.includes("NOT_FOUND")) return notFound("Movimentação");
+        if (cancelError.message.includes("INVENTORY_CLOSED") || cancelError.message.includes("REVERSAL_NOT_ALLOWED")) {
+          return badRequest(cancelError.message);
+        }
+        throw cancelError;
+      }
 
       return jsonRes({ success: true, mensagem: "Movimentação cancelada e estorno criado.", request_id: requestId });
     }
@@ -554,9 +447,10 @@ serve(withRequestCors(async (req) => {
         // Fetch requisicao item IDs for linking
         const { data: reqItemRows } = await adminClient
           .from("requisicao_estoque_itens")
-          .select("id, produto_id")
-          .eq("requisicao_id", requisicao_id)
-          .in("produto_id", prodIds);
+        .select("id, produto_id")
+        .eq("requisicao_id", requisicao_id)
+        .eq("company_id", companyId)
+        .in("produto_id", prodIds);
 
         const reqItemMap = new Map(
           (reqItemRows || []).map((ri: { id: string; produto_id: string }) => [ri.produto_id, ri.id])
@@ -786,6 +680,7 @@ serve(withRequestCors(async (req) => {
           motivo_recusa: motivo_recusa.trim().slice(0, 500),
         })
         .eq("id", item_id)
+        .eq("requisicao_id", requisicao_id)
         .eq("company_id", companyId);
 
       if (updateErr) throw updateErr;
@@ -869,7 +764,7 @@ serve(withRequestCors(async (req) => {
 
       const { data: reqData, error: reqErr } = await adminClient
         .from("requisicoes_estoque")
-        .select("id, status, setor, requisicao_estoque_itens(id, produto_id, quantidade_solicitada, status)")
+        .select("id, status, setor")
         .eq("id", requisicao_id)
         .eq("company_id", companyId)
         .single();
@@ -877,7 +772,14 @@ serve(withRequestCors(async (req) => {
       if (reqErr || !reqData) return notFound("Requisição");
       if (reqData.status === "CANCELADA" || reqData.status === "NEGADA") return badRequest("Requisição já processada");
 
-      const pendingItems = reqData.requisicao_estoque_itens.filter(
+      const { data: requestItems, error: requestItemsError } = await adminClient
+        .from("requisicao_estoque_itens")
+        .select("id, produto_id, quantidade_solicitada, status")
+        .eq("requisicao_id", requisicao_id)
+        .eq("company_id", companyId);
+      if (requestItemsError) throw requestItemsError;
+
+      const pendingItems = (requestItems || []).filter(
         (i: { status: string }) => i.status === "SOLICITADO"
       );
 
@@ -989,7 +891,7 @@ serve(withRequestCors(async (req) => {
       const motivoText = motivo_recusa?.trim() || "Requisição negada integralmente";
 
       // Mark all SOLICITADO items as RECUSADO
-      await adminClient
+      const { error: rejectItemsError } = await adminClient
         .from("requisicao_estoque_itens")
         .update({
           status: "RECUSADO",
@@ -1000,6 +902,7 @@ serve(withRequestCors(async (req) => {
         .eq("requisicao_id", requisicao_id)
         .eq("status", "SOLICITADO")
         .eq("company_id", companyId);
+      if (rejectItemsError) throw rejectItemsError;
 
       // Tenant-scoped update
       const { data: negada, error: negErr } = await adminClient
