@@ -1,0 +1,22 @@
+{
+  "capturedAt": "2026-09-16T17:45:12.557143+00:00",
+  "projectId": "wuzxpbixprrgssoeeaez",
+  "sameVersions": true,
+  "sameFunctions": true,
+  "samePolicies": true,
+  "sameEdgeBundles": true,
+  "vercel": {
+    "id": "dpl_79oubxDxhgVF4owXmEXiEP6QUV5N",
+    "state": "READY",
+    "sha": "80dcf4ec527d1a7e86ed3509496638b71219ab43",
+    "target": "production",
+    "alias": [
+      "www.marginfood.com",
+      "moralles-food.vercel.app",
+      "marginfood.com",
+      "moralles-food-moralles-filmes-projects.vercel.app",
+      "moralles-food-git-main-moralles-filmes-projects.vercel.app"
+    ]
+  },
+  "productionMigrationsApplied": 0
+}

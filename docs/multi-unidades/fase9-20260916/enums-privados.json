@@ -1,0 +1,87 @@
+{
+  "enums": [
+    {
+      "name": "app_role",
+      "labels": [
+        "admin",
+        "compras",
+        "compras_assistente",
+        "operador",
+        "viewer",
+        "diretor",
+        "gerente_geral",
+        "gerente",
+        "colaborador",
+        "financeiro",
+        "chefe_setor",
+        "estoquista"
+      ]
+    }
+  ],
+  "history_order": "schema_migrations has no applied_at; version sorting is not application order",
+  "private_relations": [
+    {
+      "acl": "{postgres=arwdDxtm/postgres}",
+      "rls": true,
+      "kind": "r",
+      "name": "definitions_before",
+      "force": true,
+      "owner": "postgres",
+      "schema": "multiunit_private"
+    },
+    {
+      "acl": "{postgres=arwdDxtm/postgres}",
+      "rls": true,
+      "kind": "r",
+      "name": "policies_before",
+      "force": true,
+      "owner": "postgres",
+      "schema": "multiunit_private"
+    },
+    {
+      "acl": "{postgres=arwdDxtm/postgres}",
+      "rls": true,
+      "kind": "r",
+      "name": "relations_before",
+      "force": true,
+      "owner": "postgres",
+      "schema": "multiunit_private"
+    },
+    {
+      "acl": "{postgres=arwdDxtm/postgres}",
+      "rls": true,
+      "kind": "r",
+      "name": "triggers_before",
+      "force": true,
+      "owner": "postgres",
+      "schema": "multiunit_private"
+    },
+    {
+      "acl": "{postgres=arwdDxtm/postgres}",
+      "rls": true,
+      "kind": "r",
+      "name": "publication_before",
+      "force": true,
+      "owner": "postgres",
+      "schema": "multiunit_private"
+    },
+    {
+      "acl": "{postgres=arwdDxtm/postgres}",
+      "rls": true,
+      "kind": "r",
+      "name": "pending_identity_companies",
+      "force": true,
+      "owner": "postgres",
+      "schema": "multiunit_private"
+    },
+    {
+      "acl": "{postgres=arwdDxtm/postgres}",
+      "rls": true,
+      "kind": "r",
+      "name": "rbac_before",
+      "force": true,
+      "owner": "postgres",
+      "schema": "multiunit_private"
+    }
+  ]
+}

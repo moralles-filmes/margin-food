@@ -1,0 +1,4654 @@
+{
+  "sha256": "af624b2bb357d3151f31d75f20d66d3b7f1c2d7a5d97b6478b55a27d92908768",
+  "functions": [
+    {
+      "name": "list_restricted_logs",
+      "line": 9531,
+      "contract": "{\r\n        Args: { p_table: string; p_scope?: string; p_limit?: number; p_cursor_at?: string; p_cursor_id?: string; p_module?: string; p_action?: string; p_entity?: string }\r\n        Returns: Json[]\r\n      }",
+      "liveIdentities": [],
+      "callers": [
+        {
+          "file": "src/components/GlobalAuditView.tsx",
+          "line": 110,
+          "kind": "rpc",
+          "name": "list_restricted_logs"
+        },
+        {
+          "file": "src/components/PerformanceMonitorView.tsx",
+          "line": 52,
+          "kind": "rpc",
+          "name": "list_restricted_logs"
+        }
+      ]
+    },
+    {
+      "name": "get_fin_orcamento_arvore",
+      "line": 9535,
+      "contract": "{ Args: { p_mes: string }; Returns: Json }",
+      "liveIdentities": [
+        {
+          "signature": "get_fin_orcamento_arvore(text)",
+          "args": "p_mes text",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/financeiro/OrcamentoSection.tsx",
+          "line": 164,
+          "kind": "rpc",
+          "name": "get_fin_orcamento_arvore"
+        }
+      ]
+    },
+    {
+      "name": "_guarded_bulk_upsert_orcamento",
+      "line": 9536,
+      "contract": "{ Args: { p_mes_ano: string; p_items: Json }; Returns: Json }",
+      "liveIdentities": [
+        {
+          "signature": "_guarded_bulk_upsert_orcamento(text,jsonb)",
+          "args": "p_mes_ano text, p_items jsonb",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/financeiro/OrcamentoSection.tsx",
+          "line": 309,
+          "kind": "rpc",
+          "name": "_guarded_bulk_upsert_orcamento"
+        }
+      ]
+    },
+    {
+      "name": "list_my_companies",
+      "line": 9537,
+      "contract": "{ Args: Record<PropertyKey, never>; Returns: { id: string; nome: string }[] }",
+      "liveIdentities": [
+        {
+          "signature": "list_my_companies()",
+          "args": "",
+          "returns": "TABLE(id uuid, nome text)"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/lib/companyAccess.ts",
+          "line": 33,
+          "kind": "rpc",
+          "name": "list_my_companies"
+        }
+      ]
+    },
+    {
+      "name": "get_my_company_context",
+      "line": 9538,
+      "contract": "{ Args: Record<PropertyKey, never>; Returns: Json }",
+      "liveIdentities": [
+        {
+          "signature": "get_my_company_context()",
+          "args": "",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/lib/companyAccess.ts",
+          "line": 51,
+          "kind": "rpc",
+          "name": "get_my_company_context"
+        }
+      ]
+    },
+    {
+      "name": "_fin_dfc_effective_allocations",
+      "line": 9540,
+      "contract": "{\r\n        Args: { p_company_id: string; p_end_inclusive: string; p_start: string }\r\n        Returns: {\r\n          allocation_id: string\r\n          allocation_source: string\r\n          categoria_id: string\r\n          descricao: string\r\n          effective_date: string\r\n          entry_excluded_from_reports: boolean\r\n          lancamento_id: string\r\n          origem: string\r\n          status: string\r\n          tipo: string\r\n          valor: number\r\n        }[]\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "_fin_dfc_effective_allocations(uuid,date,date)",
+          "args": "p_company_id uuid, p_start date, p_end_inclusive date",
+          "returns": "TABLE(allocation_id uuid, allocation_source text, lancamento_id uuid, categoria_id uuid, valor numeric, tipo text, effective_date date, descricao text, status text, origem text, entry_excluded_from_reports boolean)"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "_guarded_add_presentation_decision_revision",
+      "line": 9556,
+      "contract": "{\r\n        Args: {\r\n          p_decision_id: string\r\n          p_expected_status: string\r\n          p_expected_updated_at: string\r\n          p_reason: string\r\n          p_reference_type: string\r\n          p_snapshot: Json\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "_guarded_add_presentation_decision_revision(uuid,text,jsonb,text,text,timestamp with time zone)",
+          "args": "p_decision_id uuid, p_reference_type text, p_snapshot jsonb, p_reason text, p_expected_status text, p_expected_updated_at timestamp with time zone",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/hooks/usePresentationDecisions.ts",
+          "line": 217,
+          "kind": "rpc",
+          "name": "_guarded_add_presentation_decision_revision"
+        }
+      ]
+    },
+    {
+      "name": "_guarded_aprovar_conta_pagar",
+      "line": 9567,
+      "contract": "{\r\n        Args: { p_expected_updated_at: string; p_id: string }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "_guarded_aprovar_conta_pagar(uuid,timestamp with time zone)",
+          "args": "p_id uuid, p_expected_updated_at timestamp with time zone",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/financeiro/ContasPagarSection.tsx",
+          "line": 455,
+          "kind": "rpc",
+          "name": "_guarded_aprovar_conta_pagar"
+        }
+      ]
+    },
+    {
+      "name": "_guarded_create_conta_pagar",
+      "line": 9571,
+      "contract": "{\r\n        Args: {\r\n          p_categoria_id?: string\r\n          p_centro_custo_id?: string\r\n          p_conta_id?: string\r\n          p_data_competencia?: string\r\n          p_data_vencimento?: string\r\n          p_descricao: string\r\n          p_forma_pagamento?: string\r\n          p_fornecedor?: string\r\n          p_observacoes?: string\r\n          p_rateios?: Json\r\n          p_recorrencia?: Json\r\n          p_supplier_id?: string\r\n          p_valor: number\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "_guarded_create_conta_pagar(text,numeric,text,uuid,date,date,uuid,uuid,uuid,text,text,jsonb,jsonb)",
+          "args": "p_descricao text, p_valor numeric, p_fornecedor text DEFAULT NULL::text, p_supplier_id uuid DEFAULT NULL::uuid, p_data_vencimento date DEFAULT CURRENT_DATE, p_data_competencia date DEFAULT NULL::date, p_categoria_id uuid DEFAULT NULL::uuid, p_centro_custo_id uuid DEFAULT NULL::uuid, p_conta_id uuid DEFAULT NULL::uuid, p_forma_pagamento text DEFAULT 'boleto'::text, p_observacoes text DEFAULT NULL::text, p_rateios jsonb DEFAULT '[]'::jsonb, p_recorrencia jsonb DEFAULT NULL::jsonb",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "_guarded_create_conta_receber",
+      "line": 9589,
+      "contract": "{\r\n        Args: {\r\n          p_categoria_id?: string\r\n          p_centro_custo_id?: string\r\n          p_cliente?: string\r\n          p_conta_id?: string\r\n          p_data_competencia?: string\r\n          p_data_vencimento?: string\r\n          p_descricao: string\r\n          p_forma_pagamento?: string\r\n          p_observacoes?: string\r\n          p_rateios?: Json\r\n          p_recorrencia?: Json\r\n          p_supplier_id?: string\r\n          p_valor?: number\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "_guarded_create_conta_receber(text,text,numeric,date,date,uuid,uuid,uuid,text,text,jsonb,jsonb,uuid)",
+          "args": "p_descricao text, p_cliente text DEFAULT NULL::text, p_valor numeric DEFAULT 0, p_data_vencimento date DEFAULT CURRENT_DATE, p_data_competencia date DEFAULT NULL::date, p_categoria_id uuid DEFAULT NULL::uuid, p_centro_custo_id uuid DEFAULT NULL::uuid, p_conta_id uuid DEFAULT NULL::uuid, p_forma_pagamento text DEFAULT 'pix'::text, p_observacoes text DEFAULT NULL::text, p_rateios jsonb DEFAULT '[]'::jsonb, p_recorrencia jsonb DEFAULT NULL::jsonb, p_supplier_id uuid DEFAULT NULL::uuid",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "_guarded_create_presentation_decision",
+      "line": 9607,
+      "contract": "{\r\n        Args: {\r\n          p_context: string\r\n          p_executive_responsible_user_id?: string\r\n          p_granularity: string\r\n          p_period_end_exclusive: string\r\n          p_period_start: string\r\n          p_reference_type: string\r\n          p_snapshot: Json\r\n          p_title: string\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "_guarded_create_presentation_decision(text,text,date,date,text,text,jsonb,uuid)",
+          "args": "p_title text, p_context text, p_period_start date, p_period_end_exclusive date, p_granularity text, p_reference_type text, p_snapshot jsonb, p_executive_responsible_user_id uuid DEFAULT NULL::uuid",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/hooks/usePresentationDecisions.ts",
+          "line": 171,
+          "kind": "rpc",
+          "name": "_guarded_create_presentation_decision"
+        }
+      ]
+    },
+    {
+      "name": "_guarded_create_presentation_decision_action",
+      "line": 9620,
+      "contract": "{\r\n        Args: {\r\n          p_decision_id: string\r\n          p_description: string\r\n          p_due_date: string\r\n          p_expected_decision_status: string\r\n          p_expected_decision_updated_at: string\r\n          p_priority: string\r\n          p_responsible_user_id: string\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "_guarded_create_presentation_decision_action(uuid,text,uuid,text,timestamp with time zone,date,text)",
+          "args": "p_decision_id uuid, p_description text, p_responsible_user_id uuid, p_expected_decision_status text, p_expected_decision_updated_at timestamp with time zone, p_due_date date, p_priority text",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/hooks/usePresentationDecisions.ts",
+          "line": 272,
+          "kind": "rpc",
+          "name": "_guarded_create_presentation_decision_action"
+        }
+      ]
+    },
+    {
+      "name": "_guarded_create_presentation_session",
+      "line": 9632,
+      "contract": "{\r\n        Args: {\r\n          p_agenda_items: Json\r\n          p_context: string\r\n          p_granularity: string\r\n          p_meeting_date: string\r\n          p_minutes_responsible_user_id: string\r\n          p_participant_user_ids: string[]\r\n          p_period_end_exclusive: string\r\n          p_period_start: string\r\n          p_previous_session_id: string\r\n          p_title: string\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "_guarded_create_presentation_session(text,text,date,date,text,date,uuid,uuid[],uuid,jsonb)",
+          "args": "p_title text, p_context text, p_period_start date, p_period_end_exclusive date, p_granularity text, p_meeting_date date, p_minutes_responsible_user_id uuid, p_participant_user_ids uuid[], p_previous_session_id uuid, p_agenda_items jsonb",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/hooks/usePresentationMeetings.ts",
+          "line": 164,
+          "kind": "rpc",
+          "name": "_guarded_create_presentation_session"
+        }
+      ]
+    },
+    {
+      "name": "_guarded_delete_categoria",
+      "line": 9647,
+      "contract": "{ Args: { p_id: string }; Returns: Json }",
+      "liveIdentities": [
+        {
+          "signature": "_guarded_delete_categoria(uuid)",
+          "args": "p_id uuid",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "_guarded_delete_centro_custo",
+      "line": 9648,
+      "contract": "{ Args: { p_id: string }; Returns: Json }",
+      "liveIdentities": [
+        {
+          "signature": "_guarded_delete_centro_custo(uuid)",
+          "args": "p_id uuid",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "_guarded_delete_conta",
+      "line": 9649,
+      "contract": "{ Args: { p_id: string }; Returns: Json }",
+      "liveIdentities": [
+        {
+          "signature": "_guarded_delete_conta(uuid)",
+          "args": "p_id uuid",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "_guarded_delete_conta_pagar",
+      "line": 9650,
+      "contract": "{\r\n        Args: { p_expected_updated_at?: string; p_id: string }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "_guarded_delete_conta_pagar(uuid,timestamp with time zone)",
+          "args": "p_id uuid, p_expected_updated_at timestamp with time zone DEFAULT NULL::timestamp with time zone",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "_guarded_delete_conta_receber",
+      "line": 9654,
+      "contract": "{\r\n        Args: { p_expected_updated_at?: string; p_id: string }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "_guarded_delete_conta_receber(uuid,timestamp with time zone)",
+          "args": "p_id uuid, p_expected_updated_at timestamp with time zone DEFAULT NULL::timestamp with time zone",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "_guarded_delete_lancamento",
+      "line": 9658,
+      "contract": "{\r\n        Args: { p_expected_updated_at?: string; p_id: string }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "_guarded_delete_lancamento(uuid,timestamp with time zone)",
+          "args": "p_id uuid, p_expected_updated_at timestamp with time zone DEFAULT NULL::timestamp with time zone",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "_guarded_delete_orcamento",
+      "line": 9662,
+      "contract": "{\r\n        Args: { p_expected_updated_at: string; p_id: string }\r\n        Returns: undefined\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "_guarded_delete_orcamento(uuid,timestamp with time zone)",
+          "args": "p_id uuid, p_expected_updated_at timestamp with time zone",
+          "returns": "void"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/financeiro/OrcamentoSection.tsx",
+          "line": 345,
+          "kind": "rpc",
+          "name": "_guarded_delete_orcamento"
+        }
+      ]
+    },
+    {
+      "name": "_guarded_delete_plano_contas",
+      "line": 9666,
+      "contract": "{ Args: { p_id: string }; Returns: Json }",
+      "liveIdentities": [
+        {
+          "signature": "_guarded_delete_plano_contas(uuid)",
+          "args": "p_id uuid",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "_guarded_estornar_conta_pagar",
+      "line": 9667,
+      "contract": "{\r\n        Args: { p_id: string; p_justificativa?: string }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "_guarded_estornar_conta_pagar(uuid,text)",
+          "args": "p_id uuid, p_justificativa text DEFAULT NULL::text",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/financeiro/ContasPagarSection.tsx",
+          "line": 532,
+          "kind": "rpc",
+          "name": "_guarded_estornar_conta_pagar"
+        }
+      ]
+    },
+    {
+      "name": "_guarded_estornar_conta_receber",
+      "line": 9671,
+      "contract": "{\r\n        Args: { p_id: string; p_justificativa?: string }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "_guarded_estornar_conta_receber(uuid,text)",
+          "args": "p_id uuid, p_justificativa text DEFAULT NULL::text",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/financeiro/ContasReceberSection.tsx",
+          "line": 431,
+          "kind": "rpc",
+          "name": "_guarded_estornar_conta_receber"
+        }
+      ]
+    },
+    {
+      "name": "_guarded_list_fin_audit_logs",
+      "line": 9675,
+      "contract": "{\r\n        Args: {\r\n          p_acao?: string\r\n          p_cursor_created_at?: string\r\n          p_cursor_id?: string\r\n          p_dias?: number\r\n          p_entidade?: string\r\n          p_limit?: number\r\n          p_search?: string\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "_guarded_list_fin_audit_logs(text,text,text,integer,timestamp with time zone,uuid,integer)",
+          "args": "p_entidade text DEFAULT NULL::text, p_acao text DEFAULT NULL::text, p_search text DEFAULT NULL::text, p_dias integer DEFAULT 30, p_cursor_created_at timestamp with time zone DEFAULT NULL::timestamp with time zone, p_cursor_id uuid DEFAULT NULL::uuid, p_limit integer DEFAULT 50",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/financeiro/AuditoriaFinSection.tsx",
+          "line": 203,
+          "kind": "rpc",
+          "name": "_guarded_list_fin_audit_logs"
+        }
+      ]
+    },
+    {
+      "name": "_guarded_list_recorrencias",
+      "line": 9687,
+      "contract": "{\r\n        Args: {\r\n          p_cursor_data?: string\r\n          p_cursor_id?: string\r\n          p_limit?: number\r\n          p_mes?: string\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "_guarded_list_recorrencias(timestamp with time zone,uuid,integer,text)",
+          "args": "p_cursor_data timestamp with time zone DEFAULT NULL::timestamp with time zone, p_cursor_id uuid DEFAULT NULL::uuid, p_limit integer DEFAULT 50, p_mes text DEFAULT NULL::text",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/financeiro/RecorrenciasSection.tsx",
+          "line": 148,
+          "kind": "rpc",
+          "name": "_guarded_list_recorrencias"
+        }
+      ]
+    },
+    {
+      "name": "_guarded_save_presentation_session",
+      "line": 9696,
+      "contract": "{\r\n        Args: {\r\n          p_agenda_items: Json\r\n          p_context: string\r\n          p_expected_status: string\r\n          p_expected_updated_at: string\r\n          p_meeting_date: string\r\n          p_minutes_responsible_user_id: string\r\n          p_participant_user_ids: string[]\r\n          p_previous_session_id: string\r\n          p_session_id: string\r\n          p_title: string\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "_guarded_save_presentation_session(uuid,text,text,date,uuid,uuid[],uuid,jsonb,text,timestamp with time zone)",
+          "args": "p_session_id uuid, p_title text, p_context text, p_meeting_date date, p_minutes_responsible_user_id uuid, p_participant_user_ids uuid[], p_previous_session_id uuid, p_agenda_items jsonb, p_expected_status text, p_expected_updated_at timestamp with time zone",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/hooks/usePresentationMeetings.ts",
+          "line": 190,
+          "kind": "rpc",
+          "name": "_guarded_save_presentation_session"
+        }
+      ]
+    },
+    {
+      "name": "_guarded_start_presentation_session",
+      "line": 9711,
+      "contract": "{\r\n        Args: {\r\n          p_expected_status: string\r\n          p_expected_updated_at: string\r\n          p_session_id: string\r\n          p_snapshot: Json\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "_guarded_start_presentation_session(uuid,jsonb,text,timestamp with time zone)",
+          "args": "p_session_id uuid, p_snapshot jsonb, p_expected_status text, p_expected_updated_at timestamp with time zone",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/hooks/usePresentationMeetings.ts",
+          "line": 214,
+          "kind": "rpc",
+          "name": "_guarded_start_presentation_session"
+        }
+      ]
+    },
+    {
+      "name": "_guarded_submit_presentation_minutes",
+      "line": 9720,
+      "contract": "{\r\n        Args: {\r\n          p_expected_status: string\r\n          p_expected_updated_at: string\r\n          p_revision_reason: string\r\n          p_session_id: string\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "_guarded_submit_presentation_minutes(uuid,text,text,timestamp with time zone)",
+          "args": "p_session_id uuid, p_revision_reason text, p_expected_status text, p_expected_updated_at timestamp with time zone",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/hooks/usePresentationMeetings.ts",
+          "line": 232,
+          "kind": "rpc",
+          "name": "_guarded_submit_presentation_minutes"
+        }
+      ]
+    },
+    {
+      "name": "_guarded_transition_presentation_decision",
+      "line": 9729,
+      "contract": "{\r\n        Args: {\r\n          p_decision_id: string\r\n          p_expected_status: string\r\n          p_expected_updated_at: string\r\n          p_justification: string\r\n          p_target_status: string\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "_guarded_transition_presentation_decision(uuid,text,text,text,timestamp with time zone)",
+          "args": "p_decision_id uuid, p_expected_status text, p_target_status text, p_justification text, p_expected_updated_at timestamp with time zone",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/hooks/usePresentationDecisions.ts",
+          "line": 249,
+          "kind": "rpc",
+          "name": "_guarded_transition_presentation_decision"
+        }
+      ]
+    },
+    {
+      "name": "_guarded_transition_presentation_decision_action",
+      "line": 9739,
+      "contract": "{\r\n        Args: {\r\n          p_action_id: string\r\n          p_expected_status: string\r\n          p_expected_updated_at: string\r\n          p_outcome_note: string\r\n          p_target_status: string\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "_guarded_transition_presentation_decision_action(uuid,text,text,text,timestamp with time zone)",
+          "args": "p_action_id uuid, p_expected_status text, p_target_status text, p_outcome_note text, p_expected_updated_at timestamp with time zone",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/hooks/usePresentationDecisions.ts",
+          "line": 332,
+          "kind": "rpc",
+          "name": "_guarded_transition_presentation_decision_action"
+        }
+      ]
+    },
+    {
+      "name": "_guarded_transition_presentation_session",
+      "line": 9749,
+      "contract": "{\r\n        Args: {\r\n          p_expected_status: string\r\n          p_expected_updated_at: string\r\n          p_justification: string\r\n          p_session_id: string\r\n          p_target_status: string\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "_guarded_transition_presentation_session(uuid,text,text,text,timestamp with time zone)",
+          "args": "p_session_id uuid, p_expected_status text, p_target_status text, p_justification text, p_expected_updated_at timestamp with time zone",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/hooks/usePresentationMeetings.ts",
+          "line": 252,
+          "kind": "rpc",
+          "name": "_guarded_transition_presentation_session"
+        }
+      ]
+    },
+    {
+      "name": "_guarded_update_categoria",
+      "line": 9759,
+      "contract": "{\r\n        Args: {\r\n          p_centro_custo_padrao_id?: string\r\n          p_expected_updated_at?: string\r\n          p_grupo?: string\r\n          p_id: string\r\n          p_linha_dre?: string\r\n          p_nome: string\r\n          p_tipo: string\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "_guarded_update_categoria(uuid,text,text,text,text,uuid,timestamp with time zone)",
+          "args": "p_id uuid, p_nome text, p_tipo text, p_grupo text DEFAULT ''::text, p_linha_dre text DEFAULT ''::text, p_centro_custo_padrao_id uuid DEFAULT NULL::uuid, p_expected_updated_at timestamp with time zone DEFAULT NULL::timestamp with time zone",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "_guarded_update_centro_custo",
+      "line": 9771,
+      "contract": "{\r\n        Args: {\r\n          p_descricao?: string\r\n          p_expected_updated_at?: string\r\n          p_id: string\r\n          p_nome: string\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "_guarded_update_centro_custo(uuid,text,text,timestamp with time zone)",
+          "args": "p_id uuid, p_nome text, p_descricao text DEFAULT ''::text, p_expected_updated_at timestamp with time zone DEFAULT NULL::timestamp with time zone",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "_guarded_update_conta",
+      "line": 9780,
+      "contract": "{\r\n        Args: {\r\n          p_agencia?: string\r\n          p_banco?: string\r\n          p_expected_updated_at?: string\r\n          p_id: string\r\n          p_nome: string\r\n          p_numero_conta?: string\r\n          p_saldo_inicial?: number\r\n          p_tipo: string\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "_guarded_update_conta(uuid,text,text,text,text,text,numeric,timestamp with time zone)",
+          "args": "p_id uuid, p_nome text, p_tipo text, p_banco text DEFAULT ''::text, p_agencia text DEFAULT ''::text, p_numero_conta text DEFAULT ''::text, p_saldo_inicial numeric DEFAULT 0, p_expected_updated_at timestamp with time zone DEFAULT NULL::timestamp with time zone",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "_guarded_update_conta_pagar",
+      "line": 9793,
+      "contract": "{\r\n        Args: {\r\n          p_categoria_id?: string\r\n          p_centro_custo_id?: string\r\n          p_conta_id?: string\r\n          p_data_competencia?: string\r\n          p_data_vencimento?: string\r\n          p_descricao: string\r\n          p_expected_updated_at?: string\r\n          p_forma_pagamento?: string\r\n          p_fornecedor?: string\r\n          p_id: string\r\n          p_observacoes?: string\r\n          p_rateios?: Json\r\n          p_recorrencia?: Json\r\n          p_supplier_id?: string\r\n          p_valor: number\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "_guarded_update_conta_pagar(uuid,text,numeric,text,uuid,date,date,uuid,uuid,uuid,text,text,jsonb,jsonb,timestamp with time zone)",
+          "args": "p_id uuid, p_descricao text, p_valor numeric, p_fornecedor text DEFAULT NULL::text, p_supplier_id uuid DEFAULT NULL::uuid, p_data_vencimento date DEFAULT NULL::date, p_data_competencia date DEFAULT NULL::date, p_categoria_id uuid DEFAULT NULL::uuid, p_centro_custo_id uuid DEFAULT NULL::uuid, p_conta_id uuid DEFAULT NULL::uuid, p_forma_pagamento text DEFAULT NULL::text, p_observacoes text DEFAULT NULL::text, p_rateios jsonb DEFAULT '[]'::jsonb, p_recorrencia jsonb DEFAULT NULL::jsonb, p_expected_updated_at timestamp with time zone DEFAULT NULL::timestamp with time zone",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "_guarded_update_conta_receber",
+      "line": 9813,
+      "contract": "{\r\n        Args: {\r\n          p_categoria_id?: string\r\n          p_centro_custo_id?: string\r\n          p_cliente?: string\r\n          p_conta_id?: string\r\n          p_data_competencia?: string\r\n          p_data_vencimento?: string\r\n          p_descricao: string\r\n          p_expected_updated_at?: string\r\n          p_forma_pagamento?: string\r\n          p_id: string\r\n          p_observacoes?: string\r\n          p_rateios?: Json\r\n          p_recorrencia?: Json\r\n          p_supplier_id?: string\r\n          p_valor?: number\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "_guarded_update_conta_receber(uuid,text,text,numeric,date,date,uuid,uuid,uuid,text,text,jsonb,jsonb,uuid,timestamp with time zone)",
+          "args": "p_id uuid, p_descricao text, p_cliente text DEFAULT NULL::text, p_valor numeric DEFAULT 0, p_data_vencimento date DEFAULT NULL::date, p_data_competencia date DEFAULT NULL::date, p_categoria_id uuid DEFAULT NULL::uuid, p_centro_custo_id uuid DEFAULT NULL::uuid, p_conta_id uuid DEFAULT NULL::uuid, p_forma_pagamento text DEFAULT NULL::text, p_observacoes text DEFAULT NULL::text, p_rateios jsonb DEFAULT '[]'::jsonb, p_recorrencia jsonb DEFAULT NULL::jsonb, p_supplier_id uuid DEFAULT NULL::uuid, p_expected_updated_at timestamp with time zone DEFAULT NULL::timestamp with time zone",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "_guarded_update_plano_contas",
+      "line": 9833,
+      "contract": "{\r\n        Args: {\r\n          p_codigo: string\r\n          p_expected_updated_at?: string\r\n          p_id: string\r\n          p_linha_dre?: string\r\n          p_natureza: string\r\n          p_nome: string\r\n          p_tipo: string\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "_guarded_update_plano_contas(uuid,text,text,text,text,text,timestamp with time zone)",
+          "args": "p_id uuid, p_codigo text, p_nome text, p_tipo text, p_natureza text, p_linha_dre text DEFAULT ''::text, p_expected_updated_at timestamp with time zone DEFAULT NULL::timestamp with time zone",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "_guarded_update_presentation_decision_action",
+      "line": 9845,
+      "contract": "{\r\n        Args: {\r\n          p_action_id: string\r\n          p_description: string\r\n          p_due_date: string\r\n          p_expected_status: string\r\n          p_expected_updated_at: string\r\n          p_priority: string\r\n          p_responsible_user_id: string\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "_guarded_update_presentation_decision_action(uuid,text,uuid,date,text,text,timestamp with time zone)",
+          "args": "p_action_id uuid, p_description text, p_responsible_user_id uuid, p_due_date date, p_priority text, p_expected_status text, p_expected_updated_at timestamp with time zone",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/hooks/usePresentationDecisions.ts",
+          "line": 298,
+          "kind": "rpc",
+          "name": "_guarded_update_presentation_decision_action"
+        }
+      ]
+    },
+    {
+      "name": "_guarded_update_presentation_decision_draft",
+      "line": 9857,
+      "contract": "{\r\n        Args: {\r\n          p_context: string\r\n          p_decision_id: string\r\n          p_executive_responsible_user_id: string\r\n          p_expected_updated_at: string\r\n          p_title: string\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "_guarded_update_presentation_decision_draft(uuid,text,text,uuid,timestamp with time zone)",
+          "args": "p_decision_id uuid, p_title text, p_context text, p_executive_responsible_user_id uuid, p_expected_updated_at timestamp with time zone",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/hooks/usePresentationDecisions.ts",
+          "line": 195,
+          "kind": "rpc",
+          "name": "_guarded_update_presentation_decision_draft"
+        }
+      ]
+    },
+    {
+      "name": "_guarded_update_reconciled_classification",
+      "line": 9867,
+      "contract": "{\r\n        Args: {\r\n          p_categoria_id?: string\r\n          p_centro_custo_id?: string\r\n          p_expected_updated_at?: string\r\n          p_id: string\r\n          p_justificativa_edicao?: string\r\n          p_observacoes?: string\r\n          p_rateios?: Json\r\n        }\r\n        Returns: {\r\n          id: string\r\n          updated_at: string\r\n        }[]\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "_guarded_update_reconciled_classification(uuid,uuid,uuid,text,jsonb,timestamp with time zone,text)",
+          "args": "p_id uuid, p_categoria_id uuid DEFAULT NULL::uuid, p_centro_custo_id uuid DEFAULT NULL::uuid, p_observacoes text DEFAULT NULL::text, p_rateios jsonb DEFAULT '[]'::jsonb, p_expected_updated_at timestamp with time zone DEFAULT NULL::timestamp with time zone, p_justificativa_edicao text DEFAULT NULL::text",
+          "returns": "TABLE(id uuid, updated_at timestamp with time zone)"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "_guarded_upsert_lancamento",
+      "line": 9882,
+      "contract": "{\r\n        Args: {\r\n          p_categoria_id?: string\r\n          p_centro_custo_id?: string\r\n          p_conta_id?: string\r\n          p_data_competencia?: string\r\n          p_data_pagamento?: string\r\n          p_data_vencimento?: string\r\n          p_descricao?: string\r\n          p_forma_pagamento?: string\r\n          p_id?: string\r\n          p_justificativa_edicao?: string\r\n          p_observacoes?: string\r\n          p_origem?: string\r\n          p_rateios?: Json\r\n          p_recorrencia_config?: Json\r\n          p_recorrente?: boolean\r\n          p_status?: string\r\n          p_tipo?: string\r\n          p_updated_at?: string\r\n          p_valor?: number\r\n        }\r\n        Returns: {\r\n          id: string\r\n          updated_at: string\r\n        }[]\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "_guarded_upsert_lancamento(uuid,text,text,numeric,uuid,uuid,uuid,date,date,date,text,text,text,text,boolean,jsonb,jsonb,timestamp with time zone,text)",
+          "args": "p_id uuid DEFAULT NULL::uuid, p_tipo text DEFAULT 'DESPESA'::text, p_status text DEFAULT 'PREVISTO'::text, p_valor numeric DEFAULT 0, p_conta_id uuid DEFAULT NULL::uuid, p_categoria_id uuid DEFAULT NULL::uuid, p_centro_custo_id uuid DEFAULT NULL::uuid, p_data_competencia date DEFAULT CURRENT_DATE, p_data_vencimento date DEFAULT NULL::date, p_data_pagamento date DEFAULT NULL::date, p_descricao text DEFAULT ''::text, p_observacoes text DEFAULT NULL::text, p_forma_pagamento text DEFAULT 'pix'::text, p_origem text DEFAULT 'manual'::text, p_recorrente boolean DEFAULT false, p_recorrencia_config jsonb DEFAULT NULL::jsonb, p_rateios jsonb DEFAULT '[]'::jsonb, p_updated_at timestamp with time zone DEFAULT NULL::timestamp with time zone, p_justificativa_edicao text DEFAULT NULL::text",
+          "returns": "TABLE(id uuid, updated_at timestamp with time zone)"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "_guarded_upsert_orcamento",
+      "line": 9909,
+      "contract": "{\r\n        Args: {\r\n          p_categoria_id: string\r\n          p_expected_updated_at?: string\r\n          p_mes_ano: string\r\n          p_valor: number\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "_guarded_upsert_orcamento(uuid,text,numeric,timestamp with time zone)",
+          "args": "p_categoria_id uuid, p_mes_ano text, p_valor numeric, p_expected_updated_at timestamp with time zone DEFAULT NULL::timestamp with time zone",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "_planning_delete_meta_guarded",
+      "line": 9918,
+      "contract": "{ Args: { p_id: string }; Returns: Json }",
+      "liveIdentities": [
+        {
+          "signature": "_planning_delete_meta_guarded(uuid)",
+          "args": "p_id uuid",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/hooks/usePlanningStore.ts",
+          "line": 144,
+          "kind": "rpc",
+          "name": "_planning_delete_meta_guarded"
+        }
+      ]
+    },
+    {
+      "name": "_planning_spend_summary_guarded",
+      "line": 9919,
+      "contract": "{\r\n        Args: {\r\n          p_categoria?: string\r\n          p_month: number\r\n          p_source?: string\r\n          p_year: number\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "_planning_spend_summary_guarded(integer,integer,text,text)",
+          "args": "p_year integer, p_month integer, p_source text DEFAULT NULL::text, p_categoria text DEFAULT NULL::text",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/hooks/usePlanningStore.ts",
+          "line": 164,
+          "kind": "rpc",
+          "name": "_planning_spend_summary_guarded"
+        }
+      ]
+    },
+    {
+      "name": "_planning_spend_summary_inner",
+      "line": 9928,
+      "contract": "{\r\n        Args: {\r\n          p_categoria?: string\r\n          p_company_id: string\r\n          p_month: number\r\n          p_source?: string\r\n          p_year: number\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "_planning_spend_summary_inner(uuid,integer,integer,text,text)",
+          "args": "p_company_id uuid, p_year integer, p_month integer, p_source text DEFAULT NULL::text, p_categoria text DEFAULT NULL::text",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "_planning_upsert_meta_guarded",
+      "line": 9938,
+      "contract": "{\r\n        Args: {\r\n          p_alerta_amarelo?: number\r\n          p_alerta_vermelho?: number\r\n          p_categoria: string\r\n          p_month: number\r\n          p_target_value: number\r\n          p_year: number\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "_planning_upsert_meta_guarded(integer,integer,text,numeric,numeric,numeric)",
+          "args": "p_year integer, p_month integer, p_categoria text, p_target_value numeric, p_alerta_amarelo numeric DEFAULT 80, p_alerta_vermelho numeric DEFAULT 100",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/hooks/usePlanningStore.ts",
+          "line": 111,
+          "kind": "rpc",
+          "name": "_planning_upsert_meta_guarded"
+        }
+      ]
+    },
+    {
+      "name": "_relatorios_compras_guarded",
+      "line": 9949,
+      "contract": "{\r\n        Args: { p_end: string; p_start: string }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "_relatorios_compras_guarded(text,text)",
+          "args": "p_start text, p_end text",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "_relatorios_kpis_guarded",
+      "line": 9953,
+      "contract": "{\r\n        Args: { p_end: string; p_start: string }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "_relatorios_kpis_guarded(text,text)",
+          "args": "p_start text, p_end text",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "_relatorios_score_guarded",
+      "line": 9957,
+      "contract": "{\r\n        Args: { p_end: string; p_start: string }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "_relatorios_score_guarded(text,text)",
+          "args": "p_start text, p_end text",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "_relatorios_tendencia_guarded",
+      "line": 9961,
+      "contract": "{\r\n        Args: { p_end: string; p_start: string }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "_relatorios_tendencia_guarded(text,text)",
+          "args": "p_start text, p_end text",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "_replace_fin_presentation_session_content",
+      "line": 9965,
+      "contract": "{\r\n        Args: {\r\n          p_actor_name: string\r\n          p_actor_user_id: string\r\n          p_agenda_items: Json\r\n          p_company_id: string\r\n          p_participant_user_ids: string[]\r\n          p_session_id: string\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "_replace_fin_presentation_session_content(uuid,uuid,uuid,text,uuid[],jsonb)",
+          "args": "p_session_id uuid, p_company_id uuid, p_actor_user_id uuid, p_actor_name text, p_participant_user_ids uuid[], p_agenda_items jsonb",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "_salmon_cancel_entry_guarded",
+      "line": 9976,
+      "contract": "{\r\n        Args: { p_entry_id: string; p_reason?: string }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "_salmon_cancel_entry_guarded(uuid,text)",
+          "args": "p_entry_id uuid, p_reason text DEFAULT ''::text",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "_salmon_cancel_manipulation_guarded",
+      "line": 9980,
+      "contract": "{\r\n        Args: { p_manip_id: string; p_reason?: string }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "_salmon_cancel_manipulation_guarded(uuid,text)",
+          "args": "p_manip_id uuid, p_reason text DEFAULT ''::text",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "_salmon_create_entry_guarded",
+      "line": 9984,
+      "contract": "{\r\n        Args: {\r\n          p_boxes: number\r\n          p_entry_date: string\r\n          p_gross_kg: number\r\n          p_lot: string\r\n          p_notes?: string\r\n          p_sif: string\r\n          p_supplier_name: string\r\n          p_total_value: number\r\n          p_units: number\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "_salmon_create_entry_guarded(text,text,text,text,integer,integer,numeric,numeric,text,text)",
+          "args": "p_entry_date text, p_lot text, p_sif text, p_supplier_name text, p_boxes integer, p_units integer, p_gross_kg numeric, p_total_value numeric, p_notes text DEFAULT ''::text, p_expiration_date text DEFAULT NULL::text",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "_salmon_create_manipulation_guarded",
+      "line": 9998,
+      "contract": "{\r\n        Args: {\r\n          p_clean_in_kg: number\r\n          p_entry_id: string\r\n          p_fish_count: number\r\n          p_gross_out_kg: number\r\n          p_leftover_kg: number\r\n          p_manipulation_date: string\r\n          p_notes?: string\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "_salmon_create_manipulation_guarded(uuid,text,integer,numeric,numeric,numeric,text)",
+          "args": "p_entry_id uuid, p_manipulation_date text, p_fish_count integer, p_gross_out_kg numeric, p_clean_in_kg numeric, p_leftover_kg numeric, p_notes text DEFAULT ''::text",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "_salmon_dashboard_guarded",
+      "line": 10010,
+      "contract": "{\r\n        Args: { p_end: string; p_start: string }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "_salmon_dashboard_guarded(text,text)",
+          "args": "p_start text, p_end text",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "_simulate_relatorios_guarded",
+      "line": 10014,
+      "contract": "{\r\n        Args: { p_end: string; p_params?: Json; p_start: string }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "_simulate_relatorios_guarded(text,text,jsonb)",
+          "args": "p_start text, p_end text, p_params jsonb DEFAULT '{}'::jsonb",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "_validate_fin_presentation_decision_snapshot",
+      "line": 10018,
+      "contract": "{\r\n        Args: {\r\n          p_granularity: string\r\n          p_period_end_exclusive: string\r\n          p_period_start: string\r\n          p_reference_type: string\r\n          p_snapshot: Json\r\n        }\r\n        Returns: undefined\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "_validate_fin_presentation_decision_snapshot(jsonb,date,date,text,text)",
+          "args": "p_snapshot jsonb, p_period_start date, p_period_end_exclusive date, p_granularity text, p_reference_type text",
+          "returns": "void"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "_validate_fin_presentation_meeting_snapshot",
+      "line": 10028,
+      "contract": "{\r\n        Args: {\r\n          p_company_id: string\r\n          p_granularity: string\r\n          p_period_end_exclusive: string\r\n          p_period_start: string\r\n          p_snapshot: Json\r\n        }\r\n        Returns: undefined\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "_validate_fin_presentation_meeting_snapshot(jsonb,uuid,date,date,text)",
+          "args": "p_snapshot jsonb, p_company_id uuid, p_period_start date, p_period_end_exclusive date, p_granularity text",
+          "returns": "void"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "admin_checkup_suite",
+      "line": 10038,
+      "contract": "{ Args: never; Returns: Json }",
+      "liveIdentities": [
+        {
+          "signature": "admin_checkup_suite()",
+          "args": "",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "admin_has_permission",
+      "line": 10039,
+      "contract": "{\r\n        Args: { p_permission: string; p_user_id: string }\r\n        Returns: boolean\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "admin_has_permission(uuid,text)",
+          "args": "p_user_id uuid, p_permission text",
+          "returns": "boolean"
+        }
+      ],
+      "callers": [
+        {
+          "file": "supabase/functions/rbac-lint/index.ts",
+          "line": 48,
+          "kind": "rpc",
+          "name": "admin_has_permission"
+        },
+        {
+          "file": "supabase/functions/rbac-lint-full/index.ts",
+          "line": 48,
+          "kind": "rpc",
+          "name": "admin_has_permission"
+        },
+        {
+          "file": "supabase/functions/rbac-lint-quick/index.ts",
+          "line": 48,
+          "kind": "rpc",
+          "name": "admin_has_permission"
+        }
+      ]
+    },
+    {
+      "name": "admin_health_counts",
+      "line": 10043,
+      "contract": "{ Args: never; Returns: Json }",
+      "liveIdentities": [
+        {
+          "signature": "admin_health_counts()",
+          "args": "",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "admin_list_users",
+      "line": 10044,
+      "contract": "{ Args: never; Returns: Json }",
+      "liveIdentities": [
+        {
+          "signature": "admin_list_users()",
+          "args": "",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "admin_set_super_admin",
+      "line": 10045,
+      "contract": "{\r\n        Args: {\r\n          p_confirmation_email: string\r\n          p_confirmation_phrase: string\r\n          p_enable: boolean\r\n          p_target_user_id: string\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "admin_set_super_admin(uuid,boolean,text,text)",
+          "args": "p_target_user_id uuid, p_enable boolean, p_confirmation_email text, p_confirmation_phrase text",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "aplicar_regras_categorizacao",
+      "line": 10054,
+      "contract": "{ Args: never; Returns: Json }",
+      "liveIdentities": [
+        {
+          "signature": "aplicar_regras_categorizacao()",
+          "args": "",
+          "returns": "json"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/financeiro/CategorizacaoSection.tsx",
+          "line": 220,
+          "kind": "rpc",
+          "name": "aplicar_regras_categorizacao"
+        }
+      ]
+    },
+    {
+      "name": "aprovar_ferias",
+      "line": 10055,
+      "contract": "{\r\n        Args: { p_aprovado_por: string; p_registro_id: string }\r\n        Returns: undefined\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "aprovar_ferias(uuid,uuid)",
+          "args": "p_registro_id uuid, p_aprovado_por uuid",
+          "returns": "void"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/rh/FeriasAfastamentosSection.tsx",
+          "line": 184,
+          "kind": "rpc",
+          "name": "aprovar_ferias"
+        }
+      ]
+    },
+    {
+      "name": "assert_tenant",
+      "line": 10059,
+      "contract": "{ Args: never; Returns: string }",
+      "liveIdentities": [
+        {
+          "signature": "assert_tenant()",
+          "args": "",
+          "returns": "uuid"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/lib/companyAccess.ts",
+          "line": 60,
+          "kind": "rpc",
+          "name": "assert_tenant"
+        },
+        {
+          "file": "src/lib/tenant.ts",
+          "line": 7,
+          "kind": "rpc",
+          "name": "assert_tenant"
+        },
+        {
+          "file": "supabase/functions/_shared/company-scope.ts",
+          "line": 10,
+          "kind": "rpc",
+          "name": "assert_tenant"
+        }
+      ]
+    },
+    {
+      "name": "attend_requisicao_item_atomic",
+      "line": 10060,
+      "contract": "{\r\n        Args: {\r\n          p_item_id: string\r\n          p_quantidade_aprovada?: number\r\n          p_requisicao_id: string\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "attend_requisicao_item_atomic(uuid,uuid,numeric)",
+          "args": "p_requisicao_id uuid, p_item_id uuid, p_quantidade_aprovada numeric DEFAULT NULL::numeric",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "supabase/functions/requisicao-estoque/index.ts",
+          "line": 722,
+          "kind": "rpc",
+          "name": "attend_requisicao_item_atomic"
+        }
+      ]
+    },
+    {
+      "name": "audit_log_write",
+      "line": 10068,
+      "contract": "{\r\n        Args: {\r\n          _action: string\r\n          _after?: Json\r\n          _before?: Json\r\n          _entity_id?: string\r\n          _entity_type: string\r\n          _metadata?: Json\r\n          _module: string\r\n          _severity?: string\r\n        }\r\n        Returns: undefined\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "audit_log_write(text,text,text,text,jsonb,jsonb,jsonb,text)",
+          "args": "_module text, _action text, _entity_type text, _entity_id text DEFAULT NULL::text, _before jsonb DEFAULT NULL::jsonb, _after jsonb DEFAULT NULL::jsonb, _metadata jsonb DEFAULT NULL::jsonb, _severity text DEFAULT 'INFO'::text",
+          "returns": "void"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "batch_reorder_fin_categorias",
+      "line": 10081,
+      "contract": "{ Args: { p_items: Json }; Returns: Json }",
+      "liveIdentities": [
+        {
+          "signature": "batch_reorder_fin_categorias(jsonb)",
+          "args": "p_items jsonb",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/financeiro/CadastroBaseTree.tsx",
+          "line": 720,
+          "kind": "rpc",
+          "name": "batch_reorder_fin_categorias"
+        }
+      ]
+    },
+    {
+      "name": "cancel_salmon_entry_atomic",
+      "line": 10082,
+      "contract": "{\r\n        Args: { p_entry_id: string; p_reason?: string }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "cancel_salmon_entry_atomic(uuid,text)",
+          "args": "p_entry_id uuid, p_reason text DEFAULT 'Cancelamento de entrada'::text",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "cancel_salmon_manipulation_atomic",
+      "line": 10086,
+      "contract": "{\r\n        Args: { p_manip_id: string; p_reason?: string }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "cancel_salmon_manipulation_atomic(uuid,text)",
+          "args": "p_manip_id uuid, p_reason text DEFAULT 'Cancelamento de manipulação'::text",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "cleanup_old_audit_logs",
+      "line": 10090,
+      "contract": "{ Args: { p_months?: number }; Returns: number }",
+      "liveIdentities": [
+        {
+          "signature": "cleanup_old_audit_logs(integer)",
+          "args": "p_months integer DEFAULT 24",
+          "returns": "integer"
+        }
+      ],
+      "callers": [
+        {
+          "file": "supabase/functions/scheduled-jobs/index.ts",
+          "line": 58,
+          "kind": "rpc",
+          "name": "cleanup_old_audit_logs"
+        }
+      ]
+    },
+    {
+      "name": "comparativo_periodos",
+      "line": 10091,
+      "contract": "{\r\n        Args: { p_mes_a: string; p_mes_b: string }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "comparativo_periodos(text,text)",
+          "args": "p_mes_a text, p_mes_b text",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/financeiro/ComparativoSection.tsx",
+          "line": 96,
+          "kind": "rpc",
+          "name": "comparativo_periodos"
+        }
+      ]
+    },
+    {
+      "name": "compute_requisicao_status_agregado",
+      "line": 10095,
+      "contract": "{\r\n        Args: { p_requisicao_id: string }\r\n        Returns: string\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "compute_requisicao_status_agregado(uuid)",
+          "args": "p_requisicao_id uuid",
+          "returns": "text"
+        }
+      ],
+      "callers": [
+        {
+          "file": "supabase/functions/requisicao-estoque/index.ts",
+          "line": 630,
+          "kind": "rpc",
+          "name": "compute_requisicao_status_agregado"
+        }
+      ]
+    },
+    {
+      "name": "contar_lancamentos_sem_categoria",
+      "line": 10099,
+      "contract": "{ Args: never; Returns: number }",
+      "liveIdentities": [
+        {
+          "signature": "contar_lancamentos_sem_categoria()",
+          "args": "",
+          "returns": "integer"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/financeiro/CategorizacaoSection.tsx",
+          "line": 114,
+          "kind": "rpc",
+          "name": "contar_lancamentos_sem_categoria"
+        }
+      ]
+    },
+    {
+      "name": "copiar_orcamento_mes",
+      "line": 10100,
+      "contract": "{\r\n        Args: { p_destino: string; p_origem: string }\r\n        Returns: number\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "copiar_orcamento_mes(text,text)",
+          "args": "p_origem text, p_destino text",
+          "returns": "integer"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/financeiro/OrcamentoSection.tsx",
+          "line": 363,
+          "kind": "rpc",
+          "name": "copiar_orcamento_mes"
+        }
+      ]
+    },
+    {
+      "name": "count_requisicoes_with_pending_items",
+      "line": 10104,
+      "contract": "{ Args: never; Returns: number }",
+      "liveIdentities": [
+        {
+          "signature": "count_requisicoes_with_pending_items()",
+          "args": "",
+          "returns": "integer"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/EstoqueGeralView.tsx",
+          "line": 104,
+          "kind": "rpc",
+          "name": "count_requisicoes_with_pending_items"
+        }
+      ]
+    },
+    {
+      "name": "create_cotacao_atomic",
+      "line": 10105,
+      "contract": "{\r\n        Args: {\r\n          p_data_validade?: string\r\n          p_fornecedores?: Json\r\n          p_itens?: Json\r\n          p_observacao?: string\r\n          p_origin_ref?: string\r\n          p_origin_type?: string\r\n          p_titulo: string\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "create_cotacao_atomic(text,text,date,text,uuid,jsonb,jsonb)",
+          "args": "p_titulo text, p_observacao text DEFAULT NULL::text, p_data_validade date DEFAULT NULL::date, p_origin_type text DEFAULT 'MANUAL'::text, p_origin_ref uuid DEFAULT NULL::uuid, p_itens jsonb DEFAULT '[]'::jsonb, p_fornecedores jsonb DEFAULT '[]'::jsonb",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/hooks/useCotacoesStore.ts",
+          "line": 139,
+          "kind": "rpc",
+          "name": "create_cotacao_atomic"
+        }
+      ]
+    },
+    {
+      "name": "create_inventory_atomic",
+      "line": 10117,
+      "contract": "{\r\n        Args: {\r\n          p_categorias?: string[]\r\n          p_data: string\r\n          p_hora: string\r\n          p_idempotency_key?: string\r\n          p_observacao?: string\r\n          p_tipo: string\r\n          p_turno_id: string\r\n        }\r\n        Returns: string\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "create_inventory_atomic(text,date,text,uuid,text[],text,text)",
+          "args": "p_tipo text, p_data date, p_hora text, p_turno_id uuid, p_categorias text[] DEFAULT '{}'::text[], p_observacao text DEFAULT ''::text, p_idempotency_key text DEFAULT NULL::text",
+          "returns": "uuid"
+        }
+      ],
+      "callers": [
+        {
+          "file": "supabase/functions/inventario/index.ts",
+          "line": 169,
+          "kind": "rpc",
+          "name": "create_inventory_atomic"
+        }
+      ]
+    },
+    {
+      "name": "create_purchase_order_atomic",
+      "line": 10129,
+      "contract": "{\r\n        Args: { p_idempotency_key: string; p_payload: Json }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "create_purchase_order_atomic(jsonb,uuid)",
+          "args": "p_payload jsonb, p_idempotency_key uuid",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/hooks/usePurchaseOrdersStore.ts",
+          "line": 280,
+          "kind": "rpc",
+          "name": "create_purchase_order_atomic"
+        }
+      ]
+    },
+    {
+      "name": "create_purchase_orders_from_cotacao_atomic",
+      "line": 10133,
+      "contract": "{\r\n        Args: { p_cotacao_id: string; p_expected_updated_at?: string }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "create_purchase_orders_from_cotacao_atomic(uuid,timestamp with time zone)",
+          "args": "p_cotacao_id uuid, p_expected_updated_at timestamp with time zone DEFAULT NULL::timestamp with time zone",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/hooks/useCotacoesStore.ts",
+          "line": 241,
+          "kind": "rpc",
+          "name": "create_purchase_orders_from_cotacao_atomic"
+        }
+      ]
+    },
+    {
+      "name": "create_quick_inventory_atomic",
+      "line": 10137,
+      "contract": "{\r\n        Args: {\r\n          p_idempotency_key?: string\r\n          p_items: Json\r\n          p_observacao?: string\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "create_quick_inventory_atomic(jsonb,text,text)",
+          "args": "p_items jsonb, p_observacao text DEFAULT NULL::text, p_idempotency_key text DEFAULT NULL::text",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/QuickInventorySection.tsx",
+          "line": 171,
+          "kind": "rpc",
+          "name": "create_quick_inventory_atomic"
+        }
+      ]
+    },
+    {
+      "name": "create_salmon_entry_atomic",
+      "line": 10145,
+      "contract": "{\r\n        Args: {\r\n          p_boxes: number\r\n          p_entry_date: string\r\n          p_gross_kg: number\r\n          p_lot: string\r\n          p_notes?: string\r\n          p_sif: string\r\n          p_supplier_name: string\r\n          p_total_value: number\r\n          p_units: number\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "create_salmon_entry_atomic(date,text,text,text,integer,integer,numeric,numeric,text,date)",
+          "args": "p_entry_date date, p_lot text, p_sif text, p_supplier_name text, p_boxes integer, p_units integer, p_gross_kg numeric, p_total_value numeric, p_notes text DEFAULT ''::text, p_expiration_date date DEFAULT NULL::date",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "create_salmon_manipulation_atomic",
+      "line": 10159,
+      "contract": "{\r\n        Args: {\r\n          p_clean_in_kg: number\r\n          p_entry_id: string\r\n          p_fish_count: number\r\n          p_gross_out_kg: number\r\n          p_leftover_kg?: number\r\n          p_manipulation_date: string\r\n          p_notes?: string\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "create_salmon_manipulation_atomic(uuid,date,integer,numeric,numeric,numeric,text)",
+          "args": "p_entry_id uuid, p_manipulation_date date, p_fish_count integer, p_gross_out_kg numeric, p_clean_in_kg numeric, p_leftover_kg numeric DEFAULT 0, p_notes text DEFAULT ''::text",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "create_transfer",
+      "line": 10171,
+      "contract": "{\r\n        Args: {\r\n          p_conta_destino: string\r\n          p_conta_origem: string\r\n          p_created_by?: string\r\n          p_data: string\r\n          p_descricao: string\r\n          p_valor: number\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "create_transfer(uuid,uuid,numeric,date,text,uuid)",
+          "args": "p_conta_origem uuid, p_conta_destino uuid, p_valor numeric, p_data date, p_descricao text, p_created_by uuid DEFAULT NULL::uuid",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/financeiro/LivroRazaoSection.tsx",
+          "line": 534,
+          "kind": "rpc",
+          "name": "create_transfer"
+        }
+      ]
+    },
+    {
+      "name": "debug_company_inventory",
+      "line": 10182,
+      "contract": "{ Args: never; Returns: Json }",
+      "liveIdentities": [
+        {
+          "signature": "debug_company_inventory()",
+          "args": "",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "debug_stock_last_movements",
+      "line": 10183,
+      "contract": "{ Args: { p_limit?: number }; Returns: Json }",
+      "liveIdentities": [
+        {
+          "signature": "debug_stock_last_movements(integer)",
+          "args": "p_limit integer DEFAULT 30",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "debug_tenant",
+      "line": 10184,
+      "contract": "{ Args: never; Returns: Json }",
+      "liveIdentities": [
+        {
+          "signature": "debug_tenant()",
+          "args": "",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "delete_transfer",
+      "line": 10185,
+      "contract": "{ Args: { p_lancamento_id: string }; Returns: Json }",
+      "liveIdentities": [
+        {
+          "signature": "delete_transfer(uuid)",
+          "args": "p_lancamento_id uuid",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/financeiro/LivroRazaoSection.tsx",
+          "line": 489,
+          "kind": "rpc",
+          "name": "delete_transfer"
+        }
+      ]
+    },
+    {
+      "name": "edit_purchase_order_atomic",
+      "line": 10186,
+      "contract": "{\r\n        Args: { p_order_id: string; p_payload: Json }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "edit_purchase_order_atomic(uuid,jsonb)",
+          "args": "p_order_id uuid, p_payload jsonb",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/hooks/usePurchaseOrdersStore.ts",
+          "line": 576,
+          "kind": "rpc",
+          "name": "edit_purchase_order_atomic"
+        }
+      ]
+    },
+    {
+      "name": "ensure_salmon_raw_product",
+      "line": 10190,
+      "contract": "{ Args: never; Returns: string }",
+      "liveIdentities": [
+        {
+          "signature": "ensure_salmon_raw_product()",
+          "args": "",
+          "returns": "uuid"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "ficha_salvar_componente_itens_atomic",
+      "line": 10191,
+      "contract": "{\r\n        Args: { _componente_pai_id: string; _itens: Json }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "ficha_salvar_componente_itens_atomic(uuid,jsonb)",
+          "args": "_componente_pai_id uuid, _itens jsonb",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "supabase/functions/ficha-tecnica/index.ts",
+          "line": 546,
+          "kind": "rpc",
+          "name": "ficha_salvar_componente_itens_atomic"
+        }
+      ]
+    },
+    {
+      "name": "fin_audit_integrity_check",
+      "line": 10195,
+      "contract": "{\r\n        Args: never\r\n        Returns: {\r\n          descricao: string\r\n          entidade_id: string\r\n          lancamento_id: string\r\n          problema: string\r\n          status: string\r\n          tipo: string\r\n          valor: number\r\n        }[]\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "fin_audit_integrity_check()",
+          "args": "",
+          "returns": "TABLE(tipo text, problema text, entidade_id uuid, descricao text, valor numeric, status text, lancamento_id uuid)"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "fin_categoria_fora_do_resultado",
+      "line": 10207,
+      "contract": "{\r\n        Args: { p_categoria_id: string; p_company_id: string }\r\n        Returns: boolean\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "fin_categoria_fora_do_resultado(uuid,uuid)",
+          "args": "p_categoria_id uuid, p_company_id uuid",
+          "returns": "boolean"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "fin_category_is_excluded",
+      "line": 10211,
+      "contract": "{\r\n        Args: { p_category_id: string; p_company_id: string }\r\n        Returns: boolean\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "fin_category_is_excluded(uuid,uuid)",
+          "args": "p_category_id uuid, p_company_id uuid",
+          "returns": "boolean"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "fin_ensure_non_operational_categories",
+      "line": 10215,
+      "contract": "{\r\n        Args: { p_company_id: string }\r\n        Returns: undefined\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "fin_ensure_non_operational_categories(uuid)",
+          "args": "p_company_id uuid",
+          "returns": "void"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "fin_entity_has_category",
+      "line": 10219,
+      "contract": "{\r\n        Args: {\r\n          p_company_id: string\r\n          p_direct_category_id: string\r\n          p_entity_id: string\r\n        }\r\n        Returns: boolean\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "fin_entity_has_category(uuid,uuid,uuid)",
+          "args": "p_entity_id uuid, p_direct_category_id uuid, p_company_id uuid",
+          "returns": "boolean"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "fin_get_categoria_desconto_baixa",
+      "line": 10227,
+      "contract": "{\r\n        Args: { p_company_id: string }\r\n        Returns: string\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "fin_get_categoria_desconto_baixa(uuid)",
+          "args": "p_company_id uuid",
+          "returns": "uuid"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "fin_get_categoria_desconto_concedido",
+      "line": 10231,
+      "contract": "{\r\n        Args: { p_company_id: string }\r\n        Returns: string\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "fin_get_categoria_desconto_concedido(uuid)",
+          "args": "p_company_id uuid",
+          "returns": "uuid"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "fin_get_limite_aprovacao",
+      "line": 10235,
+      "contract": "{\r\n        Args: { p_company_id: string }\r\n        Returns: number\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "fin_get_limite_aprovacao(uuid)",
+          "args": "p_company_id uuid",
+          "returns": "numeric"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "fin_get_limite_aprovacao_atual",
+      "line": 10239,
+      "contract": "{ Args: never; Returns: number }",
+      "liveIdentities": [
+        {
+          "signature": "fin_get_limite_aprovacao_atual()",
+          "args": "",
+          "returns": "numeric"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "fin_recompute_entity_report_exclusion",
+      "line": 10240,
+      "contract": "{\r\n        Args: { p_company_id: string; p_entity_id: string }\r\n        Returns: undefined\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "fin_recompute_entity_report_exclusion(uuid,uuid)",
+          "args": "p_entity_id uuid, p_company_id uuid",
+          "returns": "void"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "fin_recorrencia_config_valida",
+      "line": 10244,
+      "contract": "{\r\n        Args: { p_config: Json }\r\n        Returns: boolean\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "fin_recorrencia_config_valida(jsonb)",
+          "args": "p_config jsonb",
+          "returns": "boolean"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "fin_set_limite_aprovacao",
+      "line": 10248,
+      "contract": "{ Args: { p_valor: number }; Returns: Json }",
+      "liveIdentities": [
+        {
+          "signature": "fin_set_limite_aprovacao(numeric)",
+          "args": "p_valor numeric",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "fin_validate_recorrencia_config",
+      "line": 10249,
+      "contract": "{\r\n        Args: { p_config: Json }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "fin_validate_recorrencia_config(jsonb)",
+          "args": "p_config jsonb",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "finalize_inventory_atomic",
+      "line": 10253,
+      "contract": "{\r\n        Args: { p_id: string; p_justificativa: string }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "finalize_inventory_atomic(uuid,text)",
+          "args": "p_id uuid, p_justificativa text",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "supabase/functions/inventario/index.ts",
+          "line": 333,
+          "kind": "rpc",
+          "name": "finalize_inventory_atomic"
+        }
+      ]
+    },
+    {
+      "name": "fn_recompute_product_saldo",
+      "line": 10257,
+      "contract": "{\r\n        Args: { p_company: string; p_id: string }\r\n        Returns: undefined\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "fn_recompute_product_saldo(uuid,uuid)",
+          "args": "p_id uuid, p_company uuid",
+          "returns": "void"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "generate_next_sku",
+      "line": 10261,
+      "contract": "{ Args: { p_prefix?: string }; Returns: string }",
+      "liveIdentities": [
+        {
+          "signature": "generate_next_sku(text)",
+          "args": "p_prefix text DEFAULT 'MP'::text",
+          "returns": "text"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/hooks/useEstoqueGeralStore.ts",
+          "line": 610,
+          "kind": "rpc",
+          "name": "generate_next_sku"
+        }
+      ]
+    },
+    {
+      "name": "deactivate_produto",
+      "line": 10262,
+      "contract": "{ Args: { p_produto_id: string }; Returns: string }",
+      "liveIdentities": [],
+      "callers": [
+        {
+          "file": "src/hooks/useEstoqueGeralStore.ts",
+          "line": 706,
+          "kind": "rpc",
+          "name": "deactivate_produto"
+        }
+      ]
+    },
+    {
+      "name": "gerar_parcela_recorrente",
+      "line": 10263,
+      "contract": "{\r\n        Args: { p_lancamento_pai_id: string }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "gerar_parcela_recorrente(uuid)",
+          "args": "p_lancamento_pai_id uuid",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/financeiro/RecorrenciasSection.tsx",
+          "line": 216,
+          "kind": "rpc",
+          "name": "gerar_parcela_recorrente"
+        }
+      ]
+    },
+    {
+      "name": "get_all_saldos_contas",
+      "line": 10267,
+      "contract": "{\r\n        Args: never\r\n        Returns: {\r\n          conta_id: string\r\n          saldo: number\r\n        }[]\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "get_all_saldos_contas()",
+          "args": "",
+          "returns": "TABLE(conta_id uuid, saldo numeric)"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/financeiro/ContasBancariasSection.tsx",
+          "line": 135,
+          "kind": "rpc",
+          "name": "get_all_saldos_contas"
+        }
+      ]
+    },
+    {
+      "name": "get_beneficios_masked",
+      "line": 10274,
+      "contract": "{\r\n        Args: { p_colaborador_id?: string }\r\n        Returns: {\r\n          colaborador_id: string\r\n          created_at: string\r\n          data_fim: string\r\n          data_inicio: string\r\n          descricao: string\r\n          elegivel: boolean\r\n          id: string\r\n          nome: string\r\n          numero_cartao: string\r\n          numero_cartao_last4: string\r\n          observacoes: string\r\n          operadora: string\r\n          percentual_desconto: number\r\n          status: string\r\n          tipo: string\r\n          valor_colaborador: number\r\n          valor_empresa: number\r\n        }[]\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "get_beneficios_masked(uuid)",
+          "args": "p_colaborador_id uuid DEFAULT NULL::uuid",
+          "returns": "TABLE(id uuid, colaborador_id uuid, tipo text, nome text, descricao text, valor_empresa numeric, valor_colaborador numeric, percentual_desconto numeric, elegivel boolean, data_inicio date, data_fim date, status text, operadora text, numero_cartao text, numero_cartao_last4 text, observacoes text, created_at timestamp with time zone)"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "get_catalog_counts",
+      "line": 10296,
+      "contract": "{ Args: never; Returns: Json }",
+      "liveIdentities": [
+        {
+          "signature": "get_catalog_counts()",
+          "args": "",
+          "returns": "json"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "get_consumo_por_produto",
+      "line": 10297,
+      "contract": "{\r\n        Args: {\r\n          p_company_id: string\r\n          p_produtos: string[]\r\n          p_since: string\r\n          p_tipos: string[]\r\n        }\r\n        Returns: {\r\n          consumo_total: number\r\n          dias_com_mov: number\r\n          media_diaria: number\r\n          produto_id: string\r\n          ultima_mov: string\r\n        }[]\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "get_consumo_por_produto(uuid,date,text[],uuid[])",
+          "args": "p_company_id uuid, p_since date, p_tipos text[], p_produtos uuid[]",
+          "returns": "TABLE(produto_id uuid, consumo_total numeric, dias_com_mov bigint, ultima_mov date, media_diaria numeric)"
+        }
+      ],
+      "callers": [
+        {
+          "file": "supabase/functions/cmv/index.ts",
+          "line": 629,
+          "kind": "rpc",
+          "name": "get_consumo_por_produto"
+        }
+      ]
+    },
+    {
+      "name": "get_cotacao_ia_config",
+      "line": 10312,
+      "contract": "{ Args: never; Returns: Json }",
+      "liveIdentities": [
+        {
+          "signature": "get_cotacao_ia_config()",
+          "args": "",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/hooks/useIntegracoesConfig.ts",
+          "line": 60,
+          "kind": "rpc",
+          "name": "get_cotacao_ia_config"
+        }
+      ]
+    },
+    {
+      "name": "get_cotacao_zapi_config",
+      "line": 10313,
+      "contract": "{ Args: never; Returns: Json }",
+      "liveIdentities": [
+        {
+          "signature": "get_cotacao_zapi_config()",
+          "args": "",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/hooks/useIntegracoesConfig.ts",
+          "line": 59,
+          "kind": "rpc",
+          "name": "get_cotacao_zapi_config"
+        }
+      ]
+    },
+    {
+      "name": "get_current_company_id",
+      "line": 10314,
+      "contract": "{ Args: never; Returns: string }",
+      "liveIdentities": [
+        {
+          "signature": "get_current_company_id()",
+          "args": "",
+          "returns": "uuid"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "get_current_company_id_strict",
+      "line": 10315,
+      "contract": "{ Args: never; Returns: string }",
+      "liveIdentities": [
+        {
+          "signature": "get_current_company_id_strict()",
+          "args": "",
+          "returns": "uuid"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "get_effective_permissions",
+      "line": 10316,
+      "contract": "{\r\n        Args: { _user_id: string }\r\n        Returns: string[]\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "get_effective_permissions(uuid)",
+          "args": "_user_id uuid",
+          "returns": "text[]"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/lib/companyAccess.ts",
+          "line": 62,
+          "kind": "rpc",
+          "name": "get_effective_permissions"
+        },
+        {
+          "file": "supabase/functions/admin-users/index.ts",
+          "line": 19,
+          "kind": "rpc",
+          "name": "get_effective_permissions"
+        }
+      ]
+    },
+    {
+      "name": "get_fin_alertas",
+      "line": 10320,
+      "contract": "{ Args: never; Returns: Json }",
+      "liveIdentities": [
+        {
+          "signature": "get_fin_alertas()",
+          "args": "",
+          "returns": "json"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/financeiro/AlertasSection.tsx",
+          "line": 108,
+          "kind": "rpc",
+          "name": "get_fin_alertas"
+        }
+      ]
+    },
+    {
+      "name": "get_fin_bordero",
+      "line": 10321,
+      "contract": "{\r\n        Args: { p_fim: string; p_inicio: string }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "get_fin_bordero(date,date)",
+          "args": "p_inicio date, p_fim date",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/hooks/useBordero.ts",
+          "line": 34,
+          "kind": "rpc",
+          "name": "get_fin_bordero"
+        }
+      ]
+    },
+    {
+      "name": "get_fin_cashflow",
+      "line": 10325,
+      "contract": "{\r\n        Args: { p_fim: string; p_inicio: string }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "get_fin_cashflow(date,date)",
+          "args": "p_inicio date, p_fim date",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/financeiro/FluxoCaixaSection.tsx",
+          "line": 120,
+          "kind": "rpc",
+          "name": "get_fin_cashflow"
+        }
+      ]
+    },
+    {
+      "name": "get_fin_counts_by_status",
+      "line": 10329,
+      "contract": "{\r\n        Args: { p_end?: string; p_start?: string }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "get_fin_counts_by_status(date,date)",
+          "args": "p_start date DEFAULT NULL::date, p_end date DEFAULT NULL::date",
+          "returns": "json"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/financeiro/ContasPagarSection.tsx",
+          "line": 190,
+          "kind": "rpc",
+          "name": "get_fin_counts_by_status"
+        },
+        {
+          "file": "src/components/financeiro/ContasReceberSection.tsx",
+          "line": 176,
+          "kind": "rpc",
+          "name": "get_fin_counts_by_status"
+        }
+      ]
+    },
+    {
+      "name": "get_fin_dashboard_charts",
+      "line": 10333,
+      "contract": "{\r\n        Args: { p_end: string; p_start: string }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "get_fin_dashboard_charts(date,date)",
+          "args": "p_start date, p_end date",
+          "returns": "json"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/financeiro/DashboardCharts.tsx",
+          "line": 76,
+          "kind": "rpc",
+          "name": "get_fin_dashboard_charts"
+        },
+        {
+          "file": "src/components/financeiro/DashboardCharts.tsx",
+          "line": 77,
+          "kind": "rpc",
+          "name": "get_fin_dashboard_charts"
+        }
+      ]
+    },
+    {
+      "name": "get_fin_dashboard_summary",
+      "line": 10337,
+      "contract": "{\r\n        Args: { p_end: string; p_start: string }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "get_fin_dashboard_summary(date,date)",
+          "args": "p_start date, p_end date",
+          "returns": "json"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/financeiro/DashboardFinanceiroSection.tsx",
+          "line": 143,
+          "kind": "rpc",
+          "name": "get_fin_dashboard_summary"
+        }
+      ]
+    },
+    {
+      "name": "get_fin_dfc_summary",
+      "line": 10341,
+      "contract": "{\r\n        Args: { p_fim: string; p_inicio: string }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "get_fin_dfc_summary(date,date)",
+          "args": "p_inicio date, p_fim date",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/financeiro/DFCSection.tsx",
+          "line": 76,
+          "kind": "rpc",
+          "name": "get_fin_dfc_summary"
+        }
+      ]
+    },
+    {
+      "name": "get_fin_dre_summary",
+      "line": 10345,
+      "contract": "{\r\n        Args: { p_fim: string; p_inicio: string }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "get_fin_dre_summary(date,date)",
+          "args": "p_inicio date, p_fim date",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/financeiro/DRESection.tsx",
+          "line": 76,
+          "kind": "rpc",
+          "name": "get_fin_dre_summary"
+        }
+      ]
+    },
+    {
+      "name": "get_fin_fluxo_projecao",
+      "line": 10349,
+      "contract": "{\r\n        Args: { p_dias?: number; p_saldo_manual?: number }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "get_fin_fluxo_projecao(integer,numeric)",
+          "args": "p_dias integer DEFAULT 30, p_saldo_manual numeric DEFAULT NULL::numeric",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/financeiro/ProjecaoFluxoSection.tsx",
+          "line": 75,
+          "kind": "rpc",
+          "name": "get_fin_fluxo_projecao"
+        }
+      ]
+    },
+    {
+      "name": "get_fin_kpis",
+      "line": 10353,
+      "contract": "| { Args: { p_meses?: number }; Returns: Json }\r\n        | { Args: { p_end: string; p_start: string }; Returns: Json }",
+      "liveIdentities": [
+        {
+          "signature": "get_fin_kpis(date,date)",
+          "args": "p_start date, p_end date",
+          "returns": "json"
+        },
+        {
+          "signature": "get_fin_kpis(integer)",
+          "args": "p_meses integer DEFAULT 6",
+          "returns": "json"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/financeiro/KPIsSection.tsx",
+          "line": 91,
+          "kind": "rpc",
+          "name": "get_fin_kpis"
+        }
+      ]
+    },
+    {
+      "name": "get_fin_lancamentos_totais",
+      "line": 10356,
+      "contract": "{\r\n        Args: {\r\n          p_categoria_id?: string\r\n          p_conta_id?: string\r\n          p_end?: string\r\n          p_origem?: string\r\n          p_sem_categoria?: boolean\r\n          p_start?: string\r\n          p_tipo?: string\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "get_fin_lancamentos_totais(date,date,text,uuid,text,uuid,boolean)",
+          "args": "p_start date DEFAULT NULL::date, p_end date DEFAULT NULL::date, p_tipo text DEFAULT NULL::text, p_conta_id uuid DEFAULT NULL::uuid, p_origem text DEFAULT NULL::text, p_categoria_id uuid DEFAULT NULL::uuid, p_sem_categoria boolean DEFAULT false",
+          "returns": "json"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/financeiro/LivroRazaoSection.tsx",
+          "line": 212,
+          "kind": "rpc",
+          "name": "get_fin_lancamentos_totais"
+        }
+      ]
+    },
+    {
+      "name": "get_fin_presentation_category_metadata",
+      "line": 10368,
+      "contract": "{ Args: never; Returns: Json }",
+      "liveIdentities": [
+        {
+          "signature": "get_fin_presentation_category_metadata()",
+          "args": "",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/hooks/usePresentationCategoryMetadata.ts",
+          "line": 40,
+          "kind": "rpc",
+          "name": "get_fin_presentation_category_metadata"
+        }
+      ]
+    },
+    {
+      "name": "get_fin_presentation_decision",
+      "line": 10369,
+      "contract": "{\r\n        Args: { p_decision_id: string }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "get_fin_presentation_decision(uuid)",
+          "args": "p_decision_id uuid",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/hooks/usePresentationDecisions.ts",
+          "line": 119,
+          "kind": "rpc",
+          "name": "get_fin_presentation_decision"
+        }
+      ]
+    },
+    {
+      "name": "get_fin_presentation_detail_rows",
+      "line": 10373,
+      "contract": "{\r\n        Args: {\r\n          p_category_id?: string\r\n          p_end_exclusive: string\r\n          p_group?: string\r\n          p_kind?: string\r\n          p_nature?: string\r\n          p_page?: number\r\n          p_page_size?: number\r\n          p_start: string\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "get_fin_presentation_detail_rows(date,date,text,text,uuid,text,integer,integer)",
+          "args": "p_start date, p_end_exclusive date, p_kind text DEFAULT 'ledger'::text, p_nature text DEFAULT NULL::text, p_category_id uuid DEFAULT NULL::uuid, p_group text DEFAULT NULL::text, p_page integer DEFAULT 1, p_page_size integer DEFAULT 25",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/hooks/usePresentationDetail.ts",
+          "line": 204,
+          "kind": "rpc",
+          "name": "get_fin_presentation_detail_rows"
+        }
+      ]
+    },
+    {
+      "name": "get_fin_presentation_detail_series",
+      "line": 10386,
+      "contract": "{\r\n        Args: {\r\n          p_category_id?: string\r\n          p_end_exclusive: string\r\n          p_granularity?: string\r\n          p_group?: string\r\n          p_nature?: string\r\n          p_start: string\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "get_fin_presentation_detail_series(date,date,text,text,uuid,text)",
+          "args": "p_start date, p_end_exclusive date, p_granularity text DEFAULT 'month'::text, p_nature text DEFAULT NULL::text, p_category_id uuid DEFAULT NULL::uuid, p_group text DEFAULT NULL::text",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/hooks/usePresentationDetail.ts",
+          "line": 223,
+          "kind": "rpc",
+          "name": "get_fin_presentation_detail_series"
+        }
+      ]
+    },
+    {
+      "name": "get_fin_presentation_expense_details",
+      "line": 10397,
+      "contract": "{\r\n        Args: {\r\n          p_category_id?: string\r\n          p_cursor?: Json\r\n          p_limit?: number\r\n          p_month: string\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "get_fin_presentation_expense_details(text,uuid,jsonb,integer)",
+          "args": "p_month text, p_category_id uuid DEFAULT NULL::uuid, p_cursor jsonb DEFAULT NULL::jsonb, p_limit integer DEFAULT 25",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/hooks/usePresentationExpenseDetails.ts",
+          "line": 55,
+          "kind": "rpc",
+          "name": "get_fin_presentation_expense_details"
+        }
+      ]
+    },
+    {
+      "name": "get_fin_presentation_expenses",
+      "line": 10406,
+      "contract": "{\r\n        Args: { p_history_years: number[]; p_month: string }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "get_fin_presentation_expenses(text,integer[])",
+          "args": "p_month text, p_history_years integer[]",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/hooks/usePresentationExpenses.ts",
+          "line": 65,
+          "kind": "rpc",
+          "name": "get_fin_presentation_expenses"
+        }
+      ]
+    },
+    {
+      "name": "get_fin_presentation_minutes_export",
+      "line": 10410,
+      "contract": "{\r\n        Args: { p_session_id: string }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "get_fin_presentation_minutes_export(uuid)",
+          "args": "p_session_id uuid",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/hooks/usePresentationMeetings.ts",
+          "line": 138,
+          "kind": "rpc",
+          "name": "get_fin_presentation_minutes_export"
+        }
+      ]
+    },
+    {
+      "name": "get_fin_presentation_plan",
+      "line": 10414,
+      "contract": "{\r\n        Args: {\r\n          p_category_group?: string\r\n          p_category_id?: string\r\n          p_category_nature?: string\r\n          p_end_exclusive: string\r\n          p_granularity?: string\r\n          p_page?: number\r\n          p_page_size?: number\r\n          p_start: string\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "get_fin_presentation_plan(date,date,text,text,text,uuid,integer,integer)",
+          "args": "p_start date, p_end_exclusive date, p_granularity text DEFAULT 'month'::text, p_category_nature text DEFAULT NULL::text, p_category_group text DEFAULT NULL::text, p_category_id uuid DEFAULT NULL::uuid, p_page integer DEFAULT 1, p_page_size integer DEFAULT 25",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/hooks/usePresentationPlan.ts",
+          "line": 293,
+          "kind": "rpc",
+          "name": "get_fin_presentation_plan"
+        }
+      ]
+    },
+    {
+      "name": "get_fin_presentation_revenue",
+      "line": 10427,
+      "contract": "{\r\n        Args: { p_history_years: number[]; p_month: string }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "get_fin_presentation_revenue(text,integer[])",
+          "args": "p_month text, p_history_years integer[]",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/hooks/usePresentationRevenue.ts",
+          "line": 70,
+          "kind": "rpc",
+          "name": "get_fin_presentation_revenue"
+        }
+      ]
+    },
+    {
+      "name": "get_fin_presentation_session",
+      "line": 10431,
+      "contract": "{\r\n        Args: { p_session_id: string }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "get_fin_presentation_session(uuid)",
+          "args": "p_session_id uuid",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/hooks/usePresentationMeetings.ts",
+          "line": 120,
+          "kind": "rpc",
+          "name": "get_fin_presentation_session"
+        }
+      ]
+    },
+    {
+      "name": "get_fin_presentation_socios",
+      "line": 10435,
+      "contract": "{\r\n        Args: {\r\n          p_end_exclusive: string\r\n          p_granularity?: string\r\n          p_previous_end_exclusive: string\r\n          p_previous_start: string\r\n          p_previous_year_end_exclusive: string\r\n          p_previous_year_start: string\r\n          p_ranking_limit?: number\r\n          p_start: string\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "get_fin_presentation_socios(date,date,date,date,date,date,text,integer)",
+          "args": "p_start date, p_end_exclusive date, p_previous_start date, p_previous_end_exclusive date, p_previous_year_start date, p_previous_year_end_exclusive date, p_granularity text DEFAULT 'month'::text, p_ranking_limit integer DEFAULT 10",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/hooks/usePresentationSocios.ts",
+          "line": 133,
+          "kind": "rpc",
+          "name": "get_fin_presentation_socios"
+        }
+      ]
+    },
+    {
+      "name": "get_fin_saldo_atual",
+      "line": 10448,
+      "contract": "{\r\n        Args: { p_conta_id?: string; p_data?: string }\r\n        Returns: number\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "get_fin_saldo_atual(uuid,date)",
+          "args": "p_conta_id uuid DEFAULT NULL::uuid, p_data date DEFAULT NULL::date",
+          "returns": "numeric"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/financeiro/LivroRazaoSection.tsx",
+          "line": 231,
+          "kind": "rpc",
+          "name": "get_fin_saldo_atual"
+        }
+      ]
+    },
+    {
+      "name": "get_fin_saldo_conta_em",
+      "line": 10452,
+      "contract": "{\r\n        Args: { p_conta_id: string; p_data: string }\r\n        Returns: number\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "get_fin_saldo_conta_em(uuid,date)",
+          "args": "p_conta_id uuid, p_data date",
+          "returns": "numeric"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/financeiro/ConciliacaoBancariaSection.tsx",
+          "line": 157,
+          "kind": "rpc",
+          "name": "get_fin_saldo_conta_em"
+        },
+        {
+          "file": "src/components/financeiro/ConciliacaoBancariaSection.tsx",
+          "line": 394,
+          "kind": "rpc",
+          "name": "get_fin_saldo_conta_em"
+        },
+        {
+          "file": "src/components/financeiro/ConfirmarSaldoExtratoDialog.tsx",
+          "line": 122,
+          "kind": "rpc",
+          "name": "get_fin_saldo_conta_em"
+        },
+        {
+          "file": "src/components/financeiro/ContasBancariasSection.tsx",
+          "line": 177,
+          "kind": "rpc",
+          "name": "get_fin_saldo_conta_em"
+        }
+      ]
+    },
+    {
+      "name": "get_inactive_stock_items",
+      "line": 10456,
+      "contract": "{ Args: never; Returns: Json }",
+      "liveIdentities": [
+        {
+          "signature": "get_inactive_stock_items()",
+          "args": "",
+          "returns": "json"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/estoque/StockInactivityAlert.tsx",
+          "line": 39,
+          "kind": "rpc",
+          "name": "get_inactive_stock_items"
+        }
+      ]
+    },
+    {
+      "name": "get_movimentacoes_kpis",
+      "line": 10457,
+      "contract": "{\r\n        Args: {\r\n          p_date_from?: string\r\n          p_date_to?: string\r\n          p_produto_id?: string\r\n          p_setor?: string\r\n          p_show_cancelled?: boolean\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "get_movimentacoes_kpis(uuid,text,date,date,boolean)",
+          "args": "p_produto_id uuid DEFAULT NULL::uuid, p_setor text DEFAULT NULL::text, p_date_from date DEFAULT NULL::date, p_date_to date DEFAULT NULL::date, p_show_cancelled boolean DEFAULT false",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/hooks/useEstoqueGeralStore.ts",
+          "line": 459,
+          "kind": "rpc",
+          "name": "get_movimentacoes_kpis"
+        }
+      ]
+    },
+    {
+      "name": "get_or_set_cache",
+      "line": 10467,
+      "contract": "{\r\n        Args: { p_key: string; p_ttl_seconds?: number }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "get_or_set_cache(text,integer)",
+          "args": "p_key text, p_ttl_seconds integer DEFAULT 120",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "get_relatorios_compras",
+      "line": 10471,
+      "contract": "| { Args: { p_end: string; p_start: string }; Returns: Json }\r\n        | { Args: { p_end: string; p_start: string }; Returns: Json }",
+      "liveIdentities": [
+        {
+          "signature": "get_relatorios_compras(date,date)",
+          "args": "p_start date, p_end date",
+          "returns": "jsonb"
+        },
+        {
+          "signature": "get_relatorios_compras(text,text)",
+          "args": "p_start text, p_end text",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "get_relatorios_kpis",
+      "line": 10474,
+      "contract": "| { Args: { p_end: string; p_start: string }; Returns: Json }\r\n        | { Args: { p_end: string; p_start: string }; Returns: Json }",
+      "liveIdentities": [
+        {
+          "signature": "get_relatorios_kpis(date,date)",
+          "args": "p_start date, p_end date",
+          "returns": "jsonb"
+        },
+        {
+          "signature": "get_relatorios_kpis(text,text)",
+          "args": "p_start text, p_end text",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "get_relatorios_score",
+      "line": 10477,
+      "contract": "| { Args: { p_end: string; p_start: string }; Returns: Json }\r\n        | { Args: { p_end: string; p_start: string }; Returns: Json }",
+      "liveIdentities": [
+        {
+          "signature": "get_relatorios_score(date,date)",
+          "args": "p_start date, p_end date",
+          "returns": "jsonb"
+        },
+        {
+          "signature": "get_relatorios_score(text,text)",
+          "args": "p_start text, p_end text",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "get_relatorios_tendencia",
+      "line": 10480,
+      "contract": "| { Args: { p_end: string; p_start: string }; Returns: Json }\r\n        | { Args: { p_end: string; p_start: string }; Returns: Json }",
+      "liveIdentities": [
+        {
+          "signature": "get_relatorios_tendencia(date,date)",
+          "args": "p_start date, p_end date",
+          "returns": "jsonb"
+        },
+        {
+          "signature": "get_relatorios_tendencia(text,text)",
+          "args": "p_start text, p_end text",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "get_report_item_detail",
+      "line": 10483,
+      "contract": "{\r\n        Args: { p_end: string; p_produto_id: string; p_start: string }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "get_report_item_detail(uuid,date,date)",
+          "args": "p_produto_id uuid, p_start date, p_end date",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/AnaliseItemView.tsx",
+          "line": 193,
+          "kind": "rpc",
+          "name": "get_report_item_detail"
+        }
+      ]
+    },
+    {
+      "name": "get_report_items_summary",
+      "line": 10487,
+      "contract": "{\r\n        Args: { p_end: string; p_start: string }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "get_report_items_summary(date,date)",
+          "args": "p_start date, p_end date",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/AnaliseItemView.tsx",
+          "line": 166,
+          "kind": "rpc",
+          "name": "get_report_items_summary"
+        }
+      ]
+    },
+    {
+      "name": "get_rh_beneficios_total",
+      "line": 10491,
+      "contract": "{ Args: never; Returns: Json }",
+      "liveIdentities": [
+        {
+          "signature": "get_rh_beneficios_total()",
+          "args": "",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/rh/ControleCustosRhSection.tsx",
+          "line": 103,
+          "kind": "rpc",
+          "name": "get_rh_beneficios_total"
+        }
+      ]
+    },
+    {
+      "name": "get_saldo_conta",
+      "line": 10492,
+      "contract": "{ Args: { p_conta_id: string }; Returns: number }",
+      "liveIdentities": [
+        {
+          "signature": "get_saldo_conta(uuid)",
+          "args": "p_conta_id uuid",
+          "returns": "numeric"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "get_saldo_produto",
+      "line": 10493,
+      "contract": "{ Args: { p_produto_id: string }; Returns: number }",
+      "liveIdentities": [
+        {
+          "signature": "get_saldo_produto(uuid)",
+          "args": "p_produto_id uuid",
+          "returns": "numeric"
+        }
+      ],
+      "callers": [
+        {
+          "file": "supabase/functions/requisicao-estoque/index.ts",
+          "line": 481,
+          "kind": "rpc",
+          "name": "get_saldo_produto"
+        },
+        {
+          "file": "supabase/functions/requisicao-estoque/index.ts",
+          "line": 1204,
+          "kind": "rpc",
+          "name": "get_saldo_produto"
+        }
+      ]
+    },
+    {
+      "name": "get_saldo_produtos",
+      "line": 10494,
+      "contract": "{\r\n        Args: { p_produto_ids: string[] }\r\n        Returns: {\r\n          produto_id: string\r\n          saldo: number\r\n        }[]\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "get_saldo_produtos(uuid[])",
+          "args": "p_produto_ids uuid[]",
+          "returns": "TABLE(produto_id uuid, saldo numeric)"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/QuickInventorySection.tsx",
+          "line": 112,
+          "kind": "rpc",
+          "name": "get_saldo_produtos"
+        },
+        {
+          "file": "src/hooks/useEstoqueGeralStore.ts",
+          "line": 269,
+          "kind": "rpc",
+          "name": "get_saldo_produtos"
+        }
+      ]
+    },
+    {
+      "name": "get_salmon_dashboard_summary",
+      "line": 10501,
+      "contract": "{\r\n        Args: { p_end: string; p_start: string }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "get_salmon_dashboard_summary(date,date)",
+          "args": "p_start date, p_end date",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "get_salmon_inventory_adjustment_kg",
+      "line": 10505,
+      "contract": "{ Args: never; Returns: Json }",
+      "liveIdentities": [
+        {
+          "signature": "get_salmon_inventory_adjustment_kg()",
+          "args": "",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/hooks/useSalmonStore.ts",
+          "line": 240,
+          "kind": "rpc",
+          "name": "get_salmon_inventory_adjustment_kg"
+        }
+      ]
+    },
+    {
+      "name": "get_salmon_reconciliation_kpis",
+      "line": 10506,
+      "contract": "{ Args: never; Returns: Json }",
+      "liveIdentities": [
+        {
+          "signature": "get_salmon_reconciliation_kpis()",
+          "args": "",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "get_spend_by_sector",
+      "line": 10507,
+      "contract": "{\r\n        Args: {\r\n          p_end_date: string\r\n          p_include_losses?: boolean\r\n          p_start_date: string\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "get_spend_by_sector(date,date,boolean)",
+          "args": "p_start_date date, p_end_date date, p_include_losses boolean DEFAULT true",
+          "returns": "json"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/relatorios/GastosPorSetorChart.tsx",
+          "line": 44,
+          "kind": "rpc",
+          "name": "get_spend_by_sector"
+        }
+      ]
+    },
+    {
+      "name": "get_stock_consumption_history",
+      "line": 10515,
+      "contract": "{\r\n        Args: {\r\n          p_category?: string\r\n          p_end_date: string\r\n          p_group_by?: string\r\n          p_product_id?: string\r\n          p_start_date: string\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "get_stock_consumption_history(date,date,text,uuid,text)",
+          "args": "p_start_date date, p_end_date date, p_group_by text DEFAULT 'daily'::text, p_product_id uuid DEFAULT NULL::uuid, p_category text DEFAULT NULL::text",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "get_stock_dashboard",
+      "line": 10525,
+      "contract": "{ Args: { p_days?: number }; Returns: Json }",
+      "liveIdentities": [
+        {
+          "signature": "get_stock_dashboard(integer)",
+          "args": "p_days integer DEFAULT 30",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/estoque/StockDashboardSection.tsx",
+          "line": 167,
+          "kind": "rpc",
+          "name": "get_stock_dashboard"
+        }
+      ]
+    },
+    {
+      "name": "get_stock_losses_report",
+      "line": 10526,
+      "contract": "{\r\n        Args: {\r\n          p_category?: string\r\n          p_end_date?: string\r\n          p_group_by?: string\r\n          p_loss_type?: string\r\n          p_order_by?: string\r\n          p_product_id?: string\r\n          p_start_date?: string\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "get_stock_losses_report(date,date,text,uuid,text,text,text)",
+          "args": "p_start_date date DEFAULT ((now() - '30 days'::interval))::date, p_end_date date DEFAULT (now())::date, p_category text DEFAULT NULL::text, p_product_id uuid DEFAULT NULL::uuid, p_loss_type text DEFAULT NULL::text, p_order_by text DEFAULT 'quantity'::text, p_group_by text DEFAULT 'daily'::text",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/estoque/StockLossesSection.tsx",
+          "line": 97,
+          "kind": "rpc",
+          "name": "get_stock_losses_report"
+        }
+      ]
+    },
+    {
+      "name": "get_stock_predictive_analysis",
+      "line": 10538,
+      "contract": "{\r\n        Args: {\r\n          p_base_window_days?: number\r\n          p_category_id?: string\r\n          p_only_critical?: boolean\r\n          p_product_id?: string\r\n          p_target_coverage_days?: number\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "get_stock_predictive_analysis(text,uuid,integer,integer,boolean)",
+          "args": "p_category_id text DEFAULT NULL::text, p_product_id uuid DEFAULT NULL::uuid, p_base_window_days integer DEFAULT 30, p_target_coverage_days integer DEFAULT 7, p_only_critical boolean DEFAULT false",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "get_stock_predictive_analysis_v2",
+      "line": 10548,
+      "contract": "{\r\n        Args: {\r\n          p_category_id?: string\r\n          p_only_critical?: boolean\r\n          p_product_id?: string\r\n          p_target_coverage_days?: number\r\n          p_use_weekday_pattern?: boolean\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "get_stock_predictive_analysis_v2(text,uuid,integer,boolean,boolean)",
+          "args": "p_category_id text DEFAULT NULL::text, p_product_id uuid DEFAULT NULL::uuid, p_target_coverage_days integer DEFAULT 7, p_only_critical boolean DEFAULT false, p_use_weekday_pattern boolean DEFAULT true",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "get_stock_summary",
+      "line": 10558,
+      "contract": "{\r\n        Args: never\r\n        Returns: {\r\n          items_count: number\r\n          missing_cost_items_count: number\r\n          total_stock_value: number\r\n          updated_at: string\r\n        }[]\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "get_stock_summary()",
+          "args": "",
+          "returns": "TABLE(total_stock_value numeric, items_count integer, missing_cost_items_count integer, updated_at timestamp with time zone)"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "get_stock_top_consumed",
+      "line": 10567,
+      "contract": "{\r\n        Args: {\r\n          p_category?: string\r\n          p_end_date: string\r\n          p_limit?: number\r\n          p_rank_by?: string\r\n          p_start_date: string\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "get_stock_top_consumed(date,date,text,integer,text)",
+          "args": "p_start_date date, p_end_date date, p_rank_by text DEFAULT 'quantity'::text, p_limit integer DEFAULT 20, p_category text DEFAULT NULL::text",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/estoque/StockTopConsumedSection.tsx",
+          "line": 101,
+          "kind": "rpc",
+          "name": "get_stock_top_consumed"
+        }
+      ]
+    },
+    {
+      "name": "get_supplier_ranking",
+      "line": 10577,
+      "contract": "{\r\n        Args: {\r\n          p_category?: string\r\n          p_limit?: number\r\n          p_offset?: number\r\n          p_sort?: string\r\n          p_stock_item_id?: string\r\n        }\r\n        Returns: {\r\n          avg_unit_cost: number\r\n          has_more: boolean\r\n          items_count: number\r\n          last_price: number\r\n          last_updated_at: string\r\n          max_unit_cost: number\r\n          min_unit_cost: number\r\n          rank_position: number\r\n          supplier_id: string\r\n          supplier_name: string\r\n          supplier_uuid: string\r\n        }[]\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "get_supplier_ranking(uuid,text,integer,integer,text)",
+          "args": "p_stock_item_id uuid DEFAULT NULL::uuid, p_category text DEFAULT NULL::text, p_limit integer DEFAULT 50, p_offset integer DEFAULT 0, p_sort text DEFAULT 'cheapest'::text",
+          "returns": "TABLE(supplier_id text, supplier_uuid uuid, supplier_name text, avg_unit_cost numeric, min_unit_cost numeric, max_unit_cost numeric, last_price numeric, last_updated_at timestamp with time zone, items_count bigint, rank_position bigint, has_more boolean)"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/compras/RankingFornecedoresView.tsx",
+          "line": 75,
+          "kind": "rpc",
+          "name": "get_supplier_ranking"
+        }
+      ]
+    },
+    {
+      "name": "has_any_permission",
+      "line": 10599,
+      "contract": "{\r\n        Args: { _permissions: string[]; _user_id: string }\r\n        Returns: boolean\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "has_any_permission(uuid,text[])",
+          "args": "_user_id uuid, _permissions text[]",
+          "returns": "boolean"
+        }
+      ],
+      "callers": [
+        {
+          "file": "supabase/functions/ficha-tecnica/index.ts",
+          "line": 85,
+          "kind": "rpc",
+          "name": "has_any_permission"
+        }
+      ]
+    },
+    {
+      "name": "has_compras_view",
+      "line": 10603,
+      "contract": "{ Args: { p_user_id: string }; Returns: boolean }",
+      "liveIdentities": [
+        {
+          "signature": "has_compras_view(uuid)",
+          "args": "p_user_id uuid",
+          "returns": "boolean"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "has_permission",
+      "line": 10604,
+      "contract": "| { Args: { _permission: string }; Returns: boolean }\r\n        | { Args: { _permission: string; _user_id: string }; Returns: boolean }",
+      "liveIdentities": [
+        {
+          "signature": "has_permission(text)",
+          "args": "_permission text",
+          "returns": "boolean"
+        },
+        {
+          "signature": "has_permission(uuid,text)",
+          "args": "_user_id uuid, _permission text",
+          "returns": "boolean"
+        }
+      ],
+      "callers": [
+        {
+          "file": "supabase/functions/admin-companies/index.ts",
+          "line": 35,
+          "kind": "rpc",
+          "name": "has_permission"
+        },
+        {
+          "file": "supabase/functions/admin-create-user/index.ts",
+          "line": 35,
+          "kind": "rpc",
+          "name": "has_permission"
+        },
+        {
+          "file": "supabase/functions/ai-chat/index.ts",
+          "line": 134,
+          "kind": "rpc",
+          "name": "has_permission"
+        },
+        {
+          "file": "supabase/functions/cmv/index.ts",
+          "line": 60,
+          "kind": "rpc",
+          "name": "has_permission"
+        },
+        {
+          "file": "supabase/functions/cotacao-ia/index.ts",
+          "line": 64,
+          "kind": "rpc",
+          "name": "has_permission"
+        },
+        {
+          "file": "supabase/functions/ficha-tecnica/index.ts",
+          "line": 80,
+          "kind": "rpc",
+          "name": "has_permission"
+        },
+        {
+          "file": "supabase/functions/inventario/index.ts",
+          "line": 40,
+          "kind": "rpc",
+          "name": "has_permission"
+        },
+        {
+          "file": "supabase/functions/purchase-requisitions/index.ts",
+          "line": 34,
+          "kind": "rpc",
+          "name": "has_permission"
+        },
+        {
+          "file": "supabase/functions/purchase-requisitions/index.ts",
+          "line": 42,
+          "kind": "rpc",
+          "name": "has_permission"
+        },
+        {
+          "file": "supabase/functions/purchase-requisitions/index.ts",
+          "line": 51,
+          "kind": "rpc",
+          "name": "has_permission"
+        },
+        {
+          "file": "supabase/functions/requisicao-estoque/index.ts",
+          "line": 101,
+          "kind": "rpc",
+          "name": "has_permission"
+        },
+        {
+          "file": "supabase/functions/rh/index.ts",
+          "line": 48,
+          "kind": "rpc",
+          "name": "has_permission"
+        },
+        {
+          "file": "supabase/functions/send-whatsapp-zapi/index.ts",
+          "line": 72,
+          "kind": "rpc",
+          "name": "has_permission"
+        }
+      ]
+    },
+    {
+      "name": "has_permission_quick",
+      "line": 10607,
+      "contract": "{\r\n        Args: { _permission: string; _user_id: string }\r\n        Returns: boolean\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "has_permission_quick(uuid,text)",
+          "args": "_user_id uuid, _permission text",
+          "returns": "boolean"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "has_role",
+      "line": 10611,
+      "contract": "{\r\n        Args: {\r\n          _role: Database[\"public\"][\"Enums\"][\"app_role\"]\r\n          _user_id: string\r\n        }\r\n        Returns: boolean\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "has_role(uuid,app_role)",
+          "args": "_user_id uuid, _role app_role",
+          "returns": "boolean"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "immutable_unaccent",
+      "line": 10618,
+      "contract": "{ Args: { \"\": string }; Returns: string }",
+      "liveIdentities": [
+        {
+          "signature": "immutable_unaccent(text)",
+          "args": "text",
+          "returns": "text"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "list_companies",
+      "line": 10619,
+      "contract": "{ Args: never; Returns: Json }",
+      "liveIdentities": [
+        {
+          "signature": "list_companies()",
+          "args": "",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "list_fin_contas_pagar_abertas",
+      "line": 10620,
+      "contract": "{\r\n        Args: {\r\n          p_data?: string\r\n          p_limit?: number\r\n          p_search?: string\r\n          p_valor?: number\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "list_fin_contas_pagar_abertas(text,numeric,date,integer)",
+          "args": "p_search text DEFAULT NULL::text, p_valor numeric DEFAULT NULL::numeric, p_data date DEFAULT NULL::date, p_limit integer DEFAULT 30",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "list_fin_contas_pagar_cursor",
+      "line": 10629,
+      "contract": "{\r\n        Args: {\r\n          p_categoria_id?: string\r\n          p_conta_id?: string\r\n          p_cursor_date?: string\r\n          p_cursor_id?: string\r\n          p_data_ate?: string\r\n          p_data_de?: string\r\n          p_fornecedor?: string\r\n          p_limit?: number\r\n          p_search?: string\r\n          p_sem_categoria?: boolean\r\n          p_status?: string\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "list_fin_contas_pagar_cursor(text,text,text,integer,date,uuid,date,date,uuid,uuid,boolean)",
+          "args": "p_status text DEFAULT NULL::text, p_fornecedor text DEFAULT NULL::text, p_search text DEFAULT NULL::text, p_limit integer DEFAULT 50, p_cursor_date date DEFAULT NULL::date, p_cursor_id uuid DEFAULT NULL::uuid, p_data_de date DEFAULT NULL::date, p_data_ate date DEFAULT NULL::date, p_conta_id uuid DEFAULT NULL::uuid, p_categoria_id uuid DEFAULT NULL::uuid, p_sem_categoria boolean DEFAULT false",
+          "returns": "json"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/financeiro/ContasPagarSection.tsx",
+          "line": 150,
+          "kind": "rpc",
+          "name": "list_fin_contas_pagar_cursor"
+        }
+      ]
+    },
+    {
+      "name": "list_fin_contas_receber_cursor",
+      "line": 10645,
+      "contract": "{\r\n        Args: {\r\n          p_categoria_id?: string\r\n          p_cliente?: string\r\n          p_conta_id?: string\r\n          p_cursor_date?: string\r\n          p_cursor_id?: string\r\n          p_data_ate?: string\r\n          p_data_de?: string\r\n          p_limit?: number\r\n          p_search?: string\r\n          p_sem_categoria?: boolean\r\n          p_status?: string\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "list_fin_contas_receber_cursor(text,text,text,integer,date,uuid,date,date,uuid,uuid,boolean)",
+          "args": "p_status text DEFAULT NULL::text, p_cliente text DEFAULT NULL::text, p_search text DEFAULT NULL::text, p_limit integer DEFAULT 50, p_cursor_date date DEFAULT NULL::date, p_cursor_id uuid DEFAULT NULL::uuid, p_data_de date DEFAULT NULL::date, p_data_ate date DEFAULT NULL::date, p_conta_id uuid DEFAULT NULL::uuid, p_categoria_id uuid DEFAULT NULL::uuid, p_sem_categoria boolean DEFAULT false",
+          "returns": "json"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/financeiro/ContasReceberSection.tsx",
+          "line": 136,
+          "kind": "rpc",
+          "name": "list_fin_contas_receber_cursor"
+        }
+      ]
+    },
+    {
+      "name": "list_fin_lancamentos_cursor",
+      "line": 10661,
+      "contract": "| {\r\n            Args: {\r\n              p_conta_id?: string\r\n              p_cursor_date?: string\r\n              p_cursor_id?: string\r\n              p_end?: string\r\n              p_limit?: number\r\n              p_search?: string\r\n              p_start?: string\r\n              p_status?: string\r\n              p_tipo?: string\r\n            }\r\n            Returns: Json\r\n          }\r\n        | {\r\n            Args: {\r\n              p_categoria_id?: string\r\n              p_conta_id?: string\r\n              p_cursor_date?: string\r\n              p_cursor_id?: string\r\n              p_end?: string\r\n              p_limit?: number\r\n              p_origem?: string\r\n              p_search?: string\r\n              p_sem_categoria?: boolean\r\n              p_start?: string\r\n              p_status?: string\r\n              p_tipo?: string\r\n            }\r\n            Returns: Json\r\n          }",
+      "liveIdentities": [
+        {
+          "signature": "list_fin_lancamentos_cursor(date,date,text,text,uuid,text,integer,date,uuid,text,uuid,boolean)",
+          "args": "p_start date DEFAULT NULL::date, p_end date DEFAULT NULL::date, p_status text DEFAULT NULL::text, p_tipo text DEFAULT NULL::text, p_conta_id uuid DEFAULT NULL::uuid, p_search text DEFAULT NULL::text, p_limit integer DEFAULT 50, p_cursor_date date DEFAULT NULL::date, p_cursor_id uuid DEFAULT NULL::uuid, p_origem text DEFAULT NULL::text, p_categoria_id uuid DEFAULT NULL::uuid, p_sem_categoria boolean DEFAULT false",
+          "returns": "json"
+        },
+        {
+          "signature": "list_fin_lancamentos_cursor(date,date,text,text,uuid,text,integer,date,uuid)",
+          "args": "p_start date DEFAULT NULL::date, p_end date DEFAULT NULL::date, p_status text DEFAULT NULL::text, p_tipo text DEFAULT NULL::text, p_conta_id uuid DEFAULT NULL::uuid, p_search text DEFAULT NULL::text, p_limit integer DEFAULT 50, p_cursor_date date DEFAULT NULL::date, p_cursor_id uuid DEFAULT NULL::uuid",
+          "returns": "json"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/financeiro/LivroRazaoSection.tsx",
+          "line": 186,
+          "kind": "rpc",
+          "name": "list_fin_lancamentos_cursor"
+        }
+      ]
+    },
+    {
+      "name": "list_fin_presentation_decisions",
+      "line": 10693,
+      "contract": "{\r\n        Args: {\r\n          p_due_filter?: string\r\n          p_page?: number\r\n          p_page_size?: number\r\n          p_period_end_exclusive?: string\r\n          p_period_start?: string\r\n          p_responsible_user_id?: string\r\n          p_search?: string\r\n          p_status?: string\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "list_fin_presentation_decisions(date,date,text,uuid,text,text,integer,integer)",
+          "args": "p_period_start date DEFAULT NULL::date, p_period_end_exclusive date DEFAULT NULL::date, p_status text DEFAULT NULL::text, p_responsible_user_id uuid DEFAULT NULL::uuid, p_due_filter text DEFAULT 'all'::text, p_search text DEFAULT ''::text, p_page integer DEFAULT 1, p_page_size integer DEFAULT 20",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/hooks/usePresentationDecisions.ts",
+          "line": 93,
+          "kind": "rpc",
+          "name": "list_fin_presentation_decisions"
+        }
+      ]
+    },
+    {
+      "name": "list_fin_presentation_sessions",
+      "line": 10706,
+      "contract": "{\r\n        Args: {\r\n          p_page?: number\r\n          p_page_size?: number\r\n          p_participant_user_id?: string\r\n          p_period_end_exclusive?: string\r\n          p_period_start?: string\r\n          p_responsible_user_id?: string\r\n          p_search?: string\r\n          p_status?: string\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "list_fin_presentation_sessions(date,date,text,uuid,uuid,text,integer,integer)",
+          "args": "p_period_start date DEFAULT NULL::date, p_period_end_exclusive date DEFAULT NULL::date, p_status text DEFAULT NULL::text, p_responsible_user_id uuid DEFAULT NULL::uuid, p_participant_user_id uuid DEFAULT NULL::uuid, p_search text DEFAULT ''::text, p_page integer DEFAULT 1, p_page_size integer DEFAULT 20",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/hooks/usePresentationMeetings.ts",
+          "line": 94,
+          "kind": "rpc",
+          "name": "list_fin_presentation_sessions"
+        }
+      ]
+    },
+    {
+      "name": "list_movimentacoes_cursor",
+      "line": 10719,
+      "contract": "{\r\n        Args: {\r\n          p_categoria?: string\r\n          p_cursor_created_at?: string\r\n          p_cursor_id?: string\r\n          p_date_from?: string\r\n          p_date_to?: string\r\n          p_direction?: string\r\n          p_limit?: number\r\n          p_produto_id?: string\r\n          p_setor?: string\r\n          p_show_cancelled?: boolean\r\n        }\r\n        Returns: {\r\n          created_at: string\r\n          created_by: string\r\n          custo_total: number\r\n          custo_unitario: number\r\n          data: string\r\n          direction: string\r\n          estorno_de_id: string\r\n          has_more: boolean\r\n          id: string\r\n          internal_transfer: boolean\r\n          justificativa_cancelamento: string\r\n          justificativa_edicao: string\r\n          observacao: string\r\n          origem: string\r\n          produto_id: string\r\n          quantidade: number\r\n          reference_id: string\r\n          reference_type: string\r\n          referencia_id: string\r\n          salmon_lot_id: string\r\n          setor: string\r\n          source_module: string\r\n          status: string\r\n          tipo: string\r\n        }[]\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "list_movimentacoes_cursor(text,uuid,text,text,date,date,boolean,timestamp with time zone,uuid,integer)",
+          "args": "p_direction text DEFAULT NULL::text, p_produto_id uuid DEFAULT NULL::uuid, p_categoria text DEFAULT NULL::text, p_setor text DEFAULT NULL::text, p_date_from date DEFAULT NULL::date, p_date_to date DEFAULT NULL::date, p_show_cancelled boolean DEFAULT false, p_cursor_created_at timestamp with time zone DEFAULT NULL::timestamp with time zone, p_cursor_id uuid DEFAULT NULL::uuid, p_limit integer DEFAULT 50",
+          "returns": "TABLE(id uuid, produto_id uuid, data date, tipo text, quantidade numeric, custo_unitario numeric, custo_total numeric, origem text, referencia_id text, observacao text, created_by uuid, created_at timestamp with time zone, status text, estorno_de_id uuid, justificativa_cancelamento text, justificativa_edicao text, setor text, reference_type text, reference_id text, internal_transfer boolean, source_module text, salmon_lot_id text, direction text, has_more boolean)"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/hooks/useEstoqueGeralStore.ts",
+          "line": 477,
+          "kind": "rpc",
+          "name": "list_movimentacoes_cursor"
+        }
+      ]
+    },
+    {
+      "name": "list_profiles_minimal",
+      "line": 10759,
+      "contract": "{\r\n        Args: { p_limit?: number; p_search?: string }\r\n        Returns: {\r\n          avatar_url: string\r\n          email: string\r\n          id: string\r\n          nome: string\r\n        }[]\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "list_profiles_minimal(text,integer)",
+          "args": "p_search text DEFAULT ''::text, p_limit integer DEFAULT 50",
+          "returns": "TABLE(id uuid, nome text, email text, avatar_url text)"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/GlobalAuditView.tsx",
+          "line": 166,
+          "kind": "rpc",
+          "name": "list_profiles_minimal"
+        },
+        {
+          "file": "src/components/InventarioView.tsx",
+          "line": 965,
+          "kind": "rpc",
+          "name": "list_profiles_minimal"
+        },
+        {
+          "file": "src/components/RhView.tsx",
+          "line": 216,
+          "kind": "rpc",
+          "name": "list_profiles_minimal"
+        },
+        {
+          "file": "src/components/UserMentionSelect.tsx",
+          "line": 32,
+          "kind": "rpc",
+          "name": "list_profiles_minimal"
+        },
+        {
+          "file": "src/hooks/usePresentationDecisions.ts",
+          "line": 138,
+          "kind": "rpc",
+          "name": "list_profiles_minimal"
+        }
+      ]
+    },
+    {
+      "name": "list_purchase_orders_cursor",
+      "line": 10768,
+      "contract": "{\r\n        Args: {\r\n          p_cursor_created_at?: string\r\n          p_cursor_id?: string\r\n          p_limit?: number\r\n          p_priority?: string\r\n          p_responsible?: string\r\n          p_search?: string\r\n          p_status?: string\r\n          p_type?: string\r\n        }\r\n        Returns: {\r\n          category: string\r\n          concluded_at: string\r\n          created_at: string\r\n          created_by: string\r\n          delivery_forecast_date: string\r\n          has_more: boolean\r\n          id: string\r\n          need_by_date: string\r\n          not_delivered_ack_at: string\r\n          not_delivered_ack_by: string\r\n          notes: string\r\n          origin: string\r\n          origin_ref: string\r\n          payment_type: string\r\n          priority: string\r\n          responsible_user_id: string\r\n          shopping_done_at: string\r\n          shopping_done_by: string\r\n          status: string\r\n          supplier_name: string\r\n          title: string\r\n          total_confirmed: number\r\n          total_estimated: number\r\n          type: string\r\n          updated_at: string\r\n        }[]\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "list_purchase_orders_cursor(integer,timestamp with time zone,uuid,text,text,text,text,text)",
+          "args": "p_limit integer DEFAULT 50, p_cursor_created_at timestamp with time zone DEFAULT NULL::timestamp with time zone, p_cursor_id uuid DEFAULT NULL::uuid, p_status text DEFAULT NULL::text, p_type text DEFAULT NULL::text, p_priority text DEFAULT NULL::text, p_search text DEFAULT NULL::text, p_responsible text DEFAULT NULL::text",
+          "returns": "TABLE(id uuid, title text, type text, priority text, category text, supplier_name text, payment_type text, need_by_date date, delivery_forecast_date date, responsible_user_id text, notes text, status text, total_estimated numeric, total_confirmed numeric, concluded_at timestamp with time zone, shopping_done_at timestamp with time zone, shopping_done_by text, not_delivered_ack_at timestamp with time zone, not_delivered_ack_by text, created_by text, created_at timestamp with time zone, updated_at timestamp with time zone, origin text, origin_ref text, has_more boolean)"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/hooks/usePurchaseOrdersStore.ts",
+          "line": 138,
+          "kind": "rpc",
+          "name": "list_purchase_orders_cursor"
+        }
+      ]
+    },
+    {
+      "name": "list_report_items_cursor",
+      "line": 10807,
+      "contract": "{\r\n        Args: {\r\n          p_categoria?: string\r\n          p_cursor_created_at?: string\r\n          p_cursor_id?: string\r\n          p_end: string\r\n          p_limit?: number\r\n          p_search?: string\r\n          p_sort_asc?: boolean\r\n          p_sort_key?: string\r\n          p_start: string\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "list_report_items_cursor(date,date,integer,timestamp with time zone,uuid,text,text,text,boolean)",
+          "args": "p_start date, p_end date, p_limit integer DEFAULT 20, p_cursor_created_at timestamp with time zone DEFAULT NULL::timestamp with time zone, p_cursor_id uuid DEFAULT NULL::uuid, p_search text DEFAULT NULL::text, p_categoria text DEFAULT NULL::text, p_sort_key text DEFAULT 'consumo'::text, p_sort_asc boolean DEFAULT false",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "list_solic_compra_mercado_cursor",
+      "line": 10821,
+      "contract": "{\r\n        Args: {\r\n          p_cursor_created_at?: string\r\n          p_cursor_id?: string\r\n          p_date_from?: string\r\n          p_date_to?: string\r\n          p_limit?: number\r\n          p_prioridade?: string\r\n          p_search?: string\r\n          p_solicitante?: string\r\n          p_status?: string\r\n        }\r\n        Returns: {\r\n          created_at: string\r\n          data_necessidade: string\r\n          has_more: boolean\r\n          id: string\r\n          observacoes: string\r\n          prioridade: string\r\n          responsavel_user_id: string\r\n          solicitante_user_id: string\r\n          status: string\r\n          tipo: string\r\n          titulo: string\r\n          total_estimado: number\r\n          total_real: number\r\n          updated_at: string\r\n        }[]\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "list_solic_compra_mercado_cursor(integer,timestamp with time zone,uuid,text,text,uuid,text,date,date)",
+          "args": "p_limit integer DEFAULT 50, p_cursor_created_at timestamp with time zone DEFAULT NULL::timestamp with time zone, p_cursor_id uuid DEFAULT NULL::uuid, p_status text DEFAULT NULL::text, p_prioridade text DEFAULT NULL::text, p_solicitante uuid DEFAULT NULL::uuid, p_search text DEFAULT NULL::text, p_date_from date DEFAULT NULL::date, p_date_to date DEFAULT NULL::date",
+          "returns": "TABLE(id uuid, titulo text, tipo text, solicitante_user_id text, responsavel_user_id text, prioridade text, data_necessidade text, status text, observacoes text, total_estimado numeric, total_real numeric, created_at timestamp with time zone, updated_at timestamp with time zone, has_more boolean)"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "list_stock_transfers",
+      "line": 10850,
+      "contract": "{\r\n        Args: {\r\n          p_end_date?: string\r\n          p_limit?: number\r\n          p_location?: string\r\n          p_offset?: number\r\n          p_product_id?: string\r\n          p_start_date?: string\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "list_stock_transfers(date,date,uuid,text,integer,integer)",
+          "args": "p_start_date date DEFAULT ((now() - '30 days'::interval))::date, p_end_date date DEFAULT (now())::date, p_product_id uuid DEFAULT NULL::uuid, p_location text DEFAULT NULL::text, p_limit integer DEFAULT 50, p_offset integer DEFAULT 0",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/estoque/StockTransfersSection.tsx",
+          "line": 88,
+          "kind": "rpc",
+          "name": "list_stock_transfers"
+        }
+      ]
+    },
+    {
+      "name": "log_audit",
+      "line": 10861,
+      "contract": "| {\r\n            Args: {\r\n              p_action: string\r\n              p_after?: Json\r\n              p_before?: Json\r\n              p_entity: string\r\n              p_entity_id: string\r\n              p_metadata?: Json\r\n              p_module: string\r\n              p_source: string\r\n            }\r\n            Returns: undefined\r\n          }\r\n        | {\r\n            Args: {\r\n              p_action: string\r\n              p_after?: Json\r\n              p_before?: Json\r\n              p_entity: string\r\n              p_entity_id: string\r\n              p_metadata?: Json\r\n              p_module: string\r\n              p_source: string\r\n            }\r\n            Returns: undefined\r\n          }",
+      "liveIdentities": [
+        {
+          "signature": "log_audit(text,text,text,text,text,jsonb,jsonb,jsonb)",
+          "args": "p_source text, p_module text, p_entity text, p_entity_id text, p_action text, p_before jsonb DEFAULT NULL::jsonb, p_after jsonb DEFAULT NULL::jsonb, p_metadata jsonb DEFAULT NULL::jsonb",
+          "returns": "void"
+        },
+        {
+          "signature": "log_audit(text,text,text,uuid,text,jsonb,jsonb,jsonb)",
+          "args": "p_source text, p_module text, p_entity text, p_entity_id uuid, p_action text, p_before jsonb DEFAULT NULL::jsonb, p_after jsonb DEFAULT NULL::jsonb, p_metadata jsonb DEFAULT NULL::jsonb",
+          "returns": "void"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "log_integration_error",
+      "line": 10888,
+      "contract": "{\r\n        Args: {\r\n          p_action: string\r\n          p_error_message: string\r\n          p_module: string\r\n          p_payload?: Json\r\n          p_reference_id: string\r\n        }\r\n        Returns: undefined\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "log_integration_error(text,text,text,text,jsonb)",
+          "args": "p_module text, p_action text, p_reference_id text, p_error_message text, p_payload jsonb DEFAULT NULL::jsonb",
+          "returns": "void"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "mark_all_notifications_read",
+      "line": 10898,
+      "contract": "{ Args: never; Returns: number }",
+      "liveIdentities": [
+        {
+          "signature": "mark_all_notifications_read()",
+          "args": "",
+          "returns": "integer"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/hooks/useNotifications.ts",
+          "line": 50,
+          "kind": "rpc",
+          "name": "mark_all_notifications_read"
+        }
+      ]
+    },
+    {
+      "name": "onboard_new_company",
+      "line": 10899,
+      "contract": "{\r\n        Args: {\r\n          p_admin_user_id?: string\r\n          p_cnpj?: string\r\n          p_company_name: string\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "onboard_new_company(text,text,uuid)",
+          "args": "p_company_name text, p_cnpj text DEFAULT NULL::text, p_admin_user_id uuid DEFAULT NULL::uuid",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "orcamento_execucao_mensal",
+      "line": 10907,
+      "contract": "{ Args: { p_mes: string }; Returns: Json }",
+      "liveIdentities": [
+        {
+          "signature": "orcamento_execucao_mensal(text)",
+          "args": "p_mes text",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "pay_conta_pagar",
+      "line": 10908,
+      "contract": "{\r\n        Args: {\r\n          p_conta_id?: string\r\n          p_data_pagamento?: string\r\n          p_expected_updated_at: string\r\n          p_id: string\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "pay_conta_pagar(uuid,text,date,uuid)",
+          "args": "p_id uuid, p_expected_updated_at text, p_data_pagamento date DEFAULT NULL::date, p_conta_id uuid DEFAULT NULL::uuid",
+          "returns": "json"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/financeiro/ContasPagarSection.tsx",
+          "line": 502,
+          "kind": "rpc",
+          "name": "pay_conta_pagar"
+        }
+      ]
+    },
+    {
+      "name": "preview_regra_categorizacao",
+      "line": 10917,
+      "contract": "{\r\n        Args: { p_padrao: string; p_tipo_match?: string }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "preview_regra_categorizacao(text,text)",
+          "args": "p_padrao text, p_tipo_match text DEFAULT 'contem'::text",
+          "returns": "json"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/financeiro/CategorizacaoSection.tsx",
+          "line": 261,
+          "kind": "rpc",
+          "name": "preview_regra_categorizacao"
+        }
+      ]
+    },
+    {
+      "name": "rbac_permissions_diff",
+      "line": 10921,
+      "contract": "{ Args: { _registry_keys: Json }; Returns: Json }",
+      "liveIdentities": [
+        {
+          "signature": "rbac_permissions_diff(jsonb)",
+          "args": "_registry_keys jsonb",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "rbac_sql_lint_report",
+      "line": 10922,
+      "contract": "{ Args: never; Returns: Json }",
+      "liveIdentities": [
+        {
+          "signature": "rbac_sql_lint_report()",
+          "args": "",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "rbac_sql_lint_report_admin",
+      "line": 10923,
+      "contract": "{\r\n        Args: { p_actor_user_id: string }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "rbac_sql_lint_report_admin(uuid)",
+          "args": "p_actor_user_id uuid",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "supabase/functions/rbac-lint-full/index.ts",
+          "line": 62,
+          "kind": "rpc",
+          "name": "rbac_sql_lint_report_admin"
+        }
+      ]
+    },
+    {
+      "name": "rbac_sql_lint_report_internal",
+      "line": 10927,
+      "contract": "{ Args: never; Returns: Json }",
+      "liveIdentities": [
+        {
+          "signature": "rbac_sql_lint_report_internal()",
+          "args": "",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "rbac_sql_lint_report_quick",
+      "line": 10928,
+      "contract": "{\r\n        Args: { p_actor_user_id: string }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "rbac_sql_lint_report_quick(uuid)",
+          "args": "p_actor_user_id uuid",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "supabase/functions/rbac-lint/index.ts",
+          "line": 62,
+          "kind": "rpc",
+          "name": "rbac_sql_lint_report_quick"
+        },
+        {
+          "file": "supabase/functions/rbac-lint-quick/index.ts",
+          "line": 62,
+          "kind": "rpc",
+          "name": "rbac_sql_lint_report_quick"
+        }
+      ]
+    },
+    {
+      "name": "rbac_top_legacy_usage",
+      "line": 10932,
+      "contract": "{\r\n        Args: { _days?: number; _limit?: number }\r\n        Returns: {\r\n          first_seen: string\r\n          last_seen: string\r\n          legacy_key: string\r\n          usage_count: number\r\n        }[]\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "rbac_top_legacy_usage(integer,integer)",
+          "args": "_days integer DEFAULT 7, _limit integer DEFAULT 20",
+          "returns": "TABLE(legacy_key text, usage_count bigint, first_seen timestamp with time zone, last_seen timestamp with time zone)"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "recalc_product_costs",
+      "line": 10941,
+      "contract": "{\r\n        Args: { p_produto_id: string }\r\n        Returns: undefined\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "recalc_product_costs(uuid)",
+          "args": "p_produto_id uuid",
+          "returns": "void"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "receive_conta_receber",
+      "line": 10945,
+      "contract": "{\r\n        Args: {\r\n          p_data_recebimento?: string\r\n          p_expected_updated_at: string\r\n          p_id: string\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "receive_conta_receber(uuid,text,date)",
+          "args": "p_id uuid, p_expected_updated_at text, p_data_recebimento date DEFAULT NULL::date",
+          "returns": "json"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/financeiro/ContasReceberSection.tsx",
+          "line": 408,
+          "kind": "rpc",
+          "name": "receive_conta_receber"
+        }
+      ]
+    },
+    {
+      "name": "receive_market_order_atomic",
+      "line": 10953,
+      "contract": "{\r\n        Args: {\r\n          p_items: Json\r\n          p_observacoes?: string\r\n          p_recebimento_id: string\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "receive_market_order_atomic(uuid,jsonb,text)",
+          "args": "p_recebimento_id uuid, p_items jsonb, p_observacoes text DEFAULT ''::text",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "receive_purchase_order_atomic",
+      "line": 10961,
+      "contract": "{\r\n        Args: { p_items: Json; p_metadata?: Json; p_order_id: string }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "receive_purchase_order_atomic(uuid,jsonb,jsonb)",
+          "args": "p_order_id uuid, p_items jsonb, p_metadata jsonb DEFAULT '{}'::jsonb",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/hooks/usePurchaseOrdersStore.ts",
+          "line": 439,
+          "kind": "rpc",
+          "name": "receive_purchase_order_atomic"
+        },
+        {
+          "file": "src/hooks/usePurchaseOrdersStore.ts",
+          "line": 500,
+          "kind": "rpc",
+          "name": "receive_purchase_order_atomic"
+        }
+      ]
+    },
+    {
+      "name": "reconcile_auto_bind_transfer_counterparts",
+      "line": 10965,
+      "contract": "{\r\n        Args: { p_conta_id: string; p_lines: Json }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "reconcile_auto_bind_transfer_counterparts(uuid,jsonb)",
+          "args": "p_conta_id uuid, p_lines jsonb",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/financeiro/ConciliacaoBancariaSection.tsx",
+          "line": 1206,
+          "kind": "rpc",
+          "name": "reconcile_auto_bind_transfer_counterparts"
+        }
+      ]
+    },
+    {
+      "name": "reconcile_batch_lancamentos",
+      "line": 10969,
+      "contract": "{\r\n        Args: { p_lancamento_ids: string[] }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "reconcile_batch_lancamentos(uuid[])",
+          "args": "p_lancamento_ids uuid[]",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/financeiro/ConciliacaoBancariaSection.tsx",
+          "line": 546,
+          "kind": "rpc",
+          "name": "reconcile_batch_lancamentos"
+        },
+        {
+          "file": "src/components/financeiro/ConciliacaoBancariaSection.tsx",
+          "line": 792,
+          "kind": "rpc",
+          "name": "reconcile_batch_lancamentos"
+        },
+        {
+          "file": "src/components/financeiro/ConciliacaoBancariaSection.tsx",
+          "line": 2016,
+          "kind": "rpc",
+          "name": "reconcile_batch_lancamentos"
+        }
+      ]
+    },
+    {
+      "name": "reconcile_bind_extrato",
+      "line": 10973,
+      "contract": "{\r\n        Args: {\r\n          p_conta_id: string\r\n          p_external_id: string\r\n          p_lancamento_id: string\r\n          p_tipo: string\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "reconcile_bind_extrato(uuid,text,text,uuid)",
+          "args": "p_conta_id uuid, p_external_id text, p_tipo text, p_lancamento_id uuid",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/financeiro/ConciliacaoBancariaSection.tsx",
+          "line": 1675,
+          "kind": "rpc",
+          "name": "reconcile_bind_extrato"
+        },
+        {
+          "file": "src/components/financeiro/CriarLancamentoExtratoDialog.tsx",
+          "line": 147,
+          "kind": "rpc",
+          "name": "reconcile_bind_extrato"
+        }
+      ]
+    },
+    {
+      "name": "reconcile_create_transfer",
+      "line": 10982,
+      "contract": "{\r\n        Args: {\r\n          p_conta_destino_id: string\r\n          p_conta_origem_id: string\r\n          p_data: string\r\n          p_descricao: string\r\n          p_user_id: string\r\n          p_valor: number\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "reconcile_create_transfer(date,numeric,text,uuid,uuid,uuid)",
+          "args": "p_data date, p_valor numeric, p_descricao text, p_conta_origem_id uuid, p_conta_destino_id uuid, p_user_id uuid",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "reconcile_create_transfer_from_extrato",
+      "line": 10993,
+      "contract": "{\r\n        Args: {\r\n          p_conta_destino_id: string\r\n          p_conta_origem_id: string\r\n          p_data: string\r\n          p_descricao: string\r\n          p_external_id: string\r\n          p_external_tipo: string\r\n          p_valor: number\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "reconcile_create_transfer_from_extrato(date,numeric,text,uuid,uuid,text,text)",
+          "args": "p_data date, p_valor numeric, p_descricao text, p_conta_origem_id uuid, p_conta_destino_id uuid, p_external_id text, p_external_tipo text",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/financeiro/ConciliacaoBancariaSection.tsx",
+          "line": 1691,
+          "kind": "rpc",
+          "name": "reconcile_create_transfer_from_extrato"
+        }
+      ]
+    },
+    {
+      "name": "reconcile_ignorar_lancamento",
+      "line": 11005,
+      "contract": "{\r\n        Args: {\r\n          p_conta_id: string\r\n          p_data: string\r\n          p_descricao: string\r\n          p_tipo: string\r\n          p_user_id: string\r\n          p_valor: number\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "reconcile_ignorar_lancamento(uuid,date,numeric,text,text,uuid)",
+          "args": "p_conta_id uuid, p_data date, p_valor numeric, p_tipo text, p_descricao text, p_user_id uuid",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/financeiro/ConciliacaoBancariaSection.tsx",
+          "line": 1475,
+          "kind": "rpc",
+          "name": "reconcile_ignorar_lancamento"
+        }
+      ]
+    },
+    {
+      "name": "reconcile_import_lancamento",
+      "line": 11016,
+      "contract": "{\r\n        Args: {\r\n          p_conta_id: string\r\n          p_data: string\r\n          p_descricao: string\r\n          p_external_id?: string\r\n          p_force_duplicate?: boolean\r\n          p_occurrence_index?: number\r\n          p_rateio_linhas?: Json\r\n          p_tipo: string\r\n          p_user_id: string\r\n          p_valor: number\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "reconcile_import_lancamento(date,text,numeric,text,uuid,uuid,jsonb,text,boolean,integer)",
+          "args": "p_data date, p_descricao text, p_valor numeric, p_tipo text, p_conta_id uuid, p_user_id uuid, p_rateio_linhas jsonb DEFAULT NULL::jsonb, p_external_id text DEFAULT NULL::text, p_force_duplicate boolean DEFAULT false, p_occurrence_index integer DEFAULT 0",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/financeiro/ConciliacaoBancariaSection.tsx",
+          "line": 1759,
+          "kind": "rpc",
+          "name": "reconcile_import_lancamento"
+        },
+        {
+          "file": "src/components/financeiro/ConciliacaoBancariaSection.tsx",
+          "line": 1978,
+          "kind": "rpc",
+          "name": "reconcile_import_lancamento"
+        },
+        {
+          "file": "src/components/financeiro/CriarLancamentoExtratoDialog.tsx",
+          "line": 207,
+          "kind": "rpc",
+          "name": "reconcile_import_lancamento"
+        },
+        {
+          "file": "src/components/financeiro/CriarLancamentoExtratoDialog.tsx",
+          "line": 252,
+          "kind": "rpc",
+          "name": "reconcile_import_lancamento"
+        },
+        {
+          "file": "src/components/financeiro/CriarLancamentoExtratoDialog.tsx",
+          "line": 317,
+          "kind": "rpc",
+          "name": "reconcile_import_lancamento"
+        }
+      ]
+    },
+    {
+      "name": "reconcile_link_existing_lancamento",
+      "line": 11031,
+      "contract": "{\r\n        Args: {\r\n          p_conta_id: string\r\n          p_data_extrato?: string\r\n          p_external_id?: string\r\n          p_lancamento_id: string\r\n          p_tipo?: string\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "reconcile_link_existing_lancamento(uuid,uuid,text,text,date)",
+          "args": "p_conta_id uuid, p_lancamento_id uuid, p_external_id text DEFAULT NULL::text, p_tipo text DEFAULT NULL::text, p_data_extrato date DEFAULT NULL::date",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "reconcile_neutralize_contamax",
+      "line": 11041,
+      "contract": "{\r\n        Args: { p_conta_id: string; p_linhas: Json }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "reconcile_neutralize_contamax(uuid,jsonb)",
+          "args": "p_conta_id uuid, p_linhas jsonb",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/financeiro/ConciliacaoBancariaSection.tsx",
+          "line": 1228,
+          "kind": "rpc",
+          "name": "reconcile_neutralize_contamax"
+        }
+      ]
+    },
+    {
+      "name": "reconcile_pay_conta_pagar",
+      "line": 11045,
+      "contract": "{\r\n        Args: {\r\n          p_ajuste_categoria_id?: string\r\n          p_ajuste_tipo?: string\r\n          p_conta_bancaria_id: string\r\n          p_conta_pagar_id: string\r\n          p_data_pagamento: string\r\n          p_user_id: string\r\n          p_valor_extrato?: number\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "reconcile_pay_conta_pagar(uuid,uuid,date,uuid,numeric,text,uuid)",
+          "args": "p_conta_pagar_id uuid, p_conta_bancaria_id uuid, p_data_pagamento date, p_user_id uuid, p_valor_extrato numeric DEFAULT NULL::numeric, p_ajuste_tipo text DEFAULT NULL::text, p_ajuste_categoria_id uuid DEFAULT NULL::uuid",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/financeiro/ConciliacaoBancariaSection.tsx",
+          "line": 1862,
+          "kind": "rpc",
+          "name": "reconcile_pay_conta_pagar"
+        },
+        {
+          "file": "src/components/financeiro/ConciliacaoBancariaSection.tsx",
+          "line": 2029,
+          "kind": "rpc",
+          "name": "reconcile_pay_conta_pagar"
+        }
+      ]
+    },
+    {
+      "name": "reconcile_receive_conta_receber",
+      "line": 11057,
+      "contract": "{\r\n        Args: {\r\n          p_ajuste_categoria_id?: string\r\n          p_ajuste_tipo?: string\r\n          p_conta_bancaria_id: string\r\n          p_conta_receber_id: string\r\n          p_data_recebimento: string\r\n          p_user_id: string\r\n          p_valor_extrato?: number\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "reconcile_receive_conta_receber(uuid,uuid,date,uuid,numeric,text,uuid)",
+          "args": "p_conta_receber_id uuid, p_conta_bancaria_id uuid, p_data_recebimento date, p_user_id uuid, p_valor_extrato numeric DEFAULT NULL::numeric, p_ajuste_tipo text DEFAULT NULL::text, p_ajuste_categoria_id uuid DEFAULT NULL::uuid",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/financeiro/ConciliacaoBancariaSection.tsx",
+          "line": 1874,
+          "kind": "rpc",
+          "name": "reconcile_receive_conta_receber"
+        },
+        {
+          "file": "src/components/financeiro/ConciliacaoBancariaSection.tsx",
+          "line": 2047,
+          "kind": "rpc",
+          "name": "reconcile_receive_conta_receber"
+        }
+      ]
+    },
+    {
+      "name": "reconcile_reconsiderar_ignorada",
+      "line": 11069,
+      "contract": "{\r\n        Args: { p_ignorada_id: string }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "reconcile_reconsiderar_ignorada(uuid)",
+          "args": "p_ignorada_id uuid",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/financeiro/ConciliacaoBancariaSection.tsx",
+          "line": 1498,
+          "kind": "rpc",
+          "name": "reconcile_reconsiderar_ignorada"
+        }
+      ]
+    },
+    {
+      "name": "refresh_materialized_views",
+      "line": 11073,
+      "contract": "{ Args: never; Returns: Json }",
+      "liveIdentities": [
+        {
+          "signature": "refresh_materialized_views()",
+          "args": "",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "supabase/functions/scheduled-jobs/index.ts",
+          "line": 52,
+          "kind": "rpc",
+          "name": "refresh_materialized_views"
+        }
+      ]
+    },
+    {
+      "name": "refresh_saldo_cache",
+      "line": 11074,
+      "contract": "{ Args: { p_conta_id: string }; Returns: undefined }",
+      "liveIdentities": [
+        {
+          "signature": "refresh_saldo_cache(uuid)",
+          "args": "p_conta_id uuid",
+          "returns": "void"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "reject_ponto_record",
+      "line": 11075,
+      "contract": "{\r\n        Args: { p_id: string; p_reason?: string }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "reject_ponto_record(uuid,text)",
+          "args": "p_id uuid, p_reason text DEFAULT ''::text",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/RhView.tsx",
+          "line": 409,
+          "kind": "rpc",
+          "name": "reject_ponto_record"
+        }
+      ]
+    },
+    {
+      "name": "relatorio_socios_resumo",
+      "line": 11079,
+      "contract": "{ Args: { p_mes: string }; Returns: Json }",
+      "liveIdentities": [
+        {
+          "signature": "relatorio_socios_resumo(text)",
+          "args": "p_mes text",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "reopen_inventory",
+      "line": 11080,
+      "contract": "{\r\n        Args: { p_id: string; p_justificativa: string }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "reopen_inventory(uuid,text)",
+          "args": "p_id uuid, p_justificativa text",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "supabase/functions/inventario/index.ts",
+          "line": 561,
+          "kind": "rpc",
+          "name": "reopen_inventory"
+        }
+      ]
+    },
+    {
+      "name": "reorder_fin_categoria",
+      "line": 11084,
+      "contract": "{\r\n        Args: { p_category_id: string; p_direction: string }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "reorder_fin_categoria(uuid,text)",
+          "args": "p_category_id uuid, p_direction text",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/financeiro/CadastroBaseTree.tsx",
+          "line": 663,
+          "kind": "rpc",
+          "name": "reorder_fin_categoria"
+        }
+      ]
+    },
+    {
+      "name": "rpc_confirmacoes_approve",
+      "line": 11088,
+      "contract": "{\r\n        Args: { p_confirmacao_id: string }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "rpc_confirmacoes_approve(uuid)",
+          "args": "p_confirmacao_id uuid",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "rpc_create_company",
+      "line": 11092,
+      "contract": "{\r\n        Args: { p_cnpj?: string; p_nome: string }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "rpc_create_company(text,text)",
+          "args": "p_nome text, p_cnpj text DEFAULT NULL::text",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "rpc_delete_fechamento_caixa",
+      "line": 11096,
+      "contract": "{ Args: { p_id: string }; Returns: Json }",
+      "liveIdentities": [
+        {
+          "signature": "rpc_delete_fechamento_caixa(uuid)",
+          "args": "p_id uuid",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/financeiro/FechamentoCaixaSection.tsx",
+          "line": 312,
+          "kind": "rpc",
+          "name": "rpc_delete_fechamento_caixa"
+        }
+      ]
+    },
+    {
+      "name": "rpc_recebimentos_close",
+      "line": 11097,
+      "contract": "{\r\n        Args: {\r\n          p_enviar_ao_estoque?: boolean\r\n          p_observacoes?: string\r\n          p_recebimento_id: string\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "rpc_recebimentos_close(uuid,boolean,text)",
+          "args": "p_recebimento_id uuid, p_enviar_ao_estoque boolean DEFAULT false, p_observacoes text DEFAULT ''::text",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "rpc_set_user_company",
+      "line": 11105,
+      "contract": "{\r\n        Args: { p_company_id: string; p_user_id: string }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "rpc_set_user_company(uuid,uuid)",
+          "args": "p_user_id uuid, p_company_id uuid",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "rpc_upsert_fechamento_caixa",
+      "line": 11109,
+      "contract": "| {\r\n            Args: {\r\n              p_data: string\r\n              p_descontos?: number\r\n              p_faturamento_bruto: number\r\n              p_observacao?: string\r\n              p_taxas?: number\r\n            }\r\n            Returns: Json\r\n          }\r\n        | {\r\n            Args: {\r\n              p_data: string\r\n              p_descontos?: number\r\n              p_expected_updated_at?: string\r\n              p_faturamento_bruto: number\r\n              p_observacao?: string\r\n              p_taxas?: number\r\n            }\r\n            Returns: Json\r\n          }",
+      "liveIdentities": [
+        {
+          "signature": "rpc_upsert_fechamento_caixa(date,numeric,numeric,numeric,text,timestamp with time zone)",
+          "args": "p_data date, p_faturamento_bruto numeric, p_taxas numeric DEFAULT 0, p_descontos numeric DEFAULT 0, p_observacao text DEFAULT NULL::text, p_expected_updated_at timestamp with time zone DEFAULT NULL::timestamp with time zone",
+          "returns": "jsonb"
+        },
+        {
+          "signature": "rpc_upsert_fechamento_caixa(date,numeric,numeric,numeric,text)",
+          "args": "p_data date, p_faturamento_bruto numeric, p_taxas numeric DEFAULT 0, p_descontos numeric DEFAULT 0, p_observacao text DEFAULT NULL::text",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "rpc_upsert_fechamento_caixa_com_marcas",
+      "line": 11131,
+      "contract": "{\r\n        Args: {\r\n          p_data: string\r\n          p_descontos?: number\r\n          p_expected_updated_at?: string\r\n          p_faturamento_bruto: number\r\n          p_marcas?: Json\r\n          p_observacao?: string\r\n          p_taxas?: number\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "rpc_upsert_fechamento_caixa_com_marcas(date,numeric,numeric,numeric,text,jsonb,timestamp with time zone)",
+          "args": "p_data date, p_faturamento_bruto numeric, p_taxas numeric DEFAULT 0, p_descontos numeric DEFAULT 0, p_observacao text DEFAULT NULL::text, p_marcas jsonb DEFAULT '[]'::jsonb, p_expected_updated_at timestamp with time zone DEFAULT NULL::timestamp with time zone",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/financeiro/FechamentoCaixaSection.tsx",
+          "line": 270,
+          "kind": "rpc",
+          "name": "rpc_upsert_fechamento_caixa_com_marcas"
+        }
+      ]
+    },
+    {
+      "name": "save_cotacao_ia_config",
+      "line": 11143,
+      "contract": "{\r\n        Args: {\r\n          p_api_key?: string\r\n          p_ativo?: boolean\r\n          p_model?: string\r\n          p_provider?: string\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "save_cotacao_ia_config(text,text,text,boolean)",
+          "args": "p_provider text DEFAULT 'gemini'::text, p_api_key text DEFAULT NULL::text, p_model text DEFAULT NULL::text, p_ativo boolean DEFAULT true",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/hooks/useIntegracoesConfig.ts",
+          "line": 92,
+          "kind": "rpc",
+          "name": "save_cotacao_ia_config"
+        }
+      ]
+    },
+    {
+      "name": "save_cotacao_respostas_atomic",
+      "line": 11152,
+      "contract": "{\r\n        Args: {\r\n          p_cotacao_id: string\r\n          p_fornecedores_meta?: Json\r\n          p_respostas?: Json\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "save_cotacao_respostas_atomic(uuid,jsonb,jsonb)",
+          "args": "p_cotacao_id uuid, p_respostas jsonb DEFAULT '[]'::jsonb, p_fornecedores_meta jsonb DEFAULT '[]'::jsonb",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/hooks/useCotacoesStore.ts",
+          "line": 300,
+          "kind": "rpc",
+          "name": "save_cotacao_respostas_atomic"
+        }
+      ]
+    },
+    {
+      "name": "save_cotacao_sugestao",
+      "line": 11160,
+      "contract": "{\r\n        Args: {\r\n          p_cotacao_id: string\r\n          p_dados_json?: Json\r\n          p_economia_estimada?: number\r\n          p_selecoes?: Json\r\n          p_tipo: string\r\n          p_total_estimado?: number\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "save_cotacao_sugestao(uuid,text,numeric,numeric,jsonb,jsonb)",
+          "args": "p_cotacao_id uuid, p_tipo text, p_total_estimado numeric DEFAULT 0, p_economia_estimada numeric DEFAULT 0, p_dados_json jsonb DEFAULT '{}'::jsonb, p_selecoes jsonb DEFAULT '[]'::jsonb",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/hooks/useCotacoesStore.ts",
+          "line": 220,
+          "kind": "rpc",
+          "name": "save_cotacao_sugestao"
+        }
+      ]
+    },
+    {
+      "name": "save_cotacao_zapi_config",
+      "line": 11171,
+      "contract": "{\r\n        Args: {\r\n          p_ativo?: boolean\r\n          p_base_url?: string\r\n          p_client_token?: string\r\n          p_default_phone?: string\r\n          p_instance_id?: string\r\n          p_token?: string\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "save_cotacao_zapi_config(text,text,text,text,text,boolean)",
+          "args": "p_instance_id text DEFAULT NULL::text, p_token text DEFAULT NULL::text, p_client_token text DEFAULT NULL::text, p_base_url text DEFAULT NULL::text, p_default_phone text DEFAULT NULL::text, p_ativo boolean DEFAULT true",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/hooks/useIntegracoesConfig.ts",
+          "line": 78,
+          "kind": "rpc",
+          "name": "save_cotacao_zapi_config"
+        }
+      ]
+    },
+    {
+      "name": "seed_default_categories",
+      "line": 11182,
+      "contract": "{ Args: never; Returns: Json }",
+      "liveIdentities": [
+        {
+          "signature": "seed_default_categories()",
+          "args": "",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "set_cache",
+      "line": 11183,
+      "contract": "{\r\n        Args: { p_key: string; p_payload: Json; p_ttl_seconds?: number }\r\n        Returns: undefined\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "set_cache(text,jsonb,integer)",
+          "args": "p_key text, p_payload jsonb, p_ttl_seconds integer DEFAULT 120",
+          "returns": "void"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "show_limit",
+      "line": 11187,
+      "contract": "{ Args: never; Returns: number }",
+      "liveIdentities": [
+        {
+          "signature": "show_limit()",
+          "args": "",
+          "returns": "real"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "show_trgm",
+      "line": 11188,
+      "contract": "{ Args: { \"\": string }; Returns: string[] }",
+      "liveIdentities": [
+        {
+          "signature": "show_trgm(text)",
+          "args": "text",
+          "returns": "text[]"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "simulate_relatorios_score",
+      "line": 11189,
+      "contract": "| {\r\n            Args: { p_end: string; p_params?: Json; p_start: string }\r\n            Returns: Json\r\n          }\r\n        | {\r\n            Args: { p_end: string; p_params?: Json; p_start: string }\r\n            Returns: Json\r\n          }",
+      "liveIdentities": [
+        {
+          "signature": "simulate_relatorios_score(date,date,jsonb)",
+          "args": "p_start date, p_end date, p_params jsonb DEFAULT '{}'::jsonb",
+          "returns": "jsonb"
+        },
+        {
+          "signature": "simulate_relatorios_score(text,text,jsonb)",
+          "args": "p_start text, p_end text, p_params jsonb DEFAULT '{}'::jsonb",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "soft_delete_cotacao",
+      "line": 11198,
+      "contract": "{\r\n        Args: { p_expected_updated_at?: string; p_id: string }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "soft_delete_cotacao(uuid,timestamp with time zone)",
+          "args": "p_id uuid, p_expected_updated_at timestamp with time zone DEFAULT NULL::timestamp with time zone",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/hooks/useCotacoesStore.ts",
+          "line": 173,
+          "kind": "rpc",
+          "name": "soft_delete_cotacao"
+        }
+      ]
+    },
+    {
+      "name": "soft_delete_inventory",
+      "line": 11202,
+      "contract": "{\r\n        Args: { p_id: string; p_justificativa: string }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "soft_delete_inventory(uuid,text)",
+          "args": "p_id uuid, p_justificativa text",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "supabase/functions/inventario/index.ts",
+          "line": 583,
+          "kind": "rpc",
+          "name": "soft_delete_inventory"
+        }
+      ]
+    },
+    {
+      "name": "stock_insert_movement_atomic",
+      "line": 11206,
+      "contract": "{\r\n        Args: {\r\n          p_direction: string\r\n          p_metadata?: Json\r\n          p_note?: string\r\n          p_origem?: string\r\n          p_produto_id: string\r\n          p_qty: number\r\n          p_ref_id?: string\r\n          p_ref_type?: string\r\n          p_setor?: string\r\n          p_tipo: string\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "stock_insert_movement_atomic(uuid,numeric,text,text,text,text,text,text,text,jsonb)",
+          "args": "p_produto_id uuid, p_qty numeric, p_tipo text, p_direction text, p_origem text DEFAULT 'MANUAL'::text, p_ref_type text DEFAULT NULL::text, p_ref_id text DEFAULT NULL::text, p_note text DEFAULT NULL::text, p_setor text DEFAULT NULL::text, p_metadata jsonb DEFAULT NULL::jsonb",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "stock_transfer_between_locations",
+      "line": 11221,
+      "contract": "{\r\n        Args: {\r\n          p_from_location: string\r\n          p_product_id: string\r\n          p_quantity: number\r\n          p_reason?: string\r\n          p_to_location: string\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "stock_transfer_between_locations(uuid,text,text,numeric,text)",
+          "args": "p_product_id uuid, p_from_location text, p_to_location text, p_quantity numeric, p_reason text DEFAULT NULL::text",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/estoque/StockTransfersSection.tsx",
+          "line": 122,
+          "kind": "rpc",
+          "name": "stock_transfer_between_locations"
+        }
+      ]
+    },
+    {
+      "name": "storno_purchase_order_stock",
+      "line": 11231,
+      "contract": "{\r\n        Args: { p_order_id: string }\r\n        Returns: undefined\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "storno_purchase_order_stock(uuid)",
+          "args": "p_order_id uuid",
+          "returns": "void"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/hooks/usePurchaseOrdersStore.ts",
+          "line": 617,
+          "kind": "rpc",
+          "name": "storno_purchase_order_stock"
+        }
+      ]
+    },
+    {
+      "name": "strip_html",
+      "line": 11235,
+      "contract": "{ Args: { p_text: string }; Returns: string }",
+      "liveIdentities": [
+        {
+          "signature": "strip_html(text)",
+          "args": "p_text text",
+          "returns": "text"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "sync_permissions_from_registry",
+      "line": 11236,
+      "contract": "{\r\n        Args: { _entries: Json }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "sync_permissions_from_registry(jsonb)",
+          "args": "_entries jsonb",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "unaccent",
+      "line": 11240,
+      "contract": "{ Args: { \"\": string }; Returns: string }",
+      "liveIdentities": [
+        {
+          "signature": "unaccent(regdictionary,text)",
+          "args": "regdictionary, text",
+          "returns": "text"
+        },
+        {
+          "signature": "unaccent(text)",
+          "args": "text",
+          "returns": "text"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "unreconcile_lancamento",
+      "line": 11241,
+      "contract": "{ Args: { p_id: string }; Returns: Json }",
+      "liveIdentities": [
+        {
+          "signature": "unreconcile_lancamento(uuid)",
+          "args": "p_id uuid",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/financeiro/ConciliacaoBancariaSection.tsx",
+          "line": 554,
+          "kind": "rpc",
+          "name": "unreconcile_lancamento"
+        }
+      ]
+    },
+    {
+      "name": "update_company",
+      "line": 11242,
+      "contract": "{\r\n        Args: {\r\n          p_ativo?: boolean\r\n          p_cnpj?: string\r\n          p_company_id: string\r\n          p_nome?: string\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "update_company(uuid,text,text,boolean)",
+          "args": "p_company_id uuid, p_nome text DEFAULT NULL::text, p_cnpj text DEFAULT NULL::text, p_ativo boolean DEFAULT NULL::boolean",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "update_cotacao_atomic",
+      "line": 11251,
+      "contract": "{\r\n        Args: {\r\n          p_data_validade?: string\r\n          p_expected_updated_at?: string\r\n          p_fornecedores?: Json\r\n          p_id: string\r\n          p_itens?: Json\r\n          p_observacao?: string\r\n          p_titulo: string\r\n        }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "update_cotacao_atomic(uuid,text,text,date,jsonb,jsonb,timestamp with time zone)",
+          "args": "p_id uuid, p_titulo text, p_observacao text DEFAULT NULL::text, p_data_validade date DEFAULT NULL::date, p_itens jsonb DEFAULT '[]'::jsonb, p_fornecedores jsonb DEFAULT '[]'::jsonb, p_expected_updated_at timestamp with time zone DEFAULT NULL::timestamp with time zone",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/hooks/useCotacoesStore.ts",
+          "line": 158,
+          "kind": "rpc",
+          "name": "update_cotacao_atomic"
+        }
+      ]
+    },
+    {
+      "name": "update_transfer",
+      "line": 11263,
+      "contract": "{\r\n        Args: {\r\n          p_conta_destino_id: string\r\n          p_conta_origem_id: string\r\n          p_data_competencia: string\r\n          p_descricao: string\r\n          p_lancamento_id: string\r\n          p_valor: number\r\n        }\r\n        Returns: undefined\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "update_transfer(uuid,numeric,date,text,uuid,uuid)",
+          "args": "p_lancamento_id uuid, p_valor numeric, p_data_competencia date, p_descricao text, p_conta_origem_id uuid, p_conta_destino_id uuid",
+          "returns": "void"
+        }
+      ],
+      "callers": [
+        {
+          "file": "src/components/financeiro/LivroRazaoSection.tsx",
+          "line": 523,
+          "kind": "rpc",
+          "name": "update_transfer"
+        }
+      ]
+    },
+    {
+      "name": "upsert_salmon_leftover_atomic",
+      "line": 11274,
+      "contract": "{\r\n        Args: { p_leftover_kg: number; p_note?: string; p_record_date: string }\r\n        Returns: Json\r\n      }",
+      "liveIdentities": [
+        {
+          "signature": "upsert_salmon_leftover_atomic(date,numeric,text)",
+          "args": "p_record_date date, p_leftover_kg numeric, p_note text DEFAULT NULL::text",
+          "returns": "jsonb"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "upsert_supplier",
+      "line": 11278,
+      "contract": "{ Args: { p_name: string }; Returns: string }",
+      "liveIdentities": [
+        {
+          "signature": "upsert_supplier(text)",
+          "args": "p_name text",
+          "returns": "uuid"
+        }
+      ],
+      "callers": []
+    },
+    {
+      "name": "upsert_supplier_price",
+      "line": 11279,
+      "contract": "{\n        Args: {\n          p_name: string\n          p_stock_item_id: string\n          p_unit_cost: number\n          p_purchase_unit?: string\n        }\n        Returns: string\n      }",
+      "liveIdentities": [],
+      "callers": [
+        {
+          "file": "src/components/compras/RankingFornecedoresView.tsx",
+          "line": 116,
+          "kind": "rpc",
+          "name": "upsert_supplier_price"
+        }
+      ]
+    }
+  ],
+  "liveMissingInTypes": [
+    "_fin_bordero_payload(uuid,date,date)",
+    "admin_upsert_company_membership(uuid,uuid,uuid,app_role,text[],text,uuid,text,boolean)",
+    "assert_requisicao_estoque_movement_consistency()",
+    "audit_trigger_fn()",
+    "block_categoria_pai_vinculada_a_marca()",
+    "can_access_company_document(text,text)",
+    "can_receive_company_change(uuid,text[])",
+    "cotacao_force_company_id()",
+    "fin_block_contamax_ledger_entry()",
+    "fin_prepare_category_reporting_class()",
+    "fin_preserve_materialized_recurrence()",
+    "fin_protect_system_category()",
+    "fin_set_entity_report_exclusion()",
+    "fin_validate_orcamento_scope()",
+    "find_auth_user_by_email(text)",
+    "fn_update_product_stock()",
+    "generate_requisition_code()",
+    "get_company_permissions(uuid,uuid)",
+    "gin_extract_query_trgm(text,internal,smallint,internal,internal,internal,internal)",
+    "gin_extract_value_trgm(text,internal)",
+    "gin_trgm_consistent(internal,smallint,text,integer,internal,internal,internal,internal)",
+    "gin_trgm_triconsistent(internal,smallint,text,integer,internal,internal,internal)",
+    "gtrgm_compress(internal)",
+    "gtrgm_consistent(internal,text,smallint,oid,internal)",
+    "gtrgm_decompress(internal)",
+    "gtrgm_distance(internal,text,smallint,oid,internal)",
+    "gtrgm_in(cstring)",
+    "gtrgm_options(internal)",
+    "gtrgm_out(gtrgm)",
+    "gtrgm_penalty(internal,internal,internal)",
+    "gtrgm_picksplit(internal,internal)",
+    "gtrgm_same(gtrgm,gtrgm,internal)",
+    "gtrgm_union(internal,internal)",
+    "handle_first_admin()",
+    "handle_new_user()",
+    "is_company_member(uuid,uuid)",
+    "list_report_items_page(date,date,integer,integer,text,text,text,boolean)",
+    "produtos_force_company_id()",
+    "protect_profile_identity_scope()",
+    "reserve_company_invitation(uuid,uuid,text)",
+    "set_limit(real)",
+    "set_stock_movement_direction()",
+    "set_updated_at()",
+    "similarity_dist(text,text)",
+    "similarity_op(text,text)",
+    "similarity(text,text)",
+    "strict_word_similarity_commutator_op(text,text)",
+    "strict_word_similarity_dist_commutator_op(text,text)",
+    "strict_word_similarity_dist_op(text,text)",
+    "strict_word_similarity_op(text,text)",
+    "strict_word_similarity(text,text)",
+    "trg_block_placeholder_company()",
+    "trg_ficha_itens_invalidate_parent()",
+    "trg_fin_category_propagate_reporting_class()",
+    "trg_fin_contas_pagar_aprovado_em()",
+    "trg_fin_ensure_non_operational_categories()",
+    "trg_fin_rateio_report_exclusion()",
+    "trg_fin_require_category_on_reconciliation()",
+    "trg_force_company_alertas_falta()",
+    "trg_mask_numero_cartao()",
+    "trg_po_block_post_approval_changes()",
+    "trg_refresh_saldo_cache_conta()",
+    "trg_refresh_saldo_cache_lancamento()",
+    "trg_set_updated_at()",
+    "trg_validate_fin_lancamento_update()",
+    "trg_validate_rateio_sum()",
+    "unaccent_init(internal)",
+    "unaccent_lexize(internal,internal,internal,internal)",
+    "update_produto_last_movement()",
+    "update_updated_at_column()",
+    "validate_cp_valor()",
+    "validate_cr_valor()",
+    "validate_estorno_movement()",
+    "validate_fechamento_marca_total()",
+    "validate_fin_lancamento()",
+    "validate_marca_categoria_vinculo()",
+    "validate_ponto_ferias()",
+    "validate_ponto_registro()",
+    "validate_ponto_update()",
+    "validate_purchase_order_item()",
+    "validate_requisicao_item_status()",
+    "validate_rh_banco_horas_numeric()",
+    "validate_rh_beneficios_numeric()",
+    "validate_rh_colaboradores_numeric()",
+    "validate_rh_folha_numeric()",
+    "validate_salmon_entry()",
+    "validate_salmon_manipulation()",
+    "validate_stock_movement()",
+    "validate_supplier_item_price()",
+    "word_similarity_commutator_op(text,text)",
+    "word_similarity_dist_commutator_op(text,text)",
+    "word_similarity_dist_op(text,text)",
+    "word_similarity_op(text,text)",
+    "word_similarity(text,text)"
+  ],
+  "warning": "Unions de overloads e Args homonimos exigem resolucao real PostgREST; nao regenerar tipos candidatos a partir do vivo atrasado."
+}

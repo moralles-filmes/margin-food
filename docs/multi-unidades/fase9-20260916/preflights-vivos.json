@@ -1,0 +1,59 @@
+[
+  {
+    "file": "fase2-20260915/preflight.sql",
+    "capturedAt": "2026-09-16T17:07:13.925Z",
+    "status": "PASS",
+    "detail": null
+  },
+  {
+    "file": "fase3-20260915/preflight.sql",
+    "capturedAt": "2026-09-16T17:07:19.653Z",
+    "status": "REFUSED",
+    "detail": {
+      "error": {
+        "name": "HttpException",
+        "message": "Failed to run sql query: ERROR:  P0001: PHASE3_FUNCTION_DRIFT: create_salmon_entry_atomic(date,text,text,text,integer,integer,numeric,numeric,text)\nCONTEXT:  PL/pgSQL function inline_code_block line 5 at RAISE\n"
+      }
+    }
+  },
+  {
+    "file": "fase4-20260915/preflight.sql",
+    "capturedAt": "2026-09-16T17:07:27.055Z",
+    "status": "PASS",
+    "detail": null
+  },
+  {
+    "file": "fase6-20260915/preflight.sql",
+    "capturedAt": "2026-09-16T17:07:32.997Z",
+    "status": "REFUSED",
+    "detail": {
+      "error": {
+        "name": "HttpException",
+        "message": "Failed to run sql query: ERROR:  P0001: PHASE6_PREREQUISITES_REQUIRED\nCONTEXT:  PL/pgSQL function inline_code_block line 4 at RAISE\n"
+      }
+    }
+  },
+  {
+    "file": "fase7-20260916/preflight.sql",
+    "capturedAt": "2026-09-16T17:07:39.394Z",
+    "status": "REFUSED",
+    "detail": {
+      "error": {
+        "name": "HttpException",
+        "message": "Failed to run sql query: ERROR:  P0001: PHASE7_PREREQUISITES_REQUIRED\nCONTEXT:  PL/pgSQL function inline_code_block line 4 at RAISE\n"
+      }
+    }
+  },
+  {
+    "file": "fase8-20260916/preflight.sql",
+    "capturedAt": "2026-09-16T17:07:44.981Z",
+    "status": "PASS",
+    "detail": null
+  },
+  {
+    "file": "fase8-20260916/preflight-realtime.sql",
+    "capturedAt": "2026-09-16T17:07:50.090Z",
+    "status": "PASS",
+    "detail": null
+  }
+]

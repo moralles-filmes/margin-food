@@ -1,0 +1,42 @@
+{
+  "counts": {
+    "statements equivalentes (LF/delimitadores)": 613,
+    "historico presente; formato/conteudo exige comparacao": 215,
+    "historico sem statements": 5,
+    "texto integral equivalente": 23,
+    "candidato local": 14
+  },
+  "refs": 75,
+  "blobs": 957,
+  "local": 870,
+  "history": 856,
+  "functions": 356,
+  "typeFunctions": 254,
+  "changed": {
+    "relations": 0,
+    "columns": 0,
+    "constraints": 0,
+    "indexes": 0,
+    "triggers": 0,
+    "policies": 17
+  },
+  "f8ChangedFunctions": [],
+  "sameNameDifferentVersionGroups": 17,
+  "absent": [
+    "20260915140812",
+    "20260915144030",
+    "20260915144031",
+    "20260915200818",
+    "20260915225538",
+    "20260915232846",
+    "20260916133617",
+    "20260916133618",
+    "20260916133619",
+    "20260916134848",
+    "20260916135928",
+    "20260916141000",
+    "20260916143153",
+    "20260916144830"
+  ],
+  "noLocal": []
+}

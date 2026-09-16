@@ -1,0 +1,165 @@
+{
+  "capturedAt": "2026-09-16T17:07:01.146Z",
+  "deployments": [
+    {
+      "id": "dpl_79oubxDxhgVF4owXmEXiEP6QUV5N",
+      "url": "moralles-food-jf64yz8y0-moralles-filmes-projects.vercel.app",
+      "state": "READY",
+      "target": "production",
+      "created": 1789502173139,
+      "sha": "80dcf4ec527d1a7e86ed3509496638b71219ab43"
+    },
+    {
+      "id": "dpl_19vFTAVyaf4gXH5WPYc2FDd4YrMJ",
+      "url": "moralles-food-e2uf6dtou-moralles-filmes-projects.vercel.app",
+      "state": "READY",
+      "target": null,
+      "created": 1789502094329,
+      "sha": "e4f165f92f94463413482e137c3f999fbe1948d7"
+    },
+    {
+      "id": "dpl_DKDp5AsMJFU5t5Ssk5gu3NHSrScQ",
+      "url": "moralles-food-esn7weh38-moralles-filmes-projects.vercel.app",
+      "state": "READY",
+      "target": "production",
+      "created": 1789500388403,
+      "sha": "a32c10a3ed9c1df9cd0cbb32538480d3fdc31ec4"
+    },
+    {
+      "id": "dpl_7Qh3kuWm6DNSWWM9WmNadVhqMwXL",
+      "url": "moralles-food-ho2vz7e75-moralles-filmes-projects.vercel.app",
+      "state": "READY",
+      "target": null,
+      "created": 1789500342672,
+      "sha": "c7fe53ae10d9ef8f5a33037526960268f084e50c"
+    },
+    {
+      "id": "dpl_CHhbeXh5w1BQCUT2Ggf9oMX1HuwR",
+      "url": "moralles-food-qi2i74nvs-moralles-filmes-projects.vercel.app",
+      "state": "READY",
+      "target": "production",
+      "created": 1789499458297,
+      "sha": "37656e08245ddf0f2b599e0d68afa6bec5119a47"
+    },
+    {
+      "id": "dpl_8nU9D3LMEQ5UXnQyGMnCBYQ5UgMA",
+      "url": "moralles-food-cao4dvi9p-moralles-filmes-projects.vercel.app",
+      "state": "READY",
+      "target": null,
+      "created": 1789499403748,
+      "sha": "1706a0513ce1aed526cc72e18459ec75e1197ca2"
+    },
+    {
+      "id": "dpl_FCAW2cWL1KtDjj9cLC4t3WLkHYPR",
+      "url": "moralles-food-d4x1lb45m-moralles-filmes-projects.vercel.app",
+      "state": "READY",
+      "target": "production",
+      "created": 1789498387395,
+      "sha": "50662ca6e57ac4be298f96de76078bafdad79a2b"
+    },
+    {
+      "id": "dpl_HzbYCLgmkW65ETZeqXFfwVJex1Yp",
+      "url": "moralles-food-bpmxe9940-moralles-filmes-projects.vercel.app",
+      "state": "READY",
+      "target": null,
+      "created": 1789498144687,
+      "sha": "ceab03584bbecd7295f2349f73d892c7c23feadc"
+    },
+    {
+      "id": "dpl_ENHeGbZWyW51TC4TakigQCDapxmp",
+      "url": "moralles-food-icw1trvam-moralles-filmes-projects.vercel.app",
+      "state": "READY",
+      "target": "production",
+      "created": 1789487633471,
+      "sha": "2e2edb2f1dcc544fc1e18127b7b7752f8a0e9630"
+    },
+    {
+      "id": "dpl_EqhFFebaxwH9ohXpiMXuNFKjsTVU",
+      "url": "moralles-food-4k777rv3d-moralles-filmes-projects.vercel.app",
+      "state": "READY",
+      "target": null,
+      "created": 1789487578739,
+      "sha": "89fcfe5327f1ea118ff6e0479a36319f891aaad4"
+    },
+    {
+      "id": "dpl_34MgdBG44ZUZUEduXrCqSPK56BuS",
+      "url": "moralles-food-4q3fk31gs-moralles-filmes-projects.vercel.app",
+      "state": "READY",
+      "target": "production",
+      "created": 1789486646465,
+      "sha": "ece9fdc879ce31b332c1b9bc609b7d764496e66c"
+    },
+    {
+      "id": "dpl_GGaTrX4yiWGHwdSyhdDShsaMDbBC",
+      "url": "moralles-food-5mi56fv8t-moralles-filmes-projects.vercel.app",
+      "state": "READY",
+      "target": null,
+      "created": 1789486516158,
+      "sha": "48a45d714abfbe253d267d8acb0ba23b69873c75"
+    },
+    {
+      "id": "dpl_H1KYvu3W69D1qdLmUC3SCtXDe8wy",
+      "url": "moralles-food-jk6oipozv-moralles-filmes-projects.vercel.app",
+      "state": "READY",
+      "target": null,
+      "created": 1789486457804,
+      "sha": "79875ff1d4953b8283121f9b96ce4c601fa6cb6f"
+    },
+    {
+      "id": "dpl_HbsTEE6JmozyeiZV7wVEiTYfEtBb",
+      "url": "moralles-food-ftk9dhv6f-moralles-filmes-projects.vercel.app",
+      "state": "READY",
+      "target": "production",
+      "created": 1789485991719,
+      "sha": "f00cd584e55b6a40038d3dfd2052e9414c497177"
+    },
+    {
+      "id": "dpl_Fu5obxMiiVyaTZddJUHDX6eB6ySW",
+      "url": "moralles-food-pbzt7z3kv-moralles-filmes-projects.vercel.app",
+      "state": "READY",
+      "target": null,
+      "created": 1789485877527,
+      "sha": "8c569023c175ff523383118f08a0b9079e0515ec"
+    },
+    {
+      "id": "dpl_B24aDSzhzfkegRiiXbPXCnTQA9UM",
+      "url": "moralles-food-2wrkoaif7-moralles-filmes-projects.vercel.app",
+      "state": "READY",
+      "target": null,
+      "created": 1789485537354,
+      "sha": "e7a76ea4af882d086f7a9488a3e5482bb7f38ad9"
+    },
+    {
+      "id": "dpl_95UMCPcd3LiQ8dokWXmUyNFq743q",
+      "url": "moralles-food-2ncfsrf0y-moralles-filmes-projects.vercel.app",
+      "state": "READY",
+      "target": null,
+      "created": 1789485124177,
+      "sha": "49394b6b34465abd7df14cd2080471c5e039767f"
+    },
+    {
+      "id": "dpl_BKSLbqzyKxgEsnfhdthKheMQGWvP",
+      "url": "moralles-food-4x5c32569-moralles-filmes-projects.vercel.app",
+      "state": "READY",
+      "target": "production",
+      "created": 1789398108097,
+      "sha": "1fdea27e69e3d687b49fdd04e91069b25cc70850"
+    },
+    {
+      "id": "dpl_9g7ryiKHffFWjVazZ9pmhBEy8Jjk",
+      "url": "moralles-food-gx6r5a5fb-moralles-filmes-projects.vercel.app",
+      "state": "READY",
+      "target": null,
+      "created": 1789397657125,
+      "sha": "8e0c6a590d24ee8561d61df3ebfeba809568ce51"
+    },
+    {
+      "id": "dpl_Homz7X6J9QZiXgU8gEhiLfpWXuyK",
+      "url": "moralles-food-abv7iexbt-moralles-filmes-projects.vercel.app",
+      "state": "READY",
+      "target": "production",
+      "created": 1789395421122,
+      "sha": "cd23dcacd4f82599ff0cbefb2136f7d451cf037a"
+    }
+  ]
+}
