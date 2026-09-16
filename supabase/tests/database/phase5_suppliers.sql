@@ -179,9 +179,16 @@ SELECT pg_temp.denied($q$SELECT pg_temp.receive_item('d5000000-0000-4000-8000-00
 RESET ROLE;
 SELECT pg_temp.ok(pg_temp.digest()=(SELECT value FROM resources WHERE name='before-receipt-failure'),'receipt failure atomic including shortfall row');
 DROP TRIGGER phase5_fail ON supplier_item_prices;
-UPDATE purchase_order_items SET stock_item_id='c5000000-0000-4000-8000-000000000002' WHERE id='e5000000-0000-4000-8000-000000000002';
+DO $$ BEGIN
+ IF EXISTS(SELECT 1 FROM pg_constraint WHERE conname='phase7_purchase_order_items_stock_item_id_tenant_fk') THEN
+  PERFORM pg_temp.denied($q$UPDATE purchase_order_items SET stock_item_id='c5000000-0000-4000-8000-000000000002' WHERE id='e5000000-0000-4000-8000-000000000002'$q$,'receipt cross product blocked at FK','23503');
+ ELSE
+  UPDATE purchase_order_items SET stock_item_id='c5000000-0000-4000-8000-000000000002' WHERE id='e5000000-0000-4000-8000-000000000002';
+ END IF;
+END $$;
 SET LOCAL ROLE authenticated;
-SELECT pg_temp.denied($q$SELECT pg_temp.receive_item('d5000000-0000-4000-8000-000000000002','e5000000-0000-4000-8000-000000000002')$q$,'receipt rejects crossed product');
+SELECT pg_temp.denied($q$SELECT pg_temp.receive_item('d5000000-0000-4000-8000-000000000002','e5000000-0000-4000-8000-000000000002')$q$,'receipt rejects crossed product')
+WHERE NOT EXISTS(SELECT 1 FROM pg_constraint WHERE conname='phase7_purchase_order_items_stock_item_id_tenant_fk');
 SELECT pg_temp.denied($q$SELECT pg_temp.receive_item('d5000000-0000-4000-8000-000000000002','e5000000-0000-4000-8000-000000000001')$q$,'receipt rejects item from another order','P0001');
 RESET ROLE;
 UPDATE purchase_order_items SET stock_item_id='c5000000-0000-4000-8000-000000000001' WHERE id='e5000000-0000-4000-8000-000000000002';

@@ -179,7 +179,13 @@ SELECT pg_temp.context(1);
 SELECT pg_temp.ok((SELECT count(*)=0 FROM audit_logs WHERE log_scope<>'TENANT'),'tenant excludes global and ambiguous after backfill');
 SELECT pg_temp.ok((_guarded_list_fin_audit_logs()->'items') @> '[{"acao":"LEGACY"}]'::jsonb,'finance reader sees correlated historical row');
 SELECT pg_temp.ok(NOT (_guarded_list_fin_audit_logs()->'items') @> '[{"acao":"ATTRIBUTED_CONFLICT"}]'::jsonb,'finance definer excludes ambiguous rows');
-SELECT pg_temp.denied($q$SELECT _planning_upsert_meta_guarded(2026,9,'Fixture',100)$q$,'known baseline planning ON CONFLICT mismatch (before logging)','42P10');
+DO $$ BEGIN
+ IF EXISTS(SELECT 1 FROM pg_constraint WHERE conname='phase7_planning_metas_compra_tenant_key') THEN
+  PERFORM pg_temp.ok((_planning_upsert_meta_guarded(2026,9,'Phase7 upsert',100)->>'success')::boolean,'planning conflict fixed; internal log remains authorized');
+ ELSE
+  PERFORM pg_temp.denied($q$SELECT _planning_upsert_meta_guarded(2026,9,'Fixture',100)$q$,'known baseline planning ON CONFLICT mismatch (before logging)','42P10');
+ END IF;
+END $$;
 RESET ROLE;
 INSERT INTO planning_metas_compra(id,company_id,year,month,categoria,target_value) VALUES('f0000000-0000-4000-8000-000000000001','b0000000-0000-4000-8000-000000000001',2026,9,'Fixture',100);
 SET LOCAL ROLE authenticated;
