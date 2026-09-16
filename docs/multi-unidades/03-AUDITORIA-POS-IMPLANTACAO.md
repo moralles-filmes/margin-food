@@ -257,8 +257,8 @@ A numeração abaixo é a deste trabalho; agrupa as 20 frentes do pedido origina
 | 7 | Tabelas, INSERTs, RLS, views e SECURITY DEFINER | Inventário completo e correções ensaiadas localmente; aceite integral/publicação pendentes por dependências e contratos SQL residuais ([resultados](fase7-20260916/RESULTADOS.md)) |
 | 8 | Edges, Storage, Realtime, integrações e jobs | Entrega local: 88 checks HTTP, 37 Storage, 16 Realtime, 10 recusas de drift e 6 de recuo; publicação/aceite integral pendentes por gateway, scheduler, integrações e falhas parciais ([resultados](fase8-20260916/RESULTADOS.md)) |
 | 9 | Drift de schema/histórico | Inventário e ensaios locais entregues; rastreabilidade administrativa comprovada; release integrado bloqueado por F3/Salmão e F7/hotfix ([resultados](fase9-20260916/RESULTADOS.md)) |
-| 10 | Frontend/cache e jornada multiunidade | A/B/multi/admin/global; troca, revogação, identidade existente e respostas atrasadas |
-| 11 | Regressão final, performance e operação | Todos os checks, EXPLAIN pertinente, checklist completo, deploy/rollback ordenados e documentação final |
+| 10 | Frontend/cache e jornada multiunidade | Entrega local F10 concluída; correções por lifetime e jornadas isoladas, sem publicação ([resultados](fase10-20260916/RESULTADOS.md)) |
+| 11 | Regressão final, performance e operação | Entrega local concluída: 789 unitários, SQL real, 21 HTTP, 17 jornadas browser, 60 planos EXPLAIN e matriz item por item; aceite integral/publicação bloqueados ([resultados](fase11-20260916/RESULTADOS.md)) |
 
 Cada fase executa auditoria específica antes da alteração, entrega correções pequenas verificadas, atualiza este relatório e fornece o prompt da seguinte. Achados críticos novos podem antecipar trabalho com justificativa. Fase 2 é separada do backfill extenso para permitir correção crítica pequena e revisável.
 
@@ -285,7 +285,9 @@ Nenhuma correção funcional foi feita; portanto estas falhas são baseline ante
 
 ## 9. Checklist final de isolamento
 
-Itens pendentes até evidência nas fases correspondentes:
+Estado inicial abaixo preservado como baseline da Fase 1. A decisão atual para **cada um dos 19 itens**, com fonte, ambiente, data, limite e responsável/próximo passo, está na [matriz de aceite F11](fase11-20260916/MATRIZ-ACEITE.md). F11 encerrou sua entrega local, mas não o aceite integral ou a publicação: F3/F7, contratos residuais e provas operacionais continuam bloqueantes. [Performance](fase11-20260916/PERFORMANCE.md) e [operação/publicação/recuo](fase11-20260916/PLANO-OPERACAO.md) distinguem ensaio local de prova viva.
+
+Itens pendentes na baseline inicial:
 
 - [ ] Nenhuma tabela tenant-sensitive conhecida permite leitura cross-tenant.
 - [ ] Três tabelas de logs protegidas e histórico classificado.
