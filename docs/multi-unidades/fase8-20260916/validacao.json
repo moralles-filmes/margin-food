@@ -1,0 +1,480 @@
+{
+  "storage": {
+    "checks": 37,
+    "realAuth": true,
+    "realStorage": true
+  },
+  "realtime": {
+    "checks": 16,
+    "deleteObservation": {
+      "a": false,
+      "unfilteredA": false,
+      "b": false
+    },
+    "realWebSocket": true
+  },
+  "edge": {
+    "checks": 88,
+    "cases": [
+      {
+        "edge": "send-whatsapp-zapi",
+        "case": "OPTIONS",
+        "status": 200
+      },
+      {
+        "edge": "send-whatsapp-zapi",
+        "case": "anon",
+        "status": 401
+      },
+      {
+        "edge": "send-whatsapp-zapi",
+        "case": "JWT inválido",
+        "status": 401
+      },
+      {
+        "edge": "send-whatsapp-zapi",
+        "case": "método",
+        "status": 405
+      },
+      {
+        "edge": "send-whatsapp-zapi",
+        "case": "sem permissão",
+        "status": 403
+      },
+      {
+        "edge": "send-whatsapp-zapi",
+        "case": "granular ALLOW legado DENY",
+        "status": 200
+      },
+      {
+        "edge": "send-whatsapp-zapi",
+        "case": "super permitido",
+        "status": 200
+      },
+      {
+        "edge": "send-whatsapp-zapi",
+        "case": "A header B",
+        "status": 403
+      },
+      {
+        "edge": "send-whatsapp-zapi",
+        "case": "header inválido",
+        "status": 403
+      },
+      {
+        "edge": "send-whatsapp-zapi",
+        "case": "placeholder",
+        "status": 403
+      },
+      {
+        "edge": "send-whatsapp-zapi",
+        "case": "header ausente usa origem",
+        "status": 200
+      },
+      {
+        "edge": "send-whatsapp-zapi",
+        "case": "fornecedor B",
+        "status": 404
+      },
+      {
+        "edge": "send-whatsapp-zapi",
+        "case": "fornecedor outra cotação A",
+        "status": 404
+      },
+      {
+        "edge": "send-whatsapp-zapi",
+        "case": "cotação B",
+        "status": 404
+      },
+      {
+        "edge": "send-whatsapp-zapi",
+        "case": "body role não concede",
+        "status": 403
+      },
+      {
+        "edge": "send-whatsapp-zapi",
+        "case": "multi B autorizado",
+        "status": 200
+      },
+      {
+        "edge": "send-whatsapp-zapi",
+        "case": "membership revoked",
+        "status": 403
+      },
+      {
+        "edge": "send-whatsapp-zapi",
+        "case": "membership inactive",
+        "status": 403
+      },
+      {
+        "edge": "send-whatsapp-zapi",
+        "case": "empresa inativa",
+        "status": 403
+      },
+      {
+        "edge": "cotacao-ia",
+        "case": "OPTIONS",
+        "status": 200
+      },
+      {
+        "edge": "cotacao-ia",
+        "case": "anon",
+        "status": 401
+      },
+      {
+        "edge": "cotacao-ia",
+        "case": "JWT inválido",
+        "status": 401
+      },
+      {
+        "edge": "cotacao-ia",
+        "case": "método",
+        "status": 405
+      },
+      {
+        "edge": "cotacao-ia",
+        "case": "sem permissão",
+        "status": 403
+      },
+      {
+        "edge": "cotacao-ia",
+        "case": "granular permitido sem disparo externo",
+        "status": 200
+      },
+      {
+        "edge": "admin-users",
+        "case": "OPTIONS",
+        "status": 200
+      },
+      {
+        "edge": "admin-users",
+        "case": "anon",
+        "status": 401
+      },
+      {
+        "edge": "admin-users",
+        "case": "JWT inválido",
+        "status": 401
+      },
+      {
+        "edge": "admin-users",
+        "case": "admin local sem gate de usuários",
+        "status": 403
+      },
+      {
+        "edge": "admin-users",
+        "case": "global lista unidade",
+        "status": 200
+      },
+      {
+        "edge": "requisicao-estoque",
+        "case": "recurso cruzado não confirma ciência",
+        "status": 404
+      },
+      {
+        "edge": "requisicao-estoque",
+        "case": "owner forjado não confirma",
+        "status": 403
+      },
+      {
+        "edge": "requisicao-estoque",
+        "case": "self-service do solicitante",
+        "status": 200
+      },
+      {
+        "edge": "requisicao-estoque",
+        "case": "negação grava notificação tenant",
+        "status": 200
+      },
+      {
+        "edge": "requisicao-estoque",
+        "case": "retry de notificação",
+        "status": 200
+      },
+      {
+        "edge": "ai-chat",
+        "case": "OPTIONS",
+        "status": 200
+      },
+      {
+        "edge": "ai-chat",
+        "case": "anon",
+        "status": 401
+      },
+      {
+        "edge": "ai-chat",
+        "case": "JWT inválido",
+        "status": 401
+      },
+      {
+        "edge": "check-password",
+        "case": "OPTIONS",
+        "status": 200
+      },
+      {
+        "edge": "check-password",
+        "case": "anon",
+        "status": 401
+      },
+      {
+        "edge": "check-password",
+        "case": "JWT inválido",
+        "status": 401
+      },
+      {
+        "edge": "cmv",
+        "case": "OPTIONS",
+        "status": 200
+      },
+      {
+        "edge": "cmv",
+        "case": "anon",
+        "status": 401
+      },
+      {
+        "edge": "cmv",
+        "case": "JWT inválido",
+        "status": 401
+      },
+      {
+        "edge": "ficha-tecnica",
+        "case": "OPTIONS",
+        "status": 200
+      },
+      {
+        "edge": "ficha-tecnica",
+        "case": "anon",
+        "status": 401
+      },
+      {
+        "edge": "ficha-tecnica",
+        "case": "JWT inválido",
+        "status": 401
+      },
+      {
+        "edge": "inventario",
+        "case": "OPTIONS",
+        "status": 200
+      },
+      {
+        "edge": "inventario",
+        "case": "anon",
+        "status": 401
+      },
+      {
+        "edge": "inventario",
+        "case": "JWT inválido",
+        "status": 401
+      },
+      {
+        "edge": "requisicao-estoque",
+        "case": "OPTIONS",
+        "status": 200
+      },
+      {
+        "edge": "requisicao-estoque",
+        "case": "anon",
+        "status": 401
+      },
+      {
+        "edge": "requisicao-estoque",
+        "case": "JWT inválido",
+        "status": 401
+      },
+      {
+        "edge": "rh",
+        "case": "OPTIONS",
+        "status": 200
+      },
+      {
+        "edge": "rh",
+        "case": "anon",
+        "status": 401
+      },
+      {
+        "edge": "rh",
+        "case": "JWT inválido",
+        "status": 401
+      },
+      {
+        "edge": "rbac-lint",
+        "case": "OPTIONS",
+        "status": 200
+      },
+      {
+        "edge": "rbac-lint",
+        "case": "anon",
+        "status": 401
+      },
+      {
+        "edge": "rbac-lint",
+        "case": "JWT inválido",
+        "status": 401
+      },
+      {
+        "edge": "rbac-lint-full",
+        "case": "OPTIONS",
+        "status": 200
+      },
+      {
+        "edge": "rbac-lint-full",
+        "case": "anon",
+        "status": 401
+      },
+      {
+        "edge": "rbac-lint-full",
+        "case": "JWT inválido",
+        "status": 401
+      },
+      {
+        "edge": "rbac-lint-quick",
+        "case": "OPTIONS",
+        "status": 200
+      },
+      {
+        "edge": "rbac-lint-quick",
+        "case": "anon",
+        "status": 401
+      },
+      {
+        "edge": "rbac-lint-quick",
+        "case": "JWT inválido",
+        "status": 401
+      },
+      {
+        "edge": "admin-companies",
+        "case": "OPTIONS",
+        "status": 200
+      },
+      {
+        "edge": "admin-companies",
+        "case": "anon",
+        "status": 401
+      },
+      {
+        "edge": "admin-companies",
+        "case": "JWT inválido",
+        "status": 401
+      },
+      {
+        "edge": "admin-create-user",
+        "case": "OPTIONS",
+        "status": 200
+      },
+      {
+        "edge": "admin-create-user",
+        "case": "anon",
+        "status": 401
+      },
+      {
+        "edge": "admin-create-user",
+        "case": "JWT inválido",
+        "status": 401
+      },
+      {
+        "edge": "purchase-requisitions",
+        "case": "OPTIONS",
+        "status": 200
+      },
+      {
+        "edge": "purchase-requisitions",
+        "case": "anon",
+        "status": 401
+      },
+      {
+        "edge": "purchase-requisitions",
+        "case": "JWT inválido",
+        "status": 401
+      },
+      {
+        "edge": "purchase-requisitions",
+        "case": "admin com DENY não contorna RBAC",
+        "status": 403
+      },
+      {
+        "edge": "purchase-requisitions",
+        "case": "granular-only autorizado",
+        "status": 200
+      },
+      {
+        "edge": "purchase-requisitions",
+        "case": "global autorizado",
+        "status": 200
+      },
+      {
+        "edge": "scheduled-jobs",
+        "case": "método",
+        "status": 405
+      },
+      {
+        "edge": "scheduled-jobs",
+        "case": "anon",
+        "status": 401
+      },
+      {
+        "edge": "scheduled-jobs",
+        "case": "JWT usuário não é scheduler",
+        "status": 401
+      },
+      {
+        "edge": "scheduled-jobs",
+        "case": "serviço action inválida",
+        "status": 400
+      },
+      {
+        "edge": "scheduled-jobs",
+        "case": "refresh real + log",
+        "status": 200
+      },
+      {
+        "edge": "scheduled-jobs",
+        "case": "cleanup real sintético",
+        "status": 200
+      },
+      {
+        "edge": "scheduled-jobs",
+        "case": "retry cleanup sem apagar mais",
+        "status": 200
+      },
+      {
+        "edge": "scheduled-jobs",
+        "case": "refresh concorrente",
+        "status": 200
+      },
+      {
+        "edge": "scheduled-jobs",
+        "case": "refresh concorrente",
+        "status": 200
+      },
+      {
+        "edge": "scheduled-jobs",
+        "case": "falha intermediária auditoria não retorna sucesso",
+        "status": 500
+      }
+    ]
+  },
+  "rollback": {
+    "checks": 6,
+    "unchangedTables": 152,
+    "realStorage": true
+  },
+  "drift": {
+    "refusals": 10
+  },
+  "sql": {
+    "phase7": 248,
+    "phase3": 175,
+    "phase4": 146,
+    "phase5": 67,
+    "phase6": 80
+  },
+  "unit": {
+    "passed": 781,
+    "files": 100
+  },
+  "deno": {
+    "checkedHandlers": 17,
+    "corsTests": 1,
+    "schedulerHttpChecks": 8
+  }
+}

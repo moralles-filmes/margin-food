@@ -1,0 +1,105 @@
+{
+  "capturedAt": "2026-09-16T15:09:35Z",
+  "projectId": "wuzxpbixprrgssoeeaez",
+  "edges": [
+    {
+      "slug": "admin-users",
+      "version": 32,
+      "verify_jwt": false
+    },
+    {
+      "slug": "ai-chat",
+      "version": 9,
+      "verify_jwt": false
+    },
+    {
+      "slug": "inventario",
+      "version": 15,
+      "verify_jwt": false
+    },
+    {
+      "slug": "check-password",
+      "version": 8,
+      "verify_jwt": true
+    },
+    {
+      "slug": "purchase-requisitions",
+      "version": 10,
+      "verify_jwt": false
+    },
+    {
+      "slug": "requisicao-estoque",
+      "version": 14,
+      "verify_jwt": false
+    },
+    {
+      "slug": "cmv",
+      "version": 10,
+      "verify_jwt": false
+    },
+    {
+      "slug": "rh",
+      "version": 10,
+      "verify_jwt": false
+    },
+    {
+      "slug": "ficha-tecnica",
+      "version": 11,
+      "verify_jwt": false
+    },
+    {
+      "slug": "admin-companies",
+      "version": 11,
+      "verify_jwt": true
+    },
+    {
+      "slug": "scheduled-jobs",
+      "version": 7,
+      "verify_jwt": false
+    },
+    {
+      "slug": "admin-create-user",
+      "version": 6,
+      "verify_jwt": false
+    },
+    {
+      "slug": "rbac-lint",
+      "version": 6,
+      "verify_jwt": false
+    },
+    {
+      "slug": "rbac-lint-quick",
+      "version": 6,
+      "verify_jwt": true
+    },
+    {
+      "slug": "rbac-lint-full",
+      "version": 6,
+      "verify_jwt": true
+    },
+    {
+      "slug": "send-whatsapp-zapi",
+      "version": 5,
+      "verify_jwt": false
+    },
+    {
+      "slug": "cotacao-ia",
+      "version": 4,
+      "verify_jwt": false
+    }
+  ],
+  "vercel": [
+    {
+      "id": "dpl_79oubxDxhgVF4owXmEXiEP6QUV5N",
+      "state": "READY",
+      "sha": "80dcf4ec527d1a7e86ed3509496638b71219ab43",
+      "target": "production"
+    }
+  ],
+  "phase2Through8VersionsPresent": [],
+  "phase8ReadOnlyPreflights": {
+    "storage": "PASS",
+    "realtime": "PASS"
+  },
+  "productionMutations": false
+}
