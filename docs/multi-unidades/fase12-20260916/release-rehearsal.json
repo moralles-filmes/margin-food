@@ -1,0 +1,610 @@
+{
+  "generatedAt": "2026-09-16T22:10:59.799Z",
+  "environment": {
+    "host": "127.0.0.1",
+    "port": 15440,
+    "template": "moralles_phase9_test_live",
+    "database": "moralles_stabilization_release_20260916221043",
+    "postgres": "17.10"
+  },
+  "releaseManifestSha256": "c1eaa6fb267d71bc52bd10e3d0eed0f104e267ba5963766a4fa3bdeb1d90ed8e",
+  "exactSequence": [
+    {
+      "order": 1,
+      "destination": "20260916220000_phase2_containment_forward.sql",
+      "sha256": "d680729197c1db8effcf9d83518853a047f179bc396c7c466a9491de43273063",
+      "mode": "byte-identical"
+    },
+    {
+      "order": 2,
+      "destination": "20260916220100_phase3_logs_compatible_forward.sql",
+      "sha256": "8308114ab4b31a161cc1a20db0e7f31e59db0895d7f452ffe447f5129a3a221d",
+      "mode": "compatible-forward"
+    },
+    {
+      "order": 3,
+      "destination": "20260916220200_phase3_log_classifier_forward.sql",
+      "sha256": "5caf5ad11ad0cff6964675fdc5cac7d3c1f8b288802a9ff06c54b3a13b354b2d",
+      "mode": "byte-identical"
+    },
+    {
+      "order": 4,
+      "destination": "20260916220300_phase4_salmon_forward.sql",
+      "sha256": "1b8a0fb45b9c1c750a58164cba27ccb125ee57ce42960a2c9dc0f1a84114fcb7",
+      "mode": "byte-identical"
+    },
+    {
+      "order": 5,
+      "destination": "20260916220400_phase5_supplier_forward.sql",
+      "sha256": "2e25ed4afb4827157a0592f9c74ee210e99a2d18ac58b837a41477e8a4e67690",
+      "mode": "byte-identical"
+    },
+    {
+      "order": 6,
+      "destination": "20260916220500_phase6_catalog_forward.sql",
+      "sha256": "9684e53b52132f7743503247ce3a364256ef5208eea1951513f6e86cbdbb768a",
+      "mode": "compatible-forward"
+    },
+    {
+      "order": 7,
+      "destination": "20260916220600_phase7_containment_compatible_forward.sql",
+      "sha256": "ee69ce9f87e8691e8068eac62bb55c9aa1b57ac1251bf03554e4b42d2312916a",
+      "mode": "compatible-forward"
+    },
+    {
+      "order": 8,
+      "destination": "20260916220700_phase7_preserve_reference_hotfix.sql",
+      "sha256": "b9c22f54313e46ad6674de7358768834f239679dc42f7cc62443955ee3cb81af",
+      "mode": "superseded-by-live-hotfix"
+    },
+    {
+      "order": 9,
+      "destination": "20260916220800_phase7_writers_forward.sql",
+      "sha256": "31009b9e7ec96ddd3ccc84d756efc0384bd3a442536b0bb2c0f04e62492ce36b",
+      "mode": "byte-identical"
+    },
+    {
+      "order": 10,
+      "destination": "20260916220900_phase7_conflicts_forward.sql",
+      "sha256": "e8bd35ed5fafd2cedfd630ae7196c2a2bfc5f1df6a53872928f64967a8180cad",
+      "mode": "byte-identical"
+    },
+    {
+      "order": 11,
+      "destination": "20260916221000_phase7_readers_forward.sql",
+      "sha256": "ead47a752e592ff8d9aa744f5a0d4b7023c77b314f5abe791a5d07235ddc0b79",
+      "mode": "byte-identical"
+    },
+    {
+      "order": 12,
+      "destination": "20260916221100_phase7_notifications_forward.sql",
+      "sha256": "7eafe6ff948a5563dfd7ce777f5654e02c1317b6ab91a842622010865c401fb8",
+      "mode": "byte-identical"
+    },
+    {
+      "order": 13,
+      "destination": "20260916221200_phase8_storage_forward.sql",
+      "sha256": "f7e0247639c92f6654c23f2ed05f7dec616274a935b871144cb03a9adbdefbed",
+      "mode": "byte-identical"
+    },
+    {
+      "order": 14,
+      "destination": "20260916221300_phase8_realtime_forward.sql",
+      "sha256": "aeeae880dba46ca4f838611b6f9e48a2a3355f1e3c219f613bc5946ef54dec6d",
+      "mode": "byte-identical"
+    },
+    {
+      "order": 15,
+      "destination": "20260916221400_stabilization_residual_forward.sql",
+      "sha256": "46f98587b8505a6b2d8d759e9a6f9db113afaf99bcbcf62d909675f1e56604aa",
+      "mode": "new-forward"
+    }
+  ],
+  "stageDatabases": [
+    {
+      "phase": "phase2",
+      "database": "moralles_phase2_test_release_20260916221043",
+      "test": "supabase/tests/database/phase2_global_containment.sql"
+    },
+    {
+      "phase": "phase3",
+      "database": "moralles_phase3_test_release_20260916221043",
+      "test": "supabase/tests/database/phase3_logs.sql"
+    },
+    {
+      "phase": "phase4",
+      "database": "moralles_phase4_test_release_20260916221043",
+      "test": "supabase/tests/database/phase4_salmon.sql"
+    },
+    {
+      "phase": "phase5",
+      "database": "moralles_phase5_test_release_20260916221043",
+      "test": "supabase/tests/database/phase5_suppliers.sql"
+    },
+    {
+      "phase": "phase6",
+      "database": "moralles_phase6_test_release_20260916221043",
+      "test": "supabase/tests/database/phase6_products.sql"
+    },
+    {
+      "phase": "phase7",
+      "database": "moralles_phase7_test_release_20260916221043",
+      "test": "supabase/tests/database/phase7_security.sql"
+    }
+  ],
+  "catalog": {
+    "public_tables": 150,
+    "public_policies": 596,
+    "realtime_tables": 6,
+    "public_functions": 402,
+    "storage_policies": 4,
+    "new_salmon_contract": true,
+    "old_salmon_overload": false,
+    "reference_hotfix_count": 17,
+    "reference_hotfix_digest": "9a49d198cabb2ec4f9fd1984e8c20404",
+    "realtime_insert_update_only": true
+  },
+  "concurrency": {
+    "items": 1,
+    "orders": 1,
+    "distinct_keys": 1
+  },
+  "checks": [
+    {
+      "label": "create fresh live-equivalent clone",
+      "durationMs": 1552,
+      "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "outputTail": []
+    },
+    {
+      "label": "restore omitted Storage/Realtime catalog substrate",
+      "durationMs": 76,
+      "outputSha256": "b77a0abfef2c90c4d5ba03177c318a8bd2c91be5466f91e8be323af59ffcdd5b",
+      "outputTail": [
+        "CREATE POLICY",
+        "CREATE POLICY",
+        "CREATE POLICY",
+        "CREATE POLICY",
+        "DO",
+        "ALTER PUBLICATION",
+        "psql:C:/Users/Yuri/Documents/Desenvolvedor/margin.food/release/multiunit-stabilization-20260916/rehearsal/live-external-substrate.sql:50: WARNING:  \"wal_level\" is insufficient to publish logical changes",
+        "HINT:  Set \"wal_level\" to \"logical\" before creating subscriptions."
+      ]
+    },
+    {
+      "label": "apply 20260916220000_phase2_containment_forward.sql",
+      "durationMs": 83,
+      "outputSha256": "87928657f4d0590f87c19ee012003bc7f0516e4e9f0562edc811cb953d8e4eb5",
+      "outputTail": [
+        "GRANT",
+        "REVOKE",
+        "GRANT",
+        "DROP POLICY",
+        "CREATE POLICY",
+        "DO",
+        "NOTIFY",
+        "COMMIT"
+      ]
+    },
+    {
+      "label": "clone phase2 stage",
+      "durationMs": 1400,
+      "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "outputTail": []
+    },
+    {
+      "label": "phase2 database regression",
+      "durationMs": 262,
+      "outputSha256": "97212e942358fda0591e09998d4d6496b4a5028e63e6450bf306e6cd2dbca89c",
+      "outputTail": [
+        " service refreshes all four existing reporting views",
+        " super admin global discovery excludes placeholder",
+        "(82 rows)",
+        "ROLLBACK",
+        " fixtures_rolled_back ",
+        "----------------------",
+        " t",
+        "(1 row)"
+      ]
+    },
+    {
+      "label": "apply 20260916220100_phase3_logs_compatible_forward.sql",
+      "durationMs": 197,
+      "outputSha256": "18f7879c3e9ac387f0a237f92c0ecb6e38556a53cc49182428b6996d9fd90b64",
+      "outputTail": [
+        "GRANT",
+        "CREATE FUNCTION",
+        "CREATE FUNCTION",
+        "CREATE FUNCTION",
+        "CREATE FUNCTION",
+        "DO",
+        "NOTIFY",
+        "COMMIT"
+      ]
+    },
+    {
+      "label": "apply 20260916220200_phase3_log_classifier_forward.sql",
+      "durationMs": 65,
+      "outputSha256": "e3ac61dcdf0719cbf559652abc736be88af5d5e2a8c445dd439022713b38e97d",
+      "outputTail": [
+        "CREATE FUNCTION",
+        "REVOKE",
+        "GRANT",
+        "CREATE INDEX",
+        "CREATE INDEX",
+        "CREATE INDEX",
+        "NOTIFY",
+        "COMMIT"
+      ]
+    },
+    {
+      "label": "clone phase3 stage",
+      "durationMs": 1556,
+      "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "outputTail": []
+    },
+    {
+      "label": "phase3 database regression",
+      "durationMs": 312,
+      "outputSha256": "72ba4a66b4d039c1c2c30ef9aa62febc13a6eca3167461769b67307214e5dd81",
+      "outputTail": [
+        "----",
+        " ",
+        "(1 row)",
+        " passed_assertions ",
+        "-------------------",
+        "               175",
+        "(1 row)",
+        "ROLLBACK"
+      ]
+    },
+    {
+      "label": "apply 20260916220300_phase4_salmon_forward.sql",
+      "durationMs": 144,
+      "outputSha256": "92a634767dfb593b17f1e53706bc07ff558eda574cbbc7d32111e561b9dd75c6",
+      "outputTail": [
+        "GRANT",
+        "GRANT",
+        "GRANT",
+        "GRANT",
+        "GRANT",
+        "DO",
+        "NOTIFY",
+        "COMMIT"
+      ]
+    },
+    {
+      "label": "clone phase4 stage",
+      "durationMs": 1125,
+      "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "outputTail": []
+    },
+    {
+      "label": "phase4 database regression",
+      "durationMs": 269,
+      "outputSha256": "de024e27901c00dc4e55b55d0bbeadb9273006e51192fd6967bf902154cab093",
+      "outputTail": [
+        " ",
+        "(1 row)",
+        " passed_assertions ",
+        "-------------------",
+        "               146",
+        "(1 row)",
+        "ROLLBACK",
+        "psql:C:/Users/Yuri/Documents/Desenvolvedor/margin.food/supabase/tests/database/phase4_salmon.sql:99: WARNING:  upsert_salmon_leftover_atomic error: Forbidden"
+      ]
+    },
+    {
+      "label": "apply 20260916220400_phase5_supplier_forward.sql",
+      "durationMs": 142,
+      "outputSha256": "09f4a370ff6132dea5e14d4a74324e3ca51338a9a0b08d913f0b9085969bda8b",
+      "outputTail": [
+        "REVOKE",
+        "GRANT",
+        "CREATE FUNCTION",
+        "REVOKE",
+        "GRANT",
+        "DO",
+        "NOTIFY",
+        "COMMIT"
+      ]
+    },
+    {
+      "label": "clone phase5 stage",
+      "durationMs": 1306,
+      "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "outputTail": []
+    },
+    {
+      "label": "phase5 database regression",
+      "durationMs": 349,
+      "outputSha256": "b3a70df288a02394c24398ba319ef487f40b7c85baa9c3b6409557e19dfc66b1",
+      "outputTail": [
+        "----",
+        " ",
+        "(1 row)",
+        " phase5_assertions ",
+        "-------------------",
+        "                67",
+        "(1 row)",
+        "ROLLBACK"
+      ]
+    },
+    {
+      "label": "apply 20260916220500_phase6_catalog_forward.sql",
+      "durationMs": 105,
+      "outputSha256": "6c4aa8d25ffd655a8ac2d442d285c933994b572c28be528533ee11d57531c2b1",
+      "outputTail": [
+        "CREATE FUNCTION",
+        "REVOKE",
+        "REVOKE",
+        "CREATE FUNCTION",
+        "REVOKE",
+        "GRANT",
+        "NOTIFY",
+        "COMMIT"
+      ]
+    },
+    {
+      "label": "clone phase6 stage",
+      "durationMs": 1476,
+      "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "outputTail": []
+    },
+    {
+      "label": "phase6 database regression",
+      "durationMs": 312,
+      "outputSha256": "41cc0e49ab9072a6f44166e1187230b3798afe581b963d5d7260a6c3b1765c89",
+      "outputTail": [
+        " ",
+        "(1 row)",
+        "RESET",
+        " assertions ",
+        "------------",
+        "         80",
+        "(1 row)",
+        "ROLLBACK"
+      ]
+    },
+    {
+      "label": "apply 20260916220600_phase7_containment_compatible_forward.sql",
+      "durationMs": 112,
+      "outputSha256": "4e76e8f1c626fab71874aba9526567e3401b8447f5585d9f43a47fe2d228b8c4",
+      "outputTail": [
+        "REVOKE",
+        "REVOKE",
+        "REVOKE",
+        "REVOKE",
+        "REVOKE",
+        "REVOKE",
+        "REVOKE",
+        "COMMIT"
+      ]
+    },
+    {
+      "label": "apply 20260916220700_phase7_preserve_reference_hotfix.sql",
+      "durationMs": 65,
+      "outputSha256": "6bdddab3fbc9006bb3621e8282e3c17f385ae79f595a1d48998c3de2ee4f58bd",
+      "outputTail": [
+        "BEGIN",
+        "SET",
+        "DO",
+        "COMMIT"
+      ]
+    },
+    {
+      "label": "apply 20260916220800_phase7_writers_forward.sql",
+      "durationMs": 112,
+      "outputSha256": "fbe155a099c1c3fd6307fe05c553adcba5e736b424cbcce6a6dde92b7da23395",
+      "outputTail": [
+        "ALTER TABLE",
+        "ALTER TABLE",
+        "ALTER TABLE",
+        "ALTER TABLE",
+        "ALTER TABLE",
+        "ALTER TABLE",
+        "NOTIFY",
+        "COMMIT"
+      ]
+    },
+    {
+      "label": "apply 20260916220900_phase7_conflicts_forward.sql",
+      "durationMs": 81,
+      "outputSha256": "97cc679ffa3302f53d3173d115e71311bae3b2f889e7345f64d8e6ab326679b2",
+      "outputTail": [
+        "DO",
+        "ALTER TABLE",
+        "ALTER TABLE",
+        "DO",
+        "ALTER TABLE",
+        "ALTER TABLE",
+        "NOTIFY",
+        "COMMIT"
+      ]
+    },
+    {
+      "label": "apply 20260916221000_phase7_readers_forward.sql",
+      "durationMs": 61,
+      "outputSha256": "dd0c2a8dda8429526840665da76a103ae45f2142d93814bbf9437377556dd37e",
+      "outputTail": [
+        "DO",
+        "CREATE FUNCTION",
+        "DO",
+        "CREATE FUNCTION",
+        "DO",
+        "CREATE FUNCTION",
+        "NOTIFY",
+        "COMMIT"
+      ]
+    },
+    {
+      "label": "apply 20260916221100_phase7_notifications_forward.sql",
+      "durationMs": 58,
+      "outputSha256": "38b2d01f46165f4b29fd00ccb54186dc352d38de5b4b3d34a4e6db8d2db111c0",
+      "outputTail": [
+        "BEGIN",
+        "SET",
+        "DO",
+        "CREATE FUNCTION",
+        "NOTIFY",
+        "COMMIT"
+      ]
+    },
+    {
+      "label": "clone phase7 stage",
+      "durationMs": 1286,
+      "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "outputTail": []
+    },
+    {
+      "label": "phase7 database regression",
+      "durationMs": 359,
+      "outputSha256": "f856a5bf6753e780dbfdbea169962eb4a960cf028d8ed058c397266728e848f4",
+      "outputTail": [
+        " ",
+        "(1 row)",
+        "RESET",
+        " assertions ",
+        "------------",
+        "        248",
+        "(1 row)",
+        "ROLLBACK"
+      ]
+    },
+    {
+      "label": "apply 20260916221200_phase8_storage_forward.sql",
+      "durationMs": 82,
+      "outputSha256": "b4bca81184e10e8caa62798fb058475d724f2314e16038c8f80af518f1ac5f3e",
+      "outputTail": [
+        "BEGIN",
+        "SET",
+        "DO",
+        "CREATE FUNCTION",
+        "REVOKE",
+        "GRANT",
+        "DO",
+        "COMMIT"
+      ]
+    },
+    {
+      "label": "apply 20260916221300_phase8_realtime_forward.sql",
+      "durationMs": 65,
+      "outputSha256": "c02789837280e650dcecac65263e1c01bd5042faac2ecbb5320c8d1d45fa7271",
+      "outputTail": [
+        "BEGIN",
+        "SET",
+        "DO",
+        "ALTER PUBLICATION",
+        "COMMIT"
+      ]
+    },
+    {
+      "label": "phase8 Storage post-validation",
+      "durationMs": 66,
+      "outputSha256": "90711394800fe5a1a4537b3f2cbbae90b18e3ef39020c13e95559453c7bd5d89",
+      "outputTail": [
+        "BEGIN",
+        "DO",
+        "ROLLBACK"
+      ]
+    },
+    {
+      "label": "apply 20260916221400_stabilization_residual_forward.sql",
+      "durationMs": 138,
+      "outputSha256": "fc67f22998a6d5d4d87e2050d782b1b4f724bb143f3d78d3c3a2703fcfe108ee",
+      "outputTail": [
+        "DROP POLICY",
+        "DROP POLICY",
+        "CREATE POLICY",
+        "CREATE POLICY",
+        "CREATE POLICY",
+        "DO",
+        "NOTIFY",
+        "COMMIT"
+      ]
+    },
+    {
+      "label": "residual integrated database regression",
+      "durationMs": 243,
+      "outputSha256": "dea9297e1485449cd1b55ec74b998960faa03b07bfc7a0990bf0d33c423fa8bf",
+      "outputTail": [
+        "----",
+        " ",
+        "(1 row)",
+        " stabilization_assertions ",
+        "--------------------------",
+        "                       35",
+        "(1 row)",
+        "ROLLBACK"
+      ]
+    },
+    {
+      "label": "prepare synthetic RFQ concurrency fixture",
+      "durationMs": 72,
+      "outputSha256": "11f5ad6b399ef1dc2997b3c3bee0e846b13ae21b83267d36ea3f140b517b258a",
+      "outputTail": [
+        "INSERT 0 1",
+        "INSERT 0 1",
+        "INSERT 0 1",
+        "INSERT 0 1",
+        "INSERT 0 1",
+        "INSERT 0 1",
+        "INSERT 0 1",
+        "SET"
+      ]
+    },
+    {
+      "label": "hold RFQ row lock",
+      "durationMs": 2094,
+      "outputSha256": "b501cfe42072d21bc8bd5047a00aaee77cdba850a78ed7f68d9458da8c0e4743",
+      "outputTail": [
+        "BEGIN",
+        "LOCK_ACQUIRED",
+        "COMMIT"
+      ]
+    },
+    {
+      "label": "RFQ concurrent conversion A",
+      "durationMs": 171,
+      "outputSha256": "7ad2529a67b286895505fb80bf378893ec0e7baf385c8f9016864cc68d378520",
+      "outputTail": [
+        "{\"sub\":\"da000000-0000-4000-8000-000000000001\",\"role\":\"authenticated\"}",
+        "{\"x-company-id\":\"db000000-0000-4000-8000-000000000001\"}",
+        "SET",
+        "{\"items\": 1, \"orders\": 1, \"success\": true, \"order_ids\": [\"377c43ff-83b2-4d70-a010-4b416b5189b0\"], \"idempotent\": false}"
+      ]
+    },
+    {
+      "label": "RFQ concurrent conversion B",
+      "durationMs": 167,
+      "outputSha256": "473a2db850ad38f39c0791f4a564b99a0f7f3c40f3878522038671fac3e93728",
+      "outputTail": [
+        "{\"sub\":\"da000000-0000-4000-8000-000000000001\",\"role\":\"authenticated\"}",
+        "{\"x-company-id\":\"db000000-0000-4000-8000-000000000001\"}",
+        "SET",
+        "{\"items\": 1, \"orders\": 1, \"success\": true, \"order_ids\": [\"377c43ff-83b2-4d70-a010-4b416b5189b0\"], \"idempotent\": true}"
+      ]
+    },
+    {
+      "label": "RFQ concurrency invariant",
+      "durationMs": 71,
+      "outputSha256": "2b740ba5bccca8cf93af0319bd197494ea8fd3e8b986f7f4894edbfc1a5e62ee",
+      "outputTail": [
+        "{\"items\": 1, \"orders\": 1, \"distinct_keys\": 1}"
+      ]
+    },
+    {
+      "label": "final catalog invariants",
+      "durationMs": 70,
+      "outputSha256": "dd8ecdd89466b494ac1becdeecc22a80f8c15c2038c12a78d176e9607dc961de",
+      "outputTail": [
+        "{\"public_tables\": 150, \"public_policies\": 596, \"realtime_tables\": 6, \"public_functions\": 402, \"storage_policies\": 4, \"new_salmon_contract\": true, \"old_salmon_overload\": false, \"reference_hotfix_count\": 17, \"reference_hotfix_digest\": \"9a49d198cabb2ec4f9fd1984e8c20404\", \"realtime_insert_update_only\": true}"
+      ]
+    }
+  ],
+  "limitations": [
+    "Storage bytes are not present; only the live catalog surface omitted by the public template is reconstructed.",
+    "The local PostgreSQL cluster has wal_level below logical; publication membership is catalog-tested, not streamed.",
+    "No hosted gateway, production write, deploy, migration repair, external message or paid integration was used."
+  ]
+}

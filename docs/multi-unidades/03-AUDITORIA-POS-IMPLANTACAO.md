@@ -1,5 +1,7 @@
 # Auditoria pós-implantação multiunidade
 
+Atualização Fase 12: [resultado integrado](fase12-20260916/RESULTADOS.md), [matriz de aceite](fase12-20260916/MATRIZ-ACEITE.md) e [manifesto](fase12-20260916/MANIFESTO-RELEASE.md). A cadeia F3/F7 foi reconciliada em avanços novos e passou em clone vivo-equivalente; produção permanece inalterada e bloqueada por backup restaurável, scheduler/consumers e gateway hospedado.
+
 Atualização Fase 10: [frontend/cache, jornadas e limites](fase10-20260916/RESULTADOS.md). Correções locais de lifetime/cache/eventos/rascunhos/exports; 789 unitários, 21 checkpoints HTTP reais e 12 jornadas Chromium em duas stacks isoladas. Banco revalidado em 16/09/2026 18:35:41 UTC; mesmas 14 candidatas ausentes, cadeia F3/F7 bloqueada e produção inalterada. [Prompt completo da Fase 11](fase10-20260916/PROMPT-FASE11.md); não iniciada.
 
 Data: 2026-09-15. **Fase 1 concluída; Fases 2, 3, 4, 5 e 6 implementadas e ensaiadas localmente, com publicação pendente. Estabilização ainda em andamento.**

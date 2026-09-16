@@ -1,0 +1,34 @@
+{
+  "collectedAtUtc": "2026-09-16T22:16:35.827436Z",
+  "projectId": "wuzxpbixprrgssoeeaez",
+  "mode": "read-only catalog and edge metadata",
+  "catalog": {
+    "migrationVersions": 856,
+    "publicTables": 149,
+    "publicFunctions": 356,
+    "publicPolicies": 595,
+    "storagePolicies": 4,
+    "phaseCandidateVersionsPresent": 0,
+    "residualMigrationPresent": false,
+    "referenceHotfixPolicyCount": 17,
+    "referenceHotfixDigest": "9a49d198cabb2ec4f9fd1984e8c20404",
+    "salmonEntrySignatures": [
+      "create_salmon_entry_atomic(date,text,text,text,integer,integer,numeric,numeric,text,date)",
+      "_salmon_create_entry_guarded(text,text,text,text,integer,integer,numeric,numeric,text,text)"
+    ],
+    "brokenReportTextOverloadsStillPresent": true,
+    "newResidualPurchaseRequisitionRpcPresent": false
+  },
+  "edgeFunctions": {
+    "count": 17,
+    "scheduledJobs": { "version": 7, "status": "ACTIVE", "verifyJwt": false },
+    "purchaseRequisitions": { "version": 10, "status": "ACTIVE", "verifyJwt": false },
+    "requisicaoEstoque": { "version": 14, "status": "ACTIVE", "verifyJwt": false },
+    "rh": { "version": 10, "status": "ACTIVE", "verifyJwt": false }
+  },
+  "limits": [
+    "No production data rows, secret values, writes, jobs, deploys or migration operations were read or executed.",
+    "The repository contains the scheduled-jobs target and authentication contract, but no authoritative external schedule, retry, timezone, alert or owner configuration.",
+    "Counts describe production before this local candidate is published."
+  ]
+}
