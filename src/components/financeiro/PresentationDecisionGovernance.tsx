@@ -14,7 +14,8 @@ import {
   UserRound,
   XCircle,
 } from 'lucide-react';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
+import { useScopeActivity } from '@/hooks/useScopeActivity';
 import {
   buildPresentationDecisionSnapshot,
   comparePresentationDecisionSnapshot,
@@ -165,6 +166,8 @@ export default function PresentationDecisionGovernance({
   canManage,
   canApprove,
 }: Props) {
+  const toast = useScopedToast();
+  const isScopeActive = useScopeActivity();
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -208,6 +211,7 @@ export default function PresentationDecisionGovernance({
   const comparison = currentRevision ? comparePresentationDecisionSnapshot(currentRevision.snapshot, plan) : null;
 
   const setUrlState = (patch: Partial<typeof urlState>) => {
+    if (!isScopeActive()) return;
     const nextState = { ...urlState, ...patch };
     const next = writePresentationDecisionUrlState(searchParams, nextState);
     navigate(`${location.pathname}?${next.toString()}`, { replace: true });

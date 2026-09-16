@@ -11,7 +11,7 @@ import {
   Settings2,
   X,
 } from 'lucide-react';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import PresentationSlideCanvas from '@/components/financeiro/PresentationSlideCanvas';
@@ -129,6 +129,7 @@ export default function PresentationMode({
   onOpenExpenseCategory,
   onOpenResultDetail,
 }: PresentationModeProps) {
+  const toast = useScopedToast();
   const slides = useMemo(
     () => [...data.slides].sort((left, right) => left.order - right.order),
     [data.slides],
@@ -278,7 +279,7 @@ export default function PresentationMode({
       console.error('Erro ao alternar tela cheia:', error);
       toast.info('O navegador não permitiu a tela cheia; a apresentação continuará neste modo.');
     }
-  }, []);
+  }, [toast]);
 
   const updateExportProgress = useCallback((kind: ExportKind, progress: PresentationExportProgress) => {
     setExportJob({ kind, ...progress });
@@ -298,6 +299,7 @@ export default function PresentationMode({
           signal: controller.signal,
           onProgress: progress => updateExportProgress(kind, progress),
         });
+        controller.signal.throwIfAborted();
         downloadBlob(blob, presentationFilename(data, 'pdf'));
         toast.success('PDF gerado com sucesso.');
       } else {
@@ -306,6 +308,7 @@ export default function PresentationMode({
           signal: controller.signal,
           onProgress: progress => updateExportProgress(kind, progress),
         });
+        controller.signal.throwIfAborted();
         downloadBlob(blob, presentationFilename(data, 'pptx'));
         toast.success('PowerPoint gerado com sucesso.');
       }
@@ -320,14 +323,17 @@ export default function PresentationMode({
       exportBusyRef.current = false;
       setExportJob(null);
     }
-  }, [canExport, data, exportableSlides.length, updateExportProgress]);
+  }, [canExport, data, exportableSlides.length, updateExportProgress, toast]);
 
   const printPresentation = useCallback(async () => {
     if (!canExport || exportBusyRef.current) return;
     exportBusyRef.current = true;
+    const controller = new AbortController();
+    exportAbortRef.current = controller;
     setExportJob({ kind: 'print', completed: 0, total: exportableSlides.length, message: 'Preparando impressão', cancellable: false });
     try {
       await nextPaint();
+      controller.signal.throwIfAborted();
       setExportJob({ kind: 'print', completed: exportableSlides.length, total: exportableSlides.length, message: 'Abrindo impressão', cancellable: false });
       window.print();
     } catch (error) {
@@ -337,7 +343,7 @@ export default function PresentationMode({
       exportBusyRef.current = false;
       setExportJob(null);
     }
-  }, [canExport, exportableSlides.length]);
+  }, [canExport, exportableSlides.length, toast]);
 
   const cancelExport = useCallback(() => {
     if (exportJob?.cancellable) exportAbortRef.current?.abort();

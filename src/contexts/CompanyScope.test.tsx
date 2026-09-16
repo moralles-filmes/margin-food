@@ -102,6 +102,60 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup();vi.unstubAllGlobals();expect(identity.callbacks.size).toBe(0); });
 describe('escopo de unidade com um login',() => {
+  it('falha fechada e retry criam cliente novo para a apresentação', async () => {
+    localStorage.setItem(companyPreferenceKey('user-1'), 'A');
+    const transport = vi.mocked(fetch).getMockImplementation()!;
+    let fail = true;
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      if (fail && String(input).includes('get_my_company_context') && new Headers(init?.headers).get('x-company-id') === 'B') {
+        return new Response(JSON.stringify({ message: 'fixture unavailable' }), { status: 500 });
+      }
+      return transport(input, init);
+    });
+    mount('/presentation?presentationUnit=B');
+    expect(await screen.findByText('Não foi possível validar o acesso a esta unidade.')).toBeInTheDocument();
+    expect(screen.queryByLabelText('apresentação')).toBeNull();
+    fail = false;
+    fireEvent.click(screen.getByRole('button', { name: 'Tentar novamente' }));
+    await waitFor(() => expect(screen.getByLabelText('apresentação')).toHaveTextContent('Conta B'));
+    expect(screen.getByLabelText('global')).toHaveTextContent('Conta A');
+  });
+  it('não troca uma seleção explícita em voo por refresh de foco', async () => {
+    localStorage.setItem(companyPreferenceKey('user-1'), 'A');
+    mount();
+    await waitFor(() => expect(screen.getByLabelText('global')).toHaveTextContent('Conta A'));
+    const transport = vi.mocked(fetch).getMockImplementation()!;
+    let release!: () => void;
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      if (String(input).includes('get_my_company_context') && new Headers(init?.headers).get('x-company-id') === 'B') {
+        await new Promise<void>(resolve => { release = resolve; });
+      }
+      return transport(input, init);
+    });
+    await select('Unidade global', 'Loja Shopping');
+    await waitFor(() => expect(release).toBeDefined());
+    await act(async () => { window.dispatchEvent(new Event('focus')); });
+    // Liberar só o primeiro carregamento; os seguintes usam o transporte normal.
+    vi.mocked(fetch).mockImplementation(transport);
+    await act(async () => release());
+    await waitFor(() => expect(screen.getByLabelText('global')).toHaveTextContent('Conta B'));
+    expect(localStorage.getItem(companyPreferenceKey('user-1'))).toBe('B');
+  });
+  it('descarta exportador que conclui depois de encerrar a apresentação', async () => {
+    let complete!: (blob: Blob) => void;
+    exports.pdf.mockImplementation(() => new Promise<Blob>(resolve => { complete = resolve; }));
+    const download = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:late');
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+    localStorage.setItem(companyPreferenceKey('user-1'), 'A');
+    mount('/presentation/export?presentationUnit=B');
+    fireEvent.click(await screen.findByRole('button', { name: 'Exportar apresentação em PDF' }));
+    await waitFor(() => expect(complete).toBeDefined());
+    fireEvent.click(screen.getByRole('button', { name: 'Estoque' }));
+    await act(async () => complete(new Blob(['late'])));
+    expect(download).not.toHaveBeenCalled();
+    vi.restoreAllMocks();
+  });
   it('entra no banco anterior à migração, inclusive na apresentação e nas Edge Functions',async()=>{
     identity.list.mockReturnValue({data:null,error:{code:'PGRST202',message:'Could not find the function public.list_my_companies without parameters in the schema cache'}});
     localStorage.setItem(companyPreferenceKey('user-1'),'B');

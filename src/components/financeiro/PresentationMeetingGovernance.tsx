@@ -19,7 +19,8 @@ import {
   ShieldCheck,
   XCircle,
 } from 'lucide-react';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
+import { useScopeActivity } from '@/hooks/useScopeActivity';
 import {
   addCalendarDays,
   buildPresentationMeetingFollowUp,
@@ -170,6 +171,8 @@ export default function PresentationMeetingGovernance({
   canApprove: boolean;
   canExport: boolean;
 }) {
+  const toast = useScopedToast();
+  const isScopeActive = useScopeActivity();
   const supabase = useSupabase();
   const location = useLocation();
   const navigate = useNavigate();
@@ -233,6 +236,7 @@ export default function PresentationMeetingGovernance({
   }) ?? [];
 
   const setUrlState = (patch: Partial<typeof urlState>) => {
+    if (!isScopeActive()) return;
     const next = writePresentationMeetingUrlState(searchParams, { ...urlState, ...patch });
     navigate(`${location.pathname}?${next.toString()}`, { replace: true });
   };
@@ -377,10 +381,12 @@ export default function PresentationMeetingGovernance({
       });
       if (kind === 'pdf') {
         const { createPresentationMinutesPdfBlob } = await import('@/lib/presentationMinutesPdfExport');
-        downloadBlob(await createPresentationMinutesPdfBlob(payload), safeFilename(detail.session.title, 'pdf'));
+        const blob = await createPresentationMinutesPdfBlob(payload);
+        if (isScopeActive()) downloadBlob(blob, safeFilename(detail.session.title, 'pdf'));
       } else {
         const { createPresentationMinutesPptxBlob } = await import('@/lib/presentationMinutesPptxExport');
-        downloadBlob(await createPresentationMinutesPptxBlob(payload), safeFilename(detail.session.title, 'pptx'));
+        const blob = await createPresentationMinutesPptxBlob(payload);
+        if (isScopeActive()) downloadBlob(blob, safeFilename(detail.session.title, 'pptx'));
       }
       toast.success(`${kind === 'pdf' ? 'PDF' : 'PowerPoint'} da ata gerado${payload.draftWatermark ? ' com marca RASCUNHO' : ''}.`);
     } catch (error) {
