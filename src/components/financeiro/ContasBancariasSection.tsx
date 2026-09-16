@@ -4,9 +4,9 @@ import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCan } from '@/permissions';
-import { emitDataEvent, useDataEvent } from '@/lib/dataEvents';
+import { useEmitDataEvent, useDataEvent } from '@/lib/dataEvents';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { fmtBRL } from '@/lib/money';
 import { formatDateBR, parseLocalDate } from '@/lib/formatters';
 import { loadSaldoExtrato } from '@/lib/conciliacaoSaldoExtrato';
@@ -100,6 +100,8 @@ interface ContasBancariasProps {
 }
 
 export default function ContasBancariasSection({ onNavigateExtrato }: ContasBancariasProps = {}) {
+  const emitDataEvent = useEmitDataEvent();
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const { companyId } = useCompanyId();
   const { user } = useAuth();

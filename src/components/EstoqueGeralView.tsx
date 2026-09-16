@@ -1,3 +1,4 @@
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { includesNormalized } from '@/lib/utils';
@@ -11,7 +12,7 @@ function isTenantErrorMessage(msg?: string): boolean {
   return /tenant\s*inv[aá]lido|placeholder|empresa\s*n[ãa]o\s*(est[aá]|config)|n[ãa]o\s*vinculad/i.test(msg);
 }
 
-function showTenantErrorToast(msg: string) {
+function showTenantErrorToast(msg: string, toast: ReturnType<typeof useScopedToast>) {
   toast.error(msg || 'Seu usuário não está vinculado a uma empresa válida. Faça logout e login novamente.', {
     action: {
       label: 'Recarregar sessão',
@@ -42,7 +43,6 @@ import { supabase } from '@/integrations/supabase/client';
 import type { Produto, MovimentacaoEstoque } from '@/types/salmon';
 import type { ProdutoExtended, ProdutoFormData } from '@/types/estoque';
 import { classifyStockHealth, countStockHealth, STOCK_HEALTH_CONFIG } from '@/domain/estoque/rules';
-import { toast } from 'sonner';
 import SimuladorCompraGeral from './SimuladorCompraGeral';
 import RequisicaoEstoqueSection from './RequisicaoEstoqueSection';
 import MovimentacoesSection from './MovimentacoesSection';
@@ -80,6 +80,7 @@ const SUB_VIEW_REGISTRY_MAP: Record<SubView, string> = {
 };
 
 export default function EstoqueGeralView() {
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const [activeView, setActiveView] = usePersistedTab<SubView>('app:tab:estoque', 'dashboard');
   const store = useEstoqueGeralStoreContext();
@@ -287,7 +288,7 @@ export default function EstoqueGeralView() {
         toast.error('Não foi possível alterar o status do produto.');
       }
     }
-  }, [canEditCatalogo, canDeleteCatalogo, confirm, store, activeView, applyCatalogFilters, catalogSearchInput, catalogCatFilter]);
+  }, [canEditCatalogo, canDeleteCatalogo, confirm, store, activeView, applyCatalogFilters, catalogSearchInput, catalogCatFilter, toast]);
 
 
   // Filtered catalog products (stock filter is client-side since saldos are already loaded)
@@ -455,7 +456,7 @@ export default function EstoqueGeralView() {
     } catch (err: any) {
       const msg = err?.message || '';
       if (err instanceof TenantError || isTenantErrorMessage(msg)) {
-        showTenantErrorToast(msg);
+        showTenantErrorToast(msg, toast);
       } else {
         toast.error(msg || 'Erro ao registrar movimentação');
       }
@@ -470,8 +471,8 @@ export default function EstoqueGeralView() {
       const body = produtoId ? { action, produto_id: produtoId } : { action };
       const { data, error } = await supabase.functions.invoke('cmv', { body });
       if (error) throw error;
-      cacheInvalidate('calcular_cmv');
-      cacheInvalidate('get_ranking');
+      cacheInvalidate(supabase, 'calcular_cmv');
+      cacheInvalidate(supabase, 'get_ranking');
       if (!produtoId) {
         toast.success(`Preços recalculados: ${data?.total || 0} produtos`);
       }
@@ -479,7 +480,7 @@ export default function EstoqueGeralView() {
       console.error('Erro ao recalcular preços:', e);
     }
     setRecalculating(false);
-  }, []);
+  }, [toast]);
 
   // Permission map for sub-views - now using granular registry via useModuleAccess
   const canAccessSubView = (view: SubView) => {

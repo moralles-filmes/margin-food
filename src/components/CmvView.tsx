@@ -10,7 +10,7 @@ import { formatDateISO } from '@/lib/datetime';
 
 import { AlertTriangle, Calculator, Lightbulb } from 'lucide-react';
 import { DecimalInput } from '@/components/ui/decimal-input';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 
 import CmvFiltersBar from '@/components/cmv/CmvFiltersBar';
 import CmvKpis from '@/components/cmv/CmvKpis';
@@ -20,6 +20,7 @@ import { cacheGet, cacheSet, cacheInvalidate } from '@/components/cmv/cmvCache';
 import type { CmvResult, MetaCmv, RankingItem } from '@/components/cmv/types';
 
 export default function CmvView() {
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const companyId = useCompanyScope()?.companyId;
   const { user } = useAuth();
@@ -59,7 +60,7 @@ export default function CmvView() {
 
   const fetchCmv = useCallback(async () => {
     const cacheParams = { companyId, userId: user?.id, data_inicio: dataInicio, data_fim: dataFim, metodo, escopo, setor: filterSetor };
-    const cached = cacheGet<CmvResult>('calcular_cmv', cacheParams);
+    const cached = cacheGet<CmvResult>(supabase, 'calcular_cmv', cacheParams);
     if (cached) {
       setCmvData(cached);
       return;
@@ -71,17 +72,17 @@ export default function CmvView() {
       });
       if (error) throw error;
       setCmvData(data);
-      cacheSet('calcular_cmv', cacheParams, data, 60);
+      cacheSet(supabase, 'calcular_cmv', cacheParams, data, 60);
     } catch (e: any) {
       toast.error('Erro ao calcular CMV: ' + (e.message || ''));
     }
     setLoading(false);
-  }, [companyId, user?.id, dataInicio, dataFim, metodo, escopo, filterSetor, supabase.functions]);
+  }, [companyId, user?.id, dataInicio, dataFim, metodo, escopo, filterSetor, supabase.functions, toast]);
 
   const fetchRanking = useCallback(async (offset = 0, append = false) => {
     const cacheParams = { companyId, userId: user?.id, data_inicio: dataInicio, data_fim: dataFim, escopo, offset };
     if (!append) {
-      const cached = cacheGet<{ ranking: RankingItem[]; next_offset: number | null; total_count: number }>('get_ranking', cacheParams);
+      const cached = cacheGet<{ ranking: RankingItem[]; next_offset: number | null; total_count: number }>(supabase, 'get_ranking', cacheParams);
       if (cached) {
         setRanking(cached.ranking);
         setRankingHasMore(cached.next_offset != null);
@@ -103,7 +104,7 @@ export default function CmvView() {
         setRanking(prev => [...prev, ...rows]);
       } else {
         setRanking(rows);
-        cacheSet('get_ranking', cacheParams, { ranking: rows, next_offset: data?.next_offset, total_count: data?.total_count ?? 0 }, 30);
+        cacheSet(supabase, 'get_ranking', cacheParams, { ranking: rows, next_offset: data?.next_offset, total_count: data?.total_count ?? 0 }, 30);
       }
       setRankingHasMore(data?.next_offset != null);
       setRankingOffset(data?.next_offset ?? offset + rows.length);
@@ -115,7 +116,7 @@ export default function CmvView() {
     } finally {
       setRankingLoadingMore(false);
     }
-  }, [companyId, user?.id, dataInicio, dataFim, escopo, supabase.functions]);
+  }, [companyId, user?.id, dataInicio, dataFim, escopo, supabase.functions, toast]);
 
   const loadMoreRanking = useCallback(() => {
     if (rankingHasMore && !rankingLoadingMore) {
@@ -125,7 +126,7 @@ export default function CmvView() {
 
   const fetchMeta = useCallback(async () => {
     const cacheParams = { companyId, userId: user?.id, mes_ano: mesAno };
-    const cached = cacheGet<any>('get_metas', cacheParams);
+    const cached = cacheGet<any>(supabase, 'get_metas', cacheParams);
     if (cached !== null) {
       setMeta(cached._empty ? null : cached);
       setErrorMeta(null);
@@ -140,13 +141,13 @@ export default function CmvView() {
       const metas = data?.metas || [];
       const result = metas.length > 0 ? metas[0] : null;
       setMeta(result);
-      cacheSet('get_metas', cacheParams, result ?? { _empty: true }, 30);
+      cacheSet(supabase, 'get_metas', cacheParams, result ?? { _empty: true }, 30);
     } catch (e: any) {
       const msg = e.message || 'Erro desconhecido';
       setErrorMeta(msg);
       toast.error('Falha ao carregar metas: ' + msg);
     }
-  }, [companyId, mesAno, supabase.functions, user?.id]);
+  }, [companyId, mesAno, supabase.functions, user?.id, toast]);
 
   useEffect(() => {
     fetchCmv();
@@ -167,8 +168,8 @@ export default function CmvView() {
       if (error) throw error;
       toast.success('Meta salva');
       setMetaDialog(false);
-      cacheInvalidate('get_metas');
-      cacheInvalidate('calcular_cmv');
+      cacheInvalidate(supabase, 'get_metas');
+      cacheInvalidate(supabase, 'calcular_cmv');
       fetchMeta();
     } catch (e: any) {
       toast.error(e.message || 'Erro ao salvar meta');

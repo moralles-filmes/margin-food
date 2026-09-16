@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { PackageX, ClipboardList, Check } from 'lucide-react';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import type { CotacaoItemInput } from '@/hooks/useCotacoesStore';
 import { sortByName } from '@/lib/sortByName';
@@ -22,6 +22,7 @@ interface ImportItensDialogProps {
 }
 
 export default function ImportItensDialog({ open, onOpenChange, onImport }: ImportItensDialogProps) {
+  const toast = useScopedToast();
   const db = useSupabase() as any;
   const [source, setSource] = useState<Source>('alertas');
   const [rows, setRows] = useState<ImportRow[]>([]);
@@ -84,7 +85,7 @@ export default function ImportItensDialog({ open, onOpenChange, onImport }: Impo
     } finally {
       setLoading(false);
     }
-  }, [db]);
+  }, [db, toast]);
 
   useEffect(() => {
     if (open) load(source);

@@ -3,7 +3,7 @@ import { withCompanyId } from '@/lib/companyPayload';
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -158,6 +158,7 @@ export default function SSTSection({
 
 // ─── EPIs Tab ───
 function EpisTab({ epis, colaboradores, canManage, user, getColabNome, onRefresh }: any) {
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const { companyId } = useCompanyId();
   const [showForm, setShowForm] = useState(false);
@@ -288,6 +289,7 @@ function EpisTab({ epis, colaboradores, canManage, user, getColabNome, onRefresh
 
 // ─── Exames Tab ───
 function ExamesTab({ exames, colaboradores, canManage, user, getColabNome, onRefresh }: any) {
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const { companyId } = useCompanyId();
   const [showForm, setShowForm] = useState(false);
@@ -432,6 +434,7 @@ function ExamesTab({ exames, colaboradores, canManage, user, getColabNome, onRef
 
 // ─── Incidentes Tab ───
 function IncidentesTab({ incidentes, colaboradores, canManage, user, getColabNome, onRefresh }: any) {
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const { companyId } = useCompanyId();
   const [showForm, setShowForm] = useState(false);

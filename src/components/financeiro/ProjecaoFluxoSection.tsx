@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { RefreshCw, TrendingUp, TrendingDown, Wallet, FileDown, Ban, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { fmtBRL, formatDateBR, parseLocalDate } from '@/lib/formatters';
@@ -54,6 +54,7 @@ function SkeletonKpis() {
 
 
 export default function ProjecaoFluxoSection() {
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const canView = useCan('financeiro:projecao:view');
   const canExport = useCan('financeiro:projecao:export');
@@ -97,7 +98,7 @@ export default function ProjecaoFluxoSection() {
       setErrorState(true);
     }
     setLoading(false);
-  }, [canView, dias, loading, saldoManual, supabase]);
+  }, [canView, dias, loading, saldoManual, supabase, toast]);
 
   // Auto-load on mount and when dias changes
   useEffect(() => {

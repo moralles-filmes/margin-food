@@ -3,7 +3,7 @@ import { withCompanyId } from '@/lib/companyPayload';
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import KpiCard from '@/components/ui/KpiCard';
 import { Button } from '@/components/ui/button';
@@ -93,6 +93,7 @@ const R = (v: number) => formatFixedBR(v, 2);
 
 export default function FolhaPagamentoSection({
  colaboradores, canManage }: Props) {
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const { companyId } = useCompanyId();
   const canViewRbac = useCan('rh:folha:view');

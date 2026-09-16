@@ -1,7 +1,7 @@
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown, TrendingDown, TrendingUp, DollarSign, Package, Filter, X, Edit2, Trash2, Eye, Ban, RotateCcw, Settings2 } from 'lucide-react';
-import { emitDataEvent } from '@/lib/dataEvents';
+import { useEmitDataEvent } from '@/lib/dataEvents';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DateInput } from '@/components/ui/DateInput';
@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Produto, MovimentacaoEstoque } from '@/types/salmon';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCan } from '@/permissions/hooks';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 
 type DirectionTab = 'entradas' | 'saidas';
 
@@ -69,6 +69,8 @@ export default function MovimentacoesSection({
   canEditPricing, recalculating, recalcularPrecos,
   onRefresh, onFilterChange, onLoadMore, hasMore, movKpis, movKpisLoading,
 }: Props) {
+  const emitDataEvent = useEmitDataEvent();
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const { hasPermission } = useAuth();
   const canEditMovimentacoes = useCan('estoque:movimentacoes:edit');
@@ -226,7 +228,7 @@ export default function MovimentacoesSection({
       toast.error(message);
     }
     setProcessing(false);
-  }, [editMov, editForm, editJustificativa, onRefresh]);
+  }, [editMov, editForm, editJustificativa, onRefresh, emitDataEvent, toast]);
 
   // Cancel handler
   const handleConfirmCancel = useCallback(async () => {
@@ -259,7 +261,7 @@ export default function MovimentacoesSection({
       toast.error(message);
     }
     setProcessing(false);
-  }, [cancelMov, cancelJustificativa, onRefresh]);
+  }, [cancelMov, cancelJustificativa, onRefresh, emitDataEvent, toast]);
 
   const cancelledCount = movimentacoes.filter(m => m.status === 'CANCELADO').length;
 

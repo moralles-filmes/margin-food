@@ -4,8 +4,8 @@ import { useCompanyId } from '@/hooks/useCompanyId';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { SalmonEntry, Manipulation, DailyRecord, StockConfig, StockState, Supplier, LotStock, MetaCompraMensal, AuditoriaCompra, LoteSalmaoLimpo, MetaProvisionadaSalmao, SmartSuggestion } from '@/types/salmon';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
-import { emitDataEvent } from '@/lib/dataEvents';
+import { useScopedToast } from '@/hooks/useScopedToast';
+import { useEmitDataEvent } from '@/lib/dataEvents';
 import { todayBR } from '@/lib/datetime';
 import { sortByName } from '@/lib/sortByName';
 
@@ -94,6 +94,8 @@ function sortKey(lot: { expirationDate?: string; entryDate: string }): string {
 }
 
 export function useSalmonStore() {
+  const emitDataEvent = useEmitDataEvent();
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const { companyId } = useCompanyId();
   const [entries, setEntries] = useState<SalmonEntry[]>([]);
@@ -297,7 +299,7 @@ export function useSalmonStore() {
     };
     setSuppliers(prev => [newS, ...prev]);
     return newS;
-  }, [supabase, companyId]);
+  }, [supabase, companyId, toast]);
 
   const updateSupplier = useCallback(async (id: string, data: Partial<Supplier>) => {
     const current = suppliers.find(s => s.id === id);
@@ -326,7 +328,7 @@ export function useSalmonStore() {
       return;
     }
     setSuppliers(prev => prev.map(s => s.id === id ? { ...s, ...data } : s));
-  }, [supabase, suppliers]);
+  }, [supabase, suppliers, toast]);
 
   const deleteSupplier = useCallback(async (id: string) => {
     const { error } = await supabase.from('suppliers').delete().eq('id', id);
@@ -336,7 +338,7 @@ export function useSalmonStore() {
       return;
     }
     setSuppliers(prev => prev.filter(s => s.id !== id));
-  }, [supabase]);
+  }, [supabase, toast]);
 
   const activeSuppliers = useMemo(() => suppliers.filter(s => s.active), [suppliers]);
 
@@ -382,7 +384,7 @@ export function useSalmonStore() {
       }
       return [...prev, newMeta];
     });
-  }, [companyId, supabase]);
+  }, [companyId, supabase, toast]);
 
   // Meta Provisionada CRUD — persisted to salmon_metas_provisionadas
   const saveMetaProvisionada = useCallback(async (data: Omit<MetaProvisionadaSalmao, 'id' | 'createdAt'>) => {
@@ -414,7 +416,7 @@ export function useSalmonStore() {
       }
       return [...prev, newMeta];
     });
-  }, [companyId, supabase]);
+  }, [companyId, supabase, toast]);
 
   // ── ENTRY CRUD via atomic RPCs ──
 
@@ -448,7 +450,7 @@ export function useSalmonStore() {
     setEntries(prev => [newEntry, ...prev]);
     emitDataEvent('salmao:entradas');
     return newEntry;
-  }, [supabase]);
+  }, [supabase, emitDataEvent, toast]);
 
   const updateEntry = useCallback(async (id: string, data: Partial<Omit<SalmonEntry, 'id' | 'createdAt'>>) => {
     // For updates, cancel old + create new (simplest atomic approach)
@@ -498,7 +500,7 @@ export function useSalmonStore() {
       pricePerKg: Number(result.unit_cost),
     } : e));
     emitDataEvent('salmao:entradas');
-  }, [entries, supabase]);
+  }, [entries, supabase, emitDataEvent, toast]);
 
   const deleteEntry = useCallback(async (id: string) => {
     const { error } = await supabase.rpc('_salmon_cancel_entry_guarded' as any, {
@@ -518,7 +520,7 @@ export function useSalmonStore() {
     }
     setEntries(prev => prev.filter(e => e.id !== id));
     emitDataEvent('salmao:entradas');
-  }, [supabase]);
+  }, [supabase, emitDataEvent, toast]);
 
   // ── MANIPULATION CRUD via atomic RPCs ──
 
@@ -558,7 +560,7 @@ export function useSalmonStore() {
     setManipulations(prev => [newM, ...prev]);
     emitDataEvent('salmao:manipulacoes');
     return newM;
-  }, [supabase]);
+  }, [supabase, emitDataEvent, toast]);
 
   const updateManipulation = useCallback(async (id: string, m: Omit<Manipulation, 'id' | 'createdAt' | 'lossKg' | 'lossPercent' | 'yieldKg' | 'yieldPercent' | 'perdaValor' | 'valorTotalBruto' | 'valorTotalLimpo'>) => {
     // Cancel + recreate
@@ -605,7 +607,7 @@ export function useSalmonStore() {
       leftoverRecorded: false,
       createdAt: x.createdAt,
     } : x));
-  }, [supabase]);
+  }, [supabase, toast]);
 
   const deleteManipulation = useCallback(async (id: string) => {
     const { error } = await supabase.rpc('_salmon_cancel_manipulation_guarded' as any, {
@@ -625,7 +627,7 @@ export function useSalmonStore() {
     }
     setManipulations(prev => prev.filter(m => m.id !== id));
     emitDataEvent('salmao:manipulacoes');
-  }, [supabase]);
+  }, [supabase, emitDataEvent, toast]);
 
   const recordLeftover = useCallback(async (id: string, leftoverKg: number) => {
     const m = manipulations.find(x => x.id === id);
@@ -654,7 +656,7 @@ export function useSalmonStore() {
       if (x.id !== id) return x;
       return { ...x, leftoverKg, leftoverRecorded: true };
     }));
-  }, [manipulations, supabase]);
+  }, [manipulations, supabase, toast]);
 
   const addDailyRecord = useCallback(async (r: Omit<DailyRecord, 'id' | 'createdAt'>) => {
     const { data, error } = await supabase
@@ -681,7 +683,7 @@ export function useSalmonStore() {
     };
     setDailyRecords(prev => [newR, ...prev.filter(x => x.date !== r.date)]);
     return newR;
-  }, [companyId, supabase]);
+  }, [companyId, supabase, toast]);
 
   const deleteDailyRecord = useCallback(async (id: string) => {
     const { error } = await supabase.from('salmon_daily_records').delete().eq('id', id);
@@ -690,7 +692,7 @@ export function useSalmonStore() {
       throw new Error(error.message);
     }
     setDailyRecords(prev => prev.filter(r => r.id !== id));
-  }, [supabase]);
+  }, [supabase, toast]);
 
   const setStockConfig = useCallback(async (config: StockConfig) => {
     setStockConfigState(config);

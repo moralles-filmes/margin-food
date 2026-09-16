@@ -3,8 +3,8 @@ import { withCompanyId } from '@/lib/companyPayload';
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { emitDataEvent } from '@/lib/dataEvents';
-import { toast } from 'sonner';
+import { useEmitDataEvent } from '@/lib/dataEvents';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -37,6 +37,8 @@ interface Props {
 
 export default function PlanoContasFinSection({
  canCreate, canEdit, canDelete }: Props) {
+  const emitDataEvent = useEmitDataEvent();
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const { companyId } = useCompanyId();
   const canViewRbac = useCan('financeiro:cadastros:view');

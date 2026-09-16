@@ -75,6 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const userRef = useRef<string | null>(null);
   const activeRef = useRef<string | null>(null);
   const requestId = useRef(0);
+  const selecting = useRef(false);
 
   const loadContext = useCallback(async (userId: string, companyId: string, generation: number, mode: CompanyAccessMode) => {
     const resource = createCompanyClient(companyId, userId, mode);
@@ -92,6 +93,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const refreshCompanies = useCallback(async () => {
+    // Foco/reconexão não pode substituir a escolha explícita ainda em voo.
+    if (selecting.current) return;
     const userId = userRef.current;
     if (!userId) return;
     const generation = ++requestId.current;
@@ -123,6 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const userId = userRef.current;
     if (!userId || !accessibleCompanies.some(company => company.id === companyId)) return;
     const generation = ++requestId.current;
+    selecting.current = true;
     setSwitching(true);
     setProfile(null);
     setPermissionState('LOADING');
@@ -133,7 +137,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error('[Auth] Falha ao trocar unidade:', error);
       setPermissionState('ERROR');
       setPermissionError('Não foi possível acessar esta unidade. Atualize seus acessos e tente novamente.');
-    } finally { if (generation === requestId.current) setSwitching(false); }
+    } finally { if (generation === requestId.current) { selecting.current = false; setSwitching(false); } }
   }, [accessibleCompanies, companyAccessMode, loadContext]);
 
   useEffect(() => {
@@ -150,6 +154,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const nextId = next?.user.id ?? null;
       if (nextId === userRef.current) { if (!nextId) setLoading(false); return; }
       userRef.current = nextId;
+      selecting.current = false;
       activeRef.current = null;
       requestId.current++;
       setActiveId(null); setProfile(null); setCompanies([]); setPermissionError(null);
@@ -181,6 +186,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [refreshCompanies]);
 
   const signOut = useCallback(async () => {
+    selecting.current = false;
     requestId.current++; userRef.current = null; activeRef.current = null;
     setUser(null); setSession(null); setProfile(null); setCompanies([]); setActiveId(null); setPermissionState('IDLE');
     await supabase.auth.signOut();

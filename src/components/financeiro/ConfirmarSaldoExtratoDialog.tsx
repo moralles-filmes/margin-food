@@ -9,7 +9,7 @@ import { diaAnterior } from '@/lib/extratoParser';
 import { getConsolidatedBankDelta, isAutomaticInvestmentLine } from '@/lib/conciliacaoInvestimentoAutomatico';
 import { fmtBRL, formatDateBR, parseLocalDate } from '@/lib/formatters';
 import { normalizeBRLMoneyToNumber, formatNumberToBRL } from '@/lib/money';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { AlertTriangle } from 'lucide-react';
 import { useCan } from '@/permissions/hooks';
 
@@ -76,6 +76,7 @@ export default function ConfirmarSaldoExtratoDialog({
   saldoContaCorrenteArquivo, internalMovementCount = 0, contaId,
   onCancel, onConfirmed,
 }: ConfirmarSaldoExtratoDialogProps) {
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const [valorInput, setValorInput] = useState(() =>
     internalMovementCount === 0 && saldoSugerido ? formatNumberToBRL(saldoSugerido.valor) : ''

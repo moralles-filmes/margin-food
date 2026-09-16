@@ -8,7 +8,7 @@ import { DecimalInput, parseDecimal } from '@/components/ui/decimal-input';
 import { CurrencyInput } from '@/components/ui/brl-input';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCan, useModuleAccess } from '@/permissions/hooks';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { fmtBRL, formatDateBR, formatInBR, normalizeBRLMoneyToNumber, todayBR } from '@/lib/formatters';
 import { formatDateISO } from '@/lib/datetime';
 
@@ -138,6 +138,7 @@ export default function RhView() {
 function RhViewInner({ visibleSubtabs, user }: {
   visibleSubtabs: string[]; user: any;
 }) {
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const { companyId } = useCompanyId();
   const { confirm, ConfirmDialog } = useConfirmDialog();

@@ -13,11 +13,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import TableActions from '@/components/ui/TableActions';
 import CategoryCombobox from '@/components/financeiro/CategoryCombobox';
 import { useCompanyId } from '@/hooks/useCompanyId';
-import { emitDataEvent } from '@/lib/dataEvents';
+import { useEmitDataEvent } from '@/lib/dataEvents';
 import { buildCategoryOptions } from '@/lib/categoriaOptions';
 import { filterEligibleMarcaCategoryOptions } from '@/domain/financeiro/marcaCategoriaOptions';
 import { Plus, Store } from 'lucide-react';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 
 export interface FechamentoMarca {
   id: string;
@@ -62,6 +62,8 @@ export default function FechamentoMarcasTab({
   canCreate,
   canEdit,
 }: FechamentoMarcasTabProps) {
+  const emitDataEvent = useEmitDataEvent();
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const { companyId, loading: companyLoading, error: companyError } = useCompanyId();
   const [showForm, setShowForm] = useState(false);

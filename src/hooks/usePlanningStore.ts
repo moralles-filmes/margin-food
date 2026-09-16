@@ -1,8 +1,8 @@
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { MetaCompraMensal } from '@/types/salmon';
-import { toast } from 'sonner';
-import { emitDataEvent } from '@/lib/dataEvents';
+import { useScopedToast } from '@/hooks/useScopedToast';
+import { useEmitDataEvent } from '@/lib/dataEvents';
 
 export interface PlanningMeta {
   id: string;
@@ -54,6 +54,8 @@ function toLegacy(m: PlanningMeta): MetaCompraMensal {
 }
 
 export function usePlanningStore() {
+  const emitDataEvent = useEmitDataEvent();
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const [metas, setMetas] = useState<PlanningMeta[]>([]);
   const [loading, setLoading] = useState(false);
@@ -134,7 +136,7 @@ export function usePlanningStore() {
     } finally {
       if (mounted.current) setSaving(false);
     }
-  }, [saving, supabase, fetchMetas]);
+  }, [saving, supabase, fetchMetas, emitDataEvent, toast]);
 
   // ── Delete meta (guarded RPC) ──
   const deleteMeta = useCallback(async (id: string): Promise<boolean> => {
@@ -154,7 +156,7 @@ export function usePlanningStore() {
     } finally {
       if (mounted.current) setSaving(false);
     }
-  }, [saving, supabase]);
+  }, [saving, supabase, emitDataEvent, toast]);
 
   // ── Fetch aggregated spend summary (guarded RPC) ──
   const fetchSpendSummary = useCallback(async (year: number, month: number, source?: string | null, categoria?: string | null) => {

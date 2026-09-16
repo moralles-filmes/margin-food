@@ -11,7 +11,7 @@ import RequisicaoNotificationModal from "@/components/RequisicaoNotificationModa
 import LegacyPresentationRedirect from "@/components/financeiro/LegacyPresentationRedirect";
 import { toast } from "sonner";
 import { PwaUpdatePrompt } from "@/components/PwaUpdatePrompt";
-import { emitDataEvent } from "@/lib/dataEvents";
+import { emitAppRefresh } from "@/lib/dataEvents";
 import { clearSwAndReload } from "@/lib/swRecovery";
 
 const Index = lazy(() => import("./pages/Index"));
@@ -126,7 +126,7 @@ const App = () => {
       lastRefreshAt = now;
       // Invalida apenas queries que já ficaram stale, sem forçar refetch de tudo
       queryClient.invalidateQueries({ refetchType: 'none' });
-      emitDataEvent('app:refresh');
+      emitAppRefresh();
     };
 
     const handleVisibilityChange = () => {

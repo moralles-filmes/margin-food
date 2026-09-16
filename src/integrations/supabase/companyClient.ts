@@ -3,6 +3,7 @@ import { supabase } from './client';
 import type { Database } from './types';
 import type { CompanyAccessMode } from '@/lib/companyAccess';
 import { supabaseFetch } from './fetch';
+import { registerClientScope } from '@/lib/companyClientLifetime';
 
 export const COMPANY_ACCESS_REVOKED_EVENT = 'company:access-revoked';
 
@@ -27,8 +28,10 @@ export function createCompanyClient(companyId: string, userId: string, mode: Com
             ? AbortSignal.any([lifetime.signal, init.signal])
             : lifetime.signal;
           const response = await supabaseFetch(input, { ...init, signal });
+          lifetime.signal.throwIfAborted();
           if (!response.ok && (response.status === 401 || response.status === 403)) {
             const body = await response.clone().text();
+            lifetime.signal.throwIfAborted();
             if (body.includes('COMPANY_ACCESS_DENIED')) {
               window.dispatchEvent(new CustomEvent(COMPANY_ACCESS_REVOKED_EVENT, { detail: { companyId } }));
             }
@@ -40,6 +43,7 @@ export function createCompanyClient(companyId: string, userId: string, mode: Com
   );
   // One identity client owns refresh/session storage. Scoped clients never create
   // another GoTrue instance; legacy auth.getUser consumers share the same session.
+  registerClientScope(client, { companyId, userId, mode, signal: lifetime.signal });
   client.auth = supabase.auth;
   const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
     if (session?.user.id !== userId) lifetime.abort();

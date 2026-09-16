@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { BRLInput } from '@/components/ui/brl-input';
 import { Label } from '@/components/ui/label';
 import { Plus, Edit2, Trash2, Building2, Check, X } from 'lucide-react';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { Supplier } from '@/types/salmon';
 import { useCan } from '@/permissions/hooks';
 
@@ -17,6 +17,7 @@ interface SuppliersViewProps {
 const emptyForm = { name: '', cnpj: '', contact: '', notes: '', active: true, categoriasAtendidas: [] as string[], prazoEntregaPadrao: 0, formaPagamentoPadrao: '', pedidoMinimoValor: 0, pedidoMinimoQtd: 0, whatsappNumber: '' };
 
 export default function SuppliersView({ store }: SuppliersViewProps) {
+  const toast = useScopedToast();
   const { suppliers, addSupplier, updateSupplier, deleteSupplier } = store;
   const { confirm, ConfirmDialog } = useConfirmDialog();
   const [showForm, setShowForm] = useState(false);

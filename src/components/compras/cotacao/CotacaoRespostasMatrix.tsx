@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { CurrencyInput } from '@/components/ui/brl-input';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { Save, Ban } from 'lucide-react';
 import { mapCotacaoError } from '@/lib/cotacaoErrors';
 import type { useCotacoesStore, CotacaoRespostaInput, CotacaoFornecedorMetaInput } from '@/hooks/useCotacoesStore';
@@ -24,6 +24,7 @@ interface CotacaoRespostasMatrixProps {
 const cellKey = (fornId: string, itemId: string) => `${fornId}|${itemId}`;
 
 export default function CotacaoRespostasMatrix({ cotacaoId, itens, fornecedores, respostas, store, canEdit, onSaved }: CotacaoRespostasMatrixProps) {
+  const toast = useScopedToast();
   const [cells, setCells] = useState<Record<string, Cell>>(() => {
     const m: Record<string, Cell> = {};
     respostas.forEach(r => {

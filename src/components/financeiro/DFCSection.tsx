@@ -7,7 +7,7 @@ import { FileDown, FileSpreadsheet, ShieldAlert } from 'lucide-react';
 import { exportDemonstrativoPDF, exportDemonstrativoExcel } from '@/lib/exportDemonstrativo';
 import { useDataEvent } from '@/lib/dataEvents';
 import { useCan } from '@/permissions';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { DfcSummary, DfcCategoria } from '@/types/financeiro';
 import DemonstrativoTree from './DemonstrativoTree';
@@ -50,6 +50,7 @@ function valoresMapToLancamentos(valoresMap: Record<string, number>) {
 }
 
 export default function DFCSection() {
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const [mesAncora, setMesAncora] = useState(() => formatInBR(new Date(), 'yyyy-MM'));
   const [meses, setMeses] = useState('3');
@@ -90,7 +91,7 @@ export default function DFCSection() {
     setLancamentos(valoresMapToLancamentos(result?.valores_por_categoria || {}));
     setSaldoInicial(Number(result?.saldo_inicial || 0));
     setLoading(false);
-  }, [mesAncora, meses, supabase]);
+  }, [mesAncora, meses, supabase, toast]);
 
   useEffect(() => { load(); }, [load]);
   useDataEvent('financeiro:lancamentos', load);

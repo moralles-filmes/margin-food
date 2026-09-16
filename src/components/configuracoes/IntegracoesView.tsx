@@ -4,13 +4,14 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { MessageCircle, Bot, Save, ExternalLink, ShieldCheck, Info } from 'lucide-react';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { useCanAny } from '@/permissions';
 import { useIntegracoesConfig } from '@/hooks/useIntegracoesConfig';
 
 const MANAGE_KEYS = ['configuracoes:integracoes:manage', 'compras:cotacao:manage'] as const;
 
 export default function IntegracoesView() {
+  const toast = useScopedToast();
   const canManage = useCanAny(...MANAGE_KEYS);
   const { zapi, ia, loading, saveZapi, saveIa } = useIntegracoesConfig();
 

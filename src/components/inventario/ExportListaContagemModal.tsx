@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { FileDown, AlertTriangle } from 'lucide-react';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import type { Inventario, InventarioItem } from '@/hooks/useInventarioStore';
 import { gerarPDFListaContagem } from '@/lib/pdfInventarioContagem';
 
@@ -31,6 +31,7 @@ export default function ExportListaContagemModal({
   itens,
   nomeConferente,
 }: Props) {
+  const toast = useScopedToast();
   const [agruparPorLocal, setAgruparPorLocal] = useState(true);
   const [mostrarSaldo, setMostrarSaldo] = useState(false);
   const [apenasNaoContados, setApenasNaoContados] = useState(false);

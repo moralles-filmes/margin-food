@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useSalmonStore } from '@/hooks/useSalmonStore';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { Loader2 } from 'lucide-react';
 
 interface QuickSupplierDialogProps {
@@ -20,6 +20,7 @@ export default function QuickSupplierDialog({
   onSuccess,
   defaultName = '',
 }: QuickSupplierDialogProps) {
+  const toast = useScopedToast();
   const { addSupplier } = useSalmonStore();
   const [name, setName] = useState(defaultName);
   const [cnpj, setCnpj] = useState('');

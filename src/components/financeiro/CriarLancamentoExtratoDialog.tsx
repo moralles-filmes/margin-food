@@ -14,10 +14,10 @@ import { Card, CardContent } from '@/components/ui/card';
 import { BRLInput } from '@/components/ui/brl-input';
 import { DecimalInput } from '@/components/ui/decimal-input';
 import { useAuth } from '@/contexts/AuthContext';
-import { emitDataEvent } from '@/lib/dataEvents';
+import { useEmitDataEvent } from '@/lib/dataEvents';
 import { fmtBRL } from '@/lib/money';
 import { formatDateValueBR } from '@/lib/datetime';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import CategoryCombobox from '@/components/financeiro/CategoryCombobox';
 import { buildCategoryOptions } from '@/lib/categoriaOptions';
 import SupplierCombobox from '@/components/financeiro/SupplierCombobox';
@@ -52,6 +52,8 @@ type Destino = 'lancamento' | 'conta_pagar' | 'conta_receber';
 
 export default function CriarLancamentoExtratoDialog({
  open, onOpenChange, linha, contaBancariaId, onCreated }: Props) {
+  const emitDataEvent = useEmitDataEvent();
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const { companyId } = useCompanyId();
   const canViewRbac = useCan('financeiro:conciliacao:reconcile');

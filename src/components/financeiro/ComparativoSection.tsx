@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { formatInBR, fmtBRL, formatPercentBR, formatDecimalBR } from '@/lib/formatters';
 import { subMonths } from 'date-fns';
 import { RefreshCw, ArrowRight, Equal, FileDown, Ban, AlertTriangle } from 'lucide-react';
@@ -72,6 +72,7 @@ function formatMesLabel(mes: string): string {
 }
 
 export default function ComparativoSection() {
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const canView = useCan('financeiro:comparativo:view');
   const canExport = useCan('financeiro:comparativo:export');
@@ -117,7 +118,7 @@ export default function ComparativoSection() {
       setErrorState(true);
     }
     setLoading(false);
-  }, [canView, loading, mesA, mesB, supabase]);
+  }, [canView, loading, mesA, mesB, supabase, toast]);
 
   // Auto-load on mount
   useEffect(() => {

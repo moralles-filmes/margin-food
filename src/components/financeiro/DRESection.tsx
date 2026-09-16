@@ -7,7 +7,7 @@ import { FileDown, FileSpreadsheet, ShieldAlert } from 'lucide-react';
 import { exportDemonstrativoPDF, exportDemonstrativoExcel } from '@/lib/exportDemonstrativo';
 import { useDataEvent } from '@/lib/dataEvents';
 import { useCan } from '@/permissions';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { Skeleton } from '@/components/ui/skeleton';
 import DemonstrativoTree from './DemonstrativoTree';
 import MonthNavigator, { shiftMonth, monthBounds } from './MonthNavigator';
@@ -51,6 +51,7 @@ function formatMonthLabelShort(value: string): string {
 }
 
 export default function DRESection() {
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const [categorias, setCategorias] = useState<any[]>([]);
   const [lancamentos, setLancamentos] = useState<any[]>([]);
@@ -86,7 +87,7 @@ export default function DRESection() {
     setCategorias(result?.categorias || []);
     setLancamentos(valoresMapToLancamentos(result?.valores_por_categoria || {}));
     setLoading(false);
-  }, [mesAncora, meses, supabase]);
+  }, [mesAncora, meses, supabase, toast]);
 
   useEffect(() => { load(); }, [load]);
   useDataEvent('financeiro:lancamentos', load);

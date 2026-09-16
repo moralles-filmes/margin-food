@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { Plus, Calendar, Pencil, Trash2, Zap } from 'lucide-react';
 import UserMentionSelect from '@/components/UserMentionSelect';
 import { todayBR } from '@/lib/datetime';
@@ -58,6 +58,7 @@ const emptyForm = {
 };
 
 export default function CalendarioLembretesView() {
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const { companyId } = useCompanyId();
   const canViewRbac = useCan('compras:calendario:view');

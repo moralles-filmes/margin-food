@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { Check, AlertTriangle, Save, Wand2, RotateCcw, ArrowRight, Truck, Coins, TrendingDown, Users, Sparkles } from 'lucide-react';
 import { formatMoneyBR } from '@/lib/formatters';
 import { mapCotacaoError } from '@/lib/cotacaoErrors';
@@ -24,6 +24,7 @@ interface Props {
 }
 
 export default function CotacaoSugestaoInteligente({ cotacaoId, itens, fornecedores, respostas, store, canEdit, onSaved }: Props) {
+  const toast = useScopedToast();
   const input = useMemo(() => buildOptimizerInput(itens, fornecedores, respostas), [itens, fornecedores, respostas]);
   const set = useMemo(() => optimizeCotacao(input), [input]);
   const [selectedType, setSelectedType] = useState<ScenarioType>(() => set.recomendado);

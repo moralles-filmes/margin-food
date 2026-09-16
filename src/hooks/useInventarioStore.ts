@@ -1,7 +1,7 @@
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useCallback } from 'react';
-import { emitDataEvent } from '@/lib/dataEvents';
-import { toast } from 'sonner';
+import { useEmitDataEvent } from '@/lib/dataEvents';
+import { useScopedToast } from '@/hooks/useScopedToast';
 
 export interface Inventario {
   id: string;
@@ -93,6 +93,8 @@ export interface DashboardData {
 }
 
 export function useInventarioStore() {
+  const emitDataEvent = useEmitDataEvent();
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const [inventarios, setInventarios] = useState<Inventario[]>([]);
   const [currentInventario, setCurrentInventario] = useState<Inventario | null>(null);
@@ -121,7 +123,7 @@ export function useInventarioStore() {
     } catch (e: any) {
       toast.error(e.message || 'Erro ao carregar turnos');
     }
-  }, [invoke]);
+  }, [invoke, toast]);
 
   const loadList = useCallback(async (filters?: { status_filter?: string; turno_filter?: string; flag_filter?: boolean }, append = false) => {
     setLoading(true);
@@ -140,7 +142,7 @@ export function useInventarioStore() {
     } finally {
       setLoading(false);
     }
-  }, [invoke, nextCursor]);
+  }, [invoke, nextCursor, toast]);
 
   const loadInventario = useCallback(async (id: string) => {
     setLoading(true);
@@ -154,7 +156,7 @@ export function useInventarioStore() {
     } finally {
       setLoading(false);
     }
-  }, [invoke]);
+  }, [invoke, toast]);
 
   const [savingCreate, setSavingCreate] = useState(false);
 
@@ -185,7 +187,7 @@ export function useInventarioStore() {
     } finally {
       setSavingCreate(false);
     }
-  }, [invoke, loadList, savingCreate]);
+  }, [invoke, loadList, savingCreate, emitDataEvent, toast]);
 
   const updateStatus = useCallback(async (id: string, status: string) => {
     try {
@@ -198,7 +200,7 @@ export function useInventarioStore() {
     } catch (e: any) {
       toast.error(e.message || 'Erro ao atualizar status');
     }
-  }, [invoke, currentInventario, loadList]);
+  }, [invoke, currentInventario, loadList, toast]);
 
   const updateContagem = useCallback(async (itemId: string, contagem: number) => {
     try {
@@ -213,7 +215,7 @@ export function useInventarioStore() {
       toast.error(e.message || 'Erro ao salvar contagem');
       return null;
     }
-  }, [invoke]);
+  }, [invoke, toast]);
 
   const finalizar = useCallback(async (id: string, justificativa?: string) => {
     setLoading(true);
@@ -236,7 +238,7 @@ export function useInventarioStore() {
     } finally {
       setLoading(false);
     }
-  }, [invoke, loadInventario, loadList]);
+  }, [invoke, loadInventario, loadList, emitDataEvent, toast]);
 
   const aprovarAnalise = useCallback(async (id: string, justificativa: string) => {
     try {
@@ -246,7 +248,7 @@ export function useInventarioStore() {
     } catch (e: any) {
       toast.error(e.message || 'Erro ao aprovar');
     }
-  }, [invoke, loadInventario]);
+  }, [invoke, loadInventario, toast]);
 
   const correcaoPosterior = useCallback(async (inventarioId: string, produtoId: string, quantidade: number, motivo: string) => {
     try {
@@ -255,7 +257,7 @@ export function useInventarioStore() {
     } catch (e: any) {
       toast.error(e.message || 'Erro na correção');
     }
-  }, [invoke]);
+  }, [invoke, toast]);
 
   const reopenInventario = useCallback(async (id: string, justificativa: string) => {
     setLoading(true);
@@ -271,7 +273,7 @@ export function useInventarioStore() {
     } finally {
       setLoading(false);
     }
-  }, [invoke, loadInventario, loadList]);
+  }, [invoke, loadInventario, loadList, emitDataEvent, toast]);
 
   const deleteInventario = useCallback(async (id: string, justificativa: string) => {
     setLoading(true);
@@ -287,7 +289,7 @@ export function useInventarioStore() {
     } finally {
       setLoading(false);
     }
-  }, [invoke, loadList]);
+  }, [invoke, loadList, emitDataEvent, toast]);
 
   const loadDashboard = useCallback(async () => {
     try {
@@ -296,7 +298,7 @@ export function useInventarioStore() {
     } catch (e: any) {
       toast.error(e.message || 'Erro ao carregar dashboard');
     }
-  }, [invoke]);
+  }, [invoke, toast]);
 
   const loadConferentes = useCallback(async () => {
     try {
@@ -305,7 +307,7 @@ export function useInventarioStore() {
     } catch (e: any) {
       toast.error(e.message || 'Erro ao carregar conferentes');
     }
-  }, [invoke]);
+  }, [invoke, toast]);
 
   const addConferente = useCallback(async (userId: string) => {
     try {
@@ -315,7 +317,7 @@ export function useInventarioStore() {
     } catch (e: any) {
       toast.error(e.message || 'Erro ao adicionar conferente');
     }
-  }, [invoke, loadConferentes]);
+  }, [invoke, loadConferentes, toast]);
 
   const removeConferente = useCallback(async (conferenteId: string) => {
     try {
@@ -325,7 +327,7 @@ export function useInventarioStore() {
     } catch (e: any) {
       toast.error(e.message || 'Erro ao remover conferente');
     }
-  }, [invoke, loadConferentes]);
+  }, [invoke, loadConferentes, toast]);
 
   const assignConferente = useCallback(async (inventarioId: string, conferenteUserId: string) => {
     try {
@@ -335,7 +337,7 @@ export function useInventarioStore() {
     } catch (e: any) {
       toast.error(e.message || 'Erro ao atribuir conferente');
     }
-  }, [invoke, loadInventario]);
+  }, [invoke, loadInventario, toast]);
 
   return {
     inventarios, currentInventario, currentItens, auditLogs, turnos, conferentes, dashboard, loading,

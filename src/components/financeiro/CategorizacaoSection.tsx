@@ -12,9 +12,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useCan } from '@/permissions';
-import { emitDataEvent, useDataEvent } from '@/lib/dataEvents';
+import { useEmitDataEvent, useDataEvent } from '@/lib/dataEvents';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { fmtBRL } from '@/lib/formatters';
 import { Plus, Edit, Trash2, Tag, Zap, FileWarning, ShieldX, Search, RefreshCw } from 'lucide-react';
 import { useFormDirtyGuard } from '@/hooks/useFormDirtyGuard';
@@ -77,6 +77,8 @@ function SkeletonRows() {
 }
 
 export default function CategorizacaoSection() {
+  const emitDataEvent = useEmitDataEvent();
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const { companyId } = useCompanyId();
   const canView = useCan('financeiro:categorizacao:view');

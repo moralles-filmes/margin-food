@@ -11,7 +11,7 @@ import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCan } from '@/permissions/hooks';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { ShoppingCart, RefreshCw, AlertTriangle, Package, DollarSign, Shield, Clock, ArrowRight, FileText, Zap } from 'lucide-react';
 
 interface SimItem {
@@ -49,6 +49,7 @@ import { compareNames } from '@/lib/sortByName';
 const fmt = (v: number) => formatFixedBR(v, 2);
 
 export default function SimuladorCompraGeral() {
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const { hasPermission } = useAuth();
   const canCreatePedidos = useCan('compras:pedidos:create');
@@ -91,7 +92,7 @@ export default function SimuladorCompraGeral() {
       toast.error('Erro na simulação: ' + (e.message || ''));
     }
     setLoading(false);
-  }, [semanasMeta, semanasConsumo, metodoPreco, categoria, apenasRuptura]);
+  }, [semanasMeta, semanasConsumo, metodoPreco, categoria, apenasRuptura, toast]);
 
   const getQtd = (item: SimItem) => {
     const override = qtdOverrides[item.produtoId];

@@ -22,7 +22,7 @@ import {
   itemStatusLabel,
   itemStatusStyle,
 } from '@/domain/estoque/requisitionStatus';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import ListaFixaSetorAdmin from './estoque/ListaFixaSetorAdmin';
 import RequisicaoListaFixa from './estoque/RequisicaoListaFixa';
@@ -82,6 +82,7 @@ async function extractEdgeFnErrorMessage(error: unknown, fallback: string): Prom
 type FormMode = 'none' | 'manual' | 'lista-fixa';
 
 export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefresh }: Props) {
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const { user, profile } = useAuth();
   const canManage = useCan('estoque:requisicoes:manage');
@@ -114,7 +115,7 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
         setSetores(nomes);
         setSetor(current => nomes.includes(current) ? current : nomes[0] || '');
       });
-  }, [supabase]);
+  }, [supabase, toast]);
   const [observacao, setObservacao] = useState('');
   const [itens, setItens] = useState<ManualRequisitionItem[]>([]);
   const [cancelling, setCancelling] = useState<string | null>(null);
@@ -170,7 +171,7 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [onBadgeRefresh]);
+  }, [onBadgeRefresh, toast]);
 
   const loadHistorico = useCallback(async (offset = 0, append = false) => {
     try {
@@ -189,7 +190,7 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
       setHistoricoLoading(false);
       setHistoricoLoadingMore(false);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     loadRequisicoes();

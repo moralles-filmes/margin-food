@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { useAuth } from '@/contexts/AuthContext';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 
 import { useCan, useCanAny } from '@/permissions/hooks';
 import { useCompanyId } from '@/hooks/useCompanyId';
@@ -49,6 +49,7 @@ const LOCATION_TYPES = [
 ];
 
 export default function StockCadastrosSection() {
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const canViewRbac = useCan('estoque:cadastros:view');
   const { user } = useAuth();

@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { NumericInput } from '@/components/ui/numeric-input';
 import { parseDecimal } from '@/components/ui/decimal-input';
 import { Users, Fish, Target, Check } from 'lucide-react';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import PeriodFilter, { PeriodRange, getDefaultRange, filterByPeriod } from './PeriodFilter';
 import { todayBR, formatDateBR, formatDecimalBR, formatPercentBR, parseLocalDate } from '@/lib/formatters';
 
@@ -18,6 +18,7 @@ interface GoalsViewProps {
 }
 
 export default function GoalsView({ store }: GoalsViewProps) {
+  const toast = useScopedToast();
   const { dailyRecords, manipulations, metasProvisionadas, saveMetaProvisionada } = store;
   const canEditMetas = useCan('salmon:metas:edit');
   const [period, setPeriod] = useState<PeriodRange>(getDefaultRange());

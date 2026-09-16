@@ -5,7 +5,7 @@ import { ShoppingCart, Check, X, RefreshCw, Inbox, ChevronRight, Send, CheckCirc
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCan } from '@/permissions/hooks';
 import { PurchaseOrderItem } from '@/hooks/usePurchaseOrdersStore';
@@ -17,6 +17,7 @@ interface Props {
 }
 
 export default function ShoppingChecklistView({ onNavigateToOrder }: Props) {
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const { user } = useAuth();
   const store = usePurchaseOrdersStoreContext();

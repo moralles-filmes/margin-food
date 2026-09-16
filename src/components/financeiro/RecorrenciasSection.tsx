@@ -1,6 +1,6 @@
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { emitDataEvent, useDataEvent } from '@/lib/dataEvents';
+import { useEmitDataEvent, useDataEvent } from '@/lib/dataEvents';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { useCan } from '@/permissions/hooks';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { RefreshCw, Repeat, Play, ExternalLink, ShieldX, Download } from 'lucide-react';
 import { fmtBRL, todayBR } from '@/lib/formatters';
 import { format } from 'date-fns';
@@ -98,6 +98,8 @@ function SkeletonRows() {
 }
 
 export default function RecorrenciasSection({ onNavigate }: Props) {
+  const emitDataEvent = useEmitDataEvent();
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const canView = useCan('financeiro:recorrencias:view');
   const canCreate = useCan('financeiro:recorrencias:create');
@@ -191,7 +193,7 @@ export default function RecorrenciasSection({ onNavigate }: Props) {
 
     setLoading(false);
     setLoadingMore(false);
-  }, [mesAno, supabase]);
+  }, [mesAno, supabase, toast]);
 
   useEffect(() => {
     if (canView) loadPage(null, null, true);

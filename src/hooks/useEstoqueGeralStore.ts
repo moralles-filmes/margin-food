@@ -1,6 +1,6 @@
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { emitDataEvent } from '@/lib/dataEvents';
+import { useEmitDataEvent } from '@/lib/dataEvents';
 import type { Produto, MovimentacaoEstoque } from '@/types/salmon';
 import type { ProdutoExtended, MovimentacaoExtended } from '@/types/estoque';
 import { resolveCompanyIdOrThrow } from '@/lib/tenant';
@@ -231,6 +231,7 @@ export type ProdutoUpdateInput = Partial<Produto> & Partial<Pick<ProdutoExtended
 interface SaldoRow { produto_id: string; saldo: number }
 
 export function useEstoqueGeralStore() {
+  const emitDataEvent = useEmitDataEvent();
   const supabase = useSupabase();
   const { companyId } = useCompanyId();
   const [produtos, setProdutos] = useState<ProdutoExtended[]>([]);
@@ -653,7 +654,7 @@ export function useEstoqueGeralStore() {
     fetchProdutoGlobalCounts();
     emitDataEvent('estoque:produtos');
     return newProd;
-  }, [companyId, fetchProdutoGlobalCounts, supabase]);
+  }, [companyId, fetchProdutoGlobalCounts, supabase, emitDataEvent]);
 
   const updateProduto = useCallback(async (id: string, updates: ProdutoUpdateInput) => {
     const dbUpdates: Record<string, unknown> = {};
@@ -700,7 +701,7 @@ export function useEstoqueGeralStore() {
     setProdutos(prev => prev.map(p => p.id === id ? { ...p, ...updates } as ProdutoExtended : p));
     fetchProdutoGlobalCounts();
     emitDataEvent('estoque:produtos');
-  }, [fetchProdutoGlobalCounts, supabase]);
+  }, [fetchProdutoGlobalCounts, supabase, emitDataEvent]);
 
   const deleteProduto = useCallback(async (id: string) => {
     const { data: deactivatedId, error } = await supabase.rpc('deactivate_produto', { p_produto_id: id });
@@ -716,7 +717,7 @@ export function useEstoqueGeralStore() {
     setProdutos(prev => prev.map(p => p.id === id ? { ...p, ativo: false } : p));
     fetchProdutoGlobalCounts();
     emitDataEvent('estoque:produtos');
-  }, [fetchProdutoGlobalCounts, supabase]);
+  }, [fetchProdutoGlobalCounts, supabase, emitDataEvent]);
 
   // === Movimentação (DB) ===
   const addMovimentacao = useCallback(async (m: Omit<MovimentacaoEstoque, 'id' | 'createdAt'> & { setor?: string }) => {
@@ -757,7 +758,7 @@ export function useEstoqueGeralStore() {
     ]);
     emitDataEvent('estoque:movimentacoes');
     return newMov;
-  }, [supabase, fetchMovimentacoes, movFilters, fetchSaldos]);
+  }, [supabase, fetchMovimentacoes, movFilters, fetchSaldos, emitDataEvent]);
 
   // Categorias derived from produtos
   const categorias = useMemo(() => sortNames([...new Set(produtos.map(p => p.categoria).filter(Boolean))]), [produtos]);

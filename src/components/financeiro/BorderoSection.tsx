@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { AlertTriangle, CheckCircle2, CircleCheckBig, FileDown, Landmark, Loader2, MinusCircle, RefreshCw, ShieldX, Sigma, Wallet, CalendarClock } from 'lucide-react';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { useCan } from '@/permissions';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCompanyScope } from '@/contexts/CompanyScopeContext';
@@ -105,6 +105,7 @@ function AccountsDialog({ report, open, onOpenChange }: { report: BorderoReport;
 }
 
 export default function BorderoSection() {
+  const toast = useScopedToast();
   const canView = useCan('financeiro:relatorio-socios:view');
   const canExport = useCan('financeiro:relatorio-socios:export');
   const scope = useCompanyScope();

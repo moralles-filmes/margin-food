@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandInput, CommandList, CommandEmpty, CommandItem } from '@/components/ui/command';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { fmtBRL, formatDateBR, formatDateTimeBR, formatDateValueBR } from '@/lib/formatters';
 import UserMentionSelect from '@/components/UserMentionSelect';
 import ProductSearchCombobox, { type ProductOption } from '@/components/ui/ProductSearchCombobox';
@@ -64,6 +64,7 @@ function serializeCategories(cats: string[]): string {
 }
 
 export default function PedidosComprasMercadoView() {
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const { user } = useAuth();
   const store = usePurchaseOrdersStoreContext();

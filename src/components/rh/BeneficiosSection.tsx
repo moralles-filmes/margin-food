@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { DecimalInput, parseDecimal } from '@/components/ui/decimal-input';
 import { CurrencyInput } from '@/components/ui/brl-input';
 import { useAuth } from '@/contexts/AuthContext';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -78,6 +78,7 @@ const R = (v: number) => formatFixedBR(v, 2);
 
 export default function BeneficiosSection({
  colaboradores, canManage }: Props) {
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const { companyId } = useCompanyId();
   const canViewRbac = useCan('rh:beneficios:view');

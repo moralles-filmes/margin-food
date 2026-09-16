@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import KpiCard, { type KpiCardDelta, type KpiVariant } from '@/components/ui/KpiCard';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { useCan } from '@/permissions/hooks';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { todayBR, fmtBRL, formatPercentBR } from '@/lib/formatters';
 import { formatDateISO } from '@/lib/datetime';
 import { format } from 'date-fns';
@@ -80,6 +80,7 @@ function buildDelta(current: number, previous: number, invert = false): KpiCardD
 // ── Component ──
 
 export default function DashboardFinanceiroSection({ onNavigate }: { onNavigate?: (params: DashboardNavigateParams) => void }) {
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const canView = useCan('financeiro:dashboard:view');
   const canExport = useCan('financeiro:dashboard:export');
@@ -167,7 +168,7 @@ export default function DashboardFinanceiroSection({ onNavigate }: { onNavigate?
       toast.error('Erro ao carregar resumo do dashboard');
     }
     setLoading(false);
-  }, [loading, resumo.receita, filterType, supabase, periodoInicio, periodoFim, selectedDate, mesAno]);
+  }, [loading, resumo.receita, filterType, supabase, periodoInicio, periodoFim, selectedDate, mesAno, toast]);
 
   // Keep ref in sync
   loadResumoRef.current = loadResumo;

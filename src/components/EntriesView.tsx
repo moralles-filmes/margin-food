@@ -7,7 +7,7 @@ import { DateInput } from '@/components/ui/DateInput';
 import { CurrencyInput } from '@/components/ui/brl-input';
 import { Label } from '@/components/ui/label';
 import { Plus, Copy, ChevronDown, ChevronUp, Pencil, Trash2, X, Check, Calculator } from 'lucide-react';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import PeriodFilter, { PeriodRange, getDefaultRange, filterByPeriod } from './PeriodFilter';
 import QuickSupplierDialog from './compras/QuickSupplierDialog';
 import { endOfMonth } from 'date-fns';
@@ -41,6 +41,7 @@ const emptyForm = () => ({
 });
 
 export default function EntriesView({ store }: EntriesViewProps) {
+  const toast = useScopedToast();
   const { entries, addEntry, updateEntry, deleteEntry, activeSuppliers, addSupplier, metasCompra, saveMetaCompra, addAuditoria } = store;
   const canCreate = useCan('salmon:entradas:create');
   const canEdit = useCan('salmon:entradas:edit');

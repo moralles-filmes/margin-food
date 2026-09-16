@@ -27,7 +27,7 @@ import ProductSearchCombobox, { type ProductOption } from '@/components/ui/Produ
 import { useFormDirtyGuard } from '@/hooks/useFormDirtyGuard';
 import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
 import { formatFixedBR, todayBR, fmtBRL, normalizeBRLMoneyToNumber } from '@/lib/formatters';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { TenantError } from '@/lib/tenant';
 import { getCostOrigin, getCostLabel, getActiveCostBase, getActiveCostPurchase } from '@/components/estoque/CustoItemDisplay';
 import { Badge } from '@/components/ui/badge';
@@ -93,6 +93,7 @@ export default function NovaMovimentacaoModal({
   userId, hasPermission, canEditPricing,
   addMovimentacao, recalcularPrecos,
 }: Props) {
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const emptyForm: MovFormState = {
     produtoId: '',

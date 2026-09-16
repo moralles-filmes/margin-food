@@ -1,6 +1,6 @@
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { emitDataEvent, useDataEvent } from '@/lib/dataEvents';
+import { useEmitDataEvent, useDataEvent } from '@/lib/dataEvents';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { DateInput } from '@/components/ui/DateInput';
@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SubmoduleSwitcher, type SubmoduleItem } from '@/components/ui/SubmoduleSwitcher';
 import { cacheInvalidate } from '@/components/cmv/cmvCache';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { Plus, Edit, Trash2, RefreshCw, DollarSign, Calendar, FileDown, FileSpreadsheet, AlertTriangle, Store } from 'lucide-react';
 import { useFormDirtyGuard } from '@/hooks/useFormDirtyGuard';
 import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
@@ -86,6 +86,8 @@ function NoAccess() {
 // ── Component ──
 
 export default function FechamentoCaixaSection() {
+  const emitDataEvent = useEmitDataEvent();
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const canView = useCan('financeiro:fechamento:view');
   const canCreate = useCan('financeiro:fechamento:create');
@@ -139,7 +141,7 @@ export default function FechamentoCaixaSection() {
       setBrands((data || []) as FechamentoMarca[]);
     }
     setBrandsLoading(false);
-  }, [supabase]);
+  }, [supabase, toast]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -176,7 +178,7 @@ export default function FechamentoCaixaSection() {
       }
     }
     setLoading(false);
-  }, [supabase, startDate, endDate]);
+  }, [supabase, startDate, endDate, toast]);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => { loadBrands(); }, [loadBrands]);
@@ -289,8 +291,8 @@ export default function FechamentoCaixaSection() {
       }
     } else {
       toast.success(editId ? 'Fechamento atualizado' : 'Fechamento registrado');
-      cacheInvalidate('calcular_cmv');
-      cacheInvalidate('get_ranking');
+      cacheInvalidate(supabase, 'calcular_cmv');
+      cacheInvalidate(supabase, 'get_ranking');
       resetForm();
       emitDataEvent('financeiro:fechamento');
     }
@@ -312,8 +314,8 @@ export default function FechamentoCaixaSection() {
       const { error } = await supabase.rpc('rpc_delete_fechamento_caixa', { p_id: id });
       if (error) throw error;
       toast.success('Fechamento excluído');
-      cacheInvalidate('calcular_cmv');
-      cacheInvalidate('get_ranking');
+      cacheInvalidate(supabase, 'calcular_cmv');
+      cacheInvalidate(supabase, 'get_ranking');
       emitDataEvent('financeiro:fechamento');
     } catch (err: unknown) {
       console.error('[FechamentoCaixaSection.remove]', err);

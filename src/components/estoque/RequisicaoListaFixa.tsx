@@ -7,7 +7,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCan } from '@/permissions/hooks';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -38,6 +38,7 @@ function getRequisitionProductDisplay(prod: ProdutoExtended) {
 }
 
 export default function RequisicaoListaFixa({ produtos, saldos, onSuccess, onCancel }: Props) {
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const { profile } = useAuth();
   const canCreate = useCan('estoque:requisicoes:create');
@@ -56,7 +57,7 @@ export default function RequisicaoListaFixa({ produtos, saldos, onSuccess, onCan
         setSetores(nomes);
         setSetor(current => nomes.includes(current) ? current : nomes[0] || '');
       });
-  }, [canCreate, supabase]);
+  }, [canCreate, supabase, toast]);
   const [observacao, setObservacao] = useState('');
   const [items, setItems] = useState<ListaFixaItem[]>([]);
   const [quantities, setQuantities] = useState<Record<string, string>>({});
@@ -107,7 +108,7 @@ export default function RequisicaoListaFixa({ produtos, saldos, onSuccess, onCan
     } finally {
       if (currentRequest === requestId.current) setLoading(false);
     }
-  }, [supabase]);
+  }, [supabase, toast]);
 
   useEffect(() => {
     if (canCreate) loadListaFixa(setor);

@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { resolveCompanySelection, readCompanyPreference, writeCompanyPreference } from './companySelection';
 import { cacheGet, cacheSet, cacheInvalidate } from '@/components/cmv/cmvCache';
 const units = [{ id: 'A', nome: 'Centro' }, { id: 'B', nome: 'Shopping' }];
-beforeEach(() => { localStorage.clear(); cacheInvalidate(); });
+const client = {};
+beforeEach(() => { localStorage.clear(); cacheInvalidate(client); });
 describe('seleção autorizada de unidade', () => {
   it('seleciona a única unidade sem exigir escolha', () => expect(resolveCompanySelection([units[0]])).toBe('A'));
   it('exige escolha para várias unidades sem preferência válida', () => {
@@ -17,9 +18,10 @@ describe('seleção autorizada de unidade', () => {
     expect(resolveCompanySelection([], readCompanyPreference('user-1'))).toBeNull();
   });
   it('não compartilha o cache de CMV entre lojas ou usuários', () => {
-    cacheSet('cmv', { companyId:'A', userId:'one', month:'2026-09' }, { revenue:10 }, 60);
-    expect(cacheGet('cmv', { companyId:'A', userId:'one', month:'2026-09' })).toEqual({ revenue:10 });
-    expect(cacheGet('cmv', { companyId:'B', userId:'one', month:'2026-09' })).toBeNull();
-    expect(cacheGet('cmv', { companyId:'A', userId:'two', month:'2026-09' })).toBeNull();
+    cacheSet(client, 'cmv', { companyId:'A', userId:'one', month:'2026-09' }, { revenue:10 }, 60);
+    expect(cacheGet(client, 'cmv', { companyId:'A', userId:'one', month:'2026-09' })).toEqual({ revenue:10 });
+    expect(cacheGet(client, 'cmv', { companyId:'B', userId:'one', month:'2026-09' })).toBeNull();
+    expect(cacheGet(client, 'cmv', { companyId:'A', userId:'two', month:'2026-09' })).toBeNull();
+    expect(cacheGet({}, 'cmv', { companyId:'A', userId:'one', month:'2026-09' })).toBeNull();
   });
 });

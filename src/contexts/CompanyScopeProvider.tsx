@@ -7,34 +7,38 @@ import { loadCompanyProfile, type CompanyAccessMode } from '@/lib/companyAccess'
 import { Button } from '@/components/ui/button';
 import { useLocation } from 'react-router-dom';
 
-function ScopedContent({ companyId, userId, mode, resource, queryClient, initialProfile, children }: {
-  companyId: string; userId: string; mode: CompanyAccessMode; resource: ReturnType<typeof createCompanyClient>; queryClient: QueryClient; initialProfile?: CompanyProfile; children: ReactNode;
+function ScopedContent({ companyId, userId, mode, resource, queryClient, initialProfile, children, restart }: {
+  companyId: string; userId: string; mode: CompanyAccessMode; resource: ReturnType<typeof createCompanyClient>; queryClient: QueryClient; initialProfile?: CompanyProfile; children: ReactNode; restart: () => void;
 }) {
   const [profile, setProfile] = useState<CompanyProfile | null>(initialProfile ?? null);
   const [error, setError] = useState<string | null>(null);
-  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let alive = true;
+    let generation = 0;
+    let blocked = false;
+    const close = () => { blocked = true; generation++; void queryClient.cancelQueries(); queryClient.clear(); resource.dispose(); };
     const load = async () => {
+      if (blocked) return;
+      const request = ++generation;
       try {
         const next = await loadCompanyProfile(resource.client, userId, companyId, mode, AbortSignal.timeout(15_000));
-        if (alive) { setProfile(next); setError(null); }
+        if (alive && request === generation) { setProfile(next); setError(null); }
       } catch (failure) {
         console.error('[Unidade] Falha de autorização:', failure);
-        if (alive) { setProfile(null); setError('Não foi possível validar o acesso a esta unidade.'); queryClient.clear(); }
+        if (alive && request === generation) { close(); setProfile(null); setError('Não foi possível validar o acesso a esta unidade.'); }
       }
     };
     void load();
     const timer = window.setInterval(() => void load(), 60_000);
     const revoked = (event: Event) => {
       if ((event as CustomEvent).detail.companyId !== companyId) return;
-      setProfile(null); setError('Seu acesso a esta unidade foi removido.'); queryClient.clear();
+      close(); setProfile(null); setError('Seu acesso a esta unidade foi removido.');
     };
     window.addEventListener(COMPANY_ACCESS_REVOKED_EVENT, revoked);
     return () => { alive = false; clearInterval(timer); window.removeEventListener(COMPANY_ACCESS_REVOKED_EVENT, revoked); };
-  }, [attempt, companyId, userId, mode, queryClient, resource]);
+  }, [companyId, userId, mode, queryClient, resource]);
   const scope = useMemo(() => profile ? { companyId, client: resource.client, profile } : null, [companyId, resource, profile]);
-  if (error) return <div role="alert" className="space-y-3 p-6 text-sm"><p>{error}</p><Button variant="outline" onClick={() => { setError(null); setAttempt(value => value + 1); }}>Tentar novamente</Button></div>;
+  if (error) return <div role="alert" className="space-y-3 p-6 text-sm"><p>{error}</p><Button variant="outline" onClick={restart}>Tentar novamente</Button></div>;
   if (!scope) return <div role="status" aria-label="Carregando unidade" className="min-h-48 animate-pulse rounded-lg bg-muted" />;
   return <CompanyScopeContext.Provider value={scope}><QueryClientProvider client={queryClient}>{children}</QueryClientProvider></CompanyScopeContext.Provider>;
 }
@@ -45,6 +49,7 @@ export function CompanyScopeProvider(props: { companyId: string; userId: string;
 }
 
 function CompanyScopeLifetime({ companyId, userId, mode, ...props }: { companyId: string; userId: string; mode: CompanyAccessMode; initialProfile?: CompanyProfile; children: ReactNode }) {
+  const [attempt, setAttempt] = useState(0);
   const [resources, setResources] = useState<{ resource: ReturnType<typeof createCompanyClient>; queryClient: QueryClient } | null>(null);
   useEffect(() => {
     const resource = createCompanyClient(companyId, userId, mode);
@@ -54,9 +59,9 @@ function CompanyScopeLifetime({ companyId, userId, mode, ...props }: { companyId
     } } });
     setResources({ resource, queryClient });
     return () => { void queryClient.cancelQueries(); queryClient.clear(); resource.dispose(); };
-  }, [companyId, userId, mode]);
+  }, [companyId, userId, mode, attempt]);
   if (!resources) return <div role="status" aria-label="Carregando unidade" className="min-h-48 animate-pulse rounded-lg bg-muted" />;
-  return <ScopedContent {...props} {...resources} companyId={companyId} userId={userId} mode={mode} />;
+  return <ScopedContent key={attempt} {...props} initialProfile={attempt ? undefined : props.initialProfile} {...resources} companyId={companyId} userId={userId} mode={mode} restart={() => { setResources(null); setAttempt(value => value + 1); }} />;
 }
 
 export function GlobalCompanyBoundary({ children }: { children: ReactNode }) {

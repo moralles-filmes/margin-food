@@ -1,7 +1,7 @@
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { CursorListResponse, FinStatusCounts } from '@/types/financeiro';
-import { emitDataEvent, useDataEvent } from '@/lib/dataEvents';
+import { useEmitDataEvent, useDataEvent } from '@/lib/dataEvents';
 import { fmtBRL, formatDateBR, parseLocalDate } from '@/lib/formatters';
 import { useCan } from '@/permissions/hooks';
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { Plus, AlertTriangle, CheckCircle, Clock, Ban, FileDown, RefreshCw, Undo2, Search, X } from 'lucide-react';
 import { useFormDirtyGuard } from '@/hooks/useFormDirtyGuard';
 import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
@@ -83,6 +83,8 @@ interface ContasPagarSectionProps {
 }
 
 export default function ContasPagarSection({ initialStatus }: ContasPagarSectionProps = {}) {
+  const emitDataEvent = useEmitDataEvent();
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const canView = useCan('financeiro:pagar:view');
   const canCreate = useCan('financeiro:pagar:create');

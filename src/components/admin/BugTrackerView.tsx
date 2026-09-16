@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Bug, Plus, Loader2, AlertTriangle } from 'lucide-react';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { formatDateBR } from '@/lib/formatters';
 
 const MODULES = ['estoque','financeiro','compras','auth','relatorios','admin','edge','rh','planning','salmon','ficha_tecnica','geral'] as const;
@@ -51,6 +51,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function BugTrackerView() {
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const { user } = useAuth();
   const { companyId } = useCompanyId();

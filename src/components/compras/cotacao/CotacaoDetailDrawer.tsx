@@ -3,7 +3,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Pencil, Trash2, Package, Building2, Info, Table2, BarChart3, Wand2, ShoppingCart, PackageCheck, MessageCircle } from 'lucide-react';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { useCan } from '@/permissions/hooks';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { formatMoneyBR } from '@/lib/formatters';
@@ -33,6 +33,7 @@ interface CotacaoDetailDrawerProps {
 
 
 export default function CotacaoDetailDrawer({ cotacao, store, onClose, onEdit, onDeleted }: CotacaoDetailDrawerProps) {
+  const toast = useScopedToast();
   const canEdit = useCan('compras:cotacao:edit');
   const canDelete = useCan('compras:cotacao:delete');
   const canConvert = useCan('compras:cotacao:close'); // "converter em pedido" mapeia para close
@@ -52,7 +53,7 @@ export default function CotacaoDetailDrawer({ cotacao, store, onClose, onEdit, o
     } finally {
       setLoading(false);
     }
-  }, [store]);
+  }, [store, toast]);
 
   useEffect(() => {
     if (cotacao) { setDetail(null); load(cotacao.id); }

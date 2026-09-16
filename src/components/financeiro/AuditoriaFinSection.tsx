@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { parseUTCToBR } from '@/lib/formatters';
 import { RefreshCw, Shield, Search, FileDown, Ban, ChevronDown, ChevronRight, Plus, Pencil, Trash2, Users } from 'lucide-react';
 import { useCan } from '@/permissions/hooks';
@@ -151,6 +151,7 @@ function entidadeToRoute(entidade: string, entidade_id: string | null): string |
 }
 
 export default function AuditoriaFinSection() {
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const canView = useCan('financeiro:auditoria:view');
   const canExport = useCan('financeiro:auditoria:export');
@@ -234,7 +235,7 @@ export default function AuditoriaFinSection() {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [canView, loadingMore, loading, items.length, filtroEntidade, filtroAcao, busca, dias, cursorCreatedAt, cursorId, supabase]);
+  }, [canView, loadingMore, loading, items.length, filtroEntidade, filtroAcao, busca, dias, cursorCreatedAt, cursorId, supabase, toast]);
 
   const reload = useCallback(() => {
     setCursorCreatedAt(null);

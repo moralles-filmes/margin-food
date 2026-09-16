@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Send, RefreshCw, Check, AlertTriangle, Clock, MessageCircle, Sparkles } from 'lucide-react';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { useCan } from '@/permissions';
 import { buildTemplateContext, renderTemplate, WHATSAPP_TIPO_LABEL } from '@/lib/cotacaoTemplates';
 import type { useCotacoesStore } from '@/hooks/useCotacoesStore';
@@ -28,6 +28,7 @@ function logIcon(status: string) {
 }
 
 export default function CotacaoWhatsappPanel({ cotacao, itens, fornecedores, store, onChanged }: Props) {
+  const toast = useScopedToast();
   const canSend = useCan('compras:cotacao:manage');
   const [fornId, setFornId] = useState<string>(fornecedores[0]?.id ?? '');
   const [tipo, setTipo] = useState<CotacaoWhatsappTipo>('SOLICITACAO_COTACAO');

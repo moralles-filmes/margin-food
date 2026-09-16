@@ -5,7 +5,7 @@ import { Warehouse, Droplets, Clock, Settings2, Check, AlertTriangle, Zap } from
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { DecimalInput, parseDecimal } from '@/components/ui/decimal-input';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import PeriodFilter, { PeriodRange, getDefaultRange, filterByPeriod } from './PeriodFilter';
 import ValidadeAlertCard from './ValidadeAlertCard';
 
@@ -15,6 +15,7 @@ interface StockViewProps {
 }
 
 export default function StockView({ store, onStartManipulation }: StockViewProps) {
+  const toast = useScopedToast();
   const { stock, stockConfig, setStockConfig, avgDailyConsumption, daysRemaining, entries, manipulations, staleLots, lotesLimpos } = store;
   const [period, setPeriod] = useState<PeriodRange>(getDefaultRange());
   const [showConfig, setShowConfig] = useState(false);

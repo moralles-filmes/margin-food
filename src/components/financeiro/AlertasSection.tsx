@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { useCan } from '@/permissions/hooks';
 import { AlertTriangle, Bell, Clock, RefreshCw, ExternalLink, ShieldX, Download } from 'lucide-react';
 import { fmtBRL } from '@/lib/money';
@@ -86,6 +86,7 @@ function SkeletonCards() {
 }
 
 export default function AlertasSection({ onNavigate }: Props) {
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const canView = useCan('financeiro:alertas:view');
   const canExport = useCan('financeiro:alertas:export');
@@ -226,7 +227,7 @@ export default function AlertasSection({ onNavigate }: Props) {
       toast.error('Erro inesperado ao carregar alertas');
     }
     setLoading(false);
-  }, [supabase]);
+  }, [supabase, toast]);
 
   useEffect(() => { if (canView) load(); }, [load, canView]);
 

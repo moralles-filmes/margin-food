@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Slider } from '@/components/ui/slider';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import ProductSearchCombobox, { type ProductOption } from '@/components/ui/ProductSearchCombobox';
 import { LoteSalmaoLimpo } from '@/types/salmon';
 import { DecimalInput, parseDecimal } from '@/components/ui/decimal-input';
@@ -219,6 +219,7 @@ function NivelTable({ tipo, tipoLabel, tipoIcon, componentes, canCreate, canEdit
 // MAIN VIEW
 // ============================================================
 export default function FichaTecnicaView({ lotesLimpos = [] }: { lotesLimpos?: LoteSalmaoLimpo[] }) {
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const { confirm, ConfirmDialog } = useConfirmDialog();
   const { visibleSubtabs, canView } = useModuleAccess('ficha');
@@ -300,7 +301,7 @@ export default function FichaTecnicaView({ lotesLimpos = [] }: { lotesLimpos?: L
       toast.error(e.message);
     }
     setLoading(false);
-  }, [supabase, listarTodosComponentes]);
+  }, [supabase, listarTodosComponentes, toast]);
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
@@ -563,6 +564,7 @@ function ComponenteFormDialog({ open, onClose, componente, forcedTipo, component
   open: boolean; onClose: () => void; componente: Componente | null; forcedTipo: ComponenteTipo | null;
   componentes: Componente[]; produtos: any[]; salmonRef: SalmonRef; onSaved: () => void;
 }) {
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const [form, setForm] = useState({
     tipo: 'PRE_PREPARO' as ComponenteTipo,
@@ -900,6 +902,7 @@ function ComponenteFormDialog({ open, onClose, componente, forcedTipo, component
 function CanalFormDialog({ open, onClose, canal, onSaved }: {
   open: boolean; onClose: () => void; canal: Canal | null; onSaved: () => void;
 }) {
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const [form, setForm] = useState({ nome: '', taxa_percentual: '0', taxa_fixa: '0', imposto_percent: '0', custo_embalagem_adicional: '0' });
   const [saving, setSaving] = useState(false);
@@ -1061,6 +1064,7 @@ function DetalheDialog({ open, onClose, componente, itens, custo }: {
 function PrecificacaoDialog({ open, onClose, componente, canais, onSaved }: {
   open: boolean; onClose: () => void; componente: Componente; canais: Canal[]; onSaved: () => void;
 }) {
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const [precos, setPrecos] = useState<Record<string, string>>({});
   const [analise, setAnalise] = useState<any[]>([]);
@@ -1074,7 +1078,7 @@ function PrecificacaoDialog({ open, onClose, componente, canais, onSaved }: {
       setPrecos(map);
       setAnalise(sortByName<any>(res.analise || [], a => a.canalNome));
     }).catch(e => toast.error(e.message));
-  }, [componente, canais, supabase]);
+  }, [componente, canais, supabase, toast]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -1158,6 +1162,7 @@ function PrecificacaoDialog({ open, onClose, componente, canais, onSaved }: {
 function SimuladorDialog({ open, onClose, componente, canais }: {
   open: boolean; onClose: () => void; componente: Componente; canais: Canal[];
 }) {
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const [ajusteCusto, setAjusteCusto] = useState(0);
   const [ajustePerda, setAjustePerda] = useState(Number(componente.perda_estimada_percent) || 0);
@@ -1362,6 +1367,7 @@ function MarkupExplicacao() {
 function SalmonConfigDialog({ open, onClose, salmonRef, isAdmin, onSaved }: {
   open: boolean; onClose: () => void; salmonRef: SalmonRef; isAdmin: boolean; onSaved: () => void;
 }) {
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const [manualPrice, setManualPrice] = useState(String(salmonRef.preco_manual || ''));
   const [saving, setSaving] = useState(false);

@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import TableActions from '@/components/ui/TableActions';
 import { Building2, Plus, Loader2, Users, RefreshCw, UserPlus } from 'lucide-react';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { sortByName } from '@/lib/sortByName';
 
 interface Company {
@@ -32,6 +32,7 @@ function extractEdgeFnError(data: any, error: any): string {
 }
 
 export default function AdminCompaniesView() {
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const { user } = useAuth();
   const canCreate = useCan('configuracoes:empresas:create');

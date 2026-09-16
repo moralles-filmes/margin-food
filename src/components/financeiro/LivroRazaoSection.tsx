@@ -2,9 +2,9 @@ import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { Fragment, useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCan } from '@/permissions';
-import { emitDataEvent, useDataEvent } from '@/lib/dataEvents';
+import { useEmitDataEvent, useDataEvent } from '@/lib/dataEvents';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { fmtBRL, formatDateBR, formatDateValueBR, todayBR, parseLocalDate } from '@/lib/formatters';
 import { formatDateISO, formatInBR } from '@/lib/datetime';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
@@ -115,6 +115,8 @@ function capitalizeFirst(text: string): string {
 }
 
 export default function LivroRazaoSection({ initialContaId, initialDateFrom, initialDateTo, initialTipo }: LivroRazaoProps = {}) {
+  const emitDataEvent = useEmitDataEvent();
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const callUntypedRpc = supabase.rpc.bind(supabase) as unknown as UntypedRpc;
   const { user } = useAuth();

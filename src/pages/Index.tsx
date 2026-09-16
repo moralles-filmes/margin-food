@@ -23,7 +23,7 @@ const RhView = lazy(() => import('@/components/RhView'));
 const FinanceiroView = lazy(() => import('@/components/FinanceiroView'));
 import { Button } from '@/components/ui/button';
 import { RefreshCw, LogOut, AlertTriangle, ShieldAlert } from 'lucide-react';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { useMentionToast } from '@/hooks/useMentionToast';
 import { useModuleAccess } from '@/permissions/hooks';
 
@@ -52,6 +52,7 @@ const TAB_PRIORITY: TabId[] = [
 ];
 
 const Index = () => {
+  const toast = useScopedToast();
   const { user, loading, permissionState, permissionError, retryPermissions, signOut, hasPermission, effectivePermissions } = useAuth();
   
   // Build module access for all tabs
@@ -120,7 +121,7 @@ const Index = () => {
       toast.error('Sem permissão para acessar este módulo.');
       setActiveTab(defaultTab);
     }
-  }, [permissionState, activeTab, canAccessTab, defaultTab]);
+  }, [permissionState, activeTab, canAccessTab, defaultTab, toast]);
 
   // Guard tab changes
   const handleTabChange = useCallback((tab: TabId) => {
@@ -130,7 +131,7 @@ const Index = () => {
       toast.error('Sem permissão para acessar este módulo.');
       setActiveTab(defaultTab);
     }
-  }, [canAccessTab, defaultTab]);
+  }, [canAccessTab, defaultTab, toast]);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -185,7 +186,7 @@ const Index = () => {
     }
 
     setActiveTab('compras');
-  }, [location.pathname, permissionState, canAccessTab, navigate]);
+  }, [location.pathname, permissionState, canAccessTab, navigate, toast]);
 
   useEffect(() => {
     if (permissionState !== 'READY' || !location.pathname.startsWith('/financeiro/')) return;
@@ -195,7 +196,7 @@ const Index = () => {
       return;
     }
     setActiveTab('financeiro');
-  }, [location.pathname, permissionState, canAccessTab, navigate, setActiveTab]);
+  }, [location.pathname, permissionState, canAccessTab, navigate, setActiveTab, toast]);
 
   useEffect(() => {
     const handleOnline = () => setIsOffline(false);

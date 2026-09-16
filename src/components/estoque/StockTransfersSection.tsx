@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import SearchableSelect from '@/components/ui/SearchableSelect';
 import { Badge } from '@/components/ui/badge';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { ArrowRight, ArrowLeftRight, Loader2, Package, MapPin, RefreshCw } from 'lucide-react';
 import { format, subDays } from 'date-fns';
 import { fmtBRL, formatFixedBR } from '@/lib/formatters';
@@ -38,6 +38,7 @@ interface Props {
 
 export default function StockTransfersSection({
  categorias, locais }: Props) {
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const canViewRbac = useCan('estoque:transferencias:view');
   const store = useEstoqueGeralStoreContext();
@@ -95,7 +96,7 @@ export default function StockTransfersSection({
       setTotalCount(result.total || 0);
     }
     setLoading(false);
-  }, [period, filterProduct, filterLocation, supabase]);
+  }, [period, filterProduct, filterLocation, supabase, toast]);
 
   useEffect(() => {
     fetchTransfers(0);

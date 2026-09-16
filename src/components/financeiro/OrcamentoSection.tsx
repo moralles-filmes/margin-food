@@ -9,13 +9,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import StatusBadge from '@/components/ui/StatusBadge';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { subMonths } from 'date-fns';
 import {
   Target, ChevronRight, ChevronDown, Trash2, FileDown, FileSpreadsheet,
   Copy, Loader2, ShieldAlert, Lock, Save,
 } from 'lucide-react';
-import { useDataEvent, emitDataEvent } from '@/lib/dataEvents';
+import { useDataEvent, useEmitDataEvent } from '@/lib/dataEvents';
 import { useCan } from '@/permissions/hooks';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import jsPDF from 'jspdf';
@@ -122,6 +122,8 @@ function NoAccess() {
 // ─── Component ───
 
 export default function OrcamentoSection() {
+  const emitDataEvent = useEmitDataEvent();
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const [categorias, setCategorias] = useState<Omit<CatNode, 'children'>[]>([]);
   const [orcamentos, setOrcamentos] = useState<OrcamentoRow[]>([]);
@@ -176,7 +178,7 @@ export default function OrcamentoSection() {
       toast.error('Erro ao carregar orçamento');
     }
     setLoading(false);
-  }, [mesAtual, supabase]);
+  }, [mesAtual, supabase, toast]);
 
   useEffect(() => { load(); }, [load]);
 

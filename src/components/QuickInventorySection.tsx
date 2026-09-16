@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { Search, Loader2, ClipboardCheck, Package, CheckCircle, AlertTriangle, Zap, RotateCcw } from 'lucide-react';
 import { fmtBRL } from '@/lib/formatters';
 import { normalizeSearchText } from '@/lib/utils';
@@ -31,6 +31,7 @@ interface ProductRow {
 }
 
 export default function QuickInventorySection() {
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const canViewRbac = useCan('inventario:rapido:view');
   // Product search
@@ -132,7 +133,7 @@ export default function QuickInventorySection() {
     } finally {
       addingIds.current.delete(product.id);
     }
-  }, [supabase]);
+  }, [supabase, toast]);
 
   // Update counted quantity
   const updateCount = useCallback((productId: string, qty: string) => {

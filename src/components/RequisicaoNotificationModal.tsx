@@ -12,11 +12,12 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useNotificationsContext } from '@/contexts/NotificationsContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 
 const AUTH_ROUTES = ['/login', '/reset-password'];
 
 export default function RequisicaoNotificationModal() {
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const { user } = useAuth();
   const location = useLocation();

@@ -3,7 +3,7 @@ import { withCompanyId } from '@/lib/companyPayload';
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -97,6 +97,7 @@ const FASE_LABELS: Record<string, string> = {
 
 export default function OnboardingSection({
  colaboradores, canManage }: Props) {
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const { companyId } = useCompanyId();
   const canViewRbac = useCan('rh:onboarding:view');

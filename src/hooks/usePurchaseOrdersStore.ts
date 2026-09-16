@@ -3,8 +3,8 @@ import { withCompanyId } from '@/lib/companyPayload';
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { toast } from 'sonner';
-import { emitDataEvent } from '@/lib/dataEvents';
+import { useScopedToast } from '@/hooks/useScopedToast';
+import { useEmitDataEvent } from '@/lib/dataEvents';
 import { includesNormalized } from '@/lib/utils';
 
 export interface PurchaseOrder {
@@ -102,6 +102,8 @@ function matchesPurchaseOrderSearch(order: PurchaseOrder, search: string): boole
 }
 
 export function usePurchaseOrdersStore() {
+  const emitDataEvent = useEmitDataEvent();
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const { companyId } = useCompanyId();
   const { user } = useAuth();
@@ -313,7 +315,7 @@ export function usePurchaseOrdersStore() {
     } finally {
       setSaving(false);
     }
-  }, [companyId, user, saving, supabase, fetchOrders]);
+  }, [companyId, user, saving, supabase, fetchOrders, toast]);
 
   // ===== SHOPPING CHECKLIST FUNCTIONS =====
   const updateShoppingItem = useCallback(async (
@@ -383,7 +385,7 @@ export function usePurchaseOrdersStore() {
     await fetchOrders();
     toast.success('Compra confirmada! Pedido enviado para Recebimento.');
     emitDataEvent('compras:pedidos');
-  }, [companyId, user, fetchItems, supabase, orders, fetchOrders]);
+  }, [companyId, user, fetchItems, supabase, orders, fetchOrders, emitDataEvent, toast]);
 
   // ===== RECEIVING FUNCTIONS =====
   const receiveItem = useCallback(async (
@@ -481,7 +483,7 @@ export function usePurchaseOrdersStore() {
     toast.success(newStatus === 'COMPLETED' ? 'Pedido concluído! Estoque atualizado.' : 'Recebimento parcial registrado. Itens não entregues pendentes.');
     emitDataEvent('compras:pedidos');
     emitDataEvent('estoque:movimentacoes');
-  }, [companyId, user, fetchItems, supabase, fetchOrders, orders]);
+  }, [companyId, user, fetchItems, supabase, fetchOrders, orders, emitDataEvent, toast]);
 
   const finalizePartialItem = useCallback(async (itemId: string, qtyReceived: number) => {
     if (!user) return;
@@ -515,7 +517,7 @@ export function usePurchaseOrdersStore() {
     toast.success(newStatus === 'COMPLETED' ? 'Todos os itens recebidos! Pedido concluído.' : 'Item recebido e estoque atualizado.');
     emitDataEvent('compras:pedidos');
     emitDataEvent('estoque:movimentacoes');
-  }, [user, supabase, fetchOrders]);
+  }, [user, supabase, fetchOrders, emitDataEvent, toast]);
 
   const updateOrderStatus = useCallback(async (orderId: string, status: string) => {
     await supabase.from('purchase_orders').update({
@@ -535,7 +537,7 @@ export function usePurchaseOrdersStore() {
     await fetchOrders();
     toast.success('Pedido cancelado.');
     emitDataEvent('compras:pedidos');
-  }, [user, supabase, fetchOrders]);
+  }, [user, supabase, fetchOrders, emitDataEvent, toast]);
 
   // ===== W2: ATOMIC editOrder via RPC =====
   const editOrder = useCallback(async (
@@ -605,7 +607,7 @@ export function usePurchaseOrdersStore() {
     } finally {
       setSaving(false);
     }
-  }, [companyId, user, saving, supabase, fetchOrders]);
+  }, [companyId, user, saving, supabase, fetchOrders, emitDataEvent, toast]);
 
   const deleteOrder = useCallback(async (orderId: string) => {
     if (!user) return false;
@@ -643,7 +645,7 @@ export function usePurchaseOrdersStore() {
     emitDataEvent('compras:pedidos');
     if (hasReceived) emitDataEvent('estoque:movimentacoes');
     return true;
-  }, [user, fetchItems, supabase, fetchOrders]);
+  }, [user, fetchItems, supabase, fetchOrders, emitDataEvent, toast]);
 
   // Counts
   const pendingCount = orders.filter(o => o.status === 'PENDING').length;
@@ -675,7 +677,7 @@ export function usePurchaseOrdersStore() {
 
     await fetchOrders();
     toast.success('Ciência registrada.');
-  }, [user, supabase, fetchOrders]);
+  }, [user, supabase, fetchOrders, toast]);
 
   return {
     orders, loading, saving, errorMessage, hasMore, loadMore, filters, applyFilters,

@@ -1,9 +1,10 @@
 import { useSupabase, useCompanyScope } from '@/contexts/CompanyScopeContext';
 import { useEffect, useRef } from 'react';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 
 
 export function useMentionToast(userId: string | undefined, onNavigate: () => void) {
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const companyId = useCompanyScope()?.companyId;
   const sessionKey = `mentions_toast_last_shown_at:${userId}:${companyId}`;
@@ -48,7 +49,7 @@ export function useMentionToast(userId: string | undefined, onNavigate: () => vo
 
     checkMentions();
     return () => { active = false; };
-  }, [userId, companyId, supabase, onNavigate, sessionKey]);
+  }, [userId, companyId, supabase, onNavigate, sessionKey, toast]);
 
   // Realtime: listen for new notifications
   useEffect(() => {
@@ -86,5 +87,5 @@ export function useMentionToast(userId: string | undefined, onNavigate: () => vo
       active = false;
       supabase.removeChannel(channel);
     };
-  }, [userId, companyId, supabase, onNavigate, sessionKey]);
+  }, [userId, companyId, supabase, onNavigate, sessionKey, toast]);
 }

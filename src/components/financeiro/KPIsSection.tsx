@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { RefreshCw, TrendingUp, TrendingDown, Clock, AlertTriangle, DollarSign, BarChart3, Users, Calendar, FileDown, Ban } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { fmtBRL, formatPercentBR, formatIntegerBR } from '@/lib/formatters';
@@ -72,6 +72,7 @@ function formatMesLabel(mes: string): string {
 }
 
 export default function KPIsSection() {
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const canView = useCan('financeiro:kpis:view');
   const canExport = useCan('financeiro:kpis:export');
@@ -129,7 +130,7 @@ export default function KPIsSection() {
       setErrorState(true);
     }
     setLoading(false);
-  }, [canView, loading, meses, supabase]);
+  }, [canView, loading, meses, supabase, toast]);
 
   // Auto-load
   useEffect(() => { load(); }, [meses]);

@@ -16,7 +16,7 @@ import { DecimalInput, parseDecimal } from '@/components/ui/decimal-input';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import KpiCard from '@/components/ui/KpiCard';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { normalizeBRLMoneyToNumber } from '@/lib/money';
 
 // Map internal subtab keys to module registry keys
@@ -50,6 +50,7 @@ interface Props {
 }
 
 export default function ConfiguracoesView({ store, initialSubTab }: Props) {
+  const toast = useScopedToast();
   const [activeView, setActiveView] = useState<SubView>(initialSubTab ?? 'geral');
   const { stockConfig, setStockConfig } = store;
   const { visibleSubtabs } = useModuleAccess('configuracoes');

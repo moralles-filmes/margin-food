@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Stethoscope, Copy, CheckCircle2, XCircle, MinusCircle, ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 
 interface CheckupSection {
   status: 'PASS' | 'FAIL' | 'SKIPPED';
@@ -64,6 +64,7 @@ function SectionRow({ title, status, children }: { title: string; status: string
 }
 
 function DetailRenderer({ details }: { details: Record<string, unknown> }) {
+  const toast = useScopedToast();
   // Render tables array (rls, policies, rpcs)
   if (details.tables && Array.isArray(details.tables)) {
     return (
@@ -210,6 +211,7 @@ function DetailRenderer({ details }: { details: Record<string, unknown> }) {
 }
 
 export default function CheckupSuiteCard() {
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<CheckupResult | null>(null);

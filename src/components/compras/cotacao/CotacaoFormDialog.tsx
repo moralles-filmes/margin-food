@@ -9,7 +9,7 @@ import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
 import { useFormDirtyGuard } from '@/hooks/useFormDirtyGuard';
 import { useEstoqueGeralStoreContext } from '@/contexts/EstoqueGeralStoreContext';
 import { useSalmonStoreContext } from '@/contexts/SalmonStoreContext';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { Plus, X, Package, Building2, Download, PencilLine } from 'lucide-react';
 import { includesNormalized } from '@/lib/utils';
 import { formatMoneyBR } from '@/lib/formatters';
@@ -31,6 +31,7 @@ interface CotacaoFormDialogProps {
 const emptyHeader = { titulo: '', observacao: '', dataValidade: '' };
 
 export default function CotacaoFormDialog({ open, onOpenChange, store, editing, editingDetail, onSaved }: CotacaoFormDialogProps) {
+  const toast = useScopedToast();
   const estoque = useEstoqueGeralStoreContext();
   const salmon = useSalmonStoreContext();
 
@@ -122,7 +123,7 @@ export default function CotacaoFormDialog({ open, onOpenChange, store, editing, 
     });
     setImportOpen(false);
     toast.success(`${imported.length} item(ns) importado(s)`);
-  }, []);
+  }, [toast]);
 
   const removeItem = (idx: number) => setItens(prev => prev.filter((_, i) => i !== idx));
   const setItemQty = (idx: number, v: string) =>

@@ -15,7 +15,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import SearchableSelect from '@/components/ui/SearchableSelect';
 import { fmtBRL, formatFixedBR } from '@/lib/formatters';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { TenantError } from '@/lib/tenant';
 import { extractSupabaseErrorMessage } from '@/lib/supabaseErrors';
 import type { Produto } from '@/types/salmon';
@@ -63,6 +63,7 @@ export default function ProdutoFormPanel({
   batchMode, setBatchMode, saving, setSaving,
   onClose, onSave, onUpdate, addProduto, updateProduto,
 }: ProdutoFormPanelProps) {
+  const toast = useScopedToast();
   const prodNameInputRef = useRef<HTMLInputElement>(null);
   const didFocusRef = useRef(false);
 

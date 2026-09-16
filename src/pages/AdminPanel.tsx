@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ShieldAlert, RefreshCw, Database, User, Shield, Wrench, Play, Trash2, Bug, ArrowLeft, Building2 } from 'lucide-react';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import CheckupSuiteCard from '@/components/admin/CheckupSuiteCard';
 import AccessManagementCard from '@/components/admin/AccessManagementCard';
 import BugTrackerView, { useCriticalBugCount } from '@/components/admin/BugTrackerView';
@@ -37,6 +37,7 @@ function useRpcRunner() {
 }
 
 export default function AdminPanel() {
+  const toast = useScopedToast();
   const { user, profile } = useAuth();
   const navigate = useNavigate();
   const canAccess = useCan('system:global:manage');

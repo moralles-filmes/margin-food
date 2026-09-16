@@ -15,7 +15,7 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@
 import StatusBadge from '@/components/ui/StatusBadge';
 import TableActions from '@/components/ui/TableActions';
 import { UserPlus, Shield, Ban, CheckCircle, Loader2, Pencil, KeyRound, Power, Trash2, Briefcase, Plus } from 'lucide-react';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
@@ -56,6 +56,7 @@ const ALL_ROLES = [
 ];
 
 export default function AdminUsersView() {
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const { user, rolesLoaded } = useAuth();
   const { confirm, ConfirmDialog } = useConfirmDialog();
@@ -173,7 +174,7 @@ export default function AdminUsersView() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   const fetchJobRoles = useCallback(async () => {
     try {
@@ -184,7 +185,7 @@ export default function AdminUsersView() {
       console.error('[fetchJobRoles]', e);
       toast.error('Erro ao carregar cargos. Recarregue a página se o dropdown de cargos estiver vazio.');
     }
-  }, [supabase]);
+  }, [supabase, toast]);
 
   const fetchRolePermissions = useCallback(async () => {
     try {
@@ -218,7 +219,7 @@ export default function AdminUsersView() {
       console.error('[fetchRolePermissions]', e);
       toast.error('Erro ao carregar permissões dos perfis. Recarregue a página.');
     }
-  }, [supabase]);
+  }, [supabase, toast]);
 
   const fetchAll = useCallback(async () => {
     await Promise.all([

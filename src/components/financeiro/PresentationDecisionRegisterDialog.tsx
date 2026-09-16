@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import {
   buildPresentationDecisionSnapshot,
   assertPresentationResponsibleInTenant,
@@ -98,6 +98,7 @@ export default function PresentationDecisionRegisterDialog({
   profiles,
   onCreated,
 }: Props) {
+  const toast = useScopedToast();
   const [draft, setDraft] = useState<RegistrationDraft>(() => createInitialDraft(defaultMode));
   const [hydrated, setHydrated] = useState(false);
   const mutations = usePresentationDecisionMutations(companyId);

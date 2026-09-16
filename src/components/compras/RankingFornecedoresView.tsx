@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import SearchableSelect from '@/components/ui/SearchableSelect';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { fmtBRL, formatDateBR, normalizeBRLMoneyToNumber } from '@/lib/formatters';
 import { Crown, Award, Medal, Search, Plus, Inbox, ArrowUp, BarChart3, Loader2, ChevronDown } from 'lucide-react';
 
@@ -37,6 +37,7 @@ interface RankingRow {
 type RankingTab = 'cheapest' | 'expensive' | 'by-item' | 'by-category';
 
 export default function RankingFornecedoresView() {
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const canViewRbac = useCan('compras:ranking:view');
   const canEditPrices = useCan('compras:fornecedores:edit');

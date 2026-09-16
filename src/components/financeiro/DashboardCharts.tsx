@@ -8,7 +8,7 @@ import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, R
 import { subMonths, startOfMonth, endOfMonth, subDays } from 'date-fns';
 import { formatDateISO, formatInBR } from '@/lib/datetime';
 import { fmtBRL, formatDecimalBR } from '@/lib/formatters';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { AlertTriangle } from 'lucide-react';
 import {
   axisProps,
@@ -55,6 +55,7 @@ interface DashboardChartsProps {
 }
 
 export default function DashboardCharts({ periodStart, periodEndExclusive }: DashboardChartsProps) {
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const canViewRbac = useCan('financeiro:dashboard:view');
   const [chartData, setChartData] = useState<ChartsData | null>(null);
@@ -108,7 +109,7 @@ export default function DashboardCharts({ periodStart, periodEndExclusive }: Das
       })),
     });
     setLoading(false);
-  }, [meses, periodEndExclusive, supabase, periodStart]);
+  }, [meses, periodEndExclusive, supabase, periodStart, toast]);
 
   loadRef.current = load;
 

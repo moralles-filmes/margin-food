@@ -1,6 +1,9 @@
 import { useSupabase } from '@/contexts/CompanyScopeContext';
+import { useCompanyId } from '@/hooks/useCompanyId';
+import { useScopeActivity } from '@/hooks/useScopeActivity';
+import { bankDraftScope } from '@/lib/bankDraftScope';
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { emitDataEvent } from '@/lib/dataEvents';
+import { useEmitDataEvent } from '@/lib/dataEvents';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,7 +20,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
 import { parseExtrato, verifyContaExtrato, decodeExtratoBuffer, type ExtratoConta } from '@/lib/extratoParser';
 import { useAuth } from '@/contexts/AuthContext';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { Upload, CheckCircle, Save, RefreshCw, ArrowRight, Receipt, Plus, Trash2, PieChart, ArrowRightLeft, Search, CreditCard, FileText, EyeOff, X, AlertTriangle, Edit, RotateCcw } from 'lucide-react';
 import CriarLancamentoExtratoDialog from '@/components/financeiro/CriarLancamentoExtratoDialog';
 import CategoryCombobox from '@/components/financeiro/CategoryCombobox';
@@ -202,12 +205,19 @@ function fitidsDasLinhas(linhas: Pick<LinhaExtrato, 'tipo' | 'fitId'>[]): Set<st
 }
 
 export default function ConciliacaoBancariaSection() {
+  const emitDataEvent = useEmitDataEvent();
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const canViewRbac = useCan('financeiro:conciliacao:view');
   const canReconcileRbac = useCan('financeiro:conciliacao:reconcile');
   const { user } = useAuth();
+  const { companyId } = useCompanyId();
+  const isScopeActive = useScopeActivity();
   const [contas, setContas] = useState<ContaBancariaRef[]>([]);
   const [contaSel, setContaSel] = useState('');
+  const draftKey = bankDraftScope(user?.id, companyId, contaSel);
+  const currentAccount = useRef(contaSel);
+  currentAccount.current = contaSel;
   const [loading, setLoading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const [nomeArquivo, setNomeArquivo] = useState<string>('');
@@ -330,9 +340,11 @@ export default function ConciliacaoBancariaSection() {
 
   // Wrapper: atualiza state e persiste no sessionStorage
   const setLinhas = (updater: LinhaExtrato[] | ((prev: LinhaExtrato[]) => LinhaExtrato[])) => {
+    if (!isScopeActive() || currentAccount.current !== contaSel) return;
     setLinhasState(prev => {
+      if (!isScopeActive() || currentAccount.current !== contaSel) return prev;
       const next = typeof updater === 'function' ? updater(prev) : updater;
-      if (contaSel) saveLinhas(contaSel, next);
+      if (draftKey) saveLinhas(draftKey, next);
       return next;
     });
   };
@@ -369,8 +381,8 @@ export default function ConciliacaoBancariaSection() {
       setSaldoExtrato(null);
       return;
     }
-    setSaldoExtrato(loadSaldoExtrato(contaSel));
-    const saved = loadLinhas(contaSel);
+    setSaldoExtrato(draftKey ? loadSaldoExtrato(draftKey) : null);
+    const saved = draftKey ? loadLinhas(draftKey) : null;
     if (saved && saved.length > 0) {
       setLinhasState(saved);
       if (view !== 'importar') setView('importar');
@@ -380,7 +392,7 @@ export default function ConciliacaoBancariaSection() {
     } else {
       setLinhasState([]);
     }
-  }, [contaSel]);
+  }, [contaSel, draftKey]);
 
   // Recalcula a conferência de saldo sempre que as linhas mudam (processar,
   // ignorar, desconciliar). Debounce curto para agrupar mutações em sequência.
@@ -390,11 +402,13 @@ export default function ConciliacaoBancariaSection() {
       setDiaDivergencia(null);
       return;
     }
+    let active = true;
     const t = setTimeout(async () => {
       const { data, error } = await supabase.rpc('get_fin_saldo_conta_em', {
         p_conta_id: contaSel,
         p_data: saldoExtrato.data,
       });
+      if (!active || !isScopeActive()) return;
       if (error) {
         console.error('[ConciliacaoBancariaSection.conferenciaSaldo]', error);
         return;
@@ -412,14 +426,15 @@ export default function ConciliacaoBancariaSection() {
         return;
       }
       try {
-        setDiaDivergencia(await localizarDiaDivergencia(supabase, contaSel, saldoExtrato, linhas));
+        const divergence = await localizarDiaDivergencia(supabase, contaSel, saldoExtrato, linhas);
+        if (active && isScopeActive()) setDiaDivergencia(divergence);
       } catch (err) {
         console.error('[ConciliacaoBancariaSection.diaDivergencia]', err);
-        setDiaDivergencia(null);
+        if (active && isScopeActive()) setDiaDivergencia(null);
       }
     }, 600);
-    return () => clearTimeout(t);
-  }, [contaSel, saldoExtrato, linhas, supabase]);
+    return () => { active = false; clearTimeout(t); };
+  }, [contaSel, saldoExtrato, linhas, supabase, isScopeActive]);
 
   useEffect(() => {
     if (contaSel && view === 'conciliar') loadLancamentos();
@@ -1459,8 +1474,8 @@ export default function ConciliacaoBancariaSection() {
     setSaldoExtrato(null);
     setConferenciaSaldo(null);
     setLinhasAntigasAusentes([]);
-    if (contaSel) clearSaldoExtrato(contaSel);
-    if (contaSel) clearLinhas(contaSel);
+    if (draftKey) clearSaldoExtrato(draftKey);
+    if (draftKey) clearLinhas(draftKey);
   };
 
   // ========== Ignorar linha ==========
@@ -3588,7 +3603,7 @@ export default function ConciliacaoBancariaSection() {
             // pós-processamento (banner verde/vermelho acima da lista).
             setSaldoExtrato(saldoConfirmado);
             if (contaSel) {
-              saveSaldoExtrato(contaSel, saldoConfirmado);
+              if (draftKey && isScopeActive()) saveSaldoExtrato(draftKey, saldoConfirmado);
               emitDataEvent('financeiro:conciliacao');
             }
             setLoading(true);

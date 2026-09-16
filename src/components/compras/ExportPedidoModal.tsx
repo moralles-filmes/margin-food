@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { FileDown, Copy, FileText } from 'lucide-react';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { PurchaseOrder, PurchaseOrderItem } from '@/hooks/usePurchaseOrdersStore';
 import { gerarPDFPedidoFornecedor } from '@/lib/pdfPedidoFornecedor';
 import { fmtBRL, formatDateBR, formatDateValueBR, formatFixedBR } from '@/lib/formatters';
@@ -18,6 +18,7 @@ interface Props {
 }
 
 export default function ExportPedidoModal({ open, onOpenChange, order, items }: Props) {
+  const toast = useScopedToast();
   const [includePrice, setIncludePrice] = useState(false);
   const [extraNotes, setExtraNotes] = useState('');
 

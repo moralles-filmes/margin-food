@@ -16,7 +16,7 @@ import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useCan } from '@/permissions';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -53,6 +53,7 @@ function NoAccess() {
 }
 
 export default function AlertasFaltaEstoqueView() {
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const canViewAlertas = useCan('compras:alertas_falta:view');
   const canViewPedidos = useCan('compras:pedidos:view');
@@ -92,7 +93,7 @@ export default function AlertasFaltaEstoqueView() {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, supabase]);
+  }, [statusFilter, supabase, toast]);
 
   useEffect(() => { load(); }, [load]);
 

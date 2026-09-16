@@ -1,6 +1,6 @@
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect } from 'react';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { useInventarioStore, Inventario } from '@/hooks/useInventarioStore';
 import { useQuantityNavigation } from '@/hooks/useQuantityNavigation';
 import InventoryItemRow from './inventario/InventoryItemRow';
@@ -44,6 +44,7 @@ const tipoDisplayLabel = (tipo: string) => {
 };
 
 export default function InventarioView() {
+  const toast = useScopedToast();
   const store = useInventarioStore();
   const quantityNavigation = useQuantityNavigation();
   const { visibleSubtabs } = useModuleAccess('inventario');

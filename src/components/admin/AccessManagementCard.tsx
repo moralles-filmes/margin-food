@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Users, ShieldCheck, ShieldOff, History, UserPlus } from 'lucide-react';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { parseUTCToBR } from '@/lib/datetime';
 import { sortByName } from '@/lib/sortByName';
 
@@ -28,6 +28,7 @@ interface AuditEntry {
 }
 
 export default function AccessManagementCard() {
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const { user } = useAuth();
   const [users, setUsers] = useState<UserItem[]>([]);
@@ -64,7 +65,7 @@ export default function AccessManagementCard() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   const fetchAudit = useCallback(async () => {
     try {
@@ -79,7 +80,7 @@ export default function AccessManagementCard() {
       console.error('[AccessManagementCard.fetchAudit]', e);
       toast.error('Não foi possível carregar o log de auditoria.');
     }
-  }, [supabase]);
+  }, [supabase, toast]);
 
   useEffect(() => {
     fetchUsers();

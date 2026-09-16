@@ -9,7 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCan } from '@/permissions';
 import { useCompanyId } from '@/hooks/useCompanyId';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -42,6 +42,7 @@ interface Props {
 }
 
 export default function ListaFixaSetorAdmin({ produtos }: Props) {
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const canManage = useCan('estoque:requisicoes:manage');
   const { companyId } = useCompanyId();
@@ -82,7 +83,7 @@ export default function ListaFixaSetorAdmin({ produtos }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [supabase]);
+  }, [supabase, toast]);
 
   const loadItems = useCallback(async (listaId: string) => {
     const { data, error } = await supabase

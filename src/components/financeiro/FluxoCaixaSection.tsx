@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { gerarPDFFluxoCaixa } from '@/lib/pdfFinanceiro';
 import { fmtBRL, formatDateBR, parseLocalDate } from '@/lib/formatters';
 import { formatDateISO } from '@/lib/datetime';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import * as XLSX from '@/lib/safeXlsx';
 
 /* ─── Types ─── */
@@ -87,6 +87,7 @@ function NoAccess() {
 }
 
 export default function FluxoCaixaSection({ onNavigate }: FluxoCaixaProps) {
+  const toast = useScopedToast();
   const supabase = useSupabase();
   const canView = useCan('financeiro:fluxo:view');
   const canExport = useCan('financeiro:fluxo:export');
@@ -124,7 +125,7 @@ export default function FluxoCaixaSection({ onNavigate }: FluxoCaixaProps) {
     setDias(result?.dias || []);
     setTotais(result?.totais || { entradas: 0, saidas: 0, prev_entradas: 0, prev_saidas: 0, saldo_acumulado: 0 });
     setLoading(false);
-  }, [canView, supabase]);
+  }, [canView, supabase, toast]);
 
   useEffect(() => { load(); }, [load]);
   useDataEvent('financeiro:lancamentos', load);

@@ -7,7 +7,7 @@ import { DecimalInput, parseDecimal } from '@/components/ui/decimal-input';
 import { Plus, Check, ChevronLeft, ChevronRight, Edit2, Trash2, AlertTriangle, Snowflake, Package, Lock, AlertCircle, Zap, DollarSign, Printer, Loader2 } from 'lucide-react';
 import { useCan } from '@/permissions/hooks';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { toast } from 'sonner';
+import { useScopedToast } from '@/hooks/useScopedToast';
 import PeriodFilter, { PeriodRange, getDefaultRange, filterByPeriod } from './PeriodFilter';
 import { todayBR, formatDateBR, fmtBRL, formatPercentBR, formatFixedBR } from '@/lib/formatters';
 import SmartSuggestionCard from './SmartSuggestionCard';
@@ -44,6 +44,7 @@ const emptyWizard: WizardData = {
 };
 
 export default function ManipulationView({ store, preSelectedEntryId, onClearPreSelected }: ManipulationViewProps) {
+  const toast = useScopedToast();
   const { manipulations, addManipulation, updateManipulation, deleteManipulation, recordLeftover, stock, availableLots, suppliers, suggestedLot, entries, stockConfig, smartSuggestion } = store;
   const canCreate = useCan('salmon:manipulacao:create');
   const canDelete = useCan('salmon:manipulacao:delete');
