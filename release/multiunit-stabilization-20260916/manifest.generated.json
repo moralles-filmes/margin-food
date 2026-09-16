@@ -1,0 +1,174 @@
+{
+  "format": 1,
+  "generatedAt": "2026-09-16T22:09:35.963Z",
+  "projectId": "wuzxpbixprrgssoeeaez",
+  "liveHistoryBase": "20260916153928",
+  "forbiddenOperations": [
+    "push",
+    "production deploy",
+    "production migration apply",
+    "migration repair"
+  ],
+  "policyHotfix": {
+    "count": 17,
+    "digest": "9a49d198cabb2ec4f9fd1984e8c20404"
+  },
+  "entries": [
+    {
+      "order": 1,
+      "destination": "20260916220000_phase2_containment_forward.sql",
+      "sha256": "d680729197c1db8effcf9d83518853a047f179bc396c7c466a9491de43273063",
+      "mode": "byte-identical",
+      "source": "20260915140812_contain_global_maintenance_and_companies.sql",
+      "sourceSha256": "d680729197c1db8effcf9d83518853a047f179bc396c7c466a9491de43273063"
+    },
+    {
+      "order": 2,
+      "destination": "20260916220100_phase3_logs_compatible_forward.sql",
+      "sha256": "8308114ab4b31a161cc1a20db0e7f31e59db0895d7f452ffe447f5129a3a221d",
+      "mode": "compatible-forward",
+      "source": "20260915144030_trusted_log_writers_and_readers.sql",
+      "sourceSha256": "c7922c7569b53482c341a274648db77a3a11af93a77bee6737e614ee47d00b80"
+    },
+    {
+      "order": 3,
+      "destination": "20260916220200_phase3_log_classifier_forward.sql",
+      "sha256": "5caf5ad11ad0cff6964675fdc5cac7d3c1f8b288802a9ff06c54b3a13b354b2d",
+      "mode": "byte-identical",
+      "source": "20260915144031_classify_legacy_logs_safely.sql",
+      "sourceSha256": "5caf5ad11ad0cff6964675fdc5cac7d3c1f8b288802a9ff06c54b3a13b354b2d"
+    },
+    {
+      "order": 4,
+      "destination": "20260916220300_phase4_salmon_forward.sql",
+      "sha256": "1b8a0fb45b9c1c750a58164cba27ccb125ee57ce42960a2c9dc0f1a84114fcb7",
+      "mode": "byte-identical",
+      "source": "20260915200818_harden_salmon_internal_functions.sql",
+      "sourceSha256": "1b8a0fb45b9c1c750a58164cba27ccb125ee57ce42960a2c9dc0f1a84114fcb7"
+    },
+    {
+      "order": 5,
+      "destination": "20260916220400_phase5_supplier_forward.sql",
+      "sha256": "2e25ed4afb4827157a0592f9c74ee210e99a2d18ac58b837a41477e8a4e67690",
+      "mode": "byte-identical",
+      "source": "20260915225538_isolate_supplier_prices.sql",
+      "sourceSha256": "2e25ed4afb4827157a0592f9c74ee210e99a2d18ac58b837a41477e8a4e67690"
+    },
+    {
+      "order": 6,
+      "destination": "20260916220500_phase6_catalog_forward.sql",
+      "sha256": "9684e53b52132f7743503247ce3a364256ef5208eea1951513f6e86cbdbb768a",
+      "mode": "compatible-forward",
+      "source": "20260915232846_align_product_catalog_permissions.sql",
+      "sourceSha256": "e6557452c9c809e4320fae08412f5beeb426f8a5c7ab5f18a155044b35a8dc49"
+    },
+    {
+      "order": 7,
+      "destination": "20260916220600_phase7_containment_compatible_forward.sql",
+      "sha256": "ee69ce9f87e8691e8068eac62bb55c9aa1b57ac1251bf03554e4b42d2312916a",
+      "mode": "compatible-forward",
+      "source": "20260916133617_phase7_contain_non_rls_privileges.sql",
+      "sourceSha256": "f366f533f5fef8ff254267cfafced35ca54cd458d77f203ee5ad6e3dc072ab79"
+    },
+    {
+      "order": 8,
+      "destination": "20260916220700_phase7_preserve_reference_hotfix.sql",
+      "sha256": "b9c22f54313e46ad6674de7358768834f239679dc42f7cc62443955ee3cb81af",
+      "mode": "superseded-by-live-hotfix",
+      "source": "20260916133618_phase7_align_reference_catalogs.sql",
+      "sourceSha256": "816565b5c5c0311d6eadf7c944e85c8a852492aab15874912bebff11a8a47dcc"
+    },
+    {
+      "order": 9,
+      "destination": "20260916220800_phase7_writers_forward.sql",
+      "sha256": "31009b9e7ec96ddd3ccc84d756efc0384bd3a442536b0bb2c0f04e62492ce36b",
+      "mode": "byte-identical",
+      "source": "20260916133619_phase7_guard_sql_writers.sql",
+      "sourceSha256": "31009b9e7ec96ddd3ccc84d756efc0384bd3a442536b0bb2c0f04e62492ce36b"
+    },
+    {
+      "order": 10,
+      "destination": "20260916220900_phase7_conflicts_forward.sql",
+      "sha256": "e8bd35ed5fafd2cedfd630ae7196c2a2bfc5f1df6a53872928f64967a8180cad",
+      "mode": "byte-identical",
+      "source": "20260916134848_phase7_scope_upsert_conflicts.sql",
+      "sourceSha256": "e8bd35ed5fafd2cedfd630ae7196c2a2bfc5f1df6a53872928f64967a8180cad"
+    },
+    {
+      "order": 11,
+      "destination": "20260916221000_phase7_readers_forward.sql",
+      "sha256": "ead47a752e592ff8d9aa744f5a0d4b7023c77b314f5abe791a5d07235ddc0b79",
+      "mode": "byte-identical",
+      "source": "20260916135928_phase7_guard_stock_readers.sql",
+      "sourceSha256": "ead47a752e592ff8d9aa744f5a0d4b7023c77b314f5abe791a5d07235ddc0b79"
+    },
+    {
+      "order": 12,
+      "destination": "20260916221100_phase7_notifications_forward.sql",
+      "sha256": "7eafe6ff948a5563dfd7ce777f5654e02c1317b6ab91a842622010865c401fb8",
+      "mode": "byte-identical",
+      "source": "20260916141000_phase7_scope_notification_writer.sql",
+      "sourceSha256": "7eafe6ff948a5563dfd7ce777f5654e02c1317b6ab91a842622010865c401fb8"
+    },
+    {
+      "order": 13,
+      "destination": "20260916221200_phase8_storage_forward.sql",
+      "sha256": "f7e0247639c92f6654c23f2ed05f7dec616274a935b871144cb03a9adbdefbed",
+      "mode": "byte-identical",
+      "source": "20260916143153_phase8_storage_scope.sql",
+      "sourceSha256": "f7e0247639c92f6654c23f2ed05f7dec616274a935b871144cb03a9adbdefbed"
+    },
+    {
+      "order": 14,
+      "destination": "20260916221300_phase8_realtime_forward.sql",
+      "sha256": "aeeae880dba46ca4f838611b6f9e48a2a3355f1e3c219f613bc5946ef54dec6d",
+      "mode": "byte-identical",
+      "source": "20260916144830_phase8_realtime_events.sql",
+      "sourceSha256": "aeeae880dba46ca4f838611b6f9e48a2a3355f1e3c219f613bc5946ef54dec6d"
+    },
+    {
+      "order": 15,
+      "destination": "20260916221400_stabilization_residual_forward.sql",
+      "sha256": "46f98587b8505a6b2d8d759e9a6f9db113afaf99bcbcf62d909675f1e56604aa",
+      "mode": "new-forward",
+      "source": "20260916211110_stabilize_multiunit_residual_contracts.sql",
+      "sourceSha256": "46f98587b8505a6b2d8d759e9a6f9db113afaf99bcbcf62d909675f1e56604aa"
+    }
+  ],
+  "futureHistory": {
+    "historicalCandidatesRemainUnapplied": [
+      "20260915140812_contain_global_maintenance_and_companies.sql",
+      "20260915144030_trusted_log_writers_and_readers.sql",
+      "20260915144031_classify_legacy_logs_safely.sql",
+      "20260915200818_harden_salmon_internal_functions.sql",
+      "20260915225538_isolate_supplier_prices.sql",
+      "20260915232846_align_product_catalog_permissions.sql",
+      "20260916133617_phase7_contain_non_rls_privileges.sql",
+      "20260916133618_phase7_align_reference_catalogs.sql",
+      "20260916133619_phase7_guard_sql_writers.sql",
+      "20260916134848_phase7_scope_upsert_conflicts.sql",
+      "20260916135928_phase7_guard_stock_readers.sql",
+      "20260916141000_phase7_scope_notification_writer.sql",
+      "20260916143153_phase8_storage_scope.sql",
+      "20260916144830_phase8_realtime_events.sql"
+    ],
+    "forwardVersions": [
+      "20260916220000",
+      "20260916220100",
+      "20260916220200",
+      "20260916220300",
+      "20260916220400",
+      "20260916220500",
+      "20260916220600",
+      "20260916220700",
+      "20260916220800",
+      "20260916220900",
+      "20260916221000",
+      "20260916221100",
+      "20260916221200",
+      "20260916221300",
+      "20260916221400"
+    ],
+    "rule": "Only forward versions are recorded remotely; historical candidate versions remain absent. No repair or renumbering."
+  }
+}
