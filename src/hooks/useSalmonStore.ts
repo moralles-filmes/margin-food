@@ -1,3 +1,4 @@
+import { withCompanyId } from '@/lib/companyPayload';
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useCompanyId } from '@/hooks/useCompanyId';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
@@ -347,7 +348,7 @@ export function useSalmonStore() {
 
     const { data: result, error } = await supabase
       .from('planning_metas_compra')
-      .upsert({
+      .upsert(withCompanyId(companyId, {
         year,
         month,
         categoria: data.categoria,
@@ -355,7 +356,7 @@ export function useSalmonStore() {
         alerta_amarelo_percent: data.alertaAmareloPercent,
         alerta_vermelho_percent: data.alertaVermelhoPercent,
         ativo: true,
-      }, { onConflict: 'company_id,year,month,categoria' })
+      }), { onConflict: 'company_id,year,month,categoria' })
       .select()
       .single();
 
@@ -381,16 +382,16 @@ export function useSalmonStore() {
       }
       return [...prev, newMeta];
     });
-  }, [supabase]);
+  }, [companyId, supabase]);
 
   // Meta Provisionada CRUD — persisted to salmon_metas_provisionadas
   const saveMetaProvisionada = useCallback(async (data: Omit<MetaProvisionadaSalmao, 'id' | 'createdAt'>) => {
     const { data: result, error } = await supabase
       .from('salmon_metas_provisionadas')
-      .upsert({
+      .upsert(withCompanyId(companyId, {
         mes_ano: data.mesAno,
         meta_gramas_por_cliente: data.metaGramasPorCliente,
-      }, { onConflict: 'company_id,mes_ano' })
+      }), { onConflict: 'company_id,mes_ano' })
       .select()
       .single();
 
@@ -413,7 +414,7 @@ export function useSalmonStore() {
       }
       return [...prev, newMeta];
     });
-  }, [supabase]);
+  }, [companyId, supabase]);
 
   // ── ENTRY CRUD via atomic RPCs ──
 
@@ -658,11 +659,11 @@ export function useSalmonStore() {
   const addDailyRecord = useCallback(async (r: Omit<DailyRecord, 'id' | 'createdAt'>) => {
     const { data, error } = await supabase
       .from('salmon_daily_records')
-      .upsert({
+      .upsert(withCompanyId(companyId, {
         record_date: r.date,
         revenue: r.revenue,
         clients_count: r.customers,
-      }, { onConflict: 'company_id,record_date' })
+      }), { onConflict: 'company_id,record_date' })
       .select()
       .single();
 
@@ -680,7 +681,7 @@ export function useSalmonStore() {
     };
     setDailyRecords(prev => [newR, ...prev.filter(x => x.date !== r.date)]);
     return newR;
-  }, [supabase]);
+  }, [companyId, supabase]);
 
   const deleteDailyRecord = useCallback(async (id: string) => {
     const { error } = await supabase.from('salmon_daily_records').delete().eq('id', id);
@@ -950,7 +951,7 @@ export function useSalmonStore() {
   const addAuditoria = useCallback(async (a: Omit<AuditoriaCompra, 'id' | 'createdAt'>) => {
     const { data, error } = await supabase
       .from('salmon_auditorias_compra')
-      .insert({
+      .insert(withCompanyId(companyId, {
         entrada_id: a.entradaId,
         data_entrada: a.dataEntrada,
         valor_total: a.valorTotal,
@@ -965,7 +966,7 @@ export function useSalmonStore() {
         created_by: a.createdBy || '',
         override_user: a.overrideUser || '',
         override_at: a.overrideAt || null,
-      } as any)
+      } as any))
       .select()
       .single();
 
@@ -984,7 +985,7 @@ export function useSalmonStore() {
     };
     setAuditorias(prev => [newA, ...prev]);
     return newA;
-  }, [supabase]);
+  }, [companyId, supabase]);
 
   // Sync all (legacy compatibility — now mostly no-op since DB is master)
   const syncAllToStock = useCallback(async () => {

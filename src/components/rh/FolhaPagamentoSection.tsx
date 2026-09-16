@@ -1,3 +1,5 @@
+import { useCompanyId } from '@/hooks/useCompanyId';
+import { withCompanyId } from '@/lib/companyPayload';
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -92,6 +94,7 @@ const R = (v: number) => formatFixedBR(v, 2);
 export default function FolhaPagamentoSection({
  colaboradores, canManage }: Props) {
   const supabase = useSupabase();
+  const { companyId } = useCompanyId();
   const canViewRbac = useCan('rh:folha:view');
   const { user } = useAuth();
   const [folhas, setFolhas] = useState<FolhaPagamento[]>([]);
@@ -195,7 +198,7 @@ export default function FolhaPagamentoSection({
         if (existing) {
           await supabase.from('rh_folha_pagamento').update(insert).eq('id', existing.id);
         } else {
-          await supabase.from('rh_folha_pagamento').insert(insert);
+          await supabase.from('rh_folha_pagamento').insert(withCompanyId(companyId, insert));
         }
       }
 

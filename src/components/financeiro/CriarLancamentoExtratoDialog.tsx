@@ -1,3 +1,5 @@
+import { useCompanyId } from '@/hooks/useCompanyId';
+import { withCompanyId } from '@/lib/companyPayload';
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -51,6 +53,7 @@ type Destino = 'lancamento' | 'conta_pagar' | 'conta_receber';
 export default function CriarLancamentoExtratoDialog({
  open, onOpenChange, linha, contaBancariaId, onCreated }: Props) {
   const supabase = useSupabase();
+  const { companyId } = useCompanyId();
   const canViewRbac = useCan('financeiro:conciliacao:reconcile');
   const { user } = useAuth();
 
@@ -280,7 +283,7 @@ export default function CriarLancamentoExtratoDialog({
           lancamento_id: lancResult?.lancamento_id || null,
         };
 
-        const { data: cpData, error: cpError } = await supabase.from('fin_contas_pagar').insert(payload).select('id').single();
+        const { data: cpData, error: cpError } = await supabase.from('fin_contas_pagar').insert(withCompanyId(companyId, payload)).select('id').single();
         if (cpError) {
           // O lançamento já foi criado/conciliado pela RPC acima — se esse insert
           // falhar agora, ele fica no razão sem conta a pagar vinculada. Repetir a
@@ -346,7 +349,7 @@ export default function CriarLancamentoExtratoDialog({
           lancamento_id: lancResult?.lancamento_id || null,
         };
 
-        const { data: crData, error: crError } = await supabase.from('fin_contas_receber').insert(payload).select('id').single();
+        const { data: crData, error: crError } = await supabase.from('fin_contas_receber').insert(withCompanyId(companyId, payload)).select('id').single();
         if (crError) {
           // Mesmo motivo do bloco de Conta a Pagar acima.
           throw new Error(`Lançamento já foi criado no razão, mas a conta a receber não pôde ser gravada (${crError.message}). Tente novamente — a repetição não duplica.`);

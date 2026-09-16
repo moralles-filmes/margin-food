@@ -1,3 +1,5 @@
+import { useCompanyId } from '@/hooks/useCompanyId';
+import { withCompanyId } from '@/lib/companyPayload';
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
 import { usePersistedTab } from '@/hooks/usePersistedTab';
@@ -137,6 +139,7 @@ function RhViewInner({ visibleSubtabs, user }: {
   visibleSubtabs: string[]; user: any;
 }) {
   const supabase = useSupabase();
+  const { companyId } = useCompanyId();
   const { confirm, ConfirmDialog } = useConfirmDialog();
   const canCreateProntuario = useCan('rh:prontuario:create');
   const canEditProntuario = useCan('rh:prontuario:edit');
@@ -291,7 +294,7 @@ function RhViewInner({ visibleSubtabs, user }: {
         created_by: user?.id,
       };
       if (formColab.user_id) payload.user_id = formColab.user_id;
-      const { error } = await supabase.from('rh_colaboradores').insert(payload);
+      const { error } = await supabase.from('rh_colaboradores').insert(withCompanyId(companyId, payload));
       if (error) { toast.error('Erro ao criar colaborador: ' + error.message); return; }
       toast.success('Colaborador criado com sucesso!');
       setShowNewColab(false);
@@ -364,14 +367,14 @@ function RhViewInner({ visibleSubtabs, user }: {
     }
     setSavingPonto(true);
     try {
-      const { error } = await supabase.from('rh_ponto_registros').insert({
+      const { error } = await supabase.from('rh_ponto_registros').insert(withCompanyId(companyId, {
         colaborador_id: myColaboradorId,
         tipo,
         data: todayBR(),
         hora: new Date().toISOString(),
         metodo: 'app',
         created_by: user?.id,
-      });
+      }));
       if (error) { toast.error('Erro ao registrar ponto: ' + error.message); return; }
       toast.success(`${tipo.replace('_', ' ')} registrado!`);
       fetchPontos();

@@ -12,7 +12,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
-import { useCan } from '@/permissions/hooks';
+import { useCan, useCanAny } from '@/permissions/hooks';
+import { useCompanyId } from '@/hooks/useCompanyId';
 interface StockCategory {
   id: string;
   name: string;
@@ -50,7 +51,11 @@ const LOCATION_TYPES = [
 export default function StockCadastrosSection() {
   const supabase = useSupabase();
   const canViewRbac = useCan('estoque:cadastros:view');
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
+  const { companyId } = useCompanyId();
+  const canCreate = useCanAny('estoque:cadastros:create', 'estoque:cadastros:manage');
+  const canEdit = useCanAny('estoque:cadastros:edit', 'estoque:cadastros:manage');
+  const canDelete = useCanAny('estoque:cadastros:delete', 'estoque:cadastros:manage');
   const [tab, setTab] = useState('categorias');
   const { confirm, ConfirmDialog } = useConfirmDialog();
 
@@ -84,11 +89,11 @@ export default function StockCadastrosSection() {
     const { data } = await supabase
       .from('stock_categories')
       .select('id, name, description, is_active, sort_order, created_at')
-      .eq('company_id', profile?.company_id ?? '')
+      .eq('company_id', companyId ?? '')
       .order('name', { ascending: true });
     setCategories((data as StockCategory[]) || []);
     setLoadingCat(false);
-  }, [profile?.company_id, supabase]);
+  }, [companyId, supabase]);
 
   // Fetch locations
   const fetchLocations = useCallback(async () => {
@@ -96,11 +101,11 @@ export default function StockCadastrosSection() {
     const { data } = await supabase
       .from('stock_locations')
       .select('id, name, type, notes, is_active, created_at')
-      .eq('company_id', profile?.company_id ?? '')
+      .eq('company_id', companyId ?? '')
       .order('name', { ascending: true });
     setLocations((data as StockLocation[]) || []);
     setLoadingLoc(false);
-  }, [profile?.company_id, supabase]);
+  }, [companyId, supabase]);
 
   // Fetch sectors
   const fetchSectors = useCallback(async () => {
@@ -108,11 +113,11 @@ export default function StockCadastrosSection() {
     const { data } = await supabase
       .from('stock_sectors')
       .select('id, name, is_active, sort_order, created_at')
-      .eq('company_id', profile?.company_id ?? '')
+      .eq('company_id', companyId ?? '')
       .order('name', { ascending: true });
     setSectors((data as StockSector[]) || []);
     setLoadingSec(false);
-  }, [profile?.company_id, supabase]);
+  }, [companyId, supabase]);
 
   useEffect(() => {
     fetchCategories();
@@ -133,6 +138,7 @@ export default function StockCadastrosSection() {
   };
 
   const handleSaveCat = async () => {
+    if (!companyId || !(editCat ? canEdit : canCreate)) { toast.error('Sem permissão para salvar'); return; }
     if (!catForm.name.trim()) { toast.error('Nome é obrigatório'); return; }
     setSavingCat(true);
     try {
@@ -148,7 +154,7 @@ export default function StockCadastrosSection() {
         const maxOrder = categories.reduce((max, c) => Math.max(max, c.sort_order), 0);
         const { data, error } = await supabase
           .from('stock_categories')
-          .insert({ name: catForm.name.trim(), description: catForm.description || null, sort_order: maxOrder + 1, created_by: user?.id, company_id: profile?.company_id })
+          .insert({ name: catForm.name.trim(), description: catForm.description || null, sort_order: maxOrder + 1, created_by: user?.id, company_id: companyId })
           .select('id')
           .single();
         if (error) throw error;
@@ -157,6 +163,7 @@ export default function StockCadastrosSection() {
       setCatDialog(false);
       fetchCategories();
     } catch (e: any) {
+      console.error('Erro no cadastro de estoque', e);
       if (e?.message?.includes('stock_categories_name_unique')) {
         toast.error('Já existe uma categoria com esse nome');
       } else {
@@ -187,6 +194,7 @@ export default function StockCadastrosSection() {
   };
 
   const handleSaveLoc = async () => {
+    if (!companyId || !(editLoc ? canEdit : canCreate)) { toast.error('Sem permissão para salvar'); return; }
     if (!locForm.name.trim()) { toast.error('Nome é obrigatório'); return; }
     setSavingLoc(true);
     try {
@@ -200,7 +208,7 @@ export default function StockCadastrosSection() {
       } else {
         const { data, error } = await supabase
           .from('stock_locations')
-          .insert({ name: locForm.name.trim(), type: locForm.type || null, notes: locForm.notes || null, created_by: user?.id, company_id: profile?.company_id })
+          .insert({ name: locForm.name.trim(), type: locForm.type || null, notes: locForm.notes || null, created_by: user?.id, company_id: companyId })
           .select('id')
           .single();
         if (error) throw error;
@@ -209,6 +217,7 @@ export default function StockCadastrosSection() {
       setLocDialog(false);
       fetchLocations();
     } catch (e: any) {
+      console.error('Erro no cadastro de estoque', e);
       if (e?.message?.includes('stock_locations_name_unique')) {
         toast.error('Já existe um local com esse nome');
       } else {
@@ -255,6 +264,7 @@ export default function StockCadastrosSection() {
   };
 
   const handleSaveSec = async () => {
+    if (!companyId || !(editSec ? canEdit : canCreate)) { toast.error('Sem permissão para salvar'); return; }
     if (!secForm.name.trim()) { toast.error('Nome é obrigatório'); return; }
     setSavingSec(true);
     try {
@@ -269,7 +279,7 @@ export default function StockCadastrosSection() {
         const maxOrder = sectors.reduce((max, s) => Math.max(max, s.sort_order), 0);
         const { data, error } = await supabase
           .from('stock_sectors')
-          .insert({ name: secForm.name.trim(), sort_order: maxOrder + 1, created_by: user?.id, company_id: profile?.company_id })
+          .insert({ name: secForm.name.trim(), sort_order: maxOrder + 1, created_by: user?.id, company_id: companyId })
           .select('id')
           .single();
         if (error) throw error;
@@ -278,6 +288,7 @@ export default function StockCadastrosSection() {
       setSecDialog(false);
       fetchSectors();
     } catch (e: any) {
+      console.error('Erro no cadastro de estoque', e);
       if (e?.message?.includes('stock_sectors_name_unique')) {
         toast.error('Já existe um setor com esse nome');
       } else {
@@ -349,7 +360,7 @@ export default function StockCadastrosSection() {
         <TabsContent value="categorias" className="space-y-3 mt-3">
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold text-foreground">Categorias de Estoque</p>
-            <Button size="sm" className="bg-primary-strong text-primary-foreground border-0 gap-1.5 text-xs" onClick={() => openCatDialog()}>
+            <Button size="sm" className="bg-primary-strong text-primary-foreground border-0 gap-1.5 text-xs" disabled={!canCreate} onClick={() => openCatDialog()}>
               <Plus className="w-3.5 h-3.5" /> Nova Categoria
             </Button>
           </div>
@@ -376,13 +387,13 @@ export default function StockCadastrosSection() {
                     {cat.description && <p className="text-[11px] text-muted-foreground mt-0.5">{cat.description}</p>}
                   </div>
                   <div className="flex items-center gap-1">
-                    <button onClick={() => openCatDialog(cat)} className="p-1.5 rounded-lg text-muted-foreground hover:bg-secondary">
+                    <button disabled={!canEdit} onClick={() => openCatDialog(cat)} className="p-1.5 rounded-lg text-muted-foreground hover:bg-secondary">
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
-                    <button onClick={() => toggleCatActive(cat)} className={`p-1.5 rounded-lg ${cat.is_active ? 'text-warning hover:bg-warning-soft' : 'text-success hover:bg-success-soft'}`}>
+                    <button disabled={!canEdit} onClick={() => toggleCatActive(cat)} className={`p-1.5 rounded-lg ${cat.is_active ? 'text-warning hover:bg-warning-soft' : 'text-success hover:bg-success-soft'}`}>
                       {cat.is_active ? <PowerOff className="w-3.5 h-3.5" /> : <Power className="w-3.5 h-3.5" />}
                     </button>
-                    <button onClick={() => deleteCat(cat)} className="p-1.5 rounded-lg text-destructive hover:bg-destructive-soft">
+                    <button disabled={!canDelete} onClick={() => deleteCat(cat)} className="p-1.5 rounded-lg text-destructive hover:bg-destructive-soft">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
@@ -396,7 +407,7 @@ export default function StockCadastrosSection() {
         <TabsContent value="locais" className="space-y-3 mt-3">
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold text-foreground">Locais de Armazenagem</p>
-            <Button size="sm" className="bg-primary-strong text-primary-foreground border-0 gap-1.5 text-xs" onClick={() => openLocDialog()}>
+            <Button size="sm" className="bg-primary-strong text-primary-foreground border-0 gap-1.5 text-xs" disabled={!canCreate} onClick={() => openLocDialog()}>
               <Plus className="w-3.5 h-3.5" /> Novo Local
             </Button>
           </div>
@@ -426,13 +437,13 @@ export default function StockCadastrosSection() {
                     {loc.notes && <p className="text-[11px] text-muted-foreground mt-0.5">{loc.notes}</p>}
                   </div>
                   <div className="flex items-center gap-1">
-                    <button onClick={() => openLocDialog(loc)} className="p-1.5 rounded-lg text-muted-foreground hover:bg-secondary">
+                    <button disabled={!canEdit} onClick={() => openLocDialog(loc)} className="p-1.5 rounded-lg text-muted-foreground hover:bg-secondary">
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
-                    <button onClick={() => toggleLocActive(loc)} className={`p-1.5 rounded-lg ${loc.is_active ? 'text-warning hover:bg-warning-soft' : 'text-success hover:bg-success-soft'}`}>
+                    <button disabled={!canEdit} onClick={() => toggleLocActive(loc)} className={`p-1.5 rounded-lg ${loc.is_active ? 'text-warning hover:bg-warning-soft' : 'text-success hover:bg-success-soft'}`}>
                       {loc.is_active ? <PowerOff className="w-3.5 h-3.5" /> : <Power className="w-3.5 h-3.5" />}
                     </button>
-                    <button onClick={() => deleteLoc(loc)} className="p-1.5 rounded-lg text-destructive hover:bg-destructive-soft">
+                    <button disabled={!canDelete} onClick={() => deleteLoc(loc)} className="p-1.5 rounded-lg text-destructive hover:bg-destructive-soft">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
@@ -446,7 +457,7 @@ export default function StockCadastrosSection() {
         <TabsContent value="setores" className="space-y-3 mt-3">
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold text-foreground">Setores</p>
-            <Button size="sm" className="bg-primary-strong text-primary-foreground border-0 gap-1.5 text-xs" onClick={() => openSecDialog()}>
+            <Button size="sm" className="bg-primary-strong text-primary-foreground border-0 gap-1.5 text-xs" disabled={!canCreate} onClick={() => openSecDialog()}>
               <Plus className="w-3.5 h-3.5" /> Novo Setor
             </Button>
           </div>
@@ -470,13 +481,13 @@ export default function StockCadastrosSection() {
                     {!sec.is_active && <Badge variant="outline" className="text-[9px] h-4">Inativo</Badge>}
                   </div>
                   <div className="flex items-center gap-1">
-                    <button onClick={() => openSecDialog(sec)} className="p-1.5 rounded-lg text-muted-foreground hover:bg-secondary">
+                    <button disabled={!canEdit} onClick={() => openSecDialog(sec)} className="p-1.5 rounded-lg text-muted-foreground hover:bg-secondary">
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
-                    <button onClick={() => toggleSecActive(sec)} className={`p-1.5 rounded-lg ${sec.is_active ? 'text-warning hover:bg-warning-soft' : 'text-success hover:bg-success-soft'}`}>
+                    <button disabled={!canEdit} onClick={() => toggleSecActive(sec)} className={`p-1.5 rounded-lg ${sec.is_active ? 'text-warning hover:bg-warning-soft' : 'text-success hover:bg-success-soft'}`}>
                       {sec.is_active ? <PowerOff className="w-3.5 h-3.5" /> : <Power className="w-3.5 h-3.5" />}
                     </button>
-                    <button onClick={() => deleteSec(sec)} className="p-1.5 rounded-lg text-destructive hover:bg-destructive-soft">
+                    <button disabled={!canDelete} onClick={() => deleteSec(sec)} className="p-1.5 rounded-lg text-destructive hover:bg-destructive-soft">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>

@@ -1,3 +1,5 @@
+import { useCompanyId } from '@/hooks/useCompanyId';
+import { withCompanyId } from '@/lib/companyPayload';
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -36,6 +38,7 @@ interface Props {
 export default function PlanoContasFinSection({
  canCreate, canEdit, canDelete }: Props) {
   const supabase = useSupabase();
+  const { companyId } = useCompanyId();
   const canViewRbac = useCan('financeiro:cadastros:view');
   const { user } = useAuth();
   const [items, setItems] = useState<PlanoContaRow[]>([]);
@@ -86,7 +89,7 @@ export default function PlanoContasFinSection({
       if (error) { toast.error(error.message); return; }
       toast.success('Conta atualizada');
     } else {
-      const { error } = await supabase.from('fin_plano_contas').insert({ ...form, created_by: user?.id });
+      const { error } = await supabase.from('fin_plano_contas').insert(withCompanyId(companyId, { ...form, created_by: user?.id }));
       if (error) { toast.error(error.message); return; }
       toast.success('Conta criada');
     }

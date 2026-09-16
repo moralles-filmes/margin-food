@@ -1,3 +1,5 @@
+import { useCompanyId } from '@/hooks/useCompanyId';
+import { withCompanyId } from '@/lib/companyPayload';
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
 import { DecimalInput, parseDecimal } from '@/components/ui/decimal-input';
@@ -77,6 +79,7 @@ const R = (v: number) => formatFixedBR(v, 2);
 export default function BeneficiosSection({
  colaboradores, canManage }: Props) {
   const supabase = useSupabase();
+  const { companyId } = useCompanyId();
   const canViewRbac = useCan('rh:beneficios:view');
   const { user } = useAuth();
   const [beneficios, setBeneficios] = useState<Beneficio[]>([]);
@@ -149,7 +152,7 @@ export default function BeneficiosSection({
         if (error) { toast.error('Erro: ' + error.message); return; }
         toast.success('Benefício atualizado!');
       } else {
-        const { error } = await supabase.from('rh_beneficios').insert({ ...payload, created_by: user?.id });
+        const { error } = await supabase.from('rh_beneficios').insert(withCompanyId(companyId, { ...payload, created_by: user?.id }));
         if (error) { toast.error('Erro: ' + error.message); return; }
         toast.success('Benefício cadastrado!');
       }
@@ -216,7 +219,7 @@ export default function BeneficiosSection({
       created_by: user?.id,
     }));
 
-    const { error } = await supabase.from('rh_beneficios').insert(inserts);
+    const { error } = await supabase.from('rh_beneficios').insert(withCompanyId(companyId, inserts));
     if (error) { toast.error('Erro: ' + error.message); return; }
     toast.success(`${tipoInfo.label} atribuído a ${colabsSemBeneficio.length} colaboradores!`);
     fetchData();

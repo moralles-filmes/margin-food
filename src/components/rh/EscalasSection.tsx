@@ -1,3 +1,5 @@
+import { useCompanyId } from '@/hooks/useCompanyId';
+import { withCompanyId } from '@/lib/companyPayload';
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -70,6 +72,7 @@ interface Props {
 export default function EscalasSection({
  colaboradores, canManage }: Props) {
   const supabase = useSupabase();
+  const { companyId } = useCompanyId();
   const canViewRbac = useCan('rh:escalas:view');
   const { user, profile } = useAuth();
   const { confirm, ConfirmDialog } = useConfirmDialog();
@@ -188,7 +191,7 @@ export default function EscalasSection({
     }
     setSavingSlot(true);
     try {
-      const { error } = await supabase.from('rh_escala_slots').insert({
+      const { error } = await supabase.from('rh_escala_slots').insert(withCompanyId(companyId, {
         escala_id: escala.id,
         colaborador_id: slotForm.colaborador_id,
         dia: selectedDay,
@@ -197,7 +200,7 @@ export default function EscalasSection({
         funcao: slotForm.funcao,
         tipo: slotForm.tipo,
         observacao: slotForm.observacao,
-      });
+      }));
       if (error) { toast.error('Erro: ' + error.message); return; }
       toast.success('Turno adicionado!');
       setShowAddSlot(false);

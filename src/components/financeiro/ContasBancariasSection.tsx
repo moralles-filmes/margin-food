@@ -1,3 +1,5 @@
+import { useCompanyId } from '@/hooks/useCompanyId';
+import { withCompanyId } from '@/lib/companyPayload';
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -99,6 +101,7 @@ interface ContasBancariasProps {
 
 export default function ContasBancariasSection({ onNavigateExtrato }: ContasBancariasProps = {}) {
   const supabase = useSupabase();
+  const { companyId } = useCompanyId();
   const { user } = useAuth();
   const canView = useCan('financeiro:contas:view');
   const canCreate = useCan('financeiro:contas:create');
@@ -261,7 +264,7 @@ export default function ContasBancariasSection({ onNavigateExtrato }: ContasBanc
         if (error) { toast.error(error.message); return; }
         toast.success('Conta atualizada');
       } else {
-        const { error } = await supabase.from('fin_contas').insert({ ...payload, created_by: user?.id });
+        const { error } = await supabase.from('fin_contas').insert(withCompanyId(companyId, { ...payload, created_by: user?.id }));
         if (error) { toast.error(error.message); return; }
         toast.success('Conta criada');
       }

@@ -1,3 +1,5 @@
+import { useCompanyId } from '@/hooks/useCompanyId';
+import { withCompanyId } from '@/lib/companyPayload';
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -81,6 +83,7 @@ const TIPO_ICONS = { leitura: FileText, video: Video, quiz: HelpCircle };
 export default function TreinamentoSection({
  colaboradores, canManage }: Props) {
   const supabase = useSupabase();
+  const { companyId } = useCompanyId();
   const canViewRbac = useCan('rh:treinamento:view');
   const { user } = useAuth();
   const [trilhas, setTrilhas] = useState<Trilha[]>([]);
@@ -124,7 +127,7 @@ export default function TreinamentoSection({
   const handleCreateTrilha = async () => {
     if (!form.titulo.trim()) { toast.error('Título obrigatório'); return; }
     try {
-      const { error } = await supabase.from('rh_trilhas_treinamento').insert({
+      const { error } = await supabase.from('rh_trilhas_treinamento').insert(withCompanyId(companyId, {
         titulo: form.titulo,
         descricao: form.descricao,
         setor: form.setor,
@@ -132,7 +135,7 @@ export default function TreinamentoSection({
         modulos: formModulos as unknown as import('@/integrations/supabase/types').Json[],
         carga_horaria_min: form.carga_horaria_min,
         criado_por: user?.id ?? null,
-      });
+      }));
       if (error) { toast.error('Erro: ' + error.message); return; }
       toast.success('Trilha criada!');
       setShowNew(false);
@@ -154,10 +157,10 @@ export default function TreinamentoSection({
   const handleAssign = async () => {
     if (!showAssign || !assignColabId) return;
     try {
-      const { error } = await supabase.from('rh_progresso_treinamento').insert({
+      const { error } = await supabase.from('rh_progresso_treinamento').insert(withCompanyId(companyId, {
         trilha_id: showAssign,
         colaborador_id: assignColabId,
-      });
+      }));
       if (error) {
         if (error.message.includes('duplicate')) { toast.error('Colaborador já está inscrito'); return; }
         toast.error('Erro: ' + error.message); return;

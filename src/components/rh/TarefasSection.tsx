@@ -1,3 +1,5 @@
+import { useCompanyId } from '@/hooks/useCompanyId';
+import { withCompanyId } from '@/lib/companyPayload';
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -72,6 +74,7 @@ const STATUS_LABELS: Record<string, { label: string; icon: typeof Clock }> = {
 export default function TarefasSection({
  colaboradores, canManage }: Props) {
   const supabase = useSupabase();
+  const { companyId } = useCompanyId();
   const canViewRbac = useCan('rh:tarefas:view');
   const { user } = useAuth();
   const [tarefas, setTarefas] = useState<Tarefa[]>([]);
@@ -124,7 +127,7 @@ export default function TarefasSection({
         .filter(l => l.trim())
         .map(l => ({ texto: l.trim(), feito: false }));
 
-      const { error } = await supabase.from('rh_tarefas').insert({
+      const { error } = await supabase.from('rh_tarefas').insert(withCompanyId(companyId, {
         titulo: form.titulo,
         descricao: form.descricao,
         setor: form.setor,
@@ -135,7 +138,7 @@ export default function TarefasSection({
         prazo: form.prazo ? new Date(form.prazo).toISOString() : null,
         checklist: checklist as unknown as import('@/integrations/supabase/types').Json[],
         observacoes: form.observacoes,
-      });
+      }));
       if (error) { toast.error('Erro: ' + error.message); return; }
       toast.success('Tarefa criada!');
       setShowNew(false);

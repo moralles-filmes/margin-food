@@ -1,3 +1,5 @@
+import { useCompanyId } from '@/hooks/useCompanyId';
+import { withCompanyId } from '@/lib/companyPayload';
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -363,6 +365,7 @@ const CATEGORY_FIELDS = `
 // ─── Main component ───
 export default function CadastroBaseTree() {
   const supabase = useSupabase();
+  const { companyId } = useCompanyId();
   const { user } = useAuth();
   const canView = useCan('financeiro:cadastros:view');
   const canCreate = useCan('financeiro:cadastros:create');
@@ -544,7 +547,7 @@ export default function CadastroBaseTree() {
         toast.success('Categoria atualizada');
       } else {
         const insertPayload = { ...payload, created_by: user?.id };
-        const { error } = await supabase.from('fin_categorias').insert(insertPayload);
+        const { error } = await supabase.from('fin_categorias').insert(withCompanyId(companyId, insertPayload));
         if (error) { toast.error(error.message); return; }
         toast.success('Categoria criada');
       }

@@ -1,3 +1,5 @@
+import { useCompanyId } from '@/hooks/useCompanyId';
+import { withCompanyId } from '@/lib/companyPayload';
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -96,6 +98,7 @@ const FASE_LABELS: Record<string, string> = {
 export default function OnboardingSection({
  colaboradores, canManage }: Props) {
   const supabase = useSupabase();
+  const { companyId } = useCompanyId();
   const canViewRbac = useCan('rh:onboarding:view');
   const { user } = useAuth();
   const [onboardings, setOnboardings] = useState<Onboarding[]>([]);
@@ -134,7 +137,7 @@ export default function OnboardingSection({
 
   const handleCreate = async () => {
     if (!formColabId) { toast.error('Selecione o colaborador'); return; }
-    const { error } = await supabase.from('rh_onboarding').insert([{
+    const { error } = await supabase.from('rh_onboarding').insert(withCompanyId(companyId, [{
       colaborador_id: formColabId,
       mentor_id: formMentorId || null,
       criado_por: user?.id ?? null,
@@ -142,7 +145,7 @@ export default function OnboardingSection({
       checklist_30dias: JSON.parse(JSON.stringify(DEFAULT_30)),
       checklist_60dias: JSON.parse(JSON.stringify(DEFAULT_60)),
       checklist_90dias: JSON.parse(JSON.stringify(DEFAULT_90)),
-    }]);
+    }]));
     if (error) { toast.error('Erro: ' + error.message); return; }
     toast.success('Onboarding criado!');
     setShowNew(false);

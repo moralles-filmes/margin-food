@@ -1,4 +1,6 @@
-import { useSupabase, useCompanyScope } from '@/contexts/CompanyScopeContext';
+import { useCompanyId } from '@/hooks/useCompanyId';
+import { withCompanyId } from '@/lib/companyPayload';
+import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -101,7 +103,7 @@ function matchesPurchaseOrderSearch(order: PurchaseOrder, search: string): boole
 
 export function usePurchaseOrdersStore() {
   const supabase = useSupabase();
-  const companyId = useCompanyScope()?.companyId;
+  const { companyId } = useCompanyId();
   const { user } = useAuth();
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -289,7 +291,7 @@ export function usePurchaseOrdersStore() {
         const isMercadoSazonal = orderData.type === 'MERCADO' || orderData.type === 'SAZONAL';
         const { data: profile } = await supabase.from('profiles').select('nome').eq('id', user.id).maybeSingle();
         const senderName = profile?.nome || 'Alguém';
-        await supabase.from('notifications').insert({
+        await supabase.from('notifications').insert(withCompanyId(companyId, {
           recipient_user_id: orderData.responsible_user_id,
           type: 'MENTION',
           module: 'purchases',
@@ -299,7 +301,7 @@ export function usePurchaseOrdersStore() {
           entity_id: orderId,
           link_path: '/compras?subtab=pedidos-compras&order=' + orderId,
           created_by: user.id,
-        });
+        }));
       }
 
       await fetchOrders();
@@ -310,7 +312,7 @@ export function usePurchaseOrdersStore() {
     } finally {
       setSaving(false);
     }
-  }, [user, saving, supabase, fetchOrders]);
+  }, [companyId, user, saving, supabase, fetchOrders]);
 
   // ===== SHOPPING CHECKLIST FUNCTIONS =====
   const updateShoppingItem = useCallback(async (
@@ -363,7 +365,7 @@ export function usePurchaseOrdersStore() {
     if (order && order.created_by !== user.id) {
       const { data: profile } = await supabase.from('profiles').select('nome').eq('id', user.id).maybeSingle();
       const senderName = profile?.nome || 'Responsável';
-      await supabase.from('notifications').insert({
+      await supabase.from('notifications').insert(withCompanyId(companyId, {
         recipient_user_id: order.created_by,
         type: 'MENTION',
         module: 'purchases',
@@ -373,14 +375,14 @@ export function usePurchaseOrdersStore() {
         entity_id: orderId,
         link_path: '/compras',
         created_by: user.id,
-      });
+      }));
     }
 
 
     await fetchOrders();
     toast.success('Compra confirmada! Pedido enviado para Recebimento.');
     emitDataEvent('compras:pedidos');
-  }, [user, fetchItems, supabase, orders, fetchOrders]);
+  }, [companyId, user, fetchItems, supabase, orders, fetchOrders]);
 
   // ===== RECEIVING FUNCTIONS =====
   const receiveItem = useCallback(async (
@@ -459,7 +461,7 @@ export function usePurchaseOrdersStore() {
           .limit(1);
 
         if (!existing || existing.length === 0) {
-          await supabase.from('notifications').insert({
+          await supabase.from('notifications').insert(withCompanyId(companyId, {
             recipient_user_id: order.created_by,
             type: 'NOT_DELIVERED_ACK_REQUIRED',
             module: 'purchases',
@@ -469,7 +471,7 @@ export function usePurchaseOrdersStore() {
             entity_id: orderId,
             link_path: '/compras',
             created_by: user.id,
-          });
+          }));
         }
       }
     }
@@ -478,7 +480,7 @@ export function usePurchaseOrdersStore() {
     toast.success(newStatus === 'COMPLETED' ? 'Pedido concluído! Estoque atualizado.' : 'Recebimento parcial registrado. Itens não entregues pendentes.');
     emitDataEvent('compras:pedidos');
     emitDataEvent('estoque:movimentacoes');
-  }, [user, fetchItems, supabase, fetchOrders, orders]);
+  }, [companyId, user, fetchItems, supabase, fetchOrders, orders]);
 
   const finalizePartialItem = useCallback(async (itemId: string, qtyReceived: number) => {
     if (!user) return;
@@ -582,7 +584,7 @@ export function usePurchaseOrdersStore() {
         const { data: orderData } = await supabase.from('purchase_orders').select('title').eq('id', orderId).single();
         const { data: profile } = await supabase.from('profiles').select('nome').eq('id', user.id).maybeSingle();
         const senderName = profile?.nome || 'Alguém';
-        await supabase.from('notifications').insert({
+        await supabase.from('notifications').insert(withCompanyId(companyId, {
           recipient_user_id: updates.responsible_user_id,
           type: 'MENTION',
           module: 'purchases',
@@ -592,7 +594,7 @@ export function usePurchaseOrdersStore() {
           entity_id: orderId,
           link_path: '/compras?subtab=pedidos-compras&order=' + orderId,
           created_by: user.id,
-        });
+        }));
       }
 
       await fetchOrders();
@@ -602,7 +604,7 @@ export function usePurchaseOrdersStore() {
     } finally {
       setSaving(false);
     }
-  }, [user, saving, supabase, fetchOrders]);
+  }, [companyId, user, saving, supabase, fetchOrders]);
 
   const deleteOrder = useCallback(async (orderId: string) => {
     if (!user) return false;

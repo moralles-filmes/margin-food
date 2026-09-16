@@ -1,3 +1,5 @@
+import { useCompanyId } from '@/hooks/useCompanyId';
+import { withCompanyId } from '@/lib/companyPayload';
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -53,6 +55,7 @@ const R = (v: number) => formatIntegerBR(v);
 export default function SSTSection({
  colaboradores, canManage }: Props) {
   const supabase = useSupabase();
+  const { companyId } = useCompanyId();
   const canViewRbac = useCan('rh:sst:view');
   const { user } = useAuth();
   const [tab, setTab] = useState<SstTab>('epis');
@@ -156,15 +159,16 @@ export default function SSTSection({
 // ─── EPIs Tab ───
 function EpisTab({ epis, colaboradores, canManage, user, getColabNome, onRefresh }: any) {
   const supabase = useSupabase();
+  const { companyId } = useCompanyId();
   const [showForm, setShowForm] = useState(false);
   const emptyForm = { colaborador_id: '', nome: '', tipo: 'Luva', ca_numero: '', data_entrega: format(new Date(), 'yyyy-MM-dd'), data_validade: '', quantidade: 1, observacoes: '' };
   const [form, setForm] = useState(emptyForm);
 
   const handleSave = async () => {
     if (!form.colaborador_id || !form.nome) { toast.error('Preencha colaborador e nome'); return; }
-    const { error } = await supabase.from('rh_epis').insert({
+    const { error } = await supabase.from('rh_epis').insert(withCompanyId(companyId, {
       ...form, data_validade: form.data_validade || null, created_by: user?.id,
-    });
+    }));
     if (error) { toast.error('Erro: ' + error.message); return; }
     toast.success('EPI registrado!');
     setShowForm(false);
@@ -285,19 +289,20 @@ function EpisTab({ epis, colaboradores, canManage, user, getColabNome, onRefresh
 // ─── Exames Tab ───
 function ExamesTab({ exames, colaboradores, canManage, user, getColabNome, onRefresh }: any) {
   const supabase = useSupabase();
+  const { companyId } = useCompanyId();
   const [showForm, setShowForm] = useState(false);
   const emptyForm = { colaborador_id: '', tipo: 'periodico', descricao: '', data_realizacao: '', data_vencimento: '', resultado: 'APTO', clinica: '', medico: '', observacoes: '' };
   const [form, setForm] = useState(emptyForm);
 
   const handleSave = async () => {
     if (!form.colaborador_id) { toast.error('Selecione um colaborador'); return; }
-    const { error } = await supabase.from('rh_exames').insert({
+    const { error } = await supabase.from('rh_exames').insert(withCompanyId(companyId, {
       ...form,
       data_realizacao: form.data_realizacao || null,
       data_vencimento: form.data_vencimento || null,
       status: form.data_realizacao ? 'REALIZADO' : 'PENDENTE',
       created_by: user?.id,
-    });
+    }));
     if (error) { toast.error('Erro: ' + error.message); return; }
     toast.success('Exame registrado!');
     setShowForm(false);
@@ -428,6 +433,7 @@ function ExamesTab({ exames, colaboradores, canManage, user, getColabNome, onRef
 // ─── Incidentes Tab ───
 function IncidentesTab({ incidentes, colaboradores, canManage, user, getColabNome, onRefresh }: any) {
   const supabase = useSupabase();
+  const { companyId } = useCompanyId();
   const [showForm, setShowForm] = useState(false);
   const emptyForm = {
     colaborador_id: '', tipo: 'incidente', gravidade: 'leve',
@@ -439,11 +445,11 @@ function IncidentesTab({ incidentes, colaboradores, canManage, user, getColabNom
 
   const handleSave = async () => {
     if (!form.descricao.trim()) { toast.error('Descrição é obrigatória'); return; }
-    const { error } = await supabase.from('rh_incidentes').insert({
+    const { error } = await supabase.from('rh_incidentes').insert(withCompanyId(companyId, {
       ...form,
       colaborador_id: form.colaborador_id || null,
       created_by: user?.id,
-    });
+    }));
     if (error) { toast.error('Erro: ' + error.message); return; }
     toast.success('Incidente registrado!');
     setShowForm(false);

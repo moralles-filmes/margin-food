@@ -1,3 +1,5 @@
+import { useCompanyId } from '@/hooks/useCompanyId';
+import { withCompanyId } from '@/lib/companyPayload';
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -46,6 +48,7 @@ const SETOR_LABELS: Record<string, string> = {
 export default function ComunicacaoInternaSection({
  canManage }: Props) {
   const supabase = useSupabase();
+  const { companyId } = useCompanyId();
   const canViewRbac = useCan('rh:mural:view');
   const { user } = useAuth();
   const [comunicados, setComunicados] = useState<any[]>([]);
@@ -109,9 +112,9 @@ export default function ComunicacaoInternaSection({
         if (error) { toast.error('Erro: ' + error.message); return; }
         toast.success('Comunicado atualizado!');
       } else {
-        const { error } = await supabase.from('rh_comunicados').insert({
+        const { error } = await supabase.from('rh_comunicados').insert(withCompanyId(companyId, {
           ...payload, autor_id: user?.id, autor_nome: user?.email?.split('@')[0] || '',
-        });
+        }));
         if (error) { toast.error('Erro: ' + error.message); return; }
         toast.success('Comunicado publicado!');
       }

@@ -1,3 +1,5 @@
+import { useCompanyId } from '@/hooks/useCompanyId';
+import { withCompanyId } from '@/lib/companyPayload';
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -55,6 +57,7 @@ const fmt = fmtBRL;
 export default function ControleCustosRhSection({
  colaboradores }: Props) {
   const supabase = useSupabase();
+  const { companyId } = useCompanyId();
   const canViewRbac = useCan('rh:custos:view');
   const { user } = useAuth();
   const [custos, setCustos] = useState<CustoMensalView[]>([]);
@@ -144,7 +147,7 @@ export default function ControleCustosRhSection({
 
       const { error } = await supabase
         .from('rh_custos_mensais')
-        .upsert(payload, { onConflict: 'periodo' });
+        .upsert(withCompanyId(companyId, payload), { onConflict: 'company_id,periodo' });
 
       if (error) { toast.error('Erro: ' + error.message); return; }
       toast.success('Custos calculados com sucesso!');

@@ -1,3 +1,5 @@
+import { useCompanyId } from '@/hooks/useCompanyId';
+import { withCompanyId } from '@/lib/companyPayload';
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -84,6 +86,7 @@ const STATUS_CONFIG: Record<string, { label: string; variant: 'default' | 'secon
 export default function FeriasAfastamentosSection({
  colaboradores, canManage }: Props) {
   const supabase = useSupabase();
+  const { companyId } = useCompanyId();
   const canViewRbac = useCan('rh:ferias:view');
   const { user } = useAuth();
   const [registros, setRegistros] = useState<FeriaAfastamento[]>([]);
@@ -144,7 +147,7 @@ export default function FeriasAfastamentosSection({
     setSaving(true);
     const dias = calcDiasUteis(dateInicio, dateFim);
     try {
-      const { error } = await supabase.from('rh_ferias_afastamentos').insert({
+      const { error } = await supabase.from('rh_ferias_afastamentos').insert(withCompanyId(companyId, {
         colaborador_id: form.colaborador_id,
         tipo: form.tipo,
         data_inicio: format(dateInicio, 'yyyy-MM-dd'),
@@ -153,7 +156,7 @@ export default function FeriasAfastamentosSection({
         motivo: form.motivo,
         observacoes: form.observacoes,
         solicitado_por: user?.id ?? null,
-      });
+      }));
       if (error) { toast.error('Erro: ' + error.message); return; }
       toast.success('Solicitação registrada!');
       setShowNew(false);

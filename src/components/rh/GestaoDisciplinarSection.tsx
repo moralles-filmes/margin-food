@@ -1,3 +1,5 @@
+import { useCompanyId } from '@/hooks/useCompanyId';
+import { withCompanyId } from '@/lib/companyPayload';
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -46,6 +48,7 @@ const GRAVIDADES: Record<string, { label: string; variant: 'default' | 'secondar
 
 export default function GestaoDisciplinarSection({ colaboradores, canManage }: Props) {
   const supabase = useSupabase();
+  const { companyId } = useCompanyId();
   const { user } = useAuth();
   const [ocorrencias, setOcorrencias] = useState<OcorrenciaRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -111,7 +114,7 @@ export default function GestaoDisciplinarSection({ colaboradores, canManage }: P
 
       const { error } = await supabase
         .from('rh_ocorrencias_disciplinares')
-        .insert(payload);
+        .insert(withCompanyId(companyId, payload));
 
       if (error) { toast.error('Erro: ' + error.message); return; }
       toast.success('Ocorrência registrada!');

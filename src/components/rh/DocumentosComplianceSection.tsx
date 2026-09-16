@@ -1,3 +1,5 @@
+import { useCompanyId } from '@/hooks/useCompanyId';
+import { withCompanyId } from '@/lib/companyPayload';
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -73,6 +75,7 @@ const STATUS_CONFIG: Record<string, { label: string; variant: 'default' | 'secon
 export default function DocumentosComplianceSection({
  colaboradores, canManage }: Props) {
   const supabase = useSupabase();
+  const { companyId } = useCompanyId();
   const canViewRbac = useCan('rh:documentos:view');
   const { user } = useAuth();
   const [documentos, setDocumentos] = useState<Documento[]>([]);
@@ -152,7 +155,7 @@ export default function DocumentosComplianceSection({
         arquivo_tamanho = selectedFile.size;
       }
 
-      const { error } = await supabase.from('rh_documentos').insert({
+      const { error } = await supabase.from('rh_documentos').insert(withCompanyId(companyId, {
         colaborador_id: form.colaborador_id,
         tipo: form.tipo,
         nome: form.nome,
@@ -166,7 +169,7 @@ export default function DocumentosComplianceSection({
         alertar_vencimento: form.alertar_vencimento,
         dias_alerta_antes: form.dias_alerta_antes,
         uploaded_by: user?.id ?? null,
-      });
+      }));
       if (error) { toast.error('Erro: ' + error.message); setUploading(false); return; }
       toast.success('Documento registrado!');
       setShowNew(false);

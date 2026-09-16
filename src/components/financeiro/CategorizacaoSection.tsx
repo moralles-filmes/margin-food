@@ -1,3 +1,5 @@
+import { useCompanyId } from '@/hooks/useCompanyId';
+import { withCompanyId } from '@/lib/companyPayload';
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -76,6 +78,7 @@ function SkeletonRows() {
 
 export default function CategorizacaoSection() {
   const supabase = useSupabase();
+  const { companyId } = useCompanyId();
   const canView = useCan('financeiro:categorizacao:view');
   const canCreate = useCan('financeiro:categorizacao:create');
   const canEdit = useCan('financeiro:categorizacao:edit');
@@ -181,7 +184,7 @@ export default function CategorizacaoSection() {
         if (error) { toast.error(error.message); return; }
         toast.success('Regra atualizada');
       } else {
-        const { error } = await supabase.from('fin_regras_categorizacao').insert(payload);
+        const { error } = await supabase.from('fin_regras_categorizacao').insert(withCompanyId(companyId, payload));
         if (error) { toast.error(error.message); return; }
         toast.success('Regra criada');
       }

@@ -1,3 +1,5 @@
+import { useCompanyId } from '@/hooks/useCompanyId';
+import { withCompanyId } from '@/lib/companyPayload';
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -57,6 +59,7 @@ const emptyForm = {
 
 export default function CalendarioLembretesView() {
   const supabase = useSupabase();
+  const { companyId } = useCompanyId();
   const canViewRbac = useCan('compras:calendario:view');
   const { user } = useAuth();
   const { produtos } = useEstoqueGeralStoreContext();
@@ -110,7 +113,7 @@ export default function CalendarioLembretesView() {
       if (error) { toast.error('Erro: ' + error.message); return; }
       toast.success('Lembrete atualizado!');
     } else {
-      const { error } = await supabase.from('purchase_reminders').insert(payload);
+      const { error } = await supabase.from('purchase_reminders').insert(withCompanyId(companyId, payload));
       if (error) { toast.error('Erro: ' + error.message); return; }
       toast.success('Lembrete criado!');
     }
