@@ -1,0 +1,147 @@
+{
+  "capturedAt": "2026-09-16T20:22:18.150Z",
+  "databases": {
+    "live": "moralles_phase11_test_live_20260916202159",
+    "refs": "moralles_phase11_test_refs_20260916202159",
+    "candidate": "moralles_phase11_test_candidate_20260916202159",
+    "hotfix": "moralles_phase11_test_hotfix_20260916202159",
+    "history": "moralles_phase11_test_history_20260916202159"
+  },
+  "checks": [
+    {
+      "label": "restore: 356 definicoes/owner/ACL identicos ao vivo",
+      "status": "PASS"
+    },
+    {
+      "label": "restore: relations identicos",
+      "status": "PASS"
+    },
+    {
+      "label": "restore: columns identicos",
+      "status": "PASS"
+    },
+    {
+      "label": "restore: constraints identicos",
+      "status": "PASS"
+    },
+    {
+      "label": "restore: indexes identicos",
+      "status": "PASS"
+    },
+    {
+      "label": "restore: triggers identicos",
+      "status": "PASS"
+    },
+    {
+      "label": "restore: policies public/reporting identicas; Storage fora deste clone",
+      "status": "PASS"
+    },
+    {
+      "label": "F3 recusa assinatura anterior no vivo equivalente sem mutacao",
+      "status": "PASS"
+    },
+    {
+      "label": "cadeia: F2 aplica no vivo equivalente",
+      "status": "PASS"
+    },
+    {
+      "label": "F2 repetida recusa estado ja aplicado; nao mascara aplicacao parcial",
+      "status": "PASS"
+    },
+    {
+      "label": "cadeia: F3 e retry recusados atomicamente apos F2",
+      "status": "PASS"
+    },
+    {
+      "label": "F7 preflight recusa hotfix com F2-F6 presentes",
+      "status": "PASS"
+    },
+    {
+      "label": "cadeia: primeira migration F7 tambem recusa hotfix atomicamente",
+      "status": "PASS"
+    },
+    {
+      "label": "526 assertions hotfix no vivo equivalente",
+      "status": "PASS"
+    },
+    {
+      "label": "F7 referencias recusa hotfix em clone candidato ja contido",
+      "status": "PASS"
+    },
+    {
+      "label": "526 assertions hotfix sobre candidato F7",
+      "status": "PASS"
+    },
+    {
+      "label": "regressao SQL F3",
+      "status": "PASS"
+    },
+    {
+      "label": "regressao SQL F4",
+      "status": "PASS"
+    },
+    {
+      "label": "regressao SQL F5",
+      "status": "PASS"
+    },
+    {
+      "label": "regressao SQL F6",
+      "status": "PASS"
+    },
+    {
+      "label": "regressao SQL F7",
+      "status": "PASS"
+    },
+    {
+      "label": "3 definicoes admin historicas compiladas: Git=history; ultima=vivo",
+      "status": "PASS",
+      "detail": [
+        {
+          "version": "20260910003448",
+          "acl": "{postgres=X/postgres,service_role=X/postgres}",
+          "md5": "606fb890b92975a13cdffdfb800f4851",
+          "sameAsLive": false
+        },
+        {
+          "version": "20260912164600",
+          "acl": "{postgres=X/postgres,service_role=X/postgres}",
+          "md5": "27384e68ba2a3e84ed10ed218f45b68e",
+          "sameAsLive": false
+        },
+        {
+          "version": "20260915120000",
+          "acl": "{postgres=X/postgres,service_role=X/postgres}",
+          "md5": "353ed3cb9f163776b94a8ef322845915",
+          "sameAsLive": true
+        }
+      ]
+    }
+  ],
+  "compiled": [
+    {
+      "version": "20260910003448",
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "md5": "606fb890b92975a13cdffdfb800f4851",
+      "sameAsLive": false
+    },
+    {
+      "version": "20260912164600",
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "md5": "27384e68ba2a3e84ed10ed218f45b68e",
+      "sameAsLive": false
+    },
+    {
+      "version": "20260915120000",
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "md5": "353ed3cb9f163776b94a8ef322845915",
+      "sameAsLive": true
+    }
+  ],
+  "integratedRelease": "BLOCKED: F3 antes de F4-F8; F7 referencia conflita com hotfix. Regressao de candidato nao prova construcao a partir do vivo.",
+  "productionMutations": false,
+  "limits": [
+    "SQL PostgreSQL real; Auth fixture, sem gateway/browser",
+    "Clone candidato herdado F7, nao obtido pelo release bloqueado",
+    "Nenhuma migration historica alterada ou history repair executado"
+  ]
+}

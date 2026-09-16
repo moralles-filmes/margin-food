@@ -1,0 +1,145 @@
+{
+  "capturedAt": "2026-09-16T20:43:02.156Z",
+  "databaseCapturedAt": "2026-09-16T20:41:55.013737+00:00",
+  "productionMutations": false,
+  "catalogs": {
+    "versions": {
+      "count": 856,
+      "equalInitialF11": true,
+      "sha256": "4e03f901982ce026ffaf7cb8ad4ace9f9c33d322c73e8bce3e52e816baa420d5"
+    },
+    "functions": {
+      "count": 356,
+      "equalInitialF11": true,
+      "sha256": "2c4b26fa740d1f29f04e05344f0b40c6bc395772370e4d18a2cc5393ca0f32b7"
+    },
+    "policies": {
+      "count": 599,
+      "equalInitialF11": true,
+      "sha256": "53275bc7ff162c9d08e42988fc2a2fd9b9582de462f0371e496de6a77935bfe0"
+    }
+  },
+  "edges": {
+    "count": 17,
+    "equalInitialF11": true,
+    "entries": [
+      {
+        "slug": "admin-users",
+        "version": 32,
+        "verify_jwt": false,
+        "bundleHash": "beac051bbd778dae235737c1f06443881761c8676382828a4ed3e78c38636791"
+      },
+      {
+        "slug": "ai-chat",
+        "version": 9,
+        "verify_jwt": false,
+        "bundleHash": "f69cc84332fb772248af091ac1e98ba041e47bb4d0ec5a1f0da97b71b8723fb7"
+      },
+      {
+        "slug": "inventario",
+        "version": 15,
+        "verify_jwt": false,
+        "bundleHash": "df334230202613c86d8864c4382fee6aa8f6727fcf38d7a2cc4f8a6bdbf876ae"
+      },
+      {
+        "slug": "check-password",
+        "version": 8,
+        "verify_jwt": true,
+        "bundleHash": "20d1d0558eac3627c7521efe47532d298310d31257d5e8812364cf09156e657f"
+      },
+      {
+        "slug": "purchase-requisitions",
+        "version": 10,
+        "verify_jwt": false,
+        "bundleHash": "12b9ec51451add1cd015ffa065129dc3042550f72a5e36bfc91b187ae833b67c"
+      },
+      {
+        "slug": "requisicao-estoque",
+        "version": 14,
+        "verify_jwt": false,
+        "bundleHash": "4aa1a03e851549c6322e6ba432063c0087944c51b06db23f9e4f8a2aed529445"
+      },
+      {
+        "slug": "cmv",
+        "version": 10,
+        "verify_jwt": false,
+        "bundleHash": "9a21b79cd79af3ebab068741326f29feba01c1da4a4afd6ca088c4dbc2101626"
+      },
+      {
+        "slug": "rh",
+        "version": 10,
+        "verify_jwt": false,
+        "bundleHash": "acf1ee3ab4c1e959f82b1341bc25fd4e8c4aac4e88179a8674fcfaebde4ed8cc"
+      },
+      {
+        "slug": "ficha-tecnica",
+        "version": 11,
+        "verify_jwt": false,
+        "bundleHash": "8ae014771f544d9305b585f2cef7738dbd9e4496e84d91f8dbfff56deb5a0a6e"
+      },
+      {
+        "slug": "admin-companies",
+        "version": 11,
+        "verify_jwt": true,
+        "bundleHash": "bab1714730d66d532588f252a4de63885f1019282b5cf282cba49cfd5920561b"
+      },
+      {
+        "slug": "scheduled-jobs",
+        "version": 7,
+        "verify_jwt": false,
+        "bundleHash": "e70b6bf47eec1df55dd9a45760a71cdf8f447ca24e36913fe42315a334a8e5da"
+      },
+      {
+        "slug": "admin-create-user",
+        "version": 6,
+        "verify_jwt": false,
+        "bundleHash": "9da8c84e0495ae75cacfd520fcb23762b90917eab9db2cbf1fb79008f444f68d"
+      },
+      {
+        "slug": "rbac-lint",
+        "version": 6,
+        "verify_jwt": false,
+        "bundleHash": "e2cea0024ca37021f4f8bbe3c5e547dd5b7f42c4da0c1f292f686826086ea36e"
+      },
+      {
+        "slug": "rbac-lint-quick",
+        "version": 6,
+        "verify_jwt": true,
+        "bundleHash": "770028b3413cbe0474b1617993817fd005527aacf09a406ed15d6570d22bc121"
+      },
+      {
+        "slug": "rbac-lint-full",
+        "version": 6,
+        "verify_jwt": true,
+        "bundleHash": "e0ccebeb6b67c1cfc5110f335d55357339f511d187041d83941fece37f048d17"
+      },
+      {
+        "slug": "send-whatsapp-zapi",
+        "version": 5,
+        "verify_jwt": false,
+        "bundleHash": "7ca435f3f03b188d8ec8f0517759636b221e1af354fd43bcbdd4fef23291e728"
+      },
+      {
+        "slug": "cotacao-ia",
+        "version": 4,
+        "verify_jwt": false,
+        "bundleHash": "b6067da96c980e6507283ef781950fc7a784feed40ce67482df3b31315b1c1de"
+      }
+    ]
+  },
+  "vercel": {
+    "id": "dpl_79oubxDxhgVF4owXmEXiEP6QUV5N",
+    "state": "READY",
+    "sha": "80dcf4ec527d1a7e86ed3509496638b71219ab43",
+    "target": "production",
+    "alias": [
+      "www.marginfood.com",
+      "moralles-food.vercel.app",
+      "marginfood.com",
+      "moralles-food-moralles-filmes-projects.vercel.app",
+      "moralles-food-git-main-moralles-filmes-projects.vercel.app"
+    ],
+    "equalInitialF11": true
+  },
+  "method": "Compare full canonical lists to revalidacao-viva/publicacao; preserve SQL strings, sort object keys only. Independent service captures, not atomic."
+}

@@ -1,0 +1,7 @@
+{
+  "capturedAt": "2026-09-16T20:29:46.248Z",
+  "incident": "First HTTP/browser runner adapter changed phase10 but missed Portuguese fase10 evidence output path.",
+  "recovery": "New HTTP/browser results moved to F11. Baseline F10 restored byte-for-byte from clean HEAD. Adapter now replaces both spellings.",
+  "productionImpact": false,
+  "sourceAssertionsChanged": false
+}

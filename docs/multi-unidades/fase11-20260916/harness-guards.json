@@ -1,0 +1,23 @@
+{
+  "source": "scripts/test-phase9-guards.mjs",
+  "sha256": "4185089ccfe6231e2b14639880239663356c820e6ebaace0d12471fb503ff1b5",
+  "generatedSha256": "f14ff45fb33f138c7f0a96ffdeeeb821fc752125261139073e2b3ad69e4b012d",
+  "replacements": [
+    {
+      "from": "moralles_phase9_test_",
+      "to": "moralles_phase11_test_",
+      "count": 1
+    },
+    {
+      "from": "fs.readFileSync(`${dir}/ensaios.json`",
+      "to": "fs.readFileSync('docs/multi-unidades/fase11-20260916/sql.json'",
+      "count": 1
+    },
+    {
+      "from": "fs.writeFileSync(`${dir}/ensaios-guards-recuo.json`",
+      "to": "fs.writeFileSync('docs/multi-unidades/fase11-20260916/guards-recuo.json'",
+      "count": 1
+    }
+  ],
+  "capturedAt": "2026-09-16T20:22:48.336Z"
+}

@@ -1,0 +1,34 @@
+{
+  "capturedAt": "2026-09-16T20:20:19.710691+00:00",
+  "comparedTo": "F10 revalidacao-viva/publicacao",
+  "counts": {
+    "versions": 856,
+    "functions": 356,
+    "policies": 599,
+    "files": 870
+  },
+  "same": {
+    "versions": true,
+    "functions": true,
+    "policies": true,
+    "edges": true,
+    "vercel": true
+  },
+  "absent": [
+    "20260915140812_contain_global_maintenance_and_companies.sql",
+    "20260915144030_trusted_log_writers_and_readers.sql",
+    "20260915144031_classify_legacy_logs_safely.sql",
+    "20260915200818_harden_salmon_internal_functions.sql",
+    "20260915225538_isolate_supplier_prices.sql",
+    "20260915232846_align_product_catalog_permissions.sql",
+    "20260916133617_phase7_contain_non_rls_privileges.sql",
+    "20260916133618_phase7_align_reference_catalogs.sql",
+    "20260916133619_phase7_guard_sql_writers.sql",
+    "20260916134848_phase7_scope_upsert_conflicts.sql",
+    "20260916135928_phase7_guard_stock_readers.sql",
+    "20260916141000_phase7_scope_notification_writer.sql",
+    "20260916143153_phase8_storage_scope.sql",
+    "20260916144830_phase8_realtime_events.sql"
+  ],
+  "typesUnchanged": true
+}

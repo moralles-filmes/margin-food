@@ -1,0 +1,226 @@
+{
+  "capturedAt": "2026-09-16T20:32:31.336Z",
+  "files": [
+    {
+      "file": "AGENTS.md",
+      "bytes": 55224,
+      "sha256": "dfaaf6bff0d5646378ac95d5e4109dc67613f1faf6b2d6c70df2f26c0ce57a04"
+    },
+    {
+      "file": "CLAUDE.md",
+      "bytes": 55224,
+      "sha256": "dfaaf6bff0d5646378ac95d5e4109dc67613f1faf6b2d6c70df2f26c0ce57a04"
+    },
+    {
+      "file": "docs/ARCHITECTURE.md",
+      "bytes": 51240,
+      "sha256": "3f11f01a3b49435ac992b14dd72164b989a67495b9fc437a7565be0c9ec33b12"
+    },
+    {
+      "file": "docs/multi-unidades/00-AUDITORIA.md",
+      "bytes": 12542,
+      "sha256": "4e425de483ac6b5babb755804a95db73b82f75e32edfc366bc53191a8eefe9f0"
+    },
+    {
+      "file": "docs/multi-unidades/01-INVENTARIO.md",
+      "bytes": 9897,
+      "sha256": "6457ff7e9105b6d61ed11e628d5238c679b44ef2f6cc8c7a2690c32188a907c2"
+    },
+    {
+      "file": "docs/multi-unidades/02-ARQUITETURA-E-OPERACAO.md",
+      "bytes": 20590,
+      "sha256": "eb761a0e97bd7772396dbc0bb9d456ace99996041297c15019cc7b08c085993a"
+    },
+    {
+      "file": "docs/multi-unidades/03-AUDITORIA-POS-IMPLANTACAO.md",
+      "bytes": 36238,
+      "sha256": "ee9ae0b176cf7c86b2bb300dbcfb6455f5294b9a8d1515c76bf4fb20f2302027"
+    },
+    {
+      "file": "docs/multi-unidades/fase2-20260915/RESULTADOS.md",
+      "bytes": 12386,
+      "sha256": "f7bdf2aa4af67e29d813467fc542a9a70fec24d6eba5d4913188da2158751444"
+    },
+    {
+      "file": "docs/multi-unidades/fase3-20260915/RESULTADOS.md",
+      "bytes": 19334,
+      "sha256": "288c22dde148cd850dccfa2c651527775a9a1d7f4221e8afb3800b7af11e2732"
+    },
+    {
+      "file": "docs/multi-unidades/fase4-20260915/RESULTADOS.md",
+      "bytes": 19325,
+      "sha256": "0419be7d3185fca5dddbd896ceb2d3d6c8c70bf4ceae2ffbb3fa2c543f1eb2c7"
+    },
+    {
+      "file": "docs/multi-unidades/fase5-20260915/RESULTADOS.md",
+      "bytes": 16071,
+      "sha256": "bcb21d80600bb086452d41d5b9f6bb939b7f42bb0de3b50c568fa676e488aa59"
+    },
+    {
+      "file": "docs/multi-unidades/fase6-20260915/RESULTADOS.md",
+      "bytes": 19238,
+      "sha256": "e39d31964644a98fc0b1f1ef0d1f2fbe2b056ef5cec7885c344cfd8dfa64121f"
+    },
+    {
+      "file": "docs/multi-unidades/fase7-20260916/RESULTADOS.md",
+      "bytes": 17346,
+      "sha256": "dfe740a97f400365737de69e67bcbbca83a97c0dc8f053adc2a424b1d08740c0"
+    },
+    {
+      "file": "docs/multi-unidades/fase7-20260916/REVISAO-SQL.md",
+      "bytes": 8579,
+      "sha256": "12f4e7c44b0ff1d3a3f32d7ecaa22a149eee5bb7bdb0efffd39e3ac5e1a6a4d4"
+    },
+    {
+      "file": "docs/multi-unidades/fase8-20260916/RESULTADOS.md",
+      "bytes": 15172,
+      "sha256": "c9e240f15106860d9c7844f63be624a1fc5ad54d0515b25407775d513b74654d"
+    },
+    {
+      "file": "docs/multi-unidades/fase8-20260916/MAPA-DE-CONFIANCA.md",
+      "bytes": 17111,
+      "sha256": "dcc59d6f6ea2f38bc44b19dde0a7ad59aa9972afab168633d5fbf142ba2199db"
+    },
+    {
+      "file": "docs/multi-unidades/fase8-20260916/RUNBOOK-TESTES.md",
+      "bytes": 9306,
+      "sha256": "576eecb912355f88dd43512973c91271b539d24ee70d87f6041d7d919adbe297"
+    },
+    {
+      "file": "docs/multi-unidades/fase9-20260916/RESULTADOS.md",
+      "bytes": 13507,
+      "sha256": "c50d7a0a17580e776d38bb8ef8ceb7f64516098771d7184d64bf3a04ae002b81"
+    },
+    {
+      "file": "docs/multi-unidades/fase9-20260916/PLANO-RELEASE.md",
+      "bytes": 10523,
+      "sha256": "9339e153812b80a58864dcb572035a2b2b85dbbfc829edc0d67f1334ad49c36f"
+    },
+    {
+      "file": "docs/multi-unidades/fase9-20260916/RUNBOOK-TESTES.md",
+      "bytes": 7246,
+      "sha256": "5366c0db9d428f31295b376cc2e8e9f76bc84675ca419772ed24518bc03997fa"
+    },
+    {
+      "file": "docs/multi-unidades/fase9-20260916/publicacao.json",
+      "bytes": 4523,
+      "sha256": "c8c22298fb81918cf27cd38bfd755309ece23371f43ce1c35756ae60a9911c8f"
+    },
+    {
+      "file": "docs/multi-unidades/fase9-20260916/preflights-vivos.json",
+      "bytes": 1730,
+      "sha256": "aa061b10cb37f641ac15b2f687239044a4197a3530e723755e3793ed2924c5b8"
+    },
+    {
+      "file": "docs/multi-unidades/fase9-20260916/cli-historico.json",
+      "bytes": 532,
+      "sha256": "23b4c66ab9272164bbd1e680562b600655836b1e5d73b5122c40f560a1c6dd68"
+    },
+    {
+      "file": "docs/multi-unidades/fase9-20260916/matriz-objetos.json",
+      "bytes": 1362392,
+      "sha256": "732f7ec77c5e2d495e3dc24d48a3aba9a099943c2f7e1db510d38f5f4011b252"
+    },
+    {
+      "file": "docs/multi-unidades/fase9-20260916/contratos-types.json",
+      "bytes": 187566,
+      "sha256": "fa4c7ccb89da1fafed0d026eeefd11473a493e429ad1eac6802aaafb486078b5"
+    },
+    {
+      "file": "docs/multi-unidades/fase9-20260916/ensaios.json",
+      "bytes": 4093,
+      "sha256": "909449776b88b9519ecde257276d9ce8517c880c013972b9c9482ff501eeaabc"
+    },
+    {
+      "file": "docs/multi-unidades/fase9-20260916/ensaios-guards-recuo.json",
+      "bytes": 23423,
+      "sha256": "22836e7f1a2ca7b431586d723d21b7012bb1bb83147f483156f4ed2877ba1152"
+    },
+    {
+      "file": "docs/multi-unidades/fase10-20260916/comparacao-f9.json",
+      "bytes": 2455,
+      "sha256": "dcc102e573de71ff2f7d4b676e7e60338c50a30f5c08ca33521adcd5dd0754d9"
+    },
+    {
+      "file": "docs/multi-unidades/fase10-20260916/config-http.toml",
+      "bytes": 3150,
+      "sha256": "d4892daff840836f0f177cdf26d894e16cfc0c9793e38c3045778c630d2ba8ea"
+    },
+    {
+      "file": "docs/multi-unidades/fase10-20260916/contratos-frontend.json",
+      "bytes": 296992,
+      "sha256": "49a5b642583730e8dd73224f2f8099fa802978e4a35fb872b06ae0173337df46"
+    },
+    {
+      "file": "docs/multi-unidades/fase10-20260916/ensaios.json",
+      "bytes": 1900,
+      "sha256": "be8f969ecd7f06e2fd46b1bde1181f75c72eac1d3a5abd555836c163a5745404"
+    },
+    {
+      "file": "docs/multi-unidades/fase10-20260916/http.json",
+      "bytes": 2262,
+      "sha256": "829c307c0b76144abae9011419ab4d14e8561d2b8d5c82e1d9b83ae67dcea44d"
+    },
+    {
+      "file": "docs/multi-unidades/fase10-20260916/inventario-frontend.json",
+      "bytes": 695489,
+      "sha256": "7a9b81734a78f806668e9882efa07a1cfd2fca1eeaa5d6c088e7e7c9913fb0ff"
+    },
+    {
+      "file": "docs/multi-unidades/fase10-20260916/MATRIZ-ARQUIVOS.md",
+      "bytes": 29693,
+      "sha256": "f51dbfab5affd1373463d2bb9d63f8ad818222a7337fdfadb2dae3d37a7498b9"
+    },
+    {
+      "file": "docs/multi-unidades/fase10-20260916/MATRIZ-FRONTEND.md",
+      "bytes": 9366,
+      "sha256": "1ecf32391a99f7e4dd75daf277f3f6c77d20c87e67fa85581352396d4bae0c80"
+    },
+    {
+      "file": "docs/multi-unidades/fase10-20260916/PLANO-PUBLICACAO.md",
+      "bytes": 2798,
+      "sha256": "15af72a7fa2931608e12f7d41f024c4979f4c0e53c642a82ae13f1f0e9932693"
+    },
+    {
+      "file": "docs/multi-unidades/fase10-20260916/PROMPT-FASE11.md",
+      "bytes": 11295,
+      "sha256": "9a8d81971bcd695cdf6e3040c842b0e66e7ef45994fd39d1a77b957ce3221b0e"
+    },
+    {
+      "file": "docs/multi-unidades/fase10-20260916/publicacao.json",
+      "bytes": 3527,
+      "sha256": "b3d90b94c3868c51810106cd6d9993db6c04446c69c0b51c315b345d0f887d78"
+    },
+    {
+      "file": "docs/multi-unidades/fase10-20260916/RESULTADOS.md",
+      "bytes": 10433,
+      "sha256": "e895d58372760257ee89b717fb3301c624e9adfcc2eebb5bb9175be33217806f"
+    },
+    {
+      "file": "docs/multi-unidades/fase10-20260916/revalidacao-final.json",
+      "bytes": 3046,
+      "sha256": "52eeb9587fba10a0a2c67fc29cce0fe32ca6857f4ba8ce9cda99a060f62bfd53"
+    },
+    {
+      "file": "docs/multi-unidades/fase10-20260916/revalidacao-viva.json",
+      "bytes": 412923,
+      "sha256": "cdee3a4ff277b66c72863fb2a875d8e91ef33647ca6f334f87c5cfbfe40a0683"
+    },
+    {
+      "file": "docs/multi-unidades/fase10-20260916/RUNBOOK-TESTES.md",
+      "bytes": 6601,
+      "sha256": "f05c1eed78101191aee53d496eb7f1c31ee4476bd4a862fd8f719b6ffd2135f2"
+    },
+    {
+      "file": "docs/multi-unidades/fase10-20260916/security-scan.json",
+      "bytes": 9642,
+      "sha256": "d36a5ad4af8d5fcf18b924200c7a6ad8b34ac7708d85c515f892935c985e6fa2"
+    },
+    {
+      "file": "docs/multi-unidades/fase10-20260916/browser/result.json",
+      "bytes": 1118,
+      "sha256": "459ddef507bfff48d6d2cec5c13ef21dfa6f68b817868b3b81fd94ffcb7426f3"
+    }
+  ],
+  "note": "Evidence source inventory, not a semantic approval of every operation in each source."
+}

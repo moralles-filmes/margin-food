@@ -1,0 +1,33 @@
+{
+  "source": "scripts/prepare-phase10-stack.mjs",
+  "sha256": "1c94400fa2083aacf0814c405447219f575229525194b9dc48b358e5539db85f",
+  "generatedSha256": "31bca53aaf3bf5dcb80534d9bc18ecbea439ee74470a841c125350cd874bb2f0",
+  "replacements": [
+    {
+      "from": "phase10",
+      "to": "phase11",
+      "count": 2
+    },
+    {
+      "from": "PHASE10",
+      "to": "PHASE11",
+      "count": 1
+    },
+    {
+      "from": "F10",
+      "to": "F11",
+      "count": 1
+    },
+    {
+      "from": "5662",
+      "to": "5672",
+      "count": 8
+    },
+    {
+      "from": "5663",
+      "to": "5673",
+      "count": 1
+    }
+  ],
+  "capturedAt": "2026-09-16T20:24:53.682Z"
+}

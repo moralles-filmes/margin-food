@@ -1,0 +1,43 @@
+{
+  "source": "scripts/test-phase10-http.mjs",
+  "sha256": "4c8ada827c37ad9395adef689a72c29a179530d395bcffac39a83263f7685b84",
+  "generatedSha256": "ea6338fd0c2939626bdd5923b937e0c5db57863daa23009e11b926d0617bf128",
+  "replacements": [
+    {
+      "from": "phase10",
+      "to": "phase11",
+      "count": 1
+    },
+    {
+      "from": "fase10-20260916",
+      "to": "fase11-20260916",
+      "count": 1
+    },
+    {
+      "from": "PHASE10",
+      "to": "PHASE11",
+      "count": 3
+    },
+    {
+      "from": "F10",
+      "to": "F11",
+      "count": 5
+    },
+    {
+      "from": "f10",
+      "to": "f11",
+      "count": 2
+    },
+    {
+      "from": "5662",
+      "to": "5672",
+      "count": 1
+    },
+    {
+      "from": "8085",
+      "to": "8087",
+      "count": 1
+    }
+  ],
+  "capturedAt": "2026-09-16T20:39:21.423Z"
+}

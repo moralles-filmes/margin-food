@@ -1,0 +1,33 @@
+{
+  "source": "scripts/phase10-fixtures.mjs",
+  "sha256": "364fbbab71a83f6620dac99f2481f955d73659c2fada9c1f6e5936ee0e404a91",
+  "generatedSha256": "20ac02534c952de4685d748b820aa757e9a7c351f291ce414216408b08d164d9",
+  "replacements": [
+    {
+      "from": "phase10",
+      "to": "phase11",
+      "count": 3
+    },
+    {
+      "from": "PHASE10",
+      "to": "PHASE11",
+      "count": 1
+    },
+    {
+      "from": "F10",
+      "to": "F11",
+      "count": 6
+    },
+    {
+      "from": "5662",
+      "to": "5672",
+      "count": 1
+    },
+    {
+      "from": "5663",
+      "to": "5673",
+      "count": 1
+    }
+  ],
+  "capturedAt": "2026-09-16T20:25:05.392Z"
+}

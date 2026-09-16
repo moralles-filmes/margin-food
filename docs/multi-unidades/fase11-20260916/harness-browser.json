@@ -1,0 +1,68 @@
+{
+  "source": "scripts/test-phase10-browser.mjs",
+  "sha256": "08465bedba35417cf8ffc97546335b758c0c29952c5f3cbcdc059ac2d529e5cd",
+  "generatedSha256": "161de1db418741d8118ebb18d4dd3ae67b814fdf99c018d69dee4abac229435a",
+  "replacements": [
+    {
+      "from": "phase10",
+      "to": "phase11",
+      "count": 3
+    },
+    {
+      "from": "fase10-20260916",
+      "to": "fase11-20260916",
+      "count": 1
+    },
+    {
+      "from": "PHASE10",
+      "to": "PHASE11",
+      "count": 2
+    },
+    {
+      "from": "F10",
+      "to": "F11",
+      "count": 24
+    },
+    {
+      "from": "5663",
+      "to": "5673",
+      "count": 1
+    },
+    {
+      "from": "8086",
+      "to": "8088",
+      "count": 3
+    },
+    {
+      "from": "await page.getByLabel('Recolher menu',{exact:true}).click();await page.screenshot",
+      "to": "await page.getByLabel('Recolher menu',{exact:true}).click();await page.waitForFunction(()=>document.querySelector('aside')?.getBoundingClientRect().width===64);await page.screenshot",
+      "count": 1
+    },
+    {
+      "from": "await page.screenshot({path:`${dir}/presentation-b.png`});",
+      "to": "await page.screenshot({path:`${dir}/presentation-b.png`});\n\n for(const [kind,label] of [['pdf','PDF'],['pptx','PowerPoint']]){\n   const pending=page.waitForEvent('download');\n   await button('Exportar apresentação em '+label).click();\n   const download=await pending;\n   assert.match(download.suggestedFilename(),/f11-shopping/i);\n   const bytes=fs.readFileSync(await download.path());\n   let content;\n   if(kind==='pdf'){content=bytes.toString('latin1');assert.ok(content.startsWith('%PDF-'));}\n   else {const JSZip=(await import('jszip')).default;const zip=await JSZip.loadAsync(bytes);content=(await Promise.all(Object.keys(zip.files).filter(n=>/^ppt\\/slides\\/slide\\d+\\.xml$/.test(n)).map(n=>zip.file(n).async('string')))).join('\\n');}\n   assert.ok(content.includes('F11 Shopping'));assert.ok(!content.includes('F11 Centro'));assert.ok(content.includes('222,00'));\n   fs.writeFileSync(dir+'/presentation-b.'+kind,bytes);\n   pass('download real '+label+': unidade B e R$222; não contém unidade global A');\n }\n await button('Ativar tema escuro').click();await page.waitForFunction(()=>document.documentElement.classList.contains('dark'));\n await page.screenshot({path:dir+'/presentation-dark.png'});await button('Ativar tema claro').click();\n pass('apresentação B renderiza em tema escuro e retorna ao claro');\n ",
+      "count": 1
+    },
+    {
+      "from": "await page.reload();await account(1);pass('reload restaura preferência válida');",
+      "to": "await page.reload();await account(1);pass('reload restaura preferência válida');\n\n // Falha de transporte real: nenhuma resposta/linha do banco é substituída.\n const failContext=route=>route.abort('connectionfailed');\n await context.route('**/rest/v1/rpc/get_my_company_context',failContext);\n await page.evaluate(()=>window.dispatchEvent(new Event('focus')));\n await button('Tentar novamente').waitFor();\n assert.equal(await page.getByText('Conta F11 1',{exact:true}).count(),0);\n await page.screenshot({path:dir+'/context-error.png'});\n await context.unroute('**/rest/v1/rpc/get_my_company_context',failContext);\n const retryStart=performance.now(); await button('Tentar novamente').click(); await account(1);\n pass('erro de contexto remove dados; retry valida backend real e remonta A ('+Math.round(performance.now()-retryStart)+'ms locais)');\n ",
+      "count": 1
+    },
+    {
+      "from": "assert.deepEqual(failures,[]);",
+      "to": "\n await page.setViewportSize({width:1440,height:1000});\n await page.evaluate(({id,unit})=>localStorage.setItem('marginpro:last-company:'+id,unit),{id:users.multi.id,unit:units.b});\n assert.equal((await service.from('company_memberships').update({status:'inactive'}).eq('user_id',users.multi.id).eq('company_id',units.b)).error,null);\n await page.reload(); await page.getByText('F11 Centro',{exact:true}).first().waitFor();\n assert.equal(await page.getByRole('button',{name:'Trocar unidade: F11 Shopping',exact:true}).count(),0);\n pass('preferência antes válida torna-se obsoleta; reload recusa membership inativo');\n assert.equal((await service.from('company_memberships').update({status:'active'}).eq('user_id',users.multi.id).eq('company_id',units.b)).error,null);\n assert.deepEqual(failures,[]);",
+      "count": 1
+    },
+    {
+      "from": "'exports e falhas/retry cobertos separadamente por testes de componente'",
+      "to": "'exports pós-cleanup são testes de componente; erro/retry também exercitado neste browser'",
+      "count": 1
+    },
+    {
+      "from": "'CLI agent-browser timeout; Chromium via Playwright'",
+      "to": "'Chromium via runner Playwright revisado; tráfego externo bloqueado'",
+      "count": 1
+    }
+  ],
+  "capturedAt": "2026-09-16T20:31:06.135Z"
+}

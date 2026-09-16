@@ -1,0 +1,31 @@
+{
+  "capturedAt": "2026-09-16T20:21:40.607Z",
+  "head": "483c332b896b299c822972ff01822ce4aa7613a9",
+  "originMain": "80dcf4ec527d1a7e86ed3509496638b71219ab43",
+  "preserved": [
+    {
+      "file": "TAREFAS.md",
+      "sha256": "ceecc6968e8d8a7a01b8eb738867f5a8a88ee6458e0ecfc4398b5db2caddf379"
+    },
+    {
+      "file": "docs/multi-unidades/fase7-20260916/RESULTADOS.md",
+      "sha256": "dfe740a97f400365737de69e67bcbbca83a97c0dc8f053adc2a424b1d08740c0"
+    },
+    {
+      "file": "docs/rbac/stock-reference-access-20260916-before.json",
+      "sha256": "310cad32c8094a23977f2bd09240aaecc2750d4082be951c0e16eaf731ea2905"
+    },
+    {
+      "file": "docs/rbac/stock-reference-access-20260916.md",
+      "sha256": "be3da92410fa7e806df29c65153d95768821b08ec93a51218f6c7cd6d93957d2"
+    },
+    {
+      "file": "supabase/migrations/20260916153928_fix_stock_reference_access.sql",
+      "sha256": "cbad06cf9a1bfeb4a4f07783cfc49a5b49f53c0d6782f2a791db865ccbd6bcda"
+    },
+    {
+      "file": "supabase/tests/database/stock_reference_access.sql",
+      "sha256": "473d141005d3c24dc0141d41d62ddeb5dc0f2cb6f52962b73cc078182b2df918"
+    }
+  ]
+}

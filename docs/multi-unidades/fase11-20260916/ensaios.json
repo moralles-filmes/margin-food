@@ -1,0 +1,179 @@
+{
+  "capturedAt": "2026-09-16T20:36:01.908Z",
+  "baseCommit": "483c332b896b299c822972ff01822ce4aa7613a9",
+  "productionMutations": false,
+  "checks": {
+    "unit": {
+      "passed": 789,
+      "files": 101,
+      "durationSeconds": 49.67,
+      "transport": "simulated in components"
+    },
+    "typescriptApp": "PASS",
+    "typescriptNode": "PASS",
+    "build": "PASS",
+    "lint": {
+      "errors": 0,
+      "warnings": 1357
+    },
+    "rbac": {
+      "blockers": 0,
+      "important": 2,
+      "info": 19,
+      "allowlisted": 11
+    },
+    "security": {
+      "exit": 0,
+      "sqlLint": "SKIPPED: env not configured"
+    },
+    "deno": {
+      "handlers": 17,
+      "exit": 0
+    },
+    "cors": {
+      "passed": 1
+    },
+    "splitter": {
+      "passed": 8
+    },
+    "sql": {
+      "checkpoints": 22,
+      "hotfixAssertionsPerState": 526,
+      "states": 2,
+      "regressionAssertions": {
+        "F3": 175,
+        "F4": 146,
+        "F5": 67,
+        "F6": 80,
+        "F7": 248
+      }
+    },
+    "guardsRollback": {
+      "checkpoints": 8,
+      "drift": 4,
+      "rollbackStages": [
+        "F2",
+        "F7"
+      ]
+    },
+    "http": {
+      "passed": 21,
+      "environment": "Auth/PostgREST local, Deno direct"
+    },
+    "browser": {
+      "passed": 17,
+      "screenshots": 11,
+      "realDownloads": 2
+    },
+    "performance": {
+      "plans": 60,
+      "queries": 10,
+      "repetitions": 3,
+      "states": 2
+    },
+    "finalHarnessLint": {
+      "errors": 0,
+      "warnings": 0,
+      "exit": 0
+    }
+  },
+  "baselineNotRerun": {
+    "F8": {
+      "http": 88,
+      "storage": 37,
+      "realtime": 16,
+      "drift": 10,
+      "rollback": 6
+    },
+    "F9": "previous execution not added; harness rerun in F11 clones",
+    "F10": "previous 789/21/12 not added"
+  },
+  "privateLogs": [
+    {
+      "path": ".phase11.local/unit.log",
+      "sha256": "d152e6e5c56bd21f4e974864d19b100efba47e0993f87fd1fa3e0e6fd47cbd32"
+    },
+    {
+      "path": ".phase11.local/ts-app.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": ".phase11.local/ts-node.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": ".phase11.local/lint.log",
+      "sha256": "49f2fc7049cc989f22709ccbf7f0c6bf097ffc7a6c8fc3c301cc655ff4495827"
+    },
+    {
+      "path": ".phase11.local/rbac.log",
+      "sha256": "119acd89d822e5eccc7136524fd6dbdd4d2622412a0710824bf4f7a3f20e4af4"
+    },
+    {
+      "path": ".phase11.local/security.log",
+      "sha256": "847a2856a7590de6e069375605fafde12e981ce221a4d517efdafaa6b26e24de"
+    },
+    {
+      "path": ".phase11.local/build.log",
+      "sha256": "d5805e2e84b4e4438acc2c3853948172dbd2655a730b3b34689389cd05874ed1"
+    },
+    {
+      "path": ".phase11.local/deno.log",
+      "sha256": "e37477ed3a621cc8ac81c3dbff40d3593b72e05cba4bc01bdfe259bc8b175f8b"
+    },
+    {
+      "path": ".phase11.local/cors.log",
+      "sha256": "36283d62d3b5d0c21b141cd9989c361ded685a16077697d9bd93b19456c104a2"
+    },
+    {
+      "path": ".phase11.local/splitter.log",
+      "sha256": "e9c64c40c24261746dca7637f84a27ae492c088dfd33104df58a48de565f8ee2"
+    },
+    {
+      "path": ".phase11.local/sql.log",
+      "sha256": "1155c20d146023424f91221193c9ff9e88ad183a20869d1f5efc8b9c2325e348"
+    },
+    {
+      "path": ".phase11.local/guards.log",
+      "sha256": "14f9f73f92c1005f8517515179c840a2a2a209a4654f2fa6713e32927af9eac8"
+    },
+    {
+      "path": ".phase11.local/http.log",
+      "sha256": "2a64fa29c8f70e8d9c21b997a580136175bd1b95c16558ec3d5e8617e487e5fb"
+    },
+    {
+      "path": ".phase11.local/browser-final.log",
+      "sha256": "304bd23a45a0e8a0cb88963ee8cdf5d8119f66f0d0511114d23ce834d3b2c7fe"
+    },
+    {
+      "path": ".phase11.local/performance.log",
+      "sha256": "a4dddd9017ecdcefbc345775a6999c7825b43899afd8cce59fbeadc739263be8"
+    },
+    {
+      "path": ".phase11.local/lint-final.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": ".phase11.local/stop-http.log",
+      "sha256": "47d90076a44ca5f7bcc32b42dea80da77e770bc5faee5644fe84a74908f33b8f"
+    },
+    {
+      "path": ".phase11.local/stop-browser.log",
+      "sha256": "3717c422991177705ce2884622313ba58b7a463b5eaa0d62ffc470d9c65721cc"
+    }
+  ],
+  "shutdown": {
+    "capturedAt": "2026-09-16T20:44:03.759Z",
+    "http": "stopped; backup=true; volumes retained",
+    "browser": "stopped; backup=true; volumes retained",
+    "vite8088": "interrupted after browser; no listening port",
+    "agentBrowser": "timed-out attempt interrupted",
+    "ports56721_56731_8088_8000": "no listeners observed",
+    "postgres15440": "shared synthetic host preserved; evidence clones retained"
+  },
+  "limitations": [
+    "No cloud gateway/backup restore/external scheduler proof",
+    "No external effects or production write",
+    "Candidate F7 is not an integrated release"
+  ]
+}

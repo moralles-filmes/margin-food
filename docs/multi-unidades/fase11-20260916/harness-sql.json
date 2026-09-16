@@ -1,0 +1,43 @@
+{
+  "source": "scripts/test-phase9-db.mjs",
+  "sha256": "21f4d1fa8df1a67688b2d8ded69ee45c61b3439468bbcfbccd361963514bdb7f",
+  "generatedSha256": "d0922ecf106c124a3ce6ca6291e1901d018448692dc88d863d58841bb5a15151",
+  "replacements": [
+    {
+      "from": "moralles_phase9_test_",
+      "to": "moralles_phase11_test_",
+      "count": 7
+    },
+    {
+      "from": "clone('live','moralles_phase11_test_live')",
+      "to": "clone('live','moralles_phase9_test_live')",
+      "count": 1
+    },
+    {
+      "from": "clone('refs','moralles_phase11_test_live')",
+      "to": "clone('refs','moralles_phase9_test_live')",
+      "count": 1
+    },
+    {
+      "from": "clone('history','moralles_phase11_test_live')",
+      "to": "clone('history','moralles_phase9_test_live')",
+      "count": 1
+    },
+    {
+      "from": "'./phase9-sql.mjs'",
+      "to": "'../scripts/phase9-sql.mjs'",
+      "count": 1
+    },
+    {
+      "from": "scratch='.phase9.local'",
+      "to": "scratch='.phase11.local'",
+      "count": 1
+    },
+    {
+      "from": "fs.writeFileSync(`${dir}/ensaios.json`",
+      "to": "fs.writeFileSync('docs/multi-unidades/fase11-20260916/sql.json'",
+      "count": 1
+    }
+  ],
+  "capturedAt": "2026-09-16T20:21:59.408Z"
+}
