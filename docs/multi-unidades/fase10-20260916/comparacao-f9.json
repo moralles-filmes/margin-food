@@ -1,0 +1,107 @@
+{
+  "capturedAt": "2026-09-16T17:56:22.254659+00:00",
+  "versions": 856,
+  "localMigrations": 870,
+  "absent": [
+    "20260915140812_contain_global_maintenance_and_companies.sql",
+    "20260915144030_trusted_log_writers_and_readers.sql",
+    "20260915144031_classify_legacy_logs_safely.sql",
+    "20260915200818_harden_salmon_internal_functions.sql",
+    "20260915225538_isolate_supplier_prices.sql",
+    "20260915232846_align_product_catalog_permissions.sql",
+    "20260916133617_phase7_contain_non_rls_privileges.sql",
+    "20260916133618_phase7_align_reference_catalogs.sql",
+    "20260916133619_phase7_guard_sql_writers.sql",
+    "20260916134848_phase7_scope_upsert_conflicts.sql",
+    "20260916135928_phase7_guard_stock_readers.sql",
+    "20260916141000_phase7_scope_notification_writer.sql",
+    "20260916143153_phase8_storage_scope.sql",
+    "20260916144830_phase8_realtime_events.sql"
+  ],
+  "functionsSame": true,
+  "edges": [
+    {
+      "slug": "admin-users",
+      "same": true
+    },
+    {
+      "slug": "ai-chat",
+      "same": true
+    },
+    {
+      "slug": "inventario",
+      "same": true
+    },
+    {
+      "slug": "check-password",
+      "same": true
+    },
+    {
+      "slug": "purchase-requisitions",
+      "same": true
+    },
+    {
+      "slug": "requisicao-estoque",
+      "same": true
+    },
+    {
+      "slug": "cmv",
+      "same": true
+    },
+    {
+      "slug": "rh",
+      "same": true
+    },
+    {
+      "slug": "ficha-tecnica",
+      "same": true
+    },
+    {
+      "slug": "admin-companies",
+      "same": true
+    },
+    {
+      "slug": "scheduled-jobs",
+      "same": true
+    },
+    {
+      "slug": "admin-create-user",
+      "same": true
+    },
+    {
+      "slug": "rbac-lint",
+      "same": true
+    },
+    {
+      "slug": "rbac-lint-quick",
+      "same": true
+    },
+    {
+      "slug": "rbac-lint-full",
+      "same": true
+    },
+    {
+      "slug": "send-whatsapp-zapi",
+      "same": true
+    },
+    {
+      "slug": "cotacao-ia",
+      "same": true
+    }
+  ],
+  "vercel": {
+    "id": "dpl_79oubxDxhgVF4owXmEXiEP6QUV5N",
+    "state": "READY",
+    "sha": "80dcf4ec527d1a7e86ed3509496638b71219ab43",
+    "target": "production",
+    "alias": [
+      "www.marginfood.com",
+      "moralles-food.vercel.app",
+      "marginfood.com",
+      "moralles-food-moralles-filmes-projects.vercel.app",
+      "moralles-food-git-main-moralles-filmes-projects.vercel.app"
+    ]
+  },
+  "typesUnchanged": true,
+  "policiesSame": true
+}

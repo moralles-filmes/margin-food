@@ -1,0 +1,103 @@
+{
+  "database": {
+    "captured_at": "2026-09-16 18:35:41.493054+00",
+    "versions": 856,
+    "versions_hash": "0af1c54223b06f281326b31d509814be",
+    "functions_hash": "2c1cf22e14464e2d71872a6bd0b9efaa",
+    "policies_hash": "9291d60469850cb33c3a993362eb56ac"
+  },
+  "edges": [
+    {
+      "slug": "admin-users",
+      "version": 32,
+      "bundleHash": "beac051bbd778dae235737c1f06443881761c8676382828a4ed3e78c38636791"
+    },
+    {
+      "slug": "ai-chat",
+      "version": 9,
+      "bundleHash": "f69cc84332fb772248af091ac1e98ba041e47bb4d0ec5a1f0da97b71b8723fb7"
+    },
+    {
+      "slug": "inventario",
+      "version": 15,
+      "bundleHash": "df334230202613c86d8864c4382fee6aa8f6727fcf38d7a2cc4f8a6bdbf876ae"
+    },
+    {
+      "slug": "check-password",
+      "version": 8,
+      "bundleHash": "20d1d0558eac3627c7521efe47532d298310d31257d5e8812364cf09156e657f"
+    },
+    {
+      "slug": "purchase-requisitions",
+      "version": 10,
+      "bundleHash": "12b9ec51451add1cd015ffa065129dc3042550f72a5e36bfc91b187ae833b67c"
+    },
+    {
+      "slug": "requisicao-estoque",
+      "version": 14,
+      "bundleHash": "4aa1a03e851549c6322e6ba432063c0087944c51b06db23f9e4f8a2aed529445"
+    },
+    {
+      "slug": "cmv",
+      "version": 10,
+      "bundleHash": "9a21b79cd79af3ebab068741326f29feba01c1da4a4afd6ca088c4dbc2101626"
+    },
+    {
+      "slug": "rh",
+      "version": 10,
+      "bundleHash": "acf1ee3ab4c1e959f82b1341bc25fd4e8c4aac4e88179a8674fcfaebde4ed8cc"
+    },
+    {
+      "slug": "ficha-tecnica",
+      "version": 11,
+      "bundleHash": "8ae014771f544d9305b585f2cef7738dbd9e4496e84d91f8dbfff56deb5a0a6e"
+    },
+    {
+      "slug": "admin-companies",
+      "version": 11,
+      "bundleHash": "bab1714730d66d532588f252a4de63885f1019282b5cf282cba49cfd5920561b"
+    },
+    {
+      "slug": "scheduled-jobs",
+      "version": 7,
+      "bundleHash": "e70b6bf47eec1df55dd9a45760a71cdf8f447ca24e36913fe42315a334a8e5da"
+    },
+    {
+      "slug": "admin-create-user",
+      "version": 6,
+      "bundleHash": "9da8c84e0495ae75cacfd520fcb23762b90917eab9db2cbf1fb79008f444f68d"
+    },
+    {
+      "slug": "rbac-lint",
+      "version": 6,
+      "bundleHash": "e2cea0024ca37021f4f8bbe3c5e547dd5b7f42c4da0c1f292f686826086ea36e"
+    },
+    {
+      "slug": "rbac-lint-quick",
+      "version": 6,
+      "bundleHash": "770028b3413cbe0474b1617993817fd005527aacf09a406ed15d6570d22bc121"
+    },
+    {
+      "slug": "rbac-lint-full",
+      "version": 6,
+      "bundleHash": "e0ccebeb6b67c1cfc5110f335d55357339f511d187041d83941fece37f048d17"
+    },
+    {
+      "slug": "send-whatsapp-zapi",
+      "version": 5,
+      "bundleHash": "7ca435f3f03b188d8ec8f0517759636b221e1af354fd43bcbdd4fef23291e728"
+    },
+    {
+      "slug": "cotacao-ia",
+      "version": 4,
+      "bundleHash": "b6067da96c980e6507283ef781950fc7a784feed40ce67482df3b31315b1c1de"
+    }
+  ],
+  "vercel": {
+    "id": "dpl_79oubxDxhgVF4owXmEXiEP6QUV5N",
+    "state": "READY",
+    "sha": "80dcf4ec527d1a7e86ed3509496638b71219ab43"
+  },
+  "productionMutations": false,
+  "hashOrdering": "C"
+}

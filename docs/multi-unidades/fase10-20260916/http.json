@@ -1,0 +1,95 @@
+{
+  "capturedAt": "2026-09-16T18:15:56.604Z",
+  "baseline": "Supabase real local: candidato F7 + hotfix; Auth trigger vivo. Não release integrado.",
+  "checks": [
+    {
+      "label": "descoberta one: 1 unidades",
+      "status": "PASS"
+    },
+    {
+      "label": "descoberta multi: 2 unidades",
+      "status": "PASS"
+    },
+    {
+      "label": "descoberta none: 0 unidades",
+      "status": "PASS"
+    },
+    {
+      "label": "contexto one/A permitido",
+      "status": "PASS"
+    },
+    {
+      "label": "contexto one/B recusado",
+      "status": "PASS"
+    },
+    {
+      "label": "contexto multi/B permitido",
+      "status": "PASS"
+    },
+    {
+      "label": "contexto multi/forjado recusado",
+      "status": "PASS"
+    },
+    {
+      "label": "contexto multi/forjado recusado",
+      "status": "PASS"
+    },
+    {
+      "label": "contexto multi/forjado recusado",
+      "status": "PASS"
+    },
+    {
+      "label": "contexto multi/origem permitido",
+      "status": "PASS"
+    },
+    {
+      "label": "A→B→A: leituras HTTP isoladas com JWT real",
+      "status": "PASS"
+    },
+    {
+      "label": "ALLOW granular e DENY legado preservados",
+      "status": "PASS"
+    },
+    {
+      "label": "membership inactive: mesmo JWT recusado",
+      "status": "PASS"
+    },
+    {
+      "label": "membership revoked: mesmo JWT recusado",
+      "status": "PASS"
+    },
+    {
+      "label": "empresa inativa recusada com mesmo JWT",
+      "status": "PASS"
+    },
+    {
+      "label": "admin local não cria empresa",
+      "status": "PASS"
+    },
+    {
+      "label": "super explícito cria empresa por RPC real",
+      "status": "PASS"
+    },
+    {
+      "label": "reserva pré-Auth → primeiro admin → login real",
+      "status": "PASS"
+    },
+    {
+      "label": "admin cria usuário; outro admin vincula email existente sem mudar ID/nome/email/senha/origem",
+      "status": "PASS"
+    },
+    {
+      "label": "revogar só membership mantém login e acesso original",
+      "status": "PASS"
+    },
+    {
+      "label": "reintrodução usa grants novos sem restaurar antigos",
+      "status": "PASS"
+    }
+  ],
+  "productionMutations": false,
+  "limits": [
+    "handlers Deno diretos; não gateway cloud",
+    "sem convites/email/IA/WhatsApp"
+  ]
+}

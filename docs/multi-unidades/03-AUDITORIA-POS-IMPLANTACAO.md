@@ -1,5 +1,7 @@
 # Auditoria pós-implantação multiunidade
 
+Atualização Fase 10: [frontend/cache, jornadas e limites](fase10-20260916/RESULTADOS.md). Correções locais de lifetime/cache/eventos/rascunhos/exports; 789 unitários, 21 checkpoints HTTP reais e 12 jornadas Chromium em duas stacks isoladas. Banco revalidado em 16/09/2026 18:35:41 UTC; mesmas 14 candidatas ausentes, cadeia F3/F7 bloqueada e produção inalterada. [Prompt completo da Fase 11](fase10-20260916/PROMPT-FASE11.md); não iniciada.
+
 Data: 2026-09-15. **Fase 1 concluída; Fases 2, 3, 4, 5 e 6 implementadas e ensaiadas localmente, com publicação pendente. Estabilização ainda em andamento.**
 
 Atualização Fase 2: [resultados, testes e sequência de produção](fase2-20260915/RESULTADOS.md). C01/C02 foram corrigidos no código e testados com 82 assertions SQL reais, cinco casos de drift e rollback de contenção; **continuam abertos em produção**, que recebeu somente leituras. A baseline e os achados abaixo preservam a auditoria da Fase 1.

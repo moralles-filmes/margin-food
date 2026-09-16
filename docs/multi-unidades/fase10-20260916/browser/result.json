@@ -1,0 +1,28 @@
+{
+  "capturedAt": "2026-09-16T18:31:50.144Z",
+  "failures": [],
+  "hosts": [
+    "127.0.0.1",
+    "fonts.googleapis.com"
+  ],
+  "checks": [
+    "login multi, seleção A e dados reais isolados",
+    "A→B com resposta atrasada, foco e loading sem dados A",
+    "B→A pelo seletor da sidebar recolhida",
+    "reload restaura preferência válida",
+    "global A / apresentação B mantém override nas trocas globais",
+    "selecionar global remove override",
+    "URL presentationUnit sem acesso recusada",
+    "logout e nova identidade com uma unidade, sem preferência compartilhada",
+    "zero unidades bloqueia módulos",
+    "preferência forjada não aceita",
+    "revogação real revalidada no foco abandona B",
+    "mobile 390×844: seletor acessível e troca B"
+  ],
+  "baseline": "stack browser independente; candidato F7 + hotfix + reserva privada; Auth/PostgREST reais",
+  "limits": [
+    "fechamentos sintéticos 111/222; sem lançamentos/atas ou alto volume",
+    "exports e falhas/retry cobertos separadamente por testes de componente",
+    "CLI agent-browser timeout; Chromium via Playwright"
+  ]
+}

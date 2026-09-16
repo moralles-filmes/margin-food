@@ -1,0 +1,421 @@
+{
+  "capturedAt": "2026-09-16T18:49:24.998Z",
+  "files": 140,
+  "actualSecretHits": 0,
+  "forbiddenFiles": 0,
+  "reviewedKeywordLocations": [
+    {
+      "file": "docs/multi-unidades/fase10-20260916/MATRIZ-ARQUIVOS.md",
+      "line": 105
+    },
+    {
+      "file": "docs/multi-unidades/fase10-20260916/MATRIZ-ARQUIVOS.md",
+      "line": 203
+    },
+    {
+      "file": "docs/multi-unidades/fase10-20260916/RESULTADOS.md",
+      "line": 51
+    },
+    {
+      "file": "docs/multi-unidades/fase10-20260916/RUNBOOK-TESTES.md",
+      "line": 32
+    },
+    {
+      "file": "docs/multi-unidades/fase10-20260916/comparacao-f9.json",
+      "line": 36
+    },
+    {
+      "file": "docs/multi-unidades/fase10-20260916/config-http.toml",
+      "line": 37
+    },
+    {
+      "file": "docs/multi-unidades/fase10-20260916/config-http.toml",
+      "line": 65
+    },
+    {
+      "file": "docs/multi-unidades/fase10-20260916/config-http.toml",
+      "line": 66
+    },
+    {
+      "file": "docs/multi-unidades/fase10-20260916/config-http.toml",
+      "line": 79
+    },
+    {
+      "file": "docs/multi-unidades/fase10-20260916/contratos-frontend.json",
+      "line": 977
+    },
+    {
+      "file": "docs/multi-unidades/fase10-20260916/contratos-frontend.json",
+      "line": 7052
+    },
+    {
+      "file": "docs/multi-unidades/fase10-20260916/contratos-frontend.json",
+      "line": 7056
+    },
+    {
+      "file": "docs/multi-unidades/fase10-20260916/inventario-frontend.json",
+      "line": 4382
+    },
+    {
+      "file": "docs/multi-unidades/fase10-20260916/inventario-frontend.json",
+      "line": 4492
+    },
+    {
+      "file": "docs/multi-unidades/fase10-20260916/inventario-frontend.json",
+      "line": 10947
+    },
+    {
+      "file": "docs/multi-unidades/fase10-20260916/inventario-frontend.json",
+      "line": 15186
+    },
+    {
+      "file": "docs/multi-unidades/fase10-20260916/inventario-frontend.json",
+      "line": 15189
+    },
+    {
+      "file": "docs/multi-unidades/fase10-20260916/inventario-frontend.json",
+      "line": 15190
+    },
+    {
+      "file": "docs/multi-unidades/fase10-20260916/inventario-frontend.json",
+      "line": 15193
+    },
+    {
+      "file": "docs/multi-unidades/fase10-20260916/inventario-frontend.json",
+      "line": 15377
+    },
+    {
+      "file": "docs/multi-unidades/fase10-20260916/inventario-frontend.json",
+      "line": 21144
+    },
+    {
+      "file": "docs/multi-unidades/fase10-20260916/inventario-frontend.json",
+      "line": 21277
+    },
+    {
+      "file": "docs/multi-unidades/fase10-20260916/publicacao.json",
+      "line": 37
+    },
+    {
+      "file": "docs/multi-unidades/fase10-20260916/revalidacao-final.json",
+      "line": 26
+    },
+    {
+      "file": "docs/multi-unidades/fase10-20260916/security-scan.json",
+      "line": 420
+    },
+    {
+      "file": "scripts/phase10-fixtures.mjs",
+      "line": 11
+    },
+    {
+      "file": "scripts/phase10-fixtures.mjs",
+      "line": 22
+    },
+    {
+      "file": "scripts/phase10-fixtures.mjs",
+      "line": 23
+    },
+    {
+      "file": "scripts/phase10-fixtures.mjs",
+      "line": 24
+    },
+    {
+      "file": "scripts/prepare-phase10-stack.mjs",
+      "line": 10
+    },
+    {
+      "file": "scripts/test-phase10-browser.mjs",
+      "line": 18
+    },
+    {
+      "file": "scripts/test-phase10-http.mjs",
+      "line": 11
+    },
+    {
+      "file": "scripts/test-phase10-http.mjs",
+      "line": 24
+    },
+    {
+      "file": "scripts/test-phase10-http.mjs",
+      "line": 27
+    },
+    {
+      "file": "scripts/test-phase10-http.mjs",
+      "line": 34
+    },
+    {
+      "file": "scripts/test-phase10-http.mjs",
+      "line": 37
+    },
+    {
+      "file": "scripts/test-phase10-http.mjs",
+      "line": 40
+    },
+    {
+      "file": "scripts/test-phase10-http.mjs",
+      "line": 42
+    },
+    {
+      "file": "scripts/test-phase10-http.mjs",
+      "line": 45
+    },
+    {
+      "file": "src/App.tsx",
+      "line": 19
+    },
+    {
+      "file": "src/App.tsx",
+      "line": 167
+    },
+    {
+      "file": "src/components/AdminUsersView.tsx",
+      "line": 6
+    },
+    {
+      "file": "src/components/AdminUsersView.tsx",
+      "line": 7
+    },
+    {
+      "file": "src/components/AdminUsersView.tsx",
+      "line": 8
+    },
+    {
+      "file": "src/components/AdminUsersView.tsx",
+      "line": 81
+    },
+    {
+      "file": "src/components/AdminUsersView.tsx",
+      "line": 93
+    },
+    {
+      "file": "src/components/AdminUsersView.tsx",
+      "line": 95
+    },
+    {
+      "file": "src/components/AdminUsersView.tsx",
+      "line": 252
+    },
+    {
+      "file": "src/components/AdminUsersView.tsx",
+      "line": 254
+    },
+    {
+      "file": "src/components/AdminUsersView.tsx",
+      "line": 258
+    },
+    {
+      "file": "src/components/AdminUsersView.tsx",
+      "line": 269
+    },
+    {
+      "file": "src/components/AdminUsersView.tsx",
+      "line": 320
+    },
+    {
+      "file": "src/components/AdminUsersView.tsx",
+      "line": 327
+    },
+    {
+      "file": "src/components/AdminUsersView.tsx",
+      "line": 330
+    },
+    {
+      "file": "src/components/AdminUsersView.tsx",
+      "line": 474
+    },
+    {
+      "file": "src/components/AdminUsersView.tsx",
+      "line": 550
+    },
+    {
+      "file": "src/components/AdminUsersView.tsx",
+      "line": 551
+    },
+    {
+      "file": "src/components/AdminUsersView.tsx",
+      "line": 552
+    },
+    {
+      "file": "src/components/AdminUsersView.tsx",
+      "line": 553
+    },
+    {
+      "file": "src/components/AdminUsersView.tsx",
+      "line": 583
+    },
+    {
+      "file": "src/components/AdminUsersView.tsx",
+      "line": 647
+    },
+    {
+      "file": "src/components/AdminUsersView.tsx",
+      "line": 648
+    },
+    {
+      "file": "src/components/AdminUsersView.tsx",
+      "line": 661
+    },
+    {
+      "file": "src/components/AdminUsersView.tsx",
+      "line": 662
+    },
+    {
+      "file": "src/components/AdminUsersView.tsx",
+      "line": 666
+    },
+    {
+      "file": "src/components/AdminUsersView.tsx",
+      "line": 667
+    },
+    {
+      "file": "src/components/RequisicaoNotificationModal.tsx",
+      "line": 17
+    },
+    {
+      "file": "src/components/admin/AccessManagementCard.tsx",
+      "line": 51
+    },
+    {
+      "file": "src/components/admin/AccessManagementCard.tsx",
+      "line": 135
+    },
+    {
+      "file": "src/components/admin/AccessManagementCard.tsx",
+      "line": 144
+    },
+    {
+      "file": "src/components/admin/AccessManagementCard.tsx",
+      "line": 156
+    },
+    {
+      "file": "src/components/admin/AccessManagementCard.tsx",
+      "line": 355
+    },
+    {
+      "file": "src/components/admin/AccessManagementCard.tsx",
+      "line": 357
+    },
+    {
+      "file": "src/components/admin/AccessManagementCard.tsx",
+      "line": 358
+    },
+    {
+      "file": "src/components/admin/AccessManagementCard.tsx",
+      "line": 359
+    },
+    {
+      "file": "src/components/admin/AccessManagementCard.tsx",
+      "line": 360
+    },
+    {
+      "file": "src/components/admin/AccessManagementCard.tsx",
+      "line": 361
+    },
+    {
+      "file": "src/components/admin/AccessManagementCard.tsx",
+      "line": 365
+    },
+    {
+      "file": "src/components/admin/AccessManagementCard.tsx",
+      "line": 366
+    },
+    {
+      "file": "src/components/admin/AccessManagementCard.tsx",
+      "line": 379
+    },
+    {
+      "file": "src/components/admin/AdminCompaniesView.tsx",
+      "line": 61
+    },
+    {
+      "file": "src/components/admin/AdminCompaniesView.tsx",
+      "line": 143
+    },
+    {
+      "file": "src/components/admin/AdminCompaniesView.tsx",
+      "line": 149
+    },
+    {
+      "file": "src/components/admin/AdminCompaniesView.tsx",
+      "line": 161
+    },
+    {
+      "file": "src/components/admin/AdminCompaniesView.tsx",
+      "line": 452
+    },
+    {
+      "file": "src/components/admin/AdminCompaniesView.tsx",
+      "line": 454
+    },
+    {
+      "file": "src/components/admin/AdminCompaniesView.tsx",
+      "line": 455
+    },
+    {
+      "file": "src/components/admin/AdminCompaniesView.tsx",
+      "line": 456
+    },
+    {
+      "file": "src/components/admin/AdminCompaniesView.tsx",
+      "line": 457
+    },
+    {
+      "file": "src/components/admin/AdminCompaniesView.tsx",
+      "line": 458
+    },
+    {
+      "file": "src/components/admin/AdminCompaniesView.tsx",
+      "line": 462
+    },
+    {
+      "file": "src/components/admin/AdminCompaniesView.tsx",
+      "line": 463
+    },
+    {
+      "file": "src/components/admin/AdminCompaniesView.tsx",
+      "line": 465
+    },
+    {
+      "file": "src/components/admin/AdminCompaniesView.tsx",
+      "line": 484
+    },
+    {
+      "file": "src/components/configuracoes/IntegracoesView.tsx",
+      "line": 75
+    },
+    {
+      "file": "src/components/configuracoes/IntegracoesView.tsx",
+      "line": 116
+    },
+    {
+      "file": "src/components/configuracoes/IntegracoesView.tsx",
+      "line": 122
+    },
+    {
+      "file": "src/components/configuracoes/IntegracoesView.tsx",
+      "line": 160
+    },
+    {
+      "file": "src/components/configuracoes/IntegracoesView.tsx",
+      "line": 161
+    },
+    {
+      "file": "src/components/configuracoes/IntegracoesView.tsx",
+      "line": 188
+    },
+    {
+      "file": "src/components/configuracoes/IntegracoesView.tsx",
+      "line": 189
+    },
+    {
+      "file": "src/contexts/AuthContext.tsx",
+      "line": 167
+    },
+    {
+      "file": "src/contexts/CompanyScopeProvider.tsx",
+      "line": 70
+    }
+  ],
+  "classification": "password/api_key são campos de UI, fixtures aleatórias ou referências env; sem valores secretos/JWT. PNGs contêm só fixture sintética."
+}

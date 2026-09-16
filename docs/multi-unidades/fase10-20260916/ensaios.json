@@ -1,0 +1,80 @@
+{
+  "capturedAt": "2026-09-16T18:45:50.721Z",
+  "productionMutations": false,
+  "baseline": "duas stacks independentes, candidato F7 + hotfix + reserva privada, Auth/PostgREST reais; não release integrado",
+  "checks": {
+    "unit": {
+      "passed": 789,
+      "files": 101,
+      "command": "bun run test --maxWorkers=4"
+    },
+    "afterLastNavigationGuards": {
+      "passed": 22,
+      "files": 3,
+      "subset": true
+    },
+    "typescriptApp": "PASS",
+    "typescriptNode": "PASS",
+    "build": "PASS",
+    "lint": {
+      "errors": 0,
+      "warnings": 1357
+    },
+    "rbac": {
+      "blockers": 0,
+      "important": 2,
+      "info": 19
+    },
+    "security": {
+      "exit": 0,
+      "sqlLint": "SKIPPED: env não configurado"
+    },
+    "http": {
+      "passed": 21,
+      "details": "http.json"
+    },
+    "browser": {
+      "passed": 12,
+      "details": "browser/result.json",
+      "screenshots": 9
+    }
+  },
+  "liveFinal": {
+    "versionsSame": true,
+    "functionsSame": true,
+    "policiesSame": true,
+    "edgeBundlesSame": true,
+    "vercelSame": true,
+    "hashOrdering": "C"
+  },
+  "before": {
+    "lateExport": {
+      "failed": 1,
+      "passed": 11,
+      "assertion": "download não deve ocorrer após unmount; antes ocorria"
+    }
+  },
+  "stacks": [
+    {
+      "name": "margin-food-phase10",
+      "apiPort": 56621,
+      "dbPort": 56622
+    },
+    {
+      "name": "margin-food-phase10-browser",
+      "apiPort": 56631,
+      "dbPort": 56632
+    }
+  ],
+  "shutdown": {
+    "stacks": "STOPPED; backup=true; volumes preservados",
+    "vite": "8085/8086 encerrados; comando/PID conferidos",
+    "otherServices": "não alterados"
+  },
+  "limits": [
+    "Suite F8/F9 não reexecutada nem somada",
+    "Nenhum gateway cloud/backup/scheduler certificado",
+    "Unitários simulam transporte e exports; não são prova RLS",
+    "Sem dados privados ou efeitos externos"
+  ]
+}
