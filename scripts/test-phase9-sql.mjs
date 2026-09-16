@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import {test} from 'node:test';
+import {splitSql} from './phase9-sql.mjs';
+test('separa statements sem dividir corpo PL/pgSQL',()=>assert.equal(splitSql('BEGIN; DO $x$ BEGIN PERFORM 1; END $x$; COMMIT;').length,3));
+test('preserva ponto-e-virgula em literals e identificadores',()=>assert.deepEqual(splitSql('SELECT \'a;\'\'b\'; SELECT "c;d";'),["SELECT 'a;''b'",'SELECT "c;d"']));
+test('comentarios de bloco aninhados e linha',()=>assert.equal(splitSql('/* a; /* b; */ c */ SELECT 1; -- ;\nSELECT 2; -- final').length,2));
+test('escape string E com quote escapada',()=>assert.equal(splitSql("SELECT E'a\\';b'; SELECT 2;").length,2));
+test('string normal nao trata barra como escape',()=>assert.equal(splitSql("SELECT 'a\\'; SELECT 2;").length,2));
+test('recusa corpo incompleto',()=>assert.throws(()=>splitSql('DO $$ BEGIN;')));
+test('recusa literal incompleto',()=>assert.throws(()=>splitSql("SELECT 'foo")));
+test('LF e CRLF preservam limites',()=>assert.equal(splitSql('SELECT 1;\r\nSELECT 2;').length,2));
