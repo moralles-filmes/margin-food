@@ -1,4 +1,5 @@
 import { useSupabase, useCompanyScope } from '@/contexts/CompanyScopeContext';
+import { companyRealtimeListener } from '@/lib/companyRealtime';
 import { useState, useEffect, useCallback } from 'react';
 import { Clock, AlertTriangle, ChevronDown, ChevronUp, Package } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -47,11 +48,13 @@ export default function StockInactivityAlert({
 
   // Auto-refresh on movement changes
   useEffect(() => {
+    if (!companyId) return;
+    const listener = companyRealtimeListener(companyId, () => { void fetchInactive(); });
     const channel = supabase
       .channel('inactivity-alert-refresh:' + companyId)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'movimentacoes_estoque', filter: `company_id=eq.${companyId}` }, () => fetchInactive())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'movimentacoes_estoque', filter: `company_id=eq.${companyId}` }, listener.receive)
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => { listener.dispose(); supabase.removeChannel(channel); };
   }, [fetchInactive, companyId, supabase]);
 
   const filtered = items.filter(i => {

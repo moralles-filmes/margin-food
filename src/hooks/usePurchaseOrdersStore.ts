@@ -221,14 +221,15 @@ export function usePurchaseOrdersStore() {
   useEffect(() => { fetchOrdersRef.current = fetchOrders; }, [fetchOrders]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !companyId) return;
+    let active = true;
     const channel = supabase
       .channel('purchase-orders-rt:' + companyId)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'purchase_orders', filter: `company_id=eq.${companyId}` }, () => {
-        fetchOrdersRef.current();
+        if (active) fetchOrdersRef.current();
       })
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => { active = false; supabase.removeChannel(channel); };
   }, [companyId, supabase, user]);
 
   const fetchItems = useCallback(async (orderId: string): Promise<PurchaseOrderItem[]> => {

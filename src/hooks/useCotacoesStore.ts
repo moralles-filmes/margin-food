@@ -1,4 +1,5 @@
 import { useSupabase, useCompanyScope } from '@/contexts/CompanyScopeContext';
+import { companyRealtimeListener } from '@/lib/companyRealtime';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Cotacao, CotacaoCounts, CotacaoItem, CotacaoFornecedor, CotacaoResposta, CotacaoWhatsappLog, CotacaoWhatsappTipo } from '@/types/cotacao';
@@ -104,17 +105,15 @@ export function useCotacoesStore() {
 
   // Realtime — canal próprio, isolado do de pedidos. Refetch em qualquer mudança.
   useEffect(() => {
-    if (!user) return;
+    if (!user || !companyId) return;
+    const listener = companyRealtimeListener(companyId, () => { void fetchCotacoes(); });
     const channel = supabase
       .channel('cotacoes-rt:' + companyId)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'cotacoes', filter: `company_id=eq.${companyId}` }, () => {
-        fetchCotacoes();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'cotacao_fornecedores', filter: `company_id=eq.${companyId}` }, () => {
-        fetchCotacoes();
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cotacoes', filter: `company_id=eq.${companyId}` }, listener.receive)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cotacao_fornecedores', filter: `company_id=eq.${companyId}` }, listener.receive)
       .subscribe();
     return () => {
+      listener.dispose();
       supabase.removeChannel(channel);
     };
   }, [user, fetchCotacoes, supabase, companyId]);

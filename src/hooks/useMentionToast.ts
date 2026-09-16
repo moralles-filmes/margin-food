@@ -10,6 +10,7 @@ export function useMentionToast(userId: string | undefined, onNavigate: () => vo
   const shownRef = useRef(false);
 
   useEffect(() => {
+    let active = true;
     if (!userId || shownRef.current) return;
 
     const checkMentions = async () => {
@@ -27,7 +28,7 @@ export function useMentionToast(userId: string | undefined, onNavigate: () => vo
       }
 
       const { data } = await query;
-      if (!data || data.length === 0) return;
+      if (!active || !data || data.length === 0) return;
 
       shownRef.current = true;
       sessionStorage.setItem(sessionKey, new Date().toISOString());
@@ -46,11 +47,13 @@ export function useMentionToast(userId: string | undefined, onNavigate: () => vo
     };
 
     checkMentions();
+    return () => { active = false; };
   }, [userId, companyId, supabase, onNavigate, sessionKey]);
 
   // Realtime: listen for new notifications
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || !companyId) return;
+    let active = true;
 
     const channel = supabase
       .channel('mention-toast-' + userId + ':' + companyId)
@@ -64,7 +67,7 @@ export function useMentionToast(userId: string | undefined, onNavigate: () => vo
         },
         (payload: any) => {
           const row = payload.new;
-          if (row.recipient_user_id !== userId) return;
+          if (!active || row.company_id !== companyId || row.recipient_user_id !== userId) return;
           if (row?.type === 'MENTION_MARKET_SEASONAL' && !row?.read_at) {
             sessionStorage.setItem(sessionKey, new Date().toISOString());
             toast.info('Nova menção recebida em Mercado & Sazonais', {
@@ -80,6 +83,7 @@ export function useMentionToast(userId: string | undefined, onNavigate: () => vo
       .subscribe();
 
     return () => {
+      active = false;
       supabase.removeChannel(channel);
     };
   }, [userId, companyId, supabase, onNavigate, sessionKey]);

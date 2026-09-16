@@ -2,6 +2,7 @@ import { useSupabase, useCompanyScope } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
 
 export interface AppNotification {
+  company_id: string;
   id: string;
   recipient_user_id: string;
   type: string;
@@ -28,7 +29,7 @@ export function useNotifications(userId: string | undefined) {
     setLoading(true);
     const { data } = await supabase
       .from('notifications')
-      .select('id, recipient_user_id, type, module, title, message, entity_type, entity_id, link_path, created_by, created_at, read_at, metadata')
+      .select('id, company_id, recipient_user_id, type, module, title, message, entity_type, entity_id, link_path, created_by, created_at, read_at, metadata')
       .eq('recipient_user_id', userId)
       .order('created_at', { ascending: false })
       .limit(50);
@@ -59,7 +60,8 @@ export function useNotifications(userId: string | undefined) {
 
   // Realtime subscription
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || !companyId) return;
+    let active = true;
     const channel = supabase
       .channel('notif-bell-' + userId + ':' + companyId)
       .on('postgres_changes', {
@@ -69,11 +71,11 @@ export function useNotifications(userId: string | undefined) {
         filter: `company_id=eq.${companyId}`,
       }, (payload: any) => {
         const row = payload.new as AppNotification;
-        if (row.recipient_user_id !== userId) return;
+        if (!active || row.company_id !== companyId || row.recipient_user_id !== userId) return;
         setNotifications(prev => [row, ...prev].slice(0, 50));
       })
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => { active = false; supabase.removeChannel(channel); };
   }, [userId, companyId, supabase]);
 
   return { notifications, unreadCount, loading, load, markAsRead, markAllAsRead };
