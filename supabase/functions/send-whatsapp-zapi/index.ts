@@ -1,3 +1,4 @@
+import { withRequestCors } from '../_shared/request-cors.ts';
 import { companyHeaders, requestCompanyProfile } from "../_shared/company-scope.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 // ════════════════════════════════════════════════════════════════════════════
@@ -12,7 +13,7 @@ import { getCorsHeaders } from "../_shared/cors.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 
-let corsHeaders = getCorsHeaders();
+const corsHeaders = getCorsHeaders();
 
 const PLACEHOLDER_TENANT = "00000000-0000-0000-0000-000000000001";
 
@@ -82,9 +83,10 @@ function normalizePhone(raw: string | null | undefined): string {
   return (raw ?? "").replace(/\D/g, "");
 }
 
-serve(async (req) => {
-  corsHeaders = getCorsHeaders(req);
+serve(withRequestCors(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method !== 'POST') return jsonRes({ error: 'METHOD_NOT_ALLOWED' }, 405);
 
   const requestId = crypto.randomUUID();
 
@@ -139,6 +141,15 @@ serve(async (req) => {
       .maybeSingle();
     if (!cot) return jsonRes({ error: "NOT_FOUND", message: "Cotação não encontrada" }, 404);
 
+    // O vínculo vem do banco: UUID de outra cotação/unidade não autoriza envio.
+    if (cotacao_fornecedor_id) {
+      const { data: supplier, error } = await adminClient.from('cotacao_fornecedores')
+        .select('id').eq('id', cotacao_fornecedor_id)
+        .eq('cotacao_id', cotacao_id).eq('company_id', companyId).maybeSingle();
+      if (error) throw new Error('SUPPLIER_LOOKUP_FAILED');
+      if (!supplier) return jsonRes({ error: 'NOT_FOUND', message: 'Fornecedor não encontrado na cotação' }, 404);
+    }
+
     // ── Config Z-API da empresa ──
     const { data: cfg } = await adminClient
       .from("cotacao_zapi_config")
@@ -166,6 +177,8 @@ serve(async (req) => {
       if (cfg.client_token) headers["Client-Token"] = cfg.client_token;
       const resp = await fetch(url, {
         method: "POST",
+        redirect: 'error',
+        signal: AbortSignal.timeout(20_000),
         headers,
         body: JSON.stringify({ phone, message }),
       });
@@ -173,12 +186,13 @@ serve(async (req) => {
       try { zapiResponse = JSON.parse(text); } catch { zapiResponse = { raw: text }; }
       sendOk = resp.ok;
     } catch (e) {
-      zapiResponse = { error: e instanceof Error ? e.message : String(e) };
+      // Erros de transporte podem conter a URL com o token da instância.
+      zapiResponse = { error: 'ZAPI_TRANSPORT_FAILED' };
       sendOk = false;
     }
 
     // ── Log (service-role: company_id e created_by explícitos) ──
-    const { data: logRow } = await adminClient
+    const { data: logRow, error: logError } = await adminClient
       .from("cotacao_whatsapp_logs")
       .insert({
         cotacao_id,
@@ -194,15 +208,24 @@ serve(async (req) => {
       })
       .select("id")
       .single();
+    if (logError) {
+      // O envio pode ter ocorrido: não sugerir retry automático/duplicação.
+      return jsonRes({ success: false, status: sendOk ? 'SENT_LOG_FAILED' : 'ERROR',
+        error: 'DELIVERY_REVIEW_REQUIRED', request_id: requestId,
+        message: 'Não foi possível registrar o resultado. Confira o envio antes de tentar novamente.' }, 502);
+    }
 
     // ── Marca fornecedor como ENVIADO (só na solicitação inicial e se ainda AGUARDANDO) ──
     if (sendOk && tipo === "SOLICITACAO_COTACAO" && cotacao_fornecedor_id) {
-      await adminClient
+      const { error: updateError } = await adminClient
         .from("cotacao_fornecedores")
         .update({ status: "ENVIADO", mensagem_enviada_em: new Date().toISOString() })
         .eq("id", cotacao_fornecedor_id)
+        .eq("cotacao_id", cotacao_id)
         .eq("company_id", companyId)
         .eq("status", "AGUARDANDO");
+      if (updateError) return jsonRes({ success: false, status: 'SENT_STATUS_FAILED',
+        log_id: logRow.id, error: 'DELIVERY_REVIEW_REQUIRED', request_id: requestId }, 502);
     }
 
     if (!sendOk) {
@@ -220,4 +243,4 @@ serve(async (req) => {
     console.error("[send-whatsapp-zapi]", e);
     return jsonRes({ error: "INTERNAL", message: "Erro interno", request_id: requestId }, 500);
   }
-});
+}));

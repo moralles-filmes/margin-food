@@ -1,9 +1,10 @@
+import { withRequestCors } from '../_shared/request-cors.ts';
 import { companyHeaders, requestCompanyProfile } from "../_shared/company-scope.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
-let corsHeaders = getCorsHeaders();const PLACEHOLDER_COMPANY = '00000000-0000-0000-0000-000000000001'
+const corsHeaders = getCorsHeaders();const PLACEHOLDER_COMPANY = '00000000-0000-0000-0000-000000000001'
 
 // ═══ SINGLE SOURCE OF TRUTH: CMV outflow & inflow types ═══
 const CMV_OUTFLOW_TYPES = ['SAIDA', 'BAIXA_PERDA', 'SAIDA_CONSUMO', 'SAIDA_REQUISICAO', 'SAIDA_PERDA', 'AJUSTE_INVENTARIO_NEGATIVO'] as const
@@ -20,8 +21,8 @@ function localDateStr(daysAgo = 0): string {
   return anchored.toISOString().split('T')[0]
 }
 
-serve(async (req) => {
-  corsHeaders = getCorsHeaders(req);
+serve(withRequestCors(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
@@ -112,7 +113,7 @@ serve(async (req) => {
     console.error(e)
     return json({ error: e instanceof Error ? e.message : 'Internal error' }, 500)
   }
-})
+}))
 
 function json(data: any, status = 200) {
   return new Response(JSON.stringify(data), {

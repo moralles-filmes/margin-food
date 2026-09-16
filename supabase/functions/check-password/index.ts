@@ -1,9 +1,10 @@
+import { withRequestCors } from '../_shared/request-cors.ts';
 import { companyHeaders } from "../_shared/company-scope.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-let corsHeaders = getCorsHeaders();
+const corsHeaders = getCorsHeaders();
 
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX_ATTEMPTS = 10;
@@ -71,8 +72,8 @@ async function checkPwnedPassword(password: string): Promise<{ breached: boolean
   }
 }
 
-serve(async (req) => {
-  corsHeaders = getCorsHeaders(req);
+serve(withRequestCors(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -142,4 +143,4 @@ serve(async (req) => {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }
-});
+}));

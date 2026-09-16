@@ -1,10 +1,11 @@
+import { withRequestCors } from '../_shared/request-cors.ts';
 import { companyHeaders, requestCompanyProfile } from "../_shared/company-scope.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { isEstornoMovement, isOriginalEntradaForReversal, getReversalTipo } from "./stock-reversal.ts";
 
-let corsHeaders = getCorsHeaders();
+const corsHeaders = getCorsHeaders();
 
 interface ReqItem {
   produto_id: string;
@@ -157,8 +158,8 @@ async function writeAudit(
 
 // ─── Main Handler ───────────────────────────────────────────────────────────
 
-serve(async (req) => {
-  corsHeaders = getCorsHeaders(req);
+serve(withRequestCors(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -676,8 +677,9 @@ serve(async (req) => {
         message = `Sua requisição #${reqShort} (${req.setor ?? "—"}) foi negada. Veja o motivo na lista de requisições.`;
       }
 
-      // ON CONFLICT DO NOTHING via UNIQUE parcial — garante idempotência em chamadas paralelas
-      await adminClient.from("notifications").upsert({
+      // O índice é parcial: PostgREST onConflict(entity_id) não o infere.
+      const { error: notificationError } = await adminClient.from("notifications").insert({
+        company_id: cId,
         recipient_user_id: req.solicitante_user_id,
         type: "REQUISICAO_ENCERRADA",
         module: "estoque",
@@ -688,7 +690,16 @@ serve(async (req) => {
         link_path: "/?module=estoque&sub=requisicoes",
         created_by: actorId,
         metadata: { status: req.status, setor: req.setor },
-      }, { onConflict: "entity_id", ignoreDuplicates: true });
+      });
+      if (notificationError) {
+        if (notificationError.code === '23505') {
+          const { data: existing, error } = await adminClient.from('notifications').select('id')
+            .eq('company_id', cId).eq('entity_id', reqId)
+            .eq('recipient_user_id', req.solicitante_user_id).eq('type', 'REQUISICAO_ENCERRADA').maybeSingle();
+          if (!error && existing) return;
+        }
+        throw new Error('NOTIFICATION_WRITE_FAILED_REVIEW_REQUIRED');
+      }
     }
 
     // ========================
@@ -1200,4 +1211,4 @@ serve(async (req) => {
     console.error("requisicao-estoque error:", err);
     return jsonRes({ error: message, request_id: requestId }, 500);
   }
-});
+}));

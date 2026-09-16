@@ -1,12 +1,13 @@
+import { withRequestCors } from '../_shared/request-cors.ts';
 import { companyHeaders, requestCompanyProfile } from "../_shared/company-scope.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-let corsHeaders = getCorsHeaders();
+const corsHeaders = getCorsHeaders();
 
-serve(async (req) => {
-  corsHeaders = getCorsHeaders(req);
+serve(withRequestCors(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
@@ -173,7 +174,7 @@ serve(async (req) => {
     console.error("rh error:", e);
     return jsonResp({ error: msg.replace("403: ", "") }, status);
   }
-});
+}));
 
 function jsonResp(data: any, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });

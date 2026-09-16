@@ -1,9 +1,10 @@
+import { withRequestCors } from '../_shared/request-cors.ts';
 import { companyHeaders, requestCompanyProfile } from "../_shared/company-scope.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-let corsHeaders = getCorsHeaders();
+const corsHeaders = getCorsHeaders();
 
 const AGENT_SUBTAB_MAP: Record<string, string> = {
   geral: "consultor-geral",
@@ -85,8 +86,8 @@ function sanitizeDbString(val: any): any {
   return val;
 }
 
-serve(async (req) => {
-  corsHeaders = getCorsHeaders(req);
+serve(withRequestCors(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   const requestId = generateRequestId();
@@ -98,8 +99,6 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const serviceKey = (Deno.env.get("SB_SECRET_KEY") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"))!;
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
-
-    if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY not configured");
 
     const userClient = createClient(supabaseUrl, supabaseKey, {
       global: { headers: { ...companyHeaders(req), Authorization: authHeader || "" } },
@@ -148,6 +147,7 @@ serve(async (req) => {
       return jsonResponse({ error: { code: "FORBIDDEN_TENANT", message: "Tenant não encontrado" } }, 403, requestId);
     }
     const companyId: string = profileData.company_id;
+    if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY not configured");
 
     // ── BLOCO 1: Idempotency check ──
     const idemKey = idempotency_key || crypto.randomUUID();
@@ -295,7 +295,7 @@ serve(async (req) => {
     structuredLog("error", requestId, { event: "unhandled_error", error: e instanceof Error ? e.message : String(e) });
     return jsonResponse({ error: e instanceof Error ? e.message : "Erro desconhecido" }, 500, requestId);
   }
-});
+}));
 
 // ═══════════════════════════════════════════════════════
 // EXTRACT CONTENT FROM SSE STREAM

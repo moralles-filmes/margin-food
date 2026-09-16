@@ -1,9 +1,10 @@
+import { withRequestCors } from '../_shared/request-cors.ts';
 import { companyHeaders, requireRequestCompany } from "../_shared/company-scope.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
-let corsHeaders = getCorsHeaders();// ─── TENANT RESOLUTION (FAIL-CLOSED) ───
+const corsHeaders = getCorsHeaders();// ─── TENANT RESOLUTION (FAIL-CLOSED) ───
 
 
 // ─── REQUEST ID ───
@@ -39,8 +40,8 @@ async function writeAudit(
   }
 }
 
-serve(async (req) => {
-  corsHeaders = getCorsHeaders(req);
+serve(withRequestCors(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
@@ -318,7 +319,7 @@ serve(async (req) => {
     const cleanMsg = msg.replace(/^(403RBAC|403|404|400|409):\s*/, '')
     return json({ error: { code, message: cleanMsg, request_id: requestId } }, status)
   }
-})
+}))
 
 function json(data: any, status = 200) {
   return new Response(JSON.stringify(data), {

@@ -1,3 +1,4 @@
+import { withRequestCors } from '../_shared/request-cors.ts';
 import { companyHeaders } from "../_shared/company-scope.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { createClient } from 'npm:@supabase/supabase-js@2';
@@ -6,10 +7,10 @@ const DEPLOY_VERSION = 'rbac-lint-quick-v1';
 const PERMISSION_KEY = 'system:global:manage';
 const EXECUTED_SQL = 'select public.rbac_sql_lint_report_quick($1) as report';
 
-let corsHeaders = getCorsHeaders();
+const corsHeaders = getCorsHeaders();
 
-Deno.serve(async (req) => {
-  corsHeaders = getCorsHeaders(req);
+Deno.serve(withRequestCors(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -81,4 +82,4 @@ Deno.serve(async (req) => {
     const msg = e instanceof Error ? e.message : String(e);
     return json({ status: 'FAIL', error: msg, step: 'general_catch', debug: buildDebug(null) }, 500);
   }
-});
+}));

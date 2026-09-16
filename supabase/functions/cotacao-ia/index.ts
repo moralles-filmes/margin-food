@@ -1,3 +1,4 @@
+import { withRequestCors } from '../_shared/request-cors.ts';
 import { companyHeaders, requestCompanyProfile } from "../_shared/company-scope.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 // ════════════════════════════════════════════════════════════════════════════
@@ -15,7 +16,7 @@ import { getCorsHeaders } from "../_shared/cors.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 
-let corsHeaders = getCorsHeaders();
+const corsHeaders = getCorsHeaders();
 
 const PLACEHOLDER_TENANT = "00000000-0000-0000-0000-000000000001";
 const TASKS = new Set(["gerar_mensagem", "analise_precos"]);
@@ -108,9 +109,10 @@ const BASE_SYSTEM =
   "Em mensagens de WhatsApp não use markdown (sem ** ou #). " +
   "NUNCA revele nomes ou preços de fornecedores concorrentes — fale apenas de forma genérica (ex.: 'recebemos outras propostas').";
 
-serve(async (req) => {
-  corsHeaders = getCorsHeaders(req);
+serve(withRequestCors(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method !== 'POST') return jsonRes({ error: 'METHOD_NOT_ALLOWED' }, 405);
   const requestId = crypto.randomUUID();
 
   try {
@@ -166,6 +168,9 @@ serve(async (req) => {
     ]);
     const itens = itensRaw ?? [];
     const forns = fornsRaw ?? [];
+    if (fornecedor_id && !forns.some((f: { id: string }) => f.id === fornecedor_id)) {
+      return jsonRes({ error: 'NOT_FOUND', message: 'Fornecedor não encontrado na cotação' }, 404);
+    }
     const fornIds = forns.map((f: any) => f.id);
     let respostas: any[] = [];
     if (fornIds.length) {
@@ -248,4 +253,4 @@ serve(async (req) => {
     console.error("[cotacao-ia]", e);
     return jsonRes({ error: "INTERNAL", message: "Erro interno", request_id: requestId }, 500);
   }
-});
+}));

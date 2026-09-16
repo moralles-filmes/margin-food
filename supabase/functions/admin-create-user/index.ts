@@ -1,15 +1,16 @@
+import { withRequestCors } from '../_shared/request-cors.ts';
 import { addCompanyUser } from "../_shared/company-users.ts";
 import { companyHeaders, requestCompanyProfile } from "../_shared/company-scope.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-let corsHeaders = getCorsHeaders();
+const corsHeaders = getCorsHeaders();
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
-Deno.serve(async (req) => {
-  corsHeaders = getCorsHeaders(req);
+Deno.serve(withRequestCors(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
@@ -64,4 +65,4 @@ Deno.serve(async (req) => {
     console.error('admin-create-user error:', err);
     return json({ error: 'Erro interno' }, 500);
   }
-});
+}));

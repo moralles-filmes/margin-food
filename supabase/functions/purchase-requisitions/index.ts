@@ -1,9 +1,10 @@
+import { withRequestCors } from '../_shared/request-cors.ts';
 import { companyHeaders, requireRequestCompany } from "../_shared/company-scope.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-let corsHeaders = getCorsHeaders();
+const corsHeaders = getCorsHeaders();
 
 // ─── Permission mapping per action ───
 const ACTION_PERMISSIONS: Record<string, string> = {
@@ -46,21 +47,18 @@ async function checkPermission(
     }
   }
 
-  const { data: roles } = await supabaseAdmin
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", userId);
-  const userRoles = (roles || []).map((r: any) => r.role);
-  if (userRoles.includes("admin")) return true;
-
-  return false;
+  // Papel admin não contorna DENY explícito na matriz de permissões.
+  const { data: globalManager, error } = await supabaseAdmin.rpc('has_permission', {
+    _user_id: userId, _permission: 'system:global:manage',
+  });
+  return !error && globalManager === true;
 }
 
 /** Resolve company_id from user profile — fail-closed */
 
 
-serve(async (req) => {
-  corsHeaders = getCorsHeaders(req);
+serve(withRequestCors(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -218,6 +216,7 @@ serve(async (req) => {
       const { data: reqData, error: reqError } = await supabaseUser
         .from("purchase_requisitions")
         .insert({
+          company_id: companyId,
           tipo: tipo || "manual",
           observacao: observacao || "",
           total_estimado: totalEstimado,
@@ -229,6 +228,7 @@ serve(async (req) => {
       if (reqError) throw reqError;
 
       const reqItems = itens.map((i: any) => ({
+        company_id: companyId,
         requisition_id: reqData.id,
         produto_id: i.produto_id || null,
         produto_nome: i.produto_nome || "",
@@ -407,4 +407,4 @@ serve(async (req) => {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
-});
+}));
