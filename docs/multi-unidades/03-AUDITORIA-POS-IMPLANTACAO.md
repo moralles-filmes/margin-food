@@ -171,10 +171,10 @@ Todos os itens abaixo estão **ABERTOS em produção**. C01/C02 possuem correç�
 
 ### M03 — MEDIUM — Drift sem rastreabilidade conclusiva
 
-- Conjunto das versões: 844 locais = 844 remotas, diferenças vazias.
-- `20260910003448_fix_membership_legacy_admin_delegation` não está nos arquivos, nem no histórico local `git log --all -- caminho`, nem na lista remota atual.
-- Migrations posteriores alteram administração e o corpo vivo já inclui correções; não é possível reconstruir autoria/conteúdo da versão ausente somente por coincidência de versões.
-- Correção: fase 9, comparar definições/ACLs e fontes históricas disponíveis; nenhuma repair foi executada. Se necessário, criar migration nova idempotente, sem fabricar a original.
+- Fase 9 (16/09): 870 arquivos locais, 856 versões vivas, exatamente 14 candidatas F2–8 ausentes; nenhuma versão remota sem arquivo. Os 75 refs disponíveis foram inventariados após fetch. A igualdade 844/844 e a ausência de `20260910003448` pertenciam ao snapshot inicial.
+- `20260910003448` está rastreada no merge `49394b6` e na publicação Git `f00cd58`; seus statements conferem com o arquivo. Compilação isolada de Git/histórico confirma a substituição por `20260912164600` e a recomposição em `20260915120000`, cujo corpo/ACL coincidem com o vivo. Não remover nem reaplicar essas versões.
+- A cadeia permanece bloqueada: F3 espera assinatura de Salmão removida por avanço publicado; F7 recusa as 17 policies alteradas/adicionadas pelo hotfix vivo `20260916153928`. Regressão do candidato não comprova reconstrução pelo release bloqueado.
+- [Inventário, ensaios e plano](fase9-20260916/RESULTADOS.md): nenhuma repair/migration/deploy produtiva na F9. Cinco históricos sem statements e comparações textuais inconclusivas permanecem explicitados; não atribuir ordem real de aplicação a timestamps de versão.
 
 ### L01 — LOW — Seis testes estáticos falham nesta máquina
 
@@ -254,7 +254,7 @@ A numeração abaixo é a deste trabalho; agrupa as 20 frentes do pedido origina
 | 6 | Produtos e inventário automático de permissões | Implementada e ensaiada localmente; publicação pendente ([resultados](fase6-20260915/RESULTADOS.md)) |
 | 7 | Tabelas, INSERTs, RLS, views e SECURITY DEFINER | Inventário completo e correções ensaiadas localmente; aceite integral/publicação pendentes por dependências e contratos SQL residuais ([resultados](fase7-20260916/RESULTADOS.md)) |
 | 8 | Edges, Storage, Realtime, integrações e jobs | Entrega local: 88 checks HTTP, 37 Storage, 16 Realtime, 10 recusas de drift e 6 de recuo; publicação/aceite integral pendentes por gateway, scheduler, integrações e falhas parciais ([resultados](fase8-20260916/RESULTADOS.md)) |
-| 9 | Drift de schema/histórico | Diferenças explicadas, definições esperadas comparadas ao vivo e migration nova somente se necessária |
+| 9 | Drift de schema/histórico | Inventário e ensaios locais entregues; rastreabilidade administrativa comprovada; release integrado bloqueado por F3/Salmão e F7/hotfix ([resultados](fase9-20260916/RESULTADOS.md)) |
 | 10 | Frontend/cache e jornada multiunidade | A/B/multi/admin/global; troca, revogação, identidade existente e respostas atrasadas |
 | 11 | Regressão final, performance e operação | Todos os checks, EXPLAIN pertinente, checklist completo, deploy/rollback ordenados e documentação final |
 

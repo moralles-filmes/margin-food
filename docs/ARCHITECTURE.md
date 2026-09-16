@@ -70,7 +70,7 @@
 
 ### 2.3 Infraestrutura
 - **Autenticação:** JWT via Supabase Auth, sem auto-confirm de email
-- **Isolamento de tenant:** `company_id` NOT NULL em todas as tabelas, `FORCE RLS` global
+- **Isolamento de tenant:** recursos operacionais usam empresa explícita e RLS; globais, identidades e logs legados exigem classificação. NOT NULL e FORCE RLS não são universais no banco vivo; consultar o [inventário reconciliado](multi-unidades/fase9-20260916/RESULTADOS.md).
 - **Secrets:** Gerenciados via Supabase (Edge Function secrets) e Vercel (env vars de build/runtime) — nunca hardcoded
 - **Deploy:** Frontend automatizado via Vercel (push em `main`); Edge Functions deployadas via `supabase functions deploy`
 
@@ -87,9 +87,9 @@
 │              ┌────────┴────────┐        │
 │              │   companies     │        │
 │              └────────┬────────┘        │
-│     Todas as tabelas  │                  │
+│ Tabelas operacionais │                  │
 │     referenciam ──────┘                  │
-│     company_id (NOT NULL, FK)           │
+│     company_id conforme contrato        │
 └─────────────────────────────────────────┘
 ```
 
