@@ -234,7 +234,7 @@ As demais 139 tabelas têm company_id, mas presença de coluna não constitui re
 
 ### Inventário e limites
 
-17 Edges publicadas ACTIVE no snapshot; bodies remotos completos ainda não comparados ao Git. Localmente há auth/session, clientes contextualizados e service role com filtros explícitos; uma revisão por rota/ação ainda é necessária.
+No snapshot inicial havia 17 Edges ACTIVE ainda sem comparação integral de fontes. A Fase 8 baixou 54 arquivos dos 17 bundles e entregou mapa por endpoint/ação, testes reais isolados e correções candidatas de CORS, recursos, Storage e Realtime; publicação e aceite integral seguem pendentes ([resultados F8](fase8-20260916/RESULTADOS.md), [mapa de confiança](fase8-20260916/MAPA-DE-CONFIANCA.md)).
 
 Um bucket: rh-documentos, privado. Policies de Storage estão salvas no catálogo. Publicação Realtime contém produtos, movimentacoes_estoque, notifications, purchase_orders, cotacoes e cotacao_fornecedores.
 
@@ -253,7 +253,7 @@ A numeração abaixo é a deste trabalho; agrupa as 20 frentes do pedido origina
 | 5 | Fornecedores e preço por item | Implementada e ensaiada localmente; publicação pendente ([resultados](fase5-20260915/RESULTADOS.md)) |
 | 6 | Produtos e inventário automático de permissões | Implementada e ensaiada localmente; publicação pendente ([resultados](fase6-20260915/RESULTADOS.md)) |
 | 7 | Tabelas, INSERTs, RLS, views e SECURITY DEFINER | Inventário completo e correções ensaiadas localmente; aceite integral/publicação pendentes por dependências e contratos SQL residuais ([resultados](fase7-20260916/RESULTADOS.md)) |
-| 8 | Edges, Storage, Realtime, integrações e jobs | Tenant explícito/autorizado, revogação, isolamento de arquivos e canais e ausência de mistura em jobs |
+| 8 | Edges, Storage, Realtime, integrações e jobs | Entrega local: 88 checks HTTP, 37 Storage, 16 Realtime, 10 recusas de drift e 6 de recuo; publicação/aceite integral pendentes por gateway, scheduler, integrações e falhas parciais ([resultados](fase8-20260916/RESULTADOS.md)) |
 | 9 | Drift de schema/histórico | Diferenças explicadas, definições esperadas comparadas ao vivo e migration nova somente se necessária |
 | 10 | Frontend/cache e jornada multiunidade | A/B/multi/admin/global; troca, revogação, identidade existente e respostas atrasadas |
 | 11 | Regressão final, performance e operação | Todos os checks, EXPLAIN pertinente, checklist completo, deploy/rollback ordenados e documentação final |
