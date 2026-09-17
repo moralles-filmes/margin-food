@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "generatedAt": "2026-09-17T03:37:25.340Z",
+  "generatedAt": "2026-09-17T03:57:39.606Z",
   "projectId": "wuzxpbixprrgssoeeaez",
   "liveHistoryBase": "20260916153928",
   "forbiddenOperations": [
@@ -57,7 +57,7 @@
     {
       "order": 6,
       "destination": "20260916220500_phase6_catalog_forward.sql",
-      "sha256": "6d138f1dee0ddad6e9a106e2c25a49639b7a824614ea598c69f99cfe38cfc957",
+      "sha256": "33d1fd536e00801b076515b1ad6343b3cec624076396131fca8821aae0799d3b",
       "mode": "compatible-forward",
       "source": "20260915232846_align_product_catalog_permissions.sql",
       "sourceSha256": "e6557452c9c809e4320fae08412f5beeb426f8a5c7ab5f18a155044b35a8dc49"

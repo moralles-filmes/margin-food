@@ -74,6 +74,18 @@ function replaceGuardLine(sql, marker, replacement) {
   return lines.join('\n');
 }
 
+function canonicalizePgAclText(value) {
+  if (value === null) return null;
+  if (typeof value !== 'string' || !value.startsWith('{') || !value.endsWith('}')) {
+    throw new Error(`Unexpected PostgreSQL ACL snapshot: ${JSON.stringify(value)}`);
+  }
+  const entries = value.slice(1, -1).split(',');
+  if (entries.some((entry) => entry.includes('"'))) {
+    throw new Error(`Quoted PostgreSQL ACL entries require an explicit parser: ${value}`);
+  }
+  return `{${entries.sort().join(',')}}`;
+}
+
 function compatiblePhase3(original) {
   let sql = original;
   sql = replaceGuardLine(sql,
@@ -130,12 +142,27 @@ function compatiblePhase6(original) {
   const localeSensitiveOrder = 'ORDER BY p.oid::regprocedure::text) FROM pg_proc p';
   if (!sql.includes(localeSensitiveOrder)) throw new Error('Phase 6 function order guard was not found');
   sql = sql.replace(localeSensitiveOrder, 'ORDER BY p.oid::regprocedure::text COLLATE "C") FROM pg_proc p');
+  const aclProjection = 'pg_get_userbyid(p.proowner),p.proacl::text)';
+  const canonicalAclProjection = `pg_get_userbyid(p.proowner),(SELECT ('{' || string_agg(a::text, ',' ORDER BY a::text COLLATE "C") || '}') FROM unnest(p.proacl) a))`;
+  if (!sql.includes(aclProjection)) throw new Error('Phase 6 ACL projection was not found');
+  sql = sql.replace(aclProjection, canonicalAclProjection);
   const marker = " IF actual IS DISTINCT FROM $expected$";
   const line = sql.split(/\r?\n/).find((value) => value.includes(marker) && value.includes('PHASE6_FUNCTION_DRIFT'));
   if (!line) throw new Error('Phase 6 function guard was not found');
-  const semantic = `${line}\n IF position('SET search_path TO ''public'', ''pg_temp''' in pg_get_functiondef(to_regprocedure('public.receive_purchase_order_atomic(uuid,jsonb,jsonb)'))) = 0 OR position('supplier_item_prices' in pg_get_functiondef(to_regprocedure('public.receive_purchase_order_atomic(uuid,jsonb,jsonb)'))) = 0 OR position('company_id' in pg_get_functiondef(to_regprocedure('public.receive_purchase_order_atomic(uuid,jsonb,jsonb)'))) = 0 OR position('assert_tenant' in pg_get_functiondef(to_regprocedure('public.receive_purchase_order_atomic(uuid,jsonb,jsonb)'))) = 0 THEN RAISE EXCEPTION 'PHASE6_RECEIVE_PURCHASE_HARDENING_DRIFT'; END IF;`;
+  let canonicalLine = line;
+  const expectedStart = canonicalLine.indexOf(marker) + marker.length;
+  const expectedEndToken = '$expected$::jsonb';
+  const expectedEnd = canonicalLine.indexOf(expectedEndToken, expectedStart);
+  if (expectedEnd < 0) throw new Error('Phase 6 expected function snapshot was not found');
+  const expected = JSON.parse(canonicalLine.slice(expectedStart, expectedEnd));
+  for (const row of expected) {
+    if (!Array.isArray(row) || row.length !== 4) throw new Error('Phase 6 function snapshot row is invalid');
+    row[3] = canonicalizePgAclText(row[3]);
+  }
+  canonicalLine = `${canonicalLine.slice(0, expectedStart)}${JSON.stringify(expected)}${canonicalLine.slice(expectedEnd)}`;
+  const semantic = `${canonicalLine}\n IF position('SET search_path TO ''public'', ''pg_temp''' in pg_get_functiondef(to_regprocedure('public.receive_purchase_order_atomic(uuid,jsonb,jsonb)'))) = 0 OR position('supplier_item_prices' in pg_get_functiondef(to_regprocedure('public.receive_purchase_order_atomic(uuid,jsonb,jsonb)'))) = 0 OR position('company_id' in pg_get_functiondef(to_regprocedure('public.receive_purchase_order_atomic(uuid,jsonb,jsonb)'))) = 0 OR position('assert_tenant' in pg_get_functiondef(to_regprocedure('public.receive_purchase_order_atomic(uuid,jsonb,jsonb)'))) = 0 THEN RAISE EXCEPTION 'PHASE6_RECEIVE_PURCHASE_HARDENING_DRIFT'; END IF;`;
   sql = sql.replace(line, semantic);
-  return '-- Generated compatible F6 forward; preserves the Phase 5 pg_temp hardening.\n' + sql;
+  return '-- Generated compatible F6 forward; preserves Phase 5 hardening and canonicalizes ACL order.\n' + sql;
 }
 
 function compatiblePhase7Notifications(original) {
