@@ -54,7 +54,7 @@ const plan = [
   ['phase7References', '20260916220700_phase7_preserve_reference_hotfix.sql', 'superseded-by-live-hotfix'],
   ['phase7Writers', '20260916220800_phase7_writers_forward.sql', 'byte-identical'],
   ['phase7Conflicts', '20260916220900_phase7_conflicts_forward.sql', 'byte-identical'],
-  ['phase7Readers', '20260916221000_phase7_readers_forward.sql', 'byte-identical'],
+  ['phase7Readers', '20260916221000_phase7_readers_forward.sql', 'compatible-forward'],
   ['phase7Notifications', '20260916221100_phase7_notifications_forward.sql', 'compatible-forward'],
   ['phase8Storage', '20260916221200_phase8_storage_forward.sql', 'byte-identical'],
   ['phase8Realtime', '20260916221300_phase8_realtime_forward.sql', 'byte-identical'],
@@ -84,6 +84,13 @@ function canonicalizePgAclText(value) {
     throw new Error(`Quoted PostgreSQL ACL entries require an explicit parser: ${value}`);
   }
   return `{${entries.sort().join(',')}}`;
+}
+
+function pgAclTextToSortedEntries(value) {
+  const canonical = canonicalizePgAclText(value);
+  if (canonical === null) return null;
+  if (canonical === '{}') return [];
+  return canonical.slice(1, -1).split(',');
 }
 
 function compatiblePhase3(original) {
@@ -173,6 +180,37 @@ function compatiblePhase7Notifications(original) {
   );
 }
 
+function compatiblePhase7Readers(original) {
+  const marker = 'PHASE7_READER_DRIFT';
+  const expectedMarker = '$expected$';
+  const expectedEndToken = '$expected$::jsonb';
+  let replacements = 0;
+  const lines = original.split(/\r?\n/).map((line) => {
+    if (!line.includes(marker)) return line;
+    let canonicalLine = line.replace(
+      'p.proacl::text',
+      '(select jsonb_agg(a::text order by a::text COLLATE "C") from unnest(p.proacl) a)',
+    );
+    canonicalLine = canonicalLine.replace(
+      'order by p.oid::regprocedure::text)',
+      'order by p.oid::regprocedure::text COLLATE "C")',
+    );
+    if (canonicalLine === line) throw new Error(`Phase 7 reader ACL guard was not found: ${line}`);
+    const expectedStart = canonicalLine.indexOf(expectedMarker) + expectedMarker.length;
+    const expectedEnd = canonicalLine.indexOf(expectedEndToken, expectedStart);
+    if (expectedEnd < 0) throw new Error('Phase 7 reader expected snapshot was not found');
+    const expected = JSON.parse(canonicalLine.slice(expectedStart, expectedEnd));
+    for (const row of expected) {
+      if (!Array.isArray(row) || row.length !== 4) throw new Error('Phase 7 reader snapshot row is invalid');
+      row[2] = pgAclTextToSortedEntries(row[2]);
+    }
+    replacements += 1;
+    return `${canonicalLine.slice(0, expectedStart)}${JSON.stringify(expected)}${canonicalLine.slice(expectedEnd)}`;
+  });
+  if (replacements !== 6) throw new Error(`Expected six Phase 7 reader guards, got ${replacements}`);
+  return '-- Generated compatible F7 reader forward; canonicalizes catalog and ACL ordering.\n' + lines.join('\n');
+}
+
 function preservedReferenceHotfix() {
   return `-- Historical Phase 7 reference alignment is superseded by live hotfix
 -- 20260916153928. Do not recreate phase7_active_consumers or weaken granular
@@ -221,6 +259,7 @@ for (const [key, destination, mode] of plan) {
   if (key === 'phase6') content = compatiblePhase6(content);
   if (key === 'phase7Containment') content = compatiblePhase7Containment(content);
   if (key === 'phase7References') content = preservedReferenceHotfix();
+  if (key === 'phase7Readers') content = compatiblePhase7Readers(content);
   if (key === 'phase7Notifications') content = compatiblePhase7Notifications(content);
   await writeFile(join(sqlDir, destination), content, 'utf8');
   entries.push({

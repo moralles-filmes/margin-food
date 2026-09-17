@@ -1,8 +1,9 @@
+-- Generated compatible F7 reader forward; canonicalizes catalog and ACL ordering.
 -- Leitores públicos: manter contratos, limitar pela permissão funcional do consumer.
 BEGIN;
 SET LOCAL lock_timeout='5s';
 SET LOCAL statement_timeout='60s';
-DO $$ BEGIN IF (select jsonb_agg(jsonb_build_array(p.oid::regprocedure::text,md5(pg_get_functiondef(p.oid)),p.proacl::text,pg_get_userbyid(p.proowner)) order by p.oid::regprocedure::text) from pg_proc p where pronamespace='public'::regnamespace and proname='get_stock_dashboard') IS DISTINCT FROM $expected$[["get_stock_dashboard(integer)", "d2dd42ac4f445cec81a604a997808f8e", "{postgres=X/postgres,=X/postgres,authenticated=X/postgres,service_role=X/postgres}", "postgres"]]$expected$::jsonb THEN RAISE EXCEPTION 'PHASE7_READER_DRIFT: get_stock_dashboard'; END IF; END $$;
+DO $$ BEGIN IF (select jsonb_agg(jsonb_build_array(p.oid::regprocedure::text,md5(pg_get_functiondef(p.oid)),(select jsonb_agg(a::text order by a::text COLLATE "C") from unnest(p.proacl) a),pg_get_userbyid(p.proowner)) order by p.oid::regprocedure::text COLLATE "C") from pg_proc p where pronamespace='public'::regnamespace and proname='get_stock_dashboard') IS DISTINCT FROM $expected$[["get_stock_dashboard(integer)","d2dd42ac4f445cec81a604a997808f8e",["=X/postgres","authenticated=X/postgres","postgres=X/postgres","service_role=X/postgres"],"postgres"]]$expected$::jsonb THEN RAISE EXCEPTION 'PHASE7_READER_DRIFT: get_stock_dashboard'; END IF; END $$;
 CREATE OR REPLACE FUNCTION public.get_stock_dashboard(p_days integer DEFAULT 30)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -124,7 +125,7 @@ BEGIN
     RETURN v_result;
 END;
 $function$;
-DO $$ BEGIN IF (select jsonb_agg(jsonb_build_array(p.oid::regprocedure::text,md5(pg_get_functiondef(p.oid)),p.proacl::text,pg_get_userbyid(p.proowner)) order by p.oid::regprocedure::text) from pg_proc p where pronamespace='public'::regnamespace and proname='get_stock_predictive_analysis_v2') IS DISTINCT FROM $expected$[["get_stock_predictive_analysis_v2(text,uuid,integer,boolean,boolean)", "141c76c4c973257fd7e181bf55d72120", "{postgres=X/postgres,=X/postgres,authenticated=X/postgres,service_role=X/postgres}", "postgres"]]$expected$::jsonb THEN RAISE EXCEPTION 'PHASE7_READER_DRIFT: get_stock_predictive_analysis_v2'; END IF; END $$;
+DO $$ BEGIN IF (select jsonb_agg(jsonb_build_array(p.oid::regprocedure::text,md5(pg_get_functiondef(p.oid)),(select jsonb_agg(a::text order by a::text COLLATE "C") from unnest(p.proacl) a),pg_get_userbyid(p.proowner)) order by p.oid::regprocedure::text COLLATE "C") from pg_proc p where pronamespace='public'::regnamespace and proname='get_stock_predictive_analysis_v2') IS DISTINCT FROM $expected$[["get_stock_predictive_analysis_v2(text,uuid,integer,boolean,boolean)","141c76c4c973257fd7e181bf55d72120",["=X/postgres","authenticated=X/postgres","postgres=X/postgres","service_role=X/postgres"],"postgres"]]$expected$::jsonb THEN RAISE EXCEPTION 'PHASE7_READER_DRIFT: get_stock_predictive_analysis_v2'; END IF; END $$;
 CREATE OR REPLACE FUNCTION public.get_stock_predictive_analysis_v2(p_category_id text DEFAULT NULL::text, p_product_id uuid DEFAULT NULL::uuid, p_target_coverage_days integer DEFAULT 7, p_only_critical boolean DEFAULT false, p_use_weekday_pattern boolean DEFAULT true)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -397,7 +398,7 @@ BEGIN
   RETURN v_result;
 END;
 $function$;
-DO $$ BEGIN IF (select jsonb_agg(jsonb_build_array(p.oid::regprocedure::text,md5(pg_get_functiondef(p.oid)),p.proacl::text,pg_get_userbyid(p.proowner)) order by p.oid::regprocedure::text) from pg_proc p where pronamespace='public'::regnamespace and proname='get_stock_losses_report') IS DISTINCT FROM $expected$[["get_stock_losses_report(date,date,text,uuid,text,text,text)", "00d7ed3117c468d07d1ea4ac54599e4e", "{postgres=X/postgres,=X/postgres,authenticated=X/postgres,service_role=X/postgres}", "postgres"]]$expected$::jsonb THEN RAISE EXCEPTION 'PHASE7_READER_DRIFT: get_stock_losses_report'; END IF; END $$;
+DO $$ BEGIN IF (select jsonb_agg(jsonb_build_array(p.oid::regprocedure::text,md5(pg_get_functiondef(p.oid)),(select jsonb_agg(a::text order by a::text COLLATE "C") from unnest(p.proacl) a),pg_get_userbyid(p.proowner)) order by p.oid::regprocedure::text COLLATE "C") from pg_proc p where pronamespace='public'::regnamespace and proname='get_stock_losses_report') IS DISTINCT FROM $expected$[["get_stock_losses_report(date,date,text,uuid,text,text,text)","00d7ed3117c468d07d1ea4ac54599e4e",["=X/postgres","authenticated=X/postgres","postgres=X/postgres","service_role=X/postgres"],"postgres"]]$expected$::jsonb THEN RAISE EXCEPTION 'PHASE7_READER_DRIFT: get_stock_losses_report'; END IF; END $$;
 CREATE OR REPLACE FUNCTION public.get_stock_losses_report(p_start_date date DEFAULT ((now() - '30 days'::interval))::date, p_end_date date DEFAULT (now())::date, p_category text DEFAULT NULL::text, p_product_id uuid DEFAULT NULL::uuid, p_loss_type text DEFAULT NULL::text, p_order_by text DEFAULT 'quantity'::text, p_group_by text DEFAULT 'daily'::text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -591,7 +592,7 @@ BEGIN
     RETURN v_result;
 END;
 $function$;
-DO $$ BEGIN IF (select jsonb_agg(jsonb_build_array(p.oid::regprocedure::text,md5(pg_get_functiondef(p.oid)),p.proacl::text,pg_get_userbyid(p.proowner)) order by p.oid::regprocedure::text) from pg_proc p where pronamespace='public'::regnamespace and proname='get_stock_top_consumed') IS DISTINCT FROM $expected$[["get_stock_top_consumed(date,date,text,integer,text)", "19f734caa816e1d20ee8803d1847da38", "{postgres=X/postgres,=X/postgres,authenticated=X/postgres,service_role=X/postgres}", "postgres"]]$expected$::jsonb THEN RAISE EXCEPTION 'PHASE7_READER_DRIFT: get_stock_top_consumed'; END IF; END $$;
+DO $$ BEGIN IF (select jsonb_agg(jsonb_build_array(p.oid::regprocedure::text,md5(pg_get_functiondef(p.oid)),(select jsonb_agg(a::text order by a::text COLLATE "C") from unnest(p.proacl) a),pg_get_userbyid(p.proowner)) order by p.oid::regprocedure::text COLLATE "C") from pg_proc p where pronamespace='public'::regnamespace and proname='get_stock_top_consumed') IS DISTINCT FROM $expected$[["get_stock_top_consumed(date,date,text,integer,text)","19f734caa816e1d20ee8803d1847da38",["=X/postgres","authenticated=X/postgres","postgres=X/postgres","service_role=X/postgres"],"postgres"]]$expected$::jsonb THEN RAISE EXCEPTION 'PHASE7_READER_DRIFT: get_stock_top_consumed'; END IF; END $$;
 CREATE OR REPLACE FUNCTION public.get_stock_top_consumed(p_start_date date, p_end_date date, p_rank_by text DEFAULT 'quantity'::text, p_limit integer DEFAULT 20, p_category text DEFAULT NULL::text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -794,7 +795,7 @@ BEGIN
     RETURN v_result;
 END;
 $function$;
-DO $$ BEGIN IF (select jsonb_agg(jsonb_build_array(p.oid::regprocedure::text,md5(pg_get_functiondef(p.oid)),p.proacl::text,pg_get_userbyid(p.proowner)) order by p.oid::regprocedure::text) from pg_proc p where pronamespace='public'::regnamespace and proname='get_inactive_stock_items') IS DISTINCT FROM $expected$[["get_inactive_stock_items()", "7460f912e47f4c5194d4e5dd55e5ba58", "{postgres=X/postgres,=X/postgres,authenticated=X/postgres,service_role=X/postgres}", "postgres"]]$expected$::jsonb THEN RAISE EXCEPTION 'PHASE7_READER_DRIFT: get_inactive_stock_items'; END IF; END $$;
+DO $$ BEGIN IF (select jsonb_agg(jsonb_build_array(p.oid::regprocedure::text,md5(pg_get_functiondef(p.oid)),(select jsonb_agg(a::text order by a::text COLLATE "C") from unnest(p.proacl) a),pg_get_userbyid(p.proowner)) order by p.oid::regprocedure::text COLLATE "C") from pg_proc p where pronamespace='public'::regnamespace and proname='get_inactive_stock_items') IS DISTINCT FROM $expected$[["get_inactive_stock_items()","7460f912e47f4c5194d4e5dd55e5ba58",["=X/postgres","authenticated=X/postgres","postgres=X/postgres","service_role=X/postgres"],"postgres"]]$expected$::jsonb THEN RAISE EXCEPTION 'PHASE7_READER_DRIFT: get_inactive_stock_items'; END IF; END $$;
 CREATE OR REPLACE FUNCTION public.get_inactive_stock_items()
  RETURNS json
  LANGUAGE plpgsql
@@ -836,7 +837,7 @@ BEGIN
   RETURN v_result;
 END;
 $function$;
-DO $$ BEGIN IF (select jsonb_agg(jsonb_build_array(p.oid::regprocedure::text,md5(pg_get_functiondef(p.oid)),p.proacl::text,pg_get_userbyid(p.proowner)) order by p.oid::regprocedure::text) from pg_proc p where pronamespace='public'::regnamespace and proname='get_all_saldos_contas') IS DISTINCT FROM $expected$[["get_all_saldos_contas()", "c6f64775068599839132ae42a75865ed", "{postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}", "postgres"]]$expected$::jsonb THEN RAISE EXCEPTION 'PHASE7_READER_DRIFT: get_all_saldos_contas'; END IF; END $$;
+DO $$ BEGIN IF (select jsonb_agg(jsonb_build_array(p.oid::regprocedure::text,md5(pg_get_functiondef(p.oid)),(select jsonb_agg(a::text order by a::text COLLATE "C") from unnest(p.proacl) a),pg_get_userbyid(p.proowner)) order by p.oid::regprocedure::text COLLATE "C") from pg_proc p where pronamespace='public'::regnamespace and proname='get_all_saldos_contas') IS DISTINCT FROM $expected$[["get_all_saldos_contas()","c6f64775068599839132ae42a75865ed",["authenticated=X/postgres","postgres=X/postgres","service_role=X/postgres"],"postgres"]]$expected$::jsonb THEN RAISE EXCEPTION 'PHASE7_READER_DRIFT: get_all_saldos_contas'; END IF; END $$;
 CREATE OR REPLACE FUNCTION public.get_all_saldos_contas()
  RETURNS TABLE(conta_id uuid, saldo numeric)
  LANGUAGE plpgsql

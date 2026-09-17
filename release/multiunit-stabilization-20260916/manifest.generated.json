@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "generatedAt": "2026-09-17T03:57:39.606Z",
+  "generatedAt": "2026-09-17T04:02:05.584Z",
   "projectId": "wuzxpbixprrgssoeeaez",
   "liveHistoryBase": "20260916153928",
   "forbiddenOperations": [
@@ -97,8 +97,8 @@
     {
       "order": 11,
       "destination": "20260916221000_phase7_readers_forward.sql",
-      "sha256": "ead47a752e592ff8d9aa744f5a0d4b7023c77b314f5abe791a5d07235ddc0b79",
-      "mode": "byte-identical",
+      "sha256": "cfc095ee3b0c6f547041ccf8e727d4ac846b8a87fb7b9f4be5a551b9599522b2",
+      "mode": "compatible-forward",
       "source": "20260916135928_phase7_guard_stock_readers.sql",
       "sourceSha256": "ead47a752e592ff8d9aa744f5a0d4b7023c77b314f5abe791a5d07235ddc0b79"
     },
