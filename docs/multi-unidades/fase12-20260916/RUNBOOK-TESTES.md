@@ -108,4 +108,18 @@ git diff --cached --name-only
 git diff --cached | Select-String -Pattern 'eyJ|sb_secret_|password|api_key'
 ```
 
-Recusar `.env*`, `.claude/settings.local.json`, `supabase/.temp/` e os seis arquivos alheios listados no pedido. Nenhum push.
+Recusar `.env*`, `.claude/settings.local.json`, `supabase/.temp/` e os seis arquivos alheios listados no pedido. Sem autorização produtiva expressa, nenhum push.
+
+## Registro da publicação de 17/09/2026
+
+A proibição de push/deploy acima valeu durante a construção do candidato e foi levantada somente pela autorização expressa posterior do usuário. A janela real seguiu esta ordem:
+
+1. backup final de banco e roles fora do Git, com hashes registrados;
+2. aplicação das 16 forward migrations pelo diretório isolado, sem `--include-all` e sem repair;
+3. validação final de histórico, policies, assinaturas, Storage e Realtime;
+4. deploy das cinco Edge Functions com `--project-ref wuzxpbixprrgssoeeaez --use-api`;
+5. CORS da origem real, origem externa e autenticação ausente, sem disparar job;
+6. nova varredura Git no intervalo `origin/main..HEAD`, fast-forward para `main` e validação dos assets Vercel;
+7. navegador público na tela de login, sem autenticação nem mutação de dados reais.
+
+Evidência: [production-release.json](production-release.json). O smoke de navegador deve permitir os domínios `www.marginfood.com` e `wuzxpbixprrgssoeeaez.supabase.co`; bloquear o segundo cria falsos erros de rede. Mesmo com ambos permitidos, os stores montados antes do login emitem recusas esperadas `42501`/`COMPANY_ACCESS_DENIED`, um follow-up de ruído de console.

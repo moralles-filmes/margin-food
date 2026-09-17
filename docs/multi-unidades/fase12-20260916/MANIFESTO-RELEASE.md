@@ -1,10 +1,12 @@
 # Manifesto do release integrado
 
-Fonte executável: [manifest.generated.json](../../../release/multiunit-stabilization-20260916/manifest.generated.json). SHA-256 do manifesto usado no ensaio: `c1eaa6fb267d71bc52bd10e3d0eed0f104e267ba5963766a4fa3bdeb1d90ed8e`.
+Fonte executável: [manifest.generated.json](../../../release/multiunit-stabilization-20260916/manifest.generated.json). SHA-256 do manifesto usado no ensaio final e na publicação: `ebff4363dc0e2f9a1bfecc27884f6e4bbca8597e8a07166783f69524d897fd69`.
+
+O campo `forbiddenOperations` do JSON registra o gate vigente quando o candidato foi gerado. Ele não foi reescrito depois do ensaio; a publicação ocorreu somente após autorização expressa posterior e está documentada em [production-release.json](production-release.json).
 
 ## Regra de histórico
 
-As 14 candidatas F2–F8 permanecem ausentes do histórico remoto. Elas **não** serão reparadas, renumeradas, marcadas como aplicadas nem executadas pela raiz. Após autorização, somente as versões forward `20260916220000`–`20260916221400`, no diretório isolado, podem ser registradas. `20260910003448`, `20260915120000` e o hotfix vivo `20260916153928` permanecem intactos.
+As 14 candidatas F2–F8 permanecem ausentes do histórico remoto. Elas não foram reparadas, renumeradas, marcadas como aplicadas nem executadas pela raiz. Somente as 16 versões forward `20260916220000`–`20260916221500`, do diretório isolado, foram registradas. `20260910003448`, `20260915120000` e o hotfix vivo `20260916153928` permanecem intactos.
 
 | Ordem | Forward | Tratamento | Substitui/avança |
 |---:|---|---|---|
@@ -16,9 +18,11 @@ As 14 candidatas F2–F8 permanecem ausentes do histórico remoto. Elas **não**
 | 6 | `20260916220500_phase6_catalog_forward.sql` | avanço compatível | F6 `20260915232846`; aceita `public,pg_temp` produzido por F5 e valida tenant/preço semanticamente |
 | 7 | `20260916220600_phase7_containment_compatible_forward.sql` | avanço compatível | F7 `20260916133617`; verifica dependências e digest exato do hotfix |
 | 8 | `20260916220700_phase7_preserve_reference_hotfix.sql` | substituída pelo hotfix vivo | F7 `20260916133618`; somente verifica as 17 policies, sem recriá-las |
-| 9–12 | `20260916220800`–`20260916221100` | byte idêntico | writers, conflitos, readers e notificações F7 |
+| 9–10 | `20260916220800`–`20260916220900` | byte idêntico | writers e conflitos F7 |
+| 11–12 | `20260916221000`–`20260916221100` | avanço compatível | readers e notificações F7; ACLs comparadas canonicamente |
 | 13–14 | `20260916221200`–`20260916221300` | byte idêntico | Storage/Realtime F8 |
 | 15 | `20260916221400_stabilization_residual_forward.sql` | avanço novo | contratos funcionais, atômicos, FKs, ACLs, tipos e Storage residual |
+| 16 | `20260916221500_rh_document_storage_contract_forward.sql` | avanço novo | contrato canônico/legado e DELETE tenant-scoped de documentos RH |
 
 Os hashes individuais e de fonte estão no JSON executável; o builder falha se a substituição textual esperada não for única. O runner falha se qualquer arquivo divergir do hash antes de criar o clone.
 
@@ -38,6 +42,6 @@ Relações/constraints: `purchase_receipt_batches`, `rh_documentos.storage_state
 
 ## Prova da sequência
 
-O runner criou `moralles_stabilization_release_20260916221043` a partir de `moralles_phase9_test_live`, restaurou somente o substrato de catálogo Storage/Realtime omitido pelo template, aplicou os 15 arquivos e clonou cada estágio para regressão. Resultado e tails com hashes: [release-rehearsal.json](release-rehearsal.json).
+O ensaio final criou `moralles_stabilization_release_20260917040212` a partir de `moralles_phase9_test_live`, restaurou somente o substrato de catálogo Storage/Realtime omitido pelo template, aplicou os 16 arquivos e clonou cada estágio para regressão. Resultado e tails com hashes: [release-rehearsal.json](release-rehearsal.json).
 
 O substrato local não contém bytes Storage e o PostgreSQL local não tem `wal_level=logical`; portanto catálogo/publication foram verificados, mas streaming e restauração de objetos não foram alegados.

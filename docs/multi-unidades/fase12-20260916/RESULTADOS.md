@@ -1,6 +1,6 @@
 # Fase 12 — estabilização integrada
 
-Data: **16–17/09/2026**. Branch local: `codex/multiunit-stabilization-f12`. A entrega fecha as correções tecnicamente acessíveis e produz um pacote de release integrado; **não libera produção**. Não houve push, deploy/migration/repair produtivo, job produtivo ou mensagem externa. A única cópia de dados foi a restauração lógica autorizada no staging privado `jiufikblnfivgynrbfyq`; dumps brutos ficaram fora do Git e a evidência versionada contém apenas contagens, hashes e estados.
+Data: **16–17/09/2026**. Branch: `codex/multiunit-stabilization-f12`. Apó os gates no staging privado `jiufikblnfivgynrbfyq`, o usuário autorizou expressamente a publicação no projeto real `wuzxpbixprrgssoeeaez`. Banco, cinco Edge Functions e frontend foram publicados em 17/09/2026. Não houve `migration repair`, backfill de histórico, disparo de job produtivo, mensagem externa ou cópia de payload Storage. Dumps brutos e credenciais ficaram fora do Git; a evidência versionada contém apenas contagens, hashes e estados.
 
 ## Resultado principal
 
@@ -30,6 +30,20 @@ O08 foi executado no bundle de produção local apontado exclusivamente ao stagi
 
 O09 detectou e corrigiu duas incompatibilidades que a restauração de catálogo não exercitava: a policy aceitava dois segmentos enquanto a UI escrevia `empresa/colaborador/arquivo`, e o DELETE de metadata era sempre negado. O avanço `20260916221500` autoriza o caminho canônico, mantém a compatibilidade legada tenant-scoped durante o rollout e alinha as quatro operações de metadata às permissões granulares. A saga passou upload/delete reais, recusa cruzada, compensação depois de metadata e objeto, rollback de falha de remoção, retry de `DELETING` e reconciliação de `PENDING_UPLOAD`; zero objetos/metadata/identidade sintéticos ao final. Evidência: [staging-o09.json](staging-o09.json).
 
+## Produção autorizada
+
+Antes da janela foi criado backup lógico final de banco e roles fora do Git. Os artefatos têm, respectivamente, 11.364.050 e 5.786 bytes, com SHA-256 `1c0478363cf4ac6cfeb881c7683e027c6e7125e4fe2385cb6171b622c08f6ea5` e `d872a90bdb40e3604eae65ea5eae237945db0b3696ae99cb4b214cfa28cc0e8d`. O dump inclui seis schemas e 3.267 entradas de TOC; o export de roles não contém senhas.
+
+As 16 migrations forward `20260916220000`–`20260916221500` foram registradas no histórico real. Dois preflights pararam a execução antes da respectiva mudança porque ACLs semanticamente iguais tinham ordem textual diferente no catálogo. O builder foi corrigido para comparar ACLs de forma canônica, o release completo foi reensaiado e a cadeia restante foi simulada em uma transação produtiva com `ROLLBACK` antes da aplicação final. Nenhuma versão foi reparada, removida ou marcada manualmente.
+
+A validação final do banco confirmou 872 versões, última `20260916221500`, 150 tabelas públicas, 366 funções públicas, 596 policies públicas, 4 policies Storage e 6 tabelas Realtime. O hotfix conserva 17 policies e digest `9a49d198cabb2ec4f9fd1984e8c20404`; a assinatura nova de Salmão existe, a sobrecarga antiga não, `deactivate_produto` e o guard canônico de documentos RH existem. Storage permanece com 0 objetos/0 bytes, não há subscription lógica nem `pg_cron`, e `z_canary_test` continua sem grant de cliente.
+
+As cinco Edge Functions ficaram `ACTIVE`: `purchase-requisitions` v11, `requisicao-estoque` v15, `rh` v11, `scheduled-jobs` v8 e `ficha-tecnica` v12. Todas responderam preflight da origem `https://www.marginfood.com`, devolveram `null` para origem não autorizada e `401` sem autenticação; nenhum job foi executado.
+
+O fast-forward `80dcf4e→2ec5a38` foi publicado em `main`, acionando o Vercel. `https://www.marginfood.com` respondeu 200 pelo Vercel e serviu os mesmos hashes JS/CSS do build local validado. A tela de login carregou em navegador isolado, sem exceção de página. Consultas anônimas iniciadas pelos stores antes do login foram recusadas pelo banco (`42501`/`COMPANY_ACCESS_DENIED`) e geram ruído no console; o comportamento é fail-closed e fica como follow-up de frontend, não como falha de isolamento.
+
+Evidência sanitizada da janela: [production-release.json](production-release.json).
+
 ## Correções funcionais e de segurança
 
 - leitores de catálogo, saldo, requisições e análise de estoque agora exigem tenant + RBAC; helpers internos/debug e overloads de relatórios quebrados deixam de ser contratos públicos;
@@ -49,7 +63,7 @@ Os contratos TypeScript incluem os novos RPCs, a tabela de lotes de recebimento 
 
 | Camada | Resultado | Limite |
 |---|---:|---|
-| Sequência SQL integrada | **PASS** | PostgreSQL 17.10, clone `moralles_stabilization_release_20260917031909` |
+| Sequência SQL integrada | **PASS** | PostgreSQL 17.10, clone `moralles_stabilization_release_20260917040212` |
 | F2/F3/F4/F5/F6/F7 | **82 / 175 / 146 / 67 / 80 / 248** | Cada suíte em clone obtido no ponto exato da sequência |
 | Residual integrado | **39 PASS** | Transação revertida; fixtures sintéticas, incluindo contrato Storage canônico/legado e DELETE exato |
 | Concorrência RFQ | **PASS** | Duas sessões reais: 1 pedido, 1 item, 1 chave; uma criação e um replay |
@@ -61,7 +75,7 @@ Os contratos TypeScript incluem os novos RPCs, a tabela de lotes de recebimento 
 | ESLint | **0 erros / 1.359 warnings** | Inclui worktree local fora deste escopo |
 | RBAC | **0 blockers / 1 important / 19 info** | O important em `admin-users` é baseline; 11 ocorrências de `select('*')` permanecem allowlisted |
 | `security:check` | **exit 0; SQL SKIPPED** | Sem `SUPABASE_URL`/`SB_SECRET_KEY`; não aprova o banco |
-| Produção READ ONLY | **856 versões, 356 funções, 595 public + 4 Storage policies** | [live-readonly.json](live-readonly.json); candidato ainda ausente |
+| Produção pós-release | **PASS de catálogo/contratos** | 872 versões; 366 funções públicas; 596 public + 4 Storage policies; 16/16 forward presentes |
 | Staging hospedado | **PASS O01–O04, O08 e O09** | 16 versões; gateway/scheduler/Realtime 25/25; browser 12 checkpoints; Storage 8 checkpoints; limpeza sintética completa |
 
 O binário nativo do Deno não está no PATH; `bun x deno 2.9.6` executou `deno check --no-lock` nos cinco handlers implantados e o teste CORS compartilhado, todos com PASS.
@@ -70,6 +84,6 @@ Os advisors pós-DDL não reportaram erro de segurança, mas conservaram warning
 
 ## Decisão
 
-O candidato está pronto para revisão técnica e os gates **O01–O04 e O08–O09 estão fechados no staging autorizado**. Produção continua bloqueada: exige autorização específica de janela, drift final, publicação coordenada do SQL/Edges/frontend e pós-validações. A ausência atual de scheduler/consumer externo é uma invariante operacional; se um deles for criado ou identificado, O02/O03 reabrem antes da publicação.
+Release **publicado em produção** com backup, staging, aplicação forward, Edges, `main` e frontend confirmados. C01/C02/H01/H02/H03/H04/H05/M01 têm agora seus objetos corretivos presentes e os contratos/ACLs pós-release conferidos no banco vivo; as jornadas mutáveis completas permanecem comprovadas no staging, pois não foram repetidas com dados empresariais reais. A ausência de scheduler/consumer externo continua sendo uma invariante operacional: se um deles for criado ou identificado, O02/O03 reabrem.
 
-C01/C02/H01/H02/H03/H04/H05/M01 continuam abertos no vivo até publicação autorizada e pós-validação real; teste local não os encerra.
+Não foi executada classificação/backfill do histórico ambíguo de logs. A observação imediata deve acompanhar erros 401/403/42501, timeout, `23505`, falhas de Storage e regressão de isolamento por unidade; sem payload privado.

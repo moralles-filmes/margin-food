@@ -1,0 +1,94 @@
+{
+  "format": 1,
+  "recordedAt": "2026-09-17T04:12:07.351Z",
+  "environment": {
+    "name": "production",
+    "supabaseProjectRef": "wuzxpbixprrgssoeeaez",
+    "publicUrl": "https://www.marginfood.com"
+  },
+  "authorization": "explicit-user-authorization",
+  "release": {
+    "branch": "codex/multiunit-stabilization-f12",
+    "applicationCodeCommit": "2ec5a389727aa53e6c1ee6d6199b3729258fd525",
+    "mainFastForwardFrom": "80dcf4ec527d1a7e86ed3509496638b71219ab43",
+    "manifestSha256": "ebff4363dc0e2f9a1bfecc27884f6e4bbca8597e8a07166783f69524d897fd69",
+    "forwardVersions": {
+      "first": "20260916220000",
+      "last": "20260916221500",
+      "count": 16,
+      "status": "applied"
+    },
+    "migrationRepairUsed": false
+  },
+  "backup": {
+    "storedOutsideGit": true,
+    "databaseDump": {
+      "bytes": 11364050,
+      "sha256": "1c0478363cf4ac6cfeb881c7683e027c6e7125e4fe2385cb6171b622c08f6ea5"
+    },
+    "rolesExport": {
+      "bytes": 5786,
+      "sha256": "d872a90bdb40e3604eae65ea5eae237945db0b3696ae99cb4b214cfa28cc0e8d",
+      "passwordsIncluded": false
+    },
+    "schemas": 6,
+    "tocEntries": 3267
+  },
+  "databaseValidation": {
+    "historyRows": 872,
+    "latestVersion": "20260916221500",
+    "publicTables": 150,
+    "publicFunctions": 366,
+    "publicPolicies": 596,
+    "storagePolicies": 4,
+    "realtimeTables": 6,
+    "policyHotfix": {
+      "count": 17,
+      "digest": "9a49d198cabb2ec4f9fd1984e8c20404"
+    },
+    "contracts": {
+      "rhStorageState": true,
+      "deactivateProduto": true,
+      "newSalmonContract": true,
+      "oldSalmonOverload": false,
+      "canonicalDocumentGuard": true
+    },
+    "operations": {
+      "storageObjects": 0,
+      "storageBytes": 0,
+      "logicalSubscriptions": 0,
+      "pgCronInstalled": false,
+      "canaryClientGrant": false
+    }
+  },
+  "edgeFunctions": [
+    { "name": "purchase-requisitions", "version": 11, "status": "ACTIVE", "sha256": "723a219a14270721a2277596da8310ae0f213d604dc05cc50109bcefaa5b786a" },
+    { "name": "requisicao-estoque", "version": 15, "status": "ACTIVE", "sha256": "8e54d20dc7adbd1f80a094421c816a8bd3248b92b34be0c847a826730429d141" },
+    { "name": "rh", "version": 11, "status": "ACTIVE", "sha256": "9b2e949767195422929fffea5168fc9a4aae70283d90bf03987eaf3c063199c6" },
+    { "name": "scheduled-jobs", "version": 8, "status": "ACTIVE", "sha256": "31d67a864c5a818b25bb5073deb473443fabd2f5ddc6040fbbcf68b032b7d006" },
+    { "name": "ficha-tecnica", "version": 12, "status": "ACTIVE", "sha256": "a0a14e4fc3017d1ae5b23b649a567d5c17c15727f9721f43167862bd9a94a3f2" }
+  ],
+  "edgeSmoke": {
+    "productionOriginPreflight": "pass-5-of-5",
+    "untrustedOrigin": "blocked-5-of-5",
+    "missingAuthentication": "401-5-of-5",
+    "jobTriggered": false
+  },
+  "frontend": {
+    "delivery": "git-main-auto-deploy",
+    "httpStatus": 200,
+    "server": "Vercel",
+    "entryAssetsMatchValidatedBuild": true,
+    "entryJavascript": "/assets/index-D00FVRGk.js",
+    "entryStylesheet": "/assets/index-BLC-7oOx.css",
+    "browserTitle": "MarginPro — Gestão Inteligente para Restaurantes",
+    "pageExceptions": 0,
+    "deploymentId": null,
+    "deploymentIdLimit": "Vercel CLI had no local credentials; public artifact equality was used instead"
+  },
+  "observations": [
+    "Unauthenticated stores issue fail-closed reads before login and produce 42501/COMPANY_ACCESS_DENIED console noise.",
+    "No authenticated production mutation journey was run; the complete synthetic matrix remains evidenced in authorized staging.",
+    "No private rows, identities, tokens, credentials, request payloads, screenshots, or exported files are included in this artifact."
+  ]
+}
