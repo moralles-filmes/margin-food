@@ -1,13 +1,13 @@
 {
-  "generatedAt": "2026-09-16T22:10:59.799Z",
+  "generatedAt": "2026-09-17T03:37:44.931Z",
   "environment": {
     "host": "127.0.0.1",
     "port": 15440,
     "template": "moralles_phase9_test_live",
-    "database": "moralles_stabilization_release_20260916221043",
+    "database": "moralles_stabilization_release_20260917033730",
     "postgres": "17.10"
   },
-  "releaseManifestSha256": "c1eaa6fb267d71bc52bd10e3d0eed0f104e267ba5963766a4fa3bdeb1d90ed8e",
+  "releaseManifestSha256": "ec1228009d919b3619ef9e1c169e382f1ebfae76b663f7dc212d41848626f771",
   "exactSequence": [
     {
       "order": 1,
@@ -42,7 +42,7 @@
     {
       "order": 6,
       "destination": "20260916220500_phase6_catalog_forward.sql",
-      "sha256": "9684e53b52132f7743503247ce3a364256ef5208eea1951513f6e86cbdbb768a",
+      "sha256": "6d138f1dee0ddad6e9a106e2c25a49639b7a824614ea598c69f99cfe38cfc957",
       "mode": "compatible-forward"
     },
     {
@@ -78,8 +78,8 @@
     {
       "order": 12,
       "destination": "20260916221100_phase7_notifications_forward.sql",
-      "sha256": "7eafe6ff948a5563dfd7ce777f5654e02c1317b6ab91a842622010865c401fb8",
-      "mode": "byte-identical"
+      "sha256": "05f1151574b539ebf138a0a1c2f4e486fed72fba6e0cd1f7482dcea56003a2d7",
+      "mode": "compatible-forward"
     },
     {
       "order": 13,
@@ -98,37 +98,43 @@
       "destination": "20260916221400_stabilization_residual_forward.sql",
       "sha256": "46f98587b8505a6b2d8d759e9a6f9db113afaf99bcbcf62d909675f1e56604aa",
       "mode": "new-forward"
+    },
+    {
+      "order": 16,
+      "destination": "20260916221500_rh_document_storage_contract_forward.sql",
+      "sha256": "4ba3651b07d3b8aaaf4c5b9ce95da5b1f8ff56f5063cb3aac6bfb400b51e5053",
+      "mode": "new-forward"
     }
   ],
   "stageDatabases": [
     {
       "phase": "phase2",
-      "database": "moralles_phase2_test_release_20260916221043",
+      "database": "moralles_phase2_test_release_20260917033730",
       "test": "supabase/tests/database/phase2_global_containment.sql"
     },
     {
       "phase": "phase3",
-      "database": "moralles_phase3_test_release_20260916221043",
+      "database": "moralles_phase3_test_release_20260917033730",
       "test": "supabase/tests/database/phase3_logs.sql"
     },
     {
       "phase": "phase4",
-      "database": "moralles_phase4_test_release_20260916221043",
+      "database": "moralles_phase4_test_release_20260917033730",
       "test": "supabase/tests/database/phase4_salmon.sql"
     },
     {
       "phase": "phase5",
-      "database": "moralles_phase5_test_release_20260916221043",
+      "database": "moralles_phase5_test_release_20260917033730",
       "test": "supabase/tests/database/phase5_suppliers.sql"
     },
     {
       "phase": "phase6",
-      "database": "moralles_phase6_test_release_20260916221043",
+      "database": "moralles_phase6_test_release_20260917033730",
       "test": "supabase/tests/database/phase6_products.sql"
     },
     {
       "phase": "phase7",
-      "database": "moralles_phase7_test_release_20260916221043",
+      "database": "moralles_phase7_test_release_20260917033730",
       "test": "supabase/tests/database/phase7_security.sql"
     }
   ],
@@ -152,13 +158,13 @@
   "checks": [
     {
       "label": "create fresh live-equivalent clone",
-      "durationMs": 1552,
+      "durationMs": 1175,
       "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "outputTail": []
     },
     {
       "label": "restore omitted Storage/Realtime catalog substrate",
-      "durationMs": 76,
+      "durationMs": 108,
       "outputSha256": "b77a0abfef2c90c4d5ba03177c318a8bd2c91be5466f91e8be323af59ffcdd5b",
       "outputTail": [
         "CREATE POLICY",
@@ -173,7 +179,7 @@
     },
     {
       "label": "apply 20260916220000_phase2_containment_forward.sql",
-      "durationMs": 83,
+      "durationMs": 111,
       "outputSha256": "87928657f4d0590f87c19ee012003bc7f0516e4e9f0562edc811cb953d8e4eb5",
       "outputTail": [
         "GRANT",
@@ -188,13 +194,13 @@
     },
     {
       "label": "clone phase2 stage",
-      "durationMs": 1400,
+      "durationMs": 1124,
       "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "outputTail": []
     },
     {
       "label": "phase2 database regression",
-      "durationMs": 262,
+      "durationMs": 380,
       "outputSha256": "97212e942358fda0591e09998d4d6496b4a5028e63e6450bf306e6cd2dbca89c",
       "outputTail": [
         " service refreshes all four existing reporting views",
@@ -209,7 +215,7 @@
     },
     {
       "label": "apply 20260916220100_phase3_logs_compatible_forward.sql",
-      "durationMs": 197,
+      "durationMs": 236,
       "outputSha256": "18f7879c3e9ac387f0a237f92c0ecb6e38556a53cc49182428b6996d9fd90b64",
       "outputTail": [
         "GRANT",
@@ -224,7 +230,7 @@
     },
     {
       "label": "apply 20260916220200_phase3_log_classifier_forward.sql",
-      "durationMs": 65,
+      "durationMs": 78,
       "outputSha256": "e3ac61dcdf0719cbf559652abc736be88af5d5e2a8c445dd439022713b38e97d",
       "outputTail": [
         "CREATE FUNCTION",
@@ -239,13 +245,13 @@
     },
     {
       "label": "clone phase3 stage",
-      "durationMs": 1556,
+      "durationMs": 1063,
       "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "outputTail": []
     },
     {
       "label": "phase3 database regression",
-      "durationMs": 312,
+      "durationMs": 302,
       "outputSha256": "72ba4a66b4d039c1c2c30ef9aa62febc13a6eca3167461769b67307214e5dd81",
       "outputTail": [
         "----",
@@ -260,7 +266,7 @@
     },
     {
       "label": "apply 20260916220300_phase4_salmon_forward.sql",
-      "durationMs": 144,
+      "durationMs": 150,
       "outputSha256": "92a634767dfb593b17f1e53706bc07ff558eda574cbbc7d32111e561b9dd75c6",
       "outputTail": [
         "GRANT",
@@ -275,14 +281,14 @@
     },
     {
       "label": "clone phase4 stage",
-      "durationMs": 1125,
+      "durationMs": 1207,
       "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "outputTail": []
     },
     {
       "label": "phase4 database regression",
-      "durationMs": 269,
-      "outputSha256": "de024e27901c00dc4e55b55d0bbeadb9273006e51192fd6967bf902154cab093",
+      "durationMs": 257,
+      "outputSha256": "95bfafee2a8f7403ff3b0e4734a54a96a292165bf966fd10d93c9df4f294711d",
       "outputTail": [
         " ",
         "(1 row)",
@@ -296,7 +302,7 @@
     },
     {
       "label": "apply 20260916220400_phase5_supplier_forward.sql",
-      "durationMs": 142,
+      "durationMs": 167,
       "outputSha256": "09f4a370ff6132dea5e14d4a74324e3ca51338a9a0b08d913f0b9085969bda8b",
       "outputTail": [
         "REVOKE",
@@ -311,14 +317,14 @@
     },
     {
       "label": "clone phase5 stage",
-      "durationMs": 1306,
+      "durationMs": 1175,
       "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "outputTail": []
     },
     {
       "label": "phase5 database regression",
-      "durationMs": 349,
-      "outputSha256": "b3a70df288a02394c24398ba319ef487f40b7c85baa9c3b6409557e19dfc66b1",
+      "durationMs": 304,
+      "outputSha256": "9cd41cc70e2c43a0ca4b492986d767fc0471a8a35a3e4d41780ccd9ae72faed9",
       "outputTail": [
         "----",
         " ",
@@ -332,7 +338,7 @@
     },
     {
       "label": "apply 20260916220500_phase6_catalog_forward.sql",
-      "durationMs": 105,
+      "durationMs": 123,
       "outputSha256": "6c4aa8d25ffd655a8ac2d442d285c933994b572c28be528533ee11d57531c2b1",
       "outputTail": [
         "CREATE FUNCTION",
@@ -347,14 +353,14 @@
     },
     {
       "label": "clone phase6 stage",
-      "durationMs": 1476,
+      "durationMs": 1196,
       "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "outputTail": []
     },
     {
       "label": "phase6 database regression",
-      "durationMs": 312,
-      "outputSha256": "41cc0e49ab9072a6f44166e1187230b3798afe581b963d5d7260a6c3b1765c89",
+      "durationMs": 311,
+      "outputSha256": "5b3522fd3e0ab0afd71050bbaa033cdc54c91e0db8ce1b09f8dd0648c909c573",
       "outputTail": [
         " ",
         "(1 row)",
@@ -368,7 +374,7 @@
     },
     {
       "label": "apply 20260916220600_phase7_containment_compatible_forward.sql",
-      "durationMs": 112,
+      "durationMs": 197,
       "outputSha256": "4e76e8f1c626fab71874aba9526567e3401b8447f5585d9f43a47fe2d228b8c4",
       "outputTail": [
         "REVOKE",
@@ -383,7 +389,7 @@
     },
     {
       "label": "apply 20260916220700_phase7_preserve_reference_hotfix.sql",
-      "durationMs": 65,
+      "durationMs": 63,
       "outputSha256": "6bdddab3fbc9006bb3621e8282e3c17f385ae79f595a1d48998c3de2ee4f58bd",
       "outputTail": [
         "BEGIN",
@@ -394,7 +400,7 @@
     },
     {
       "label": "apply 20260916220800_phase7_writers_forward.sql",
-      "durationMs": 112,
+      "durationMs": 119,
       "outputSha256": "fbe155a099c1c3fd6307fe05c553adcba5e736b424cbcce6a6dde92b7da23395",
       "outputTail": [
         "ALTER TABLE",
@@ -409,7 +415,7 @@
     },
     {
       "label": "apply 20260916220900_phase7_conflicts_forward.sql",
-      "durationMs": 81,
+      "durationMs": 99,
       "outputSha256": "97cc679ffa3302f53d3173d115e71311bae3b2f889e7345f64d8e6ab326679b2",
       "outputTail": [
         "DO",
@@ -424,7 +430,7 @@
     },
     {
       "label": "apply 20260916221000_phase7_readers_forward.sql",
-      "durationMs": 61,
+      "durationMs": 77,
       "outputSha256": "dd0c2a8dda8429526840665da76a103ae45f2142d93814bbf9437377556dd37e",
       "outputTail": [
         "DO",
@@ -439,7 +445,7 @@
     },
     {
       "label": "apply 20260916221100_phase7_notifications_forward.sql",
-      "durationMs": 58,
+      "durationMs": 68,
       "outputSha256": "38b2d01f46165f4b29fd00ccb54186dc352d38de5b4b3d34a4e6db8d2db111c0",
       "outputTail": [
         "BEGIN",
@@ -452,14 +458,14 @@
     },
     {
       "label": "clone phase7 stage",
-      "durationMs": 1286,
+      "durationMs": 1095,
       "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "outputTail": []
     },
     {
       "label": "phase7 database regression",
-      "durationMs": 359,
-      "outputSha256": "f856a5bf6753e780dbfdbea169962eb4a960cf028d8ed058c397266728e848f4",
+      "durationMs": 378,
+      "outputSha256": "89ffe1114b38ac01b335dfe42a5be78412874a86f9a457d0b862a86100e3c0ef",
       "outputTail": [
         " ",
         "(1 row)",
@@ -473,7 +479,7 @@
     },
     {
       "label": "apply 20260916221200_phase8_storage_forward.sql",
-      "durationMs": 82,
+      "durationMs": 78,
       "outputSha256": "b4bca81184e10e8caa62798fb058475d724f2314e16038c8f80af518f1ac5f3e",
       "outputTail": [
         "BEGIN",
@@ -488,7 +494,7 @@
     },
     {
       "label": "apply 20260916221300_phase8_realtime_forward.sql",
-      "durationMs": 65,
+      "durationMs": 66,
       "outputSha256": "c02789837280e650dcecac65263e1c01bd5042faac2ecbb5320c8d1d45fa7271",
       "outputTail": [
         "BEGIN",
@@ -500,7 +506,7 @@
     },
     {
       "label": "phase8 Storage post-validation",
-      "durationMs": 66,
+      "durationMs": 64,
       "outputSha256": "90711394800fe5a1a4537b3f2cbbae90b18e3ef39020c13e95559453c7bd5d89",
       "outputTail": [
         "BEGIN",
@@ -510,7 +516,7 @@
     },
     {
       "label": "apply 20260916221400_stabilization_residual_forward.sql",
-      "durationMs": 138,
+      "durationMs": 169,
       "outputSha256": "fc67f22998a6d5d4d87e2050d782b1b4f724bb143f3d78d3c3a2703fcfe108ee",
       "outputTail": [
         "DROP POLICY",
@@ -524,23 +530,38 @@
       ]
     },
     {
+      "label": "apply 20260916221500_rh_document_storage_contract_forward.sql",
+      "durationMs": 90,
+      "outputSha256": "af01aa606f43906448fb3e1db9d833a79bda8ecaea2939c720e1b4ab8594a80b",
+      "outputTail": [
+        "DROP POLICY",
+        "CREATE POLICY",
+        "DROP POLICY",
+        "CREATE POLICY",
+        "DROP POLICY",
+        "CREATE POLICY",
+        "DO",
+        "COMMIT"
+      ]
+    },
+    {
       "label": "residual integrated database regression",
-      "durationMs": 243,
-      "outputSha256": "dea9297e1485449cd1b55ec74b998960faa03b07bfc7a0990bf0d33c423fa8bf",
+      "durationMs": 287,
+      "outputSha256": "f437ab279a3b5a42fcf1290e079c1a1faf989773ef11b285c45bc82aab4ca9f5",
       "outputTail": [
         "----",
         " ",
         "(1 row)",
         " stabilization_assertions ",
         "--------------------------",
-        "                       35",
+        "                       39",
         "(1 row)",
         "ROLLBACK"
       ]
     },
     {
       "label": "prepare synthetic RFQ concurrency fixture",
-      "durationMs": 72,
+      "durationMs": 74,
       "outputSha256": "11f5ad6b399ef1dc2997b3c3bee0e846b13ae21b83267d36ea3f140b517b258a",
       "outputTail": [
         "INSERT 0 1",
@@ -555,7 +576,7 @@
     },
     {
       "label": "hold RFQ row lock",
-      "durationMs": 2094,
+      "durationMs": 2070,
       "outputSha256": "b501cfe42072d21bc8bd5047a00aaee77cdba850a78ed7f68d9458da8c0e4743",
       "outputTail": [
         "BEGIN",
@@ -565,29 +586,29 @@
     },
     {
       "label": "RFQ concurrent conversion A",
-      "durationMs": 171,
-      "outputSha256": "7ad2529a67b286895505fb80bf378893ec0e7baf385c8f9016864cc68d378520",
+      "durationMs": 118,
+      "outputSha256": "3fa1847a2c2f27dc680c6f62331f0a9b9170f28e5f94a976c69d4402496ce816",
       "outputTail": [
         "{\"sub\":\"da000000-0000-4000-8000-000000000001\",\"role\":\"authenticated\"}",
         "{\"x-company-id\":\"db000000-0000-4000-8000-000000000001\"}",
         "SET",
-        "{\"items\": 1, \"orders\": 1, \"success\": true, \"order_ids\": [\"377c43ff-83b2-4d70-a010-4b416b5189b0\"], \"idempotent\": false}"
+        "{\"items\": 1, \"orders\": 1, \"success\": true, \"order_ids\": [\"2b8335ad-ef1a-4868-96ef-f35c4ab7454a\"], \"idempotent\": false}"
       ]
     },
     {
       "label": "RFQ concurrent conversion B",
-      "durationMs": 167,
-      "outputSha256": "473a2db850ad38f39c0791f4a564b99a0f7f3c40f3878522038671fac3e93728",
+      "durationMs": 115,
+      "outputSha256": "565e75df855552453a16d061041191ed790b216dd00a69ced636d9c140a2f234",
       "outputTail": [
         "{\"sub\":\"da000000-0000-4000-8000-000000000001\",\"role\":\"authenticated\"}",
         "{\"x-company-id\":\"db000000-0000-4000-8000-000000000001\"}",
         "SET",
-        "{\"items\": 1, \"orders\": 1, \"success\": true, \"order_ids\": [\"377c43ff-83b2-4d70-a010-4b416b5189b0\"], \"idempotent\": true}"
+        "{\"items\": 1, \"orders\": 1, \"success\": true, \"order_ids\": [\"2b8335ad-ef1a-4868-96ef-f35c4ab7454a\"], \"idempotent\": true}"
       ]
     },
     {
       "label": "RFQ concurrency invariant",
-      "durationMs": 71,
+      "durationMs": 61,
       "outputSha256": "2b740ba5bccca8cf93af0319bd197494ea8fd3e8b986f7f4894edbfc1a5e62ee",
       "outputTail": [
         "{\"items\": 1, \"orders\": 1, \"distinct_keys\": 1}"
@@ -595,7 +616,7 @@
     },
     {
       "label": "final catalog invariants",
-      "durationMs": 70,
+      "durationMs": 75,
       "outputSha256": "dd8ecdd89466b494ac1becdeecc22a80f8c15c2038c12a78d176e9607dc961de",
       "outputTail": [
         "{\"public_tables\": 150, \"public_policies\": 596, \"realtime_tables\": 6, \"public_functions\": 402, \"storage_policies\": 4, \"new_salmon_contract\": true, \"old_salmon_overload\": false, \"reference_hotfix_count\": 17, \"reference_hotfix_digest\": \"9a49d198cabb2ec4f9fd1984e8c20404\", \"realtime_insert_update_only\": true}"

@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "generatedAt": "2026-09-16T22:09:35.963Z",
+  "generatedAt": "2026-09-17T03:37:25.340Z",
   "projectId": "wuzxpbixprrgssoeeaez",
   "liveHistoryBase": "20260916153928",
   "forbiddenOperations": [
@@ -57,7 +57,7 @@
     {
       "order": 6,
       "destination": "20260916220500_phase6_catalog_forward.sql",
-      "sha256": "9684e53b52132f7743503247ce3a364256ef5208eea1951513f6e86cbdbb768a",
+      "sha256": "6d138f1dee0ddad6e9a106e2c25a49639b7a824614ea598c69f99cfe38cfc957",
       "mode": "compatible-forward",
       "source": "20260915232846_align_product_catalog_permissions.sql",
       "sourceSha256": "e6557452c9c809e4320fae08412f5beeb426f8a5c7ab5f18a155044b35a8dc49"
@@ -105,8 +105,8 @@
     {
       "order": 12,
       "destination": "20260916221100_phase7_notifications_forward.sql",
-      "sha256": "7eafe6ff948a5563dfd7ce777f5654e02c1317b6ab91a842622010865c401fb8",
-      "mode": "byte-identical",
+      "sha256": "05f1151574b539ebf138a0a1c2f4e486fed72fba6e0cd1f7482dcea56003a2d7",
+      "mode": "compatible-forward",
       "source": "20260916141000_phase7_scope_notification_writer.sql",
       "sourceSha256": "7eafe6ff948a5563dfd7ce777f5654e02c1317b6ab91a842622010865c401fb8"
     },
@@ -133,6 +133,14 @@
       "mode": "new-forward",
       "source": "20260916211110_stabilize_multiunit_residual_contracts.sql",
       "sourceSha256": "46f98587b8505a6b2d8d759e9a6f9db113afaf99bcbcf62d909675f1e56604aa"
+    },
+    {
+      "order": 16,
+      "destination": "20260916221500_rh_document_storage_contract_forward.sql",
+      "sha256": "4ba3651b07d3b8aaaf4c5b9ce95da5b1f8ff56f5063cb3aac6bfb400b51e5053",
+      "mode": "new-forward",
+      "source": "20260916211500_fix_rh_document_storage_contract.sql",
+      "sourceSha256": "4ba3651b07d3b8aaaf4c5b9ce95da5b1f8ff56f5063cb3aac6bfb400b51e5053"
     }
   ],
   "futureHistory": {
@@ -167,7 +175,8 @@
       "20260916221100",
       "20260916221200",
       "20260916221300",
-      "20260916221400"
+      "20260916221400",
+      "20260916221500"
     ],
     "rule": "Only forward versions are recorded remotely; historical candidate versions remain absent. No repair or renumbering."
   }

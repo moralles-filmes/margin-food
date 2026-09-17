@@ -20,6 +20,11 @@ import KpiCard from '@/components/ui/KpiCard';
 import { Plus, FileText, Download, AlertTriangle, CheckCircle2, Clock, Shield, FileWarning, Search } from 'lucide-react';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { cn, includesNormalized } from '@/lib/utils';
+import {
+  completeRhDocumentUpload,
+  createRhDocumentStorageOps,
+  deleteRhDocumentStorage,
+} from '@/lib/rhDocumentStorageSaga';
 
 import { useCan } from '@/permissions/hooks';
 interface Colaborador {
@@ -177,26 +182,11 @@ export default function DocumentosComplianceSection({
       if (metadataError) throw metadataError;
 
       if (selectedFile && arquivo_path) {
-        const { error: uploadError } = await supabase.storage.from('rh-documentos').upload(arquivo_path, selectedFile);
-        if (uploadError) {
-          await supabase.from('rh_documentos').delete().eq('id', documentId).eq('storage_state', 'PENDING_UPLOAD');
-          throw uploadError;
-        }
-
-        const { error: activateError } = await supabase
-          .from('rh_documentos')
-          .update({ storage_state: 'ACTIVE' } as any)
-          .eq('id', documentId)
-          .eq('storage_state', 'PENDING_UPLOAD');
-        if (activateError) {
-          const { error: cleanupError } = await supabase.storage.from('rh-documentos').remove([arquivo_path]);
-          if (!cleanupError) {
-            await supabase.from('rh_documentos').delete().eq('id', documentId).eq('storage_state', 'PENDING_UPLOAD');
-          }
-          throw new Error(cleanupError
-            ? `Metadado pendente e limpeza do arquivo falhou: ${activateError.message}; ${cleanupError.message}`
-            : activateError.message);
-        }
+        await completeRhDocumentUpload(createRhDocumentStorageOps(supabase), {
+          id: documentId,
+          path: arquivo_path,
+          file: selectedFile,
+        });
       }
       toast.success('Documento registrado!');
       setShowNew(false);
@@ -236,25 +226,7 @@ export default function DocumentosComplianceSection({
 
   const handleDelete = async (doc: Documento) => {
     try {
-      if (doc.storage_state !== 'DELETING') {
-        const { error: beginError } = await supabase
-          .from('rh_documentos')
-          .update({ storage_state: 'DELETING' } as any)
-          .eq('id', doc.id)
-          .eq('storage_state', 'ACTIVE');
-        if (beginError) throw beginError;
-      }
-
-      if (doc.arquivo_path) {
-        const { error: storageError } = await supabase.storage.from('rh-documentos').remove([doc.arquivo_path]);
-        if (storageError) {
-          await supabase.from('rh_documentos').update({ storage_state: 'ACTIVE' } as any).eq('id', doc.id).eq('storage_state', 'DELETING');
-          throw storageError;
-        }
-      }
-
-      const { error } = await supabase.from('rh_documentos').delete().eq('id', doc.id).eq('storage_state', 'DELETING');
-      if (error) throw new Error(`Arquivo removido; finalize a exclusão novamente: ${error.message}`);
+      await deleteRhDocumentStorage(createRhDocumentStorageOps(supabase), doc);
       toast.success('Documento excluído');
       fetchData();
     } catch (e) {

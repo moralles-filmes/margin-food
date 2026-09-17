@@ -421,8 +421,12 @@ serve(withRequestCors(async (req) => {
     });
   } catch (err: any) {
     console.error("purchase-requisitions error:", err);
-    return new Response(JSON.stringify({ error: err.message || "Erro interno" }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    const rawMessage = err.message || "Erro interno";
+    const tenantDenied = rawMessage.startsWith("403:");
+    const message = tenantDenied ? rawMessage.slice(4).trim() : rawMessage;
+    return new Response(JSON.stringify({ error: message }), {
+      status: tenantDenied ? 403 : 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 }));

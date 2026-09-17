@@ -1,0 +1,23 @@
+{
+  "capturedAt": "2026-09-17T03:18:56.344Z",
+  "environment": {
+    "kind": "authorized-hosted-staging",
+    "projectRef": "jiufikblnfivgynrbfyq"
+  },
+  "migration": {
+    "version": "20260916221500",
+    "sha256": "4ba3651b07d3b8aaaf4c5b9ce95da5b1f8ff56f5063cb3aac6bfb400b51e5053"
+  },
+  "checks": [
+    "path canônico e legado autorizados; prefixo de outra empresa recusado",
+    "upload real ativa metadata; delete real remove objeto e linha",
+    "falha real após metadata remove a linha pendente e não cria objeto cruzado",
+    "falha após objeto compensa bytes reais e metadata pendente",
+    "falha de remoção restaura ACTIVE; retry real conclui sem resíduo",
+    "falha final deixa DELETING explícito; retry idempotente remove metadata",
+    "PENDING_UPLOAD é reconciliado por DELETING sem falso sucesso",
+    "zero metadata sintética antes da limpeza de identidade"
+  ],
+  "result": "PASS",
+  "privateData": "No credentials, tokens, emails, UUIDs, object names or payloads persisted."
+}

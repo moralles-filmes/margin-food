@@ -23,6 +23,7 @@ const sources = {
   phase8Storage: '20260916143153_phase8_storage_scope.sql',
   phase8Realtime: '20260916144830_phase8_realtime_events.sql',
   residual: '20260916211110_stabilize_multiunit_residual_contracts.sql',
+  storageContract: '20260916211500_fix_rh_document_storage_contract.sql',
 };
 
 const expectedSourceHashes = {
@@ -54,10 +55,11 @@ const plan = [
   ['phase7Writers', '20260916220800_phase7_writers_forward.sql', 'byte-identical'],
   ['phase7Conflicts', '20260916220900_phase7_conflicts_forward.sql', 'byte-identical'],
   ['phase7Readers', '20260916221000_phase7_readers_forward.sql', 'byte-identical'],
-  ['phase7Notifications', '20260916221100_phase7_notifications_forward.sql', 'byte-identical'],
+  ['phase7Notifications', '20260916221100_phase7_notifications_forward.sql', 'compatible-forward'],
   ['phase8Storage', '20260916221200_phase8_storage_forward.sql', 'byte-identical'],
   ['phase8Realtime', '20260916221300_phase8_realtime_forward.sql', 'byte-identical'],
   ['residual', '20260916221400_stabilization_residual_forward.sql', 'new-forward'],
+  ['storageContract', '20260916221500_rh_document_storage_contract_forward.sql', 'new-forward'],
 ];
 
 function sha256(value) {
@@ -125,12 +127,23 @@ function compatiblePhase6(original) {
   const hardenedHash = '42354d656d3eece177c32e4a1eab03d1';
   if (!original.includes(oldHash)) throw new Error('Phase 6 expected receive hash was not found');
   let sql = original.replace(oldHash, hardenedHash);
+  const localeSensitiveOrder = 'ORDER BY p.oid::regprocedure::text) FROM pg_proc p';
+  if (!sql.includes(localeSensitiveOrder)) throw new Error('Phase 6 function order guard was not found');
+  sql = sql.replace(localeSensitiveOrder, 'ORDER BY p.oid::regprocedure::text COLLATE "C") FROM pg_proc p');
   const marker = " IF actual IS DISTINCT FROM $expected$";
   const line = sql.split(/\r?\n/).find((value) => value.includes(marker) && value.includes('PHASE6_FUNCTION_DRIFT'));
   if (!line) throw new Error('Phase 6 function guard was not found');
   const semantic = `${line}\n IF position('SET search_path TO ''public'', ''pg_temp''' in pg_get_functiondef(to_regprocedure('public.receive_purchase_order_atomic(uuid,jsonb,jsonb)'))) = 0 OR position('supplier_item_prices' in pg_get_functiondef(to_regprocedure('public.receive_purchase_order_atomic(uuid,jsonb,jsonb)'))) = 0 OR position('company_id' in pg_get_functiondef(to_regprocedure('public.receive_purchase_order_atomic(uuid,jsonb,jsonb)'))) = 0 OR position('assert_tenant' in pg_get_functiondef(to_regprocedure('public.receive_purchase_order_atomic(uuid,jsonb,jsonb)'))) = 0 THEN RAISE EXCEPTION 'PHASE6_RECEIVE_PURCHASE_HARDENING_DRIFT'; END IF;`;
   sql = sql.replace(line, semantic);
   return '-- Generated compatible F6 forward; preserves the Phase 5 pg_temp hardening.\n' + sql;
+}
+
+function compatiblePhase7Notifications(original) {
+  return replaceGuardLine(
+    original,
+    'PHASE7_NOTIFICATION_DRIFT',
+    'DO $$ BEGIN IF (select jsonb_agg(jsonb_build_array(p.oid::regprocedure::text,md5(pg_get_functiondef(p.oid)),(select jsonb_agg(a::text order by a::text) from unnest(p.proacl) a),pg_get_userbyid(p.proowner)) order by p.oid::regprocedure::text COLLATE "C") from pg_proc p where pronamespace=\'public\'::regnamespace and proname=\'mark_all_notifications_read\') IS DISTINCT FROM $expected$[["mark_all_notifications_read()", "2593645c43be89341a97b3a047733216", ["=X/postgres", "authenticated=X/postgres", "postgres=X/postgres", "service_role=X/postgres"], "postgres"]]$expected$::jsonb THEN RAISE EXCEPTION \'PHASE7_NOTIFICATION_DRIFT\'; END IF; END $$;',
+  );
 }
 
 function preservedReferenceHotfix() {
@@ -181,6 +194,7 @@ for (const [key, destination, mode] of plan) {
   if (key === 'phase6') content = compatiblePhase6(content);
   if (key === 'phase7Containment') content = compatiblePhase7Containment(content);
   if (key === 'phase7References') content = preservedReferenceHotfix();
+  if (key === 'phase7Notifications') content = compatiblePhase7Notifications(content);
   await writeFile(join(sqlDir, destination), content, 'utf8');
   entries.push({
     order: entries.length + 1,

@@ -1,0 +1,24 @@
+{
+  "capturedAt": "2026-09-17T03:11:25.120Z",
+  "environment": {
+    "kind": "authorized-hosted-staging",
+    "projectRef": "jiufikblnfivgynrbfyq",
+    "browser": "Chromium/Playwright"
+  },
+  "checks": [
+    "desktop: login multiunidade e conta A isolada",
+    "A→B atrasado: loading sem dado A e resposta B isolada",
+    "falha de contexto remove dado anterior; retry remonta A",
+    "mobile 390×844: seletor troca para B",
+    "exports reais da apresentação: PDF e PowerPoint válidos",
+    "planejamento integrado alterna realizado/orçado/projeção",
+    "ata aprovada carrega detalhe volumoso com 35 itens",
+    "exports reais da ata: PDF e PowerPoint válidos",
+    "corrida de filtro no mesmo lifetime mantém a resposta Beta mais nova",
+    "decisão e plano de ação hospedados abrem detalhe canônico",
+    "21 decisões paginam 20+1 sem truncamento silencioso",
+    "zero resíduo sintético de conta, governança e identidade"
+  ],
+  "result": "PASS",
+  "privateData": "No credentials, tokens, emails, UUIDs, company names, screenshots or export bytes persisted."
+}

@@ -63,7 +63,7 @@ FROM unnest(ARRAY[
  'estoque:movimentacoes:cancel','compras:checklist:edit','compras:recebimentos:create',
  'compras:lista:approve','compras:lista:view','compras:lista:create','compras:lista:edit','compras:checklist:approve',
  'compras:pedidos:create','compras:pedidos:delete',
- 'compras:cotacao:close','planning:meta-compras:edit','rh:banco-horas:reconcile'
+ 'compras:cotacao:close','planning:meta-compras:edit','rh:banco-horas:reconcile','rh:documentos:manage'
 ]) key ON CONFLICT(key) DO NOTHING;
 INSERT INTO user_permissions(user_id,company_id,permission_key,effect)
 SELECT 'ac000000-0000-4000-8000-000000000001','bc000000-0000-4000-8000-000000000001',key,
@@ -73,7 +73,7 @@ FROM unnest(ARRAY[
  'estoque:movimentacoes:cancel','compras:checklist:edit','compras:recebimentos:create',
  'compras:lista:approve','compras:lista:view','compras:lista:create','compras:lista:edit','compras:checklist:approve',
  'compras:pedidos:create','compras:pedidos:delete',
- 'compras:cotacao:close','planning:meta-compras:edit','rh:banco-horas:reconcile'
+ 'compras:cotacao:close','planning:meta-compras:edit','rh:banco-horas:reconcile','rh:documentos:manage'
 ]) key;
 INSERT INTO user_permissions(user_id,company_id,permission_key,effect)
 VALUES
@@ -295,6 +295,41 @@ SELECT public.replace_rh_banco_horas_period_atomic('2026-09',
 RESET ROLE;
 SELECT pg_temp.ok((SELECT count(*)=1 FROM rh_banco_horas WHERE colaborador_id='ce000000-0000-4000-8000-000000000001' AND periodo='2026-09'),'RH batch row persisted');
 SELECT pg_temp.ok((SELECT count(*)=1 FROM rh_audit_log WHERE acao='calcular_banco_horas' AND company_id='bc000000-0000-4000-8000-000000000001'),'RH audit persisted');
+
+-- RH Storage accepts the company/collaborator namespace used by the UI, keeps
+-- rolling compatibility, and permits the recoverable metadata lifecycle.
+SET LOCAL ROLE authenticated;
+SELECT pg_temp.context(1);
+SELECT pg_temp.ok(public.can_access_company_document(
+  'bc000000-0000-4000-8000-000000000001/ce000000-0000-4000-8000-000000000001/fixture.pdf','create'
+), 'Storage accepts canonical company/collaborator path');
+SELECT pg_temp.ok(public.can_access_company_document(
+  'ce000000-0000-4000-8000-000000000001/fixture.pdf','view'
+), 'Storage keeps legacy collaborator path during rollout');
+SELECT pg_temp.ok(NOT public.can_access_company_document(
+  'bc000000-0000-4000-8000-000000000002/ce000000-0000-4000-8000-000000000001/fixture.pdf','view'
+), 'Storage rejects forged company prefix');
+INSERT INTO rh_documentos(
+  id,colaborador_id,tipo,nome,arquivo_path,arquivo_nome,arquivo_tamanho,
+  uploaded_by,company_id,storage_state
+) VALUES (
+  'ce100000-0000-4000-8000-000000000001',
+  'ce000000-0000-4000-8000-000000000001','outro','Documento saga',
+  'bc000000-0000-4000-8000-000000000001/ce000000-0000-4000-8000-000000000001/fixture.pdf',
+  'fixture.pdf',9,'ac000000-0000-4000-8000-000000000001',
+  'bc000000-0000-4000-8000-000000000001','PENDING_UPLOAD'
+);
+UPDATE rh_documentos SET storage_state='ACTIVE'
+ WHERE id='ce100000-0000-4000-8000-000000000001' AND storage_state='PENDING_UPLOAD';
+UPDATE rh_documentos SET storage_state='DELETING'
+ WHERE id='ce100000-0000-4000-8000-000000000001' AND storage_state='ACTIVE';
+WITH deleted AS (
+  DELETE FROM rh_documentos
+   WHERE id='ce100000-0000-4000-8000-000000000001' AND storage_state='DELETING'
+   RETURNING id
+)
+SELECT pg_temp.ok((SELECT count(*)=1 FROM deleted), 'RH document metadata delete returns exactly one row');
+RESET ROLE;
 
 -- Denied actor cannot call newly exposed readers/mutators.
 SET LOCAL ROLE authenticated;

@@ -1,19 +1,23 @@
 # Publicação, observação e recuo
 
-Estado: **bloqueado; não executado**. Projeto alvo único `wuzxpbixprrgssoeeaez`. Push em `main` aciona Vercel e requer autorização separada.
+Estado produtivo: **bloqueado; não executado**. O ensaio O01–O04 foi concluído apenas no staging privado `jiufikblnfivgynrbfyq`. Projeto produtivo alvo único `wuzxpbixprrgssoeeaez`. Push em `main` aciona Vercel e requer autorização separada.
 
 ## Gates externos obrigatórios
 
-1. **Backup:** operação/DBA fornece backup completo recente e destino privado isolado; restaura banco, Auth, grants, funções, metadados e bytes Storage; mede RPO/RTO e guarda a evidência fora do Git.
-2. **Scheduler:** owner confirma origem, URL/action, autenticação, timezone, cadência, retry, concorrência/idempotência, alertas e versão. Executa sucesso e recusas somente no staging.
-3. **Consumidores:** owners externos assinam inventário de reporting, materialized views/caches, Storage, Realtime e eventos DELETE; validam INSERT/UPDATE + refetch sem reabrir privilégios.
-4. **Gateway:** plataforma fornece staging hospedado equivalente e identidades sintéticas; QA executa a matriz indicada no runbook.
-5. **Drift final:** comparar versões, assinaturas/ACL/corpos, policies, Edge bundles e Vercel SHA com [live-readonly.json](live-readonly.json); qualquer diferença exige novo manifesto/ensaio.
+1. **Backup — fechado no staging:** snapshot lógico completo restaurado; banco, Auth, grants, funções e metadados validados. Storage tinha 1 bucket/0 objetos/0 bytes na origem e no destino. RTO ≈54 min; idade do ponto de recuperação na primeira validação ≈14 min. Repetir um backup final se a janela produtiva ocorrer depois do ponto aceito pela operação.
+2. **Scheduler — fechado por ausência configurada:** repo/Vercel, banco, secrets e hooks não contêm scheduler real. Owner/cadência/timezone/retry/alertas são N/A; o handler passou ensaio efêmero e o secret foi removido. Reabrir este gate se qualquer scheduler for criado ou identificado.
+3. **Consumidores — fechado por inventário negativo delimitado:** nenhum BI/webhook/cache externo, role/grantee customizado, foreign server ou subscription foi encontrado. Consumers internos Edge/Realtime/Storage foram inventariados e Realtime INSERT/UPDATE + refetch passou. Reabrir se surgir integração fora das superfícies inspecionadas.
+4. **Gateway — fechado no staging:** cinco Edges afetadas implantadas; matriz sintética 25/25 e limpeza completa. A correção de status 403 em `purchase-requisitions` foi revalidada hospedada.
+5. **Frontend O08 — fechado no staging:** desktop/mobile, atraso, retry, planejamento, quatro exports, detalhe volumoso, corrida de filtro e paginação passaram no bundle real; nenhuma evidência privada persistida.
+6. **Storage O09 — fechado no staging:** caminho canônico/legado, upload/delete reais, compensações e retries passaram; limpeza zero. A origem continua com 0 objetos/0 bytes.
+7. **Drift final:** comparar versões, assinaturas/ACL/corpos, policies, Edge bundles e Vercel SHA com [live-readonly.json](live-readonly.json); qualquer diferença exige novo manifesto/ensaio.
+
+Evidências sanitizadas: [O01–O04](staging-o01-o04.json), [O08](staging-o08.json) e [O09](staging-o09.json). Esses gates não autorizam push, deploy ou migration em produção.
 
 ## Janela de publicação autorizada
 
 1. Registrar commit candidato, operador, aprovadores, backup e critérios de parada. Pausar writers incompatíveis, scheduler e consumers declarados; não alterar identidades ou dados.
-2. Usar **somente** `release/multiunit-stabilization-20260916/sql`, conferir SHA-256 do manifesto e aplicar as versões `20260916220000`–`20260916221400` na ordem. Nunca `--include-all` na raiz e nunca repair para contornar guard.
+2. Usar **somente** `release/multiunit-stabilization-20260916/sql`, conferir SHA-256 do manifesto e aplicar as versões `20260916220000`–`20260916221500` na ordem. Nunca `--include-all` na raiz e nunca repair para contornar guard.
 3. Parar no primeiro erro/timeout/drift. Como abort do cliente não desfaz commit, consultar versão/objeto/idempotency key antes de retry.
 4. Implantar juntos os bundles afetados (`purchase-requisitions`, `requisicao-estoque`, `rh`, `ficha-tecnica` e shared imports) e o frontend do mesmo commit. Não disparar jobs, mensagens ou integrações pagas como smoke test.
 5. Executar pós-validação de cada fase, catálogo final, matriz tenant/RBAC, Storage/Realtime/gateway e jornadas funcionais. Confirmar explicitamente as 17 policies pelo digest.
@@ -27,7 +31,8 @@ Estado: **bloqueado; não executado**. Projeto alvo único `wuzxpbixprrgssoeeaez
 - saldo/custo/histórico/fórmula diverge; estorno duplica ou vem depois de cancelamento;
 - auditoria/notification/metadata confirma sem a mutação principal, ou vice-versa;
 - replay cria segundo pedido/inventário/lote; primeira RFQ concorrente retorna `23505`;
-- consumer/gateway/scheduler sem owner ou backup sem restauração comprovada.
+- consumer/scheduler novo ou não inventariado, gateway divergente ou backup final fora do RPO aceito;
+- `public.z_canary_test` receber grants de cliente enquanto continuar sem RLS; o staging atual não tem grants para `anon`/`authenticated` e nenhuma mutação corretiva foi autorizada.
 
 ## Recuo fail-closed
 

@@ -1,0 +1,268 @@
+{
+  "format": 1,
+  "generatedAt": "2026-09-17T01:39:27.1055984Z",
+  "scope": {
+    "branch": "codex/multiunit-stabilization-f12",
+    "stagingProject": "jiufikblnfivgynrbfyq",
+    "stagingName": "Margin Food Staging F12",
+    "region": "sa-east-1",
+    "postgres": "17.6",
+    "productionProject": "wuzxpbixprrgssoeeaez",
+    "productionMutations": false,
+    "push": false,
+    "productionDeploy": false
+  },
+  "deno": {
+    "runtime": "bun x deno 2.9.6",
+    "check": {
+      "status": "PASS",
+      "targets": [
+        "supabase/functions/purchase-requisitions/index.ts",
+        "supabase/functions/requisicao-estoque/index.ts",
+        "supabase/functions/rh/index.ts",
+        "supabase/functions/scheduled-jobs/index.ts",
+        "supabase/functions/ficha-tecnica/index.ts"
+      ]
+    },
+    "corsTest": {
+      "status": "PASS",
+      "passed": 1,
+      "failed": 0
+    }
+  },
+  "o01": {
+    "status": "PASS_STAGING",
+    "restore": {
+      "kind": "full logical snapshot into an isolated hosted project",
+      "projectCreatedAt": "2026-09-16T23:01:20.812003Z",
+      "snapshotWindowUtc": [
+        "2026-09-16T23:40:31Z",
+        "2026-09-16T23:40:50Z"
+      ],
+      "firstValidationAtApproxUtc": "2026-09-16T23:55:00Z",
+      "restoreRtoMinutesApprox": 54,
+      "recoveryPointAgeAtFirstValidationMinutesApprox": 14,
+      "privateRawEvidenceVersioned": false
+    },
+    "validation": {
+      "auth": {
+        "tables": 26,
+        "rowsAtSnapshot": 192,
+        "matchedSnapshot": true
+      },
+      "privateSchema": {
+        "rowsAtSnapshot": 1245,
+        "matchedSnapshot": true
+      },
+      "publicSchema": {
+        "stagingRowsAtFirstValidation": 152315,
+        "productionRowsAtFirstValidation": 152476,
+        "expectedLiveDeltaRows": 161,
+        "deltaLimitedToFourLiveWriteTables": true
+      },
+      "storage": {
+        "sourceBuckets": 1,
+        "sourceObjects": 0,
+        "sourceBytes": 0,
+        "stagingBuckets": 1,
+        "stagingObjects": 0,
+        "stagingBytes": 0,
+        "byteCopyBranch": "vacuous: source contains no objects"
+      },
+      "storageObjectPolicies": 4,
+      "authUserCreationTriggerRestored": true,
+      "grantsAndFunctionAclsNormalizedBeforeRelease": true
+    },
+    "release": {
+      "versions": [
+        "20260916220000",
+        "20260916220100",
+        "20260916220200",
+        "20260916220300",
+        "20260916220400",
+        "20260916220500",
+        "20260916220600",
+        "20260916220700",
+        "20260916220800",
+        "20260916220900",
+        "20260916221000",
+        "20260916221100",
+        "20260916221200",
+        "20260916221300",
+        "20260916221400"
+      ],
+      "historyRows": 15,
+      "manifestFiles": 15,
+      "manifestHashMatches": 15,
+      "manifestSha256": "aff62d28dab673deaad4ab1d279c0673f4d85d190088161bca6a625d581c1ec8",
+      "stagingCatalog": {
+        "publicTables": 150,
+        "publicFunctions": 366,
+        "publicPolicies": 596,
+        "storagePolicies": 4,
+        "realtimeTables": 6,
+        "realtimeInsertUpdateOnly": true,
+        "referenceHotfixPolicies": 17,
+        "referenceHotfixDigest": "9a49d198cabb2ec4f9fd1984e8c20404",
+        "oldSalmonOverloadPresent": false,
+        "newSalmonContractPresent": true
+      }
+    }
+  },
+  "o02": {
+    "status": "PASS_NO_REAL_SCHEDULER_CONFIGURED",
+    "inventory": {
+      "repositorySchedule": false,
+      "vercelCronInRepositoryConfig": false,
+      "githubWorkflowInWorktree": false,
+      "pgCronInstalled": false,
+      "cronJobTablePresent": false,
+      "databaseWebhookTablePresent": false,
+      "webhookOrNetTriggers": 0,
+      "persistentCronSecretAfterTest": false
+    },
+    "realSchedulerMetadata": {
+      "service": null,
+      "owner": null,
+      "cadence": null,
+      "timezone": null,
+      "retries": null,
+      "alerts": null,
+      "reason": "no configured scheduler was found in the inspected repository, Supabase database, Supabase secrets or Vercel project configuration"
+    },
+    "handlerRehearsal": {
+      "cors": 200,
+      "missingSecret": 401,
+      "invalidSecret": 401,
+      "invalidAction": 400,
+      "refreshMvs": 200,
+      "auditRowsAdded": 1,
+      "syntheticSecretRemoved": true
+    }
+  },
+  "o03": {
+    "status": "PASS_BOUNDED_NEGATIVE_INVENTORY",
+    "externalConsumersFound": [],
+    "databaseInventory": {
+      "customLoginRoles": 0,
+      "customGranteesOnAppObjects": 0,
+      "foreignServers": 0,
+      "logicalSubscriptions": 0,
+      "databaseWebhookOrNetTriggers": 0
+    },
+    "internalConsumers": {
+      "edgeInvocations": [
+        "admin-create-user",
+        "admin-users",
+        "admin-companies",
+        "rbac-lint",
+        "rbac-lint-full",
+        "rbac-lint-quick",
+        "ai-chat",
+        "cmv",
+        "inventario",
+        "ficha-tecnica",
+        "requisicao-estoque",
+        "rh",
+        "check-password",
+        "send-whatsapp-zapi",
+        "cotacao-ia"
+      ],
+      "storageBuckets": [
+        "rh-documentos"
+      ],
+      "realtimeTables": [
+        "cotacao_fornecedores",
+        "cotacoes",
+        "movimentacoes_estoque",
+        "notifications",
+        "produtos",
+        "purchase_orders"
+      ]
+    },
+    "hostedRealtime": {
+      "subscribed": true,
+      "insertEvent": true,
+      "updateEvent": true,
+      "refetch": true,
+      "deletePublished": false,
+      "truncatePublished": false
+    },
+    "limitation": "an undisclosed out-of-band consumer reusing a standard Supabase credential cannot be disproved from repository and database metadata alone; none was reported or discovered"
+  },
+  "o04": {
+    "status": "PASS_STAGING",
+    "hostedEdgeFunctionsActive": 5,
+    "matrix": {
+      "passed": 25,
+      "failed": 0,
+      "cleanupOk": true,
+      "memberships": "0|1|2",
+      "corsAllowedOrigin": 200,
+      "corsDeniedOriginHeader": "null",
+      "jwtMissing": 401,
+      "jwtInvalid": 401,
+      "jwtExpiredPayloadWithTamperedSignature": 401,
+      "tenantRefusals": 403,
+      "oneMembershipAccepted": true,
+      "multiUnitAtoBtoA": true,
+      "adminLocalIsNotGlobal": true,
+      "explicitGlobalAdmin": true,
+      "inactiveMembershipRefusedWithSameJwt": true,
+      "inactiveCompanyRefusedWithSameJwt": true,
+      "revocationRefusedWithSameJwt": true
+    },
+    "syntheticResidue": {
+      "authUsers": 0,
+      "companies": 0,
+      "pendingIdentityReservations": 0,
+      "categoryProtectionTriggerEnabled": true
+    }
+  },
+  "releaseRehearsal": {
+    "status": "PASS",
+    "generatedAt": "2026-09-17T01:38:50.609Z",
+    "database": "moralles_stabilization_release_20260917013836",
+    "checks": 37,
+    "stageDatabases": 6,
+    "manifestFiles": 15
+  },
+  "findings": [
+    {
+      "severity": "fixed",
+      "item": "phase 6 preflight used locale-sensitive ordering",
+      "resolution": "binary C collation added to the generated guard and builder"
+    },
+    {
+      "severity": "fixed",
+      "item": "phase 7 notification preflight compared ACL text in unstable order",
+      "resolution": "ACL entries are compared as a sorted JSON array in the generated guard and builder"
+    },
+    {
+      "severity": "fixed",
+      "item": "purchase-requisitions mapped tenant denials to HTTP 500",
+      "resolution": "tenant denials now return HTTP 403; hosted matrix repeated 25/25"
+    },
+    {
+      "severity": "follow_up",
+      "item": "public.z_canary_test has RLS disabled",
+      "exposure": "no anon or authenticated table privileges were found",
+      "mutationApplied": false
+    }
+  ],
+  "advisorSummary": {
+    "securityErrors": 0,
+    "securityWarnings": {
+      "mutableSearchPath": 7,
+      "extensionsInPublic": 3,
+      "anonSecurityDefinerExecutable": 123,
+      "authenticatedSecurityDefinerExecutable": 252,
+      "leakedPasswordProtection": 1
+    },
+    "performanceWarnings": {
+      "authRlsInitplan": 489,
+      "multiplePermissivePolicies": 64,
+      "duplicateIndexes": 1
+    }
+  }
+}
