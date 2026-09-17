@@ -1,0 +1,343 @@
+{
+  "rls": [
+    {
+      "rls": true,
+      "force": true,
+      "table": "turnos"
+    },
+    {
+      "rls": true,
+      "force": true,
+      "table": "job_roles"
+    },
+    {
+      "rls": true,
+      "force": true,
+      "table": "stock_categories"
+    },
+    {
+      "rls": true,
+      "force": true,
+      "table": "stock_locations"
+    },
+    {
+      "rls": true,
+      "force": true,
+      "table": "stock_sectors"
+    }
+  ],
+  "policies": [
+    {
+      "cmd": "ALL",
+      "qual": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) OR (( SELECT (NULLIF(current_setting('request.headers'::text, true), ''::text) IS NULL)) AND is_company_member(( SELECT auth.uid() AS uid), company_id)))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "job_roles",
+      "permissive": "RESTRICTIVE",
+      "policyname": "multiunit_scope_boundary",
+      "schemaname": "public",
+      "with_check": "(company_id = ( SELECT get_current_company_id() AS get_current_company_id))"
+    },
+    {
+      "cmd": "DELETE",
+      "qual": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND ( SELECT has_any_permission(auth.uid(), ARRAY['usuarios:cargos:delete'::text, 'users:manage'::text, 'system:global:manage'::text]) AS has_any_permission))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "job_roles",
+      "permissive": "PERMISSIVE",
+      "policyname": "tenant_delete_job_roles",
+      "schemaname": "public",
+      "with_check": null
+    },
+    {
+      "cmd": "INSERT",
+      "qual": null,
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "job_roles",
+      "permissive": "PERMISSIVE",
+      "policyname": "tenant_insert_job_roles",
+      "schemaname": "public",
+      "with_check": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND ( SELECT has_any_permission(auth.uid(), ARRAY['usuarios:cargos:create'::text, 'users:manage'::text, 'system:global:manage'::text]) AS has_any_permission))"
+    },
+    {
+      "cmd": "SELECT",
+      "qual": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND ( SELECT has_any_permission(auth.uid(), ARRAY['usuarios:cargos:view'::text, 'users:manage'::text, 'system:global:manage'::text]) AS has_any_permission))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "job_roles",
+      "permissive": "PERMISSIVE",
+      "policyname": "tenant_select_job_roles",
+      "schemaname": "public",
+      "with_check": null
+    },
+    {
+      "cmd": "UPDATE",
+      "qual": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND ( SELECT has_any_permission(auth.uid(), ARRAY['usuarios:cargos:edit'::text, 'users:manage'::text, 'system:global:manage'::text]) AS has_any_permission))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "job_roles",
+      "permissive": "PERMISSIVE",
+      "policyname": "tenant_update_job_roles",
+      "schemaname": "public",
+      "with_check": "(company_id = ( SELECT get_current_company_id() AS get_current_company_id))"
+    },
+    {
+      "cmd": "ALL",
+      "qual": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) OR (( SELECT (NULLIF(current_setting('request.headers'::text, true), ''::text) IS NULL)) AND is_company_member(( SELECT auth.uid() AS uid), company_id)))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "stock_categories",
+      "permissive": "RESTRICTIVE",
+      "policyname": "multiunit_scope_boundary",
+      "schemaname": "public",
+      "with_check": "(company_id = ( SELECT get_current_company_id() AS get_current_company_id))"
+    },
+    {
+      "cmd": "DELETE",
+      "qual": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND ( SELECT has_any_permission(auth.uid(), ARRAY['estoque:categorias:delete'::text, 'stock:edit'::text, 'system:global:manage'::text]) AS has_any_permission))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "stock_categories",
+      "permissive": "PERMISSIVE",
+      "policyname": "tenant_delete_stock_categories",
+      "schemaname": "public",
+      "with_check": null
+    },
+    {
+      "cmd": "INSERT",
+      "qual": null,
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "stock_categories",
+      "permissive": "PERMISSIVE",
+      "policyname": "tenant_insert_stock_categories",
+      "schemaname": "public",
+      "with_check": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND ( SELECT has_any_permission(auth.uid(), ARRAY['estoque:categorias:create'::text, 'stock:edit'::text, 'system:global:manage'::text]) AS has_any_permission))"
+    },
+    {
+      "cmd": "SELECT",
+      "qual": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND ( SELECT has_any_permission(auth.uid(), ARRAY['estoque:categorias:view'::text, 'stock:read'::text, 'system:global:manage'::text]) AS has_any_permission))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "stock_categories",
+      "permissive": "PERMISSIVE",
+      "policyname": "tenant_select_stock_categories",
+      "schemaname": "public",
+      "with_check": null
+    },
+    {
+      "cmd": "UPDATE",
+      "qual": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND ( SELECT has_any_permission(auth.uid(), ARRAY['estoque:categorias:edit'::text, 'stock:edit'::text, 'system:global:manage'::text]) AS has_any_permission))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "stock_categories",
+      "permissive": "PERMISSIVE",
+      "policyname": "tenant_update_stock_categories",
+      "schemaname": "public",
+      "with_check": "(company_id = ( SELECT get_current_company_id() AS get_current_company_id))"
+    },
+    {
+      "cmd": "ALL",
+      "qual": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) OR (( SELECT (NULLIF(current_setting('request.headers'::text, true), ''::text) IS NULL)) AND is_company_member(( SELECT auth.uid() AS uid), company_id)))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "stock_locations",
+      "permissive": "RESTRICTIVE",
+      "policyname": "multiunit_scope_boundary",
+      "schemaname": "public",
+      "with_check": "(company_id = ( SELECT get_current_company_id() AS get_current_company_id))"
+    },
+    {
+      "cmd": "DELETE",
+      "qual": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND ( SELECT has_any_permission(auth.uid(), ARRAY['estoque:locais:delete'::text, 'stock:edit'::text, 'system:global:manage'::text]) AS has_any_permission))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "stock_locations",
+      "permissive": "PERMISSIVE",
+      "policyname": "tenant_delete_stock_locations",
+      "schemaname": "public",
+      "with_check": null
+    },
+    {
+      "cmd": "INSERT",
+      "qual": null,
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "stock_locations",
+      "permissive": "PERMISSIVE",
+      "policyname": "tenant_insert_stock_locations",
+      "schemaname": "public",
+      "with_check": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND ( SELECT has_any_permission(auth.uid(), ARRAY['estoque:locais:create'::text, 'stock:edit'::text, 'system:global:manage'::text]) AS has_any_permission))"
+    },
+    {
+      "cmd": "SELECT",
+      "qual": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND ( SELECT has_any_permission(auth.uid(), ARRAY['estoque:locais:view'::text, 'stock:read'::text, 'system:global:manage'::text]) AS has_any_permission))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "stock_locations",
+      "permissive": "PERMISSIVE",
+      "policyname": "tenant_select_stock_locations",
+      "schemaname": "public",
+      "with_check": null
+    },
+    {
+      "cmd": "UPDATE",
+      "qual": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND ( SELECT has_any_permission(auth.uid(), ARRAY['estoque:locais:edit'::text, 'stock:edit'::text, 'system:global:manage'::text]) AS has_any_permission))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "stock_locations",
+      "permissive": "PERMISSIVE",
+      "policyname": "tenant_update_stock_locations",
+      "schemaname": "public",
+      "with_check": "(company_id = ( SELECT get_current_company_id() AS get_current_company_id))"
+    },
+    {
+      "cmd": "ALL",
+      "qual": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) OR (( SELECT (NULLIF(current_setting('request.headers'::text, true), ''::text) IS NULL)) AND is_company_member(( SELECT auth.uid() AS uid), company_id)))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "stock_sectors",
+      "permissive": "RESTRICTIVE",
+      "policyname": "multiunit_scope_boundary",
+      "schemaname": "public",
+      "with_check": "(company_id = ( SELECT get_current_company_id() AS get_current_company_id))"
+    },
+    {
+      "cmd": "SELECT",
+      "qual": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND is_active AND ( SELECT has_any_permission(auth.uid(), ARRAY['estoque:requisicoes:create'::text, 'estoque:requisicoes:manage'::text]) AS has_any_permission))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "stock_sectors",
+      "permissive": "PERMISSIVE",
+      "policyname": "requisition_read_active_stock_sectors",
+      "schemaname": "public",
+      "with_check": null
+    },
+    {
+      "cmd": "DELETE",
+      "qual": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND ( SELECT has_any_permission(auth.uid(), ARRAY['estoque:setores:delete'::text, 'stock:edit'::text, 'system:global:manage'::text]) AS has_any_permission))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "stock_sectors",
+      "permissive": "PERMISSIVE",
+      "policyname": "tenant_delete_stock_sectors",
+      "schemaname": "public",
+      "with_check": null
+    },
+    {
+      "cmd": "INSERT",
+      "qual": null,
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "stock_sectors",
+      "permissive": "PERMISSIVE",
+      "policyname": "tenant_insert_stock_sectors",
+      "schemaname": "public",
+      "with_check": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND ( SELECT has_any_permission(auth.uid(), ARRAY['estoque:setores:create'::text, 'stock:edit'::text, 'system:global:manage'::text]) AS has_any_permission))"
+    },
+    {
+      "cmd": "SELECT",
+      "qual": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND ( SELECT has_any_permission(auth.uid(), ARRAY['estoque:setores:view'::text, 'stock:read'::text, 'system:global:manage'::text]) AS has_any_permission))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "stock_sectors",
+      "permissive": "PERMISSIVE",
+      "policyname": "tenant_select_stock_sectors",
+      "schemaname": "public",
+      "with_check": null
+    },
+    {
+      "cmd": "UPDATE",
+      "qual": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND ( SELECT has_any_permission(auth.uid(), ARRAY['estoque:setores:edit'::text, 'stock:edit'::text, 'system:global:manage'::text]) AS has_any_permission))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "stock_sectors",
+      "permissive": "PERMISSIVE",
+      "policyname": "tenant_update_stock_sectors",
+      "schemaname": "public",
+      "with_check": "(company_id = ( SELECT get_current_company_id() AS get_current_company_id))"
+    },
+    {
+      "cmd": "ALL",
+      "qual": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) OR (( SELECT (NULLIF(current_setting('request.headers'::text, true), ''::text) IS NULL)) AND is_company_member(( SELECT auth.uid() AS uid), company_id)))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "turnos",
+      "permissive": "RESTRICTIVE",
+      "policyname": "multiunit_scope_boundary",
+      "schemaname": "public",
+      "with_check": "(company_id = ( SELECT get_current_company_id() AS get_current_company_id))"
+    },
+    {
+      "cmd": "DELETE",
+      "qual": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND ( SELECT has_any_permission(auth.uid(), ARRAY['configuracoes:turnos:delete'::text, 'settings:manage'::text, 'system:global:manage'::text]) AS has_any_permission))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "turnos",
+      "permissive": "PERMISSIVE",
+      "policyname": "tenant_delete_turnos",
+      "schemaname": "public",
+      "with_check": null
+    },
+    {
+      "cmd": "INSERT",
+      "qual": null,
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "turnos",
+      "permissive": "PERMISSIVE",
+      "policyname": "tenant_insert_turnos",
+      "schemaname": "public",
+      "with_check": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND ( SELECT has_any_permission(auth.uid(), ARRAY['configuracoes:turnos:create'::text, 'settings:manage'::text, 'system:global:manage'::text]) AS has_any_permission))"
+    },
+    {
+      "cmd": "SELECT",
+      "qual": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND ( SELECT has_any_permission(auth.uid(), ARRAY['configuracoes:turnos:view'::text, 'settings:manage'::text, 'system:global:manage'::text]) AS has_any_permission))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "turnos",
+      "permissive": "PERMISSIVE",
+      "policyname": "tenant_select_turnos",
+      "schemaname": "public",
+      "with_check": null
+    },
+    {
+      "cmd": "UPDATE",
+      "qual": "((company_id = ( SELECT get_current_company_id() AS get_current_company_id)) AND ( SELECT has_any_permission(auth.uid(), ARRAY['configuracoes:turnos:edit'::text, 'settings:manage'::text, 'system:global:manage'::text]) AS has_any_permission))",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "turnos",
+      "permissive": "PERMISSIVE",
+      "policyname": "tenant_update_turnos",
+      "schemaname": "public",
+      "with_check": "(company_id = ( SELECT get_current_company_id() AS get_current_company_id))"
+    }
+  ]
+}

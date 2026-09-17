@@ -1,4 +1,6 @@
-# Fase 7 — entrega local, publicação e aceite integral pendentes
+# Fase 7 — registro pré-publicação, reconciliado pela Fase 12
+
+> **Situação posterior (17/09/2026):** o [hotfix de cadastros para perfis limitados](../../rbac/stock-reference-access-20260916.md), migration `20260916153928`, foi reconciliado e preservado pela publicação integrada da Fase 12. A Fase 7 entrou em produção pelos forwards `20260916220600`–`20260916221100`; evidências, hashes e recuo estão em [Fase 12](../fase12-20260916/RESULTADOS.md). O restante deste documento preserva o registro histórico anterior à publicação.
 
 **16/09/2026.** Inventário atualizado de todas as relações/funções cobertas, seis migrations novas e correções de 34 INSERTs/UPSERTs sem empresa explícita. Ensaios reais passaram. **Produção não foi alterada; os achados vivos anteriores continuam abertos.** O aceite integral da revisão SECURITY DEFINER e das relações restantes continua condicionado aos contratos/ensaios listados em [REVISAO-SQL.md](REVISAO-SQL.md). Não se declara isolamento universal com base em um inventário textual.
 

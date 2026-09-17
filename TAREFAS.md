@@ -18,6 +18,10 @@ Este arquivo serve para sincronizar o progresso do desenvolvimento entre os dife
 (Nenhuma tarefa em progresso)
 
 ## ✅ Concluído (Done)
+- [x] **Cadastros vazios para perfis limitados — Estoque (2026-09-16)**
+    - Hotfix `20260916153928` aplicado em produção: setores/categorias/locais alinhados à matriz e às dependências de movimentações, requisições, inventário, compras, transferências e CMV; leitura de cargos/turnos corrigida.
+    - Perfil de estoque da unidade validada passou de 0 para 12 setores, 23 categorias e 7 locais, mantendo bloqueios de edição/exclusão e isolamento entre empresas; 526 assertivas em PostgreSQL real.
+    - Mapeamento de chaves inconsistentes restantes e integração com Fase 7: `docs/rbac/stock-reference-access-20260916.md`; a publicação F12 posterior preservou o hotfix nos forwards `20260916220600`–`20260916221100`.
 - [x] **Conciliação Santander GM — ContaMax e OFX mutável (2026-08-31)**
     - Solução definitiva multi-tenant: aplicações/resgates ContaMax são evidências de movimento interno com efeito zero, sensíveis à ocorrência e independentes do FITID; não criam receita, despesa, transferência nem conta técnica
     - RPC em lote, RLS forçada e trigger no razão protegem clientes atuais e antigos; rendimento ContaMax continua sendo receita real e a conferência usa o saldo Santander consolidado (corrente + ContaMax)
