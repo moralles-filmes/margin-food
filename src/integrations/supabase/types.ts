@@ -5129,6 +5129,7 @@ export type Database = {
           avg30_cost_base_unit: number
           avg30_cost_purchase_unit: number
           avg30_variation_percent: number
+          barcode: string | null
           categoria: string
           company_id: string
           conta_no_cmv: boolean
@@ -5171,6 +5172,7 @@ export type Database = {
           avg30_cost_base_unit?: number
           avg30_cost_purchase_unit?: number
           avg30_variation_percent?: number
+          barcode?: string | null
           categoria?: string
           company_id?: string
           conta_no_cmv?: boolean
@@ -5213,6 +5215,7 @@ export type Database = {
           avg30_cost_base_unit?: number
           avg30_cost_purchase_unit?: number
           avg30_variation_percent?: number
+          barcode?: string | null
           categoria?: string
           company_id?: string
           conta_no_cmv?: boolean
@@ -11344,6 +11347,20 @@ export type Database = {
         }
         Returns: Json
       }
+      op_barcode_existe: { Args: { p_barcode: string }; Returns: boolean }
+      op_find_produto_por_barcode: {
+        Args: { p_barcode: string }
+        Returns: {
+          barcode: string
+          nome: string
+          produto_id: string
+          saldo: number
+          setor_id: string
+          setor_nome: string
+          sku: string
+          unidade_medida: string
+        }[]
+      }
       op_list_historico: {
         Args: { p_limit?: number }
         Returns: {
@@ -11360,6 +11377,7 @@ export type Database = {
       op_list_produtos: {
         Args: { p_limit?: number; p_search?: string; p_setor_id: string }
         Returns: {
+          barcode: string
           nome: string
           produto_id: string
           saldo: number

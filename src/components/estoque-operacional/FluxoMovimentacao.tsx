@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ArrowDown, ArrowLeft, ArrowUp, Check, CheckCircle2, Loader2 } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowUp, Check, CheckCircle2, Loader2, ScanLine } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,10 +14,11 @@ import {
   type SetorOperacional,
 } from '@/domain/estoque/operacional';
 import type { useMovimentacaoOperacional } from '@/hooks/useMovimentacaoOperacional';
+import LeitorCodigoBarras from './LeitorCodigoBarras';
 import ProdutoPickerOperacional from './ProdutoPickerOperacional';
 import QuantidadeStepper from './QuantidadeStepper';
 
-type Passo = 'setor' | 'produto' | 'quantidade' | 'sucesso';
+type Passo = 'leitor' | 'setor' | 'produto' | 'setor-do-codigo' | 'quantidade' | 'sucesso';
 
 interface Props {
   tipo: MovimentacaoOperacionalTipo;
@@ -50,13 +51,23 @@ export default function FluxoMovimentacao({
   // perguntar algo que tem uma única resposta é um clique desperdiçado.
   const setorUnico = setores.length === 1 ? setores[0] : null;
 
-  const [passo, setPasso] = useState<Passo>(setorUnico ? 'produto' : 'setor');
+  /** O passo inicial do modo manual, respeitando o atalho de setor único. */
+  const passoManualInicial: Passo = setorUnico ? 'produto' : 'setor';
+
+  // O leitor é o modo padrão: é o caminho de maior volume na operação.
+  const [passo, setPasso] = useState<Passo>('leitor');
   const [setor, setSetor] = useState<SetorOperacional | null>(setorUnico);
   const [produto, setProduto] = useState<ProdutoOperacional | null>(null);
   const [quantidadeTexto, setQuantidadeTexto] = useState('1');
   const [observacao, setObservacao] = useState('');
   const [salvando, setSalvando] = useState(false);
   const [resultado, setResultado] = useState<MovimentacaoOperacionalRegistrada | null>(null);
+
+  // Estado do leitor
+  const [lendo, setLendo] = useState(false);
+  const [avisoLeitor, setAvisoLeitor] = useState<string | undefined>();
+  const [setoresDoCodigo, setSetoresDoCodigo] = useState<SetorOperacional[]>([]);
+  const [focoLeitor, setFocoLeitor] = useState(0);
 
   // Um request id por confirmação. Só é renovado quando um novo lançamento
   // começa — assim o retry de um envio que falhou na rede reaproveita o mesmo id
@@ -78,6 +89,61 @@ export default function FluxoMovimentacao({
     setProduto(p);
     setQuantidadeTexto('1');
     setPasso('quantidade');
+  }, []);
+
+  // ─── Leitura de código de barras ───
+  const processarLeitura = useCallback(async (codigo: string) => {
+    setLendo(true);
+    setAvisoLeitor(undefined);
+    const res = await dados.buscarPorBarcode(codigo);
+    setLendo(false);
+
+    if (res.status === 'erro') {
+      setAvisoLeitor(res.erro);
+      return;
+    }
+    if (res.status === 'nao_encontrado') {
+      // O operador não cadastra produto: a mensagem manda procurar quem cadastra.
+      setAvisoLeitor(
+        `Produto não encontrado para o código ${codigo}. `
+        + 'Procure um responsável para cadastrar o código deste produto.',
+      );
+      return;
+    }
+    if (res.status === 'sem_acesso_ao_setor') {
+      setAvisoLeitor(
+        'Este produto existe, mas só nos setores que você não tem autorização para movimentar.',
+      );
+      return;
+    }
+
+    setProduto(res.produto);
+    setQuantidadeTexto('1');
+
+    // Um setor acessível resolve sozinho; vários exigem a escolha, que é rápida
+    // mas não pode ser adivinhada — o lançamento iria para o setor errado.
+    if (res.setores.length === 1) {
+      setSetor(res.setores[0]);
+      setPasso('quantidade');
+    } else {
+      setSetoresDoCodigo(res.setores);
+      setPasso('setor-do-codigo');
+    }
+  }, [dados]);
+
+  const irParaManual = useCallback(() => {
+    setAvisoLeitor(undefined);
+    setProduto(null);
+    setSetoresDoCodigo([]);
+    setSetor(setorUnico);
+    setPasso(passoManualInicial);
+  }, [setorUnico, passoManualInicial]);
+
+  const irParaLeitor = useCallback(() => {
+    setAvisoLeitor(undefined);
+    setProduto(null);
+    setPasso('leitor');
+    setFocoLeitor(t => t + 1);
   }, []);
 
   const confirmar = useCallback(async () => {
@@ -106,20 +172,38 @@ export default function FluxoMovimentacao({
     onRegistrado();
   }, [salvando, produto, setor, validacao, quantidade, dados, tipo, observacao, requestId, toast, onRegistrado]);
 
-  const novoLancamento = useCallback(() => {
+  /**
+   * Volta para o modo que originou o lançamento: quem estava bipando continua
+   * bipando, com o campo já focado para o próximo produto.
+   */
+  const novoLancamento = useCallback((modo: 'leitor' | 'manual') => {
     setProduto(null);
     setQuantidadeTexto('1');
     setObservacao('');
     setResultado(null);
     setRequestId(novoRequestId());
-    setPasso('produto');
-  }, []);
+    setAvisoLeitor(undefined);
+
+    if (modo === 'leitor') {
+      setPasso('leitor');
+      setFocoLeitor(t => t + 1);
+    } else {
+      setSetor(setorUnico);
+      setPasso(passoManualInicial);
+    }
+  }, [setorUnico, passoManualInicial]);
 
   const voltar = useCallback(() => {
-    if (passo === 'quantidade') { setPasso('produto'); return; }
+    if (passo === 'quantidade' || passo === 'setor-do-codigo') {
+      // Se o produto veio do leitor, voltar é voltar ao leitor.
+      if (setoresDoCodigo.length > 0 || passo === 'setor-do-codigo') { irParaLeitor(); return; }
+      setPasso('produto');
+      return;
+    }
     if (passo === 'produto' && !setorUnico) { setSetor(null); setPasso('setor'); return; }
+    if (passo === 'produto' || passo === 'setor') { irParaLeitor(); return; }
     onVoltarInicio();
-  }, [passo, setorUnico, onVoltarInicio]);
+  }, [passo, setorUnico, setoresDoCodigo.length, irParaLeitor, onVoltarInicio]);
 
   const corAcento = isSaida ? 'text-destructive' : 'text-success';
   const fundoAcento = isSaida ? 'bg-destructive-soft' : 'bg-success-soft';
@@ -153,6 +237,45 @@ export default function FluxoMovimentacao({
           )}
         </div>
       </div>
+
+      {/* Modo padrão — leitor de código de barras */}
+      {passo === 'leitor' && (
+        <LeitorCodigoBarras
+          onLeitura={processarLeitura}
+          onLancarManualmente={irParaManual}
+          ocupado={lendo}
+          aviso={avisoLeitor}
+          focoToken={focoLeitor}
+        />
+      )}
+
+      {/* Código lido em mais de um setor acessível */}
+      {passo === 'setor-do-codigo' && produto && (
+        <section className="space-y-3">
+          <div className="rounded-xl border border-border bg-card p-4">
+            <p className="text-base font-semibold text-foreground">{produto.nome}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {produto.sku ? `${produto.sku} · ` : ''}{produto.unidadeMedida}
+            </p>
+          </div>
+          <p className="text-sm font-medium text-foreground">
+            De qual setor deseja {isSaida ? 'retirar' : 'lançar'}?
+          </p>
+          <ul className="grid gap-2 sm:grid-cols-2">
+            {setoresDoCodigo.map(s => (
+              <li key={s.setorId}>
+                <button
+                  type="button"
+                  onClick={() => { setSetor(s); setPasso('quantidade'); }}
+                  className="w-full rounded-xl border border-border bg-card p-4 text-left text-base font-semibold text-foreground transition-colors hover:border-primary hover:bg-background-subtle"
+                >
+                  {s.nome}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {/* Passo 1 — setor */}
       {passo === 'setor' && (
@@ -202,6 +325,15 @@ export default function FluxoMovimentacao({
             onSelecionar={selecionarProduto}
             destacarSaldo={isSaida}
           />
+          <Button
+            type="button"
+            variant="outline"
+            onClick={irParaLeitor}
+            className="h-12 w-full rounded-xl text-base"
+          >
+            <ScanLine className="mr-2 h-5 w-5" />
+            Usar leitor de código de barras
+          </Button>
         </section>
       )}
 
@@ -282,15 +414,24 @@ export default function FluxoMovimentacao({
           <div className="grid gap-2 sm:grid-cols-2">
             <Button
               type="button"
-              onClick={novoLancamento}
+              onClick={() => novoLancamento('leitor')}
               className="h-12 rounded-xl bg-primary-strong text-base font-semibold text-primary-foreground"
             >
-              {isSaida ? 'Realizar outra saída' : 'Realizar outra entrada'}
+              <ScanLine className="mr-2 h-5 w-5" />
+              Ler próximo código
             </Button>
-            <Button type="button" variant="outline" onClick={onVoltarInicio} className="h-12 rounded-xl text-base">
-              Voltar ao início
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => novoLancamento('manual')}
+              className="h-12 rounded-xl text-base"
+            >
+              {isSaida ? 'Outra saída manual' : 'Outra entrada manual'}
             </Button>
           </div>
+          <Button type="button" variant="ghost" onClick={onVoltarInicio} className="h-11 w-full text-sm">
+            Voltar ao início
+          </Button>
         </section>
       )}
     </div>

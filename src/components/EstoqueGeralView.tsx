@@ -241,6 +241,9 @@ export default function EstoqueGeralView() {
     setProdForm({
       nomeProduto: `${p.nomeProduto} (cópia)`,
       sku: '',
+      // Código de barras não é copiado: é único por empresa, e duplicar
+      // quebraria o INSERT da cópia no índice uq_produtos_barcode_empresa.
+      barcode: '',
       categoria: p.categoria,
       unidadeMedida: p.unidadeMedida as ProdutoFormData['unidadeMedida'],
       conversoes: p.conversoes,
@@ -990,6 +993,7 @@ export default function EstoqueGeralView() {
                                 packageQuantity: p.packageQuantity ?? null,
                                 packageMeasureUnit: p.packageMeasureUnit ?? null,
                                 conversionMode: p.conversionMode || 'manual',
+                                barcode: p.barcode || '',
                               });
                               setShowProdForm(true);
                             }}

@@ -29,6 +29,20 @@ export interface HistoricoOperacionalItem {
   responsavel: string;
 }
 
+/**
+ * Resultado de uma leitura de código de barras.
+ *
+ * `sem_acesso_ao_setor` é deliberadamente distinto de `nao_encontrado`: no
+ * primeiro caso o operador precisa saber que é permissão, no segundo que o
+ * código não está cadastrado. Confundir os dois manda a pessoa para o lado
+ * errado (procurar o gerente vs. procurar o cadastro).
+ */
+export type ResultadoBarcode =
+  | { status: 'encontrado'; produto: ProdutoOperacional; setores: SetorOperacional[] }
+  | { status: 'sem_acesso_ao_setor' }
+  | { status: 'nao_encontrado' }
+  | { status: 'erro'; erro: string };
+
 interface RegistrarInput {
   produtoId: string;
   setorId: string;
@@ -137,6 +151,51 @@ export function useMovimentacaoOperacional() {
     };
   }, [supabase]);
 
+  // ─── Busca por código de barras ───
+  //
+  // O servidor devolve uma linha por setor acessível em que o produto pode ser
+  // movimentado. Quem resolve entre "setor único → segue direto" e "vários →
+  // pergunta" é a tela; o servidor nunca devolve setor fora do acesso, então o
+  // leitor não contorna a permissão de setor.
+  const buscarPorBarcode = useCallback(async (codigo: string): Promise<ResultadoBarcode> => {
+    const { data, error } = await supabase.rpc('op_find_produto_por_barcode', {
+      p_barcode: codigo,
+    });
+
+    if (error) {
+      console.error('[useMovimentacaoOperacional] op_find_produto_por_barcode', error);
+      return { status: 'erro', erro: traduzirErroOperacional(error.message) };
+    }
+
+    const linhas = data ?? [];
+    if (linhas.length > 0) {
+      const primeira = linhas[0];
+      return {
+        status: 'encontrado',
+        produto: {
+          produtoId: primeira.produto_id,
+          nome: primeira.nome,
+          sku: primeira.sku,
+          unidadeMedida: primeira.unidade_medida,
+          saldo: Number(primeira.saldo) || 0,
+          vinculado: true,
+        },
+        setores: linhas.map(l => ({ setorId: l.setor_id, nome: l.setor_nome })),
+      };
+    }
+
+    // Zero linhas é ambíguo: código inexistente ou produto que só existe em
+    // setor sem acesso. A orientação ao operador muda entre os dois casos.
+    const { data: existe, error: erroExiste } = await supabase.rpc('op_barcode_existe', {
+      p_barcode: codigo,
+    });
+    if (erroExiste) {
+      console.error('[useMovimentacaoOperacional] op_barcode_existe', erroExiste);
+      return { status: 'nao_encontrado' };
+    }
+    return existe ? { status: 'sem_acesso_ao_setor' } : { status: 'nao_encontrado' };
+  }, [supabase]);
+
   // ─── Histórico operacional (sem valores) ───
   const carregarHistorico = useCallback(async (
     limite = 20,
@@ -160,6 +219,6 @@ export function useMovimentacaoOperacional() {
 
   return {
     setores, setoresLoading, setoresErro, recarregarSetores: carregarSetores,
-    buscarProdutos, registrar, carregarHistorico,
+    buscarProdutos, buscarPorBarcode, registrar, carregarHistorico,
   };
 }
