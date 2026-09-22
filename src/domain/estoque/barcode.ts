@@ -74,3 +74,81 @@ export function ehLeituraDuplicada(
   if (codigo !== ultimoCodigo) return false;
   return agora - ultimoEm < JANELA_LEITURA_DUPLICADA_MS;
 }
+
+/**
+ * ─── Lista de códigos de um produto ───
+ *
+ * Um produto tem N códigos porque o mesmo item de estoque chega em marcas
+ * diferentes, cada uma com seu EAN. O `rotulo` diz qual embalagem é qual — sem
+ * ele, um produto com quatro códigos não tem como ser mantido depois.
+ */
+
+export interface CodigoBarrasProduto {
+  /** id da linha no banco. Ausente enquanto o código só existe no formulário. */
+  id?: string;
+  codigo: string;
+  rotulo: string;
+}
+
+/** Rótulo é etiqueta curta ("União"), não descrição. */
+export const ROTULO_MAX = 40;
+
+export type AdicaoCodigo =
+  | { ok: true; lista: CodigoBarrasProduto[] }
+  | { ok: false; erro: string };
+
+/**
+ * Acrescenta um código à lista do formulário.
+ *
+ * Recusa duplicata dentro do próprio produto antes de ir ao banco: sem isso o
+ * INSERT quebraria no índice único e a mensagem falaria de "outro produto",
+ * quando na verdade o código já está ali na tela.
+ */
+export function adicionarCodigo(
+  lista: CodigoBarrasProduto[],
+  raw: string,
+  rotulo: string,
+): AdicaoCodigo {
+  const { valido, codigo, motivo } = validarBarcode(raw);
+  if (!valido) return { ok: false, erro: mensagemBarcodeInvalido(motivo!) };
+
+  if (lista.some(c => c.codigo === codigo)) {
+    return { ok: false, erro: 'Este código já está na lista deste produto.' };
+  }
+
+  return {
+    ok: true,
+    lista: [...lista, { codigo, rotulo: rotulo.trim().slice(0, ROTULO_MAX) }],
+  };
+}
+
+export interface DiffCodigos {
+  /** Sem `id`: ainda não existem no banco. */
+  adicionar: CodigoBarrasProduto[];
+  /** Ids das linhas que saíram da lista. */
+  remover: string[];
+}
+
+/**
+ * O que gravar ao salvar o produto.
+ *
+ * Quem aplica o diff precisa rodar os DELETEs ANTES dos INSERTs: trocar só o
+ * rótulo de um código é removê-lo e adicioná-lo de novo, e na ordem inversa o
+ * INSERT colidiria com a linha que ainda não foi apagada.
+ *
+ * A remoção é decidida pelo `id`, nunca pelo código. Pelo código, remover uma
+ * linha e readicionar o MESMO número (só para trocar o rótulo) não gerava
+ * DELETE nenhum — a linha antiga sobrevivia e o INSERT batia no índice único.
+ */
+export function diffCodigos(
+  original: readonly CodigoBarrasProduto[],
+  atual: readonly CodigoBarrasProduto[],
+): DiffCodigos {
+  const idsAtuais = new Set(atual.map(c => c.id).filter(Boolean));
+  return {
+    adicionar: atual.filter(c => !c.id),
+    remover: original
+      .filter(c => c.id && !idsAtuais.has(c.id))
+      .map(c => c.id as string),
+  };
+}

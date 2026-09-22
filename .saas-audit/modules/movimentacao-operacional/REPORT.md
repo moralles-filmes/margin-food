@@ -255,3 +255,84 @@ ganhou duas abas.
    serializa as consultas (medido: sessão A 17:02:09.757→17:02:13.760, sessão B
    só iniciou 17:02:15.62). A garantia de concorrência está evidenciada pela
    aquisição do lock, não por paralelismo real.
+
+---
+
+# Adendo — múltiplos códigos de barras por produto
+
+**Data:** 2026-09-22
+**Branch:** `feat/produto-multiplos-codigos-barras`
+**Modo:** `--fix` (auditoria incremental; escopo é a mudança, não o módulo inteiro)
+**Veredito:** PASS — 0 bloqueantes; 3 achados P2/P3 corrigidos, 2 aceitos como dívida conhecida
+
+## O que mudou
+
+`produtos.barcode` (coluna única) → tabela `produto_codigos_barras` (N códigos por
+produto, com rótulo opcional da marca). O mesmo item de estoque chega em marcas
+diferentes, cada uma com seu EAN; a coluna única fazia a segunda marca sobrescrever
+a primeira. As três RPCs de leitura do operacional passaram a consultar a tabela nova.
+A coluna antiga foi mantida (expand/contract) e será dropada em follow-up.
+
+Auditores rodados: `rls-auditor`, `tenant-isolation-auditor`, `business-process-auditor`.
+
+## Achados corrigidos
+
+### MOD-movop-007 — DELETE e INSERT do diff sem transação (P2)
+`salvarCodigosBarras` gravava o diff em duas chamadas PostgREST. Com o DELETE
+commitado e o INSERT falhando logo depois (rede, ou corrida com outro produto
+reivindicando o mesmo código), o produto ficava **sem nenhum código de barras**: o
+leitor parava de reconhecer a embalagem e nada na tela dizia que o código sumira.
+
+Corrigido em `20260922193015` com a RPC `catalogo_salvar_codigos_barras`
+(`SECURITY DEFINER`), que faz DELETE e INSERT na mesma transação e devolve a lista
+gravada. Evidência (transação revertida): colisão recusada com `unique_violation`
+**e** o código que seria removido sobreviveu ao rollback.
+
+### MOD-movop-008 — `produto_id` não validado contra `company_id` (P2)
+A FK aponta para `produtos(id)`, único global, e a policy de escrita só exigia
+`company_id = get_current_company_id()`. Dava para gravar um código da empresa A
+apontando para um produto da empresa B. Nenhuma leitura vazava — as RPCs casam
+`company_id` dos dois lados — mas a linha nascia órfã.
+
+Corrigido por três camadas: a RPC valida que o produto é do tenant
+(`PRODUTO_NAO_ENCONTRADO`), o DML direto foi revogado de `authenticated` (resta só
+`SELECT`) e a policy de escrita ganhou o `exists` cruzando produto × empresa, para
+o caso de o GRANT voltar um dia. Evidência: produto de outra empresa recusado.
+
+### MOD-movop-009 — escape de `ILIKE` vazando na comparação exata (P3)
+`op_list_produtos` escapava o termo para `ILIKE` (`_` → `\_`) e reusava o MESMO
+termo na comparação exata do código. Como `_` é caractere válido pela CHECK,
+buscar `ABC_123` comparava contra `ABC\_123` e nunca encontrava. O bug já existia
+na versão anterior, com `p.barcode = v_term`.
+
+Corrigido separando `v_like` (escapado, para o ILIKE) de `v_term` (cru, para o
+código). Evidência: busca por `ABC_123` devolve 1 linha.
+
+### MOD-movop-010 — INSERT não devolvia os ids gerados (P2, latente)
+O código recém-gravado ficava sem `id` no estado do formulário; o diff seguinte
+tentaria inseri-lo de novo, colidindo no índice único contra a linha que ele mesmo
+acabara de criar. Hoje estava mascarado porque o painel sempre fecha após salvar.
+A RPC agora devolve a lista com os ids e o formulário a adota. Coberto por teste
+(`produto-form-codigos-barras.test.tsx`: salvar duas vezes seguidas produz diff vazio).
+
+## Achados aceitos, não corrigidos
+
+1. **Policies sem `TO authenticated` explícito** (P3). Não há GRANT para `anon`, então
+   o Postgres já barra antes de avaliar a RLS. As tabelas irmãs
+   (`estoque_setor_produtos`, `estoque_usuario_setores`) seguem o mesmo padrão —
+   corrigir só esta criaria inconsistência. É passe de padronização próprio.
+2. **`onUpdate` em `EstoqueGeralView` ignora o parâmetro `shouldClose` que recebe**
+   (P3). Pré-existente, não introduzido aqui. O risco apontado (religar "salvar e
+   continuar editando" em edição) foi neutralizado pelo MOD-movop-010.
+
+## Riscos residuais
+
+- **Produto e códigos ainda são duas transações.** A RPC tornou o diff atômico, mas
+  o UPDATE do produto continua separado. Se os códigos falharem, o produto já foi
+  salvo e os códigos ficam **inteiramente** inalterados — estado compreensível e
+  informado por toast, não mais perda silenciosa. Unificar os dois exigiria mover o
+  save inteiro do produto para RPC, que é refatoração do catálogo, fora deste escopo.
+- **`verificarCodigosLivres` é fail-open** por design: falha de rede devolve "pode
+  prosseguir". É conveniência de UX; quem garante unicidade é o índice único, e o
+  `23505` continua tratado com mensagem correta.
+- **Verificação visual em navegador real** não foi possível neste ambiente.

@@ -5123,6 +5123,58 @@ export type Database = {
           },
         ]
       }
+      produto_codigos_barras: {
+        Row: {
+          codigo: string
+          company_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          produto_id: string
+          rotulo: string | null
+        }
+        Insert: {
+          codigo: string
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          produto_id: string
+          rotulo?: string | null
+        }
+        Update: {
+          codigo?: string
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          produto_id?: string
+          rotulo?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "produto_codigos_barras_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "produto_codigos_barras_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "mv_giro_estoque"
+            referencedColumns: ["produto_id"]
+          },
+          {
+            foreignKeyName: "produto_codigos_barras_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       produtos: {
         Row: {
           ativo: boolean
@@ -11347,6 +11399,18 @@ export type Database = {
         }
         Returns: Json
       }
+      catalogo_salvar_codigos_barras: {
+        Args: {
+          p_adicionar?: Json
+          p_produto_id: string
+          p_remover?: string[]
+        }
+        Returns: {
+          codigo: string
+          id: string
+          rotulo: string
+        }[]
+      }
       op_barcode_existe: { Args: { p_barcode: string }; Returns: boolean }
       op_find_produto_por_barcode: {
         Args: { p_barcode: string }
@@ -11377,7 +11441,6 @@ export type Database = {
       op_list_produtos: {
         Args: { p_limit?: number; p_search?: string; p_setor_id: string }
         Returns: {
-          barcode: string
           nome: string
           produto_id: string
           saldo: number
