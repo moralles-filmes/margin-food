@@ -771,48 +771,41 @@ export function useEstoqueGeralStore() {
   }, [supabase]);
 
   /**
-   * Aplica o diff da lista de códigos.
+   * Aplica o diff da lista de códigos e devolve a lista gravada.
    *
-   * DELETE antes de INSERT, sempre: trocar o rótulo de um código é removê-lo e
-   * adicioná-lo de novo, e na ordem inversa o INSERT colidiria com a linha que
-   * ainda não foi apagada.
+   * Passa por RPC, não por dois PostgREST: o DELETE e o INSERT precisam da MESMA
+   * transação. Separados, o DELETE podia ser commitado e o INSERT falhar logo
+   * depois — o produto ficava sem nenhum código, o leitor parava de reconhecer a
+   * embalagem e nada na tela dizia que o código havia sumido.
+   *
+   * O retorno traz os ids recém-gravados: sem eles o formulário guardaria os
+   * códigos novos sem id e o diff seguinte tentaria inseri-los outra vez,
+   * batendo no índice único contra a linha que ele mesmo acabou de criar.
    */
-  const salvarCodigosBarras = useCallback(async (produtoId: string, diff: DiffCodigos) => {
-    if (!companyId) throw new Error('Selecione uma unidade para salvar os códigos de barras.');
+  const salvarCodigosBarras = useCallback(async (
+    produtoId: string,
+    diff: DiffCodigos,
+  ): Promise<CodigoBarrasProduto[]> => {
+    const { data, error } = await supabase.rpc('catalogo_salvar_codigos_barras', {
+      p_produto_id: produtoId,
+      p_remover: diff.remover,
+      p_adicionar: diff.adicionar.map(c => ({ codigo: c.codigo, rotulo: c.rotulo })),
+    });
 
-    if (diff.remover.length > 0) {
-      const { error } = await supabase
-        .from('produto_codigos_barras')
-        .delete()
-        .in('id', diff.remover);
-      if (error) {
-        console.error('[useEstoqueGeralStore.salvarCodigosBarras] delete', error);
-        throw error;
+    if (error) {
+      console.error('[useEstoqueGeralStore.salvarCodigosBarras]', error);
+      // 23505 = o código já existe na empresa, necessariamente em OUTRO
+      // produto: duplicata dentro do próprio formulário é barrada antes.
+      // Só chega aqui quem passou pela checagem prévia e perdeu a corrida.
+      if (error.code === '23505') {
+        const msg = await verificarCodigosLivres(diff.adicionar.map(c => c.codigo), produtoId);
+        throw new Error(msg ?? 'Este código de barras já está cadastrado em outro produto.');
       }
+      throw error;
     }
 
-    if (diff.adicionar.length > 0) {
-      const { error } = await supabase
-        .from('produto_codigos_barras')
-        .insert(diff.adicionar.map(c => ({
-          company_id: companyId,
-          produto_id: produtoId,
-          codigo: c.codigo,
-          rotulo: c.rotulo || null,
-        })));
-      if (error) {
-        console.error('[useEstoqueGeralStore.salvarCodigosBarras] insert', error);
-        // 23505 = o código já existe na empresa, necessariamente em OUTRO
-        // produto: duplicata dentro do próprio formulário é barrada antes.
-        // Só chega aqui quem passou pela checagem prévia e perdeu a corrida.
-        if (error.code === '23505') {
-          const msg = await verificarCodigosLivres(diff.adicionar.map(c => c.codigo), produtoId);
-          throw new Error(msg ?? 'Este código de barras já está cadastrado em outro produto.');
-        }
-        throw error;
-      }
-    }
-  }, [companyId, supabase, verificarCodigosLivres]);
+    return (data ?? []).map(r => ({ id: r.id, codigo: r.codigo, rotulo: r.rotulo || '' }));
+  }, [supabase, verificarCodigosLivres]);
 
   const deleteProduto = useCallback(async (id: string) => {
     const { data: deactivatedId, error } = await supabase.rpc('deactivate_produto', { p_produto_id: id });

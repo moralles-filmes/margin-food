@@ -64,7 +64,7 @@ interface ProdutoFormPanelProps {
   addProduto: (p: ProdutoCreateInput) => Promise<ProdutoExtended>;
   updateProduto: (id: string, u: ProdutoUpdateInput) => Promise<void>;
   fetchCodigosBarras: (produtoId: string) => Promise<CodigoBarrasProduto[]>;
-  salvarCodigosBarras: (produtoId: string, diff: DiffCodigos) => Promise<void>;
+  salvarCodigosBarras: (produtoId: string, diff: DiffCodigos) => Promise<CodigoBarrasProduto[]>;
   verificarCodigosLivres: (codigos: string[], produtoId?: string) => Promise<string | null>;
 }
 
@@ -247,8 +247,12 @@ export default function ProdutoFormPanel({
 
       if (editProdId) {
         await updateProduto(editProdId, savePayload);
-        await salvarCodigosBarras(editProdId, diff);
-        setCodigosOriginais(codigos);
+        // A lista volta do servidor com os ids gravados. Reaproveitar o estado
+        // local deixaria os códigos novos sem id, e o diff seguinte tentaria
+        // inseri-los de novo, colidindo com a linha recém-criada.
+        const salvos = await salvarCodigosBarras(editProdId, diff);
+        setCodigos(salvos);
+        setCodigosOriginais(salvos);
         onUpdate(shouldClose);
       } else {
         const created = await addProduto(savePayload);

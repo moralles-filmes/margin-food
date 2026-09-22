@@ -11399,6 +11399,18 @@ export type Database = {
         }
         Returns: Json
       }
+      catalogo_salvar_codigos_barras: {
+        Args: {
+          p_adicionar?: Json
+          p_produto_id: string
+          p_remover?: string[]
+        }
+        Returns: {
+          codigo: string
+          id: string
+          rotulo: string
+        }[]
+      }
       op_barcode_existe: { Args: { p_barcode: string }; Returns: boolean }
       op_find_produto_por_barcode: {
         Args: { p_barcode: string }

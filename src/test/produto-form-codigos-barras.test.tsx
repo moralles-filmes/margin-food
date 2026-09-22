@@ -40,7 +40,8 @@ function criarProps(over: Partial<Record<string, unknown>> = {}) {
     addProduto: vi.fn().mockResolvedValue({ id: 'prod-novo', sku: 'MP-0100' } as unknown as ProdutoExtended),
     updateProduto: vi.fn().mockResolvedValue(undefined),
     fetchCodigosBarras: vi.fn().mockResolvedValue([] as CodigoBarrasProduto[]),
-    salvarCodigosBarras: vi.fn().mockResolvedValue(undefined),
+    // A RPC devolve a lista gravada, já com os ids do banco.
+    salvarCodigosBarras: vi.fn().mockResolvedValue([] as CodigoBarrasProduto[]),
     verificarCodigosLivres: vi.fn().mockResolvedValue(null),
     ...over,
   };
@@ -201,6 +202,32 @@ describe('gravação dos códigos', () => {
     expect(props.verificarCodigosLivres).not.toHaveBeenCalled();
     const [, diff] = (props.salvarCodigosBarras as ReturnType<typeof vi.fn>).mock.calls[0] as [string, DiffCodigos];
     expect(diff).toEqual({ adicionar: [], remover: [] });
+  });
+
+  it('adota os ids que a RPC devolveu — salvar de novo não reinsere o mesmo código', async () => {
+    // Sem adotar o retorno, o código recém-gravado continuaria sem id no estado
+    // local e o diff seguinte tentaria inseri-lo outra vez, colidindo no índice
+    // único contra a linha que acabou de ser criada.
+    const props = criarProps({
+      salvarCodigosBarras: vi.fn().mockResolvedValue([
+        { id: 'row-gerado', codigo: '7891234567890', rotulo: 'União' },
+      ] as CodigoBarrasProduto[]),
+    });
+    render(<Harness editProdId="prod-1" {...props} />);
+
+    fireEvent.change(campoCodigo(), { target: { value: '7891234567890' } });
+    fireEvent.change(campoMarca(), { target: { value: 'União' } });
+    fireEvent.click(botaoAdicionar());
+    fireEvent.click(screen.getByRole('button', { name: 'Atualizar' }));
+
+    await waitFor(() => expect(props.salvarCodigosBarras).toHaveBeenCalledTimes(1));
+
+    // Segundo salvamento, sem o usuário mexer em nada: o diff tem de ser vazio.
+    fireEvent.click(screen.getByRole('button', { name: 'Atualizar' }));
+    await waitFor(() => expect(props.salvarCodigosBarras).toHaveBeenCalledTimes(2));
+
+    const [, segundoDiff] = (props.salvarCodigosBarras as ReturnType<typeof vi.fn>).mock.calls[1] as [string, DiffCodigos];
+    expect(segundoDiff).toEqual({ adicionar: [], remover: [] });
   });
 
   it('grava os códigos no produto recém-criado, com o id que voltou do INSERT', async () => {
