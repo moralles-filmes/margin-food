@@ -167,6 +167,22 @@ export const MODULE_MANIFESTS: ModuleManifest[] = [
       ]},
     ],
   },
+  // 3b. Movimentação Operacional (submódulo simplificado de Estoque, chão de fábrica)
+  //
+  // Módulo próprio — NÃO é subtab de `estoque`. Um operador com `operacional:*`
+  // não pode receber `estoque:*`, senão `useModuleAccess('estoque')` liberaria a
+  // aba administrativa "Controle de Estoque". As telas operacionais leem e gravam
+  // exclusivamente por RPCs `op_*` (SECURITY DEFINER), nunca por tabela direta,
+  // para que nenhum campo financeiro trafegue até o operador.
+  {
+    key: 'operacional',
+    label: 'Movimentação Operacional',
+    subtabs: [
+      { key: 'movimentacao', label: 'Entrada e Saída', actions: VIEW_CREATE },
+      { key: 'historico', label: 'Últimas Movimentações', actions: VIEW_ONLY },
+      { key: 'setores', label: 'Setores por Usuário', actions: VIEW_MANAGE },
+    ],
+  },
   // 4. Inventário
   {
     key: 'inventario',

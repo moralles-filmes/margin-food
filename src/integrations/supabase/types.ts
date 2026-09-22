@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       admin_actions_log: {
@@ -407,53 +432,59 @@ export type Database = {
       }
       audit_log: {
         Row: {
-          log_scope: string
-          scope_reason: string
-          company_id: string | null
           acao: string
           campo: string | null
+          company_id: string | null
           created_at: string
           id: string
+          log_scope: string
           registro_id: string
+          scope_reason: string
           tabela: string
           user_id: string | null
           valor_anterior: string | null
           valor_novo: string | null
         }
         Insert: {
-          log_scope?: string
-          scope_reason?: string
-          company_id?: string | null
           acao: string
           campo?: string | null
+          company_id?: string | null
           created_at?: string
           id?: string
+          log_scope?: string
           registro_id: string
+          scope_reason?: string
           tabela: string
           user_id?: string | null
           valor_anterior?: string | null
           valor_novo?: string | null
         }
         Update: {
-          log_scope?: string
-          scope_reason?: string
-          company_id?: string | null
           acao?: string
           campo?: string | null
+          company_id?: string | null
           created_at?: string
           id?: string
+          log_scope?: string
           registro_id?: string
+          scope_reason?: string
           tabela?: string
           user_id?: string | null
           valor_anterior?: string | null
           valor_novo?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "audit_log_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       audit_logs: {
         Row: {
-          log_scope: string
-          scope_reason: string
           action: string
           actor_email: string | null
           actor_role: string | null
@@ -466,15 +497,15 @@ export type Database = {
           entity_id: string | null
           entity_unaccent: string | null
           id: string
+          log_scope: string
           metadata: Json | null
           module: string
+          scope_reason: string
           severity: string
           source: string
           success: boolean
         }
         Insert: {
-          log_scope?: string
-          scope_reason?: string
           action: string
           actor_email?: string | null
           actor_role?: string | null
@@ -487,15 +518,15 @@ export type Database = {
           entity_id?: string | null
           entity_unaccent?: string | null
           id?: string
+          log_scope?: string
           metadata?: Json | null
           module: string
+          scope_reason?: string
           severity?: string
           source?: string
           success?: boolean
         }
         Update: {
-          log_scope?: string
-          scope_reason?: string
           action?: string
           actor_email?: string | null
           actor_role?: string | null
@@ -508,8 +539,10 @@ export type Database = {
           entity_id?: string | null
           entity_unaccent?: string | null
           id?: string
+          log_scope?: string
           metadata?: Json | null
           module?: string
+          scope_reason?: string
           severity?: string
           source?: string
           success?: boolean
@@ -686,6 +719,61 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      company_memberships: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          job_role_id: string | null
+          sector: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          job_role_id?: string | null
+          sector?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          job_role_id?: string | null
+          sector?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_memberships_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_memberships_job_role_id_fkey"
+            columns: ["job_role_id"]
+            isOneToOne: false
+            referencedRelation: "job_roles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_memberships_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       config_precificacao: {
         Row: {
@@ -865,6 +953,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "suppliers"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cotacao_supplier_tenant_fk"
+            columns: ["supplier_id", "company_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id", "company_id"]
           },
         ]
       }
@@ -1307,6 +1402,104 @@ export type Database = {
         }
         Relationships: []
       }
+      estoque_setor_produtos: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          produto_id: string
+          setor_id: string
+        }
+        Insert: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          produto_id: string
+          setor_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          produto_id?: string
+          setor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "estoque_setor_produtos_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "estoque_setor_produtos_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "mv_giro_estoque"
+            referencedColumns: ["produto_id"]
+          },
+          {
+            foreignKeyName: "estoque_setor_produtos_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "estoque_setor_produtos_setor_id_fkey"
+            columns: ["setor_id"]
+            isOneToOne: false
+            referencedRelation: "stock_sectors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      estoque_usuario_setores: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          setor_id: string
+          user_id: string
+        }
+        Insert: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          setor_id: string
+          user_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          setor_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "estoque_usuario_setores_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "estoque_usuario_setores_setor_id_fkey"
+            columns: ["setor_id"]
+            isOneToOne: false
+            referencedRelation: "stock_sectors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       faturamento_periodos_legacy: {
         Row: {
           company_id: string
@@ -1455,6 +1648,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "produtos"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "phase7_ficha_componente_itens_componente_filho_id_tenant_fk"
+            columns: ["company_id", "componente_filho_id"]
+            isOneToOne: false
+            referencedRelation: "ficha_componentes"
+            referencedColumns: ["company_id", "id"]
+          },
+          {
+            foreignKeyName: "phase7_ficha_componente_itens_componente_pai_id_tenant_fk"
+            columns: ["company_id", "componente_pai_id"]
+            isOneToOne: false
+            referencedRelation: "ficha_componentes"
+            referencedColumns: ["company_id", "id"]
+          },
+          {
+            foreignKeyName: "phase7_ficha_componente_itens_produto_id_tenant_fk"
+            columns: ["company_id", "produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["company_id", "id"]
           },
         ]
       }
@@ -3856,48 +4070,56 @@ export type Database = {
       }
       integration_logs: {
         Row: {
-          log_scope: string
-          scope_reason: string
-          company_id: string | null
-          actor_user_id: string | null
           action: string
+          actor_user_id: string | null
+          company_id: string | null
           created_at: string
           error_message: string | null
           id: string
+          log_scope: string
           module: string
           payload: Json | null
           reference_id: string | null
+          scope_reason: string
           status: string
         }
         Insert: {
-          log_scope?: string
-          scope_reason?: string
-          company_id?: string | null
-          actor_user_id?: string | null
           action: string
+          actor_user_id?: string | null
+          company_id?: string | null
           created_at?: string
           error_message?: string | null
           id?: string
+          log_scope?: string
           module?: string
           payload?: Json | null
           reference_id?: string | null
+          scope_reason?: string
           status?: string
         }
         Update: {
-          log_scope?: string
-          scope_reason?: string
-          company_id?: string | null
-          actor_user_id?: string | null
           action?: string
+          actor_user_id?: string | null
+          company_id?: string | null
           created_at?: string
           error_message?: string | null
           id?: string
+          log_scope?: string
           module?: string
           payload?: Json | null
           reference_id?: string | null
+          scope_reason?: string
           status?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "integration_logs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       inventario_conferentes: {
         Row: {
@@ -4029,6 +4251,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "produtos"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "phase7_inventario_itens_inventario_id_tenant_fk"
+            columns: ["company_id", "inventario_id"]
+            isOneToOne: false
+            referencedRelation: "inventarios"
+            referencedColumns: ["company_id", "id"]
+          },
+          {
+            foreignKeyName: "phase7_inventario_itens_produto_id_tenant_fk"
+            columns: ["company_id", "produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["company_id", "id"]
           },
         ]
       }
@@ -4201,11 +4437,11 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "inventarios_turno_id_fkey"
-            columns: ["turno_id"]
+            foreignKeyName: "phase7_inventarios_turno_id_tenant_fk"
+            columns: ["company_id", "turno_id"]
             isOneToOne: false
             referencedRelation: "turnos"
-            referencedColumns: ["id"]
+            referencedColumns: ["company_id", "id"]
           },
         ]
       }
@@ -5313,31 +5549,24 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "phase7_purchase_order_items_order_id_tenant_fk"
+            columns: ["company_id", "order_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["company_id", "id"]
+          },
+          {
+            foreignKeyName: "phase7_purchase_order_items_stock_item_id_tenant_fk"
+            columns: ["company_id", "stock_item_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["company_id", "id"]
+          },
+          {
             foreignKeyName: "purchase_order_items_company_fk"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "purchase_order_items_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "purchase_orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "purchase_order_items_stock_item_id_fkey"
-            columns: ["stock_item_id"]
-            isOneToOne: false
-            referencedRelation: "mv_giro_estoque"
-            referencedColumns: ["produto_id"]
-          },
-          {
-            foreignKeyName: "purchase_order_items_stock_item_id_fkey"
-            columns: ["stock_item_id"]
-            isOneToOne: false
-            referencedRelation: "produtos"
             referencedColumns: ["id"]
           },
         ]
@@ -5620,6 +5849,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "purchase_receipt_batches_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "purchase_receipt_batches_order_tenant_fk"
             columns: ["company_id", "order_id"]
             isOneToOne: false
@@ -5742,11 +5978,11 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "purchase_requisition_audit_requisition_id_fkey"
-            columns: ["requisition_id"]
+            foreignKeyName: "stabilization_purchase_requisition_audit_parent_tenant_fk"
+            columns: ["company_id", "requisition_id"]
             isOneToOne: false
             referencedRelation: "purchase_requisitions"
-            referencedColumns: ["id"]
+            referencedColumns: ["company_id", "id"]
           },
         ]
       }
@@ -5820,25 +6056,18 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "purchase_requisition_items_produto_id_fkey"
-            columns: ["produto_id"]
-            isOneToOne: false
-            referencedRelation: "mv_giro_estoque"
-            referencedColumns: ["produto_id"]
-          },
-          {
-            foreignKeyName: "purchase_requisition_items_produto_id_fkey"
-            columns: ["produto_id"]
-            isOneToOne: false
-            referencedRelation: "produtos"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "purchase_requisition_items_requisition_id_fkey"
-            columns: ["requisition_id"]
+            foreignKeyName: "stabilization_purchase_requisition_items_parent_tenant_fk"
+            columns: ["company_id", "requisition_id"]
             isOneToOne: false
             referencedRelation: "purchase_requisitions"
-            referencedColumns: ["id"]
+            referencedColumns: ["company_id", "id"]
+          },
+          {
+            foreignKeyName: "stabilization_purchase_requisition_items_product_tenant_fk"
+            columns: ["company_id", "produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["company_id", "id"]
           },
         ]
       }
@@ -6231,25 +6460,18 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "requisicao_estoque_itens_produto_id_fkey"
-            columns: ["produto_id"]
-            isOneToOne: false
-            referencedRelation: "mv_giro_estoque"
-            referencedColumns: ["produto_id"]
-          },
-          {
-            foreignKeyName: "requisicao_estoque_itens_produto_id_fkey"
-            columns: ["produto_id"]
+            foreignKeyName: "stabilization_requisicao_itens_produto_tenant_fk"
+            columns: ["company_id", "produto_id"]
             isOneToOne: false
             referencedRelation: "produtos"
-            referencedColumns: ["id"]
+            referencedColumns: ["company_id", "id"]
           },
           {
-            foreignKeyName: "requisicao_estoque_itens_requisicao_id_fkey"
-            columns: ["requisicao_id"]
+            foreignKeyName: "stabilization_requisicao_itens_requisicao_tenant_fk"
+            columns: ["company_id", "requisicao_id"]
             isOneToOne: false
             referencedRelation: "requisicoes_estoque"
-            referencedColumns: ["id"]
+            referencedColumns: ["company_id", "id"]
           },
         ]
       }
@@ -8300,6 +8522,7 @@ export type Database = {
           created_at: string
           created_by: string
           entry_date: string
+          expiration_date: string | null
           gross_kg: number
           id: string
           lot: string
@@ -8319,6 +8542,7 @@ export type Database = {
           created_at?: string
           created_by?: string
           entry_date?: string
+          expiration_date?: string | null
           gross_kg: number
           id?: string
           lot?: string
@@ -8338,6 +8562,7 @@ export type Database = {
           created_at?: string
           created_by?: string
           entry_date?: string
+          expiration_date?: string | null
           gross_kg?: number
           id?: string
           lot?: string
@@ -9191,6 +9416,20 @@ export type Database = {
             referencedRelation: "produtos"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "supplier_prices_product_tenant_fk"
+            columns: ["stock_item_id", "company_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id", "company_id"]
+          },
+          {
+            foreignKeyName: "supplier_prices_supplier_tenant_fk"
+            columns: ["supplier_uuid", "company_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id", "company_id"]
+          },
         ]
       }
       suppliers: {
@@ -9417,6 +9656,7 @@ export type Database = {
       }
       user_permissions: {
         Row: {
+          company_id: string
           created_at: string
           effect: string
           granted_by: string | null
@@ -9425,6 +9665,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          company_id?: string
           created_at?: string
           effect?: string
           granted_by?: string | null
@@ -9433,6 +9674,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          company_id?: string
           created_at?: string
           effect?: string
           granted_by?: string | null
@@ -9441,6 +9683,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "user_permissions_membership_fk"
+            columns: ["user_id", "company_id"]
+            isOneToOne: false
+            referencedRelation: "company_memberships"
+            referencedColumns: ["user_id", "company_id"]
+          },
           {
             foreignKeyName: "user_permissions_permission_key_fkey"
             columns: ["permission_key"]
@@ -9452,24 +9701,35 @@ export type Database = {
       }
       user_roles: {
         Row: {
+          company_id: string
           created_at: string
           id: string
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
         Insert: {
+          company_id?: string
           created_at?: string
           id?: string
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
         Update: {
+          company_id?: string
           created_at?: string
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_roles_membership_fk"
+            columns: ["user_id", "company_id"]
+            isOneToOne: false
+            referencedRelation: "company_memberships"
+            referencedColumns: ["user_id", "company_id"]
+          },
+        ]
       }
       z_canary_test: {
         Row: {
@@ -9569,44 +9829,10 @@ export type Database = {
       }
     }
     Functions: {
-      _salmon_replace_entry_guarded: {
-        Args: {
-          p_boxes: number
-          p_entry_date: string
-          p_entry_id: string
-          p_expiration_date?: string
-          p_gross_kg: number
-          p_lot: string
-          p_notes?: string
-          p_sif: string
-          p_supplier_name: string
-          p_total_value: number
-          p_units: number
-        }
+      _fin_bordero_payload: {
+        Args: { p_company_id: string; p_end_inclusive: string; p_start: string }
         Returns: Json
       }
-      _salmon_replace_manipulation_guarded: {
-        Args: {
-          p_clean_in_kg: number
-          p_entry_id: string
-          p_fish_count: number
-          p_gross_out_kg: number
-          p_leftover_kg: number
-          p_manip_id: string
-          p_manipulation_date: string
-          p_notes?: string
-        }
-        Returns: Json
-      }
-      list_restricted_logs: {
-        Args: { p_table: string; p_scope?: string; p_limit?: number; p_cursor_at?: string; p_cursor_id?: string; p_module?: string; p_action?: string; p_entity?: string }
-        Returns: Json[]
-      }
-      get_fin_orcamento_arvore: { Args: { p_mes: string }; Returns: Json }
-      _guarded_bulk_upsert_orcamento: { Args: { p_mes_ano: string; p_items: Json }; Returns: Json }
-      list_my_companies: { Args: Record<PropertyKey, never>; Returns: { id: string; nome: string }[] }
-      get_my_company_context: { Args: Record<PropertyKey, never>; Returns: Json }
-
       _fin_dfc_effective_allocations: {
         Args: { p_company_id: string; p_end_inclusive: string; p_start: string }
         Returns: {
@@ -9636,6 +9862,10 @@ export type Database = {
       }
       _guarded_aprovar_conta_pagar: {
         Args: { p_expected_updated_at: string; p_id: string }
+        Returns: Json
+      }
+      _guarded_bulk_upsert_orcamento: {
+        Args: { p_items: Json; p_mes_ano: string }
         Returns: Json
       }
       _guarded_create_conta_pagar: {
@@ -10055,6 +10285,7 @@ export type Database = {
         Args: {
           p_boxes: number
           p_entry_date: string
+          p_expiration_date?: string
           p_gross_kg: number
           p_lot: string
           p_notes?: string
@@ -10081,8 +10312,57 @@ export type Database = {
         Args: { p_end: string; p_start: string }
         Returns: Json
       }
+      _salmon_replace_entry_guarded: {
+        Args: {
+          p_boxes: number
+          p_entry_date: string
+          p_entry_id: string
+          p_expiration_date?: string
+          p_gross_kg: number
+          p_lot: string
+          p_notes?: string
+          p_sif: string
+          p_supplier_name: string
+          p_total_value: number
+          p_units: number
+        }
+        Returns: Json
+      }
+      _salmon_replace_manipulation_guarded: {
+        Args: {
+          p_clean_in_kg: number
+          p_entry_id: string
+          p_fish_count: number
+          p_gross_out_kg: number
+          p_leftover_kg: number
+          p_manip_id: string
+          p_manipulation_date: string
+          p_notes?: string
+        }
+        Returns: Json
+      }
       _simulate_relatorios_guarded: {
         Args: { p_end: string; p_params?: Json; p_start: string }
+        Returns: Json
+      }
+      _stabilization_stock_consumption_history_inner: {
+        Args: {
+          p_category?: string
+          p_end_date: string
+          p_group_by?: string
+          p_product_id?: string
+          p_start_date: string
+        }
+        Returns: Json
+      }
+      _stabilization_stock_predictive_analysis_inner: {
+        Args: {
+          p_base_window_days?: number
+          p_category_id?: string
+          p_only_critical?: boolean
+          p_product_id?: string
+          p_target_coverage_days?: number
+        }
         Returns: Json
       }
       _validate_fin_presentation_decision_snapshot: {
@@ -10121,6 +10401,20 @@ export type Database = {
         }
         Returns: Json
       }
+      admin_upsert_company_membership: {
+        Args: {
+          p_actor_user_id: string
+          p_company_id: string
+          p_if_not_exists?: boolean
+          p_job_role_id?: string
+          p_permissions?: string[]
+          p_role?: Database["public"]["Enums"]["app_role"]
+          p_sector?: string
+          p_status?: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
       aplicar_regras_categorizacao: { Args: never; Returns: Json }
       aprovar_ferias: {
         Args: { p_aprovado_por: string; p_registro_id: string }
@@ -10148,7 +10442,19 @@ export type Database = {
         }
         Returns: undefined
       }
+      backfill_log_scope: {
+        Args: { p_batch_size?: number; p_dry_run?: boolean; p_table: string }
+        Returns: Json
+      }
       batch_reorder_fin_categorias: { Args: { p_items: Json }; Returns: Json }
+      can_access_company_document: {
+        Args: { p_action: string; p_path: string }
+        Returns: boolean
+      }
+      can_receive_company_change: {
+        Args: { p_company_id: string; p_permissions: string[] }
+        Returns: boolean
+      }
       cancel_salmon_entry_atomic: {
         Args: { p_entry_id: string; p_reason?: string }
         Returns: Json
@@ -10258,20 +10564,17 @@ export type Database = {
         }
         Returns: Json
       }
+      deactivate_produto: { Args: { p_produto_id: string }; Returns: string }
       debug_company_inventory: { Args: never; Returns: Json }
       debug_stock_last_movements: { Args: { p_limit?: number }; Returns: Json }
       debug_tenant: { Args: never; Returns: Json }
       delete_purchase_order_atomic: {
-        Args: { p_order_id: string; p_reason?: string }
+        Args: { p_order_id: string }
         Returns: Json
       }
       delete_transfer: { Args: { p_lancamento_id: string }; Returns: Json }
       edit_purchase_order_atomic: {
         Args: { p_order_id: string; p_payload: Json }
-        Returns: Json
-      }
-      mutate_purchase_requisition_atomic: {
-        Args: { p_action: string; p_payload: Json }
         Returns: Json
       }
       ensure_salmon_raw_product: { Args: never; Returns: string }
@@ -10341,12 +10644,12 @@ export type Database = {
         Args: { p_id: string; p_justificativa: string }
         Returns: Json
       }
+      find_auth_user_by_email: { Args: { p_email: string }; Returns: string }
       fn_recompute_product_saldo: {
         Args: { p_company: string; p_id: string }
         Returns: undefined
       }
       generate_next_sku: { Args: { p_prefix?: string }; Returns: string }
-      deactivate_produto: { Args: { p_produto_id: string }; Returns: string }
       gerar_parcela_recorrente: {
         Args: { p_lancamento_pai_id: string }
         Returns: Json
@@ -10381,6 +10684,10 @@ export type Database = {
         }[]
       }
       get_catalog_counts: { Args: never; Returns: Json }
+      get_company_permissions: {
+        Args: { p_company_id: string; p_user_id: string }
+        Returns: string[]
+      }
       get_consumo_por_produto: {
         Args: {
           p_company_id: string
@@ -10452,6 +10759,7 @@ export type Database = {
         }
         Returns: Json
       }
+      get_fin_orcamento_arvore: { Args: { p_mes: string }; Returns: Json }
       get_fin_presentation_category_metadata: { Args: never; Returns: Json }
       get_fin_presentation_decision: {
         Args: { p_decision_id: string }
@@ -10551,6 +10859,7 @@ export type Database = {
         }
         Returns: Json
       }
+      get_my_company_context: { Args: never; Returns: Json }
       get_or_set_cache: {
         Args: { p_key: string; p_ttl_seconds?: number }
         Returns: Json
@@ -10558,15 +10867,18 @@ export type Database = {
       get_relatorios_compras:
         | { Args: { p_end: string; p_start: string }; Returns: Json }
         | { Args: { p_end: string; p_start: string }; Returns: Json }
-      get_relatorios_kpis:
-        | { Args: { p_end: string; p_start: string }; Returns: Json }
-        | { Args: { p_end: string; p_start: string }; Returns: Json }
-      get_relatorios_score:
-        | { Args: { p_end: string; p_start: string }; Returns: Json }
-        | { Args: { p_end: string; p_start: string }; Returns: Json }
-      get_relatorios_tendencia:
-        | { Args: { p_end: string; p_start: string }; Returns: Json }
-        | { Args: { p_end: string; p_start: string }; Returns: Json }
+      get_relatorios_kpis: {
+        Args: { p_end: string; p_start: string }
+        Returns: Json
+      }
+      get_relatorios_score: {
+        Args: { p_end: string; p_start: string }
+        Returns: Json
+      }
+      get_relatorios_tendencia: {
+        Args: { p_end: string; p_start: string }
+        Returns: Json
+      }
       get_report_item_detail: {
         Args: { p_end: string; p_produto_id: string; p_start: string }
         Returns: Json
@@ -10602,10 +10914,10 @@ export type Database = {
       get_stock_consumption_history: {
         Args: {
           p_category?: string
-          p_end_date: string
-          p_group_by?: string
+          p_end: string
           p_product_id?: string
-          p_start_date: string
+          p_search?: string
+          p_start: string
         }
         Returns: Json
       }
@@ -10624,11 +10936,11 @@ export type Database = {
       }
       get_stock_predictive_analysis: {
         Args: {
-          p_base_window_days?: number
-          p_category_id?: string
-          p_only_critical?: boolean
+          p_category?: string
+          p_horizon_days?: number
+          p_only_active?: boolean
           p_product_id?: string
-          p_target_coverage_days?: number
+          p_window_days?: number
         }
         Returns: Json
       }
@@ -10703,6 +11015,10 @@ export type Database = {
         Returns: boolean
       }
       immutable_unaccent: { Args: { "": string }; Returns: string }
+      is_company_member: {
+        Args: { p_company_id: string; p_user_id: string }
+        Returns: boolean
+      }
       list_companies: { Args: never; Returns: Json }
       list_fin_contas_pagar_abertas: {
         Args: {
@@ -10843,6 +11159,13 @@ export type Database = {
           tipo: string
         }[]
       }
+      list_my_companies: {
+        Args: never
+        Returns: {
+          id: string
+          nome: string
+        }[]
+      }
       list_profiles_minimal: {
         Args: { p_limit?: number; p_search?: string }
         Returns: {
@@ -10904,6 +11227,32 @@ export type Database = {
           p_start: string
         }
         Returns: Json
+      }
+      list_report_items_page: {
+        Args: {
+          p_categoria?: string
+          p_end: string
+          p_limit?: number
+          p_offset?: number
+          p_search?: string
+          p_sort_asc?: boolean
+          p_sort_key?: string
+          p_start: string
+        }
+        Returns: Json
+      }
+      list_restricted_logs: {
+        Args: {
+          p_action?: string
+          p_cursor_at?: string
+          p_cursor_id?: string
+          p_entity?: string
+          p_limit?: number
+          p_module?: string
+          p_scope?: string
+          p_table: string
+        }
+        Returns: Json[]
       }
       list_solic_compra_mercado_cursor: {
         Args: {
@@ -10983,6 +11332,10 @@ export type Database = {
         Returns: undefined
       }
       mark_all_notifications_read: { Args: never; Returns: number }
+      mutate_purchase_requisition_atomic: {
+        Args: { p_action: string; p_payload: Json }
+        Returns: Json
+      }
       onboard_new_company: {
         Args: {
           p_admin_user_id?: string
@@ -10990,6 +11343,53 @@ export type Database = {
           p_company_name: string
         }
         Returns: Json
+      }
+      op_list_historico: {
+        Args: { p_limit?: number }
+        Returns: {
+          criado_em: string
+          id: string
+          produto_nome: string
+          quantidade: number
+          responsavel: string
+          setor: string
+          tipo: string
+          unidade_medida: string
+        }[]
+      }
+      op_list_produtos: {
+        Args: { p_limit?: number; p_search?: string; p_setor_id: string }
+        Returns: {
+          nome: string
+          produto_id: string
+          saldo: number
+          sku: string
+          unidade_medida: string
+          vinculado: boolean
+        }[]
+      }
+      op_list_setores: {
+        Args: never
+        Returns: {
+          nome: string
+          setor_id: string
+        }[]
+      }
+      op_pode_todos_setores: { Args: { p_user_id: string }; Returns: boolean }
+      op_registrar_movimentacao: {
+        Args: {
+          p_client_request_id?: string
+          p_observacao?: string
+          p_produto_id: string
+          p_quantidade: number
+          p_setor_id: string
+          p_tipo: string
+        }
+        Returns: Json
+      }
+      op_setor_autorizado: {
+        Args: { p_company: string; p_setor_id: string; p_user_id: string }
+        Returns: boolean
       }
       orcamento_execucao_mensal: { Args: { p_mes: string }; Returns: Json }
       pay_conta_pagar: {
@@ -11047,10 +11447,6 @@ export type Database = {
       }
       receive_purchase_order_atomic: {
         Args: { p_items: Json; p_metadata?: Json; p_order_id: string }
-        Returns: Json
-      }
-      replace_rh_banco_horas_period_atomic: {
-        Args: { p_periodo: string; p_rows: Json }
         Returns: Json
       }
       reconcile_auto_bind_transfer_counterparts: {
@@ -11176,6 +11572,14 @@ export type Database = {
         Args: { p_category_id: string; p_direction: string }
         Returns: Json
       }
+      replace_rh_banco_horas_period_atomic: {
+        Args: { p_periodo: string; p_rows: Json }
+        Returns: Json
+      }
+      reserve_company_invitation: {
+        Args: { p_actor_user_id: string; p_company_id: string; p_email: string }
+        Returns: undefined
+      }
       rpc_confirmacoes_approve: {
         Args: { p_confirmacao_id: string }
         Returns: Json
@@ -11271,21 +11675,30 @@ export type Database = {
         Returns: Json
       }
       seed_default_categories: { Args: never; Returns: Json }
+      service_write_audit: {
+        Args: {
+          p_action: string
+          p_actor_id: string
+          p_after?: Json
+          p_before?: Json
+          p_company_id: string
+          p_entity: string
+          p_entity_id?: string
+          p_metadata?: Json
+          p_module: string
+        }
+        Returns: undefined
+      }
       set_cache: {
         Args: { p_key: string; p_payload: Json; p_ttl_seconds?: number }
         Returns: undefined
       }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
-      simulate_relatorios_score:
-        | {
-            Args: { p_end: string; p_params?: Json; p_start: string }
-            Returns: Json
-          }
-        | {
-            Args: { p_end: string; p_params?: Json; p_start: string }
-            Returns: Json
-          }
+      simulate_relatorios_score: {
+        Args: { p_end: string; p_params?: Json; p_start: string }
+        Returns: Json
+      }
       soft_delete_cotacao: {
         Args: { p_expected_updated_at?: string; p_id: string }
         Returns: Json
@@ -11370,9 +11783,9 @@ export type Database = {
       upsert_supplier_price: {
         Args: {
           p_name: string
+          p_purchase_unit?: string
           p_stock_item_id: string
           p_unit_cost: number
-          p_purchase_unit?: string
         }
         Returns: string
       }
@@ -11406,12 +11819,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -11435,11 +11848,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -11460,11 +11873,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -11485,11 +11898,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -11502,11 +11915,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -11516,6 +11929,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       app_role: [
