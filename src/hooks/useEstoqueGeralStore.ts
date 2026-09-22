@@ -8,6 +8,7 @@ import { narrowRows } from '@/lib/guards';
 import { normalizeSearchText } from '@/lib/utils';
 import { sortByName, sortNames } from '@/lib/sortByName';
 import { useCompanyId } from '@/hooks/useCompanyId';
+import type { CodigoBarrasProduto, DiffCodigos } from '@/domain/estoque/barcode';
 
 // ── DB → Frontend mappers ──
 
@@ -49,7 +50,8 @@ const PRODUTO_SELECT_COLUMNS = [
   'is_salmon_raw_linked',
   'conta_no_cmv',
   'saldo_atual',
-  'barcode',
+  // `barcode` saiu daqui: os códigos moram em `produto_codigos_barras` (N por
+  // produto) e são carregados sob demanda, só quando o formulário abre.
 ].join(', ');
 
 /** Raw DB row shape for produtos table */
@@ -91,7 +93,6 @@ interface ProdutoRow {
   is_salmon_raw_linked: boolean | null;
   conta_no_cmv: boolean | null;
   saldo_atual: number | null;
-  barcode: string | null;
 }
 
 function dbToProduto(row: ProdutoRow): ProdutoExtended {
@@ -133,7 +134,6 @@ function dbToProduto(row: ProdutoRow): ProdutoExtended {
     isSalmonRawLinked: !!row.is_salmon_raw_linked,
     contaNoCmv: row.conta_no_cmv ?? true,
     saldoAtual: Number(row.saldo_atual) || 0,
-    barcode: row.barcode || '',
   };
 }
 
@@ -221,14 +221,14 @@ export interface ProductGlobalCounts {
 export type ProdutoCreateInput = Omit<Produto, 'id' | 'createdAt'> & Partial<Pick<ProdutoExtended,
   'unidadeCompra' | 'fatorConversaoPadrao' | 'defaultCostPurchaseUnit' |
   'inactivityDaysThreshold' | 'contaNoCmv' | 'packageQuantity' | 'packageMeasureUnit' |
-  'conversionMode' | 'barcode'
+  'conversionMode'
 >>;
 
 /** Input type for updateProduto — partial of base + extended fields */
 export type ProdutoUpdateInput = Partial<Produto> & Partial<Pick<ProdutoExtended,
   'unidadeCompra' | 'fatorConversaoPadrao' | 'defaultCostPurchaseUnit' | 'defaultCostBaseUnit' |
   'needsCostReview' | 'inactivityDaysThreshold' | 'contaNoCmv' |
-  'packageQuantity' | 'packageMeasureUnit' | 'conversionMode' | 'barcode'
+  'packageQuantity' | 'packageMeasureUnit' | 'conversionMode'
 >>;
 
 /** RPC saldo row */
@@ -645,9 +645,6 @@ export function useEstoqueGeralStore() {
         package_quantity: p.packageQuantity ?? null,
         package_measure_unit: p.packageMeasureUnit || null,
         conversion_mode: p.conversionMode || 'manual',
-        // Vazio vira NULL: o índice único parcial ignora NULL, então vários
-        // produtos sem código convivem sem colidir entre si.
-        barcode: p.barcode?.trim() || null,
       })
       .select()
       .single();
@@ -691,7 +688,6 @@ export function useEstoqueGeralStore() {
     if (updates.packageQuantity !== undefined) dbUpdates.package_quantity = updates.packageQuantity;
     if (updates.packageMeasureUnit !== undefined) dbUpdates.package_measure_unit = updates.packageMeasureUnit;
     if (updates.conversionMode !== undefined) dbUpdates.conversion_mode = updates.conversionMode;
-    if (updates.barcode !== undefined) dbUpdates.barcode = updates.barcode.trim() || null;
 
     const { data: updatedRows, error } = await supabase.from('produtos')
       .update(dbUpdates as import('@/integrations/supabase/types').Database['public']['Tables']['produtos']['Update'])
@@ -710,6 +706,113 @@ export function useEstoqueGeralStore() {
     fetchProdutoGlobalCounts();
     emitDataEvent('estoque:produtos');
   }, [fetchProdutoGlobalCounts, supabase, emitDataEvent]);
+
+  // === Códigos de barras do produto ===
+  //
+  // Carregados sob demanda, quando o formulário abre — não junto do catálogo.
+  // Nenhuma listagem mostra código, então trazer N linhas por produto para
+  // centenas de produtos seria banda gasta à toa.
+  const fetchCodigosBarras = useCallback(async (produtoId: string): Promise<CodigoBarrasProduto[]> => {
+    const { data, error } = await supabase
+      .from('produto_codigos_barras')
+      .select('id, codigo, rotulo')
+      .eq('produto_id', produtoId)
+      .order('created_at');
+    if (error) {
+      console.error('[useEstoqueGeralStore.fetchCodigosBarras]', error);
+      throw error;
+    }
+    return (data ?? []).map(r => ({ id: r.id, codigo: r.codigo, rotulo: r.rotulo || '' }));
+  }, [supabase]);
+
+  /**
+   * Procura um dos códigos já vinculado a OUTRO produto.
+   *
+   * Devolve a mensagem pronta, ou null quando estão todos livres. Chamada antes
+   * de gravar o produto: sem isso, cadastrar um produto novo com um código já
+   * usado criaria o produto e só então falharia nos códigos, deixando um
+   * cadastro pela metade que ninguém pediu.
+   *
+   * Falha de rede aqui devolve null de propósito — esta checagem é conveniência,
+   * quem realmente garante a unicidade é o índice no banco.
+   */
+  const verificarCodigosLivres = useCallback(async (
+    codigos: string[],
+    produtoId?: string,
+  ): Promise<string | null> => {
+    if (codigos.length === 0) return null;
+    try {
+      let query = supabase
+        .from('produto_codigos_barras')
+        .select('codigo, produto_id')
+        .in('codigo', codigos);
+      if (produtoId) query = query.neq('produto_id', produtoId);
+
+      const { data, error } = await query.limit(1);
+      if (error) {
+        console.error('[useEstoqueGeralStore.verificarCodigosLivres]', error);
+        return null;
+      }
+      const conflito = data?.[0];
+      if (!conflito) return null;
+
+      const { data: dono } = await supabase
+        .from('produtos')
+        .select('nome_produto')
+        .eq('id', conflito.produto_id)
+        .maybeSingle();
+      return dono?.nome_produto
+        ? `O código ${conflito.codigo} já está vinculado a "${dono.nome_produto}".`
+        : 'Este código de barras já está cadastrado em outro produto.';
+    } catch (err) {
+      console.error('[useEstoqueGeralStore.verificarCodigosLivres]', err);
+      return null;
+    }
+  }, [supabase]);
+
+  /**
+   * Aplica o diff da lista de códigos.
+   *
+   * DELETE antes de INSERT, sempre: trocar o rótulo de um código é removê-lo e
+   * adicioná-lo de novo, e na ordem inversa o INSERT colidiria com a linha que
+   * ainda não foi apagada.
+   */
+  const salvarCodigosBarras = useCallback(async (produtoId: string, diff: DiffCodigos) => {
+    if (!companyId) throw new Error('Selecione uma unidade para salvar os códigos de barras.');
+
+    if (diff.remover.length > 0) {
+      const { error } = await supabase
+        .from('produto_codigos_barras')
+        .delete()
+        .in('id', diff.remover);
+      if (error) {
+        console.error('[useEstoqueGeralStore.salvarCodigosBarras] delete', error);
+        throw error;
+      }
+    }
+
+    if (diff.adicionar.length > 0) {
+      const { error } = await supabase
+        .from('produto_codigos_barras')
+        .insert(diff.adicionar.map(c => ({
+          company_id: companyId,
+          produto_id: produtoId,
+          codigo: c.codigo,
+          rotulo: c.rotulo || null,
+        })));
+      if (error) {
+        console.error('[useEstoqueGeralStore.salvarCodigosBarras] insert', error);
+        // 23505 = o código já existe na empresa, necessariamente em OUTRO
+        // produto: duplicata dentro do próprio formulário é barrada antes.
+        // Só chega aqui quem passou pela checagem prévia e perdeu a corrida.
+        if (error.code === '23505') {
+          const msg = await verificarCodigosLivres(diff.adicionar.map(c => c.codigo), produtoId);
+          throw new Error(msg ?? 'Este código de barras já está cadastrado em outro produto.');
+        }
+        throw error;
+      }
+    }
+  }, [companyId, supabase, verificarCodigosLivres]);
 
   const deleteProduto = useCallback(async (id: string) => {
     const { data: deactivatedId, error } = await supabase.rpc('deactivate_produto', { p_produto_id: id });
@@ -775,6 +878,7 @@ export function useEstoqueGeralStore() {
     produtos, movimentacoes, saldos, saldosLoading, categorias, loading,
     prodHasMore, prodTotalCount, prodPage, movHasMore, movKpis, movKpisLoading, movFilters, prodFilters, prodGlobalCounts, prodCatalogLoading, prodCatalogError,
     addProduto, updateProduto, deleteProduto,
+    fetchCodigosBarras, salvarCodigosBarras, verificarCodigosLivres,
     addMovimentacao,
     refetch, refreshSaldos, fetchAllProdutos, loadMoreProdutos, goToProdPage, loadMoreMovimentacoes, updateMovFilters, updateProdFilters,
   };

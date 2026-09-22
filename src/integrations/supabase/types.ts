@@ -5123,6 +5123,58 @@ export type Database = {
           },
         ]
       }
+      produto_codigos_barras: {
+        Row: {
+          codigo: string
+          company_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          produto_id: string
+          rotulo: string | null
+        }
+        Insert: {
+          codigo: string
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          produto_id: string
+          rotulo?: string | null
+        }
+        Update: {
+          codigo?: string
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          produto_id?: string
+          rotulo?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "produto_codigos_barras_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "produto_codigos_barras_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "mv_giro_estoque"
+            referencedColumns: ["produto_id"]
+          },
+          {
+            foreignKeyName: "produto_codigos_barras_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       produtos: {
         Row: {
           ativo: boolean
@@ -11377,7 +11429,6 @@ export type Database = {
       op_list_produtos: {
         Args: { p_limit?: number; p_search?: string; p_setor_id: string }
         Returns: {
-          barcode: string
           nome: string
           produto_id: string
           saldo: number

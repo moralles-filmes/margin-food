@@ -4,7 +4,7 @@
  */
 
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import { X } from 'lucide-react';
+import { Plus, Trash2, X } from 'lucide-react';
 import { useFormDirtyGuard } from '@/hooks/useFormDirtyGuard';
 import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
 import { Button } from '@/components/ui/button';
@@ -22,6 +22,13 @@ import type { Produto } from '@/types/salmon';
 import type { ProdutoExtended, ProdutoFormData } from '@/types/estoque';
 import type { ProdutoCreateInput, ProdutoUpdateInput } from '@/hooks/useEstoqueGeralStore';
 import { calcPackageConversionFactor as calcAutoFactor, formatConversionLabel, PACKAGE_MEASURE_UNITS, PURCHASE_UNITS } from '@/lib/unitConversions';
+import {
+  adicionarCodigo,
+  diffCodigos,
+  ROTULO_MAX,
+  type CodigoBarrasProduto,
+  type DiffCodigos,
+} from '@/domain/estoque/barcode';
 
 const UNIDADES_BASE: Produto['unidadeMedida'][] = ['KG', 'L', 'UN'];
 const UNIDADES_COMPRA = [...PURCHASE_UNITS];
@@ -34,7 +41,6 @@ export const emptyProdForm: ProdutoFormData = {
   defaultCostPurchaseUnit: 0, minIdealMode: 'purchase', minPurchaseQty: 0,
   idealPurchaseQty: 0, inactivityDaysThreshold: '', contaNoCmv: true,
   packageQuantity: null, packageMeasureUnit: null, conversionMode: 'manual',
-  barcode: '',
 };
 
 function isTenantErrorMessage(msg?: string): boolean {
@@ -57,19 +63,42 @@ interface ProdutoFormPanelProps {
   onUpdate: (shouldClose: boolean) => void;
   addProduto: (p: ProdutoCreateInput) => Promise<ProdutoExtended>;
   updateProduto: (id: string, u: ProdutoUpdateInput) => Promise<void>;
+  fetchCodigosBarras: (produtoId: string) => Promise<CodigoBarrasProduto[]>;
+  salvarCodigosBarras: (produtoId: string, diff: DiffCodigos) => Promise<void>;
+  verificarCodigosLivres: (codigos: string[], produtoId?: string) => Promise<string | null>;
 }
 
 export default function ProdutoFormPanel({
   editProdId, prodForm, setProdForm, categorias, locais,
   batchMode, setBatchMode, saving, setSaving,
   onClose, onSave, onUpdate, addProduto, updateProduto,
+  fetchCodigosBarras, salvarCodigosBarras, verificarCodigosLivres,
 }: ProdutoFormPanelProps) {
   const toast = useScopedToast();
   const prodNameInputRef = useRef<HTMLInputElement>(null);
   const didFocusRef = useRef(false);
 
+  // ─── Códigos de barras ───
+  //
+  // Vivem fora de `prodForm` porque não são coluna de `produtos`: são linhas de
+  // `produto_codigos_barras`, gravadas como diff depois que o produto existe.
+  // Um produto tem N códigos porque o mesmo item chega em marcas diferentes.
+  const [codigos, setCodigos] = useState<CodigoBarrasProduto[]>([]);
+  const [codigosOriginais, setCodigosOriginais] = useState<CodigoBarrasProduto[]>([]);
+  const [codigoInput, setCodigoInput] = useState('');
+  const [rotuloInput, setRotuloInput] = useState('');
+  const [erroCodigo, setErroCodigo] = useState('');
+
+  // O guard de fechamento compara o DIFF, não a lista: em edição os códigos
+  // chegam depois do primeiro render, e comparar a lista crua marcaria como
+  // "alterado" um formulário em que ninguém tocou.
+  const codigosAlterados = useMemo(() => {
+    const { adicionar, remover } = diffCodigos(codigosOriginais, codigos);
+    return adicionar.length > 0 || remover.length > 0;
+  }, [codigosOriginais, codigos]);
+
   const { isDirty, showConfirm, guardedClose, confirmClose, cancelClose, markClean } =
-    useFormDirtyGuard({ current: prodForm, onClose });
+    useFormDirtyGuard({ current: { ...prodForm, codigosAlterados }, onClose });
 
   // Raw string state para o input de fator — preserva estados intermediários como "14," ou "14."
   const [rawFator, setRawFator] = useState(() =>
@@ -111,6 +140,46 @@ export default function ProdutoFormPanel({
     const costPurchase = prodForm.defaultCostPurchaseUnit || prodForm.custoPadrao || 0;
     return fator > 0 ? costPurchase / fator : 0;
   }, [prodForm.defaultCostPurchaseUnit, prodForm.custoPadrao, prodForm.fatorConversaoPadrao]);
+
+  // Carregados só quando o formulário abre em edição — nenhuma listagem mostra
+  // código, então não vale trazê-los junto do catálogo.
+  useEffect(() => {
+    if (!editProdId) {
+      setCodigos([]);
+      setCodigosOriginais([]);
+      return;
+    }
+    let cancelado = false;
+    fetchCodigosBarras(editProdId)
+      .then(lista => {
+        if (cancelado) return;
+        setCodigos(lista);
+        setCodigosOriginais(lista);
+      })
+      .catch(err => {
+        console.error('[produto.codigos.load]', err);
+        if (!cancelado) toast.error('Não foi possível carregar os códigos de barras deste produto.');
+      });
+    return () => { cancelado = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editProdId]);
+
+  const handleAdicionarCodigo = useCallback(() => {
+    const resultado = adicionarCodigo(codigos, codigoInput, rotuloInput);
+    if (!resultado.ok) {
+      setErroCodigo(resultado.erro);
+      return;
+    }
+    setCodigos(resultado.lista);
+    setCodigoInput('');
+    setRotuloInput('');
+    setErroCodigo('');
+  }, [codigos, codigoInput, rotuloInput]);
+
+  const handleRemoverCodigo = useCallback((codigo: string) => {
+    setCodigos(prev => prev.filter(c => c.codigo !== codigo));
+    setErroCodigo('');
+  }, []);
 
   const handleSaveProduto = async (e: React.FormEvent, closeAfterSave?: boolean) => {
     e.preventDefault();
@@ -157,16 +226,41 @@ export default function ProdutoFormPanel({
         packageQuantity: prodForm.packageQuantity,
         packageMeasureUnit: prodForm.packageMeasureUnit,
         conversionMode: prodForm.conversionMode,
-        barcode: prodForm.barcode,
       };
+
+      const diff = diffCodigos(codigosOriginais, codigos);
+
+      // Checa os códigos ANTES de gravar o produto. Um código já usado por outro
+      // produto faria o INSERT do produto passar e só então falhar, deixando um
+      // cadastro pela metade que ninguém pediu.
+      if (diff.adicionar.length > 0) {
+        const conflito = await verificarCodigosLivres(
+          diff.adicionar.map(c => c.codigo),
+          editProdId ?? undefined,
+        );
+        if (conflito) {
+          toast.error(conflito);
+          setSaving(false);
+          return;
+        }
+      }
 
       if (editProdId) {
         await updateProduto(editProdId, savePayload);
+        await salvarCodigosBarras(editProdId, diff);
+        setCodigosOriginais(codigos);
         onUpdate(shouldClose);
       } else {
         const created = await addProduto(savePayload);
+        await salvarCodigosBarras(created.id, diff);
         onSave(created, shouldClose);
         if (!shouldClose) {
+          // Código de barras é da embalagem, não da categoria: o próximo item
+          // do lote nunca herda o código do anterior.
+          setCodigos([]);
+          setCodigosOriginais([]);
+          setCodigoInput('');
+          setRotuloInput('');
           setProdForm({
             ...emptyProdForm,
             categoria: prodForm.categoria,
@@ -379,19 +473,86 @@ export default function ProdutoFormPanel({
           <Label className="text-[11px] text-muted-foreground">SKU / Código <span className="text-muted-foreground">(auto se vazio)</span></Label>
           <Input value={prodForm.sku} onChange={e => setProdForm(f => ({ ...f, sku: e.target.value }))} className="bg-secondary border-border text-foreground" placeholder="Gerado automaticamente" />
         </div>
-        <div>
-          {/* Codigo de barras: lido pelo submodulo operacional. Texto, nunca
-              numero — zero a esquerda e significativo. Unico por empresa. */}
-          <Label className="text-[11px] text-muted-foreground">Código de barras <span className="text-muted-foreground">(opcional)</span></Label>
-          <Input
-            value={prodForm.barcode}
-            onChange={e => setProdForm(f => ({ ...f, barcode: e.target.value.replace(/\s+/g, '') }))}
-            className="bg-secondary border-border text-foreground font-mono"
-            placeholder="Escaneie ou digite o EAN"
-            inputMode="numeric"
-            maxLength={64}
-            autoComplete="off"
-          />
+        <div className="col-span-2">
+          {/* Codigos de barras: N por produto — o mesmo item de estoque chega em
+              marcas diferentes, cada uma com seu EAN. Texto, nunca numero:
+              zero a esquerda e significativo. Cada codigo e unico na empresa. */}
+          <Label className="text-[11px] text-muted-foreground">
+            Códigos de barras <span className="text-muted-foreground">(opcional)</span>
+          </Label>
+
+          {codigos.length > 0 && (
+            <ul className="mb-2 mt-1 space-y-1">
+              {codigos.map(c => (
+                <li
+                  key={c.codigo}
+                  className="flex items-center gap-2 rounded-lg border border-border bg-secondary px-2.5 py-1.5"
+                >
+                  <span className="font-mono text-xs text-foreground">{c.codigo}</span>
+                  {c.rotulo && (
+                    <span className="truncate text-[11px] text-muted-foreground">{c.rotulo}</span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleRemoverCodigo(c.codigo)}
+                    aria-label={`Remover código ${c.codigo}`}
+                    className="ml-auto shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-background hover:text-destructive"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <div className="flex items-start gap-2">
+            <Input
+              value={codigoInput}
+              onChange={e => { setCodigoInput(e.target.value.replace(/\s+/g, '')); setErroCodigo(''); }}
+              onKeyDown={e => {
+                // O leitor manda Enter ao fim da leitura. Sem isto o Enter
+                // submeteria o formulário e salvaria o produto no meio do
+                // cadastro, em vez de acrescentar o código à lista.
+                if (e.key === 'Enter') { e.preventDefault(); handleAdicionarCodigo(); }
+              }}
+              className="bg-secondary border-border font-mono text-foreground"
+              placeholder="Escaneie ou digite o EAN"
+              inputMode="numeric"
+              maxLength={64}
+              autoComplete="off"
+              aria-label="Código de barras"
+              aria-invalid={!!erroCodigo}
+            />
+            <Input
+              value={rotuloInput}
+              onChange={e => setRotuloInput(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') { e.preventDefault(); handleAdicionarCodigo(); }
+              }}
+              className="max-w-[9rem] bg-secondary border-border text-foreground"
+              placeholder="Marca (opcional)"
+              maxLength={ROTULO_MAX}
+              autoComplete="off"
+              aria-label="Marca do código de barras"
+            />
+            <Button
+              type="button"
+              variant="secondary"
+              size="icon"
+              className="shrink-0"
+              onClick={handleAdicionarCodigo}
+              aria-label="Adicionar código de barras"
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
+
+          {erroCodigo && <p className="mt-1 text-xs font-medium text-destructive">{erroCodigo}</p>}
+          {codigos.length > 1 && (
+            <p className="mt-1 text-[10px] text-muted-foreground">
+              Bipar qualquer um destes códigos encontra este produto.
+            </p>
+          )}
         </div>
         <div>
           <Label className="text-[11px] text-muted-foreground">Local</Label>
