@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ShieldAlert } from 'lucide-react';
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useCompanyId } from '@/hooks/useCompanyId';
 import { useScopedToast } from '@/hooks/useScopedToast';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import SearchableSelect from '@/components/ui/SearchableSelect';
+import { useCanAny } from '@/permissions/hooks';
+import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 
 interface Setor { id: string; name: string }
 interface Usuario { id: string; nome: string; email: string }
@@ -29,6 +31,12 @@ export default function AcessoSetorPorUsuarioAdmin({ canEdit }: Props) {
   const supabase = useSupabase();
   const { companyId } = useCompanyId();
   const toast = useScopedToast();
+  // Guarda própria, além do gate da aba que monta este componente.
+  const canView = useCanAny(
+    'estoque:cadastros:view', 'estoque:cadastros:manage',
+    'operacional:setores:view', 'operacional:setores:manage',
+  );
+  const { confirm, ConfirmDialog } = useConfirmDialog();
 
   const [setores, setSetores] = useState<Setor[]>([]);
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
@@ -97,6 +105,16 @@ export default function AcessoSetorPorUsuarioAdmin({ canEdit }: Props) {
         toast.error('Não foi possível liberar o setor.');
       }
     } else {
+      // Confirmação só na revogação: marcar é aditivo, desmarcar tira o acesso
+      // de alguém que pode estar no meio do turno.
+      const ok = await confirm({
+        title: `Remover acesso ao setor ${setor.name}`,
+        description: 'O usuário deixa de conseguir registrar entradas e saídas neste setor.',
+        confirmLabel: 'Remover acesso',
+        variant: 'destructive',
+      });
+      if (!ok) { setSalvandoSetor(null); return; }
+
       const vinculoId = concedidos.get(setor.id);
       if (vinculoId) {
         const { error } = await supabase.from('estoque_usuario_setores').delete().eq('id', vinculoId);
@@ -111,8 +129,20 @@ export default function AcessoSetorPorUsuarioAdmin({ canEdit }: Props) {
     void carregarConcedidos(userId);
   };
 
+  if (!canView) {
+    return (
+      <div className="flex flex-col items-center gap-2 py-10 text-center">
+        <ShieldAlert className="h-8 w-8 text-destructive" />
+        <p className="text-sm text-muted-foreground">
+          Você não tem permissão para configurar acesso por setor.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
+      <ConfirmDialog />
       <div className="space-y-1.5">
         <Label className="text-[11px] text-muted-foreground">Usuário</Label>
         <SearchableSelect

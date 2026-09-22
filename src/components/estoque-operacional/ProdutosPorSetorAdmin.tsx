@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, Plus, Trash2 } from 'lucide-react';
+import { Loader2, Plus, ShieldAlert, Trash2 } from 'lucide-react';
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useCompanyId } from '@/hooks/useCompanyId';
 import { useScopedToast } from '@/hooks/useScopedToast';
@@ -10,6 +10,8 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { normalizeSearchText } from '@/lib/utils';
+import { useCanAny } from '@/permissions/hooks';
+import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 
 interface Setor { id: string; name: string }
 interface ProdutoVinculado { id: string; produto_id: string; nome: string; sku: string }
@@ -33,6 +35,10 @@ export default function ProdutosPorSetorAdmin({ canEdit }: Props) {
   const supabase = useSupabase();
   const { companyId } = useCompanyId();
   const toast = useScopedToast();
+  // Guarda própria, além do gate da aba que monta este componente: um
+  // componente exportado não pode depender de quem o renderiza para ser seguro.
+  const canView = useCanAny('estoque:cadastros:view', 'estoque:cadastros:manage', 'stock:read');
+  const { confirm, ConfirmDialog } = useConfirmDialog();
 
   const [setores, setSetores] = useState<Setor[]>([]);
   const [setorId, setSetorId] = useState('');
@@ -137,6 +143,14 @@ export default function ProdutosPorSetorAdmin({ canEdit }: Props) {
   };
 
   const desvincular = async (vinculo: ProdutoVinculado) => {
+    const ok = await confirm({
+      title: 'Remover produto do setor',
+      description: `"${vinculo.nome}" deixa de aparecer na Movimentação Operacional deste setor. O produto e o estoque não são afetados.`,
+      confirmLabel: 'Remover',
+      variant: 'destructive',
+    });
+    if (!ok) return;
+
     setSalvandoId(vinculo.id);
     const { error } = await supabase.from('estoque_setor_produtos').delete().eq('id', vinculo.id);
     setSalvandoId(null);
@@ -149,8 +163,20 @@ export default function ProdutosPorSetorAdmin({ canEdit }: Props) {
     void carregarVinculados(setorId);
   };
 
+  if (!canView) {
+    return (
+      <div className="flex flex-col items-center gap-2 py-10 text-center">
+        <ShieldAlert className="h-8 w-8 text-destructive" />
+        <p className="text-sm text-muted-foreground">
+          Você não tem permissão para ver os cadastros de estoque.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
+      <ConfirmDialog />
       <div className="space-y-1.5">
         <Label className="text-[11px] text-muted-foreground">Setor</Label>
         <Select value={setorId} onValueChange={setSetorId}>
