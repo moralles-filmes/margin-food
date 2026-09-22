@@ -49,6 +49,7 @@ const PRODUTO_SELECT_COLUMNS = [
   'is_salmon_raw_linked',
   'conta_no_cmv',
   'saldo_atual',
+  'barcode',
 ].join(', ');
 
 /** Raw DB row shape for produtos table */
@@ -90,6 +91,7 @@ interface ProdutoRow {
   is_salmon_raw_linked: boolean | null;
   conta_no_cmv: boolean | null;
   saldo_atual: number | null;
+  barcode: string | null;
 }
 
 function dbToProduto(row: ProdutoRow): ProdutoExtended {
@@ -131,6 +133,7 @@ function dbToProduto(row: ProdutoRow): ProdutoExtended {
     isSalmonRawLinked: !!row.is_salmon_raw_linked,
     contaNoCmv: row.conta_no_cmv ?? true,
     saldoAtual: Number(row.saldo_atual) || 0,
+    barcode: row.barcode || '',
   };
 }
 
@@ -217,14 +220,15 @@ export interface ProductGlobalCounts {
 /** Input type for addProduto — base Produto fields + extended fields */
 export type ProdutoCreateInput = Omit<Produto, 'id' | 'createdAt'> & Partial<Pick<ProdutoExtended,
   'unidadeCompra' | 'fatorConversaoPadrao' | 'defaultCostPurchaseUnit' |
-  'inactivityDaysThreshold' | 'contaNoCmv' | 'packageQuantity' | 'packageMeasureUnit' | 'conversionMode'
+  'inactivityDaysThreshold' | 'contaNoCmv' | 'packageQuantity' | 'packageMeasureUnit' |
+  'conversionMode' | 'barcode'
 >>;
 
 /** Input type for updateProduto — partial of base + extended fields */
 export type ProdutoUpdateInput = Partial<Produto> & Partial<Pick<ProdutoExtended,
   'unidadeCompra' | 'fatorConversaoPadrao' | 'defaultCostPurchaseUnit' | 'defaultCostBaseUnit' |
   'needsCostReview' | 'inactivityDaysThreshold' | 'contaNoCmv' |
-  'packageQuantity' | 'packageMeasureUnit' | 'conversionMode'
+  'packageQuantity' | 'packageMeasureUnit' | 'conversionMode' | 'barcode'
 >>;
 
 /** RPC saldo row */
@@ -641,6 +645,9 @@ export function useEstoqueGeralStore() {
         package_quantity: p.packageQuantity ?? null,
         package_measure_unit: p.packageMeasureUnit || null,
         conversion_mode: p.conversionMode || 'manual',
+        // Vazio vira NULL: o índice único parcial ignora NULL, então vários
+        // produtos sem código convivem sem colidir entre si.
+        barcode: p.barcode?.trim() || null,
       })
       .select()
       .single();
@@ -684,6 +691,7 @@ export function useEstoqueGeralStore() {
     if (updates.packageQuantity !== undefined) dbUpdates.package_quantity = updates.packageQuantity;
     if (updates.packageMeasureUnit !== undefined) dbUpdates.package_measure_unit = updates.packageMeasureUnit;
     if (updates.conversionMode !== undefined) dbUpdates.conversion_mode = updates.conversionMode;
+    if (updates.barcode !== undefined) dbUpdates.barcode = updates.barcode.trim() || null;
 
     const { data: updatedRows, error } = await supabase.from('produtos')
       .update(dbUpdates as import('@/integrations/supabase/types').Database['public']['Tables']['produtos']['Update'])

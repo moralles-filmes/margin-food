@@ -10,6 +10,7 @@ import AppLayout from '@/components/AppLayout';
 
 const SalmonControlView = lazy(() => import('@/components/SalmonControlView'));
 const EstoqueGeralView = lazy(() => import('@/components/EstoqueGeralView'));
+const MovimentacaoOperacionalView = lazy(() => import('@/components/estoque-operacional/MovimentacaoOperacionalView'));
 const ComprasView = lazy(() => import('@/components/ComprasView'));
 const PlanningView = lazy(() => import('@/components/PlanningView'));
 const SuppliersView = lazy(() => import('@/components/SuppliersView'));
@@ -31,6 +32,7 @@ import { useModuleAccess } from '@/permissions/hooks';
 const TAB_MODULE_MAP: Record<TabId, string> = {
   salmon: 'salmon',
   'estoque-geral': 'estoque',
+  'movimentacao-operacional': 'operacional',
   inventario: 'inventario',
   compras: 'compras',
   cmv: 'cmv',
@@ -49,6 +51,10 @@ const TAB_MODULE_MAP: Record<TabId, string> = {
 const TAB_PRIORITY: TabId[] = [
   'salmon', 'estoque-geral', 'relatorios', 'compras', 'inventario',
   'cmv', 'ficha-tecnica', 'planning', 'ia', 'rh', 'financeiro', 'configuracoes-usuarios', 'configuracoes',
+  // Último de propósito: quem tem acesso administrativo cai primeiro no módulo
+  // completo. Para o operador puro, é a única entrada acessível, então vence
+  // por eliminação sem precisar de tratamento especial.
+  'movimentacao-operacional',
 ];
 
 const Index = () => {
@@ -58,6 +64,7 @@ const Index = () => {
   // Build module access for all tabs
   const salmonAccess = useModuleAccess('salmon');
   const estoqueAccess = useModuleAccess('estoque');
+  const operacionalAccess = useModuleAccess('operacional');
   const inventarioAccess = useModuleAccess('inventario');
   const comprasAccess = useModuleAccess('compras');
   const cmvAccess = useModuleAccess('cmv');
@@ -72,6 +79,7 @@ const Index = () => {
   const moduleAccessMap = useMemo(() => ({
     salmon: salmonAccess.canView,
     'estoque-geral': estoqueAccess.canView,
+    'movimentacao-operacional': operacionalAccess.canView,
     inventario: inventarioAccess.canView,
     compras: comprasAccess.canView,
     cmv: cmvAccess.canView,
@@ -84,7 +92,7 @@ const Index = () => {
     financeiro: financeiroAccess.canView,
     configuracoes: configAccess.canView,
     'configuracoes-usuarios': configAccess.canView,
-  }), [salmonAccess, estoqueAccess, inventarioAccess, comprasAccess, cmvAccess, fichaAccess, planningAccess, relatoriosAccess, iaAccess, rhAccess, financeiroAccess, configAccess]);
+  }), [salmonAccess, estoqueAccess, operacionalAccess, inventarioAccess, comprasAccess, cmvAccess, fichaAccess, planningAccess, relatoriosAccess, iaAccess, rhAccess, financeiroAccess, configAccess]);
   const navigate = useNavigate();
   const location = useLocation();
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
@@ -281,6 +289,7 @@ const Index = () => {
       <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>}>
         {activeTab === 'salmon' && canAccessTab('salmon') && <SalmonControlView store={store} />}
         {activeTab === 'estoque-geral' && canAccessTab('estoque-geral') && <EstoqueGeralView />}
+        {activeTab === 'movimentacao-operacional' && canAccessTab('movimentacao-operacional') && <MovimentacaoOperacionalView />}
         {activeTab === 'inventario' && canAccessTab('inventario') && <InventarioView />}
         {activeTab === 'compras' && canAccessTab('compras') && (
           <PurchaseOrdersStoreProvider><ComprasView /></PurchaseOrdersStoreProvider>

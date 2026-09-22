@@ -30,6 +30,8 @@ export interface ProdutoExtended extends Produto {
   isSalmonRawLinked: boolean;
   contaNoCmv: boolean;
   saldoAtual: number;
+  /** Código de barras lido pelo submódulo operacional. String sempre: zero à esquerda é significativo. */
+  barcode: string;
 }
 
 /** Extended movimentação with audit/status fields */
@@ -79,4 +81,5 @@ export interface ProdutoFormData {
   packageQuantity: number | null;
   packageMeasureUnit: string | null;
   conversionMode: 'auto' | 'manual';
+  barcode: string;
 }

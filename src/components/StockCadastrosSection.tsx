@@ -1,6 +1,8 @@
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
-import { Tag, MapPin, Building2, Plus, Edit2, Power, PowerOff, Trash2, Loader2 } from 'lucide-react';
+import { Tag, MapPin, Building2, Plus, Edit2, Power, PowerOff, Trash2, Loader2, Boxes, UserCog } from 'lucide-react';
+import ProdutosPorSetorAdmin from '@/components/estoque-operacional/ProdutosPorSetorAdmin';
+import AcessoSetorPorUsuarioAdmin from '@/components/estoque-operacional/AcessoSetorPorUsuarioAdmin';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -345,7 +347,7 @@ export default function StockCadastrosSection() {
   return (
     <div className="space-y-4">
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="w-full">
+        <TabsList className="w-full flex-wrap">
           <TabsTrigger value="categorias" className="flex-1 gap-1.5 text-xs">
             <Tag className="w-3.5 h-3.5" /> Categorias
           </TabsTrigger>
@@ -354,6 +356,12 @@ export default function StockCadastrosSection() {
           </TabsTrigger>
           <TabsTrigger value="setores" className="flex-1 gap-1.5 text-xs">
             <Building2 className="w-3.5 h-3.5" /> Setores
+          </TabsTrigger>
+          <TabsTrigger value="produtos-setor" className="flex-1 gap-1.5 text-xs">
+            <Boxes className="w-3.5 h-3.5" /> Produtos p/ Setor
+          </TabsTrigger>
+          <TabsTrigger value="acesso-setor" className="flex-1 gap-1.5 text-xs">
+            <UserCog className="w-3.5 h-3.5" /> Acesso p/ Setor
           </TabsTrigger>
         </TabsList>
 
@@ -496,6 +504,22 @@ export default function StockCadastrosSection() {
               ))}
             </div>
           )}
+        </TabsContent>
+
+        {/* ── PRODUTOS POR SETOR (Movimentação Operacional) ── */}
+        <TabsContent value="produtos-setor" className="space-y-3 mt-3">
+          <p className="text-xs text-muted-foreground">
+            Define quais produtos aparecem em cada setor na Movimentação Operacional.
+          </p>
+          <ProdutosPorSetorAdmin canEdit={canEdit} />
+        </TabsContent>
+
+        {/* ── ACESSO POR SETOR (Movimentação Operacional) ── */}
+        <TabsContent value="acesso-setor" className="space-y-3 mt-3">
+          <p className="text-xs text-muted-foreground">
+            Define quais setores cada usuário pode movimentar na Movimentação Operacional.
+          </p>
+          <AcessoSetorPorUsuarioAdmin canEdit={canEdit} />
         </TabsContent>
       </Tabs>
 

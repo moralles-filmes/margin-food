@@ -210,7 +210,12 @@ function checkDirectDeletes() {
     for (let i = 0; i < lines.length; i++) {
       if (!lines[i].includes('.delete()')) continue;
       for (const table of CRITICAL_TABLES) {
-        if (src.includes(`'${table}'`) && lines.slice(Math.max(0, i - 3), i + 1).join('\n').includes(table)) {
+        // Exige `from('<tabela>')` literal, não o nome solto: por substring,
+        // `estoque_setor_produtos` acusava delete em `produtos`, e qualquer
+        // tabela cujo nome contenha o de outra crítica geraria falso positivo.
+        // Um delete via PostgREST sempre passa por `.from('<tabela>')`, então a
+        // checagem continua pegando todos os casos reais.
+        if (lines.slice(Math.max(0, i - 3), i + 1).join('\n').includes(`from('${table}')`)) {
           push({ check: 'DIRECT_DELETE', tier: 'IMPORTANT', file: rel, detail: `Line ${i + 1}: .delete() on '${table}'`, suggestion: 'Use a _guarded RPC for critical table mutations' });
           v++;
         }

@@ -34,6 +34,7 @@ export const emptyProdForm: ProdutoFormData = {
   defaultCostPurchaseUnit: 0, minIdealMode: 'purchase', minPurchaseQty: 0,
   idealPurchaseQty: 0, inactivityDaysThreshold: '', contaNoCmv: true,
   packageQuantity: null, packageMeasureUnit: null, conversionMode: 'manual',
+  barcode: '',
 };
 
 function isTenantErrorMessage(msg?: string): boolean {
@@ -156,6 +157,7 @@ export default function ProdutoFormPanel({
         packageQuantity: prodForm.packageQuantity,
         packageMeasureUnit: prodForm.packageMeasureUnit,
         conversionMode: prodForm.conversionMode,
+        barcode: prodForm.barcode,
       };
 
       if (editProdId) {
@@ -373,9 +375,23 @@ export default function ProdutoFormPanel({
             </div>
           )}
         </div>
-        <div className="col-span-2">
+        <div>
           <Label className="text-[11px] text-muted-foreground">SKU / Código <span className="text-muted-foreground">(auto se vazio)</span></Label>
           <Input value={prodForm.sku} onChange={e => setProdForm(f => ({ ...f, sku: e.target.value }))} className="bg-secondary border-border text-foreground" placeholder="Gerado automaticamente" />
+        </div>
+        <div>
+          {/* Codigo de barras: lido pelo submodulo operacional. Texto, nunca
+              numero — zero a esquerda e significativo. Unico por empresa. */}
+          <Label className="text-[11px] text-muted-foreground">Código de barras <span className="text-muted-foreground">(opcional)</span></Label>
+          <Input
+            value={prodForm.barcode}
+            onChange={e => setProdForm(f => ({ ...f, barcode: e.target.value.replace(/\s+/g, '') }))}
+            className="bg-secondary border-border text-foreground font-mono"
+            placeholder="Escaneie ou digite o EAN"
+            inputMode="numeric"
+            maxLength={64}
+            autoComplete="off"
+          />
         </div>
         <div>
           <Label className="text-[11px] text-muted-foreground">Local</Label>
