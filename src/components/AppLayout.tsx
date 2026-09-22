@@ -1,7 +1,7 @@
 import { ReactNode, useMemo, useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { TabId, MetaCompraMensal, SalmonEntry } from '@/types/salmon';
-import { Package, ShoppingCart, ClipboardList, Settings, AlertTriangle, BarChart3, LayoutDashboard, Menu, Moon, Sun, User, ChevronLeft, ChevronRight, PanelLeftClose, X, LogOut, Users, Fish, ClipboardCheck, TrendingDown, BookOpen, Brain, UserCheck, DollarSign, Shield } from 'lucide-react';
+import { Package, ShoppingCart, ClipboardList, Settings, AlertTriangle, BarChart3, LayoutDashboard, Menu, Moon, Sun, User, ChevronLeft, ChevronRight, PanelLeftClose, X, LogOut, Users, Fish, ClipboardCheck, TrendingDown, BookOpen, Brain, UserCheck, DollarSign, Shield, ArrowDownUp } from 'lucide-react';
 import NotificationBell from '@/components/NotificationBell';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { useTheme } from '@/hooks/useTheme';
@@ -69,6 +69,7 @@ const navSections: NavSection[] = [
     title: 'OPERAÇÃO',
     items: [
       { id: 'estoque-geral', label: 'Controle de Estoque', icon: Package, moduleKey: 'estoque' },
+      { id: 'movimentacao-operacional', label: 'Movimentação Operacional', icon: ArrowDownUp, moduleKey: 'operacional' },
       { id: 'salmon', label: 'Controle de Salmão', icon: Fish, moduleKey: 'salmon' },
       { id: 'inventario', label: 'Inventário Geral', icon: ClipboardCheck, moduleKey: 'inventario' },
       { id: 'compras', label: 'Compras', icon: ShoppingCart, moduleKey: 'compras' },
@@ -117,6 +118,7 @@ const ROLE_DISPLAY: Record<string, string> = {
 const tabLabels: Record<TabId, string> = {
   salmon: 'Dashboard Salmão',
   'estoque-geral': 'Controle de Estoque',
+  'movimentacao-operacional': 'Movimentação Operacional',
   inventario: 'Inventário Geral',
   compras: 'Compras',
   cmv: 'Centro de CMV',
