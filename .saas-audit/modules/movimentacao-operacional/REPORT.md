@@ -3,7 +3,8 @@
 **Data:** 2026-09-22
 **Branch:** `feat/movimentacao-operacional`
 **Modo:** `--fix`
-**Veredito:** PASS_WITH_WARNINGS — 0 bloqueantes
+**Veredito:** PASS_WITH_WARNINGS — 0 bloqueantes em aberto
+(3 achados corrigidos, sendo 2 bloqueantes vindos da auditoria de processo)
 
 ---
 
@@ -75,6 +76,42 @@ levanta `COMPANY_ACCESS_DENIED`.
   novo grava · INSERT direto com id repetido é **barrado pelo índice** →
   2 movimentações para 3 chamadas.
 
+### MOD-movop-004 — chave de idempotência não identificava a operação ✅ CORRIGIDO
+- **Severidade:** P1 — bloqueante (auditoria de processo)
+- **Causa:** o reenvio era reconhecido só por `reference_id`. A tela guardava o
+  `requestId` em estado e só o renovava na tela de sucesso, então uma
+  confirmação que falhava na rede deixava a chave presa para o próximo produto.
+- **Impacto:** servidor grava e a resposta se perde → operador troca de produto e
+  confirma → caminho rápido devolve `idempotente=true` do lançamento ANTERIOR.
+  Sucesso na tela, **nada gravado** para o produto novo, com nome e quantidade em
+  branco como único sintoma. Perda silenciosa de movimento.
+- **Correção:** (a) a RPC compara produto/setor/tipo/quantidade com o lançamento
+  achado e levanta `REQUEST_ID_REUTILIZADO` quando não batem — nos dois pontos
+  (caminho rápido e `unique_violation`); (b) o retorno idempotente passa a
+  carregar os dados reais do lançamento original; (c) no cliente a chave virou
+  derivada (`chaveRequisicao` = semente + identidade), então trocar produto,
+  setor, tipo ou quantidade gera chave nova sozinho; (d) "Voltar" desabilitado
+  enquanto a confirmação está em voo. Migration `20260922180522`.
+- **Teste:** 5 chamadas → **2 movimentações**; reenvio idêntico devolve
+  `idempotente=true` com produto e quantidade corretos; mesma chave com produto
+  diferente → `REQUEST_ID_REUTILIZADO`; mesma chave com quantidade diferente →
+  `REQUEST_ID_REUTILIZADO`; chave nova grava normalmente. Mais 3 testes de fluxo.
+
+### MOD-movop-005 — quantidade ≥ 1000 corrompida pelo separador de milhar ✅ CORRIGIDO
+- **Severidade:** P1 — bloqueante (auditoria de processo)
+- **Causa:** `QuantidadeStepper` escrevia `formatarQuantidade(proximo)` de volta
+  no campo editável. `formatarQuantidade(1001)` é `"1.001"` e `parseQuantidade`
+  lê o ponto como decimal → **1,001**.
+- **Impacto:** digitar `1000` e clicar `[+]` gravava 1,001 em vez de 1001 — ~1000x
+  menos do que a tela mostrava, sem erro nenhum. Para SAÍDA o saldo do sistema
+  ficaria alto (estoque fantasma); para ENTRADA, baixo. Contamina custo e CMV.
+- **Correção:** `quantidadeParaCampo` (`useGrouping: false`) para o texto que
+  realimenta o input; `formatarQuantidade` permanece com agrupamento apenas onde
+  é exibição pura (sucesso, histórico, picker, saldo disponível).
+- **Teste:** round-trip `parseQuantidade(quantidadeParaCampo(x)) === x` em
+  `[1, 2.5, 0.125, 999, 1000, 1001, 12345, 999999]`, mais o caso de fluxo
+  "digitar 1000 → `[+]` → envia 1001".
+
 ### MOD-movop-002 — `op_barcode_existe` responde sem filtrar setor ⚠️ ACEITO
 - **Severidade:** P3
 - **Decisão:** trade-off deliberado, documentado em `CLAUDE.md`.
@@ -83,6 +120,15 @@ levanta `COMPANY_ACCESS_DENIED`.
   operador muda entre os dois casos. Filtrar por setor faria o operador pedir
   cadastro de um código já existente, que colidiria no índice único. O dado
   exposto é a existência de um EAN impresso na embalagem que ele tem na mão.
+
+### MOD-movop-006 — `PRODUTO_SEM_CUSTO` sem via de escape na tela operacional ⚠️ ACEITO
+- **Severidade:** P3
+- **Decisão:** comportamento esperado, não defeito.
+- **Razão:** o admin tem "Editar custo" no modal; o operacional não oferece campo
+  de custo de propósito — custo é dado financeiro e o operador não o informa.
+  Produto sem custo trava a saída até um responsável lançar entrada com custo ou
+  preencher `custo_padrao`. Registrado aqui para não ser diagnosticado como bug
+  num incidente futuro.
 
 ### MOD-movop-003 — janela de `EXECUTE` para `PUBLIC` entre CREATE e REVOKE ⚠️ ACEITO
 - **Severidade:** P3
@@ -140,6 +186,18 @@ Usuário com **apenas** `operacional:movimentacao:view/create` e só o setor Coz
 | movimentar no setor autorizado | OK |
 | histórico sem `operacional:historico:view` | RECUSADO — `PERMISSION_DENIED` |
 
+### Idempotência ligada à identidade da operação
+Operador simulado (chave `operacional:movimentacao:create` + 1 setor), 5 chamadas:
+
+| Sonda | Resultado |
+|---|---|
+| 1º envio (produto A, 3, ENTRADA) | gravado — `idempotente=false` |
+| reenvio idêntico | `idempotente=true`, produto e quantidade corretos no retorno |
+| mesma chave + produto diferente | RECUSADO — `REQUEST_ID_REUTILIZADO` |
+| mesma chave + quantidade diferente | RECUSADO — `REQUEST_ID_REUTILIZADO` |
+| chave nova (produto B) | gravado |
+| **movimentações para as 5 chamadas** | **2** |
+
 ### Regras de estoque
 | Sonda | Resultado |
 |---|---|
@@ -155,10 +213,10 @@ Usuário com **apenas** `operacional:movimentacao:view/create` e só o setor Coz
 | Suíte | Antes | Depois |
 |---|---|---|
 | Arquivos | 102 | 105 |
-| Testes | 798 | 880 |
+| Testes | 798 | 890 |
 
-Novos: `estoque-operacional-domain.test.ts` (34), `estoque-operacional-barcode.test.ts` (17),
-`movimentacao-operacional-fluxo.test.tsx` (31).
+Novos: `estoque-operacional-domain.test.ts` (41), `estoque-operacional-barcode.test.ts` (17),
+`movimentacao-operacional-fluxo.test.tsx` (34).
 
 `tsc --noEmit` limpo · `lint` 0 erros · `build` ok · `rbac:lint` 0 blockers ·
 `security:check` PASS.
@@ -187,7 +245,13 @@ ganhou duas abas.
    decisão do dono.
 3. **Verificação visual em navegador real** (light/dark, mobile/tablet) não foi
    possível neste ambiente — sem Playwright nem credenciais.
-4. **Corrida de relógio entre duas conexões** não pôde ser encenada: o canal MCP
+4. **`supabase db push` está bloqueado por divergência pré-existente do histórico**
+   — 16 versões `20260916220000`–`20260916221500` (pacote F12) existem no banco
+   remoto sem arquivo local, e o CLI recusa o push inteiro por isso. As migrations
+   deste módulo foram aplicadas via MCP `apply_migration`, com o arquivo local
+   renomeado para a versão que o MCP gravou. Não reparei o histórico: é trabalho
+   de outra frente e o repair reescreveria o estado dela.
+5. **Corrida de relógio entre duas conexões** não pôde ser encenada: o canal MCP
    serializa as consultas (medido: sessão A 17:02:09.757→17:02:13.760, sessão B
    só iniciou 17:02:15.62). A garantia de concorrência está evidenciada pela
    aquisição do lock, não por paralelismo real.

@@ -112,11 +112,54 @@ export function ajustarQuantidade(atual: number | null, delta: number): number {
   return proximo;
 }
 
-/** Mostra 12 em vez de 12,000 e 2,5 em vez de 2,500. */
+/**
+ * Formata para EXIBIÇÃO: 12 em vez de 12,000, 2,5 em vez de 2,500, 1.234 com
+ * separador de milhar.
+ *
+ * Não use para preencher o campo de quantidade — o separador de milhar volta a
+ * passar por `parseQuantidade`. Para isso existe `quantidadeParaCampo`.
+ */
 export function formatarQuantidade(valor: number): string {
   if (!Number.isFinite(valor)) return '0';
   const arredondado = Math.round(valor * 1000) / 1000;
   return arredondado.toLocaleString('pt-BR', { maximumFractionDigits: 3 });
+}
+
+/**
+ * Formata para REALIMENTAR o campo editável de quantidade.
+ *
+ * Sem separador de milhar, de propósito: `formatarQuantidade(1001)` é `"1.001"`
+ * e `parseQuantidade("1.001")` é `1,001` — o ponto é decimal em JS. Escrever o
+ * texto agrupado de volta no input fazia o [+] em 1000 virar 1,001 sem nenhum
+ * erro na tela, gravando ~1000x menos do que o operador enxergava.
+ * O invariante é `parseQuantidade(quantidadeParaCampo(x)) === x`.
+ */
+export function quantidadeParaCampo(valor: number): string {
+  if (!Number.isFinite(valor)) return '';
+  const arredondado = Math.round(valor * 1000) / 1000;
+  return arredondado.toLocaleString('pt-BR', {
+    useGrouping: false,
+    maximumFractionDigits: 3,
+  });
+}
+
+/**
+ * Chave de idempotência da confirmação.
+ *
+ * Determinística de propósito: repetir a MESMA operação (retry depois de falha
+ * de rede) reaproveita a chave e o servidor devolve o lançamento original;
+ * mudar produto, setor, tipo ou quantidade produz chave nova, então um reenvio
+ * nunca é confundido com a operação anterior. `semente` só troca quando começa
+ * um lançamento novo.
+ */
+export function chaveRequisicao(
+  semente: string,
+  produtoId: string,
+  setorId: string,
+  tipo: MovimentacaoOperacionalTipo,
+  quantidade: number | null,
+): string {
+  return [semente, produtoId, setorId, tipo, quantidade ?? ''].join('|');
 }
 
 /**
@@ -148,6 +191,11 @@ export function traduzirErroOperacional(mensagem: string | undefined): string {
   }
   if (msg.includes('QUANTIDADE_INVALIDA')) {
     return 'A quantidade precisa ser maior que zero.';
+  }
+  if (msg.includes('REQUEST_ID_REUTILIZADO')) {
+    // Só acontece se algo reenviar a chave de uma confirmação anterior para
+    // outra operação. A tela renova a chave sozinha; a orientação é refazer.
+    return 'Esta confirmação não confere com o lançamento anterior. Refaça o lançamento.';
   }
   if (msg.includes('TIPO_INVALIDO')) {
     return 'Tipo de movimentação inválido.';

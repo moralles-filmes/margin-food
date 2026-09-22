@@ -1,7 +1,7 @@
 import { Minus, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ajustarQuantidade, formatarQuantidade } from '@/domain/estoque/operacional';
+import { ajustarQuantidade, quantidadeParaCampo } from '@/domain/estoque/operacional';
 
 interface Props {
   /** Texto cru do campo — o operador pode estar no meio da digitação. */
@@ -24,7 +24,8 @@ export default function QuantidadeStepper({
 }: Props) {
   const aplicarDelta = (delta: number) => {
     const proximo = ajustarQuantidade(valor, delta);
-    onValorTextoChange(formatarQuantidade(proximo));
+    // Sem separador de milhar: o texto volta a passar por `parseQuantidade`.
+    onValorTextoChange(quantidadeParaCampo(proximo));
   };
 
   return (

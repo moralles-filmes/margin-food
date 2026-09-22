@@ -36,6 +36,15 @@ const COCA: ProdutoOperacional = {
   vinculado: true,
 };
 
+const AGUA: ProdutoOperacional = {
+  produtoId: 'prod-agua',
+  nome: 'Água Mineral 500ml',
+  sku: 'MP-0051',
+  unidadeMedida: 'UN',
+  saldo: 20,
+  vinculado: true,
+};
+
 function dadosBase() {
   return {
     setores: SETORES,
@@ -420,6 +429,79 @@ describe('FluxoMovimentacao — confirmação', () => {
     const primeiro = dados.registrar.mock.calls[0][0].clientRequestId;
     const segundo = dados.registrar.mock.calls[1][0].clientRequestId;
     expect(segundo).not.toBe(primeiro);
+  });
+
+  it('renova o clientRequestId ao trocar de produto depois de uma falha', async () => {
+    // Uma confirmação que falhou na rede pode ter sido gravada no servidor.
+    // Reaproveitar a chave num produto diferente faria o servidor devolver o
+    // lançamento anterior como sucesso, sem registrar nada para o produto novo.
+    const dados = dadosBase();
+    dados.buscarProdutos = vi.fn().mockResolvedValue({
+      produtos: [COCA, AGUA], erro: null, obsoleto: false,
+    });
+    dados.registrar = vi.fn().mockResolvedValue({ ok: false, erro: 'Falha de rede' });
+    renderFluxo('SAIDA', dados);
+    await irAteQuantidade();
+
+    await clicar(/Confirmar saída/);
+    await waitFor(() => expect(dados.registrar).toHaveBeenCalledTimes(1));
+
+    await clicar('Voltar');
+    await clicar(/Água Mineral 500ml/);
+    await clicar(/Confirmar saída/);
+    await waitFor(() => expect(dados.registrar).toHaveBeenCalledTimes(2));
+
+    const [primeira, segunda] = dados.registrar.mock.calls;
+    expect(segunda[0].produtoId).toBe('prod-agua');
+    expect(segunda[0].clientRequestId).not.toBe(primeira[0].clientRequestId);
+  });
+
+  it('renova o clientRequestId quando a quantidade muda', async () => {
+    const dados = dadosBase();
+    dados.registrar = vi.fn().mockResolvedValue({ ok: false, erro: 'Falha de rede' });
+    renderFluxo('SAIDA', dados);
+    const campo = await irAteQuantidade();
+
+    await clicar(/Confirmar saída/);
+    await waitFor(() => expect(dados.registrar).toHaveBeenCalledTimes(1));
+
+    digitarQuantidade(campo, '4');
+    await clicar(/Confirmar saída/);
+    await waitFor(() => expect(dados.registrar).toHaveBeenCalledTimes(2));
+
+    const [primeira, segunda] = dados.registrar.mock.calls;
+    expect(segunda[0].quantidade).toBe(4);
+    expect(segunda[0].clientRequestId).not.toBe(primeira[0].clientRequestId);
+  });
+
+  it('bloqueia o Voltar enquanto a confirmação está em voo', async () => {
+    const dados = dadosBase();
+    let liberar: (v: unknown) => void = () => {};
+    dados.registrar = vi.fn().mockReturnValue(new Promise(res => { liberar = res; }));
+    renderFluxo('SAIDA', dados);
+    await irAteQuantidade();
+
+    await clicar(/Confirmar saída/);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Voltar' })).toBeDisabled());
+
+    liberar({ ok: false, erro: 'Falha de rede' });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Voltar' })).toBeEnabled());
+  });
+
+  it('clicar [+] com 1000 no campo envia 1001, não 1,001', async () => {
+    // Regressão: o stepper escrevia o texto agrupado ("1.001") de volta no
+    // campo, e o parse o relia como decimal.
+    const dados = dadosBase();
+    renderFluxo('ENTRADA', dados);
+    const campo = await irAteQuantidade();
+
+    digitarQuantidade(campo, '1000');
+    await clicar('Aumentar quantidade');
+    await clicar(/Confirmar entrada/);
+
+    await waitFor(() => expect(dados.registrar).toHaveBeenCalledWith(
+      expect.objectContaining({ quantidade: 1001 }),
+    ));
   });
 
   it('mostra o resultado com o saldo atualizado', async () => {

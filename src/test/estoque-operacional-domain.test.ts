@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
   ajustarQuantidade,
+  chaveRequisicao,
   formatarQuantidade,
   parseQuantidade,
+  quantidadeParaCampo,
   QUANTIDADE_MAXIMA,
   traduzirErroOperacional,
   validarQuantidade,
@@ -131,6 +133,52 @@ describe('formatarQuantidade', () => {
 
   it('sobrevive a valor inválido', () => {
     expect(formatarQuantidade(Number.NaN)).toBe('0');
+  });
+});
+
+describe('quantidadeParaCampo', () => {
+  it('não agrupa milhar — o texto volta a passar por parseQuantidade', () => {
+    expect(quantidadeParaCampo(1000)).toBe('1000');
+    expect(quantidadeParaCampo(1001)).toBe('1001');
+    expect(quantidadeParaCampo(12345)).toBe('12345');
+  });
+
+  it('mantém a vírgula decimal do teclado BR', () => {
+    expect(quantidadeParaCampo(0.5)).toBe('0,5');
+    expect(quantidadeParaCampo(2.25)).toBe('2,25');
+  });
+
+  it('faz round-trip com parseQuantidade em toda a faixa útil', () => {
+    for (const valor of [1, 2.5, 0.125, 999, 1000, 1001, 12345, QUANTIDADE_MAXIMA]) {
+      expect(parseQuantidade(quantidadeParaCampo(valor))).toBe(valor);
+    }
+  });
+
+  it('o [+] a partir de 1000 chega a 1001, não a 1,001', () => {
+    // Regressão: o stepper escrevia `formatarQuantidade` de volta no campo, e o
+    // separador de milhar era relido como decimal — 1000x menos do que a tela
+    // mostrava, sem nenhum erro visível.
+    const proximo = ajustarQuantidade(1000, 1);
+    expect(proximo).toBe(1001);
+    expect(parseQuantidade(quantidadeParaCampo(proximo))).toBe(1001);
+    // O formato de exibição, esse sim, corromperia se voltasse ao campo:
+    expect(parseQuantidade(formatarQuantidade(proximo))).toBe(1.001);
+  });
+});
+
+describe('chaveRequisicao', () => {
+  it('repete a chave para a mesma operação (retry é deduplicado)', () => {
+    expect(chaveRequisicao('s1', 'p1', 'set1', 'SAIDA', 3))
+      .toBe(chaveRequisicao('s1', 'p1', 'set1', 'SAIDA', 3));
+  });
+
+  it('muda quando qualquer parte da operação muda', () => {
+    const base = chaveRequisicao('s1', 'p1', 'set1', 'SAIDA', 3);
+    expect(chaveRequisicao('s1', 'p2', 'set1', 'SAIDA', 3)).not.toBe(base);
+    expect(chaveRequisicao('s1', 'p1', 'set2', 'SAIDA', 3)).not.toBe(base);
+    expect(chaveRequisicao('s1', 'p1', 'set1', 'ENTRADA', 3)).not.toBe(base);
+    expect(chaveRequisicao('s1', 'p1', 'set1', 'SAIDA', 4)).not.toBe(base);
+    expect(chaveRequisicao('s2', 'p1', 'set1', 'SAIDA', 3)).not.toBe(base);
   });
 });
 

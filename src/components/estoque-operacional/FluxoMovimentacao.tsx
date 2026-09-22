@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useScopedToast } from '@/hooks/useScopedToast';
 import {
+  chaveRequisicao,
   formatarQuantidade,
   parseQuantidade,
   validarQuantidade,
@@ -33,8 +34,8 @@ const TITULOS: Record<MovimentacaoOperacionalTipo, string> = {
   SAIDA: 'Saída de Estoque',
 };
 
-/** Identificador da confirmação, para o servidor recusar o reenvio como duplicata. */
-function novoRequestId(): string {
+/** Semente do identificador de confirmação — troca a cada lançamento novo. */
+function novaSemente(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();
   }
@@ -69,12 +70,28 @@ export default function FluxoMovimentacao({
   const [setoresDoCodigo, setSetoresDoCodigo] = useState<SetorOperacional[]>([]);
   const [focoLeitor, setFocoLeitor] = useState(0);
 
-  // Um request id por confirmação. Só é renovado quando um novo lançamento
-  // começa — assim o retry de um envio que falhou na rede reaproveita o mesmo id
-  // e o servidor devolve a movimentação original em vez de criar a segunda.
-  const [requestId, setRequestId] = useState(novoRequestId);
+  // A semente só troca quando um lançamento novo começa; a chave enviada ao
+  // servidor combina a semente com a identidade da operação.
+  const [semente, setSemente] = useState(novaSemente);
 
   const quantidade = useMemo(() => parseQuantidade(quantidadeTexto), [quantidadeTexto]);
+
+  // Chave derivada, não estado: repetir a MESMA confirmação depois de uma falha
+  // de rede reaproveita a chave (o servidor devolve o lançamento original em vez
+  // de duplicar), mas trocar de produto/setor/tipo/quantidade gera chave nova.
+  // Guardar a chave em estado deixava o id de uma confirmação que falhou preso
+  // no próximo produto — e um envio que o servidor já tinha gravado, mas cuja
+  // resposta se perdeu, devolvia "sucesso" sem registrar nada para o item novo.
+  const requestId = useMemo(
+    () => chaveRequisicao(
+      semente,
+      produto?.produtoId ?? '',
+      setor?.setorId ?? '',
+      tipo,
+      quantidade,
+    ),
+    [semente, produto, setor, tipo, quantidade],
+  );
   const validacao = useMemo(
     () => validarQuantidade(quantidade, tipo, produto?.saldo ?? 0, produto?.unidadeMedida ?? ''),
     [quantidade, tipo, produto],
@@ -181,7 +198,7 @@ export default function FluxoMovimentacao({
     setQuantidadeTexto('1');
     setObservacao('');
     setResultado(null);
-    setRequestId(novoRequestId());
+    setSemente(novaSemente());
     setAvisoLeitor(undefined);
 
     if (modo === 'leitor') {
@@ -220,6 +237,9 @@ export default function FluxoMovimentacao({
             size="icon"
             className="h-10 w-10 shrink-0"
             onClick={voltar}
+            // Sair da tela com a confirmação em voo deixaria a resposta chegando
+            // para um produto que não está mais selecionado.
+            disabled={salvando}
             aria-label="Voltar"
           >
             <ArrowLeft className="h-5 w-5" />
