@@ -6,6 +6,7 @@ import { useScopedToast } from '@/hooks/useScopedToast';
 export interface Inventario {
   id: string;
   tipo: 'completo' | 'parcial' | 'ciclico';
+  metodo_contagem: 'lista' | 'codigo';
   status: 'RASCUNHO' | 'EM_CONTAGEM' | 'EM_REVISAO' | 'SOB_ANALISE' | 'FINALIZADO';
   data: string;
   hora: string;
@@ -79,6 +80,32 @@ export interface AuditLog {
   depois: any;
   ip_address: string;
   created_at: string;
+}
+
+export type BarcodeLookupResult =
+  | {
+      status: 'found';
+      item_id: string;
+      produto_id: string;
+      nome_produto: string;
+      sku: string;
+      barcode: string;
+      unidade_medida: string;
+      unidade_compra: string;
+      fator_conversao_padrao: number;
+      saldo_teorico: number;
+      contagem_fisica: number | null;
+      classificacao: 'NORMAL' | 'ALERTA' | 'CRITICO';
+    }
+  | { status: 'not_found'; barcode: string }
+  | { status: 'not_in_inventory'; barcode: string }
+  | { status: 'invalid' };
+
+export interface UpdateContagemResult {
+  diferenca_qtd: number;
+  diferenca_percent: number;
+  impacto_financeiro: number;
+  classificacao: 'NORMAL' | 'ALERTA' | 'CRITICO';
 }
 
 export interface DashboardData {
@@ -217,6 +244,10 @@ export function useInventarioStore() {
     }
   }, [invoke, toast]);
 
+  const findItemByBarcode = useCallback(async (inventarioId: string, barcode: string): Promise<BarcodeLookupResult> => {
+    return (await invoke('find_by_barcode', { id: inventarioId, barcode })) as BarcodeLookupResult;
+  }, [invoke]);
+
   const finalizar = useCallback(async (id: string, justificativa?: string) => {
     setLoading(true);
     try {
@@ -342,7 +373,7 @@ export function useInventarioStore() {
   return {
     inventarios, currentInventario, currentItens, auditLogs, turnos, conferentes, dashboard, loading,
     hasMore, nextCursor, savingCreate,
-    loadTurnos, loadList, loadInventario, createInventario, updateStatus, updateContagem,
+    loadTurnos, loadList, loadInventario, createInventario, updateStatus, updateContagem, findItemByBarcode,
     finalizar, aprovarAnalise, correcaoPosterior, reopenInventario, deleteInventario, loadDashboard,
     loadConferentes, addConferente, removeConferente, assignConferente,
   };
