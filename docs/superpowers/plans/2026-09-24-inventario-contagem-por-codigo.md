@@ -925,7 +925,7 @@ git commit -m "feat(inventario): etapa de escolha Lista/Codigo na criacao"
 - Consumes: `useContagemPorCodigo` (Task 4), `LeitorCodigoBarras` (imported unmodified from `@/components/estoque-operacional/LeitorCodigoBarras`), `Inventario`/`InventarioItem` types (Task 3).
 - Produces: default export `ContagemPorCodigo(props)` — a full-screen counting UI.
 
-- [ ] **Step 1: Write the component**
+- [x] **Step 1: Write the component**
 
 ```tsx
 import { useState } from 'react';
@@ -1050,7 +1050,7 @@ export default function ContagemPorCodigo({
 
 Editing a scanned item's quantity by hand (the spec's "clicar em um produto contabilizado e ajustar manualmente") is intentionally not built inline here — `onVerListaCompleta` routes to the existing detail view, where `InventoryQuantityInput` (unmodified) already lets any counted item be corrected through the same `update_contagem` action this screen uses, so the capability exists without a second implementation.
 
-- [ ] **Step 2: Wire it into `InventarioView.tsx`**
+- [x] **Step 2: Wire it into `InventarioView.tsx`**
 
 Add the import near the other sub-view imports (after `ExportListaContagemModal`, around line 29):
 
@@ -1080,7 +1080,7 @@ Add this render block in `InventarioView.tsx` immediately before the `// ===== D
 
 `onFinalizar` intentionally routes to the existing `'detail'` view rather than calling `store.finalizar` directly — finalization already has its own UI (partial-count confirmation dialog, anti-fraud block messaging) inside the detail view (`handleFinalizar`, lines 139+); reusing that screen means the barcode flow doesn't need a second finalize UI, exactly matching "mesmo processo de finalização".
 
-- [ ] **Step 3: Add a way back from the detail view into the code screen while still counting**
+- [x] **Step 3: Add a way back from the detail view into the code screen while still counting**
 
 In the detail view's header actions (`InventarioView.tsx`, inside the `<div className="flex gap-2">` block around line 554), add one more conditional button, right after the opening of that div:
 
@@ -1092,12 +1092,14 @@ In the detail view's header actions (`InventarioView.tsx`, inside the `<div clas
             )}
 ```
 
-- [ ] **Step 4: Typecheck and build**
+- [x] **Step 4: Typecheck and build**
 
 Run: `npm run typecheck` then `npm run build` (verify exact script names in `package.json` first).
 Expected: both succeed with no new errors.
 
-- [ ] **Step 5: Commit**
+Execução da Task 6: não existe `npm run typecheck` — usado `./node_modules/.bin/tsc --noEmit -p tsconfig.app.json` (só os 5 erros pré-existentes em `FluxoMovimentacao.tsx`/`ProdutoFormPanel.tsx`/testes de código de barras, nenhum novo) e `npm run build` (`vite build`, passou). Desvio de posição: após a Task 5 o `// ===== DETAIL VIEW =====` estava na linha 549 (não 508) e o `<div className="flex gap-2">` do header na 595 (não 554); o conteúdo inserido é o literal acima. `Zap` já estava importado.
+
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/components/inventario/ContagemPorCodigo.tsx src/components/InventarioView.tsx

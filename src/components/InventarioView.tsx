@@ -27,6 +27,7 @@ import QuickInventorySection from './QuickInventorySection';
 import InventarioDashboardView from './inventario/InventarioDashboardView';
 import InventarioAuditView from './inventario/InventarioAuditView';
 import ExportListaContagemModal from './inventario/ExportListaContagemModal';
+import ContagemPorCodigo from './inventario/ContagemPorCodigo';
 import { narrowRows } from '@/lib/guards';
 import { includesNormalized } from '@/lib/utils';
 import { sortByName, sortNames } from '@/lib/sortByName';
@@ -546,6 +547,22 @@ export default function InventarioView() {
     );
   }
 
+  // ===== CONTAGEM VIA CÓDIGO =====
+  if (subView === 'contagem-codigo' && store.currentInventario) {
+    return (
+      <ContagemPorCodigo
+        inventario={store.currentInventario}
+        itens={store.currentItens}
+        canCount={canEditDetail}
+        onBack={() => setSubView('list')}
+        onVerListaCompleta={() => setSubView('detail')}
+        onFinalizar={() => setSubView('detail')}
+        buscarPorBarcode={store.findItemByBarcode}
+        salvarContagem={store.updateContagem}
+      />
+    );
+  }
+
   // ===== DETAIL VIEW =====
   if (subView === 'detail' && store.currentInventario) {
     const inv = store.currentInventario;
@@ -593,6 +610,11 @@ export default function InventarioView() {
             </div>
           </div>
           <div className="flex gap-2">
+            {inv.metodo_contagem === 'codigo' && (inv.status === 'RASCUNHO' || inv.status === 'EM_CONTAGEM') && (
+              <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => setSubView('contagem-codigo')}>
+                <Zap className="w-3.5 h-3.5" /> Leitor de Código
+              </Button>
+            )}
             {canEditAudit && isFinalizado && (
               <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => { setReopenTarget(inv); setActionJustificativa(''); setConfirmText(''); }}>
                 <RotateCcw className="w-3.5 h-3.5" /> Reabrir
