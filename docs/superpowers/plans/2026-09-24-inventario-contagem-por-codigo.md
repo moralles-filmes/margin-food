@@ -1112,12 +1112,14 @@ git commit -m "feat(inventario): tela de contagem via codigo de barras"
 
 **Files:** none created — verification only.
 
-- [ ] **Step 1: Run the full test suite**
+- [x] **Step 1: Run the full test suite**
 
 Run: `npm run test` (equivalent to `vitest run` per `package.json`).
 Expected: all existing tests still pass, including `src/test/estoque-operacional-barcode.test.ts`, `src/test/estoque-operacional-domain.test.ts`, and the new `src/hooks/useContagemPorCodigo.test.ts`.
 
-- [ ] **Step 2: Confirm `LeitorCodigoBarras.tsx` and `useMovimentacaoOperacional.ts` are untouched**
+> 2026-09-24: 108 arquivos / 923 testes passando; os 3 arquivos citados rodados isoladamente: 65/65.
+
+- [x] **Step 2: Confirm `LeitorCodigoBarras.tsx` and `useMovimentacaoOperacional.ts` are untouched**
 
 ```bash
 git diff --stat main -- src/components/estoque-operacional/ src/hooks/useMovimentacaoOperacional.ts
@@ -1125,21 +1127,31 @@ git diff --stat main -- src/components/estoque-operacional/ src/hooks/useMovimen
 
 Expected: empty output — this plan never modifies either.
 
+> 2026-09-24: saída vazia contra `main` (merge-base `c8fac8d`).
+
 - [ ] **Step 3: Manual regression — existing inventories still open on Lista**
 
 Using the running app (`npm run dev`), open Estoque → Inventário → Lista and open any of the 30 pre-existing inventories (all backfilled to `metodo_contagem = 'lista'` per Task 1 Step 4). Confirm it opens on the existing detail/list screen exactly as before, counts save the same way, and Finalizar still works.
+
+> PENDENTE — validação humana: a sessão do agente não tem navegador/Playwright nem credenciais de tenant. Evidência de apoio (não substitui o teste): SQL em produção mostra os 30 inventários com `metodo_contagem='lista'`, e `InventarioView.tsx:146` só roteia para `contagem-codigo` quando `metodo_contagem === 'codigo'`.
 
 - [ ] **Step 4: Manual regression — Movimentação Operacional barcode reading**
 
 In Estoque Operacional → Movimentação, scan or type a known product barcode. Confirm product lookup, sector resolution, and the anti-duplicate-bounce behavior work exactly as before this plan (this module's code path was never touched, but this confirms the shared `barcode.ts` module wasn't broken by Task 4's new consumer).
 
+> PENDENTE — validação humana: exige app rodando, login num tenant real e leitor/digitação de código; sem navegador nem credenciais na sessão do agente. Cobertura automática: Step 2 (diff vazio) + testes de `estoque-operacional-barcode`/`-domain` passando.
+
 - [ ] **Step 5: Manual regression — new "Contagem via Código" end to end**
 
 Create a new inventory, choose "Contagem via Código", scan/type a known barcode 3 times for the same product (confirm quantity reaches 3, not more from any accidental double-fire), scan an unknown code (confirm "Produto não encontrado" without closing the scanner), use "Desfazer última leitura" (confirm the count decrements by exactly one), click "Ver lista completa" (confirm the manually-scanned quantities appear correctly converted to purchase units in the existing list view), and finalize (confirm the same finalize screen and stock adjustments as the Lista flow).
 
+> PENDENTE — validação humana: fluxo ponta a ponta com escrita em produção (criar e finalizar inventário gera ajustes de estoque reais); sem navegador nem credenciais na sessão do agente. Incluir na validação: código existente fora do snapshot ("pertence a um produto fora deste inventário") e o 409 de `update_contagem` com dois operadores (Lista × Código) aparecendo como erro visível.
+
 - [ ] **Step 6: Commit (only if Step 2/4 uncovered anything requiring a fix; otherwise no commit needed)**
 
 If any regression was found and fixed, commit with `git commit -m "fix(inventario): <descrição da regressão corrigida>"`. If nothing needed fixing, this task ends without a commit.
+
+> Steps 1–2 não revelaram regressão; nenhum commit de código. Fica aberto até os Steps 3–5 serem executados por uma pessoa.
 
 ---
 
