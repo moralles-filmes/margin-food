@@ -1,9 +1,12 @@
-import { useState } from 'react';
-import { ArrowLeft, CheckCircle2, ListChecks, Undo2 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { ArrowLeft, Check, CheckCircle2, ListChecks, Loader2, Minus, Plus, ScanLine, Search, Undo2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import type { BarcodeLookupResult, Inventario, InventarioItem, UpdateContagemResult } from '@/hooks/useInventarioStore';
-import { useContagemPorCodigo } from '@/hooks/useContagemPorCodigo';
-import LeitorCodigoBarras from '@/components/estoque-operacional/LeitorCodigoBarras';
+import { Input } from '@/components/ui/input';
+import type {
+  AjusteContagemResult, BarcodeLookupResult, Inventario, InventarioItem, OpcoesAjusteContagem,
+} from '@/hooks/useInventarioStore';
+import { useContagemPorCodigo, type ProdutoLido } from '@/hooks/useContagemPorCodigo';
+import { ajustarQuantidade, formatarQuantidade, parseQuantidade, quantidadeParaCampo } from '@/domain/estoque/operacional';
 import { formatDisplayBR } from '@/lib/datetime';
 import { parseLocalDate } from '@/lib/dateUtils';
 
@@ -15,7 +18,12 @@ interface Props {
   onVerListaCompleta: () => void;
   onFinalizar: () => void;
   buscarPorBarcode: (inventarioId: string, barcode: string) => Promise<BarcodeLookupResult>;
-  salvarContagem: (itemId: string, contagemBase: number) => Promise<UpdateContagemResult | null>;
+  ajustarContagem: (itemId: string, deltaBase: number, opcoes: OpcoesAjusteContagem) => Promise<AjusteContagemResult>;
+}
+
+interface Aviso {
+  tom: 'sucesso' | 'alerta' | 'erro';
+  texto: string;
 }
 
 const STATUS_LABEL: Record<Inventario['status'], string> = {
@@ -26,43 +34,139 @@ const STATUS_LABEL: Record<Inventario['status'], string> = {
   FINALIZADO: 'Finalizado',
 };
 
-export default function ContagemPorCodigo({
-  inventario, itens, canCount, onBack, onVerListaCompleta, onFinalizar, buscarPorBarcode, salvarContagem,
-}: Props) {
-  const [aviso, setAviso] = useState<string | undefined>();
-  const [focoToken, setFocoToken] = useState(0);
+const ESTILO_AVISO: Record<Aviso['tom'], string> = {
+  sucesso: 'border-success-border bg-success-soft',
+  alerta: 'border-warning-border bg-warning-soft',
+  erro: 'border-destructive-border bg-destructive-soft',
+};
 
-  const { processarLeitura, desfazerUltimaLeitura, historico, processando } = useContagemPorCodigo({
-    inventarioId: inventario.id, buscarPorBarcode, salvarContagem,
+/**
+ * Contagem via código em dois passos: ler o código (leitor HID, ou digitar e
+ * tocar em Buscar — teclado numérico de celular/tablet não tem Enter) e depois
+ * informar a quantidade daquele produto.
+ *
+ * Leitor próprio em vez do LeitorCodigoBarras da Movimentação Operacional:
+ * aquele devolve o foco ao campo do código a cada blur, o que roubaria o foco
+ * do campo de quantidade desta tela.
+ */
+export default function ContagemPorCodigo({
+  inventario, itens, canCount, onBack, onVerListaCompleta, onFinalizar, buscarPorBarcode, ajustarContagem,
+}: Props) {
+  const [aviso, setAviso] = useState<Aviso | null>(null);
+  const [codigo, setCodigo] = useState('');
+  const [pendente, setPendente] = useState<ProdutoLido | null>(null);
+  const [quantidade, setQuantidade] = useState('1');
+  const codigoRef = useRef<HTMLInputElement>(null);
+  const quantidadeRef = useRef<HTMLInputElement>(null);
+
+  const { buscarProduto, confirmarQuantidade, desfazerUltimaLeitura, historico, processando } = useContagemPorCodigo({
+    inventarioId: inventario.id, buscarPorBarcode, ajustarContagem,
   });
 
   const totalItens = itens.length;
   const contados = itens.filter(i => i.contagem_fisica !== null).length;
 
-  const tratarLeitura = async (raw: string) => {
-    const resultado = await processarLeitura(raw);
-    setFocoToken(v => v + 1);
-    if (resultado.tipo === 'contabilizado') {
-      setAviso(`✅ ${resultado.item.nomeProduto} — quantidade contada: ${resultado.item.quantidadeContadaCompra} ${resultado.item.unidadeCompra}`);
-    } else if (resultado.tipo === 'nao_encontrado') {
-      setAviso(`Produto não encontrado para o código ${resultado.barcode}.`);
-    } else if (resultado.tipo === 'fora_do_inventario') {
-      setAviso(`O código ${resultado.barcode} pertence a um produto fora deste inventário.`);
+  // Sem produto pendente, o campo do código fica pronto para o próximo bipe;
+  // com produto pendente, o foco vai para a quantidade já selecionada, para
+  // digitar por cima do "1".
+  useEffect(() => {
+    if (processando || !canCount) return;
+    if (pendente) {
+      quantidadeRef.current?.focus();
+      quantidadeRef.current?.select();
     } else {
-      setAviso(resultado.mensagem);
+      codigoRef.current?.focus();
+    }
+  }, [pendente, processando, canCount]);
+
+  const focarCodigo = () => {
+    if (!pendente && !processando) codigoRef.current?.focus();
+  };
+
+  const enviarCodigo = async () => {
+    if (processando) return;
+    if (!codigo.trim()) {
+      setAviso({ tom: 'alerta', texto: 'Digite ou leia um código de barras.' });
+      return;
+    }
+    const lido = codigo;
+    setCodigo('');
+    const r = await buscarProduto(lido);
+    if (r.tipo === 'encontrado') {
+      setPendente(r.produto);
+      setQuantidade('1');
+      setAviso(null);
+    } else if (r.tipo === 'nao_encontrado') {
+      setAviso({ tom: 'alerta', texto: `Produto não encontrado para o código ${r.barcode}.` });
+    } else if (r.tipo === 'fora_do_inventario') {
+      setAviso({ tom: 'alerta', texto: `O código ${r.barcode} pertence a um produto fora deste inventário.` });
+    } else {
+      setAviso({ tom: r.tipo === 'erro' ? 'erro' : 'alerta', texto: r.mensagem });
+    }
+  };
+
+  const passo = (delta: number) => {
+    setQuantidade(atual => quantidadeParaCampo(ajustarQuantidade(parseQuantidade(atual), delta)));
+  };
+
+  const confirmar = async () => {
+    if (!pendente || processando) return;
+    const texto = quantidade.trim();
+    const valor = parseQuantidade(texto);
+    if (valor === null && texto) {
+      // Leitor HID disparado com o foco na quantidade digita o código aqui.
+      setAviso({
+        tom: 'erro',
+        texto: /^\d{8,}$/.test(texto)
+          ? 'Isso parece um código de barras. Confirme ou cancele o produto atual antes de ler o próximo.'
+          : 'Quantidade inválida. Use só números (ex.: 12 ou 2,5).',
+      });
+      setQuantidade('1');
+      quantidadeRef.current?.focus();
+      return;
+    }
+    const r = await confirmarQuantidade(pendente, valor);
+    if (r.tipo === 'contabilizado') {
+      const { item } = r;
+      setAviso({
+        tom: 'sucesso',
+        texto: `${item.nomeProduto}: +${formatarQuantidade(item.quantidadeLidaCompra)} ${item.unidadeCompra} · total contado ${formatarQuantidade(item.quantidadeContadaCompra)} ${item.unidadeCompra}`,
+      });
+      setPendente(null);
+    } else {
+      setAviso({ tom: r.tipo === 'erro' ? 'erro' : 'alerta', texto: r.mensagem });
+    }
+  };
+
+  const cancelar = () => {
+    setPendente(null);
+    setAviso(null);
+  };
+
+  const desfazer = async () => {
+    const r = await desfazerUltimaLeitura();
+    if (r.tipo === 'desfeito') {
+      const { leitura } = r;
+      setAviso({
+        tom: 'alerta',
+        texto: `Leitura desfeita: ${leitura.nomeProduto} −${formatarQuantidade(leitura.quantidadeLidaCompra)} ${leitura.unidadeCompra}.`,
+      });
+    } else if (r.tipo === 'erro') {
+      setAviso({ tom: 'erro', texto: r.mensagem });
     }
   };
 
   return (
     <div className="mx-auto w-full max-w-xl space-y-5">
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="sm" onClick={onBack}><ArrowLeft className="w-4 h-4" /></Button>
+        <Button variant="ghost" size="sm" onClick={onBack} aria-label="Voltar"><ArrowLeft className="w-4 h-4" /></Button>
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-lg font-display font-bold text-foreground">
             Inventário: {formatDisplayBR(parseLocalDate(inventario.data))}
           </h2>
           <p className="text-xs text-muted-foreground">
             {STATUS_LABEL[inventario.status]} · {contados}/{totalItens} produtos contabilizados
+            {inventario.status === 'RASCUNHO' && ' · a contagem começa na primeira leitura'}
           </p>
         </div>
       </div>
@@ -71,30 +175,125 @@ export default function ContagemPorCodigo({
         <div className="rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">
           Você não tem permissão para contar itens deste inventário.
         </div>
+      ) : pendente ? (
+        <form
+          onSubmit={e => { e.preventDefault(); void confirmar(); }}
+          className="space-y-4 rounded-2xl border-2 border-primary-border bg-card p-5"
+        >
+          <div className="min-w-0">
+            <p className="text-xs text-muted-foreground">Produto lido</p>
+            <p className="text-lg font-semibold text-foreground">{pendente.nomeProduto}</p>
+            <p className="truncate font-mono text-xs text-muted-foreground">
+              {pendente.sku ? `${pendente.sku} · ` : ''}{pendente.barcode}
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {pendente.contadoCompra === null
+                ? 'Ainda não contado neste inventário.'
+                : `Já contado: ${formatarQuantidade(pendente.contadoCompra)} ${pendente.unidadeCompra}`}
+            </p>
+          </div>
+
+          <div>
+            <label htmlFor="quantidade-lida" className="text-sm font-medium text-foreground">
+              Quantidade ({pendente.unidadeCompra})
+            </label>
+            <div className="mt-1.5 flex items-center gap-2">
+              <Button type="button" variant="outline" className="h-14 w-14 shrink-0" onClick={() => passo(-1)}
+                disabled={processando} aria-label="Diminuir quantidade">
+                <Minus className="h-5 w-5" />
+              </Button>
+              <Input
+                id="quantidade-lida"
+                ref={quantidadeRef}
+                value={quantidade}
+                onChange={e => setQuantidade(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Escape') cancelar(); }}
+                disabled={processando}
+                inputMode="decimal"
+                enterKeyHint="done"
+                autoComplete="off"
+                className="h-14 min-w-0 flex-1 text-center text-2xl font-semibold"
+              />
+              <Button type="button" variant="outline" className="h-14 w-14 shrink-0" onClick={() => passo(1)}
+                disabled={processando} aria-label="Aumentar quantidade">
+                <Plus className="h-5 w-5" />
+              </Button>
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">Soma ao que já foi contado deste produto.</p>
+          </div>
+
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" className="h-12 flex-1" onClick={cancelar} disabled={processando}>
+              Cancelar
+            </Button>
+            <Button type="submit" className="h-12 flex-[2] gap-1.5" disabled={processando}>
+              {processando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+              Adicionar
+            </Button>
+          </div>
+        </form>
       ) : (
-        <LeitorCodigoBarras
-          onLeitura={codigo => void tratarLeitura(codigo)}
-          onLancarManualmente={() => setAviso('Digite o código no campo acima e pressione Enter.')}
-          ocupado={processando}
-          aviso={aviso}
-          focoToken={focoToken}
-        />
+        <form
+          onSubmit={e => { e.preventDefault(); void enviarCodigo(); }}
+          onClick={focarCodigo}
+          className="rounded-2xl border-2 border-dashed border-primary-border bg-primary-soft p-6 text-center"
+        >
+          {processando ? (
+            <Loader2 className="mx-auto h-10 w-10 animate-spin text-primary" />
+          ) : (
+            <ScanLine className="mx-auto h-10 w-10 animate-pulse text-primary" />
+          )}
+          <p className="mt-3 text-base font-semibold text-foreground">
+            {processando ? 'Buscando produto…' : 'Aguardando leitura do código de barras'}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Use o leitor ou digite o código e toque em Buscar.
+          </p>
+          <div className="mt-4 flex gap-2">
+            <Input
+              ref={codigoRef}
+              value={codigo}
+              onChange={e => setCodigo(e.target.value)}
+              // O leitor HID some com o foco se o operador tocar em outro ponto
+              // da tela; devolver no blur mantém o próximo bipe funcionando.
+              onBlur={() => window.setTimeout(focarCodigo, 0)}
+              disabled={processando}
+              inputMode="numeric"
+              enterKeyHint="search"
+              autoComplete="off"
+              aria-label="Código de barras"
+              placeholder="0000000000000"
+              className="h-14 min-w-0 flex-1 text-center font-mono text-xl tracking-widest"
+            />
+            <Button type="submit" className="h-14 shrink-0 gap-1.5 px-5" disabled={processando}>
+              <Search className="h-4 w-4" /> Buscar
+            </Button>
+          </div>
+        </form>
+      )}
+
+      {aviso && (
+        <div className={`rounded-lg border p-3 ${ESTILO_AVISO[aviso.tom]}`} role="status">
+          <p className="text-sm font-medium text-foreground">{aviso.texto}</p>
+        </div>
       )}
 
       {historico.length > 0 && (
         <div className="space-y-2 rounded-xl border border-border bg-card p-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             <p className="text-sm font-semibold text-foreground">Últimos produtos contabilizados</p>
             <Button variant="ghost" size="sm" className="gap-1.5 text-xs text-destructive hover:text-destructive"
-              onClick={() => void desfazerUltimaLeitura()} disabled={processando}>
+              onClick={() => void desfazer()} disabled={processando}>
               <Undo2 className="h-3.5 w-3.5" /> Desfazer última leitura
             </Button>
           </div>
           <ul className="space-y-1.5">
             {historico.map(h => (
-              <li key={h.id} className="flex items-center justify-between text-sm">
+              <li key={h.id} className="flex items-center justify-between gap-2 text-sm">
                 <span className="truncate text-foreground">{h.nomeProduto}</span>
-                <span className="shrink-0 font-mono text-success">+1 → {h.quantidadeContadaCompra} {h.unidadeCompra}</span>
+                <span className="shrink-0 font-mono text-success">
+                  +{formatarQuantidade(h.quantidadeLidaCompra)} → {formatarQuantidade(h.quantidadeContadaCompra)} {h.unidadeCompra}
+                </span>
               </li>
             ))}
           </ul>
