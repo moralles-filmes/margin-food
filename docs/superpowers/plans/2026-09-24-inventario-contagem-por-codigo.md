@@ -459,7 +459,7 @@ git commit -m "feat(inventario): findItemByBarcode e metodo_contagem no store"
 - Consumes: `BarcodeLookupResult`, `UpdateContagemResult` from Task 3 (imported as types only — no runtime dependency on Supabase, so this hook is testable with plain mocked functions).
 - Produces: `useContagemPorCodigo({ inventarioId, buscarPorBarcode, salvarContagem })` returning `{ processarLeitura(raw: string): Promise<ResultadoLeitura>, desfazerUltimaLeitura(): Promise<boolean>, historico: LeituraHistorico[], processando: boolean }`. This is the single function that the physical scanner, manual entry, and (in a later plan) the camera all call — satisfying "uma função central" without duplicating business logic. Consumed by Task 6's `ContagemPorCodigo.tsx`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 import { act, renderHook, waitFor } from '@testing-library/react';
@@ -584,12 +584,14 @@ describe('useContagemPorCodigo', () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+> **Nota de execução:** os códigos `'111'`, `'000'`, `'222'` do listado acima foram trocados por `'1111'`, `'0000'`, `'2222'` no arquivo real — `validarBarcode` (pré-existente, `src/domain/estoque/barcode.ts`) rejeita código com menos de 4 caracteres como `'curto'` antes mesmo de chamar `buscarPorBarcode`, então os 3 dígitos originais nunca alcançavam o status mockado (`not_found`/`not_in_inventory`) e os testes falhavam por motivo errado. Não mexe na lógica do hook nem no domínio, só na fixture.
+
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `npx vitest run src/hooks/useContagemPorCodigo.test.ts`
 Expected: FAIL — `Cannot find module '@/hooks/useContagemPorCodigo'`.
 
-- [ ] **Step 3: Implement the hook**
+- [x] **Step 3: Implement the hook**
 
 ```ts
 import { useCallback, useRef, useState } from 'react';
@@ -716,12 +718,12 @@ export function useContagemPorCodigo({ inventarioId, buscarPorBarcode, salvarCon
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `npx vitest run src/hooks/useContagemPorCodigo.test.ts`
 Expected: PASS (8 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/hooks/useContagemPorCodigo.ts src/hooks/useContagemPorCodigo.test.ts
