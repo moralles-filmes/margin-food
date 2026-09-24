@@ -741,7 +741,7 @@ git commit -m "feat(inventario): hook central de contagem por codigo de barras"
 - Consumes: `store.createInventario` (now accepting `metodo_contagem`), `store.findItemByBarcode`, `store.updateContagem` from Tasks 3–4.
 - Produces: new `SubView` value `'contagem-codigo'`; `handleCreate` and `handleOpenDetail` route based on `metodo_contagem`. Consumed by Task 6 (renders `ContagemPorCodigo` when `subView === 'contagem-codigo'`).
 
-- [ ] **Step 1: Extend `SubView` and add wizard step state**
+- [x] **Step 1: Extend `SubView` and add wizard step state**
 
 ```ts
 type SubView = 'list' | 'create' | 'detail' | 'dashboard' | 'audit' | 'conferentes' | 'rapido' | 'contagem-codigo';
@@ -753,7 +753,7 @@ Add near the other `create form` state (after `formObs`, around line 96):
   const [createStep, setCreateStep] = useState<'form' | 'metodo'>('form');
 ```
 
-- [ ] **Step 2: Rewrite `handleCreate` to take the method and route accordingly**
+- [x] **Step 2: Rewrite `handleCreate` to take the method and route accordingly**
 
 Replace the existing `handleCreate` (lines 116-127) with:
 
@@ -780,9 +780,9 @@ Replace the existing `handleCreate` (lines 116-127) with:
   };
 ```
 
-- [ ] **Step 3: Update `createInventario`'s payload type in the store to accept `metodo_contagem`**
+- [x] **Step 3: Update `createInventario`'s payload type in the store to accept `metodo_contagem`**
 
-In `src/hooks/useInventarioStore.ts`, extend the `createInventario` parameter type (already touched in Task 3 — this is the same edit, done here since it's driven by this task's caller):
+In `src/hooks/useInventarioStore.ts`, extend the `createInventario` parameter type. Desvio: ao contrário do que este texto dizia ("already touched in Task 3"), o payload de `createInventario` ainda não tinha `metodo_contagem` no código vivo quando esta Task rodou — o campo foi adicionado aqui, não em Task 3:
 
 ```ts
   const createInventario = useCallback(async (payload: {
@@ -798,7 +798,7 @@ In `src/hooks/useInventarioStore.ts`, extend the `createInventario` parameter ty
 
 (The body is unchanged — `payload` is already spread as-is into `invoke('create', { ...payload, idempotency_key })`, so `metodo_contagem` passes through automatically.)
 
-- [ ] **Step 4: Update `handleOpenDetail` to route by `metodo_contagem`**
+- [x] **Step 4: Update `handleOpenDetail` to route by `metodo_contagem`**
 
 Replace lines 129-132:
 
@@ -810,7 +810,7 @@ Replace lines 129-132:
   };
 ```
 
-- [ ] **Step 5: Replace the create-view render block with the two-step wizard**
+- [x] **Step 5: Replace the create-view render block with the two-step wizard**
 
 Replace the `// ===== CREATE VIEW =====` block (lines 461-506) with:
 
@@ -891,7 +891,7 @@ Replace the `// ===== CREATE VIEW =====` block (lines 461-506) with:
 
 Note: `store.loading` / `store.savingCreate` spinner on the "Criar" button moved — the button on the info-form step is now just "Continuar" (no network call yet), and `store.savingCreate` now gates the two method cards instead.
 
-- [ ] **Step 6: Reset `createStep` when leaving/entering the create flow**
+- [x] **Step 6: Reset `createStep` when leaving/entering the create flow**
 
 Add to the existing `useEffect` that resets search/filter state (around line 110), or add a new one right after it:
 
@@ -901,12 +901,12 @@ Add to the existing `useEffect` that resets search/filter state (around line 110
   }, [subView]);
 ```
 
-- [ ] **Step 7: Typecheck**
+- [x] **Step 7: Typecheck**
 
 Run: `npm run typecheck` (verify the exact script name in `package.json` first).
 Expected: no new errors. `Zap` is already imported in the icon list at the top of the file (line 22) — confirm it's there; if not, add it to the existing `lucide-react` import line.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/components/InventarioView.tsx src/hooks/useInventarioStore.ts

@@ -31,7 +31,7 @@ import { narrowRows } from '@/lib/guards';
 import { includesNormalized } from '@/lib/utils';
 import { sortByName, sortNames } from '@/lib/sortByName';
 
-type SubView = 'list' | 'create' | 'detail' | 'dashboard' | 'audit' | 'conferentes' | 'rapido';
+type SubView = 'list' | 'create' | 'detail' | 'dashboard' | 'audit' | 'conferentes' | 'rapido' | 'contagem-codigo';
 
 /** Maps internal tipo values to display labels (backward-compatible) */
 const tipoDisplayLabel = (tipo: string) => {
@@ -94,6 +94,7 @@ export default function InventarioView() {
   const [formTurno, setFormTurno] = useState('');
   const [formCategorias, setFormCategorias] = useState('');
   const [formObs, setFormObs] = useState('');
+  const [createStep, setCreateStep] = useState<'form' | 'metodo'>('form');
 
   useEffect(() => {
     store.loadList();
@@ -113,7 +114,11 @@ export default function InventarioView() {
     setFilterLocal('');
   }, [store.currentInventario?.id]);
 
-  const handleCreate = async () => {
+  useEffect(() => {
+    if (subView !== 'create') setCreateStep('form');
+  }, [subView]);
+
+  const handleCreate = async (metodoContagem: 'lista' | 'codigo') => {
     if (!formTurno) { return; }
     const inv = await store.createInventario({
       tipo: formTipo,
@@ -122,13 +127,22 @@ export default function InventarioView() {
       turno_id: formTurno,
       categorias: formTipo === 'parcial' ? formCategorias.split(',').map(c => c.trim()).filter(Boolean) : [],
       observacao: formObs,
+      metodo_contagem: metodoContagem,
     });
-    if (inv) setSubView('list');
+    if (!inv) return;
+    setCreateStep('form');
+    if (metodoContagem === 'codigo') {
+      await store.loadInventario(inv.id);
+      setSubView('contagem-codigo');
+    } else {
+      setSubView('list');
+    }
   };
 
   const handleOpenDetail = async (inv: Inventario) => {
     await store.loadInventario(inv.id);
-    setSubView('detail');
+    const aindaContando = inv.status === 'RASCUNHO' || inv.status === 'EM_CONTAGEM';
+    setSubView(inv.metodo_contagem === 'codigo' && aindaContando ? 'contagem-codigo' : 'detail');
   };
 
   const handleOpenDashboard = async () => {
@@ -460,6 +474,33 @@ export default function InventarioView() {
 
   // ===== CREATE VIEW =====
   if (subView === 'create') {
+    if (createStep === 'metodo') {
+      return (
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="sm" onClick={() => setCreateStep('form')}><ArrowLeft className="w-4 h-4" /></Button>
+            <h2 className="text-lg font-display font-bold text-foreground">Como deseja realizar a contagem?</h2>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <button type="button" onClick={() => void handleCreate('lista')} disabled={store.savingCreate}
+              className="rounded-2xl border-2 border-border bg-card p-6 text-left transition-colors hover:border-primary hover:bg-primary-soft disabled:opacity-60">
+              <ClipboardCheck className="h-8 w-8 text-primary" />
+              <p className="mt-3 text-base font-semibold text-foreground">Contagem por Lista</p>
+              <p className="mt-1 text-sm text-muted-foreground">Visualize os produtos do estoque e informe manualmente a quantidade encontrada.</p>
+              <span className="mt-4 inline-flex h-10 items-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground">Iniciar por lista</span>
+            </button>
+            <button type="button" onClick={() => void handleCreate('codigo')} disabled={store.savingCreate}
+              className="rounded-2xl border-2 border-border bg-card p-6 text-left transition-colors hover:border-primary hover:bg-primary-soft disabled:opacity-60">
+              <Zap className="h-8 w-8 text-primary" />
+              <p className="mt-3 text-base font-semibold text-foreground">Contagem via Código</p>
+              <p className="mt-1 text-sm text-muted-foreground">Conte os produtos utilizando um leitor de código de barras deste dispositivo.</p>
+              <span className="mt-4 inline-flex h-10 items-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground">Iniciar via código</span>
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="space-y-4">
         <div className="flex items-center gap-3">
@@ -496,8 +537,8 @@ export default function InventarioView() {
           <div><Label className="text-xs text-muted-foreground">Observação</Label><Input value={formObs} onChange={e => setFormObs(e.target.value)} className="bg-secondary border-border" maxLength={500} /></div>
           <div className="flex justify-end gap-2">
             <Button variant="ghost" size="sm" onClick={() => setSubView('list')}>Cancelar</Button>
-            <Button size="sm" className="gap-1.5" onClick={handleCreate} disabled={store.loading || store.savingCreate || !formTurno}>
-              {(store.loading || store.savingCreate) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />} Criar
+            <Button size="sm" className="gap-1.5" onClick={() => setCreateStep('metodo')} disabled={!formTurno}>
+              Continuar
             </Button>
           </div>
         </div>

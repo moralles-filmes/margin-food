@@ -194,6 +194,7 @@ export function useInventarioStore() {
     turno_id: string;
     categorias?: string[];
     observacao?: string;
+    metodo_contagem?: 'lista' | 'codigo';
   }) => {
     if (savingCreate) return null;
     setSavingCreate(true);
