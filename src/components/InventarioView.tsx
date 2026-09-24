@@ -558,7 +558,7 @@ export default function InventarioView() {
         onVerListaCompleta={() => setSubView('detail')}
         onFinalizar={() => setSubView('detail')}
         buscarPorBarcode={store.findItemByBarcode}
-        salvarContagem={store.updateContagem}
+        ajustarContagem={store.ajustarContagem}
       />
     );
   }
@@ -855,7 +855,9 @@ export default function InventarioView() {
                   canCount={canEditDetail && !isFinalizado && !isSobAnalise && inv.status !== 'RASCUNHO'}
                   inputRef={input => quantityNavigation.register(item.id, input)}
                   onNext={() => quantityNavigation.next(item.id, filteredItems.map(row => row.id))}
-                  onSave={async val => (await store.updateContagem(item.id, val)) !== null} classColor={classColor} />
+                  onSave={async val => inv.metodo_contagem === 'codigo'
+                    ? store.definirContagemPorLista(item.id, val, item.contagem_fisica === null ? null : Number(item.contagem_fisica))
+                    : (await store.updateContagem(item.id, val)) !== null} classColor={classColor} />
               ))}
             </TableBody>
           </Table>

@@ -2,6 +2,7 @@ import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useCallback } from 'react';
 import { useEmitDataEvent } from '@/lib/dataEvents';
 import { useScopedToast } from '@/hooks/useScopedToast';
+import { mensagemErroContagem } from '@/hooks/useContagemPorCodigo';
 
 export interface Inventario {
   id: string;
@@ -108,6 +109,29 @@ export interface UpdateContagemResult {
   classificacao: 'NORMAL' | 'ALERTA' | 'CRITICO';
 }
 
+/** Retorno de inventario_ajustar_contagem (soma atômica da contagem via código). */
+export interface AjusteContagemResult extends UpdateContagemResult {
+  item_id: string;
+  /** Reenvio da mesma chave: nada foi somado de novo. */
+  idempotente: boolean;
+  /** O valor atual não era o esperado (desfazer/lista): nada foi gravado. */
+  conflito: boolean;
+  contagem_anterior: number | null;
+  /** Total logo depois desta operação (base do "desfazer"). */
+  contagem_apos: number | null;
+  /** Total atual do item. */
+  contagem_fisica: number | null;
+  status_inventario: Inventario['status'];
+}
+
+export interface OpcoesAjusteContagem {
+  origem: 'leitura' | 'desfazer' | 'lista';
+  chave?: string;
+  /** Valor que a tela mostrava (NULL = não contado); exigido em 'desfazer' e 'lista'. */
+  esperado?: number | null;
+  restaurarNaoContado?: boolean;
+}
+
 export interface DashboardData {
   historico: Inventario[];
   finalizados: Inventario[];
@@ -138,7 +162,18 @@ export function useInventarioStore() {
     const { data, error } = await supabase.functions.invoke('inventario', {
       body: { action, ...payload },
     });
-    if (error) throw error;
+    if (error) {
+      // Em resposta não-2xx o supabase-js só expõe "Edge Function returned a
+      // non-2xx status code"; o motivo real está no corpo JSON da resposta.
+      // 4xx traz mensagem deliberada da função; 5xx é exceção não tratada, cujo
+      // texto cru (coluna, constraint) fica só no console.
+      const resposta = (error as { context?: Response }).context;
+      let corpo: { error?: string } | null = null;
+      try { corpo = await resposta?.json(); } catch { /* corpo não-JSON */ }
+      if (corpo?.error && resposta && resposta.status < 500) throw new Error(corpo.error);
+      if (corpo?.error) console.error(`[inventario] ${action}`, corpo.error);
+      throw new Error(error.message);
+    }
     if (data?.error) throw new Error(data.error);
     return data;
   }, []);
@@ -248,6 +283,59 @@ export function useInventarioStore() {
   const findItemByBarcode = useCallback(async (inventarioId: string, barcode: string): Promise<BarcodeLookupResult> => {
     return (await invoke('find_by_barcode', { id: inventarioId, barcode })) as BarcodeLookupResult;
   }, [invoke]);
+
+  // Soma no banco (delta em unidade base) — usada pela contagem via código.
+  // Lança erro com o código do banco; quem chama traduz a mensagem. Em conflito
+  // nada é gravado, mas o item local recebe o valor atual do banco.
+  const ajustarContagem = useCallback(async (itemId: string, deltaBase: number, opcoes: OpcoesAjusteContagem): Promise<AjusteContagemResult> => {
+    const { data, error } = await (supabase.rpc as any)('inventario_ajustar_contagem', {
+      p_item_id: itemId,
+      p_delta: deltaBase,
+      p_origem: opcoes.origem,
+      p_chave: opcoes.chave ?? null,
+      p_esperado: opcoes.esperado ?? null,
+      p_restaurar_nao_contado: opcoes.restaurarNaoContado ?? false,
+    });
+    if (error) throw new Error(error.message);
+    const resultado = data as AjusteContagemResult;
+    setCurrentItens(prev => prev.map(i =>
+      i.id === itemId
+        ? {
+            ...i,
+            contagem_fisica: resultado.contagem_fisica,
+            diferenca_qtd: resultado.diferenca_qtd,
+            diferenca_percent: resultado.diferenca_percent,
+            impacto_financeiro: resultado.impacto_financeiro,
+            classificacao: resultado.classificacao,
+          }
+        : i
+    ));
+    // A primeira leitura tira o inventário de RASCUNHO no banco.
+    setCurrentInventario(prev => prev && prev.status !== resultado.status_inventario
+      ? { ...prev, status: resultado.status_inventario }
+      : prev);
+    return resultado;
+  }, [supabase]);
+
+  // Edição pela lista de um inventário 'codigo': vira soma no banco e só grava
+  // se o item ainda tem o valor que a linha mostrava. Gravar o total direto
+  // (update_contagem) passaria por cima de leituras feitas depois que a lista
+  // carregou, e um "desfazer" posterior subtrairia de um total já corrigido.
+  const definirContagemPorLista = useCallback(async (itemId: string, novoBase: number, esperadoBase: number | null): Promise<boolean> => {
+    try {
+      const delta = Number((novoBase - (esperadoBase ?? 0)).toFixed(4));
+      const resultado = await ajustarContagem(itemId, delta, { origem: 'lista', esperado: esperadoBase });
+      if (resultado.conflito) {
+        toast.warning('Este produto foi contado de novo depois que a lista carregou. A quantidade foi atualizada: confira e salve de novo.');
+        return false;
+      }
+      return true;
+    } catch (e) {
+      console.error('[inventario] editar contagem pela lista', e);
+      toast.error(mensagemErroContagem(e));
+      return false;
+    }
+  }, [ajustarContagem, toast]);
 
   const finalizar = useCallback(async (id: string, justificativa?: string) => {
     setLoading(true);
@@ -374,7 +462,8 @@ export function useInventarioStore() {
   return {
     inventarios, currentInventario, currentItens, auditLogs, turnos, conferentes, dashboard, loading,
     hasMore, nextCursor, savingCreate,
-    loadTurnos, loadList, loadInventario, createInventario, updateStatus, updateContagem, findItemByBarcode,
+    loadTurnos, loadList, loadInventario, createInventario, updateStatus, updateContagem, findItemByBarcode, ajustarContagem,
+    definirContagemPorLista,
     finalizar, aprovarAnalise, correcaoPosterior, reopenInventario, deleteInventario, loadDashboard,
     loadConferentes, addConferente, removeConferente, assignConferente,
   };
