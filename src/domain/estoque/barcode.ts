@@ -76,6 +76,46 @@ export function ehLeituraDuplicada(
 }
 
 /**
+ * GTIN completo (EAN-8, UPC-A, EAN-13, GTIN-14) com dígito verificador válido.
+ * Mod 10: da direita para a esquerda, sem o verificador, pesos 3 e 1 alternados.
+ */
+export function gtinValido(codigo: string): boolean {
+  if (!/^\d+$/.test(codigo) || ![8, 12, 13, 14].includes(codigo.length)) return false;
+  const digitos = codigo.split('').map(Number);
+  const verificador = digitos.pop()!;
+  const soma = digitos.reverse().reduce((acc, d, i) => acc + d * (i % 2 === 0 ? 3 : 1), 0);
+  return (10 - (soma % 10)) % 10 === verificador;
+}
+
+/**
+ * ─── Busca automática ao digitar ───
+ *
+ * Teclado numérico de celular/tablet não tem Enter: quando o texto digitado é
+ * um código de barras padrão (GTIN válido) cadastrado, a tela busca sozinha
+ * depois de uma pausa curta. Se ele também for o começo de outro cadastrado,
+ * a pessoa pode ainda estar digitando — a pausa é maior.
+ *
+ * Código interno/curto não dispara sozinho mesmo cadastrado: "7891" pode ser
+ * só o começo do EAN que a pessoa está digitando, e a busca abriria o produto
+ * errado com os dígitos seguintes caindo no campo de quantidade. Um prefixo
+ * quase nunca fecha um GTIN com verificador válido. Código não cadastrado
+ * também não dispara: o botão Buscar mostra o aviso.
+ */
+export const ESPERA_BUSCA_AUTOMATICA_MS = 300;
+export const ESPERA_BUSCA_AUTOMATICA_PREFIXO_MS = 900;
+
+export type DecisaoBuscaAutomatica = 'agora' | 'aguardar' | 'nao';
+
+export function decidirBuscaAutomatica(digitado: string, codigos: ReadonlySet<string>): DecisaoBuscaAutomatica {
+  const codigo = normalizarBarcode(digitado);
+  if (!codigo || !codigos.has(codigo) || !gtinValido(codigo)) return 'nao';
+  for (const outro of codigos) {
+    if (outro.length > codigo.length && outro.startsWith(codigo)) return 'aguardar';
+  }
+  return 'agora';
+}
+
+/**
  * ─── Lista de códigos de um produto ───
  *
  * Um produto tem N códigos porque o mesmo item de estoque chega em marcas

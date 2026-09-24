@@ -284,6 +284,18 @@ export function useInventarioStore() {
     return (await invoke('find_by_barcode', { id: inventarioId, barcode })) as BarcodeLookupResult;
   }, [invoke]);
 
+  // Sem toast em falha: a busca automática só não acontece, e o botão Buscar continua funcionando.
+  const listarCodigosDoInventario = useCallback(async (inventarioId: string): Promise<string[]> => {
+    try {
+      const { data, error } = await (supabase.rpc as any)('inventario_listar_codigos', { p_inventario_id: inventarioId });
+      if (error) throw error;
+      return (data as string[] | null) ?? [];
+    } catch (e) {
+      console.error('[inventario] listar códigos', e);
+      return [];
+    }
+  }, [supabase]);
+
   // Soma no banco (delta em unidade base) — usada pela contagem via código.
   // Lança erro com o código do banco; quem chama traduz a mensagem. Em conflito
   // nada é gravado, mas o item local recebe o valor atual do banco.
@@ -463,7 +475,7 @@ export function useInventarioStore() {
     inventarios, currentInventario, currentItens, auditLogs, turnos, conferentes, dashboard, loading,
     hasMore, nextCursor, savingCreate,
     loadTurnos, loadList, loadInventario, createInventario, updateStatus, updateContagem, findItemByBarcode, ajustarContagem,
-    definirContagemPorLista,
+    definirContagemPorLista, listarCodigosDoInventario,
     finalizar, aprovarAnalise, correcaoPosterior, reopenInventario, deleteInventario, loadDashboard,
     loadConferentes, addConferente, removeConferente, assignConferente,
   };
