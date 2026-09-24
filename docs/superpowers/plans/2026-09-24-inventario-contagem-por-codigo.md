@@ -370,7 +370,7 @@ git commit -m "feat(inventario): action find_by_barcode e metodo_contagem em cre
 - Consumes: Edge Function action `find_by_barcode` from Task 2.
 - Produces: `Inventario.metodo_contagem: 'lista' | 'codigo'`; exported type `BarcodeLookupResult`; exported type `UpdateContagemResult`; `useInventarioStore()` return value gains `findItemByBarcode(inventarioId: string, barcode: string): Promise<BarcodeLookupResult>`. Consumed directly by Task 4's hook.
 
-- [ ] **Step 1: Extend the `Inventario` interface**
+- [x] **Step 1: Extend the `Inventario` interface**
 
 In `src/hooks/useInventarioStore.ts`, add the field to the existing interface (after `tipo`):
 
@@ -383,7 +383,7 @@ export interface Inventario {
   // ...resto do arquivo permanece igual
 ```
 
-- [ ] **Step 2: Add the `BarcodeLookupResult` and `UpdateContagemResult` types**
+- [x] **Step 2: Add the `BarcodeLookupResult` and `UpdateContagemResult` types**
 
 Add these two exported types right after the existing `AuditLog` interface (before `DashboardData`):
 
@@ -415,7 +415,7 @@ export interface UpdateContagemResult {
 }
 ```
 
-- [ ] **Step 3: Add `findItemByBarcode`**
+- [x] **Step 3: Add `findItemByBarcode`**
 
 Add this `useCallback` right after `updateContagem` (after line 218, before `finalizar`):
 
@@ -425,7 +425,7 @@ Add this `useCallback` right after `updateContagem` (after line 218, before `fin
   }, [invoke]);
 ```
 
-- [ ] **Step 4: Export it from the hook's return value**
+- [x] **Step 4: Export it from the hook's return value**
 
 In the `return { ... }` block at the end of the hook, add `findItemByBarcode` next to `updateContagem`:
 
@@ -433,12 +433,14 @@ In the `return { ... }` block at the end of the hook, add `findItemByBarcode` ne
     loadTurnos, loadList, loadInventario, createInventario, updateStatus, updateContagem, findItemByBarcode,
 ```
 
-- [ ] **Step 5: Typecheck**
+- [x] **Step 5: Typecheck**
 
 Run: `npm run typecheck` (or the project's equivalent script — check `package.json` `scripts` for the exact name before running; do not guess a script that doesn't exist).
 Expected: no new TypeScript errors in `useInventarioStore.ts` or its consumers.
 
-- [ ] **Step 6: Commit**
+No `typecheck` npm script exists in `package.json` (confirmed by reading `scripts`); ran `./node_modules/.bin/tsc --noEmit -p tsconfig.app.json` directly instead. Result: 5 pre-existing errors, all in unrelated files (`FluxoMovimentacao.tsx`, `ProdutoFormPanel.tsx`, `produto-codigos-barras.test.ts`, `produto-form-codigos-barras.test.tsx`) from a prior unrelated feature — confirmed identical via `git stash` before re-running against the unmodified base. Zero errors in `useInventarioStore.ts` or any of its consumers.
+
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/hooks/useInventarioStore.ts
