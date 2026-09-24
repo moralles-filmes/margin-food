@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Check, CheckCircle2, ListChecks, Loader2, Minus, Plus, ScanLine, Search, Undo2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,6 +7,9 @@ import type {
 } from '@/hooks/useInventarioStore';
 import { useContagemPorCodigo, type ProdutoLido } from '@/hooks/useContagemPorCodigo';
 import { ajustarQuantidade, formatarQuantidade, parseQuantidade, quantidadeParaCampo } from '@/domain/estoque/operacional';
+import {
+  decidirBuscaAutomatica, ESPERA_BUSCA_AUTOMATICA_MS, ESPERA_BUSCA_AUTOMATICA_PREFIXO_MS, normalizarBarcode,
+} from '@/domain/estoque/barcode';
 import { formatDisplayBR } from '@/lib/datetime';
 import { parseLocalDate } from '@/lib/dateUtils';
 
@@ -19,6 +22,8 @@ interface Props {
   onFinalizar: () => void;
   buscarPorBarcode: (inventarioId: string, barcode: string) => Promise<BarcodeLookupResult>;
   ajustarContagem: (itemId: string, deltaBase: number, opcoes: OpcoesAjusteContagem) => Promise<AjusteContagemResult>;
+  /** Códigos cadastrados dos produtos do inventário, para a busca automática. */
+  listarCodigos: (inventarioId: string) => Promise<string[]>;
 }
 
 interface Aviso {
@@ -41,21 +46,24 @@ const ESTILO_AVISO: Record<Aviso['tom'], string> = {
 };
 
 /**
- * Contagem via código em dois passos: ler o código (leitor HID, ou digitar e
- * tocar em Buscar — teclado numérico de celular/tablet não tem Enter) e depois
- * informar a quantidade daquele produto.
+ * Contagem via código em dois passos: ler o código e depois informar a
+ * quantidade daquele produto. O código chega pelo leitor HID (que manda Enter),
+ * ou digitado: teclado numérico de celular/tablet não tem Enter, então um
+ * código de barras (GTIN) cadastrado completo é buscado sozinho e o botão
+ * Buscar cobre o resto (ver decidirBuscaAutomatica).
  *
  * Leitor próprio em vez do LeitorCodigoBarras da Movimentação Operacional:
  * aquele devolve o foco ao campo do código a cada blur, o que roubaria o foco
  * do campo de quantidade desta tela.
  */
 export default function ContagemPorCodigo({
-  inventario, itens, canCount, onBack, onVerListaCompleta, onFinalizar, buscarPorBarcode, ajustarContagem,
+  inventario, itens, canCount, onBack, onVerListaCompleta, onFinalizar, buscarPorBarcode, ajustarContagem, listarCodigos,
 }: Props) {
   const [aviso, setAviso] = useState<Aviso | null>(null);
   const [codigo, setCodigo] = useState('');
   const [pendente, setPendente] = useState<ProdutoLido | null>(null);
   const [quantidade, setQuantidade] = useState('1');
+  const [codigosCadastrados, setCodigosCadastrados] = useState<ReadonlySet<string>>(() => new Set());
   const codigoRef = useRef<HTMLInputElement>(null);
   const quantidadeRef = useRef<HTMLInputElement>(null);
 
@@ -79,19 +87,27 @@ export default function ContagemPorCodigo({
     }
   }, [pendente, processando, canCount]);
 
+  useEffect(() => {
+    let cancelado = false;
+    void listarCodigos(inventario.id).then(lista => {
+      if (!cancelado) setCodigosCadastrados(new Set(lista.map(normalizarBarcode)));
+    });
+    return () => { cancelado = true; };
+  }, [inventario.id, listarCodigos]);
+
   const focarCodigo = () => {
     if (!pendente && !processando) codigoRef.current?.focus();
   };
 
-  const enviarCodigo = async () => {
-    if (processando) return;
-    if (!codigo.trim()) {
+  const buscarCodigo = useCallback(async (valor: string) => {
+    if (processando || pendente) return;
+    if (!valor.trim()) {
       setAviso({ tom: 'alerta', texto: 'Digite ou leia um código de barras.' });
       return;
     }
-    const lido = codigo;
+    // Limpar o campo também cancela a busca automática agendada para ele.
     setCodigo('');
-    const r = await buscarProduto(lido);
+    const r = await buscarProduto(valor);
     if (r.tipo === 'encontrado') {
       setPendente(r.produto);
       setQuantidade('1');
@@ -103,7 +119,18 @@ export default function ContagemPorCodigo({
     } else {
       setAviso({ tom: r.tipo === 'erro' ? 'erro' : 'alerta', texto: r.mensagem });
     }
-  };
+  }, [processando, pendente, buscarProduto]);
+
+  // Código cadastrado completo é buscado sozinho depois de uma pausa curta;
+  // cada tecla reinicia a espera.
+  useEffect(() => {
+    if (processando || pendente || !canCount) return;
+    const decisao = decidirBuscaAutomatica(codigo, codigosCadastrados);
+    if (decisao === 'nao') return;
+    const espera = decisao === 'agora' ? ESPERA_BUSCA_AUTOMATICA_MS : ESPERA_BUSCA_AUTOMATICA_PREFIXO_MS;
+    const timer = window.setTimeout(() => { void buscarCodigo(codigo); }, espera);
+    return () => window.clearTimeout(timer);
+  }, [codigo, codigosCadastrados, processando, pendente, canCount, buscarCodigo]);
 
   const passo = (delta: number) => {
     setQuantidade(atual => quantidadeParaCampo(ajustarQuantidade(parseQuantidade(atual), delta)));
@@ -234,7 +261,7 @@ export default function ContagemPorCodigo({
         </form>
       ) : (
         <form
-          onSubmit={e => { e.preventDefault(); void enviarCodigo(); }}
+          onSubmit={e => { e.preventDefault(); void buscarCodigo(codigo); }}
           onClick={focarCodigo}
           className="rounded-2xl border-2 border-dashed border-primary-border bg-primary-soft p-6 text-center"
         >
@@ -247,7 +274,7 @@ export default function ContagemPorCodigo({
             {processando ? 'Buscando produto…' : 'Aguardando leitura do código de barras'}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Use o leitor ou digite o código e toque em Buscar.
+            Use o leitor ou digite o código. Código de barras cadastrado é buscado sozinho; os demais, toque em Buscar.
           </p>
           <div className="mt-4 flex gap-2">
             <Input

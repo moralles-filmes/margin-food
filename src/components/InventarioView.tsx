@@ -559,6 +559,7 @@ export default function InventarioView() {
         onFinalizar={() => setSubView('detail')}
         buscarPorBarcode={store.findItemByBarcode}
         ajustarContagem={store.ajustarContagem}
+        listarCodigos={store.listarCodigosDoInventario}
       />
     );
   }

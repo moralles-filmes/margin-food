@@ -8,7 +8,7 @@
  *   · código de barras digitado no campo de quantidade não vira quantidade.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import ContagemPorCodigo from '@/components/inventario/ContagemPorCodigo';
 import type { AjusteContagemResult, BarcodeLookupResult, Inventario, OpcoesAjusteContagem } from '@/hooks/useInventarioStore';
 
@@ -36,8 +36,9 @@ const LOOKUP: BarcodeLookupResult = {
 
 type AjustarContagem = (itemId: string, deltaBase: number, opcoes: OpcoesAjusteContagem) => Promise<AjusteContagemResult>;
 
-function renderTela(overrides?: { ajustarContagem?: AjustarContagem }) {
+function renderTela(overrides?: { ajustarContagem?: AjustarContagem; codigos?: string[] }) {
   const buscarPorBarcode = vi.fn(async () => LOOKUP);
+  const listarCodigos = vi.fn(async () => overrides?.codigos ?? ['7891234567895']);
   const ajustarContagem = overrides?.ajustarContagem ?? vi.fn<AjustarContagem>(async (_itemId, deltaBase) => ({
     item_id: 'item-1',
     idempotente: false,
@@ -61,9 +62,22 @@ function renderTela(overrides?: { ajustarContagem?: AjustarContagem }) {
       onFinalizar={vi.fn()}
       buscarPorBarcode={buscarPorBarcode}
       ajustarContagem={ajustarContagem}
+      listarCodigos={listarCodigos}
     />,
   );
-  return { buscarPorBarcode, ajustarContagem };
+  return { buscarPorBarcode, ajustarContagem, listarCodigos };
+}
+
+/** Relógio falso: deixa a lista de códigos carregar antes de digitar. */
+async function renderComRelogio(overrides?: Parameters<typeof renderTela>[0]) {
+  vi.useFakeTimers();
+  const tela = renderTela(overrides);
+  await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+  return tela;
+}
+
+async function avancar(ms: number) {
+  await act(async () => { await vi.advanceTimersByTimeAsync(ms); });
 }
 
 async function lerPorBotao(codigo: string) {
@@ -72,7 +86,10 @@ async function lerPorBotao(codigo: string) {
   return screen.findByText('Coca-Cola 350ml');
 }
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 
 describe('ContagemPorCodigo', () => {
   it('envia o código pelo botão Buscar, sem precisar de Enter', async () => {
@@ -142,6 +159,67 @@ describe('ContagemPorCodigo', () => {
       origem: 'desfazer', esperado: 36, restaurarNaoContado: true,
     })));
     expect(await screen.findByText(/Leitura desfeita/)).toBeInTheDocument();
+  });
+
+  describe('busca automática ao digitar', () => {
+    it('código de barras cadastrado completo busca sozinho, sem Enter nem botão', async () => {
+      const { buscarPorBarcode } = await renderComRelogio();
+      fireEvent.change(screen.getByLabelText('Código de barras'), { target: { value: '7891234567895' } });
+
+      await avancar(300);
+      expect(buscarPorBarcode).toHaveBeenCalledTimes(1);
+      expect(buscarPorBarcode).toHaveBeenCalledWith('inv-1', '7891234567895');
+      expect(screen.getByText('Coca-Cola 350ml')).toBeInTheDocument();
+    });
+
+    it('código curto cadastrado não busca sozinho: pode ser o começo de outro código sendo digitado', async () => {
+      const { buscarPorBarcode } = await renderComRelogio({ codigos: ['7891'] });
+      fireEvent.change(screen.getByLabelText('Código de barras'), { target: { value: '7891' } });
+
+      await avancar(1500);
+      expect(buscarPorBarcode).not.toHaveBeenCalled();
+      expect(screen.getByLabelText('Código de barras')).toHaveValue('7891');
+    });
+
+    it('código não cadastrado não busca sozinho', async () => {
+      const { buscarPorBarcode } = await renderComRelogio();
+      fireEvent.change(screen.getByLabelText('Código de barras'), { target: { value: '7890000000000' } });
+
+      await avancar(1500);
+      expect(buscarPorBarcode).not.toHaveBeenCalled();
+      expect(screen.getByLabelText('Código de barras')).toHaveValue('7890000000000');
+    });
+
+    // EAN-8 78912342 é o começo do EAN-13 7891234200013 — os dois cadastrados.
+    it('código que é começo de outro cadastrado espera mais antes de buscar', async () => {
+      const { buscarPorBarcode } = await renderComRelogio({ codigos: ['78912342', '7891234200013'] });
+      fireEvent.change(screen.getByLabelText('Código de barras'), { target: { value: '78912342' } });
+
+      await avancar(400);
+      expect(buscarPorBarcode).not.toHaveBeenCalled();
+      await avancar(600);
+      expect(buscarPorBarcode).toHaveBeenCalledWith('inv-1', '78912342');
+    });
+
+    it('continuar digitando reinicia a espera', async () => {
+      const { buscarPorBarcode } = await renderComRelogio({ codigos: ['78912342', '7891234200013'] });
+      fireEvent.change(screen.getByLabelText('Código de barras'), { target: { value: '78912342' } });
+      await avancar(500);
+      fireEvent.change(screen.getByLabelText('Código de barras'), { target: { value: '7891234200013' } });
+
+      await avancar(300);
+      expect(buscarPorBarcode).toHaveBeenCalledTimes(1);
+      expect(buscarPorBarcode).toHaveBeenCalledWith('inv-1', '7891234200013');
+    });
+
+    it('leitor que manda Enter logo depois do código não busca duas vezes', async () => {
+      const { buscarPorBarcode } = await renderComRelogio();
+      fireEvent.change(screen.getByLabelText('Código de barras'), { target: { value: '7891234567895' } });
+      fireEvent.click(screen.getByRole('button', { name: /buscar/i }));
+
+      await avancar(1000);
+      expect(buscarPorBarcode).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('erro do banco aparece traduzido na tela', async () => {

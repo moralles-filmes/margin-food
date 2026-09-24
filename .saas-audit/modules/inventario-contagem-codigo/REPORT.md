@@ -136,3 +136,48 @@ dos cenários SQL foi feita pelo agente principal.
 - Desfazer é recusado (com aviso) quando outra pessoa leu o mesmo produto depois — escolha
   conservadora: nunca produzir um total que ninguém contou.
 - Reenvio com quantidade diferente após falha de rede é tratado como operação nova.
+
+---
+
+## Rodada 2 — busca automática ao digitar (2026-09-24)
+
+**Branch:** `feat/inventario-busca-automatica-codigo` · **Veredito:** PASS_WITH_WARNINGS — 0 bloqueantes.
+
+A tela carrega os códigos cadastrados dos produtos do inventário
+(`inventario_listar_codigos`, migration `20260924204841`, só o texto do código,
+`assert_tenant` + `has_any_permission`) e busca sozinha quando o texto digitado é um
+desses códigos (`decidirBuscaAutomatica` em `src/domain/estoque/barcode.ts`). A busca
+só identifica o produto; gravar continua exigindo "Adicionar".
+
+RPC testada no banco de produção em transação revertida: lista do inventário correta,
+inventário de outra empresa e inexistente → `[]`, usuário sem vínculo →
+`COMPANY_ACCESS_DENIED`.
+
+### MOD-inventario-contagem-codigo-006 — Código curto cadastrado abria o produto errado (P2, corrigido)
+Um código cadastrado curto ("7891") que é começo de um código maior não cadastrado
+disparava a busca no meio da digitação; os dígitos seguintes caíam no campo de
+quantidade. Correção: a busca automática só dispara para GTIN completo com dígito
+verificador válido (`gtinValido`); código interno/curto usa o botão Buscar.
+Teste: `ContagemPorCodigo.test.tsx` ("código curto cadastrado não busca sozinho").
+
+### MOD-inventario-contagem-codigo-007 — Falha ao carregar os códigos podia rejeitar sem handler (P3, corrigido)
+`listarCodigosDoInventario` agora trata exceção e devolve `[]` (a busca automática só
+não acontece; Buscar continua funcionando).
+
+### MOD-inventario-contagem-codigo-008 — `anon` com EXECUTE nas RPCs antigas (P3, pendente)
+`create_inventory_atomic` e `inventario_find_item_por_barcode` não têm
+`REVOKE ... FROM PUBLIC, anon` (as duas abortam sem `auth.uid()`, sem vazamento). Não
+corrigido: o `service_role` só alcança essas funções via `PUBLIC`, e a Edge Function
+`inventario` pode depender disso em `create` — revogar exige confirmar o cliente usado
+e conceder `service_role` explicitamente.
+
+### MOD-inventario-contagem-codigo-009 — Leitura de códigos fora do domínio do Catálogo (P3, aceito)
+A RPC libera o texto dos códigos a quem tem permissão de Inventário, sem permissão de
+Catálogo — mesmo desenho da RPC irmã `inventario_find_item_por_barcode`, que expõe mais.
+
+### Testes e regressão
+- 976 testes, build ok, typecheck só com os 5 erros pré-existentes, lint limpo.
+- security-regression-verifier: PASS — 006 e 007 fechados; Buscar/Enter, card de
+  quantidade, histórico e desfazer inalterados; sem busca duplicada; nada em
+  `estoque-operacional/` ou `supabase/functions/`; sem segredos. Migration confirmada no
+  banco pelo agente principal (`supabase_migrations.schema_migrations`, versão `20260924204841`).
