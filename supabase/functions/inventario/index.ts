@@ -151,7 +151,8 @@ serve(withRequestCors(async (req) => {
       if (deny) return deny
 
       const ALLOWED_TIPOS = ['completo', 'parcial', 'ciclico']
-      const { tipo, data: invData, hora, categorias, observacao, turno_id, idempotency_key } = payload
+      const ALLOWED_METODOS = ['lista', 'codigo']
+      const { tipo, data: invData, hora, categorias, observacao, turno_id, idempotency_key, metodo_contagem } = payload
       if (!tipo || !ALLOWED_TIPOS.includes(tipo)) return json({ error: `Tipo inválido. Permitidos: ${ALLOWED_TIPOS.join(', ')}` }, 400)
       if (!invData || !hora) return json({ error: 'Campos obrigatórios: tipo, data, hora' }, 400)
       if (!turno_id) return json({ error: 'Turno é obrigatório' }, 400)
@@ -164,6 +165,7 @@ serve(withRequestCors(async (req) => {
       // Sanitize text inputs
       const safeObservacao = (observacao || '').slice(0, 500).replace(/<[^>]*>/g, '')
       const safeCategorias = (categorias || []).slice(0, 20).map((c: string) => String(c).slice(0, 100).replace(/<[^>]*>/g, ''))
+      const safeMetodo = ALLOWED_METODOS.includes(metodo_contagem) ? metodo_contagem : 'lista'
 
       // H2: Use atomic RPC with idempotency
       const { data: rpcResult, error: rpcErr } = await userClient.rpc('create_inventory_atomic', {
@@ -174,6 +176,7 @@ serve(withRequestCors(async (req) => {
         p_categorias: safeCategorias,
         p_observacao: safeObservacao,
         p_idempotency_key: idempotency_key || null,
+        p_metodo_contagem: safeMetodo,
       })
       if (rpcErr) throw rpcErr
 
@@ -270,6 +273,24 @@ serve(withRequestCors(async (req) => {
       await auditLog(existingItem.inventario_id, 'CONTAGEM', antes, { contagem_fisica: fisica, diferenca_qtd, classificacao }, item_id)
 
       return json({ success: true, diferenca_qtd, diferenca_percent, impacto_financeiro, classificacao })
+    }
+
+    if (action === 'find_by_barcode') {
+      const deny = await requirePermission('inventario:detalhe:edit')
+      if (deny) return deny
+
+      const { id, barcode } = payload
+      if (!id || typeof barcode !== 'string' || !barcode.trim()) {
+        return json({ error: 'id e barcode são obrigatórios' }, 400)
+      }
+
+      const { data: rpcResult, error: rpcErr } = await userClient.rpc('inventario_find_item_por_barcode', {
+        p_inventario_id: id,
+        p_barcode: barcode,
+      })
+      if (rpcErr) throw rpcErr
+
+      return json(rpcResult)
     }
 
     if (action === 'finalizar') {
