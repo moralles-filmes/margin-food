@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import type {
   MovimentacaoOperacionalRegistrada,
-  MovimentacaoOperacionalTipo,
   ProdutoOperacional,
   SetorOperacional,
 } from '@/domain/estoque/operacional';
@@ -46,7 +45,6 @@ export type ResultadoBarcode =
 interface RegistrarInput {
   produtoId: string;
   setorId: string;
-  tipo: MovimentacaoOperacionalTipo;
   quantidade: number;
   observacao?: string;
   /** Gerado uma vez por confirmação; reenvio devolve a movimentação original. */
@@ -116,14 +114,17 @@ export function useMovimentacaoOperacional() {
     };
   }, [supabase]);
 
-  // ─── Registrar entrada/saída ───
+  // ─── Registrar saída ───
+  //
+  // O operacional só registra saída; entrada é do módulo administrativo. O
+  // banco recusa qualquer outro tipo, então o valor fixo aqui não é o gate.
   const registrar = useCallback(async (
     input: RegistrarInput,
   ): Promise<{ ok: true; resultado: MovimentacaoOperacionalRegistrada } | { ok: false; erro: string }> => {
     const { data, error } = await supabase.rpc('op_registrar_movimentacao', {
       p_produto_id: input.produtoId,
       p_setor_id: input.setorId,
-      p_tipo: input.tipo,
+      p_tipo: 'SAIDA',
       p_quantidade: input.quantidade,
       p_observacao: input.observacao || undefined,
       p_client_request_id: input.clientRequestId,
@@ -143,7 +144,6 @@ export function useMovimentacaoOperacional() {
         produtoNome: String(payload.produto_nome ?? ''),
         unidadeMedida: String(payload.unidade_medida ?? ''),
         setor: String(payload.setor ?? ''),
-        tipo: (payload.tipo as MovimentacaoOperacionalTipo) ?? input.tipo,
         quantidade: Number(payload.quantidade) || input.quantidade,
         saldoAnterior: Number(payload.saldo_anterior) || 0,
         saldoNovo: Number(payload.saldo_novo) || 0,

@@ -6,9 +6,10 @@
  * (`op_registrar_movimentacao`); o que está aqui existe para dar resposta
  * imediata na tela e traduzir o erro do servidor em texto que o operador
  * entenda — nunca para substituir o gate do servidor.
+ *
+ * O operacional só registra SAÍDA; entrada é lançada no módulo administrativo.
+ * O banco recusa qualquer outro tipo (`TIPO_INVALIDO`).
  */
-
-export type MovimentacaoOperacionalTipo = 'ENTRADA' | 'SAIDA';
 
 export interface SetorOperacional {
   setorId: string;
@@ -32,7 +33,6 @@ export interface MovimentacaoOperacionalRegistrada {
   produtoNome: string;
   unidadeMedida: string;
   setor: string;
-  tipo: MovimentacaoOperacionalTipo;
   quantidade: number;
   saldoAnterior: number;
   saldoNovo: number;
@@ -67,7 +67,7 @@ export interface ValidacaoQuantidade {
 }
 
 /**
- * Valida a quantidade contra o saldo conhecido.
+ * Valida a quantidade da saída contra o saldo conhecido.
  *
  * `saldoDisponivel` é o saldo que a tela carregou — pode estar desatualizado se
  * outra pessoa movimentou o mesmo item nesse meio tempo. Por isso o bloqueio
@@ -75,7 +75,6 @@ export interface ValidacaoQuantidade {
  */
 export function validarQuantidade(
   quantidade: number | null,
-  tipo: MovimentacaoOperacionalTipo,
   saldoDisponivel: number,
   unidade: string,
 ): ValidacaoQuantidade {
@@ -88,7 +87,7 @@ export function validarQuantidade(
   if (quantidade > QUANTIDADE_MAXIMA) {
     return { valida: false, erro: `Quantidade acima do limite (${QUANTIDADE_MAXIMA}).` };
   }
-  if (tipo === 'SAIDA' && quantidade > saldoDisponivel) {
+  if (quantidade > saldoDisponivel) {
     return {
       valida: false,
       erro: `Quantidade indisponível. Existem apenas ${formatarQuantidade(saldoDisponivel)} ${unidade} neste setor.`,
@@ -148,7 +147,7 @@ export function quantidadeParaCampo(valor: number): string {
  *
  * Determinística de propósito: repetir a MESMA operação (retry depois de falha
  * de rede) reaproveita a chave e o servidor devolve o lançamento original;
- * mudar produto, setor, tipo ou quantidade produz chave nova, então um reenvio
+ * mudar produto, setor ou quantidade produz chave nova, então um reenvio
  * nunca é confundido com a operação anterior. `semente` só troca quando começa
  * um lançamento novo.
  */
@@ -156,10 +155,9 @@ export function chaveRequisicao(
   semente: string,
   produtoId: string,
   setorId: string,
-  tipo: MovimentacaoOperacionalTipo,
   quantidade: number | null,
 ): string {
-  return [semente, produtoId, setorId, tipo, quantidade ?? ''].join('|');
+  return [semente, produtoId, setorId, quantidade ?? ''].join('|');
 }
 
 /**
@@ -198,7 +196,7 @@ export function traduzirErroOperacional(mensagem: string | undefined): string {
     return 'Esta confirmação não confere com o lançamento anterior. Refaça o lançamento.';
   }
   if (msg.includes('TIPO_INVALIDO')) {
-    return 'Tipo de movimentação inválido.';
+    return 'A movimentação operacional só registra saída. Entradas são lançadas no Controle de Estoque.';
   }
   if (msg.includes('PERMISSION_DENIED')) {
     return 'Você não tem permissão para registrar movimentações.';

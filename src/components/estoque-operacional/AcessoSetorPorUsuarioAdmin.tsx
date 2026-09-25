@@ -109,7 +109,7 @@ export default function AcessoSetorPorUsuarioAdmin({ canEdit }: Props) {
       // de alguém que pode estar no meio do turno.
       const ok = await confirm({
         title: `Remover acesso ao setor ${setor.name}`,
-        description: 'O usuário deixa de conseguir registrar entradas e saídas neste setor.',
+        description: 'O usuário deixa de conseguir registrar saídas neste setor.',
         confirmLabel: 'Remover acesso',
         variant: 'destructive',
       });

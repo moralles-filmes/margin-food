@@ -1,5 +1,5 @@
 /**
- * Fluxo da Movimentação Operacional — entrada e saída manual.
+ * Fluxo da Movimentação Operacional — saída (o operacional não registra entrada).
  *
  * Cobre o caminho que o operador percorre (setor → produto → quantidade →
  * confirmação) e as garantias que não podem regredir:
@@ -12,7 +12,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import FluxoMovimentacao from '@/components/estoque-operacional/FluxoMovimentacao';
 import type {
-  MovimentacaoOperacionalTipo,
   ProdutoOperacional,
   SetorOperacional,
 } from '@/domain/estoque/operacional';
@@ -60,8 +59,7 @@ function dadosBase() {
       resultado: {
         id: 'mov-1', idempotente: false,
         produtoNome: COCA.nome, unidadeMedida: 'UN', setor: 'Cozinha',
-        tipo: 'SAIDA' as MovimentacaoOperacionalTipo, quantidade: 2,
-        saldoAnterior: 8, saldoNovo: 6,
+        quantidade: 2, saldoAnterior: 8, saldoNovo: 6,
       },
     }),
     carregarHistorico: vi.fn().mockResolvedValue([]),
@@ -69,16 +67,13 @@ function dadosBase() {
 }
 
 function renderFluxo(
-  tipo: MovimentacaoOperacionalTipo,
   dados: ReturnType<typeof dadosBase>,
   setores = SETORES,
 ) {
   return render(
     <FluxoMovimentacao
-      tipo={tipo}
       setores={setores}
       dados={dados as never}
-      onVoltarInicio={vi.fn()}
       onRegistrado={vi.fn()}
     />,
   );
@@ -114,13 +109,13 @@ afterEach(() => cleanup());
 
 describe('FluxoMovimentacao — navegação', () => {
   it('abre no leitor de código de barras, não no manual', async () => {
-    renderFluxo('SAIDA', dadosBase());
+    renderFluxo(dadosBase());
     expect(await screen.findByText(/Aguardando leitura do código de barras/)).toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: 'Código de barras' })).toBeInTheDocument();
   });
 
   it('pede o setor quando há mais de um autorizado', async () => {
-    renderFluxo('SAIDA', dadosBase());
+    renderFluxo(dadosBase());
     await irParaManual();
 
     expect(await screen.findByText(/Em qual setor deseja retirar/)).toBeInTheDocument();
@@ -130,7 +125,7 @@ describe('FluxoMovimentacao — navegação', () => {
 
   it('pula a escolha de setor quando só um está autorizado', async () => {
     const dados = dadosBase();
-    renderFluxo('SAIDA', dados, [SETORES[0]]);
+    renderFluxo(dados, [SETORES[0]]);
     await irParaManual();
 
     expect(screen.queryByText(/Em qual setor deseja/)).not.toBeInTheDocument();
@@ -139,7 +134,7 @@ describe('FluxoMovimentacao — navegação', () => {
 
   it('busca produtos apenas do setor escolhido', async () => {
     const dados = dadosBase();
-    renderFluxo('SAIDA', dados);
+    renderFluxo(dados);
     await irParaManual();
 
     await clicar('Delivery');
@@ -148,7 +143,7 @@ describe('FluxoMovimentacao — navegação', () => {
   });
 
   it('permite trocar de setor sem sair do fluxo', async () => {
-    renderFluxo('SAIDA', dadosBase());
+    renderFluxo(dadosBase());
     await irParaManual();
 
     await clicar('Cozinha');
@@ -158,8 +153,23 @@ describe('FluxoMovimentacao — navegação', () => {
     expect(await screen.findByText(/Em qual setor deseja/)).toBeInTheDocument();
   });
 
+  it('não mostra Voltar no leitor — ele é a tela inicial do módulo', async () => {
+    renderFluxo(dadosBase());
+    await screen.findByRole('textbox', { name: 'Código de barras' });
+    expect(screen.queryByRole('button', { name: 'Voltar' })).not.toBeInTheDocument();
+  });
+
+  it('o sucesso não oferece voltar a uma escolha de tipo que não existe mais', async () => {
+    renderFluxo(dadosBase());
+    await escanear('7891234567890');
+    await clicar(/Confirmar saída/);
+
+    expect(await screen.findByText(/Saída realizada/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Voltar ao início/ })).not.toBeInTheDocument();
+  });
+
   it('volta do manual para o leitor sem perder o fluxo', async () => {
-    renderFluxo('SAIDA', dadosBase());
+    renderFluxo(dadosBase());
     await irParaManual();
     await clicar('Cozinha');
 
@@ -170,7 +180,7 @@ describe('FluxoMovimentacao — navegação', () => {
 
 describe('FluxoMovimentacao — sem dados financeiros', () => {
   it('não renderiza valor, custo, margem nem fornecedor em nenhum passo', async () => {
-    renderFluxo('SAIDA', dadosBase());
+    renderFluxo(dadosBase());
     await irAteQuantidade();
 
     expect(document.body.textContent).not.toMatch(/R\$/);
@@ -179,7 +189,7 @@ describe('FluxoMovimentacao — sem dados financeiros', () => {
   });
 
   it('mostra o saldo em unidades, não em valor', async () => {
-    renderFluxo('SAIDA', dadosBase());
+    renderFluxo(dadosBase());
     await irParaManual();
     await clicar('Cozinha');
     expect(await screen.findByText(/Disponível: 8/)).toBeInTheDocument();
@@ -189,7 +199,7 @@ describe('FluxoMovimentacao — sem dados financeiros', () => {
 describe('FluxoMovimentacao — leitor de código de barras', () => {
   it('resolve o setor sozinho quando o produto está em um só acessível', async () => {
     const dados = dadosBase();
-    renderFluxo('SAIDA', dados);
+    renderFluxo(dados);
 
     await escanear('7891234567890');
     await waitFor(() => expect(dados.buscarPorBarcode).toHaveBeenCalledWith('7891234567890'));
@@ -201,7 +211,7 @@ describe('FluxoMovimentacao — leitor de código de barras', () => {
     dados.buscarPorBarcode = vi.fn().mockResolvedValue({
       status: 'encontrado', produto: COCA, setores: SETORES,
     });
-    renderFluxo('SAIDA', dados);
+    renderFluxo(dados);
 
     await escanear('7891234567890');
     expect(await screen.findByText(/De qual setor deseja retirar/)).toBeInTheDocument();
@@ -215,7 +225,7 @@ describe('FluxoMovimentacao — leitor de código de barras', () => {
 
   it('preserva zeros à esquerda — o código é string do campo ao banco', async () => {
     const dados = dadosBase();
-    renderFluxo('SAIDA', dados);
+    renderFluxo(dados);
 
     await escanear('0007894900011517');
     await waitFor(() => expect(dados.buscarPorBarcode).toHaveBeenCalledWith('0007894900011517'));
@@ -223,7 +233,7 @@ describe('FluxoMovimentacao — leitor de código de barras', () => {
 
   it('limpa espaço e sufixo de controle que o leitor HID injeta', async () => {
     const dados = dadosBase();
-    renderFluxo('SAIDA', dados);
+    renderFluxo(dados);
 
     await escanear('  789123 4567890 \t');
     await waitFor(() => expect(dados.buscarPorBarcode).toHaveBeenCalledWith('7891234567890'));
@@ -232,7 +242,7 @@ describe('FluxoMovimentacao — leitor de código de barras', () => {
   it('ignora o segundo disparo imediato do mesmo código (repique do leitor)', async () => {
     const dados = dadosBase();
     dados.buscarPorBarcode = vi.fn().mockResolvedValue({ status: 'nao_encontrado' });
-    renderFluxo('SAIDA', dados);
+    renderFluxo(dados);
 
     await escanear('7891234567890');
     await waitFor(() => expect(dados.buscarPorBarcode).toHaveBeenCalledTimes(1));
@@ -244,7 +254,7 @@ describe('FluxoMovimentacao — leitor de código de barras', () => {
 
   it('recusa código curto demais sem ir ao servidor', async () => {
     const dados = dadosBase();
-    renderFluxo('SAIDA', dados);
+    renderFluxo(dados);
 
     await escanear('12');
     expect(await screen.findByText(/Código muito curto/)).toBeInTheDocument();
@@ -253,7 +263,7 @@ describe('FluxoMovimentacao — leitor de código de barras', () => {
 
   it('recusa código com caractere inválido sem ir ao servidor', async () => {
     const dados = dadosBase();
-    renderFluxo('SAIDA', dados);
+    renderFluxo(dados);
 
     await escanear('789$%#123');
     expect(await screen.findByText(/caracteres inválidos/)).toBeInTheDocument();
@@ -263,7 +273,7 @@ describe('FluxoMovimentacao — leitor de código de barras', () => {
   it('manda procurar um responsável quando o código não existe', async () => {
     const dados = dadosBase();
     dados.buscarPorBarcode = vi.fn().mockResolvedValue({ status: 'nao_encontrado' });
-    renderFluxo('SAIDA', dados);
+    renderFluxo(dados);
 
     await escanear('7891234567890');
     const aviso = await screen.findByText(/Produto não encontrado para o código/);
@@ -274,7 +284,7 @@ describe('FluxoMovimentacao — leitor de código de barras', () => {
   it('avisa de permissão quando o produto existe só em setor sem acesso', async () => {
     const dados = dadosBase();
     dados.buscarPorBarcode = vi.fn().mockResolvedValue({ status: 'sem_acesso_ao_setor' });
-    renderFluxo('SAIDA', dados);
+    renderFluxo(dados);
 
     await escanear('7891234567890');
     expect(await screen.findByText(/não tem autorização para movimentar/)).toBeInTheDocument();
@@ -282,9 +292,30 @@ describe('FluxoMovimentacao — leitor de código de barras', () => {
     expect(screen.queryByRole('button', { name: /Confirmar saída/ })).not.toBeInTheDocument();
   });
 
+  it('Voltar na quantidade volta ao leitor quando o código resolveu um setor só', async () => {
+    // Regressão: a origem "leitor" era inferida por setoresDoCodigo, que só é
+    // preenchido quando há vários setores — com um setor, o Voltar caía na busca manual.
+    renderFluxo(dadosBase());
+
+    await escanear('7891234567890');
+    await screen.findByRole('button', { name: /Confirmar saída/ });
+
+    await clicar('Voltar');
+    expect(await screen.findByRole('textbox', { name: 'Código de barras' })).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: /Pesquisar produto/ })).not.toBeInTheDocument();
+  });
+
+  it('Voltar na quantidade volta à lista quando o produto veio da busca manual', async () => {
+    renderFluxo(dadosBase());
+    await irAteQuantidade();
+
+    await clicar('Voltar');
+    expect(await screen.findByRole('textbox', { name: /Pesquisar produto/ })).toBeInTheDocument();
+  });
+
   it('continua pronto para a próxima leitura depois de concluir uma', async () => {
     const dados = dadosBase();
-    renderFluxo('SAIDA', dados);
+    renderFluxo(dados);
 
     await escanear('7891234567890');
     await clicar(/Confirmar saída/);
@@ -295,7 +326,7 @@ describe('FluxoMovimentacao — leitor de código de barras', () => {
   });
 
   it('o leitor não expõe valor financeiro', async () => {
-    renderFluxo('SAIDA', dadosBase());
+    renderFluxo(dadosBase());
     await escanear('7891234567890');
     await screen.findByRole('button', { name: /Confirmar saída/ });
 
@@ -307,7 +338,7 @@ describe('FluxoMovimentacao — leitor de código de barras', () => {
 describe('FluxoMovimentacao — validação de saída', () => {
   it('bloqueia saída acima do saldo sem chamar o servidor', async () => {
     const dados = dadosBase();
-    renderFluxo('SAIDA', dados);
+    renderFluxo(dados);
     const campo = await irAteQuantidade();
 
     digitarQuantidade(campo, '20');
@@ -317,21 +348,8 @@ describe('FluxoMovimentacao — validação de saída', () => {
     expect(dados.registrar).not.toHaveBeenCalled();
   });
 
-  it('permite entrada acima do saldo — entrada não tem teto', async () => {
-    const dados = dadosBase();
-    renderFluxo('ENTRADA', dados);
-    const campo = await irAteQuantidade();
-
-    digitarQuantidade(campo, '500');
-    await clicar(/Confirmar entrada/);
-
-    await waitFor(() => expect(dados.registrar).toHaveBeenCalledWith(
-      expect.objectContaining({ tipo: 'ENTRADA', quantidade: 500 }),
-    ));
-  });
-
   it('não mostra erro de quantidade antes da primeira tentativa', async () => {
-    renderFluxo('SAIDA', dadosBase());
+    renderFluxo(dadosBase());
     const campo = await irAteQuantidade();
 
     digitarQuantidade(campo, '99');
@@ -340,7 +358,7 @@ describe('FluxoMovimentacao — validação de saída', () => {
 
   it('bloqueia quantidade inválida digitada', async () => {
     const dados = dadosBase();
-    renderFluxo('SAIDA', dados);
+    renderFluxo(dados);
     const campo = await irAteQuantidade();
 
     digitarQuantidade(campo, 'abc');
@@ -354,7 +372,7 @@ describe('FluxoMovimentacao — validação de saída', () => {
 describe('FluxoMovimentacao — confirmação', () => {
   it('registra com o setor, o produto e a quantidade escolhidos', async () => {
     const dados = dadosBase();
-    renderFluxo('SAIDA', dados);
+    renderFluxo(dados);
     const campo = await irAteQuantidade();
 
     digitarQuantidade(campo, '2');
@@ -364,7 +382,6 @@ describe('FluxoMovimentacao — confirmação', () => {
       expect.objectContaining({
         produtoId: 'prod-coca',
         setorId: 'setor-cozinha',
-        tipo: 'SAIDA',
         quantidade: 2,
       }),
     ));
@@ -372,7 +389,7 @@ describe('FluxoMovimentacao — confirmação', () => {
 
   it('usa quantidade 1 por padrão', async () => {
     const dados = dadosBase();
-    renderFluxo('SAIDA', dados);
+    renderFluxo(dados);
     await irAteQuantidade();
 
     await clicar(/Confirmar saída/);
@@ -383,7 +400,7 @@ describe('FluxoMovimentacao — confirmação', () => {
 
   it('os botões [-] e [+] alteram a quantidade enviada', async () => {
     const dados = dadosBase();
-    renderFluxo('SAIDA', dados);
+    renderFluxo(dados);
     await irAteQuantidade();
 
     await clicar('Aumentar quantidade');
@@ -398,7 +415,7 @@ describe('FluxoMovimentacao — confirmação', () => {
   it('reenvio reaproveita o clientRequestId, para o servidor deduplicar', async () => {
     const dados = dadosBase();
     dados.registrar = vi.fn().mockResolvedValue({ ok: false, erro: 'Falha de rede' });
-    renderFluxo('SAIDA', dados);
+    renderFluxo(dados);
     await irAteQuantidade();
 
     await clicar(/Confirmar saída/);
@@ -414,7 +431,7 @@ describe('FluxoMovimentacao — confirmação', () => {
 
   it('renova o clientRequestId ao iniciar um novo lançamento', async () => {
     const dados = dadosBase();
-    renderFluxo('SAIDA', dados);
+    renderFluxo(dados);
     await irAteQuantidade();
 
     await clicar(/Confirmar saída/);
@@ -440,7 +457,7 @@ describe('FluxoMovimentacao — confirmação', () => {
       produtos: [COCA, AGUA], erro: null, obsoleto: false,
     });
     dados.registrar = vi.fn().mockResolvedValue({ ok: false, erro: 'Falha de rede' });
-    renderFluxo('SAIDA', dados);
+    renderFluxo(dados);
     await irAteQuantidade();
 
     await clicar(/Confirmar saída/);
@@ -459,7 +476,7 @@ describe('FluxoMovimentacao — confirmação', () => {
   it('renova o clientRequestId quando a quantidade muda', async () => {
     const dados = dadosBase();
     dados.registrar = vi.fn().mockResolvedValue({ ok: false, erro: 'Falha de rede' });
-    renderFluxo('SAIDA', dados);
+    renderFluxo(dados);
     const campo = await irAteQuantidade();
 
     await clicar(/Confirmar saída/);
@@ -478,7 +495,7 @@ describe('FluxoMovimentacao — confirmação', () => {
     const dados = dadosBase();
     let liberar: (v: unknown) => void = () => {};
     dados.registrar = vi.fn().mockReturnValue(new Promise(res => { liberar = res; }));
-    renderFluxo('SAIDA', dados);
+    renderFluxo(dados);
     await irAteQuantidade();
 
     await clicar(/Confirmar saída/);
@@ -492,12 +509,15 @@ describe('FluxoMovimentacao — confirmação', () => {
     // Regressão: o stepper escrevia o texto agrupado ("1.001") de volta no
     // campo, e o parse o relia como decimal.
     const dados = dadosBase();
-    renderFluxo('ENTRADA', dados);
+    dados.buscarProdutos = vi.fn().mockResolvedValue({
+      produtos: [{ ...COCA, saldo: 5000 }], erro: null, obsoleto: false,
+    });
+    renderFluxo(dados);
     const campo = await irAteQuantidade();
 
     digitarQuantidade(campo, '1000');
     await clicar('Aumentar quantidade');
-    await clicar(/Confirmar entrada/);
+    await clicar(/Confirmar saída/);
 
     await waitFor(() => expect(dados.registrar).toHaveBeenCalledWith(
       expect.objectContaining({ quantidade: 1001 }),
@@ -505,7 +525,7 @@ describe('FluxoMovimentacao — confirmação', () => {
   });
 
   it('mostra o resultado com o saldo atualizado', async () => {
-    renderFluxo('SAIDA', dadosBase());
+    renderFluxo(dadosBase());
     await irAteQuantidade();
 
     await clicar(/Confirmar saída/);
@@ -525,7 +545,7 @@ describe('FluxoMovimentacao — confirmação', () => {
         tipo: 'SAIDA', quantidade: 1, saldoAnterior: 8, saldoNovo: 7,
       },
     });
-    renderFluxo('SAIDA', dados);
+    renderFluxo(dados);
     await irAteQuantidade();
 
     await clicar(/Confirmar saída/);
@@ -538,7 +558,7 @@ describe('FluxoMovimentacao — confirmação', () => {
       ok: false,
       erro: 'Este produto ainda não tem custo cadastrado. Procure um responsável antes de dar saída.',
     });
-    renderFluxo('SAIDA', dados);
+    renderFluxo(dados);
     await irAteQuantidade();
 
     await clicar(/Confirmar saída/);

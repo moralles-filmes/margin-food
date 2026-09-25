@@ -178,7 +178,7 @@ export const MODULE_MANIFESTS: ModuleManifest[] = [
     key: 'operacional',
     label: 'Movimentação Operacional',
     subtabs: [
-      { key: 'movimentacao', label: 'Entrada e Saída', actions: VIEW_CREATE },
+      { key: 'movimentacao', label: 'Saída de Estoque', actions: VIEW_CREATE },
       { key: 'historico', label: 'Últimas Movimentações', actions: VIEW_ONLY },
       { key: 'setores', label: 'Setores por Usuário', actions: VIEW_MANAGE },
     ],
