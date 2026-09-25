@@ -1,18 +1,18 @@
 import { useCallback, useState } from 'react';
-import { ArrowDown, ArrowUp, Loader2, ShieldAlert } from 'lucide-react';
+import { Loader2, ShieldAlert } from 'lucide-react';
 import { useCan } from '@/permissions';
 import { useMovimentacaoOperacional } from '@/hooks/useMovimentacaoOperacional';
-import type { MovimentacaoOperacionalTipo } from '@/domain/estoque/operacional';
 import FluxoMovimentacao from './FluxoMovimentacao';
 import HistoricoOperacional from './HistoricoOperacional';
 
 /**
  * ─── Movimentação Operacional ───
  *
- * Submódulo simplificado de entrada e saída de estoque, para quem está no chão
- * de operação. Grava na MESMA `movimentacoes_estoque` e reflete no MESMO
- * `produtos.saldo_atual` do módulo administrativo — duas interfaces, uma fonte
- * de verdade, sem sincronização.
+ * Submódulo simplificado de saída de estoque, para quem está no chão de
+ * operação. Entrada é lançada no Controle de Estoque (módulo administrativo);
+ * o banco recusa entrada por aqui. Grava na MESMA `movimentacoes_estoque` e
+ * reflete no MESMO `produtos.saldo_atual` do módulo administrativo — duas
+ * interfaces, uma fonte de verdade, sem sincronização.
  *
  * Esta tela nunca monta o `EstoqueGeralStore`: toda leitura passa pelas RPCs
  * `op_*`, que não projetam custo, preço, fornecedor nem qualquer indicador
@@ -24,11 +24,9 @@ export default function MovimentacaoOperacionalView() {
   const podeVerHistorico = useCan('operacional:historico:view');
 
   const dados = useMovimentacaoOperacional();
-  const [tipo, setTipo] = useState<MovimentacaoOperacionalTipo | null>(null);
   const [versaoHistorico, setVersaoHistorico] = useState(0);
 
   const registrado = useCallback(() => setVersaoHistorico(v => v + 1), []);
-  const voltarInicio = useCallback(() => setTipo(null), []);
 
   if (!podeVer) {
     return (
@@ -74,58 +72,24 @@ export default function MovimentacaoOperacionalView() {
     );
   }
 
-  if (tipo) {
-    return (
-      <div className="space-y-8 pb-8">
-        <FluxoMovimentacao
-          tipo={tipo}
-          setores={dados.setores}
-          dados={dados}
-          onVoltarInicio={voltarInicio}
-          onRegistrado={registrado}
-        />
-      </div>
-    );
-  }
-
+  // Com um tipo só, a tela abre direto no fluxo de saída: uma tela de escolha
+  // seria um clique a mais antes de cada sessão de bipes.
   return (
     <div className="space-y-8 pb-8">
-      <div className="mx-auto w-full max-w-xl space-y-5">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">Movimentação de Estoque</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Escolha o que você vai registrar agora.
-          </p>
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <button
-            type="button"
-            onClick={() => setTipo('ENTRADA')}
-            disabled={!podeCriar}
-            className="flex min-h-[9rem] flex-col items-center justify-center gap-3 rounded-2xl border-2 border-success-border bg-success-soft p-6 transition-transform hover:scale-[1.02] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100"
-          >
-            <ArrowDown className="h-10 w-10 text-success" />
-            <span className="text-xl font-bold uppercase tracking-wide text-success">Entrada</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setTipo('SAIDA')}
-            disabled={!podeCriar}
-            className="flex min-h-[9rem] flex-col items-center justify-center gap-3 rounded-2xl border-2 border-destructive-border bg-destructive-soft p-6 transition-transform hover:scale-[1.02] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100"
-          >
-            <ArrowUp className="h-10 w-10 text-destructive" />
-            <span className="text-xl font-bold uppercase tracking-wide text-destructive">Saída</span>
-          </button>
-        </div>
-
-        {!podeCriar && (
+      {podeCriar ? (
+        <FluxoMovimentacao
+          setores={dados.setores}
+          dados={dados}
+          onRegistrado={registrado}
+        />
+      ) : (
+        <div className="mx-auto w-full max-w-xl space-y-5">
+          <h1 className="text-center text-2xl font-bold tracking-tight text-foreground">Movimentação de Estoque</h1>
           <p className="rounded-lg border border-border bg-background-subtle p-3 text-center text-sm text-muted-foreground">
             Seu acesso é somente de consulta. Procure um responsável para liberar o registro de movimentações.
           </p>
-        )}
-      </div>
+        </div>
+      )}
 
       {podeVerHistorico && (
         <HistoricoOperacional carregar={dados.carregarHistorico} versao={versaoHistorico} />

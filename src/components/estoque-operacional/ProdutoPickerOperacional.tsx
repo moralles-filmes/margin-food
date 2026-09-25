@@ -14,16 +14,16 @@ interface Props {
     obsoleto: boolean;
   }>;
   onSelecionar: (produto: ProdutoOperacional) => void;
-  /** Saída mostra o saldo com destaque; entrada não precisa dele para decidir. */
-  destacarSaldo: boolean;
 }
 
 /**
  * Busca de produto dentro de um setor. O que aparece aqui vem de `op_list_produtos`,
  * que projeta só nome, SKU, unidade e saldo — nenhum campo de custo chega ao cliente.
+ * O saldo aparece em destaque e item sem estoque não pode ser escolhido: toda
+ * movimentação operacional é saída.
  */
 export default function ProdutoPickerOperacional({
-  setorId, setorNome, buscarProdutos, onSelecionar, destacarSaldo,
+  setorId, setorNome, buscarProdutos, onSelecionar,
 }: Props) {
   const [termo, setTermo] = useState('');
   const termoDebounced = useDebouncedValue(termo, 250);
@@ -81,7 +81,7 @@ export default function ProdutoPickerOperacional({
       ) : (
         <ul className="space-y-2">
           {produtos.map(produto => {
-            const semSaldo = destacarSaldo && produto.saldo <= 0;
+            const semSaldo = produto.saldo <= 0;
             return (
               <li key={produto.produtoId}>
                 <button
@@ -96,13 +96,11 @@ export default function ProdutoPickerOperacional({
                       {produto.sku ? `${produto.sku} · ` : ''}{produto.unidadeMedida}
                     </p>
                   </div>
-                  {destacarSaldo && (
-                    <Badge variant={semSaldo ? 'destructive' : 'secondary'} className="shrink-0 tabular-nums">
-                      {semSaldo
-                        ? 'Sem estoque'
-                        : `Disponível: ${formatarQuantidade(produto.saldo)}`}
-                    </Badge>
-                  )}
+                  <Badge variant={semSaldo ? 'destructive' : 'secondary'} className="shrink-0 tabular-nums">
+                    {semSaldo
+                      ? 'Sem estoque'
+                      : `Disponível: ${formatarQuantidade(produto.saldo)}`}
+                  </Badge>
                 </button>
               </li>
             );

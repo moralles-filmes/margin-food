@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ArrowDown, ArrowLeft, ArrowUp, Check, CheckCircle2, Loader2, ScanLine } from 'lucide-react';
+import { ArrowLeft, ArrowUp, Check, CheckCircle2, Loader2, ScanLine } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,7 +10,6 @@ import {
   parseQuantidade,
   validarQuantidade,
   type MovimentacaoOperacionalRegistrada,
-  type MovimentacaoOperacionalTipo,
   type ProdutoOperacional,
   type SetorOperacional,
 } from '@/domain/estoque/operacional';
@@ -22,17 +21,10 @@ import QuantidadeStepper from './QuantidadeStepper';
 type Passo = 'leitor' | 'setor' | 'produto' | 'setor-do-codigo' | 'quantidade' | 'sucesso';
 
 interface Props {
-  tipo: MovimentacaoOperacionalTipo;
   setores: SetorOperacional[];
   dados: ReturnType<typeof useMovimentacaoOperacional>;
-  onVoltarInicio: () => void;
   onRegistrado: () => void;
 }
-
-const TITULOS: Record<MovimentacaoOperacionalTipo, string> = {
-  ENTRADA: 'Entrada de Estoque',
-  SAIDA: 'Saída de Estoque',
-};
 
 /** Semente do identificador de confirmação — troca a cada lançamento novo. */
 function novaSemente(): string {
@@ -42,11 +34,12 @@ function novaSemente(): string {
   return `op-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-export default function FluxoMovimentacao({
-  tipo, setores, dados, onVoltarInicio, onRegistrado,
-}: Props) {
+/**
+ * Fluxo de saída de estoque. O operacional não registra entrada: ela é lançada
+ * no Controle de Estoque (módulo administrativo), e o banco recusa outro tipo.
+ */
+export default function FluxoMovimentacao({ setores, dados, onRegistrado }: Props) {
   const toast = useScopedToast();
-  const isSaida = tipo === 'SAIDA';
 
   // Com um setor só autorizado, pular a escolha é o comportamento certo:
   // perguntar algo que tem uma única resposta é um clique desperdiçado.
@@ -69,6 +62,9 @@ export default function FluxoMovimentacao({
   const [avisoLeitor, setAvisoLeitor] = useState<string | undefined>();
   const [setoresDoCodigo, setSetoresDoCodigo] = useState<SetorOperacional[]>([]);
   const [focoLeitor, setFocoLeitor] = useState(0);
+  // De onde veio o produto em lançamento: decide para onde o Voltar leva. Não
+  // dá para inferir por `setoresDoCodigo`, que só é preenchido com vários setores.
+  const [origemProduto, setOrigemProduto] = useState<'leitor' | 'manual'>('leitor');
 
   // A semente só troca quando um lançamento novo começa; a chave enviada ao
   // servidor combina a semente com a identidade da operação.
@@ -78,7 +74,7 @@ export default function FluxoMovimentacao({
 
   // Chave derivada, não estado: repetir a MESMA confirmação depois de uma falha
   // de rede reaproveita a chave (o servidor devolve o lançamento original em vez
-  // de duplicar), mas trocar de produto/setor/tipo/quantidade gera chave nova.
+  // de duplicar), mas trocar de produto/setor/quantidade gera chave nova.
   // Guardar a chave em estado deixava o id de uma confirmação que falhou preso
   // no próximo produto — e um envio que o servidor já tinha gravado, mas cuja
   // resposta se perdeu, devolvia "sucesso" sem registrar nada para o item novo.
@@ -87,14 +83,13 @@ export default function FluxoMovimentacao({
       semente,
       produto?.produtoId ?? '',
       setor?.setorId ?? '',
-      tipo,
       quantidade,
     ),
-    [semente, produto, setor, tipo, quantidade],
+    [semente, produto, setor, quantidade],
   );
   const validacao = useMemo(
-    () => validarQuantidade(quantidade, tipo, produto?.saldo ?? 0, produto?.unidadeMedida ?? ''),
-    [quantidade, tipo, produto],
+    () => validarQuantidade(quantidade, produto?.saldo ?? 0, produto?.unidadeMedida ?? ''),
+    [quantidade, produto],
   );
 
   // Erro de quantidade só aparece depois de uma tentativa de confirmar; avisar
@@ -104,6 +99,7 @@ export default function FluxoMovimentacao({
 
   const selecionarProduto = useCallback((p: ProdutoOperacional) => {
     setProduto(p);
+    setOrigemProduto('manual');
     setQuantidadeTexto('1');
     setPasso('quantidade');
   }, []);
@@ -135,6 +131,7 @@ export default function FluxoMovimentacao({
     }
 
     setProduto(res.produto);
+    setOrigemProduto('leitor');
     setQuantidadeTexto('1');
 
     // Um setor acessível resolve sozinho; vários exigem a escolha, que é rápida
@@ -172,14 +169,14 @@ export default function FluxoMovimentacao({
     const res = await dados.registrar({
       produtoId: produto.produtoId,
       setorId: setor.setorId,
-      tipo,
       quantidade,
       observacao,
       clientRequestId: requestId,
     });
     setSalvando(false);
 
-    if (!res.ok) {
+    // Comparação explícita: com `strict: false` o `!res.ok` não estreita a união.
+    if (res.ok === false) {
       toast.error(res.erro);
       return;
     }
@@ -187,7 +184,7 @@ export default function FluxoMovimentacao({
     setResultado(res.resultado);
     setPasso('sucesso');
     onRegistrado();
-  }, [salvando, produto, setor, validacao, quantidade, dados, tipo, observacao, requestId, toast, onRegistrado]);
+  }, [salvando, produto, setor, validacao, quantidade, dados, observacao, requestId, toast, onRegistrado]);
 
   /**
    * Volta para o modo que originou o lançamento: quem estava bipando continua
@@ -211,26 +208,21 @@ export default function FluxoMovimentacao({
   }, [setorUnico, passoManualInicial]);
 
   const voltar = useCallback(() => {
-    if (passo === 'quantidade' || passo === 'setor-do-codigo') {
-      // Se o produto veio do leitor, voltar é voltar ao leitor.
-      if (setoresDoCodigo.length > 0 || passo === 'setor-do-codigo') { irParaLeitor(); return; }
-      setPasso('produto');
+    // Se o produto veio do leitor, voltar é voltar ao leitor.
+    if (passo === 'setor-do-codigo' || (passo === 'quantidade' && origemProduto === 'leitor')) {
+      irParaLeitor();
       return;
     }
+    if (passo === 'quantidade') { setPasso('produto'); return; }
     if (passo === 'produto' && !setorUnico) { setSetor(null); setPasso('setor'); return; }
-    if (passo === 'produto' || passo === 'setor') { irParaLeitor(); return; }
-    onVoltarInicio();
-  }, [passo, setorUnico, setoresDoCodigo.length, irParaLeitor, onVoltarInicio]);
-
-  const corAcento = isSaida ? 'text-destructive' : 'text-success';
-  const fundoAcento = isSaida ? 'bg-destructive-soft' : 'bg-success-soft';
-  const Icone = isSaida ? ArrowUp : ArrowDown;
+    irParaLeitor();
+  }, [passo, origemProduto, setorUnico, irParaLeitor]);
 
   return (
     <div className="mx-auto w-full max-w-xl space-y-5">
-      {/* Cabeçalho do fluxo */}
+      {/* Cabeçalho do fluxo. O leitor é a tela inicial do módulo: não há para onde voltar. */}
       <div className="flex items-center gap-3">
-        {passo !== 'sucesso' && (
+        {passo !== 'sucesso' && passo !== 'leitor' && (
           <Button
             type="button"
             variant="ghost"
@@ -245,11 +237,11 @@ export default function FluxoMovimentacao({
             <ArrowLeft className="h-5 w-5" />
           </Button>
         )}
-        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${fundoAcento}`}>
-          <Icone className={`h-5 w-5 ${corAcento}`} />
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-destructive-soft">
+          <ArrowUp className="h-5 w-5 text-destructive" />
         </div>
         <div className="min-w-0">
-          <h2 className="truncate text-lg font-bold text-foreground">{TITULOS[tipo]}</h2>
+          <h2 className="truncate text-lg font-bold text-foreground">Saída de Estoque</h2>
           {setor && passo !== 'sucesso' && (
             <p className="truncate text-xs text-muted-foreground">
               Setor: <span className="font-medium text-foreground">{setor.nome}</span>
@@ -279,7 +271,7 @@ export default function FluxoMovimentacao({
             </p>
           </div>
           <p className="text-sm font-medium text-foreground">
-            De qual setor deseja {isSaida ? 'retirar' : 'lançar'}?
+            De qual setor deseja retirar?
           </p>
           <ul className="grid gap-2 sm:grid-cols-2">
             {setoresDoCodigo.map(s => (
@@ -301,7 +293,7 @@ export default function FluxoMovimentacao({
       {passo === 'setor' && (
         <section className="space-y-3">
           <p className="text-sm font-medium text-foreground">
-            Em qual setor deseja {isSaida ? 'retirar' : 'lançar'} o produto?
+            Em qual setor deseja retirar o produto?
           </p>
           <ul className="grid gap-2 sm:grid-cols-2">
             {setores.map(s => (
@@ -343,7 +335,6 @@ export default function FluxoMovimentacao({
             setorNome={setor.nome}
             buscarProdutos={dados.buscarProdutos}
             onSelecionar={selecionarProduto}
-            destacarSaldo={isSaida}
           />
           <Button
             type="button"
@@ -363,8 +354,7 @@ export default function FluxoMovimentacao({
           <div className="rounded-xl border border-border bg-card p-4">
             <p className="text-base font-semibold text-foreground">{produto.nome}</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              {produto.sku ? `${produto.sku} · ` : ''}{produto.unidadeMedida}
-              {isSaida && ` · Disponível: ${formatarQuantidade(produto.saldo)}`}
+              {produto.sku ? `${produto.sku} · ` : ''}{produto.unidadeMedida} · Disponível: {formatarQuantidade(produto.saldo)}
             </p>
           </div>
 
@@ -403,7 +393,7 @@ export default function FluxoMovimentacao({
             {salvando ? (
               <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Registrando…</>
             ) : (
-              <><Check className="mr-2 h-5 w-5" /> Confirmar {isSaida ? 'saída' : 'entrada'}</>
+              <><Check className="mr-2 h-5 w-5" /> Confirmar saída</>
             )}
           </Button>
         </section>
@@ -412,13 +402,13 @@ export default function FluxoMovimentacao({
       {/* Passo 4 — sucesso */}
       {passo === 'sucesso' && resultado && (
         <section className="space-y-4">
-          <div className={`rounded-xl border p-5 text-center ${isSaida ? 'border-destructive-border bg-destructive-soft' : 'border-success-border bg-success-soft'}`}>
-            <CheckCircle2 className={`mx-auto h-12 w-12 ${corAcento}`} />
-            <p className={`mt-2 text-sm font-bold uppercase tracking-wide ${corAcento}`}>
-              {isSaida ? 'Saída realizada' : 'Entrada realizada'}
+          <div className="rounded-xl border border-destructive-border bg-destructive-soft p-5 text-center">
+            <CheckCircle2 className="mx-auto h-12 w-12 text-destructive" />
+            <p className="mt-2 text-sm font-bold uppercase tracking-wide text-destructive">
+              Saída realizada
             </p>
-            <p className={`mt-3 text-4xl font-bold tabular-nums ${corAcento}`}>
-              {isSaida ? '−' : '+'}{formatarQuantidade(resultado.quantidade)}
+            <p className="mt-3 text-4xl font-bold tabular-nums text-destructive">
+              −{formatarQuantidade(resultado.quantidade)}
             </p>
             <p className="mt-2 text-base font-semibold text-foreground">{resultado.produtoNome}</p>
             <p className="mt-1 text-xs text-muted-foreground">
@@ -446,12 +436,9 @@ export default function FluxoMovimentacao({
               onClick={() => novoLancamento('manual')}
               className="h-12 rounded-xl text-base"
             >
-              {isSaida ? 'Outra saída manual' : 'Outra entrada manual'}
+              Outra saída manual
             </Button>
           </div>
-          <Button type="button" variant="ghost" onClick={onVoltarInicio} className="h-11 w-full text-sm">
-            Voltar ao início
-          </Button>
         </section>
       )}
     </div>

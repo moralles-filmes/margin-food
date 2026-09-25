@@ -51,35 +51,31 @@ describe('parseQuantidade', () => {
 });
 
 describe('validarQuantidade', () => {
-  it('aprova entrada acima do saldo — entrada sempre pode', () => {
-    expect(validarQuantidade(100, 'ENTRADA', 0, 'UN').valida).toBe(true);
-  });
-
   it('recusa saída acima do saldo com a quantidade real na mensagem', () => {
-    const res = validarQuantidade(8, 'SAIDA', 5, 'UN');
+    const res = validarQuantidade(8, 5, 'UN');
     expect(res.valida).toBe(false);
     expect(res.erro).toContain('apenas 5 UN');
   });
 
   it('aprova saída exatamente igual ao saldo', () => {
-    expect(validarQuantidade(5, 'SAIDA', 5, 'UN').valida).toBe(true);
+    expect(validarQuantidade(5, 5, 'UN').valida).toBe(true);
   });
 
   it('recusa saída com estoque zerado', () => {
-    expect(validarQuantidade(1, 'SAIDA', 0, 'UN').valida).toBe(false);
+    expect(validarQuantidade(1, 0, 'UN').valida).toBe(false);
   });
 
   it('recusa zero e negativo', () => {
-    expect(validarQuantidade(0, 'ENTRADA', 10, 'UN').valida).toBe(false);
-    expect(validarQuantidade(-1, 'ENTRADA', 10, 'UN').valida).toBe(false);
+    expect(validarQuantidade(0, 10, 'UN').valida).toBe(false);
+    expect(validarQuantidade(-1, 10, 'UN').valida).toBe(false);
   });
 
   it('recusa quantidade nula com mensagem própria', () => {
-    expect(validarQuantidade(null, 'ENTRADA', 10, 'UN').erro).toBe('Informe a quantidade.');
+    expect(validarQuantidade(null, 10, 'UN').erro).toBe('Informe a quantidade.');
   });
 
   it('recusa acima do limite de segurança', () => {
-    expect(validarQuantidade(QUANTIDADE_MAXIMA + 1, 'ENTRADA', 0, 'UN').valida).toBe(false);
+    expect(validarQuantidade(QUANTIDADE_MAXIMA + 1, QUANTIDADE_MAXIMA + 10, 'UN').valida).toBe(false);
   });
 });
 
@@ -168,17 +164,16 @@ describe('quantidadeParaCampo', () => {
 
 describe('chaveRequisicao', () => {
   it('repete a chave para a mesma operação (retry é deduplicado)', () => {
-    expect(chaveRequisicao('s1', 'p1', 'set1', 'SAIDA', 3))
-      .toBe(chaveRequisicao('s1', 'p1', 'set1', 'SAIDA', 3));
+    expect(chaveRequisicao('s1', 'p1', 'set1', 3))
+      .toBe(chaveRequisicao('s1', 'p1', 'set1', 3));
   });
 
   it('muda quando qualquer parte da operação muda', () => {
-    const base = chaveRequisicao('s1', 'p1', 'set1', 'SAIDA', 3);
-    expect(chaveRequisicao('s1', 'p2', 'set1', 'SAIDA', 3)).not.toBe(base);
-    expect(chaveRequisicao('s1', 'p1', 'set2', 'SAIDA', 3)).not.toBe(base);
-    expect(chaveRequisicao('s1', 'p1', 'set1', 'ENTRADA', 3)).not.toBe(base);
-    expect(chaveRequisicao('s1', 'p1', 'set1', 'SAIDA', 4)).not.toBe(base);
-    expect(chaveRequisicao('s2', 'p1', 'set1', 'SAIDA', 3)).not.toBe(base);
+    const base = chaveRequisicao('s1', 'p1', 'set1', 3);
+    expect(chaveRequisicao('s1', 'p2', 'set1', 3)).not.toBe(base);
+    expect(chaveRequisicao('s1', 'p1', 'set2', 3)).not.toBe(base);
+    expect(chaveRequisicao('s1', 'p1', 'set1', 4)).not.toBe(base);
+    expect(chaveRequisicao('s2', 'p1', 'set1', 3)).not.toBe(base);
   });
 });
 
@@ -207,6 +202,12 @@ describe('traduzirErroOperacional', () => {
   it('traduz permissão negada sem jargão de RBAC', () => {
     const msg = traduzirErroOperacional('PERMISSION_DENIED: operacional:movimentacao:create');
     expect(msg).toBe('Você não tem permissão para registrar movimentações.');
+  });
+
+  it('explica que o operacional só registra saída quando o banco recusa o tipo', () => {
+    const msg = traduzirErroOperacional('TIPO_INVALIDO: ENTRADA');
+    expect(msg).toContain('só registra saída');
+    expect(msg).toContain('Controle de Estoque');
   });
 
   it('traduz sessão sem tenant', () => {

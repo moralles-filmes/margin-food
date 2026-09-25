@@ -336,3 +336,113 @@ A RPC agora devolve a lista com os ids e o formulário a adota. Coberto por test
   prosseguir". É conveniência de UX; quem garante unicidade é o índice único, e o
   `23505` continua tratado com mensagem correta.
 - **Verificação visual em navegador real** não foi possível neste ambiente.
+
+---
+
+# Adendo — o operacional só registra SAÍDA
+
+**Data:** 2026-09-25
+**Branch:** `feat/operacional-somente-saida`
+**Modo:** `--fix` (auditoria incremental; escopo é a mudança, não o módulo inteiro)
+**Veredito:** PASS_WITH_WARNINGS — 0 bloqueantes; 1 achado P2 corrigido, 1 P3 mitigado pela ordem de deploy
+
+## O que mudou
+
+A Movimentação Operacional passa a registrar somente saída; entrada é lançada no
+Controle de Estoque (módulo administrativo, que não muda).
+
+| Camada | Mudança |
+|---|---|
+| `MovimentacaoOperacionalView` | abre direto no fluxo de saída, histórico embaixo; sem `create`, só aviso de consulta + histórico |
+| `FluxoMovimentacao` | sem ramo de entrada, sem Voltar no leitor (é a tela inicial), sem "Voltar ao início" |
+| `ProdutoPickerOperacional` | saldo sempre em destaque; item sem estoque não é selecionável |
+| `useMovimentacaoOperacional` | envia `p_tipo: 'SAIDA'` fixo |
+| `domain/estoque/operacional.ts` | `MovimentacaoOperacionalTipo` removido; `validarQuantidade`/`chaveRequisicao` sem `tipo`; `TIPO_INVALIDO` traduzido |
+| `op_registrar_movimentacao` | recusa `p_tipo` distinto de `'SAIDA'` (inclusive NULL) antes do caminho idempotente; mesma assinatura e GRANTs |
+| `registry.ts` + `permissions.description` | rótulo "Entrada e Saída" → "Saída de Estoque"; chave inalterada |
+
+O histórico (`op_list_historico`) filtra por `source_module`, não por tipo: as 4
+entradas operacionais já gravadas em produção continuam visíveis.
+
+Auditores rodados: `migration-validator` (PASS, 0 achados), `business-process-auditor`
+(PASS_WITH_WARNINGS, 2 achados), `security-regression-verifier` (ver Regressão).
+
+## Achados
+
+### MOD-movop-011 — Voltar da quantidade caía na busca manual após bipe de setor único ✅ CORRIGIDO
+- **Severidade:** P2 (pré-existente; agravado porque o leitor virou a tela inicial)
+- **Causa:** `voltar()` inferia "veio do leitor" por `setoresDoCodigo.length > 0`, que
+  só é preenchido quando o código resolve para vários setores.
+- **Impacto:** bipar um produto de setor único (o caso comum) e tocar Voltar levava à
+  lista manual de produtos, quebrando a bipagem contínua. Sem efeito em dado.
+- **Correção:** estado explícito `origemProduto` (`leitor`/`manual`), gravado em
+  `processarLeitura` e `selecionarProduto`.
+- **Teste:** "Voltar na quantidade volta ao leitor quando o código resolveu um setor
+  só" (falhou antes da correção) e "…volta à lista quando o produto veio da busca manual".
+
+### MOD-movop-012 — janela entre a migration e o frontend novo ⚠️ MITIGADO
+- **Severidade:** P3
+- **Causa:** migration (MCP) e frontend (Vercel) são publicados por canais separados.
+- **Impacto:** com a RPC nova e o bundle antigo (inclusive aba aberta com service
+  worker em cache), quem tocar Entrada recebe "Tipo de movimentação inválido."
+  Nada é gravado; a janela se fecha com o reload.
+- **Mitigação:** aplicar a migration imediatamente antes do merge, para a janela ser
+  o tempo do build da Vercel.
+
+## Verificações executadas no banco real
+
+Um único bloco atômico terminado em `RAISE`, contra `wuzxpbixprrgssoeeaez`, com o
+operador simulado por `request.jwt.claims` + `request.headers` (x-company-id) — tudo
+revertido; conferido depois: função antiga intacta, saldo inalterado, 0 movimentações
+de teste, descrições originais.
+
+| Sonda | Resultado |
+|---|---|
+| operador tem `operacional:movimentacao:create` no contexto | `true` |
+| **controle:** versão em produção, ENTRADA | gravou (2 → 3) — o furo existia |
+| versão nova, ENTRADA | RECUSADO — `TIPO_INVALIDO: ENTRADA` |
+| versão nova, tipo NULL | RECUSADO — `TIPO_INVALIDO: <NULL>` |
+| versão nova, SAIDA | gravou (3 → 2) |
+| reenvio da SAIDA com a mesma chave | `idempotente=true` |
+| mesma chave reenviada como ENTRADA | RECUSADO — `TIPO_INVALIDO` (antes do caminho idempotente) |
+| `permissions.description` | "Movimentacao Operacional -> Saida de Estoque -> Ver/Criar" |
+| outras funções do banco que chamam a RPC | nenhuma |
+| triggers de `movimentacoes_estoque` com efeito externo (HTTP/notify) | nenhum |
+
+## Regressão
+
+`security-regression-verifier`: PASS em todos os vetores e comandos.
+
+| Verificação | Resultado |
+|---|---|
+| `npm run test` | 118 arquivos · 1039 testes · todos verdes |
+| `tsc --noEmit -p tsconfig.app.json` | 4 erros, todos pré-existentes e fora do módulo (eram 5; o de `FluxoMovimentacao.tsx` foi corrigido) |
+| `eslint` nos arquivos alterados | limpo |
+| `npm run build` | ok |
+| módulo administrativo no diff | ausente |
+| `CLAUDE.md` × `AGENTS.md` | idênticos |
+
+Testes novos ou alterados: `movimentacao-operacional-view.test.tsx` (3, novo),
+`use-movimentacao-operacional.test.ts` (1, novo), `movimentacao-operacional-fluxo.test.tsx`
+(casos de entrada trocados por "sem Voltar no leitor", "sem Voltar ao início" e os 2 de
+MOD-movop-011), `estoque-operacional-domain.test.ts` (sem `tipo`; tradução de `TIPO_INVALIDO`).
+
+## Impacto fora do módulo
+
+`src/permissions/registry.ts` (só o rótulo) e o texto de confirmação em
+`AcessoSetorPorUsuarioAdmin`. `NovaMovimentacaoModal`/`MovimentacoesSection` não foram
+tocados. `MovimentacaoOperacionalTipo`, `validarQuantidade` e `chaveRequisicao` só
+tinham consumidores dentro do operacional.
+
+## Aplicação em produção
+
+`20260925153812_operacional_somente_saida.sql`, via MCP `apply_migration` (arquivo local
+renomeado para a versão gravada; sem `db push` nem `migration repair`). Conferido no banco
+vivo: guard novo ativo, ACL inalterada (`authenticated`, `service_role`), descrições
+atualizadas, 4 entradas operacionais antigas preservadas. Sonda revertida na RPC viva:
+ENTRADA → `TIPO_INVALIDO: ENTRADA`; SAIDA grava (2 → 1); saldo e movimentações
+intactos depois.
+
+## Riscos residuais
+
+- Verificação visual em navegador real não foi possível neste ambiente.
