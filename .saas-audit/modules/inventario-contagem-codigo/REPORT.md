@@ -181,3 +181,72 @@ Catálogo — mesmo desenho da RPC irmã `inventario_find_item_por_barcode`, que
   quantidade, histórico e desfazer inalterados; sem busca duplicada; nada em
   `estoque-operacional/` ou `supabase/functions/`; sem segredos. Migration confirmada no
   banco pelo agente principal (`supabase_migrations.schema_migrations`, versão `20260924204841`).
+
+---
+
+## Rodada 3 — leitura pela câmera (2026-09-25)
+
+**Branch:** `feat/inventario-leitura-camera` · **Veredito:** PASS — 0 bloqueantes; 2 P2 e 3 P3 corrigidos.
+
+Só cliente e headers: sem banco, RLS, RPC ou Edge Function. A câmera entrega uma string
+ao mesmo `buscarCodigo` do leitor físico/digitação; gravar continua exigindo "Adicionar".
+
+```
+ContagemPorCodigo ─ "Ler pela câmera" (canCount) ─► LeitorCamera ─► useLeitorCamera
+   getUserMedia (traseira, sem áudio) + carregarDetector (nativo | ZXing wasm do próprio site)
+   loop 125 ms: detectar → dentroDaMira → filtro de repetição (2 s) → lerDaCamera
+   └► buscarCodigo → find_by_barcode → card de quantidade (câmera pausada/oculta) → Adicionar → RPC
+```
+
+Headers (`vercel.json`): `script-src 'self' 'wasm-unsafe-eval'` (só compila WebAssembly;
+`eval`/`new Function` seguem barrados) e `Permissions-Policy: camera=(self)`. `connect-src`
+inalterado — o `.wasm` vem de `/assets`, e a CSP barra o jsDelivr padrão da lib.
+Dependências com pin exato e sha512 no `bun.lock`, sem scripts de instalação.
+Frames nunca saem do aparelho (canvas em memória, sem rede nem armazenamento).
+
+Auditores: architecture-mapper; business-process (PASS_WITH_WARNINGS); revisão de
+segurança de CSP/supply chain/privacidade (sem P0–P2); functional (sem BLOCKER/HIGH).
+Tenant e identidade não rodaram: nenhum caminho de dado ou permissão novo.
+
+### MOD-inventario-contagem-codigo-010 — Mira decorativa lia código fora da vista (P2, corrigido)
+O vídeo usa `object-cover`, que corta a imagem (celular em pé perde ~60% em cima e
+embaixo); o detector aceitava qualquer código do quadro — inclusive na parte cortada ou
+na prateleira ao fundo — e abria o card do produto errado. Correção: o detector devolve o
+`boundingBox`; `dentroDaMira` (`src/domain/estoque/leituraCamera.ts`) só aceita código
+com o centro dentro da moldura, cuja medida (`MIRA_CAMERA`) é a mesma usada para desenhá-la.
+Sem medidas (vídeo sem tamanho, leitor sem retângulo) aceita. Testes: 6 de geometria e
+"só abre o código que está dentro da mira" no hook (mutação detectada).
+
+### MOD-inventario-contagem-codigo-011 — Leitor físico não funcionava com a câmera aberta (P2, corrigido)
+Com a câmera aberta nenhum campo fica focado (o teclado cobriria a imagem) e o bipe do
+leitor HID caía no vazio. Correção: com a câmera aberta, uma tecla solta (sem
+Ctrl/Alt/Meta, não Espaço, fora de campo de texto) leva o foco ao campo do código. Sem
+teclado físico não há tecla, então o teclado da tela continua sem abrir.
+
+### MOD-inventario-contagem-codigo-012/013 — Código novo (P3, corrigidos)
+Falha ao ligar lanterna/zoom agora aparece na tela; lanterna com `aria-label` fixo +
+`aria-pressed` (padrão de botão liga/desliga); mensagem de câmera bloqueada citava um botão
+"Câmera" que não existe; teste novo do componente real (`LeitorCamera.test.tsx`).
+
+### Aceitos / fora do escopo
+- 014 (P3, aceito): a busca automática agendada pela digitação não é cancelada ao abrir a
+  câmera — busca o que foi digitado, e a correção 011 depende dela com a câmera aberta.
+- 015 (P3, aceito): `DetectorCodigo.origem` só é lido pelos testes (confirma nativo × wasm).
+- 016 (P3, fora do escopo — recomendação): o rewrite `/(.*)` → `/index.html` devolve HTML
+  com 200 para asset que não existe mais; após um upgrade do `zxing-wasm`, uma aba antiga
+  mostraria "Este navegador não consegue ler código pela câmera" até atualizar (~30 s pelo
+  `PwaUpdatePrompt`). Sugestão global: rewrite `/((?!assets/).*)` e `Cache-Control`
+  imutável em `/assets/(.*)`.
+- 017 (P3, residual): Safari iOS ≤ 15 não conhece `'wasm-unsafe-eval'` → "sem suporte"
+  (leitor e digitação seguem). O `.wasm` é binário opaco: proteção = pin exato + sha512 do
+  lockfile + `zxing-wasm-versao.test.ts`.
+
+### Testes e regressão
+- 1032 testes, build ok (`zxing_reader-*.wasm` em `dist/assets`, lib em chunk lazy), typecheck
+  só com os 5 erros pré-existentes, lint limpo.
+- security-regression-verifier: PASS — 010–013 fechados; câmera nunca grava sem
+  "Adicionar"; filtro de repetição, `pausado`/`oculto` intactos; nada em `supabase/` ou
+  `estoque-operacional/`; `vercel.json` igual ao auditado; sem segredos. Ressalva apontada
+  (Espaço em botão focado movia o foco) corrigida em seguida, com teste.
+- Não verificável aqui: comportamento em aparelho real (foco de perto no iPhone Pro,
+  lanterna, MIME do `.wasm` na Vercel) — checklist manual no PR.

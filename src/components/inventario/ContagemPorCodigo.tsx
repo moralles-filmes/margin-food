@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Check, CheckCircle2, ListChecks, Loader2, Minus, Plus, ScanLine, Search, Undo2 } from 'lucide-react';
+import { ArrowLeft, Camera, Check, CheckCircle2, ListChecks, Loader2, Minus, Plus, ScanLine, Search, Undo2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import LeitorCamera from '@/components/inventario/LeitorCamera';
 import type {
   AjusteContagemResult, BarcodeLookupResult, Inventario, InventarioItem, OpcoesAjusteContagem,
 } from '@/hooks/useInventarioStore';
@@ -50,7 +51,8 @@ const ESTILO_AVISO: Record<Aviso['tom'], string> = {
  * quantidade daquele produto. O código chega pelo leitor HID (que manda Enter),
  * ou digitado: teclado numérico de celular/tablet não tem Enter, então um
  * código de barras (GTIN) cadastrado completo é buscado sozinho e o botão
- * Buscar cobre o resto (ver decidirBuscaAutomatica).
+ * Buscar cobre o resto (ver decidirBuscaAutomatica). A câmera (LeitorCamera)
+ * entrega o código pelo mesmo buscarCodigo.
  *
  * Leitor próprio em vez do LeitorCodigoBarras da Movimentação Operacional:
  * aquele devolve o foco ao campo do código a cada blur, o que roubaria o foco
@@ -64,6 +66,10 @@ export default function ContagemPorCodigo({
   const [pendente, setPendente] = useState<ProdutoLido | null>(null);
   const [quantidade, setQuantidade] = useState('1');
   const [codigosCadastrados, setCodigosCadastrados] = useState<ReadonlySet<string>>(() => new Set());
+  const [cameraAberta, setCameraAberta] = useState(false);
+  // Lido pelo refoco do blur, que roda num setTimeout com o closure antigo.
+  const cameraAbertaRef = useRef(false);
+  const temCamera = typeof navigator !== 'undefined' && typeof navigator.mediaDevices?.getUserMedia === 'function';
   const codigoRef = useRef<HTMLInputElement>(null);
   const quantidadeRef = useRef<HTMLInputElement>(null);
 
@@ -76,16 +82,34 @@ export default function ContagemPorCodigo({
 
   // Sem produto pendente, o campo do código fica pronto para o próximo bipe;
   // com produto pendente, o foco vai para a quantidade já selecionada, para
-  // digitar por cima do "1".
+  // digitar por cima do "1". Com a câmera aberta o campo do código não puxa o
+  // foco: no celular abriria o teclado por cima da imagem.
   useEffect(() => {
     if (processando || !canCount) return;
     if (pendente) {
       quantidadeRef.current?.focus();
       quantidadeRef.current?.select();
-    } else {
+    } else if (!cameraAberta) {
       codigoRef.current?.focus();
     }
-  }, [pendente, processando, canCount]);
+  }, [pendente, processando, canCount, cameraAberta]);
+
+  // Com a câmera aberta nada fica focado e o leitor HID digitaria no vazio: a
+  // primeira tecla solta leva o foco ao campo do código e o resto do bipe cai
+  // nele. Sem teclado físico não há tecla, então o teclado da tela não abre.
+  useEffect(() => {
+    if (!cameraAberta || pendente || processando || !canCount) return;
+    const aoTeclar = (e: KeyboardEvent) => {
+      // Espaço aciona o botão focado (lanterna, zoom); bipe não começa com ele.
+      if (e.ctrlKey || e.metaKey || e.altKey || e.key.length !== 1 || e.key === ' ') return;
+      const alvo = e.target;
+      if (alvo instanceof HTMLInputElement || alvo instanceof HTMLTextAreaElement
+        || alvo instanceof HTMLSelectElement || (alvo instanceof HTMLElement && alvo.isContentEditable)) return;
+      codigoRef.current?.focus();
+    };
+    document.addEventListener('keydown', aoTeclar);
+    return () => document.removeEventListener('keydown', aoTeclar);
+  }, [cameraAberta, pendente, processando, canCount]);
 
   useEffect(() => {
     let cancelado = false;
@@ -96,7 +120,7 @@ export default function ContagemPorCodigo({
   }, [inventario.id, listarCodigos]);
 
   const focarCodigo = () => {
-    if (!pendente && !processando) codigoRef.current?.focus();
+    if (!pendente && !processando && !cameraAbertaRef.current) codigoRef.current?.focus();
   };
 
   const buscarCodigo = useCallback(async (valor: string) => {
@@ -120,6 +144,23 @@ export default function ContagemPorCodigo({
       setAviso({ tom: r.tipo === 'erro' ? 'erro' : 'alerta', texto: r.mensagem });
     }
   }, [processando, pendente, buscarProduto]);
+
+  const lerDaCamera = useCallback((valor: string) => {
+    // iPhone não deixa site vibrar; lá a confirmação é o cartão abrindo.
+    navigator.vibrate?.(80);
+    void buscarCodigo(valor);
+  }, [buscarCodigo]);
+
+  const abrirCamera = () => {
+    cameraAbertaRef.current = true;
+    setCameraAberta(true);
+    codigoRef.current?.blur();
+  };
+
+  const fecharCamera = useCallback(() => {
+    cameraAbertaRef.current = false;
+    setCameraAberta(false);
+  }, []);
 
   // Código cadastrado completo é buscado sozinho depois de uma pausa curta;
   // cada tecla reinicia a espera.
@@ -198,6 +239,15 @@ export default function ContagemPorCodigo({
         </div>
       </div>
 
+      {canCount && cameraAberta && (
+        <LeitorCamera
+          pausado={!!pendente || processando}
+          oculto={!!pendente}
+          onCodigo={lerDaCamera}
+          onFechar={fecharCamera}
+        />
+      )}
+
       {!canCount ? (
         <div className="rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">
           Você não tem permissão para contar itens deste inventário.
@@ -274,7 +324,7 @@ export default function ContagemPorCodigo({
             {processando ? 'Buscando produto…' : 'Aguardando leitura do código de barras'}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Use o leitor ou digite o código. Código de barras cadastrado é buscado sozinho; os demais, toque em Buscar.
+            Use o leitor, a câmera ou digite o código. Código de barras cadastrado é buscado sozinho; os demais, toque em Buscar.
           </p>
           <div className="mt-4 flex gap-2">
             <Input
@@ -296,6 +346,18 @@ export default function ContagemPorCodigo({
               <Search className="h-4 w-4" /> Buscar
             </Button>
           </div>
+          {temCamera && !cameraAberta && (
+            <Button
+              type="button"
+              variant="outline"
+              className="mt-2 h-12 w-full gap-1.5"
+              // Sem tirar o foco no toque: o refoco do blur reabriria o teclado.
+              onMouseDown={e => e.preventDefault()}
+              onClick={e => { e.stopPropagation(); abrirCamera(); }}
+            >
+              <Camera className="h-4 w-4" /> Ler pela câmera
+            </Button>
+          )}
         </form>
       )}
 
