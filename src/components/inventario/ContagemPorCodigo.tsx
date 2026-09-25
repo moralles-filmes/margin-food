@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Camera, Check, CheckCircle2, ListChecks, Loader2, Minus, Plus, ScanLine, Search, Undo2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import LeitorCamera from '@/components/inventario/LeitorCamera';
+import LeitorCamera from '@/components/camera/LeitorCamera';
 import type {
   AjusteContagemResult, BarcodeLookupResult, Inventario, InventarioItem, OpcoesAjusteContagem,
 } from '@/hooks/useInventarioStore';

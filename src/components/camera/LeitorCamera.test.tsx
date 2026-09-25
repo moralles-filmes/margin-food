@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import LeitorCamera from '@/components/inventario/LeitorCamera';
+import LeitorCamera from '@/components/camera/LeitorCamera';
 import type { useLeitorCamera } from '@/hooks/useLeitorCamera';
 import { MENSAGEM_ERRO_CAMERA } from '@/domain/estoque/leituraCamera';
 
