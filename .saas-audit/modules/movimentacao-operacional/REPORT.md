@@ -434,8 +434,15 @@ MOD-movop-011), `estoque-operacional-domain.test.ts` (sem `tipo`; tradução de 
 tocados. `MovimentacaoOperacionalTipo`, `validarQuantidade` e `chaveRequisicao` só
 tinham consumidores dentro do operacional.
 
+## Aplicação em produção
+
+`20260925153812_operacional_somente_saida.sql`, via MCP `apply_migration` (arquivo local
+renomeado para a versão gravada; sem `db push` nem `migration repair`). Conferido no banco
+vivo: guard novo ativo, ACL inalterada (`authenticated`, `service_role`), descrições
+atualizadas, 4 entradas operacionais antigas preservadas. Sonda revertida na RPC viva:
+ENTRADA → `TIPO_INVALIDO: ENTRADA`; SAIDA grava (2 → 1); saldo e movimentações
+intactos depois.
+
 ## Riscos residuais
 
-- A migration precisa ser aplicada em produção (MCP `apply_migration`) para o bloqueio
-  valer no banco; até lá, só a tela impede a entrada.
 - Verificação visual em navegador real não foi possível neste ambiente.
