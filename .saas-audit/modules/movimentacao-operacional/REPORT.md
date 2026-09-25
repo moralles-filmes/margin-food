@@ -446,3 +446,75 @@ intactos depois.
 ## Riscos residuais
 
 - Verificação visual em navegador real não foi possível neste ambiente.
+
+---
+
+# Adendo — leitura de código de barras pela câmera
+
+**Data:** 2026-09-25
+**Branch:** `feat/operacional-leitura-camera`
+**Modo:** `--fix` (auditoria incremental; escopo é a mudança)
+**Veredito:** PASS_WITH_WARNINGS — 1 bloqueante (P1) encontrado e corrigido; 1 P3 corrigido pela mesma guarda
+
+## O que mudou
+
+Reuso da câmera do Inventário (#113), sem implementação nova e sem mudança de banco,
+permissão ou `vercel.json`.
+
+| Camada | Mudança |
+|---|---|
+| `src/components/camera/LeitorCamera.tsx` | movido de `components/inventario/` (compartilhado); Inventário só trocou import e `vi.mock` |
+| `FluxoMovimentacao` | câmera montada fora do passo de leitura: pausada e oculta em setor/quantidade/sucesso, volta a ler em "Ler próximo código"/Voltar; fecha em "Lançar manualmente"/"Outra saída manual"/Fechar/segundo plano |
+| `FluxoMovimentacao.lerDaCamera` | `validarBarcode` → `processarLeitura`, sem a janela anti-repique do HID (o filtro da câmera já segura o código parado na lente; as duas janelas somadas impediriam duas saídas seguidas do mesmo produto) |
+| `LeitorCodigoBarras` | botão "Ler pela câmera"; com a câmera aberta o campo não puxa o foco (`cameraAbertaRef`, `onMouseDown` preventDefault, `blur` ao abrir) e um `keydown` no document leva o foco ao campo na primeira tecla do leitor HID |
+
+A câmera nunca registra: só abre o passo de quantidade; `registrar` continua atrás de
+"Confirmar saída".
+
+Roteamento: TIER 1 → Codex, bloqueado por `dirty_worktree` (estado local da auditoria
+não commitado) → executado no agente principal. Auditor: `business-process-auditor`.
+
+## Achados
+
+### MOD-movop-013 — resposta atrasada da busca por código sobrescrevia o lançamento manual ✅ CORRIGIDO
+- **Severidade:** P1 — bloqueante (pré-existente no leitor HID; a câmera torna mais
+  provável, porque lê sem o operador perceber)
+- **Causa:** `processarLeitura` aplicava o resultado de `buscarPorBarcode` sem checar se
+  a leitura ainda era a atual. "Lançar manualmente" continua clicável durante a busca.
+- **Impacto:** com a rede lenta, o operador ia para o manual, escolhia o produto Y e
+  digitava a quantidade; a resposta atrasada do código X trocava produto, setor e
+  quantidade na tela sem aviso — confirmar gravava a saída do item errado. Nenhuma trava
+  do banco detecta (produto, setor e quantidade são válidos).
+- **Correção:** cada leitura leva um número (`leituraAtualRef`); `irParaManual` e
+  `irParaLeitor` invalidam a busca em voo (`descartarLeituraEmVoo`, que também solta o
+  `lendo`). O botão manual segue habilitado de propósito: é a saída quando a rede trava.
+- **Teste:** "resposta atrasada de uma leitura não troca o produto escolhido depois no
+  manual" (falhava: a Coca substituía a Água).
+
+### MOD-movop-014 — aviso de leitura atrasada aparecendo numa leitura nova ✅ CORRIGIDO
+- **Severidade:** P3 · mesma causa e mesma guarda.
+- **Teste:** "aviso de uma leitura atrasada não aparece numa leitura nova" (falhava: o
+  leitor ficava preso em "Buscando produto…" pela busca antiga).
+
+## Testes
+
+15 testes novos em `movimentacao-operacional-fluxo.test.tsx` (13 de câmera + 2 de
+MOD-movop-013/014). 14 foram vistos falhando antes da implementação; o "navegador sem
+câmera não mostra o botão" já passava por definição e fica como guarda. Câmera mockada na tela,
+como em `ContagemPorCodigo.test.tsx`; o hook real segue coberto em `useLeitorCamera.test.tsx`.
+
+`security-regression-verifier`: PASS em todos os vetores e comandos.
+
+| Verificação | Resultado |
+|---|---|
+| `npm run test` | 118 arquivos · 1054 testes · todos verdes |
+| `tsc --noEmit -p tsconfig.app.json` | 4 erros, todos pré-existentes e fora do diff |
+| `eslint` nos arquivos alterados | limpo |
+| `npm run build` | ok (`LeitorCamera` em chunk próprio) |
+| `supabase/`, `vercel.json`, `useLeitorCamera`, `leituraCamera`, `lib/camera` no diff | ausentes |
+| referência viva a `inventario/LeitorCamera` | nenhuma |
+
+## Riscos residuais
+
+- Comportamento real de câmera, teclado virtual e leitor HID só se confirma no aparelho:
+  checklist Android (celular e tablet) e iPhone no PR, testável no preview da Vercel.

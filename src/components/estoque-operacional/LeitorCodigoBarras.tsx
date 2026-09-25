@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Keyboard, Loader2, ScanLine } from 'lucide-react';
+import { Camera, Keyboard, Loader2, ScanLine } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -18,6 +18,10 @@ interface Props {
   aviso?: string;
   /** Sobe a cada nova operação concluída, para o campo voltar a receber foco. */
   focoToken: number;
+  /** Câmera aberta (LeitorCamera, montado pelo fluxo): o campo não puxa o foco. */
+  cameraAberta: boolean;
+  /** Sem ele, o botão "Ler pela câmera" não aparece. */
+  onAbrirCamera?: () => void;
 }
 
 /**
@@ -27,15 +31,23 @@ interface Props {
  * Enter. O campo por isso fica sempre focado e é reencaixado depois de cada
  * operação — o operador não clica em nada entre um bipe e o outro.
  *
+ * Com a câmera aberta é o contrário: focar o campo abriria o teclado do
+ * celular por cima da imagem. O campo fica sem foco e a primeira tecla de um
+ * leitor físico o puxa de volta, então o bipe continua funcionando.
+ *
  * O campo é visível de propósito. Campo invisível parece elegante até o leitor
  * falhar: aí ninguém vê o que foi lido e não há como digitar o código à mão.
  */
 export default function LeitorCodigoBarras({
-  onLeitura, onLancarManualmente, ocupado, aviso, focoToken,
+  onLeitura, onLancarManualmente, ocupado, aviso, focoToken, cameraAberta, onAbrirCamera,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [valor, setValor] = useState('');
   const [erro, setErro] = useState<string | null>(null);
+  const temCamera = typeof navigator !== 'undefined' && typeof navigator.mediaDevices?.getUserMedia === 'function';
+
+  // Lido pelo refoco do blur, que roda num setTimeout com o closure antigo.
+  const cameraAbertaRef = useRef(cameraAberta);
 
   // Guarda da leitura repetida: leitor em superfície reflexiva dispara duas
   // vezes e um bipe viraria duas movimentações.
@@ -43,10 +55,36 @@ export default function LeitorCodigoBarras({
   const ultimoEmRef = useRef<number | null>(null);
 
   const focar = useCallback(() => {
-    if (!ocupado) inputRef.current?.focus();
+    if (!ocupado && !cameraAbertaRef.current) inputRef.current?.focus();
   }, [ocupado]);
 
-  useEffect(() => { focar(); }, [focar, focoToken]);
+  // Antes do efeito de foco: ele precisa enxergar o estado atual da câmera.
+  // Fechar a câmera devolve o foco ao campo.
+  useEffect(() => { cameraAbertaRef.current = cameraAberta; }, [cameraAberta]);
+  useEffect(() => { focar(); }, [focar, focoToken, cameraAberta]);
+
+  // Com a câmera aberta nada fica focado e o leitor HID digitaria no vazio: a
+  // primeira tecla solta leva o foco ao campo e o resto do bipe cai nele. Sem
+  // teclado físico não há tecla, então o teclado da tela não abre.
+  useEffect(() => {
+    if (!cameraAberta || ocupado) return;
+    const aoTeclar = (e: KeyboardEvent) => {
+      // Espaço aciona o botão focado (lanterna, zoom); bipe não começa com ele.
+      if (e.ctrlKey || e.metaKey || e.altKey || e.key.length !== 1 || e.key === ' ') return;
+      const alvo = e.target;
+      if (alvo instanceof HTMLInputElement || alvo instanceof HTMLTextAreaElement
+        || alvo instanceof HTMLSelectElement || (alvo instanceof HTMLElement && alvo.isContentEditable)) return;
+      inputRef.current?.focus();
+    };
+    document.addEventListener('keydown', aoTeclar);
+    return () => document.removeEventListener('keydown', aoTeclar);
+  }, [cameraAberta, ocupado]);
+
+  const abrirCamera = () => {
+    cameraAbertaRef.current = true;
+    inputRef.current?.blur();
+    onAbrirCamera?.();
+  };
 
   const processar = useCallback((raw: string) => {
     const { valido, codigo, motivo } = validarBarcode(raw);
@@ -84,7 +122,9 @@ export default function LeitorCodigoBarras({
           {ocupado ? 'Buscando produto…' : 'Aguardando leitura do código de barras'}
         </p>
         <p className="mt-1 text-xs text-muted-foreground">
-          Use o leitor ou digite o código e pressione Enter.
+          {onAbrirCamera && temCamera
+            ? 'Use o leitor, a câmera ou digite o código e pressione Enter.'
+            : 'Use o leitor ou digite o código e pressione Enter.'}
         </p>
 
         <Input
@@ -106,6 +146,19 @@ export default function LeitorCodigoBarras({
           placeholder="0000000000000"
           className="mt-4 h-14 text-center font-mono text-xl tracking-widest"
         />
+
+        {onAbrirCamera && temCamera && !cameraAberta && (
+          <Button
+            type="button"
+            variant="outline"
+            className="mt-2 h-12 w-full gap-1.5"
+            // Sem tirar o foco no toque: o refoco do blur reabriria o teclado.
+            onMouseDown={e => e.preventDefault()}
+            onClick={e => { e.stopPropagation(); abrirCamera(); }}
+          >
+            <Camera className="h-4 w-4" /> Ler pela câmera
+          </Button>
+        )}
       </div>
 
       {erro && (

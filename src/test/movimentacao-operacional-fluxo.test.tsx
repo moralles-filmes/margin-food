@@ -9,7 +9,7 @@
  *   · erro do servidor chega traduzido ao operador.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import FluxoMovimentacao from '@/components/estoque-operacional/FluxoMovimentacao';
 import type {
   ProdutoOperacional,
@@ -19,6 +19,20 @@ import type {
 const mockToastError = vi.fn();
 vi.mock('@/hooks/useScopedToast', () => ({
   useScopedToast: () => ({ error: mockToastError, success: vi.fn() }),
+}));
+
+// A câmera de verdade é coberta em useLeitorCamera.test.tsx; aqui só o contrato com o fluxo.
+const camera = vi.hoisted(() => ({ codigo: '7891234567890' }));
+vi.mock('@/components/camera/LeitorCamera', () => ({
+  default: ({ pausado, oculto, onCodigo, onFechar }: {
+    pausado: boolean; oculto: boolean; onCodigo: (codigo: string) => void; onFechar: () => void;
+  }) => (
+    <div data-testid="camera">
+      <span data-testid="camera-estado">{oculto ? 'oculta' : pausado ? 'pausada' : 'lendo'}</span>
+      <button type="button" onClick={() => onCodigo(camera.codigo)}>simular leitura</button>
+      <button type="button" onClick={onFechar}>fechar câmera fake</button>
+    </div>
+  ),
 }));
 
 const SETORES: SetorOperacional[] = [
@@ -313,6 +327,55 @@ describe('FluxoMovimentacao — leitor de código de barras', () => {
     expect(await screen.findByRole('textbox', { name: /Pesquisar produto/ })).toBeInTheDocument();
   });
 
+  it('resposta atrasada de uma leitura não troca o produto escolhido depois no manual', async () => {
+    // Regressão: a busca em voo, ao resolver, sobrescrevia produto/setor/quantidade
+    // de um lançamento manual iniciado enquanto ela esperava a rede.
+    const dados = dadosBase();
+    let resolverBusca: (v: unknown) => void = () => {};
+    dados.buscarPorBarcode = vi.fn().mockReturnValue(new Promise(res => { resolverBusca = res; }));
+    dados.buscarProdutos = vi.fn().mockResolvedValue({
+      produtos: [COCA, AGUA], erro: null, obsoleto: false,
+    });
+    renderFluxo(dados);
+
+    await escanear('7891234567890');
+    await screen.findByText('Buscando produto…');
+    // "Lançar manualmente" segue disponível: é a saída quando a rede trava.
+    await irParaManual();
+    await clicar('Cozinha');
+    await clicar(/Água Mineral 500ml/);
+    const campo = await screen.findByRole('textbox', { name: 'Quantidade' });
+    digitarQuantidade(campo, '5');
+
+    await act(async () => {
+      resolverBusca({ status: 'encontrado', produto: COCA, setores: [SETORES[1]] });
+    });
+
+    expect(screen.getByText('Água Mineral 500ml')).toBeInTheDocument();
+    expect(screen.queryByText('Coca-Cola Lata 350ml')).not.toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Quantidade' })).toHaveValue('5');
+    expect(screen.getByText(/Setor:/).textContent).toContain('Cozinha');
+  });
+
+  it('aviso de uma leitura atrasada não aparece numa leitura nova', async () => {
+    const dados = dadosBase();
+    let resolverBusca: (v: unknown) => void = () => {};
+    dados.buscarPorBarcode = vi.fn().mockReturnValue(new Promise(res => { resolverBusca = res; }));
+    renderFluxo(dados);
+
+    await escanear('7891234567890');
+    await screen.findByText('Buscando produto…');
+    await irParaManual();
+    await clicar('Cozinha');
+    await clicar(/Usar leitor de código de barras/);
+    await screen.findByText('Aguardando leitura do código de barras');
+
+    await act(async () => { resolverBusca({ status: 'nao_encontrado' }); });
+
+    expect(screen.queryByText(/Produto não encontrado para o código/)).not.toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Código de barras' })).toBeEnabled();
+  });
+
   it('continua pronto para a próxima leitura depois de concluir uma', async () => {
     const dados = dadosBase();
     renderFluxo(dados);
@@ -566,5 +629,186 @@ describe('FluxoMovimentacao — confirmação', () => {
       expect.stringContaining('Procure um responsável'),
     ));
     expect(screen.queryByText(/Saída realizada/i)).not.toBeInTheDocument();
+  });
+});
+
+describe('FluxoMovimentacao — câmera', () => {
+  beforeEach(() => {
+    camera.codigo = '7891234567890';
+    Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: { getUserMedia: vi.fn() } });
+  });
+
+  afterEach(() => {
+    delete (navigator as { mediaDevices?: unknown }).mediaDevices;
+  });
+
+  const abrirCamera = () => clicar(/Ler pela câmera/);
+  const estadoCamera = () => screen.getByTestId('camera-estado').textContent;
+  const lerPelaCamera = () => clicar('simular leitura');
+
+  /** Deixa rodar o refoco do blur (setTimeout 0) antes de conferir o foco. */
+  async function esperarRefoco() {
+    await act(async () => { await new Promise(r => setTimeout(r, 10)); });
+  }
+
+  it('o botão "Ler pela câmera" abre a câmera lendo', async () => {
+    renderFluxo(dadosBase());
+    await abrirCamera();
+
+    expect(estadoCamera()).toBe('lendo');
+    expect(screen.queryByRole('button', { name: /Ler pela câmera/ })).not.toBeInTheDocument();
+  });
+
+  it('o código da câmera abre a quantidade com a câmera escondida, sem registrar', async () => {
+    const dados = dadosBase();
+    renderFluxo(dados);
+    await abrirCamera();
+    await lerPelaCamera();
+
+    expect(await screen.findByRole('button', { name: /Confirmar saída/ })).toBeInTheDocument();
+    expect(dados.buscarPorBarcode).toHaveBeenCalledWith('7891234567890');
+    expect(estadoCamera()).toBe('oculta');
+    expect(dados.registrar).not.toHaveBeenCalled();
+  });
+
+  it('volta a ler depois de confirmar e tocar "Ler próximo código"', async () => {
+    renderFluxo(dadosBase());
+    await abrirCamera();
+    await lerPelaCamera();
+    await clicar(/Confirmar saída/);
+
+    expect(await screen.findByText(/Saída realizada/i)).toBeInTheDocument();
+    expect(estadoCamera()).toBe('oculta');
+
+    await clicar(/Ler próximo código/);
+    await waitFor(() => expect(estadoCamera()).toBe('lendo'));
+  });
+
+  it('duas saídas seguidas do mesmo produto pela câmera buscam e registram as duas', async () => {
+    const dados = dadosBase();
+    renderFluxo(dados);
+    await abrirCamera();
+
+    await lerPelaCamera();
+    await clicar(/Confirmar saída/);
+    await screen.findByText(/Saída realizada/i);
+    await clicar(/Ler próximo código/);
+
+    await lerPelaCamera();
+    await clicar(/Confirmar saída/);
+
+    await waitFor(() => expect(dados.registrar).toHaveBeenCalledTimes(2));
+    expect(dados.buscarPorBarcode).toHaveBeenCalledTimes(2);
+  });
+
+  it('produto em vários setores pergunta o setor com a câmera escondida', async () => {
+    const dados = dadosBase();
+    dados.buscarPorBarcode = vi.fn().mockResolvedValue({
+      status: 'encontrado', produto: COCA, setores: SETORES,
+    });
+    renderFluxo(dados);
+    await abrirCamera();
+    await lerPelaCamera();
+
+    expect(await screen.findByText(/De qual setor deseja retirar/)).toBeInTheDocument();
+    expect(estadoCamera()).toBe('oculta');
+  });
+
+  it('código inválido da câmera avisa sem ir ao servidor', async () => {
+    const dados = dadosBase();
+    camera.codigo = '12';
+    renderFluxo(dados);
+    await abrirCamera();
+    await lerPelaCamera();
+
+    expect(await screen.findByText(/Código muito curto/)).toBeInTheDocument();
+    expect(dados.buscarPorBarcode).not.toHaveBeenCalled();
+  });
+
+  it('leitura da câmera fora do passo de leitura é ignorada', async () => {
+    const dados = dadosBase();
+    renderFluxo(dados);
+    await abrirCamera();
+    await lerPelaCamera();
+    await screen.findByRole('button', { name: /Confirmar saída/ });
+
+    // A câmera real fica pausada aqui; o fluxo não confia só nisso.
+    await lerPelaCamera();
+    expect(dados.buscarPorBarcode).toHaveBeenCalledTimes(1);
+  });
+
+  it('Voltar na quantidade volta ao leitor com a câmera lendo', async () => {
+    renderFluxo(dadosBase());
+    await abrirCamera();
+    await lerPelaCamera();
+    await screen.findByRole('button', { name: /Confirmar saída/ });
+
+    await clicar('Voltar');
+    expect(await screen.findByRole('textbox', { name: 'Código de barras' })).toBeInTheDocument();
+    expect(estadoCamera()).toBe('lendo');
+  });
+
+  it('"Lançar manualmente" fecha a câmera', async () => {
+    renderFluxo(dadosBase());
+    await abrirCamera();
+
+    await irParaManual();
+    expect(screen.queryByTestId('camera')).not.toBeInTheDocument();
+  });
+
+  it('com a câmera aberta o campo do código não puxa o foco (teclado cobriria a imagem)', async () => {
+    renderFluxo(dadosBase());
+    const campo = await screen.findByRole('textbox', { name: 'Código de barras' });
+    await waitFor(() => expect(campo).toHaveFocus());
+
+    await abrirCamera();
+    await esperarRefoco();
+    expect(campo).not.toHaveFocus();
+
+    // Nem ao voltar para o leitor depois de uma leitura.
+    await lerPelaCamera();
+    await screen.findByRole('button', { name: /Confirmar saída/ });
+    await clicar('Voltar');
+    const campoNovo = await screen.findByRole('textbox', { name: 'Código de barras' });
+    await esperarRefoco();
+    expect(campoNovo).not.toHaveFocus();
+  });
+
+  it('leitor físico continua funcionando com a câmera aberta', async () => {
+    const dados = dadosBase();
+    renderFluxo(dados);
+    await abrirCamera();
+    await esperarRefoco();
+    const campo = screen.getByRole('textbox', { name: 'Código de barras' });
+    expect(campo).not.toHaveFocus();
+
+    // Atalho do navegador e Espaço (aciona o botão focado) não são bipe.
+    fireEvent.keyDown(document.body, { key: 'r', ctrlKey: true });
+    fireEvent.keyDown(document.body, { key: ' ' });
+    expect(campo).not.toHaveFocus();
+
+    // O primeiro dígito do bipe leva o foco ao campo; o resto cai nele.
+    fireEvent.keyDown(document.body, { key: '7' });
+    expect(campo).toHaveFocus();
+    fireEvent.change(campo, { target: { value: '7891234567890' } });
+    fireEvent.keyDown(campo, { key: 'Enter' });
+    await waitFor(() => expect(dados.buscarPorBarcode).toHaveBeenCalledWith('7891234567890'));
+  });
+
+  it('fechar a câmera devolve o foco ao campo do código', async () => {
+    renderFluxo(dadosBase());
+    await abrirCamera();
+    await clicar('fechar câmera fake');
+
+    expect(screen.queryByTestId('camera')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Código de barras' })).toHaveFocus());
+  });
+
+  it('navegador sem acesso à câmera não mostra o botão', async () => {
+    delete (navigator as { mediaDevices?: unknown }).mediaDevices;
+    renderFluxo(dadosBase());
+
+    await screen.findByRole('textbox', { name: 'Código de barras' });
+    expect(screen.queryByRole('button', { name: /Ler pela câmera/ })).not.toBeInTheDocument();
   });
 });

@@ -4,15 +4,18 @@ import { useLeitorCamera } from '@/hooks/useLeitorCamera';
 import { MENSAGEM_ERRO_CAMERA, MIRA_CAMERA } from '@/domain/estoque/leituraCamera';
 
 interface Props {
-  /** Não analisa a imagem (produto sendo buscado ou cartão de quantidade aberto). */
+  /** Não analisa a imagem (produto sendo buscado, ou a tela fora do passo de leitura). */
   pausado: boolean;
-  /** Cartão de quantidade aberto: esconde a câmera, que segue ligada para voltar rápido. */
+  /** Tela fora do passo de leitura (ex.: quantidade): esconde a câmera, que segue ligada para voltar rápido. */
   oculto: boolean;
   onCodigo: (codigo: string) => void;
   onFechar: () => void;
 }
 
-/** Imagem da câmera traseira com moldura de mira, lanterna, zoom e fechar. */
+/**
+ * Imagem da câmera traseira com moldura de mira, lanterna, zoom e fechar.
+ * Compartilhado pela Contagem via Código (Inventário) e pela Movimentação Operacional.
+ */
 export default function LeitorCamera({ pausado, oculto, onCodigo, onFechar }: Props) {
   const { estado, videoRef, lanterna, zoom, aviso } = useLeitorCamera({ pausado, onCodigo, onEncerrada: onFechar });
 

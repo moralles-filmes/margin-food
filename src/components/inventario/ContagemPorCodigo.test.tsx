@@ -15,7 +15,7 @@ import ContagemPorCodigo from '@/components/inventario/ContagemPorCodigo';
 import type { AjusteContagemResult, BarcodeLookupResult, Inventario, OpcoesAjusteContagem } from '@/hooks/useInventarioStore';
 
 // A câmera de verdade é coberta em useLeitorCamera.test.tsx; aqui só o contrato com a tela.
-vi.mock('@/components/inventario/LeitorCamera', () => ({
+vi.mock('@/components/camera/LeitorCamera', () => ({
   default: ({ pausado, oculto, onCodigo, onFechar }: {
     pausado: boolean; oculto: boolean; onCodigo: (codigo: string) => void; onFechar: () => void;
   }) => (

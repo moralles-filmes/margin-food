@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, ArrowUp, Check, CheckCircle2, Loader2, ScanLine } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useScopedToast } from '@/hooks/useScopedToast';
+import LeitorCamera from '@/components/camera/LeitorCamera';
+import { mensagemBarcodeInvalido, validarBarcode } from '@/domain/estoque/barcode';
 import {
   chaveRequisicao,
   formatarQuantidade,
@@ -65,6 +67,9 @@ export default function FluxoMovimentacao({ setores, dados, onRegistrado }: Prop
   // De onde veio o produto em lançamento: decide para onde o Voltar leva. Não
   // dá para inferir por `setoresDoCodigo`, que só é preenchido com vários setores.
   const [origemProduto, setOrigemProduto] = useState<'leitor' | 'manual'>('leitor');
+  // A câmera fica montada entre as operações (escondida e pausada fora do
+  // leitor): reabrir a cada item custaria ligar a câmera e o leitor de novo.
+  const [cameraAberta, setCameraAberta] = useState(false);
 
   // A semente só troca quando um lançamento novo começa; a chave enviada ao
   // servidor combina a semente com a identidade da operação.
@@ -105,10 +110,23 @@ export default function FluxoMovimentacao({ setores, dados, onRegistrado }: Prop
   }, []);
 
   // ─── Leitura de código de barras ───
+  //
+  // Cada leitura leva um número; sair do leitor com a busca em voo (ex.:
+  // "Lançar manualmente" com a rede lenta) invalida o número. Sem isso, a
+  // resposta atrasada trocava produto, setor e quantidade do lançamento manual
+  // que o operador já estava preenchendo — e a confirmação gravava o item errado.
+  const leituraAtualRef = useRef(0);
+  const descartarLeituraEmVoo = useCallback(() => {
+    leituraAtualRef.current += 1;
+    setLendo(false);
+  }, []);
+
   const processarLeitura = useCallback(async (codigo: string) => {
+    const leitura = ++leituraAtualRef.current;
     setLendo(true);
     setAvisoLeitor(undefined);
     const res = await dados.buscarPorBarcode(codigo);
+    if (leitura !== leituraAtualRef.current) return;
     setLendo(false);
 
     if (res.status === 'erro') {
@@ -145,20 +163,42 @@ export default function FluxoMovimentacao({ setores, dados, onRegistrado }: Prop
     }
   }, [dados]);
 
+  // Mesma validação do leitor HID, mas sem a janela anti-repique dele: o
+  // filtro da câmera já segura o código parado na frente da lente, e somar as
+  // duas janelas impediria duas saídas seguidas do mesmo produto. A câmera só
+  // abre o passo de quantidade — registrar continua exigindo o toque.
+  const lerDaCamera = useCallback((raw: string) => {
+    if (passo !== 'leitor' || lendo) return;
+    const { valido, codigo, motivo } = validarBarcode(raw);
+    if (!valido) {
+      setAvisoLeitor(mensagemBarcodeInvalido(motivo!));
+      return;
+    }
+    // iPhone não deixa site vibrar; lá a confirmação é a tela de quantidade abrindo.
+    navigator.vibrate?.(80);
+    void processarLeitura(codigo);
+  }, [passo, lendo, processarLeitura]);
+
+  const fecharCamera = useCallback(() => setCameraAberta(false), []);
+
   const irParaManual = useCallback(() => {
+    descartarLeituraEmVoo();
+    // Quem saiu do leitor não precisa da câmera ligada por trás da lista.
+    setCameraAberta(false);
     setAvisoLeitor(undefined);
     setProduto(null);
     setSetoresDoCodigo([]);
     setSetor(setorUnico);
     setPasso(passoManualInicial);
-  }, [setorUnico, passoManualInicial]);
+  }, [descartarLeituraEmVoo, setorUnico, passoManualInicial]);
 
   const irParaLeitor = useCallback(() => {
+    descartarLeituraEmVoo();
     setAvisoLeitor(undefined);
     setProduto(null);
     setPasso('leitor');
     setFocoLeitor(t => t + 1);
-  }, []);
+  }, [descartarLeituraEmVoo]);
 
   const confirmar = useCallback(async () => {
     if (salvando || !produto || !setor) return;
@@ -202,6 +242,7 @@ export default function FluxoMovimentacao({ setores, dados, onRegistrado }: Prop
       setPasso('leitor');
       setFocoLeitor(t => t + 1);
     } else {
+      setCameraAberta(false);
       setSetor(setorUnico);
       setPasso(passoManualInicial);
     }
@@ -250,6 +291,17 @@ export default function FluxoMovimentacao({ setores, dados, onRegistrado }: Prop
         </div>
       </div>
 
+      {/* Fora do bloco do leitor, que desmonta a cada passo: a câmera segue
+          ligada (escondida e pausada) até o próximo "Ler próximo código". */}
+      {cameraAberta && (
+        <LeitorCamera
+          pausado={passo !== 'leitor' || lendo}
+          oculto={passo !== 'leitor'}
+          onCodigo={lerDaCamera}
+          onFechar={fecharCamera}
+        />
+      )}
+
       {/* Modo padrão — leitor de código de barras */}
       {passo === 'leitor' && (
         <LeitorCodigoBarras
@@ -258,6 +310,8 @@ export default function FluxoMovimentacao({ setores, dados, onRegistrado }: Prop
           ocupado={lendo}
           aviso={avisoLeitor}
           focoToken={focoLeitor}
+          cameraAberta={cameraAberta}
+          onAbrirCamera={() => setCameraAberta(true)}
         />
       )}
 
