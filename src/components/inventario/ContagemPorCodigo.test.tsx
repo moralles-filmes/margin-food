@@ -5,12 +5,27 @@
  *   · o código é enviado por botão — celular/tablet não tem Enter no teclado numérico;
  *   · a leitura só identifica o produto; a quantidade é informada antes de gravar;
  *   · o que vai ao banco é a soma (delta em unidade base), nunca um total;
- *   · código de barras digitado no campo de quantidade não vira quantidade.
+ *   · código de barras digitado no campo de quantidade não vira quantidade;
+ *   · com a câmera aberta, o campo do código não puxa o foco (o teclado cobriria a imagem),
+ *     mas o leitor físico continua funcionando.
  */
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import ContagemPorCodigo from '@/components/inventario/ContagemPorCodigo';
 import type { AjusteContagemResult, BarcodeLookupResult, Inventario, OpcoesAjusteContagem } from '@/hooks/useInventarioStore';
+
+// A câmera de verdade é coberta em useLeitorCamera.test.tsx; aqui só o contrato com a tela.
+vi.mock('@/components/inventario/LeitorCamera', () => ({
+  default: ({ pausado, oculto, onCodigo, onFechar }: {
+    pausado: boolean; oculto: boolean; onCodigo: (codigo: string) => void; onFechar: () => void;
+  }) => (
+    <div data-testid="camera">
+      <span data-testid="camera-estado">{oculto ? 'oculta' : pausado ? 'pausada' : 'lendo'}</span>
+      <button type="button" onClick={() => onCodigo('7891234567890')}>simular leitura</button>
+      <button type="button" onClick={onFechar}>fechar câmera fake</button>
+    </div>
+  ),
+}));
 
 const INVENTARIO = {
   id: 'inv-1',
@@ -219,6 +234,95 @@ describe('ContagemPorCodigo', () => {
 
       await avancar(1000);
       expect(buscarPorBarcode).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('câmera', () => {
+    beforeEach(() => {
+      Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: { getUserMedia: vi.fn() } });
+    });
+
+    afterEach(() => {
+      delete (navigator as { mediaDevices?: unknown }).mediaDevices;
+    });
+
+    /** Deixa rodar o refoco do blur (setTimeout 0) antes de conferir o foco. */
+    async function esperarRefoco() {
+      await act(async () => { await new Promise(r => setTimeout(r, 10)); });
+    }
+
+    it('botão "Ler pela câmera" abre a câmera', () => {
+      renderTela();
+      fireEvent.click(screen.getByRole('button', { name: /ler pela câmera/i }));
+
+      expect(screen.getByTestId('camera-estado')).toHaveTextContent('lendo');
+      expect(screen.queryByRole('button', { name: /ler pela câmera/i })).not.toBeInTheDocument();
+    });
+
+    it('código lido pela câmera abre o cartão de quantidade, com a câmera escondida', async () => {
+      const { buscarPorBarcode, ajustarContagem } = renderTela();
+      fireEvent.click(screen.getByRole('button', { name: /ler pela câmera/i }));
+      fireEvent.click(screen.getByRole('button', { name: 'simular leitura' }));
+
+      expect(await screen.findByText('Coca-Cola 350ml')).toBeInTheDocument();
+      expect(buscarPorBarcode).toHaveBeenCalledWith('inv-1', '7891234567890');
+      expect(ajustarContagem).not.toHaveBeenCalled();
+      expect(screen.getByTestId('camera-estado')).toHaveTextContent('oculta');
+
+      fireEvent.click(screen.getByRole('button', { name: /adicionar/i }));
+      await waitFor(() => expect(ajustarContagem).toHaveBeenCalledWith('item-1', 12, expect.objectContaining({ origem: 'leitura' })));
+      await waitFor(() => expect(screen.getByTestId('camera-estado')).toHaveTextContent('lendo'));
+    });
+
+    it('com a câmera aberta o campo do código não puxa o foco (teclado cobriria a imagem)', async () => {
+      renderTela();
+      const campo = screen.getByLabelText('Código de barras');
+      expect(campo).toHaveFocus();
+
+      fireEvent.click(screen.getByRole('button', { name: /ler pela câmera/i }));
+      await esperarRefoco();
+      expect(campo).not.toHaveFocus();
+
+      fireEvent.click(screen.getByRole('button', { name: 'simular leitura' }));
+      await screen.findByText('Coca-Cola 350ml');
+      fireEvent.click(screen.getByRole('button', { name: /cancelar/i }));
+      await esperarRefoco();
+      expect(screen.getByLabelText('Código de barras')).not.toHaveFocus();
+    });
+
+    it('leitor físico continua funcionando com a câmera aberta', async () => {
+      const { buscarPorBarcode } = renderTela();
+      fireEvent.click(screen.getByRole('button', { name: /ler pela câmera/i }));
+      await esperarRefoco();
+      const campo = screen.getByLabelText('Código de barras');
+      expect(campo).not.toHaveFocus();
+
+      // atalho do navegador e Espaço (aciona o botão focado) não são bipe
+      fireEvent.keyDown(document.body, { key: 'r', ctrlKey: true });
+      fireEvent.keyDown(document.body, { key: ' ' });
+      expect(campo).not.toHaveFocus();
+
+      // o primeiro dígito do bipe leva o foco ao campo; o resto cai nele
+      fireEvent.keyDown(document.body, { key: '7' });
+      expect(campo).toHaveFocus();
+      fireEvent.change(campo, { target: { value: '7891234567890' } });
+      fireEvent.submit(campo.closest('form')!);
+      await waitFor(() => expect(buscarPorBarcode).toHaveBeenCalledWith('inv-1', '7891234567890'));
+    });
+
+    it('fechar a câmera devolve o foco ao campo do código', async () => {
+      renderTela();
+      fireEvent.click(screen.getByRole('button', { name: /ler pela câmera/i }));
+      fireEvent.click(screen.getByRole('button', { name: 'fechar câmera fake' }));
+
+      expect(screen.queryByTestId('camera')).not.toBeInTheDocument();
+      await waitFor(() => expect(screen.getByLabelText('Código de barras')).toHaveFocus());
+    });
+
+    it('navegador sem acesso à câmera não mostra o botão', () => {
+      delete (navigator as { mediaDevices?: unknown }).mediaDevices;
+      renderTela();
+      expect(screen.queryByRole('button', { name: /ler pela câmera/i })).not.toBeInTheDocument();
     });
   });
 
