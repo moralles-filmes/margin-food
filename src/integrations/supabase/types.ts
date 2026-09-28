@@ -5550,6 +5550,7 @@ export type Database = {
           received_status: string
           shopping_note: string | null
           shopping_status: string
+          stock_entry_skipped: boolean
           stock_item_id: string | null
           unit_snapshot: string
           updated_at: string
@@ -5574,6 +5575,7 @@ export type Database = {
           received_status?: string
           shopping_note?: string | null
           shopping_status?: string
+          stock_entry_skipped?: boolean
           stock_item_id?: string | null
           unit_snapshot?: string
           updated_at?: string
@@ -5598,6 +5600,7 @@ export type Database = {
           received_status?: string
           shopping_note?: string | null
           shopping_status?: string
+          stock_entry_skipped?: boolean
           stock_item_id?: string | null
           unit_snapshot?: string
           updated_at?: string

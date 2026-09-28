@@ -55,6 +55,13 @@ const STATUS_CONFIG: Record<string, { label: string; variant: StatusType; icon: 
 };
 
 
+/** Linha do diálogo de entrada no estoque: item vinculado a produto que vai ser recebido. */
+interface StockEntryLine { id: string; name: string; qty: number; unit: string }
+
+type StockEntryPrompt =
+  | { kind: 'order'; decisions: ReceivingDecision[]; lines: StockEntryLine[] }
+  | { kind: 'item'; itemId: string; qty: number; lines: StockEntryLine[] };
+
 /** Parse comma-separated category string into array */
 function parseCategories(raw: string): string[] {
   if (!raw) return [];
@@ -198,6 +205,9 @@ export default function PedidosComprasMercadoView() {
   const [receivingQtds, setReceivingQtds] = useState<Record<string, { qty: string; status: 'RECEIVED' | 'NOT_DELIVERED'; reason: string }>>({});
   const [finalizingItemId, setFinalizingItemId] = useState<string | null>(null);
   const [finalizeQtd, setFinalizeQtd] = useState('');
+  // Recebimento aguardando a resposta "dar entrada no estoque?"
+  const [stockEntryPrompt, setStockEntryPrompt] = useState<StockEntryPrompt | null>(null);
+  const [submittingReceipt, setSubmittingReceipt] = useState(false);
 
   // Export
   const [exportOrder, setExportOrder] = useState<PurchaseOrder | null>(null);
@@ -499,17 +509,44 @@ export default function PedidosComprasMercadoView() {
         reason: r.reason || undefined,
       });
     }
-    const success = await store.confirmReceiving(selectedOrder.id, decisions);
-    if (success) setSelectedOrder(null);
+    const lines: StockEntryLine[] = pendingItems
+      .filter(i => i.stock_item_id && receivingQtds[i.id]?.status === 'RECEIVED')
+      .map(i => ({ id: i.id, name: i.name_snapshot, qty: parseFloat(receivingQtds[i.id].qty), unit: i.unit_snapshot }));
+    const prompt: StockEntryPrompt = { kind: 'order', decisions, lines };
+    // Sem item vinculado a produto não há entrada a gerar — não há o que perguntar.
+    if (lines.length === 0) await submitReceipt(prompt, true);
+    else setStockEntryPrompt(prompt);
   };
 
   const handleFinalizeItem = async (itemId: string) => {
     const qty = parseFloat(finalizeQtd) || 0;
     if (qty <= 0) { toast.error('Informe a quantidade recebida'); return; }
-    await store.finalizePartialItem(itemId, qty);
-    setFinalizingItemId(null);
-    setFinalizeQtd('');
-    if (selectedOrder) await openDetail(selectedOrder);
+    const item = orderItems.find(i => i.id === itemId);
+    const lines: StockEntryLine[] = item?.stock_item_id
+      ? [{ id: item.id, name: item.name_snapshot, qty, unit: item.unit_snapshot }]
+      : [];
+    const prompt: StockEntryPrompt = { kind: 'item', itemId, qty, lines };
+    if (lines.length === 0) await submitReceipt(prompt, true);
+    else setStockEntryPrompt(prompt);
+  };
+
+  const submitReceipt = async (prompt: StockEntryPrompt, stockEntry: boolean) => {
+    if (!selectedOrder) return;
+    setSubmittingReceipt(true);
+    try {
+      if (prompt.kind === 'order') {
+        const success = await store.confirmReceiving(selectedOrder.id, prompt.decisions, stockEntry);
+        if (success) setSelectedOrder(null);
+      } else {
+        await store.finalizePartialItem(prompt.itemId, prompt.qty, stockEntry);
+        setFinalizingItemId(null);
+        setFinalizeQtd('');
+        await openDetail(selectedOrder);
+      }
+    } finally {
+      setSubmittingReceipt(false);
+      setStockEntryPrompt(null);
+    }
   };
 
   // Itens já recebidos (edição) entram pelo próprio preço nos dois totais — não há o que comparar.
@@ -541,7 +578,9 @@ export default function PedidosComprasMercadoView() {
     return orderItems.filter(i => (i as any).shopping_status === 'NOT_AVAILABLE');
   }, [selectedOrder, orderItems]);
 
-  const hasReceivedItems = deleteItems.some(i => i.qty_received > 0);
+  // Item recebido sem entrada no estoque não tem movimentação a estornar.
+  const deleteItemsWithStock = deleteItems.filter(i => i.qty_received > 0 && !i.stock_entry_skipped);
+  const hasReceivedItems = deleteItemsWithStock.length > 0;
 
   // ===== DELETE CONFIRMATION DIALOG =====
   const deleteDialog = (
@@ -564,7 +603,7 @@ export default function PedidosComprasMercadoView() {
         {hasReceivedItems && (
           <div className="bg-destructive-soft border border-destructive-border rounded-lg p-3 text-xs space-y-1">
             <p className="font-semibold text-destructive">Itens com recebimento que serão estornados:</p>
-            {deleteItems.filter(i => i.qty_received > 0).map(i => (
+            {deleteItemsWithStock.map(i => (
               <p key={i.id} className="text-foreground">• {i.name_snapshot}: {i.qty_received} {i.unit_snapshot} recebidos</p>
             ))}
           </div>
@@ -573,6 +612,39 @@ export default function PedidosComprasMercadoView() {
           <Button variant="ghost" onClick={() => setDeleteTarget(null)} disabled={deleting}>Cancelar</Button>
           <Button variant="destructive" onClick={confirmDelete} disabled={deleting}>
             {deleting ? 'Excluindo...' : hasReceivedItems ? 'Excluir e Estornar Estoque' : 'Excluir'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
+  // ===== STOCK ENTRY CONFIRMATION DIALOG =====
+  const stockEntryDialog = (
+    <Dialog open={!!stockEntryPrompt} onOpenChange={open => { if (!open && !submittingReceipt) setStockEntryPrompt(null); }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Package className="w-5 h-5" /> Dar entrada no estoque?
+          </DialogTitle>
+          <DialogDescription>
+            Os itens abaixo entram automaticamente no estoque, com a quantidade e o custo deste recebimento.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="bg-background-subtle rounded-lg p-3 text-xs space-y-1 max-h-48 overflow-y-auto">
+          {stockEntryPrompt?.lines.map(l => (
+            <p key={l.id} className="text-foreground">• {l.name}: {l.qty} {l.unit}</p>
+          ))}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Se escolher <strong>Não</strong>, o recebimento é registrado normalmente, mas o saldo do estoque não muda.
+        </p>
+        <DialogFooter className="gap-2 sm:gap-0">
+          <Button variant="ghost" onClick={() => setStockEntryPrompt(null)} disabled={submittingReceipt}>Voltar</Button>
+          <Button variant="outline" onClick={() => stockEntryPrompt && submitReceipt(stockEntryPrompt, false)} disabled={submittingReceipt}>
+            Não, só receber
+          </Button>
+          <Button onClick={() => stockEntryPrompt && submitReceipt(stockEntryPrompt, true)} disabled={submittingReceipt}>
+            {submittingReceipt ? 'Registrando...' : 'Sim, dar entrada'}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -628,6 +700,7 @@ export default function PedidosComprasMercadoView() {
     return (
       <div className="space-y-4">
         {deleteDialog}
+        {stockEntryDialog}
         <button onClick={() => setSelectedOrder(null)} className="flex items-center gap-1 text-sm text-primary hover:underline">
           ← Voltar
         </button>
@@ -682,7 +755,7 @@ export default function PedidosComprasMercadoView() {
                 <Button size="sm" variant="outline" className="gap-1 text-xs" onClick={handleMarkAllReceived}>
                   <Check className="w-3.5 h-3.5" /> Marcar todos entregues
                 </Button>
-                <Button size="sm" className="gap-1 bg-success text-success-foreground hover:bg-success/90 text-xs" onClick={handleConfirmReceiving}>
+                <Button size="sm" className="gap-1 bg-success text-success-foreground hover:bg-success/90 text-xs" onClick={handleConfirmReceiving} disabled={submittingReceipt}>
                   <CheckCircle2 className="w-3.5 h-3.5" /> Confirmar Recebimento
                 </Button>
               </>
@@ -735,7 +808,10 @@ export default function PedidosComprasMercadoView() {
                           {item.qty_requested} {item.unit_snapshot} × {fmtBRL(item.estimated_unit_value)} = {fmtBRL(item.qty_requested * item.estimated_unit_value)}
                         </p>
                         {item.received_status === 'RECEIVED' && (
-                          <p className="text-[10px] text-success mt-0.5">✓ Recebido: {item.qty_received} {item.unit_snapshot}</p>
+                          <p className="text-[10px] text-success mt-0.5">
+                            ✓ Recebido: {item.qty_received} {item.unit_snapshot}
+                            {item.stock_entry_skipped && <span className="text-muted-foreground"> · sem entrada no estoque</span>}
+                          </p>
                         )}
                         {item.received_status === 'NOT_DELIVERED' && (
                           <p className="text-[10px] text-destructive mt-0.5">✗ Não entregue{item.not_delivered_reason ? `: ${item.not_delivered_reason}` : ''}</p>
@@ -777,7 +853,7 @@ export default function PedidosComprasMercadoView() {
                               <Label className="text-[10px] text-muted-foreground">Qtd recebida agora</Label>
                               <Input type="number" value={finalizeQtd} onChange={e => setFinalizeQtd(e.target.value)} className="text-xs" placeholder={String(item.qty_requested)} />
                             </div>
-                            <Button size="sm" className="text-xs gap-1" onClick={() => handleFinalizeItem(item.id)}>
+                            <Button size="sm" className="text-xs gap-1" onClick={() => handleFinalizeItem(item.id)} disabled={submittingReceipt}>
                               <Check className="w-3 h-3" /> Receber
                             </Button>
                             <Button size="sm" variant="ghost" className="text-xs" onClick={() => setFinalizingItemId(null)}>Cancelar</Button>
