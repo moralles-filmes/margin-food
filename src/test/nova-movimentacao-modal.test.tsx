@@ -4,7 +4,7 @@
  * and prevents regression to the old inline form pattern.
  */
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import NovaMovimentacaoModal, { type MovModalPreset } from '@/components/estoque/NovaMovimentacaoModal';
 import type { ProdutoExtended } from '@/types/estoque';
 
@@ -64,18 +64,43 @@ const baseProd: ProdutoExtended = {
   saldoAtual: 100,
 };
 
+const arroz: ProdutoExtended = {
+  ...baseProd,
+  id: 'prod-2',
+  nomeProduto: 'Arroz',
+  unidadeCompra: 'KG',
+  fatorConversaoPadrao: 1,
+  sku: 'ARR001',
+};
+
 const defaultProps = {
   open: true,
   preset: 'entrada' as MovModalPreset,
   onClose: vi.fn(),
-  produtos: [baseProd],
-  saldos: { 'prod-1': { saldo: 100 } },
+  produtos: [baseProd, arroz],
+  saldos: { 'prod-1': { saldo: 100 }, 'prod-2': { saldo: 50 } },
   userId: 'user-1',
   hasPermission: () => true,
   canEditPricing: false,
-  addMovimentacao: vi.fn().mockResolvedValue({}),
+  addMovimentacoesLote: vi.fn().mockResolvedValue([]),
   recalcularPrecos: vi.fn(),
 };
+
+// cmdk rola o item ativo para a vista; jsdom não implementa scrollIntoView.
+Element.prototype.scrollIntoView = vi.fn();
+
+/**
+ * Abre o combobox de produto da linha `linha` (0-based) e escolhe `nome`. Os
+ * selects de Tipo/Setor também têm role combobox — o de produto é o que mostra
+ * o placeholder ou o nome de um produto.
+ */
+function escolherProduto(linha: number, nome: string) {
+  const textos = ['Buscar produto…', ...defaultProps.produtos.map(p => p.nomeProduto)];
+  const gatilhos = screen.getAllByRole('combobox')
+    .filter(el => textos.some(t => el.textContent?.includes(t)));
+  fireEvent.click(gatilhos[linha]);
+  fireEvent.click(screen.getByRole('option', { name: new RegExp(nome) }));
+}
 
 // ─── Tests ───
 
@@ -100,22 +125,69 @@ describe('NovaMovimentacaoModal', () => {
     expect(container.innerHTML).toBe('');
   });
 
-  it('shows "Produto" label', () => {
+  it('shows the item list with a product search per line', () => {
     render(<NovaMovimentacaoModal {...defaultProps} preset="entrada" />);
-    expect(screen.getByText(/Produto/)).toBeInTheDocument();
+    expect(screen.getByText('Itens')).toBeInTheDocument();
+    expect(screen.getByText('Buscar produto…')).toBeInTheDocument();
   });
 
-  it('shows "Setor" field only for saída preset', () => {
-    const { rerender } = render(<NovaMovimentacaoModal {...defaultProps} preset="entrada" />);
+  it('shows a "Setor" field per line only for saída', () => {
+    const { unmount } = render(<NovaMovimentacaoModal {...defaultProps} preset="entrada" />);
+    escolherProduto(0, 'Salmão Fresco');
     expect(screen.queryByText(/Setor/)).not.toBeInTheDocument();
+    unmount();
 
-    rerender(<NovaMovimentacaoModal {...defaultProps} preset="saida" />);
-    expect(screen.getByText(/Setor/)).toBeInTheDocument();
+    render(<NovaMovimentacaoModal {...defaultProps} preset="saida" />);
+    escolherProduto(0, 'Salmão Fresco');
+    expect(screen.getByRole('combobox', { name: 'Setor do item 1' })).toBeInTheDocument();
   });
 
-  it('shows conversion fields only for entrada preset', () => {
+  it('submits every filled line in a single batch call', async () => {
+    const addMovimentacoesLote = vi.fn().mockResolvedValue([]);
+    render(<NovaMovimentacaoModal {...defaultProps} preset="entrada" addMovimentacoesLote={addMovimentacoesLote} />);
+
+    // Salmão tem un. de compra (cx, fator 10): a entrada já nasce em caixas.
+    escolherProduto(0, 'Salmão Fresco');
+    fireEvent.change(screen.getByLabelText('Quantidade do item 1'), { target: { value: '2' } });
+    fireEvent.change(screen.getByPlaceholderText('0,00'), { target: { value: '800' } });
+
+    fireEvent.click(screen.getByRole('button', { name: /Adicionar item/ }));
+    escolherProduto(1, 'Arroz');
+    fireEvent.change(screen.getByLabelText('Quantidade do item 2'), { target: { value: '5' } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar 2 itens' }));
+
+    await waitFor(() => expect(addMovimentacoesLote).toHaveBeenCalledTimes(1));
+    const itens = addMovimentacoesLote.mock.calls[0][0];
+    expect(itens).toHaveLength(2);
+    expect(itens[0]).toMatchObject({ produtoId: 'prod-1', tipo: 'ENTRADA', quantidade: 20, custoUnitario: 80, custoTotal: 1600 });
+    expect(itens[1]).toMatchObject({ produtoId: 'prod-2', tipo: 'ENTRADA', quantidade: 5 });
+    expect(itens.every((i: { setor?: string }) => i.setor === undefined)).toBe(true);
+  });
+
+  it('starts with one item line and adds more with "Adicionar item"', () => {
     render(<NovaMovimentacaoModal {...defaultProps} preset="entrada" />);
-    expect(screen.getByText(/Fator conversão/)).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /Remover item/ })).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole('button', { name: /Adicionar item/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Adicionar item/ }));
+    expect(screen.getAllByRole('button', { name: /Remover item/ })).toHaveLength(3);
+  });
+
+  it('keeps at least one line: remove is disabled when only one remains', () => {
+    render(<NovaMovimentacaoModal {...defaultProps} preset="saida" />);
+    expect(screen.getByRole('button', { name: 'Remover item 1' })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole('button', { name: /Adicionar item/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remover item 2' }));
+    expect(screen.getAllByRole('button', { name: /Remover item/ })).toHaveLength(1);
+  });
+
+  it('blocks submit with no filled item and never calls the insert', () => {
+    const addMovimentacoesLote = vi.fn().mockResolvedValue([]);
+    render(<NovaMovimentacaoModal {...defaultProps} preset="entrada" addMovimentacoesLote={addMovimentacoesLote} />);
+    fireEvent.click(screen.getByText('Registrar'));
+    expect(addMovimentacoesLote).not.toHaveBeenCalled();
   });
 
   it('shows tipo selector for ajuste preset (multiple options)', () => {
