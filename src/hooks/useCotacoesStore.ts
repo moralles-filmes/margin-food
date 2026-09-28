@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Cotacao, CotacaoCounts, CotacaoItem, CotacaoFornecedor, CotacaoResposta, CotacaoWhatsappLog, CotacaoWhatsappTipo } from '@/types/cotacao';
 import { COTACAO_STATUS_ABERTOS } from '@/types/cotacao';
+import { formatDateISO, todayBR } from '@/lib/datetime';
 
 /** Linha da matriz de respostas enviada à RPC save_cotacao_respostas_atomic. */
 export interface CotacaoRespostaInput {
@@ -119,15 +120,14 @@ export function useCotacoesStore() {
   }, [user, fetchCotacoes, supabase, companyId]);
 
   const counts: CotacaoCounts = useMemo(() => {
-    const now = new Date();
-    const mesAtual = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const mesAtual = todayBR().slice(0, 7);
     return {
       emAberto: cotacoes.filter(c => COTACAO_STATUS_ABERTOS.includes(c.status)).length,
       aguardandoResposta: cotacoes.filter(c => c.status === 'EM_COTACAO').length,
       emAnalise: cotacoes.filter(c => c.status === 'RESPONDIDA' || c.status === 'EM_ANALISE').length,
       convertidas: cotacoes.filter(c => c.status === 'CONVERTIDA').length,
       economiaMes: cotacoes
-        .filter(c => (c.created_at ?? '').slice(0, 7) === mesAtual)
+        .filter(c => !!c.created_at && formatDateISO(new Date(c.created_at)).slice(0, 7) === mesAtual)
         .reduce((sum, c) => sum + (Number(c.economia_estimada) || 0), 0),
     };
   }, [cotacoes]);

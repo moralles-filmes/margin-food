@@ -11,6 +11,7 @@ import { AlertTriangle, Bell, Clock, RefreshCw, ExternalLink, ShieldX, Download 
 import { fmtBRL } from '@/lib/money';
 import * as XLSX from '@/lib/safeXlsx';
 import { formatDateValueBR } from '@/lib/formatters';
+import { todayBR } from '@/lib/datetime';
 
 // ─── Types ───
 interface AlertaFinanceiro {
@@ -268,7 +269,7 @@ export default function AlertasSection({ onNavigate }: Props) {
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Alertas');
-    XLSX.writeFile(wb, `alertas-financeiros-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    XLSX.writeFile(wb, `alertas-financeiros-${todayBR()}.xlsx`);
     toast.success('Exportação concluída');
   };
 
