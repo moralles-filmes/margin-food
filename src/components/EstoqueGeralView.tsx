@@ -771,7 +771,7 @@ export default function EstoqueGeralView() {
             userId={user?.id || ''}
             hasPermission={hasPermission}
             canEditPricing={canEditPricing}
-            addMovimentacao={store.addMovimentacao}
+            addMovimentacoesLote={store.addMovimentacoesLote}
             recalcularPrecos={recalcularPrecos}
           />
         </>

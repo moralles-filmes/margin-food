@@ -192,6 +192,31 @@ function dbToMov(row: MovimentacaoRow): MovimentacaoExtended {
   };
 }
 
+export type NovaMovimentacao = Omit<MovimentacaoEstoque, 'id' | 'createdAt'> & { setor?: string };
+
+function toMovInsertPayload(m: NovaMovimentacao, companyId: string) {
+  const payload: {
+    produto_id: string; data: string; tipo: string; quantidade: number;
+    custo_unitario: number; custo_total: number; origem: string;
+    referencia_id: string | null; observacao: string | null;
+    created_by: string | null; company_id: string; setor?: string;
+  } = {
+    produto_id: m.produtoId,
+    data: m.data,
+    tipo: m.tipo,
+    quantidade: m.quantidade,
+    custo_unitario: m.custoUnitario,
+    custo_total: Number((m.quantidade * m.custoUnitario).toFixed(2)),
+    origem: m.origem || 'Manual',
+    referencia_id: m.referenciaId || null,
+    observacao: m.observacao || null,
+    created_by: m.createdBy || null,
+    company_id: companyId,
+  };
+  if (m.setor) payload.setor = m.setor;
+  return payload;
+}
+
 interface MovFilters {
   direction?: 'IN' | 'OUT' | null;
   produtoId?: string | null;
@@ -824,30 +849,11 @@ export function useEstoqueGeralStore() {
   }, [fetchProdutoGlobalCounts, supabase, emitDataEvent]);
 
   // === Movimentação (DB) ===
-  const addMovimentacao = useCallback(async (m: Omit<MovimentacaoEstoque, 'id' | 'createdAt'> & { setor?: string }) => {
+  const addMovimentacao = useCallback(async (m: NovaMovimentacao) => {
     const companyId = await resolveCompanyIdOrThrow(supabase);
-    const insertPayload: {
-      produto_id: string; data: string; tipo: string; quantidade: number;
-      custo_unitario: number; custo_total: number; origem: string;
-      referencia_id: string | null; observacao: string | null;
-      created_by: string | null; company_id: string; setor?: string;
-    } = {
-      produto_id: m.produtoId,
-      data: m.data,
-      tipo: m.tipo,
-      quantidade: m.quantidade,
-      custo_unitario: m.custoUnitario,
-      custo_total: Number((m.quantidade * m.custoUnitario).toFixed(2)),
-      origem: m.origem || 'Manual',
-      referencia_id: m.referenciaId || null,
-      observacao: m.observacao || null,
-      created_by: m.createdBy || null,
-      company_id: companyId,
-    };
-    if (m.setor) insertPayload.setor = m.setor;
     const { data, error } = await supabase
       .from('movimentacoes_estoque')
-      .insert(insertPayload)
+      .insert(toMovInsertPayload(m, companyId))
       .select()
       .single();
     if (error) {
@@ -864,6 +870,32 @@ export function useEstoqueGeralStore() {
     return newMov;
   }, [supabase, fetchMovimentacoes, movFilters, fetchSaldos, emitDataEvent]);
 
+  /**
+   * Vários itens num único INSERT: o PostgREST roda a requisição numa só
+   * transação, então ou todas as linhas entram ou nenhuma — nunca um lote
+   * pela metade. Triggers de saldo/validação são por linha e seguem iguais.
+   */
+  const addMovimentacoesLote = useCallback(async (itens: NovaMovimentacao[]) => {
+    if (itens.length === 0) return [];
+    const companyId = await resolveCompanyIdOrThrow(supabase);
+    const { data, error } = await supabase
+      .from('movimentacoes_estoque')
+      .insert(itens.map(m => toMovInsertPayload(m, companyId)))
+      .select();
+    if (error) {
+      console.error('[useEstoqueGeralStore.addMovimentacoesLote] insert error', error);
+      throw error;
+    }
+    const novas = ((data ?? []) as unknown as MovimentacaoRow[]).map(dbToMov);
+    setMovCursor(null);
+    await Promise.all([
+      fetchMovimentacoes(movFilters, null, false),
+      fetchSaldos([...new Set(itens.map(m => m.produtoId))]),
+    ]);
+    emitDataEvent('estoque:movimentacoes');
+    return novas;
+  }, [supabase, fetchMovimentacoes, movFilters, fetchSaldos, emitDataEvent]);
+
   // Categorias derived from produtos
   const categorias = useMemo(() => sortNames([...new Set(produtos.map(p => p.categoria).filter(Boolean))]), [produtos]);
 
@@ -872,7 +904,7 @@ export function useEstoqueGeralStore() {
     prodHasMore, prodTotalCount, prodPage, movHasMore, movKpis, movKpisLoading, movFilters, prodFilters, prodGlobalCounts, prodCatalogLoading, prodCatalogError,
     addProduto, updateProduto, deleteProduto,
     fetchCodigosBarras, salvarCodigosBarras, verificarCodigosLivres,
-    addMovimentacao,
+    addMovimentacao, addMovimentacoesLote,
     refetch, refreshSaldos, fetchAllProdutos, loadMoreProdutos, goToProdPage, loadMoreMovimentacoes, updateMovFilters, updateProdFilters,
   };
 }
