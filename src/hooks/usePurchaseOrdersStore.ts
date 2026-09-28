@@ -51,6 +51,8 @@ export interface PurchaseOrderItem {
   purchase_unit_snapshot: string | null;
   purchase_unit_cost_snapshot: number | null;
   conversion_factor_snapshot: number | null;
+  /** Recebido sem entrada automática no estoque (o usuário respondeu "não" no recebimento). */
+  stock_entry_skipped: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -72,6 +74,7 @@ export interface ReceivingDecision {
 const PO_PAGE_SIZE = 50;
 const FALLBACK_SEARCH_LIMIT = 200;
 const PURCHASE_ORDER_SELECT = 'id, title, type, priority, category, supplier_name, payment_type, need_by_date, delivery_forecast_date, responsible_user_id, notes, status, total_estimated, total_confirmed, concluded_at, shopping_done_at, shopping_done_by, not_delivered_ack_at, not_delivered_ack_by, created_by, created_at, updated_at, origin, origin_ref';
+const PURCHASE_ORDER_ITEM_SELECT = 'id, order_id, stock_item_id, name_snapshot, unit_snapshot, estimated_unit_value, qty_requested, qty_received, received_status, not_delivered_reason, received_at, received_by, shopping_status, shopping_note, purchase_unit_snapshot, purchase_unit_cost_snapshot, conversion_factor_snapshot, stock_entry_skipped, created_at, updated_at';
 type PurchaseOrderRow = PurchaseOrder & { has_more?: boolean | null };
 
 export interface PurchaseOrderFilters {
@@ -260,7 +263,7 @@ export function usePurchaseOrdersStore() {
   const fetchItems = useCallback(async (orderId: string): Promise<PurchaseOrderItem[]> => {
     const { data } = await supabase
       .from('purchase_order_items')
-      .select('id, order_id, stock_item_id, name_snapshot, unit_snapshot, estimated_unit_value, qty_requested, qty_received, received_status, not_delivered_reason, received_at, received_by, shopping_status, shopping_note, purchase_unit_snapshot, purchase_unit_cost_snapshot, conversion_factor_snapshot, created_at, updated_at')
+      .select(PURCHASE_ORDER_ITEM_SELECT)
       .eq('order_id', orderId)
       .is('deleted_at', null)
       .order('name_snapshot', { ascending: true })
@@ -342,7 +345,12 @@ export function usePurchaseOrdersStore() {
   }, [user, supabase, fetchOrders, emitDataEvent, toast]);
 
   // ===== RECEIVING FUNCTIONS =====
-  const confirmReceiving = useCallback(async (orderId: string, rpcItems: ReceivingDecision[]) => {
+  /**
+   * `stockEntry=false` registra o recebimento sem gerar ENTRADA no estoque — escolha
+   * do usuário no diálogo de confirmação. A resposta diz o que o servidor fez de fato:
+   * num replay idempotente vale a escolha da 1ª tentativa, não a atual.
+   */
+  const confirmReceiving = useCallback(async (orderId: string, rpcItems: ReceivingDecision[], stockEntry: boolean) => {
     if (!user) return false;
     const keyName = `order:${orderId}`;
     const idempotencyKey = receiptKeysRef.current.get(keyName) ?? crypto.randomUUID();
@@ -351,7 +359,7 @@ export function usePurchaseOrdersStore() {
     const { data: result, error } = await supabase.rpc('receive_purchase_order_atomic', {
       p_order_id: orderId,
       p_items: rpcItems as any,
-      p_metadata: { source: 'confirmReceiving', idempotency_key: idempotencyKey } as any,
+      p_metadata: { source: 'confirmReceiving', idempotency_key: idempotencyKey, stock_entry: stockEntry } as any,
     });
 
     if (error) {
@@ -363,18 +371,24 @@ export function usePurchaseOrdersStore() {
 
     const res = result as any;
     const newStatus = res?.status || 'COMPLETED';
+    // Lote gravado antes da entrada opcional não traz stock_entry — esses sempre deram entrada.
+    const enteredStock = res?.stock_entry !== false;
 
     await fetchOrders();
-    toast.success(newStatus === 'COMPLETED' ? 'Pedido concluído! Estoque atualizado.' : 'Recebimento parcial registrado. Itens não entregues pendentes.');
+    if (newStatus === 'COMPLETED') {
+      toast.success(enteredStock ? 'Pedido concluído! Estoque atualizado.' : 'Pedido concluído, sem entrada no estoque.');
+    } else {
+      toast.success(`Recebimento parcial registrado${enteredStock ? '' : ', sem entrada no estoque'}. Itens não entregues pendentes.`);
+    }
     emitDataEvent('compras:pedidos');
     emitDataEvent('estoque:movimentacoes');
     return true;
   }, [user, supabase, fetchOrders, emitDataEvent, toast]);
 
-  const finalizePartialItem = useCallback(async (itemId: string, qtyReceived: number) => {
+  const finalizePartialItem = useCallback(async (itemId: string, qtyReceived: number, stockEntry: boolean) => {
     if (!user) return;
 
-    const { data: item } = await supabase.from('purchase_order_items').select('id, order_id, stock_item_id, name_snapshot, unit_snapshot, estimated_unit_value, qty_requested, qty_received, received_status, not_delivered_reason, received_at, received_by, shopping_status, shopping_note, purchase_unit_snapshot, purchase_unit_cost_snapshot, conversion_factor_snapshot, created_at, updated_at').eq('id', itemId).single();
+    const { data: item } = await supabase.from('purchase_order_items').select(PURCHASE_ORDER_ITEM_SELECT).eq('id', itemId).single();
     if (!item) return;
     const typedItem = item as unknown as PurchaseOrderItem;
 
@@ -391,7 +405,7 @@ export function usePurchaseOrdersStore() {
     const { data: result, error } = await supabase.rpc('receive_purchase_order_atomic', {
       p_order_id: typedItem.order_id,
       p_items: rpcItems as any,
-      p_metadata: { source: 'finalizePartialItem', idempotency_key: idempotencyKey } as any,
+      p_metadata: { source: 'finalizePartialItem', idempotency_key: idempotencyKey, stock_entry: stockEntry } as any,
     });
 
     if (error) {
@@ -403,9 +417,14 @@ export function usePurchaseOrdersStore() {
 
     const res = result as any;
     const newStatus = res?.status || 'PARTIAL';
+    const enteredStock = res?.stock_entry !== false;
 
     await fetchOrders();
-    toast.success(newStatus === 'COMPLETED' ? 'Todos os itens recebidos! Pedido concluído.' : 'Item recebido e estoque atualizado.');
+    if (newStatus === 'COMPLETED') {
+      toast.success(enteredStock ? 'Todos os itens recebidos! Pedido concluído.' : 'Todos os itens recebidos, sem entrada no estoque. Pedido concluído.');
+    } else {
+      toast.success(enteredStock ? 'Item recebido e estoque atualizado.' : 'Item recebido, sem entrada no estoque.');
+    }
     emitDataEvent('compras:pedidos');
     emitDataEvent('estoque:movimentacoes');
   }, [user, supabase, fetchOrders, emitDataEvent, toast]);

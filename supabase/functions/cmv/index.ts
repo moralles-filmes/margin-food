@@ -11,14 +11,14 @@ const CMV_OUTFLOW_TYPES = ['SAIDA', 'BAIXA_PERDA', 'SAIDA_CONSUMO', 'SAIDA_REQUI
 const CMV_INFLOW_TYPES = ['ENTRADA', 'AJUSTE_INVENTARIO_POSITIVO'] as const
 
 /**
- * BR-safe date formatter: returns YYYY-MM-DD for "today minus N days"
- * anchored at noon UTC to prevent day-flip near midnight BRT (UTC-3).
+ * YYYY-MM-DD de "hoje menos N dias" no fuso de São Paulo.
+ * O runtime da Edge Function roda em UTC: getDate() devolveria o dia UTC,
+ * que depois das 21h (BRT) já é o dia seguinte.
  */
 function localDateStr(daysAgo = 0): string {
-  const d = new Date()
-  d.setDate(d.getDate() - daysAgo)
-  const anchored = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate(), 12, 0, 0))
-  return anchored.toISOString().split('T')[0]
+  const hoje = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date())
+  const [y, m, d] = hoje.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d - daysAgo)).toISOString().split('T')[0]
 }
 
 serve(withRequestCors(async (req) => {
