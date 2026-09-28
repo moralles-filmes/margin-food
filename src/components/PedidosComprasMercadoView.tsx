@@ -17,7 +17,10 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandInput, CommandList, CommandEmpty, CommandItem } from '@/components/ui/command';
 import { useScopedToast } from '@/hooks/useScopedToast';
-import { fmtBRL, formatDateBR, formatDateTimeBR, formatDateValueBR } from '@/lib/formatters';
+import { fmtBRL, formatDateBR, formatDateTimeBR, formatDateValueBR, formatPercentBR } from '@/lib/formatters';
+import { formatNumberToBRL, normalizeBRLMoneyToNumber } from '@/lib/money';
+import { BRLInput, CurrencyInput } from '@/components/ui/brl-input';
+import { compararTotais, getPrecoSugerido, getUltimaCompra } from '@/domain/compras/pedidoPrecos';
 import UserMentionSelect from '@/components/UserMentionSelect';
 import ProductSearchCombobox, { type ProductOption } from '@/components/ui/ProductSearchCombobox';
 import { SubmoduleSwitcher } from '@/components/ui/SubmoduleSwitcher';
@@ -63,6 +66,27 @@ function serializeCategories(cats: string[]): string {
   return [...new Set(cats)].join(', ');
 }
 
+type FormItem = {
+  stock_item_id?: string;
+  name_snapshot: string;
+  unit_snapshot: string;
+  /** Preço atual (o que será pago) — é o que vai para o pedido e para o total estimado. */
+  estimated_unit_value: number;
+  qty_requested: number;
+  purchase_unit_snapshot?: string;
+  purchase_unit_cost_snapshot?: number;
+  conversion_factor_snapshot?: number;
+  /** Preço da última compra no estoque — só comparação na tela, não é gravado. */
+  reference_unit_cost?: number | null;
+};
+
+/** "+R$ 45,00 (+4,30%)" / "-R$ 9,00 (-6,04%)" */
+function formatDiferenca(diferenca: number, percentual: number | null): string {
+  const sinal = diferenca > 0 ? '+' : '-';
+  const pct = percentual == null ? '' : ` (${sinal}${formatPercentBR(Math.abs(percentual))})`;
+  return `${sinal}${fmtBRL(Math.abs(diferenca))}${pct}`;
+}
+
 export default function PedidosComprasMercadoView() {
   const toast = useScopedToast();
   const supabase = useSupabase();
@@ -78,16 +102,14 @@ export default function PedidosComprasMercadoView() {
 
   const productOptions: ProductOption[] = useMemo(() =>
     produtos.filter(p => p.ativo).map(p => {
-      const pa = p as unknown as Record<string, unknown>;
-      const purchaseUnit = (pa.unidadeCompra as string) || p.unidadeMedida || 'UN';
-      const purchaseCost = ((pa.avg30CostPurchaseUnit as number) ?? 0) > 0 ? (pa.avg30CostPurchaseUnit as number)
-        : ((pa.lastCostPurchaseUnit as number) ?? 0) > 0 ? (pa.lastCostPurchaseUnit as number)
-        : ((pa.defaultCostPurchaseUnit as number) ?? 0) > 0 ? (pa.defaultCostPurchaseUnit as number)
-        : p.custoPadrao || 0;
+      const purchaseUnit = p.unidadeCompra || p.unidadeMedida || 'UN';
+      const ultima = getUltimaCompra(p);
       return {
         id: p.id,
         label: p.nomeProduto,
-        sublabel: `(${purchaseUnit}) — ${fmtBRL(purchaseCost)}`,
+        sublabel: ultima
+          ? `(${purchaseUnit}) — últ. compra ${fmtBRL(ultima.unitCost)}`
+          : `(${purchaseUnit}) — sem compra registrada`,
         keywords: p.sku || '',
       };
     }),
@@ -139,9 +161,27 @@ export default function PedidosComprasMercadoView() {
     responsible_user_id: '', notes: '',
   };
   const [form, setForm] = useState(emptyForm);
-  const [formItems, setFormItems] = useState<{ stock_item_id?: string; name_snapshot: string; unit_snapshot: string; estimated_unit_value: number; qty_requested: number; purchase_unit_snapshot?: string; purchase_unit_cost_snapshot?: number; conversion_factor_snapshot?: number }[]>([]);
+  const [formItems, setFormItems] = useState<FormItem[]>([]);
   const [itemProdId, setItemProdId] = useState('');
   const [itemQtd, setItemQtd] = useState('');
+  const [itemPreco, setItemPreco] = useState('');
+
+  const selectedItemProd = useMemo(() => produtos.find(p => p.id === itemProdId) ?? null, [produtos, itemProdId]);
+  const selectedUltimaCompra = selectedItemProd ? getUltimaCompra(selectedItemProd) : null;
+
+  // Ao escolher o produto, o preço atual já vem com a última compra — o usuário só troca se mudou.
+  const handleSelectItemProduct = (id: string) => {
+    setItemProdId(id);
+    const prod = produtos.find(p => p.id === id);
+    const sugerido = prod ? getPrecoSugerido(prod) : 0;
+    setItemPreco(sugerido > 0 ? formatNumberToBRL(sugerido) : '');
+  };
+
+  const updateFormItemPrice = (index: number, price: number) => {
+    setFormItems(prev => prev.map((item, j) => j === index
+      ? { ...item, estimated_unit_value: price, purchase_unit_cost_snapshot: price }
+      : item));
+  };
 
   // Edit state
   const [editingOrder, setEditingOrder] = useState<PurchaseOrder | null>(null);
@@ -269,31 +309,35 @@ export default function PedidosComprasMercadoView() {
 
   const handleAddItem = () => {
     if (!itemProdId || !itemQtd) { toast.error('Selecione produto e quantidade'); return; }
-    const prod = produtos.find(p => p.id === itemProdId) as any;
+    const prod = selectedItemProd;
     if (!prod) return;
-    // Use purchase unit cost hierarchy: avg30 → last → default (all in purchase unit)
-    const purchaseCost = (prod.avg30CostPurchaseUnit ?? 0) > 0 ? prod.avg30CostPurchaseUnit
-      : (prod.lastCostPurchaseUnit ?? 0) > 0 ? prod.lastCostPurchaseUnit
-      : (prod.defaultCostPurchaseUnit ?? 0) > 0 ? prod.defaultCostPurchaseUnit
-      : prod.custoPadrao || 0;
+    const qty = parseFloat(itemQtd);
+    if (!Number.isFinite(qty) || qty <= 0) { toast.error('Informe uma quantidade válida'); return; }
+    // Preço atual (unidade de compra) é o que vai para o pedido; a última compra fica só como referência.
+    const precoAtual = normalizeBRLMoneyToNumber(itemPreco);
+    if (precoAtual == null || precoAtual <= 0) { toast.error('Informe o preço atual do item'); return; }
     const purchaseUnit = prod.unidadeCompra || prod.unidadeMedida || 'UN';
     const conversionFactor = prod.fatorConversaoPadrao || 1;
     setFormItems(prev => [...prev, {
       stock_item_id: prod.id,
       name_snapshot: prod.nomeProduto,
       unit_snapshot: purchaseUnit,
-      estimated_unit_value: purchaseCost,
-      qty_requested: parseFloat(itemQtd),
+      estimated_unit_value: precoAtual,
+      qty_requested: qty,
       purchase_unit_snapshot: purchaseUnit,
-      purchase_unit_cost_snapshot: purchaseCost,
+      purchase_unit_cost_snapshot: precoAtual,
       conversion_factor_snapshot: conversionFactor,
+      reference_unit_cost: getUltimaCompra(prod)?.unitCost ?? null,
     }]);
-    setItemProdId(''); setItemQtd('');
+    setItemProdId(''); setItemQtd(''); setItemPreco('');
   };
 
   const handleSubmit = async () => {
     if (!form.title.trim()) { toast.error('Informe o título'); return; }
     if (formItems.length === 0 && editLockedItems.length === 0) { toast.error('Adicione itens'); return; }
+    // O preço do item vira o custo da entrada no recebimento — preço zerado distorce o custo do estoque.
+    const itemSemPreco = formItems.find(i => !(i.estimated_unit_value > 0));
+    if (itemSemPreco) { toast.error(`Informe o preço atual de ${itemSemPreco.name_snapshot}`); return; }
     if (form.type === 'FORNECEDOR' && !form.supplier_name.trim()) { toast.error('Fornecedor obrigatório para pedidos de fornecedor'); return; }
     if ((form.type === 'MERCADO' || form.type === 'SAZONAL') && !form.responsible_user_id) {
       toast.error('Para Mercado/Sazonal é obrigatório definir um responsável.');
@@ -350,6 +394,7 @@ export default function PedidosComprasMercadoView() {
     setEditLockedItems([]);
     setForm(emptyForm);
     setFormItems([]);
+    setItemProdId(''); setItemQtd(''); setItemPreco('');
   };
 
   const startEdit = async (order: PurchaseOrder) => {
@@ -371,16 +416,21 @@ export default function PedidosComprasMercadoView() {
       responsible_user_id: order.responsible_user_id || '',
       notes: order.notes,
     });
-    setFormItems(order.status === 'COMPLETED' ? [] : editableItems.map(i => ({
-      stock_item_id: i.stock_item_id || undefined,
-      name_snapshot: i.name_snapshot,
-      unit_snapshot: i.unit_snapshot,
-      estimated_unit_value: i.estimated_unit_value,
-      qty_requested: i.qty_requested,
-      purchase_unit_snapshot: (i as any).purchase_unit_snapshot || i.unit_snapshot,
-      purchase_unit_cost_snapshot: (i as any).purchase_unit_cost_snapshot ?? i.estimated_unit_value,
-      conversion_factor_snapshot: (i as any).conversion_factor_snapshot ?? 1,
-    })));
+    setFormItems(order.status === 'COMPLETED' ? [] : editableItems.map(i => {
+      const prod = i.stock_item_id ? produtos.find(p => p.id === i.stock_item_id) : undefined;
+      return {
+        stock_item_id: i.stock_item_id || undefined,
+        name_snapshot: i.name_snapshot,
+        unit_snapshot: i.unit_snapshot,
+        estimated_unit_value: i.estimated_unit_value,
+        qty_requested: i.qty_requested,
+        purchase_unit_snapshot: (i as any).purchase_unit_snapshot || i.unit_snapshot,
+        // Snapshot acompanha o preço atual do item (relatórios leem o snapshot como custo da compra).
+        purchase_unit_cost_snapshot: i.estimated_unit_value,
+        conversion_factor_snapshot: (i as any).conversion_factor_snapshot ?? 1,
+        reference_unit_cost: prod ? getUltimaCompra(prod)?.unitCost ?? null : null,
+      };
+    }));
     setShowForm(true);
   };
 
@@ -462,8 +512,12 @@ export default function PedidosComprasMercadoView() {
     if (selectedOrder) await openDetail(selectedOrder);
   };
 
-  const totalEstimado = formItems.reduce((s, i) => s + i.qty_requested * i.estimated_unit_value, 0);
-  const lockedTotal = editLockedItems.reduce((s, i) => s + i.qty_requested * i.estimated_unit_value, 0);
+  // Itens já recebidos (edição) entram pelo próprio preço nos dois totais — não há o que comparar.
+  const comparativoTotais = compararTotais([
+    ...formItems,
+    ...editLockedItems.map(i => ({ qty_requested: i.qty_requested, estimated_unit_value: i.estimated_unit_value })),
+  ]);
+  const itensSemReferencia = formItems.filter(i => !((i.reference_unit_cost ?? 0) > 0)).length;
 
   const subTabs: { id: SubTab; label: string; icon: typeof ShoppingCart; count?: number }[] = [
     { id: 'pedidos', label: 'Pedidos', icon: ShoppingCart, count: store.openCount || undefined },
@@ -1017,38 +1071,101 @@ export default function PedidosComprasMercadoView() {
           {editingOrder?.status !== 'COMPLETED' && (
             <div>
               <Label className="text-[10px] text-muted-foreground mb-2">{editingOrder ? 'Itens editáveis (pendentes)' : 'Itens do Pedido'}</Label>
-              <div className="flex items-end gap-2 mt-1">
-                <div className="flex-1">
+              <div className="flex flex-wrap items-end gap-2 mt-1">
+                <div className="flex-1 min-w-[200px]">
                   <ProductSearchCombobox
                     options={productOptions}
                     value={itemProdId}
-                    onSelect={setItemProdId}
+                    onSelect={handleSelectItemProduct}
                     placeholder="Buscar produto do estoque…"
                     searchPlaceholder="Buscar por nome ou SKU…"
                     allowClear={false}
                   />
                 </div>
-                <Input type="number" value={itemQtd} onChange={e => setItemQtd(e.target.value)} placeholder="Qtd" className="w-20 text-xs" />
-                <Button size="sm" variant="outline" onClick={handleAddItem}><Plus className="w-3.5 h-3.5" /></Button>
+                <div className="w-20">
+                  <Label htmlFor="pedido-item-qtd" className="text-[10px] text-muted-foreground">Qtd</Label>
+                  <Input id="pedido-item-qtd" type="number" value={itemQtd} onChange={e => setItemQtd(e.target.value)} placeholder="Qtd" className="h-9 text-xs" />
+                </div>
+                <div className="w-32">
+                  <Label htmlFor="pedido-item-preco" className="text-[10px] text-muted-foreground">Preço atual</Label>
+                  <CurrencyInput id="pedido-item-preco" value={itemPreco} onValueChange={raw => setItemPreco(raw)} showPrefix className="h-9 text-xs" />
+                </div>
+                <Button size="sm" variant="outline" className="h-9" onClick={handleAddItem} aria-label="Adicionar item"><Plus className="w-3.5 h-3.5" /></Button>
               </div>
+              {selectedItemProd && (
+                <p className="text-[10px] text-muted-foreground mt-1.5">
+                  {selectedUltimaCompra ? (
+                    <>
+                      Última compra: <span className="font-semibold text-foreground">{fmtBRL(selectedUltimaCompra.unitCost)}</span>
+                      {' '}/ {selectedItemProd.unidadeCompra || selectedItemProd.unidadeMedida || 'UN'}
+                      {selectedUltimaCompra.date && ` em ${formatDateValueBR(selectedUltimaCompra.date)}`}
+                      {selectedUltimaCompra.supplier && ` · ${selectedUltimaCompra.supplier}`}
+                    </>
+                  ) : (
+                    'Sem compra registrada no estoque — informe o preço atual.'
+                  )}
+                </p>
+              )}
             </div>
           )}
 
           {formItems.length > 0 && (
             <div className="space-y-1">
-              {formItems.map((item, i) => (
-                <div key={i} className="flex items-center justify-between bg-background-subtle rounded-lg px-3 py-1.5 text-xs">
-                  <span className="text-foreground">{item.name_snapshot}</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground">{item.qty_requested} {item.unit_snapshot} × {fmtBRL(item.estimated_unit_value)}</span>
-                    <span className="font-bold text-foreground">{fmtBRL(item.qty_requested * item.estimated_unit_value)}</span>
-                    <button onClick={() => setFormItems(prev => prev.filter((_, j) => j !== i))} className="text-destructive"><X className="w-3 h-3" /></button>
+              {formItems.map((item, i) => {
+                const ref = item.reference_unit_cost ?? 0;
+                const diffUnit = item.estimated_unit_value - ref;
+                return (
+                  <div key={i} className="bg-background-subtle rounded-lg px-3 py-1.5 text-xs">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-foreground">{item.name_snapshot}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground whitespace-nowrap">{item.qty_requested} {item.unit_snapshot} ×</span>
+                        <div className="w-28">
+                          <BRLInput
+                            numericValue={item.estimated_unit_value}
+                            onNumericChange={v => updateFormItemPrice(i, v)}
+                            showPrefix
+                            aria-label={`Preço atual de ${item.name_snapshot}`}
+                            className="h-7 text-xs"
+                          />
+                        </div>
+                        <span className="font-bold text-foreground whitespace-nowrap">{fmtBRL(item.qty_requested * item.estimated_unit_value)}</span>
+                        <button onClick={() => setFormItems(prev => prev.filter((_, j) => j !== i))} className="text-destructive" aria-label={`Remover ${item.name_snapshot}`}><X className="w-3 h-3" /></button>
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                      {ref > 0 ? (
+                        <>
+                          Última compra: {fmtBRL(ref)}
+                          {Math.abs(diffUnit) >= 0.005 && (
+                            <span className={`ml-1.5 font-medium ${diffUnit > 0 ? 'text-destructive' : 'text-success'}`}>
+                              {formatDiferenca(diffUnit, (diffUnit / ref) * 100)}
+                            </span>
+                          )}
+                        </>
+                      ) : 'Sem compra anterior registrada'}
+                    </p>
                   </div>
-                </div>
-              ))}
-              <p className="text-right text-xs font-bold text-foreground pt-1">
-                Total estimado: {fmtBRL(totalEstimado + lockedTotal)}
-              </p>
+                );
+              })}
+              <div className="text-right pt-1 space-y-0.5">
+                <p className="text-xs font-bold text-foreground">
+                  Total estimado (preço atual): {fmtBRL(comparativoTotais.totalAtual)}
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  No preço da última compra: {fmtBRL(comparativoTotais.totalReferencia)}
+                  {comparativoTotais.diferenca !== 0 && (
+                    <span className={`ml-1.5 font-medium ${comparativoTotais.diferenca > 0 ? 'text-destructive' : 'text-success'}`}>
+                      {formatDiferenca(comparativoTotais.diferenca, comparativoTotais.diferencaPercentual)}
+                    </span>
+                  )}
+                </p>
+                {itensSemReferencia > 0 && (
+                  <p className="text-[10px] text-muted-foreground">
+                    {itensSemReferencia === 1 ? '1 item sem compra anterior entra' : `${itensSemReferencia} itens sem compra anterior entram`} pelo preço atual.
+                  </p>
+                )}
+              </div>
             </div>
           )}
 
