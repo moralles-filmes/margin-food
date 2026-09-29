@@ -11513,6 +11513,10 @@ export type Database = {
         }
         Returns: Json
       }
+      op_registrar_saidas_lote: {
+        Args: { p_itens: Json; p_observacao?: string }
+        Returns: Json
+      }
       op_setor_autorizado: {
         Args: { p_company: string; p_setor_id: string; p_user_id: string }
         Returns: boolean
