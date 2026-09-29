@@ -41,6 +41,9 @@ export interface MovimentacaoOperacionalRegistrada {
 /** Limite de segurança para o campo de quantidade (evita dedo escorregando no teclado). */
 export const QUANTIDADE_MAXIMA = 999_999;
 
+/** Itens por saída em lote — mesmo limite do servidor (`op_registrar_saidas_lote`). */
+export const LOTE_MAXIMO_ITENS = 50;
+
 /**
  * Converte o texto digitado em número.
  *
@@ -197,6 +200,16 @@ export function traduzirErroOperacional(mensagem: string | undefined): string {
   }
   if (msg.includes('TIPO_INVALIDO')) {
     return 'A movimentação operacional só registra saída. Entradas são lançadas no Controle de Estoque.';
+  }
+  // Erros da saída em lote (op_registrar_saidas_lote).
+  if (msg.includes('LOTE_TAMANHO_INVALIDO')) {
+    return `Uma saída pode ter no máximo ${LOTE_MAXIMO_ITENS} itens. Confirme esta e comece outra.`;
+  }
+  if (msg.includes('LOTE_ITEM_INVALIDO')) {
+    return 'Este item está incompleto. Remova-o e adicione de novo.';
+  }
+  if (msg.includes('LOTE_INVALIDO')) {
+    return 'Não foi possível montar a lista de saída. Refaça o lançamento.';
   }
   if (msg.includes('PERMISSION_DENIED')) {
     return 'Você não tem permissão para registrar movimentações.';

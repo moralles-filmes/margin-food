@@ -49,3 +49,66 @@ describe('useMovimentacaoOperacional.registrar', () => {
     }));
   });
 });
+
+describe('useMovimentacaoOperacional.registrarLote', () => {
+  const ITENS = [
+    { produtoId: 'prod-coca', setorId: 'setor-cozinha', quantidade: 2, clientRequestId: 's|a' },
+    { produtoId: 'prod-agua', setorId: 'setor-delivery', quantidade: 3, clientRequestId: 's|b' },
+  ];
+
+  it('manda a lista inteira numa chamada só, com a chave de cada item', async () => {
+    rpc.mockImplementation((nome: string) => {
+      if (nome === 'op_list_setores') return Promise.resolve({ data: [], error: null });
+      return Promise.resolve({
+        data: {
+          success: true,
+          itens: [
+            { id: 'mov-1', idempotente: false, produto_nome: 'Coca', unidade_medida: 'UN', setor: 'Cozinha', quantidade: 2, saldo_novo: 6 },
+            { id: 'mov-2', idempotente: true, produto_nome: 'Água', unidade_medida: 'UN', setor: 'Delivery', quantidade: 3, saldo_novo: 17 },
+          ],
+        },
+        error: null,
+      });
+    });
+    const { result } = renderHook(() => useMovimentacaoOperacional());
+    await waitFor(() => expect(result.current.setoresLoading).toBe(false));
+
+    const res = await result.current.registrarLote({ itens: ITENS, observacao: 'turno da noite' });
+
+    expect(rpc).toHaveBeenCalledWith('op_registrar_saidas_lote', {
+      p_itens: [
+        { produto_id: 'prod-coca', setor_id: 'setor-cozinha', quantidade: 2, client_request_id: 's|a' },
+        { produto_id: 'prod-agua', setor_id: 'setor-delivery', quantidade: 3, client_request_id: 's|b' },
+      ],
+      p_observacao: 'turno da noite',
+    });
+    expect(rpc).not.toHaveBeenCalledWith('op_registrar_movimentacao', expect.anything());
+    expect(res.ok).toBe(true);
+    if (res.ok === true) {
+      expect(res.resultados.map(r => [r.produtoNome, r.saldoNovo, r.idempotente])).toEqual([
+        ['Coca', 6, false],
+        ['Água', 17, true],
+      ]);
+    }
+  });
+
+  it('aponta o item recusado pelo servidor', async () => {
+    rpc.mockImplementation((nome: string) => {
+      if (nome === 'op_list_setores') return Promise.resolve({ data: [], error: null });
+      return Promise.resolve({
+        data: null,
+        error: { message: 'LOTE_ITEM=2 SALDO_INSUFICIENTE: disponivel=1.000, solicitado=3' },
+      });
+    });
+    const { result } = renderHook(() => useMovimentacaoOperacional());
+    await waitFor(() => expect(result.current.setoresLoading).toBe(false));
+
+    const res = await result.current.registrarLote({ itens: ITENS });
+
+    expect(res).toEqual({
+      ok: false,
+      indice: 1,
+      erro: 'Quantidade indisponível. Existem apenas 1 neste setor.',
+    });
+  });
+});

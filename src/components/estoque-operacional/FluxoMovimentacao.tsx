@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ArrowUp, Check, CheckCircle2, Loader2, ScanLine } from 'lucide-react';
+import { ArrowLeft, ArrowUp, Check, CheckCircle2, ListPlus, Loader2, ScanLine } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,18 +9,40 @@ import { mensagemBarcodeInvalido, validarBarcode } from '@/domain/estoque/barcod
 import {
   chaveRequisicao,
   formatarQuantidade,
+  LOTE_MAXIMO_ITENS,
   parseQuantidade,
+  quantidadeParaCampo,
   validarQuantidade,
   type MovimentacaoOperacionalRegistrada,
   type ProdutoOperacional,
   type SetorOperacional,
 } from '@/domain/estoque/operacional';
+import {
+  adicionarAoLote,
+  alterarQuantidadeNoLote,
+  chaveItemLote,
+  quantidadeNoLote,
+  removerDoLote,
+  validarQuantidadeNoLote,
+  type ItemSaidaLote,
+} from '@/domain/estoque/operacionalLote';
 import type { useMovimentacaoOperacional } from '@/hooks/useMovimentacaoOperacional';
 import LeitorCodigoBarras from './LeitorCodigoBarras';
 import ProdutoPickerOperacional from './ProdutoPickerOperacional';
 import QuantidadeStepper from './QuantidadeStepper';
+import { ResumoLote, RevisaoLote, SucessoLote } from './SaidaLote';
 
-type Passo = 'leitor' | 'setor' | 'produto' | 'setor-do-codigo' | 'quantidade' | 'sucesso';
+type Passo = 'leitor' | 'setor' | 'produto' | 'setor-do-codigo' | 'quantidade' | 'revisao' | 'sucesso';
+
+/** Passos em que a lista em andamento aparece no topo, com o atalho para revisar. */
+const PASSOS_COM_RESUMO: Passo[] = ['leitor', 'setor', 'produto', 'setor-do-codigo'];
+
+function semErro(erros: Record<string, string>, id: string): Record<string, string> {
+  if (!(id in erros)) return erros;
+  const resto = { ...erros };
+  delete resto[id];
+  return resto;
+}
 
 interface Props {
   setores: SetorOperacional[];
@@ -39,6 +61,11 @@ function novaSemente(): string {
 /**
  * Fluxo de saída de estoque. O operacional não registra entrada: ela é lançada
  * no Controle de Estoque (módulo administrativo), e o banco recusa outro tipo.
+ *
+ * Um item só é confirmado direto na tela de quantidade. Para vários, o operador
+ * toca "Adicionar mais itens": o item vai para uma lista, o leitor volta, e a
+ * lista é conferida e confirmada de uma vez (`op_registrar_saidas_lote`, tudo
+ * ou nada).
  */
 export default function FluxoMovimentacao({ setores, dados, onRegistrado }: Props) {
   const toast = useScopedToast();
@@ -58,6 +85,14 @@ export default function FluxoMovimentacao({ setores, dados, onRegistrado }: Prop
   const [observacao, setObservacao] = useState('');
   const [salvando, setSalvando] = useState(false);
   const [resultado, setResultado] = useState<MovimentacaoOperacionalRegistrada | null>(null);
+
+  // Saída com vários itens. A lista só existe na tela até ser confirmada; nada
+  // é gravado antes disso. `editandoId` reaproveita o passo de quantidade para
+  // alterar um item da lista.
+  const [itensLote, setItensLote] = useState<ItemSaidaLote[]>([]);
+  const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [errosLote, setErrosLote] = useState<Record<string, string>>({});
+  const [resultadosLote, setResultadosLote] = useState<MovimentacaoOperacionalRegistrada[] | null>(null);
 
   // Estado do leitor
   const [lendo, setLendo] = useState(false);
@@ -92,10 +127,15 @@ export default function FluxoMovimentacao({ setores, dados, onRegistrado }: Prop
     ),
     [semente, produto, setor, quantidade],
   );
+  // Com a lista em andamento, o saldo disponível desconta o que ela já retira
+  // do mesmo produto (em qualquer setor — o saldo é um só).
   const validacao = useMemo(
-    () => validarQuantidade(quantidade, produto?.saldo ?? 0, produto?.unidadeMedida ?? ''),
-    [quantidade, produto],
+    () => (produto
+      ? validarQuantidadeNoLote(quantidade, produto, itensLote, editandoId ?? undefined)
+      : validarQuantidade(quantidade, 0, '')),
+    [quantidade, produto, itensLote, editandoId],
   );
+  const produtoNaLista = produto ? quantidadeNoLote(itensLote, produto.produtoId, editandoId ?? undefined) : 0;
 
   // Erro de quantidade só aparece depois de uma tentativa de confirmar; avisar
   // enquanto a pessoa ainda digita é ruído.
@@ -226,6 +266,131 @@ export default function FluxoMovimentacao({ setores, dados, onRegistrado }: Prop
     onRegistrado();
   }, [salvando, produto, setor, validacao, quantidade, dados, observacao, requestId, toast, onRegistrado]);
 
+  // ─── Saída com vários itens ───
+
+  /** Próximo item da lista, no mesmo modo em que o anterior foi escolhido. */
+  const seguirAdicionando = useCallback(() => {
+    setEditandoId(null);
+    if (origemProduto === 'manual' && setor) {
+      setProduto(null);
+      setAvisoLeitor(undefined);
+      setPasso('produto');
+      return;
+    }
+    irParaLeitor();
+  }, [origemProduto, setor, irParaLeitor]);
+
+  const adicionarItemAtual = useCallback((depois: 'continuar' | 'revisar') => {
+    if (salvando || !produto || !setor) return;
+    setTentouConfirmar(true);
+    if (!validacao.valida || quantidade === null) return;
+
+    const { itens, somadoEm } = adicionarAoLote(itensLote, {
+      id: novaSemente(), produto, setor, quantidade,
+    });
+    if (itens.length > LOTE_MAXIMO_ITENS) {
+      toast.error(`Uma saída pode ter no máximo ${LOTE_MAXIMO_ITENS} itens. Confirme esta e comece outra.`);
+      return;
+    }
+
+    setItensLote(itens);
+    if (somadoEm) {
+      setErrosLote(e => semErro(e, somadoEm));
+      toast.success(`${produto.nome}: quantidade somada ao item que já estava na lista.`);
+    }
+    setQuantidadeTexto('1');
+    setTentouConfirmar(false);
+
+    if (depois === 'revisar') {
+      setProduto(null);
+      setPasso('revisao');
+      return;
+    }
+    seguirAdicionando();
+  }, [salvando, produto, setor, validacao, quantidade, itensLote, toast, seguirAdicionando]);
+
+  const revisarLote = useCallback(() => {
+    descartarLeituraEmVoo();
+    setAvisoLeitor(undefined);
+    setProduto(null);
+    setPasso('revisao');
+  }, [descartarLeituraEmVoo]);
+
+  const editarItemLote = useCallback((item: ItemSaidaLote) => {
+    setEditandoId(item.id);
+    setProduto(item.produto);
+    setSetor(item.setor);
+    setQuantidadeTexto(quantidadeParaCampo(item.quantidade));
+    setPasso('quantidade');
+  }, []);
+
+  const encerrarEdicao = useCallback(() => {
+    setEditandoId(null);
+    setProduto(null);
+    setQuantidadeTexto('1');
+    setPasso('revisao');
+  }, []);
+
+  const salvarEdicao = useCallback(() => {
+    if (!editandoId) return;
+    setTentouConfirmar(true);
+    if (!validacao.valida || quantidade === null) return;
+
+    setItensLote(itens => alterarQuantidadeNoLote(itens, editandoId, quantidade));
+    setErrosLote(e => semErro(e, editandoId));
+    encerrarEdicao();
+  }, [editandoId, validacao, quantidade, encerrarEdicao]);
+
+  const removerItemLote = useCallback((item: ItemSaidaLote) => {
+    const restantes = removerDoLote(itensLote, item.id);
+    setItensLote(restantes);
+    setErrosLote(e => semErro(e, item.id));
+    if (restantes.length === 0) seguirAdicionando();
+  }, [itensLote, seguirAdicionando]);
+
+  const descartarLote = useCallback(() => {
+    setItensLote([]);
+    setErrosLote({});
+    setObservacao('');
+    setSemente(novaSemente());
+    setEditandoId(null);
+    irParaLeitor();
+  }, [irParaLeitor]);
+
+  const confirmarLote = useCallback(async () => {
+    if (salvando || itensLote.length === 0) return;
+
+    setSalvando(true);
+    setErrosLote({});
+    const res = await dados.registrarLote({
+      itens: itensLote.map(item => ({
+        produtoId: item.produto.produtoId,
+        setorId: item.setor.setorId,
+        quantidade: item.quantidade,
+        clientRequestId: chaveItemLote(semente, item),
+      })),
+      observacao,
+    });
+    setSalvando(false);
+
+    if (res.ok === false) {
+      const recusado = res.indice !== null ? itensLote[res.indice] : undefined;
+      if (recusado) {
+        // Recusa de um item desfaz a lista inteira no servidor: dizer isso evita
+        // o operador achar que os outros itens já saíram.
+        setErrosLote({ [recusado.id]: res.erro });
+        toast.error(`${recusado.produto.nome}: ${res.erro} Nenhum item foi registrado.`);
+      } else {
+        toast.error(res.erro);
+      }
+      return;
+    }
+
+    setResultadosLote(res.resultados);
+    setPasso('sucesso');
+    onRegistrado();
+  }, [salvando, itensLote, dados, semente, observacao, toast, onRegistrado]);
+
   /**
    * Volta para o modo que originou o lançamento: quem estava bipando continua
    * bipando, com o campo já focado para o próximo produto.
@@ -235,6 +400,10 @@ export default function FluxoMovimentacao({ setores, dados, onRegistrado }: Prop
     setQuantidadeTexto('1');
     setObservacao('');
     setResultado(null);
+    setItensLote([]);
+    setErrosLote({});
+    setResultadosLote(null);
+    setEditandoId(null);
     setSemente(novaSemente());
     setAvisoLeitor(undefined);
 
@@ -249,6 +418,9 @@ export default function FluxoMovimentacao({ setores, dados, onRegistrado }: Prop
   }, [setorUnico, passoManualInicial]);
 
   const voltar = useCallback(() => {
+    // Alterando um item da lista: voltar desiste da alteração.
+    if (passo === 'quantidade' && editandoId) { encerrarEdicao(); return; }
+    if (passo === 'revisao') { seguirAdicionando(); return; }
     // Se o produto veio do leitor, voltar é voltar ao leitor.
     if (passo === 'setor-do-codigo' || (passo === 'quantidade' && origemProduto === 'leitor')) {
       irParaLeitor();
@@ -257,7 +429,7 @@ export default function FluxoMovimentacao({ setores, dados, onRegistrado }: Prop
     if (passo === 'quantidade') { setPasso('produto'); return; }
     if (passo === 'produto' && !setorUnico) { setSetor(null); setPasso('setor'); return; }
     irParaLeitor();
-  }, [passo, origemProduto, setorUnico, irParaLeitor]);
+  }, [passo, editandoId, origemProduto, setorUnico, irParaLeitor, encerrarEdicao, seguirAdicionando]);
 
   return (
     <div className="mx-auto w-full max-w-xl space-y-5">
@@ -283,13 +455,18 @@ export default function FluxoMovimentacao({ setores, dados, onRegistrado }: Prop
         </div>
         <div className="min-w-0">
           <h2 className="truncate text-lg font-bold text-foreground">Saída de Estoque</h2>
-          {setor && passo !== 'sucesso' && (
+          {/* Na revisão cada item mostra o próprio setor. */}
+          {setor && passo !== 'sucesso' && passo !== 'revisao' && (
             <p className="truncate text-xs text-muted-foreground">
               Setor: <span className="font-medium text-foreground">{setor.nome}</span>
             </p>
           )}
         </div>
       </div>
+
+      {itensLote.length > 0 && PASSOS_COM_RESUMO.includes(passo) && (
+        <ResumoLote itens={itensLote} onRevisar={revisarLote} />
+      )}
 
       {/* Fora do bloco do leitor, que desmonta a cada passo: a câmera segue
           ligada (escondida e pausada) até o próximo "Ler próximo código". */}
@@ -410,6 +587,11 @@ export default function FluxoMovimentacao({ setores, dados, onRegistrado }: Prop
             <p className="mt-1 text-xs text-muted-foreground">
               {produto.sku ? `${produto.sku} · ` : ''}{produto.unidadeMedida} · Disponível: {formatarQuantidade(produto.saldo)}
             </p>
+            {produtoNaLista > 0 && (
+              <p className="mt-1 text-xs font-medium text-primary-ink">
+                Já na lista: {formatarQuantidade(produtoNaLista)} {produto.unidadeMedida}
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -424,56 +606,119 @@ export default function FluxoMovimentacao({ setores, dados, onRegistrado }: Prop
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="op-observacao" className="text-sm font-medium text-foreground">
-              Observação <span className="font-normal text-muted-foreground">(opcional)</span>
-            </Label>
-            <Input
-              id="op-observacao"
-              value={observacao}
-              onChange={e => setObservacao(e.target.value)}
-              maxLength={500}
-              disabled={salvando}
-              className="h-11"
-            />
-          </div>
+          {editandoId ? (
+            <Button
+              type="button"
+              onClick={salvarEdicao}
+              className="h-14 w-full rounded-xl bg-primary-strong text-base font-semibold text-primary-foreground"
+            >
+              <Check className="mr-2 h-5 w-5" /> Salvar quantidade
+            </Button>
+          ) : itensLote.length === 0 ? (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="op-observacao" className="text-sm font-medium text-foreground">
+                  Observação <span className="font-normal text-muted-foreground">(opcional)</span>
+                </Label>
+                <Input
+                  id="op-observacao"
+                  value={observacao}
+                  onChange={e => setObservacao(e.target.value)}
+                  maxLength={500}
+                  disabled={salvando}
+                  className="h-11"
+                />
+              </div>
 
-          <Button
-            type="button"
-            onClick={confirmar}
-            disabled={salvando}
-            className="h-14 w-full rounded-xl bg-primary-strong text-base font-semibold text-primary-foreground"
-          >
-            {salvando ? (
-              <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Registrando…</>
-            ) : (
-              <><Check className="mr-2 h-5 w-5" /> Confirmar saída</>
-            )}
-          </Button>
+              <Button
+                type="button"
+                onClick={confirmar}
+                disabled={salvando}
+                className="h-14 w-full rounded-xl bg-primary-strong text-base font-semibold text-primary-foreground"
+              >
+                {salvando ? (
+                  <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Registrando…</>
+                ) : (
+                  <><Check className="mr-2 h-5 w-5" /> Confirmar saída</>
+                )}
+              </Button>
+
+              {/* Entrada para a saída com vários itens: este vai para a lista e o leitor volta. */}
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => adicionarItemAtual('continuar')}
+                disabled={salvando}
+                className="h-12 w-full rounded-xl text-base"
+              >
+                <ListPlus className="mr-2 h-5 w-5" />
+                Adicionar mais itens
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                type="button"
+                onClick={() => adicionarItemAtual('continuar')}
+                className="h-14 w-full rounded-xl bg-primary-strong text-base font-semibold text-primary-foreground"
+              >
+                <ListPlus className="mr-2 h-5 w-5" />
+                {origemProduto === 'leitor' ? 'Adicionar e ler próximo' : 'Adicionar e escolher outro'}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => adicionarItemAtual('revisar')}
+                className="h-12 w-full rounded-xl text-base"
+              >
+                Adicionar e revisar a saída
+              </Button>
+            </>
+          )}
         </section>
       )}
 
+      {/* Conferência da saída com vários itens */}
+      {passo === 'revisao' && (
+        <RevisaoLote
+          itens={itensLote}
+          erros={errosLote}
+          observacao={observacao}
+          onObservacaoChange={setObservacao}
+          salvando={salvando}
+          onConfirmar={confirmarLote}
+          onEditar={editarItemLote}
+          onRemover={removerItemLote}
+          onAdicionarMais={seguirAdicionando}
+          onDescartar={descartarLote}
+        />
+      )}
+
       {/* Passo 4 — sucesso */}
-      {passo === 'sucesso' && resultado && (
+      {passo === 'sucesso' && (resultado || resultadosLote) && (
         <section className="space-y-4">
-          <div className="rounded-xl border border-destructive-border bg-destructive-soft p-5 text-center">
-            <CheckCircle2 className="mx-auto h-12 w-12 text-destructive" />
-            <p className="mt-2 text-sm font-bold uppercase tracking-wide text-destructive">
-              Saída realizada
-            </p>
-            <p className="mt-3 text-4xl font-bold tabular-nums text-destructive">
-              −{formatarQuantidade(resultado.quantidade)}
-            </p>
-            <p className="mt-2 text-base font-semibold text-foreground">{resultado.produtoNome}</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Setor: {resultado.setor} · Saldo agora: {formatarQuantidade(resultado.saldoNovo)} {resultado.unidadeMedida}
-            </p>
-            {resultado.idempotente && (
-              <p className="mt-2 text-xs font-medium text-muted-foreground">
-                Este lançamento já havia sido registrado — nada foi duplicado.
+          {resultadosLote ? (
+            <SucessoLote resultados={resultadosLote} />
+          ) : resultado && (
+            <div className="rounded-xl border border-destructive-border bg-destructive-soft p-5 text-center">
+              <CheckCircle2 className="mx-auto h-12 w-12 text-destructive" />
+              <p className="mt-2 text-sm font-bold uppercase tracking-wide text-destructive">
+                Saída realizada
               </p>
-            )}
-          </div>
+              <p className="mt-3 text-4xl font-bold tabular-nums text-destructive">
+                −{formatarQuantidade(resultado.quantidade)}
+              </p>
+              <p className="mt-2 text-base font-semibold text-foreground">{resultado.produtoNome}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Setor: {resultado.setor} · Saldo agora: {formatarQuantidade(resultado.saldoNovo)} {resultado.unidadeMedida}
+              </p>
+              {resultado.idempotente && (
+                <p className="mt-2 text-xs font-medium text-muted-foreground">
+                  Este lançamento já havia sido registrado — nada foi duplicado.
+                </p>
+              )}
+            </div>
+          )}
 
           <div className="grid gap-2 sm:grid-cols-2">
             <Button

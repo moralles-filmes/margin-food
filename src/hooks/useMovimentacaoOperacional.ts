@@ -6,6 +6,7 @@ import type {
   SetorOperacional,
 } from '@/domain/estoque/operacional';
 import { traduzirErroOperacional } from '@/domain/estoque/operacional';
+import { traduzirErroLote } from '@/domain/estoque/operacionalLote';
 
 /**
  * ─── Acesso a dados do submódulo Movimentação Operacional ───
@@ -49,6 +50,27 @@ interface RegistrarInput {
   observacao?: string;
   /** Gerado uma vez por confirmação; reenvio devolve a movimentação original. */
   clientRequestId: string;
+}
+
+interface RegistrarLoteInput {
+  itens: Array<Omit<RegistrarInput, 'observacao'>>;
+  /** Vale para todos os itens da saída. */
+  observacao?: string;
+}
+
+/** Retorno de `op_registrar_movimentacao` — e de cada item do lote. */
+function mapearRegistro(data: unknown, quantidadeEnviada: number): MovimentacaoOperacionalRegistrada {
+  const payload = (data ?? {}) as Record<string, unknown>;
+  return {
+    id: String(payload.id ?? ''),
+    idempotente: !!payload.idempotente,
+    produtoNome: String(payload.produto_nome ?? ''),
+    unidadeMedida: String(payload.unidade_medida ?? ''),
+    setor: String(payload.setor ?? ''),
+    quantidade: Number(payload.quantidade) || quantidadeEnviada,
+    saldoAnterior: Number(payload.saldo_anterior) || 0,
+    saldoNovo: Number(payload.saldo_novo) || 0,
+  };
 }
 
 export function useMovimentacaoOperacional() {
@@ -135,19 +157,39 @@ export function useMovimentacaoOperacional() {
       return { ok: false, erro: traduzirErroOperacional(error.message) };
     }
 
-    const payload = (data ?? {}) as Record<string, unknown>;
+    return { ok: true, resultado: mapearRegistro(data, input.quantidade) };
+  }, [supabase]);
+
+  // ─── Registrar saída de vários itens ───
+  //
+  // Tudo ou nada: o servidor grava a lista numa transação e, se um item for
+  // recusado, desfaz os anteriores. `indice` (base 0) aponta o item recusado.
+  const registrarLote = useCallback(async (
+    input: RegistrarLoteInput,
+  ): Promise<
+    | { ok: true; resultados: MovimentacaoOperacionalRegistrada[] }
+    | { ok: false; erro: string; indice: number | null }
+  > => {
+    const { data, error } = await supabase.rpc('op_registrar_saidas_lote', {
+      p_itens: input.itens.map(item => ({
+        produto_id: item.produtoId,
+        setor_id: item.setorId,
+        quantidade: item.quantidade,
+        client_request_id: item.clientRequestId,
+      })),
+      p_observacao: input.observacao || undefined,
+    });
+
+    if (error) {
+      console.error('[useMovimentacaoOperacional] op_registrar_saidas_lote', error);
+      return { ok: false, ...traduzirErroLote(error.message) };
+    }
+
+    const linhas = (data as { itens?: unknown } | null)?.itens;
+    const resultados = Array.isArray(linhas) ? linhas : [];
     return {
       ok: true,
-      resultado: {
-        id: String(payload.id ?? ''),
-        idempotente: !!payload.idempotente,
-        produtoNome: String(payload.produto_nome ?? ''),
-        unidadeMedida: String(payload.unidade_medida ?? ''),
-        setor: String(payload.setor ?? ''),
-        quantidade: Number(payload.quantidade) || input.quantidade,
-        saldoAnterior: Number(payload.saldo_anterior) || 0,
-        saldoNovo: Number(payload.saldo_novo) || 0,
-      },
+      resultados: input.itens.map((item, i) => mapearRegistro(resultados[i], item.quantidade)),
     };
   }, [supabase]);
 
@@ -219,6 +261,6 @@ export function useMovimentacaoOperacional() {
 
   return {
     setores, setoresLoading, setoresErro, recarregarSetores: carregarSetores,
-    buscarProdutos, buscarPorBarcode, registrar, carregarHistorico,
+    buscarProdutos, buscarPorBarcode, registrar, registrarLote, carregarHistorico,
   };
 }
