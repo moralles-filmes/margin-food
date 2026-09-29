@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { forwardRef, useImperativeHandle, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
@@ -10,6 +10,11 @@ export interface RequisitionQuantityRow {
   observation?: string;
 }
 
+export interface RequisicaoQuantityListHandle {
+  /** Foca a quantidade da primeira linha preenchível; false quando não há nenhuma. */
+  focusFirst: () => boolean;
+}
+
 interface Props {
   rows: RequisitionQuantityRow[];
   quantities: Record<string, string>;
@@ -17,8 +22,29 @@ interface Props {
   onComplete: () => void;
 }
 
-export default function RequisicaoQuantityList({ rows, quantities, onChange, onComplete }: Props) {
+const isFillable = (row: RequisitionQuantityRow) => !!row.unit && !row.issue;
+
+const RequisicaoQuantityList = forwardRef<RequisicaoQuantityListHandle, Props>(function RequisicaoQuantityList(
+  { rows, quantities, onChange, onComplete },
+  ref,
+) {
   const inputs = useRef(new Map<string, HTMLInputElement>());
+
+  const focusRow = (id: string) => {
+    const input = inputs.current.get(id);
+    input?.focus();
+    input?.select();
+    input?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+  };
+
+  useImperativeHandle(ref, () => ({
+    focusFirst: () => {
+      const first = rows.find(isFillable);
+      if (!first) return false;
+      focusRow(first.id);
+      return true;
+    },
+  }), [rows]);
 
   return (
     <div className="space-y-3">
@@ -41,13 +67,9 @@ export default function RequisicaoQuantityList({ rows, quantities, onChange, onC
               onKeyDown={event => {
                 if (event.key !== 'Enter' || event.nativeEvent.isComposing) return;
                 event.preventDefault();
-                const next = rows.slice(index + 1).find(candidate => candidate.unit && !candidate.issue);
-                if (next) {
-                  const input = inputs.current.get(next.id);
-                  input?.focus();
-                  input?.select();
-                  input?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
-                } else onComplete();
+                const next = rows.slice(index + 1).find(isFillable);
+                if (next) focusRow(next.id);
+                else onComplete();
               }}
               className="h-12 w-full min-w-0 text-base md:text-base bg-background border-border text-foreground"
             />
@@ -56,4 +78,6 @@ export default function RequisicaoQuantityList({ rows, quantities, onChange, onC
       ))}
     </div>
   );
-}
+});
+
+export default RequisicaoQuantityList;

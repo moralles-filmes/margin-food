@@ -20,6 +20,7 @@ import { Settings2, Plus, Trash2, Search, X, ArrowUp, ArrowDown } from 'lucide-r
 import type { ProdutoExtended } from '@/types/estoque';
 import { toRequisitionDisplayProduct } from '@/domain/estoque/requisition';
 import { sortByName } from '@/lib/sortByName';
+import ListaFixaColaboradoresAdmin from './ListaFixaColaboradoresAdmin';
 
 interface ListaFixa {
   id: string;
@@ -278,6 +279,8 @@ export default function ListaFixaSetorAdmin({ produtos }: Props) {
         {/* List content */}
         {currentLista ? (
           <div className="space-y-3">
+            <ListaFixaColaboradoresAdmin listaId={currentLista.id} setor={currentLista.setor} />
+
             {/* Existing items */}
             {items.length > 0 ? (
               <div className="space-y-1">
