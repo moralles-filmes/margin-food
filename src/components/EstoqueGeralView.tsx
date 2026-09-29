@@ -37,6 +37,8 @@ import KpiCard from '@/components/ui/KpiCard';
 import SearchableSelect from '@/components/ui/SearchableSelect';
 import { useEstoqueGeralStoreContext } from '@/contexts/EstoqueGeralStoreContext';
 import { useSalmonStoreContext } from '@/contexts/SalmonStoreContext';
+import { useModuleBadges } from '@/contexts/ModuleBadgesContext';
+import { useNotificationSubtab } from '@/hooks/useNotificationSubtab';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCan, useModuleAccess } from '@/permissions';
 import { supabase } from '@/integrations/supabase/client';
@@ -100,12 +102,17 @@ export default function EstoqueGeralView() {
   const { produtos, saldos, movimentacoes, categorias, prodTotalCount, prodHasMore, prodPage, prodGlobalCounts, prodCatalogLoading, prodCatalogError } = store;
 
   // Requisition pending count for badge — counts only requisitions with ≥1 SOLICITADO item
-  const [reqPendingCount, setReqPendingCount] = useState(0);
-  const refreshReqBadge = useCallback(async () => {
-    const { data, error } = await supabase.rpc('count_requisicoes_with_pending_items');
-    if (!error && typeof data === 'number') setReqPendingCount(data);
-  }, [supabase]);
+  const moduleBadges = useModuleBadges();
+  const reqPendingCount = moduleBadges.counts.estoque.requisicoes;
+  const refreshReqBadge = moduleBadges.refresh;
   useEffect(() => { refreshReqBadge(); }, [refreshReqBadge, activeView]);
+
+  // Clique no sininho: aceita o id da aba (`solicitacoes`) ou a chave do registry (`requisicoes`).
+  useNotificationSubtab('estoque-geral', subtab => {
+    const view = (Object.keys(SUB_VIEW_REGISTRY_MAP) as SubView[])
+      .find(id => id === subtab || SUB_VIEW_REGISTRY_MAP[id] === subtab);
+    if (view && visibleSubtabs.includes(SUB_VIEW_REGISTRY_MAP[view])) setActiveView(view);
+  });
 
   const movProductOptions: ProductOption[] = useMemo(() =>
     produtos.filter(p => p.ativo).map(p => ({

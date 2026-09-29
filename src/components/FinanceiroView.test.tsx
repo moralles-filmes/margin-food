@@ -23,6 +23,11 @@ vi.mock('@/integrations/supabase/client', () => ({
   },
 }));
 
+vi.mock('@/contexts/ModuleBadgesContext', async () => {
+  const { EMPTY_MODULE_BADGES } = await import('@/lib/moduleBadges');
+  return { useModuleBadges: () => ({ counts: EMPTY_MODULE_BADGES, totalsByTab: {}, refresh: () => {} }) };
+});
+
 vi.mock('@/components/ui/SubmoduleSwitcher', () => ({
   SubmoduleSwitcher: ({ items, onChange }: {
     items: Array<{ id: string; label: string }>;

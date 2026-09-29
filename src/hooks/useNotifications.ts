@@ -74,6 +74,18 @@ export function useNotifications(userId: string | undefined) {
         if (!active || row.company_id !== companyId || row.recipient_user_id !== userId) return;
         setNotifications(prev => [row, ...prev].slice(0, 50));
       })
+      // O servidor marca como lido o aviso de requisição aberta quando outro
+      // aprovador a atende; sem isso o sininho só baixaria ao recarregar.
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'notifications',
+        filter: `company_id=eq.${companyId}`,
+      }, (payload: any) => {
+        const row = payload.new as AppNotification;
+        if (!active || row.company_id !== companyId || row.recipient_user_id !== userId) return;
+        setNotifications(prev => prev.map(n => n.id === row.id ? { ...n, read_at: row.read_at } : n));
+      })
       .subscribe();
     return () => { active = false; supabase.removeChannel(channel); };
   }, [userId, companyId, supabase]);
