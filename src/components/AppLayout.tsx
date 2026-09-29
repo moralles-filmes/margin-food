@@ -484,13 +484,7 @@ export default function AppLayout({ children, activeTab, onTabChange, isOffline,
             >
               {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </Button>
-            <NotificationBell onNavigate={(tab, linkPath) => {
-              onTabChange(tab as TabId);
-              // Store linkPath for deep navigation
-              if (linkPath) {
-                window.dispatchEvent(new CustomEvent('notification-navigate', { detail: { linkPath } }));
-              }
-            }} />
+            <NotificationBell />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button aria-label="Menu do usuário" className="h-9 w-9 rounded-full bg-primary-soft border border-border flex items-center justify-center hover:bg-primary-soft/70 transition-colors">

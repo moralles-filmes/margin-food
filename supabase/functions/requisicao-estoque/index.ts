@@ -647,17 +647,32 @@ serve(withRequestCors(async (req) => {
     // ========================
     // HELPER: insere notificação para o solicitante quando a requisição encerra
     // ========================
+    // Chamado depois que a mutação já foi gravada: falhar aqui não pode virar erro
+    // na resposta, senão a tela convida a repetir uma operação que deu certo.
     async function notifyIfRequisicaoEncerrada(reqId: string, cId: string, actorId: string) {
-      const { data: req } = await adminClient
+      try {
+        await writeRequisicaoEncerrada(reqId, cId, actorId);
+      } catch (notifyError) {
+        console.error("[requisicao-estoque] falha ao notificar encerramento:", notifyError);
+      }
+    }
+
+    async function writeRequisicaoEncerrada(reqId: string, cId: string, actorId: string) {
+      const { data: req, error: reqError } = await adminClient
         .from("requisicoes_estoque")
-        .select("id, status, setor, solicitante_user_id")
+        .select("id, status, setor, solicitante_user_id, requisicao_estoque_itens(status)")
         .eq("id", reqId)
         .eq("company_id", cId)
         .single();
+      if (reqError) throw reqError;
 
       if (!req) return;
       const FINAL = ["ATENDIDA", "PARCIALMENTE_ATENDIDA", "NEGADA"];
       if (!FINAL.includes(req.status)) return;
+      // PARCIALMENTE_ATENDIDA sai no 1º item atendido, com outros ainda SOLICITADO:
+      // encerrada é quem não tem mais item pendente (mesma regra de hasPendingItems).
+      const itens = (req.requisicao_estoque_itens ?? []) as { status: string }[];
+      if (itens.some((item) => item.status === "SOLICITADO")) return;
       await clearRequisicaoAberta(adminClient, cId, reqId);
       if (!req.solicitante_user_id) return;
 
@@ -674,29 +689,38 @@ serve(withRequestCors(async (req) => {
         message = `Sua requisição #${reqShort} (${req.setor ?? "—"}) foi negada. Veja o motivo na lista de requisições.`;
       }
 
+      const content = { title, message, created_by: actorId, metadata: { status: req.status, setor: req.setor } };
+
       // O índice é parcial: PostgREST onConflict(entity_id) não o infere.
       const { error: notificationError } = await adminClient.from("notifications").insert({
         company_id: cId,
         recipient_user_id: req.solicitante_user_id,
         type: "REQUISICAO_ENCERRADA",
         module: "estoque",
-        title,
-        message,
         entity_type: "requisicao_estoque",
         entity_id: reqId,
         link_path: "/?module=estoque&sub=requisicoes",
-        created_by: actorId,
-        metadata: { status: req.status, setor: req.setor },
+        ...content,
       });
-      if (notificationError) {
-        if (notificationError.code === '23505') {
-          const { data: existing, error } = await adminClient.from('notifications').select('id')
-            .eq('company_id', cId).eq('entity_id', reqId)
-            .eq('recipient_user_id', req.solicitante_user_id).eq('type', 'REQUISICAO_ENCERRADA').maybeSingle();
-          if (!error && existing) return;
-        }
-        throw new Error('NOTIFICATION_WRITE_FAILED_REVIEW_REQUIRED');
+      if (!notificationError) return;
+      if (notificationError.code !== "23505") throw notificationError;
+
+      // Um aviso por requisição (índice único). Os gravados antes da regra acima
+      // saíam no 1º item atendido: se o resultado final difere do aviso, ele é
+      // atualizado e volta a ficar não lido; sem diferença, é reenvio e nada muda.
+      const { data: existing, error: existingError } = await adminClient.from("notifications")
+        .select("id, recipient_user_id, metadata")
+        .eq("company_id", cId).eq("entity_type", "requisicao_estoque").eq("entity_id", reqId)
+        .eq("type", "REQUISICAO_ENCERRADA").maybeSingle();
+      if (existingError) throw existingError;
+      if (!existing || existing.recipient_user_id !== req.solicitante_user_id) {
+        throw new Error("aviso de encerramento existente pertence a outro destinatário");
       }
+      if ((existing.metadata as { status?: string } | null)?.status === req.status) return;
+      const { error: updateError } = await adminClient.from("notifications")
+        .update({ ...content, read_at: null })
+        .eq("id", existing.id);
+      if (updateError) throw updateError;
     }
 
     // ========================
@@ -990,6 +1014,18 @@ serve(withRequestCors(async (req) => {
       ]);
       if (!canNegar) return forbidden("FORBIDDEN_RBAC", "Sem permissão para negar requisições");
 
+      const { data: reqData, error: reqErr } = await adminClient
+        .from("requisicoes_estoque")
+        .select("id, status, requisicao_estoque_itens(status)")
+        .eq("id", requisicao_id)
+        .eq("company_id", companyId)
+        .maybeSingle();
+      if (reqErr) throw reqErr;
+      if (!reqData) return notFound("Requisição");
+      if (reqData.status === "CANCELADA") return badRequest("Requisição cancelada não pode ser alterada");
+      const itensAtuais = (reqData.requisicao_estoque_itens ?? []) as { status: string }[];
+      if (!itensAtuais.some((item) => item.status === "SOLICITADO")) return badRequest("Nenhum item pendente para negar");
+
       const now = new Date().toISOString();
       const motivoText = motivo_recusa?.trim() || "Requisição negada integralmente";
 
@@ -1007,10 +1043,20 @@ serve(withRequestCors(async (req) => {
         .eq("company_id", companyId);
       if (rejectItemsError) throw rejectItemsError;
 
+      // Negar recusa só o que falta: o que já foi entregue continua entregue e a
+      // requisição fica parcialmente atendida. O status sai dos itens depois da
+      // recusa, não da leitura acima — um atendimento concorrente entre as duas
+      // seria apagado por um NEGADA calculado antes.
+      const { data: statusAgregado, error: statusErr } = await supabaseUser.rpc("compute_requisicao_status_agregado", {
+        p_requisicao_id: requisicao_id,
+      });
+      if (statusErr) throw statusErr;
+      const statusFinal = (statusAgregado as string | null) || "NEGADA";
+
       // Tenant-scoped update
       const { data: negada, error: negErr } = await adminClient
         .from("requisicoes_estoque")
-        .update({ status: "NEGADA", updated_at: now })
+        .update({ status: statusFinal, updated_at: now })
         .eq("id", requisicao_id)
         .eq("company_id", companyId)
         .select("id")
@@ -1025,13 +1071,17 @@ serve(withRequestCors(async (req) => {
         p_entity: "requisicoes_estoque",
         p_entity_id: requisicao_id,
         p_action: "REQUISICAO_NEGADA",
-        p_before: { status: "SOLICITADA" },
-        p_after: { status: "NEGADA", motivo: motivoText },
+        p_before: { status: reqData.status },
+        p_after: { status: statusFinal, motivo: motivoText },
       });
 
       await notifyIfRequisicaoEncerrada(requisicao_id, companyId, userId);
 
-      return jsonRes({ success: true, mensagem: "Requisição negada.", request_id: requestId });
+      return jsonRes({
+        success: true,
+        mensagem: statusFinal === "NEGADA" ? "Requisição negada." : "Itens pendentes recusados. A requisição ficou parcialmente atendida.",
+        request_id: requestId,
+      });
     }
 
     // ========================

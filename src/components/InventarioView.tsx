@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useScopedToast } from '@/hooks/useScopedToast';
 import { useInventarioStore, Inventario } from '@/hooks/useInventarioStore';
 import { useQuantityNavigation } from '@/hooks/useQuantityNavigation';
+import { useNavigationRecord } from '@/hooks/useNavigationRequest';
 import InventoryItemRow from './inventario/InventoryItemRow';
 
 import { useCan, useModuleAccess } from '@/permissions/hooks';
@@ -140,11 +141,17 @@ export default function InventarioView() {
     }
   };
 
-  const handleOpenDetail = async (inv: Inventario) => {
-    await store.loadInventario(inv.id);
+  const openInventario = async (id: string) => {
+    const inv = await store.loadInventario(id);
+    if (!inv) return;
     const aindaContando = inv.status === 'RASCUNHO' || inv.status === 'EM_CONTAGEM';
     setSubView(inv.metodo_contagem === 'codigo' && aindaContando ? 'contagem-codigo' : 'detail');
   };
+
+  const handleOpenDetail = (inv: Inventario) => openInventario(inv.id);
+
+  // Sininho (conferente atribuído): abre o inventário direto, sem passar pela lista.
+  useNavigationRecord('inventario', ['inventario'], ({ id }) => { void openInventario(id); });
 
   const handleOpenDashboard = async () => {
     await store.loadDashboard();

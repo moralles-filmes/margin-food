@@ -4,15 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { type AppNotification } from '@/hooks/useNotifications';
 import { useNotificationsContext } from '@/contexts/NotificationsContext';
-import { useAuth } from '@/contexts/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { resolveNotificationTarget } from '@/lib/notificationTarget';
-import { requestNotificationSubtab } from '@/hooks/useNotificationSubtab';
-
-interface Props {
-  onNavigate?: (tabId: string, linkPath?: string) => void;
-}
+import { useOpenNotification } from '@/hooks/useOpenNotification';
 
 const MODULE_LABELS: Record<string, string> = {
   purchases: 'Compras',
@@ -26,9 +20,9 @@ const MODULE_LABELS: Record<string, string> = {
   rh: 'RH',
 };
 
-export default function NotificationBell({ onNavigate }: Props) {
-  const { user } = useAuth();
+export default function NotificationBell() {
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotificationsContext();
+  const openNotification = useOpenNotification();
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState<'unread' | 'all'>('unread');
   const ref = useRef<HTMLDivElement>(null);
@@ -45,13 +39,8 @@ export default function NotificationBell({ onNavigate }: Props) {
   const filtered = filter === 'unread' ? notifications.filter(n => !n.read_at) : notifications;
 
   const handleClick = (n: AppNotification) => {
-    markAsRead(n.id);
-    const target = resolveNotificationTarget(n.link_path, n.module);
-    if (target && onNavigate) {
-      if (target.subtab) requestNotificationSubtab(target.tab, target.subtab);
-      // Pass full link_path so parent can extract subtab/order params
-      onNavigate(target.tab, n.link_path ?? undefined);
-    }
+    if (!n.read_at) void markAsRead(n.id);
+    openNotification(n);
     setOpen(false);
   };
 

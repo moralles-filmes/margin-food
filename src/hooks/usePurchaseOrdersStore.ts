@@ -231,6 +231,21 @@ export function usePurchaseOrdersStore() {
     if (hasMore && !loading) fetchOrders(true);
   }, [hasMore, loading, fetchOrders]);
 
+  /** Um pedido pelo id, independente da página e dos filtros da lista. */
+  const fetchOrderById = useCallback(async (orderId: string): Promise<PurchaseOrder | null> => {
+    const { data, error } = await supabase
+      .from('purchase_orders')
+      .select(PURCHASE_ORDER_SELECT)
+      .eq('id', orderId)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (error) {
+      console.error('fetchOrderById error:', error);
+      return null;
+    }
+    return data ? normalizePurchaseOrder(data as PurchaseOrderRow) : null;
+  }, [supabase]);
+
   const applyFilters = useCallback((newFilters: PurchaseOrderFilters) => {
     setFilters(newFilters);
     cursorRef.current.created_at = null;
@@ -533,17 +548,25 @@ export function usePurchaseOrdersStore() {
 
   const acknowledgeNotDelivered = useCallback(async (orderId: string) => {
     if (!user) return;
-    await supabase.from('purchase_orders').update({
+    const { data: acked, error } = await supabase.from('purchase_orders').update({
       not_delivered_ack_at: new Date().toISOString(),
       not_delivered_ack_by: user.id,
       // W5: updated_at handled by server trigger
-    }).eq('id', orderId);
+    }).eq('id', orderId).select('id');
+    // Sem erro e sem linha = a RLS barrou o UPDATE em silêncio.
+    if (error || !acked?.length) {
+      console.error('acknowledgeNotDelivered error:', error ?? 'nenhuma linha atualizada');
+      toast.error('Não foi possível registrar a ciência. Tente novamente.');
+      return;
+    }
 
-    await supabase.from('notifications').update({ read_at: new Date().toISOString() })
+    // A ciência já está gravada; o aviso sobra no máximo como "não lido".
+    const { error: notificationError } = await supabase.from('notifications').update({ read_at: new Date().toISOString() })
       .eq('recipient_user_id', user.id)
       .eq('entity_id', orderId)
       .eq('type', 'NOT_DELIVERED_ACK_REQUIRED')
       .is('read_at', null);
+    if (notificationError) console.error('acknowledgeNotDelivered notification error:', notificationError);
 
     await fetchOrders();
     toast.success('Ciência registrada.');
@@ -552,7 +575,7 @@ export function usePurchaseOrdersStore() {
   return {
     orders, loading, saving, errorMessage, hasMore, loadMore, filters, applyFilters,
     openCount, receivingCount, partialCount, completedCount, pendingCount, shoppingCount, unackedPartialCount,
-    fetchOrders, fetchItems,
+    fetchOrders, fetchOrderById, fetchItems,
     createOrder, editOrder, deleteOrder,
     confirmReceiving,
     finalizePartialItem, updateOrderStatus, cancelOrder,

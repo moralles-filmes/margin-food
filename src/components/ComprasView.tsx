@@ -15,6 +15,7 @@ import CotacaoView from '@/components/compras/cotacao/CotacaoView';
 import { useCotacoesStore } from '@/hooks/useCotacoesStore';
 import { useModuleBadges } from '@/contexts/ModuleBadgesContext';
 import { useModuleAccess, useCan } from '@/permissions/hooks';
+import { dropNavigationRequest, requestNavigation, useNavigationSubtab } from '@/hooks/useNavigationRequest';
 
 // Map internal subtab keys to registry keys
 const SUBTAB_REGISTRY_MAP: Record<string, string> = {
@@ -93,21 +94,11 @@ export default function ComprasView() {
   const refreshBadges = moduleBadges.refresh;
   useEffect(() => { refreshBadges(); }, [refreshBadges, activeView, purchaseOrdersStore.orders, cotacoesStore.cotacoes]);
 
-  // Deep-link from notification
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const detail = (e as CustomEvent).detail;
-      if (detail?.linkPath) {
-        const url = new URL(detail.linkPath, 'https://placeholder');
-        const subtab = url.searchParams.get('subtab');
-        if (subtab && availableViews.includes(subtab as SubView)) {
-          setActiveView(subtab as SubView);
-        }
-      }
-    };
-    window.addEventListener('notification-navigate', handler);
-    return () => window.removeEventListener('notification-navigate', handler);
-  }, [availableViews]);
+  // Sininho e atalhos: o pedido em si é aberto por PedidosComprasMercadoView.
+  useNavigationSubtab('compras', subtab => {
+    if (availableViews.includes(subtab as SubView)) setActiveView(subtab as SubView);
+    else dropNavigationRequest();
+  });
 
   const allSubViews: { id: SubView; label: string; icon: typeof ShoppingCart; badge?: number }[] = [
     { id: 'pedidos-compras', label: 'Pedidos & Compras Mercado', icon: ShoppingBag, badge: badges.pedidos || undefined },
@@ -155,7 +146,7 @@ export default function ComprasView() {
       {/* ====== CHECKLIST DE COMPRA ====== */}
       {activeView === 'requisicoes' && (
         <ShoppingChecklistView onNavigateToOrder={(orderId) => {
-          setActiveView('pedidos-compras');
+          requestNavigation({ tab: 'compras', subtab: 'pedidos-compras', record: { type: 'purchase_order', id: orderId } });
         }} />
       )}
 

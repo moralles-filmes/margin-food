@@ -1,5 +1,5 @@
 import { useSupabase } from '@/contexts/CompanyScopeContext';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { X, Check, Inbox, AlertTriangle, ShoppingCart, RefreshCw, Ban, ClipboardList, ChevronDown, ChevronUp, Edit3 } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
@@ -30,6 +30,7 @@ import RequisicaoToolbar from './estoque/RequisicaoToolbar';
 import RequisicaoCardHeader from './estoque/RequisicaoCardHeader';
 import RequisicaoProductPicker, { type ManualRequisitionItem } from './estoque/RequisicaoProductPicker';
 import { sortByName } from '@/lib/sortByName';
+import { useNavigationRecord } from '@/hooks/useNavigationRequest';
 
 interface Props {
   produtos: ProdutoExtended[];
@@ -63,7 +64,16 @@ interface Requisicao {
   atendido_por: string | null;
   atendido_em: string | null;
   confirmado_pelo_solicitante_em: string | null;
+  ativo?: boolean;
   requisicao_estoque_itens: RequisicaoItem[];
+}
+
+// Mesmo formato da ação `listar` da Edge requisicao-estoque.
+const REQUISICAO_SELECT = 'id, setor, solicitante_user_id, status, observacao, created_at, atendido_por, atendido_em, ativo, confirmado_pelo_solicitante_em, requisicao_estoque_itens(id, produto_id, quantidade_solicitada, quantidade_atendida, unidade, saldo_snapshot, status, motivo_recusa, recusado_por, recusado_em, atendido_por, atendido_em, produtos(nome_produto, unidade_medida, unidade_compra))';
+
+/** Mesmo critério da Edge: pendente é quem ainda tem item SOLICITADO, nunca o status do cabeçalho. */
+function isPendingRequisicao(req: Requisicao): boolean {
+  return req.ativo !== false && hasPendingItems(req.requisicao_estoque_itens || []);
 }
 
 async function extractEdgeFnErrorMessage(error: unknown, fallback: string): Promise<string> {
@@ -150,6 +160,55 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
 
   const PAGE_SIZE = 20;
 
+  // Aberta pelo sininho: pode estar fora da página carregada ou já encerrada (no
+  // histórico). Fica fixada no topo da lista certa até entrar na página normal.
+  const [focusedReq, setFocusedReq] = useState<Requisicao | null>(null);
+  const [scrollToReq, setScrollToReq] = useState<string | null>(null);
+  const focusedIdRef = useRef<string | null>(null);
+
+  const fetchRequisicao = useCallback(async (id: string): Promise<Requisicao | null> => {
+    const { data, error } = await supabase.from('requisicoes_estoque').select(REQUISICAO_SELECT).eq('id', id).maybeSingle();
+    if (error) {
+      console.error('Error loading requisicao:', error);
+      return null;
+    }
+    return data as unknown as Requisicao | null;
+  }, [supabase]);
+
+  /** Depois de atender/recusar, a cópia fixada também precisa refletir o novo estado. */
+  const refreshFocused = useCallback(async () => {
+    const id = focusedIdRef.current;
+    if (!id) return;
+    const fresh = await fetchRequisicao(id);
+    if (focusedIdRef.current === id) setFocusedReq(fresh);
+  }, [fetchRequisicao]);
+
+  useNavigationRecord('estoque-geral', ['requisicao_estoque'], async ({ id }) => {
+    focusedIdRef.current = id;
+    const req = await fetchRequisicao(id);
+    if (focusedIdRef.current !== id) return;
+    if (!req) {
+      toast.error('Requisição não encontrada.');
+      return;
+    }
+    setFocusedReq(req);
+    if (isPendingRequisicao(req)) {
+      setExpandedReq(req.id);
+      setScrollToReq(req.id);
+    } else {
+      setExpandedHistReq(req.id);
+      setHistoricoOpen(true);
+    }
+  });
+
+  useEffect(() => {
+    if (!scrollToReq) return;
+    const card = document.getElementById(`requisicao-${scrollToReq}`);
+    if (!card) return;
+    card.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    setScrollToReq(null);
+  });
+
   const loadRequisicoes = useCallback(async (offset = 0, append = false) => {
     try {
       if (append) setLoadingMore(true); else setLoading(true);
@@ -161,6 +220,7 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
         setRequisicoes(prev => [...prev, ...(data?.data || [])]);
       } else {
         setRequisicoes(data?.data || []);
+        void refreshFocused();
       }
       setTotalRequisicoes(data?.total ?? 0);
       onBadgeRefresh?.();
@@ -171,7 +231,7 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [onBadgeRefresh, toast]);
+  }, [onBadgeRefresh, toast, refreshFocused]);
 
   const loadHistorico = useCallback(async (offset = 0, append = false) => {
     try {
@@ -506,6 +566,13 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
   };
 
   const pendentes = requisicoes.filter(req => hasPendingItems(req.requisicao_estoque_itens || [])).length;
+  const pendingList = requisicoes.filter(req => hasPendingItems(req.requisicao_estoque_itens || []));
+  if (focusedReq && isPendingRequisicao(focusedReq) && !pendingList.some(req => req.id === focusedReq.id)) {
+    pendingList.unshift(focusedReq);
+  }
+  const historicoList = focusedReq && !isPendingRequisicao(focusedReq) && !historicoItems.some(req => req.id === focusedReq.id)
+    ? [focusedReq, ...historicoItems]
+    : historicoItems;
 
   return (
     <>
@@ -612,16 +679,16 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
           <div className="flex justify-center py-8">
             <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
           </div>
-        ) : requisicoes.filter(req => hasPendingItems(req.requisicao_estoque_itens || [])).length > 0 ? (
+        ) : pendingList.length > 0 ? (
           <div className="space-y-2">
-            {requisicoes.filter(req => hasPendingItems(req.requisicao_estoque_itens || [])).map((req, index) => {
+            {pendingList.map((req, index) => {
               const isOwn = req.solicitante_user_id === user?.id;
               const isPending = canActOnRequisicao(req.status);
               const isExpanded = expandedReq === req.id;
               const pendingItemsExist = hasPendingItems(req.requisicao_estoque_itens || []);
 
               return (
-                <div key={req.id} className="bg-card border border-border rounded-xl animate-fade-up" style={{ animationDelay: `${index * 30}ms` }}>
+                <div key={req.id} id={`requisicao-${req.id}`} className="bg-card border border-border rounded-xl animate-fade-up" style={{ animationDelay: `${index * 30}ms` }}>
                   {/* Header */}
                   <RequisicaoCardHeader req={req} expanded={isExpanded} onToggle={() => setExpandedReq(isExpanded ? null : req.id)} />
 
@@ -917,7 +984,7 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
               <div className="flex justify-center py-8">
                 <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
               </div>
-            ) : historicoItems.length === 0 ? (
+            ) : historicoList.length === 0 ? (
               <div className="bg-card border border-border rounded-xl p-8 text-center">
                 <Inbox className="w-12 h-12 mx-auto text-muted-foreground/30 mb-3" />
                 <p className="text-sm font-medium text-foreground mb-1">Sem histórico</p>
@@ -925,7 +992,7 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
               </div>
             ) : (
               <>
-                {historicoItems.map((req, index) => {
+                {historicoList.map((req, index) => {
                   const isExpanded = expandedHistReq === req.id;
 
                   return (
