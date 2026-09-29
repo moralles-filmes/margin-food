@@ -1,6 +1,5 @@
 import { useSupabase } from '@/contexts/CompanyScopeContext';
-import { Fragment, useState, useEffect, useCallback, useMemo } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import { Fragment, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useCan } from '@/permissions';
 import { useEmitDataEvent, useDataEvent } from '@/lib/dataEvents';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
@@ -26,6 +25,7 @@ import DateRangePresets from './DateRangePresets';
 import MonthNavigator, { monthBounds } from './MonthNavigator';
 import SearchableSelect from '@/components/ui/SearchableSelect';
 import { buildCategoriaFilterOptions, categoriaFiltroToParams, CATEGORIA_FILTRO_TODOS } from './categoriaFiltro';
+import { criarChavesPendentes, traduzirErroIdempotencia } from '@/domain/financeiro/idempotencia';
 
 // ─── Types ───
 interface Lancamento {
@@ -119,7 +119,6 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
   const toast = useScopedToast();
   const supabase = useSupabase();
   const callUntypedRpc = supabase.rpc.bind(supabase) as unknown as UntypedRpc;
-  const { user } = useAuth();
   const canView = useCan('financeiro:lancamentos:view');
   const canCreate = useCan('financeiro:lancamentos:create');
   const canEdit = useCan('financeiro:lancamentos:edit');
@@ -132,6 +131,13 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
   const [contas, setContas] = useState<ContaRef[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  // Trava síncrona: `saving` só chega ao botão no próximo render, e o save passa
+  // por awaits (checagem de duplicidade, confirmação) antes de gravar.
+  const salvandoRef = useRef(false);
+  // Chaves de idempotência das criações: semente por conteúdo pendente, uma
+  // instância por fluxo para lançamento e transferência nunca se misturarem.
+  const [chavesLancamento] = useState(() => criarChavesPendentes('lancamento'));
+  const [chavesTransferencia] = useState(() => criarChavesPendentes('transferencia'));
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [editUpdatedAt, setEditUpdatedAt] = useState<string | null>(null);
@@ -510,7 +516,7 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
   };
 
   const save = async () => {
-    if (saving) return;
+    if (saving || salvandoRef.current) return;
     if (!form.descricao.trim()) { toast.error('Descricao obrigatoria'); return; }
 
     // === TRANSFER FLOW ===
@@ -519,6 +525,7 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
       if (form.conta_id === form.conta_destino_id) { toast.error('Contas devem ser diferentes'); return; }
       if (!form.valor || form.valor <= 0) { toast.error('Valor obrigatorio'); return; }
 
+      salvandoRef.current = true;
       setSaving(true);
       try {
         if (editId) {
@@ -533,21 +540,31 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
           if (error) { toast.error(error.message); return; }
           toast.success('Transferencia atualizada (ambos os lados)');
         } else {
-          const { error } = await supabase.rpc('create_transfer', {
+          const transferParams = {
             p_conta_origem: form.conta_id,
             p_conta_destino: form.conta_destino_id,
             p_valor: form.valor,
             p_data: form.data_competencia,
             p_descricao: form.descricao || '',
-            p_created_by: user?.id || null,
+          };
+          const { data, error } = await supabase.rpc('create_transfer', {
+            ...transferParams,
+            p_idempotency_key: await chavesTransferencia.chave(transferParams),
           });
-          if (error) { toast.error(error.message); return; }
-          toast.success('Transferencia registrada com sucesso!');
+          if (error) {
+            console.error('[LivroRazaoSection.createTransfer]', error);
+            toast.error(traduzirErroIdempotencia(error.message) ?? error.message);
+            return;
+          }
+          chavesTransferencia.confirmar(transferParams);
+          const jaRegistrada = (data as { idempotente?: boolean } | null)?.idempotente === true;
+          toast.success(jaRegistrada ? 'Esta transferencia ja estava registrada.' : 'Transferencia registrada com sucesso!');
         }
         resetForm();
         load();
         emitDataEvent('financeiro:lancamentos');
       } finally {
+        salvandoRef.current = false;
         setSaving(false);
       }
       return;
@@ -567,34 +584,37 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
       return;
     }
 
-    // Duplicate check (new only)
-    if (!editId) {
-      const tolerance = valorFinal * 0.02;
-      const cpTable = form.tipo === 'DESPESA' ? 'fin_contas_pagar' : 'fin_contas_receber';
-      const statusFilter = form.tipo === 'DESPESA' ? ['AGUARDANDO_APROVACAO', 'APROVADO'] : ['A_RECEBER'];
-      const { data: possibleDups } = await supabase.from(cpTable)
-        .select('id, descricao, valor, data_vencimento, status')
-        .in('status', statusFilter)
-        .gte('valor', valorFinal - tolerance)
-        .lte('valor', valorFinal + tolerance)
-        .limit(5);
-
-      if (possibleDups && possibleDups.length > 0) {
-        const dupDescriptions = possibleDups.map((d: { descricao: string; valor: number; data_vencimento: string }) =>
-          `- ${d.descricao} — ${fmt(d.valor)} (venc: ${formatDateValueBR(d.data_vencimento)})`
-        ).join('\n');
-        const proceed = await confirm({
-          title: 'Possivel duplicidade detectada',
-          description: `Encontramos ${form.tipo === 'DESPESA' ? 'Conta(s) a Pagar' : 'Conta(s) a Receber'} com valor semelhante:\n\n${dupDescriptions}\n\nDeseja criar o lancamento mesmo assim?`,
-          confirmLabel: 'Criar mesmo assim',
-          variant: 'destructive',
-        });
-        if (!proceed) return;
-      }
-    }
-
+    // Trava antes do primeiro await: a checagem de duplicidade e a confirmação
+    // abaixo deixavam um segundo clique passar e gravar dois lançamentos.
+    salvandoRef.current = true;
     setSaving(true);
     try {
+      // Duplicate check (new only)
+      if (!editId) {
+        const tolerance = valorFinal * 0.02;
+        const cpTable = form.tipo === 'DESPESA' ? 'fin_contas_pagar' : 'fin_contas_receber';
+        const statusFilter = form.tipo === 'DESPESA' ? ['AGUARDANDO_APROVACAO', 'APROVADO'] : ['A_RECEBER'];
+        const { data: possibleDups } = await supabase.from(cpTable)
+          .select('id, descricao, valor, data_vencimento, status')
+          .in('status', statusFilter)
+          .gte('valor', valorFinal - tolerance)
+          .lte('valor', valorFinal + tolerance)
+          .limit(5);
+
+        if (possibleDups && possibleDups.length > 0) {
+          const dupDescriptions = possibleDups.map((d: { descricao: string; valor: number; data_vencimento: string }) =>
+            `- ${d.descricao} — ${fmt(d.valor)} (venc: ${formatDateValueBR(d.data_vencimento)})`
+          ).join('\n');
+          const proceed = await confirm({
+            title: 'Possivel duplicidade detectada',
+            description: `Encontramos ${form.tipo === 'DESPESA' ? 'Conta(s) a Pagar' : 'Conta(s) a Receber'} com valor semelhante:\n\n${dupDescriptions}\n\nDeseja criar o lancamento mesmo assim?`,
+            confirmLabel: 'Criar mesmo assim',
+            variant: 'destructive',
+          });
+          if (!proceed) return;
+        }
+      }
+
       const rateiosPayload = rateioLines.length > 0
         ? rateioLines.map(l => ({
             categoria_id: l.categoria_id,
@@ -627,21 +647,31 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
         p_justificativa_edicao: justificativa.trim() || null,
       };
 
-      const { data, error } = await supabase.rpc('_guarded_upsert_lancamento' as any, rpcParams as any);
+      // Só a criação leva chave; a edição já é protegida pelo optimistic lock.
+      const idempotencyKey = editId ? null : await chavesLancamento.chave(rpcParams);
+      const { data, error } = await supabase.rpc('_guarded_upsert_lancamento' as any, { ...rpcParams, p_idempotency_key: idempotencyKey } as any);
       if (error) {
+        console.error('[LivroRazaoSection.save]', error);
         if (error.message?.includes('CONFLICT')) {
           toast.error('Este registro foi alterado por outro usuario. Recarregue a pagina.');
         } else {
-          toast.error(error.message);
+          toast.error(traduzirErroIdempotencia(error.message) ?? error.message);
         }
         return;
       }
 
-      toast.success(editId ? 'Lancamento atualizado' : (form.recorrente ? 'Lancamento recorrente criado!' : 'Lancamento criado'));
+      if (!editId) chavesLancamento.confirmar(rpcParams);
+      const jaRegistrado = !editId && (data as { idempotente?: boolean }[] | null)?.[0]?.idempotente === true;
+      toast.success(editId
+        ? 'Lancamento atualizado'
+        : jaRegistrado
+          ? 'Este lancamento ja estava registrado.'
+          : (form.recorrente ? 'Lancamento recorrente criado!' : 'Lancamento criado'));
       resetForm();
       load();
       emitDataEvent('financeiro:lancamentos');
     } finally {
+      salvandoRef.current = false;
       setSaving(false);
     }
   };
