@@ -318,6 +318,7 @@ Todas as Edge Functions usam CORS compartilhado via `supabase/functions/_shared/
 - [ ] Otimizar `rbac_sql_lint_report()` completo para não estourar `statement_timeout` em produção (`bun run security:check` usa o fallback `rbac_sql_lint_report_quick()`)
 - [ ] Publicar e pós-validar o pacote integrado F12 (`docs/multi-unidades/fase12-20260916/`), que substitui as 14 candidatas F2–F8 sem repair e fecha localmente C01/C02/H01–H05/M01 e os contratos residuais; produção permanece aberta até prova de backup restaurado, scheduler/consumers, gateway hospedado e janela autorizada.
 - [ ] Avaliar chave RBAC própria para o Borderô (`financeiro:bordero:view/export`) — hoje herda `financeiro:relatorio-socios:*` da Apresentação Sócios (em 2026-09-15 todo membro com essa chave já tinha `pagar:view` e `contas:view`)
+
 ---
 
 ## 📖 Documentação Adicional
