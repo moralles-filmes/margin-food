@@ -38,6 +38,8 @@ import { Badge } from '@/components/ui/badge';
 import {
   calcularItemLote, itemLoteVazio, novoItemLote, validarLote, type MovLoteItem,
 } from '@/domain/estoque/movimentacaoLote';
+import { chaveLoteMovimentacao } from '@/domain/estoque/idempotencia';
+import { novaSemente } from '@/lib/chaveOperacao';
 import type { NovaMovimentacao } from '@/hooks/useEstoqueGeralStore';
 import type { MovimentacaoEstoque } from '@/types/salmon';
 import type { ProdutoExtended } from '@/types/estoque';
@@ -90,7 +92,7 @@ interface Props {
   userId: string;
   hasPermission: (p: string) => boolean;
   canEditPricing: boolean;
-  addMovimentacoesLote: (itens: NovaMovimentacao[]) => Promise<unknown>;
+  addMovimentacoesLote: (itens: NovaMovimentacao[], opts?: { clientRequestId?: string }) => Promise<unknown>;
   recalcularPrecos: (produtoId?: string) => void | Promise<void>;
 }
 
@@ -111,6 +113,11 @@ export default function NovaMovimentacaoModal({
   const [custoDesbloqueado, setCustoDesbloqueado] = useState<Record<string, boolean>>({});
   const [erros, setErros] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  // Trava síncrona: `saving` só desabilita o botão no próximo render.
+  const salvandoRef = useRef(false);
+  // Semente do lançamento: troca a cada formulário limpo. A chave enviada
+  // combina a semente com o conteúdo do lote (chaveLoteMovimentacao).
+  const [semente, setSemente] = useState(novaSemente);
   const ultimoItemRef = useRef<HTMLDivElement>(null);
 
   const resetForm = useCallback(() => {
@@ -119,6 +126,7 @@ export default function NovaMovimentacaoModal({
     setItens([novoItemLote(novaKey())]);
     setCustoDesbloqueado({});
     setErros({});
+    setSemente(novaSemente());
   }, [preset, novaKey]);
 
   // Reset form when modal opens with a new preset
@@ -253,7 +261,7 @@ export default function NovaMovimentacaoModal({
   // ─── Submit ───
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (saving) return;
+    if (salvandoRef.current) return;
 
     const resultado = validarLote({ itens, produtos: produtosById, saldos, isEntrada });
     if (!resultado.ok) {
@@ -262,10 +270,11 @@ export default function NovaMovimentacaoModal({
       return;
     }
 
+    salvandoRef.current = true;
     setSaving(true);
     try {
       const data = todayBR();
-      await addMovimentacoesLote(resultado.itens.map(item => ({
+      const movimentacoes = resultado.itens.map(item => ({
         produtoId: item.produtoId,
         data,
         tipo,
@@ -277,7 +286,17 @@ export default function NovaMovimentacaoModal({
         observacao,
         createdBy: userId,
         setor: isSaida ? item.setor : undefined,
-      })));
+      }));
+      // Chave derivada do lote: repetir o MESMO lote (duplo clique, resposta
+      // perdida) devolve as linhas já gravadas; mudar qualquer item gera outra.
+      const clientRequestId = await chaveLoteMovimentacao(semente, {
+        tipo,
+        observacao,
+        itens: movimentacoes.map(m => ({
+          produtoId: m.produtoId, quantidade: m.quantidade, custoUnitario: m.custoUnitario, setor: m.setor,
+        })),
+      });
+      await addMovimentacoesLote(movimentacoes, { clientRequestId });
 
       const n = resultado.itens.length;
       toast.success(n === 1 ? `Movimentação ${tipo} registrada!` : `${n} movimentações ${tipo} registradas!`);
@@ -292,11 +311,15 @@ export default function NovaMovimentacaoModal({
       const msg = err instanceof Error ? err.message : (err as { message?: string } | null)?.message || '';
       if (err instanceof TenantError || isTenantErrorMessage(msg)) {
         toast.error(msg || 'Usuário não vinculado a empresa válida.');
+      } else if (msg.includes('REQUEST_ID_REUTILIZADO')) {
+        toast.error('Este lote não confere com o que já foi registrado. Confira as movimentações antes de registrar de novo.');
       } else {
         toast.error(msg || 'Erro ao registrar movimentação');
       }
+    } finally {
+      salvandoRef.current = false;
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   const Icon = PRESET_ICONS[preset];

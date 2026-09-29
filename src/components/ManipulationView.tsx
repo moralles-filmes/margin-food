@@ -1,5 +1,7 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useSalmonStore } from '@/hooks/useSalmonStore';
+import { novaSemente } from '@/lib/chaveOperacao';
+import { chaveManipulacaoSalmao } from '@/domain/estoque/idempotencia';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DateInput } from '@/components/ui/DateInput';
@@ -59,6 +61,13 @@ export default function ManipulationView({ store, preSelectedEntryId, onClearPre
   const [showDivergenceDialog, setShowDivergenceDialog] = useState(false);
   const [pendingDivergenceStep, setPendingDivergenceStep] = useState<number | null>(null);
   const [etiquetaManip, setEtiquetaManip] = useState<Manipulation | null>(null);
+  const [saving, setSaving] = useState(false);
+  // Trava síncrona: Enter no campo e clique no botão chegam antes de `saving`
+  // desabilitar qualquer coisa.
+  const salvandoRef = useRef(false);
+  // Semente do assistente: troca a cada manipulação nova. A chave enviada
+  // combina a semente com os dados (chaveManipulacaoSalmao).
+  const [semente, setSemente] = useState(novaSemente);
 
   const filtered = filterByPeriod(manipulations, period);
 
@@ -140,6 +149,7 @@ export default function ManipulationView({ store, preSelectedEntryId, onClearPre
     setConfirmed([false, false, false, false, false, false]);
     setShowWizard(true);
     setEditingId(null);
+    setSemente(novaSemente());
     onClearPreSelected?.();
   };
 
@@ -203,6 +213,7 @@ export default function ManipulationView({ store, preSelectedEntryId, onClearPre
   };
 
   const handleSave = async () => {
+    if (salvandoRef.current) return;
     const gKg = parseDecimal(wizard.grossKg) ?? 0;
     const cKg = parseDecimal(wizard.cleanKg) ?? 0;
     if (!wizard.entryId) { toast.error('Selecione um lote'); return; }
@@ -225,18 +236,33 @@ export default function ManipulationView({ store, preSelectedEntryId, onClearPre
       divergenciaMotivo: wizard.divergenciaMotivo || undefined,
     };
 
-    if (editingId) {
-      updateManipulation(editingId, data);
-      toast.success('Manipulação atualizada!');
-      setShowWizard(false);
-      setEditingId(null);
-    } else {
-      const saved = await addManipulation(data);
-      toast.success('Manipulação registrada! Estoque limpo atualizado.');
-      setShowWizard(false);
-      setEditingId(null);
-      // Show etiqueta modal
-      setEtiquetaManip(saved);
+    salvandoRef.current = true;
+    setSaving(true);
+    try {
+      if (editingId) {
+        // O sucesso só aparece depois da confirmação do servidor.
+        await updateManipulation(editingId, data);
+        toast.success('Manipulação atualizada!');
+        setShowWizard(false);
+        setEditingId(null);
+      } else {
+        // Chave derivada dos dados: repetir a MESMA manipulação devolve a já
+        // gravada em vez de dar saída do salmão bruto duas vezes.
+        const saved = await addManipulation(data, {
+          clientRequestId: await chaveManipulacaoSalmao(semente, data),
+        });
+        toast.success('Manipulação registrada! Estoque limpo atualizado.');
+        setShowWizard(false);
+        setEditingId(null);
+        setSemente(novaSemente());
+        // Show etiqueta modal
+        setEtiquetaManip(saved);
+      }
+    } catch {
+      // O store já mostrou o erro; o assistente fica aberto para tentar de novo.
+    } finally {
+      salvandoRef.current = false;
+      setSaving(false);
     }
   };
 
@@ -486,7 +512,9 @@ export default function ManipulationView({ store, preSelectedEntryId, onClearPre
                   <ChevronLeft className="w-3.5 h-3.5" /> Voltar
                 </Button>
                 {step === 5 && confirmed[step] ? (
-                  <Button size="sm" className="bg-primary-strong text-primary-foreground border-0 text-sm" onClick={handleSave}>Salvar Manipulação</Button>
+                  <Button size="sm" className="bg-primary-strong text-primary-foreground border-0 text-sm" onClick={handleSave} disabled={saving}>
+                    {saving ? 'Salvando...' : 'Salvar Manipulação'}
+                  </Button>
                 ) : (
                   <Button size="sm" className="bg-primary-strong text-primary-foreground border-0 text-sm gap-1" onClick={confirmStep} disabled={step === 0 && availableLots.length === 0}>
                     Confirmar <ChevronRight className="w-3.5 h-3.5" />

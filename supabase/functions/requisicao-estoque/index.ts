@@ -27,6 +27,8 @@ interface ReqBody {
   setor: string;
   observacao?: string;
   itens: ReqItem[];
+  /** Chave derivada da operação no cliente (ação `criar`). */
+  client_request_id?: string;
   requisicao_id?: string;
   movement_id?: string;
   justificativa?: string;
@@ -468,138 +470,152 @@ serve(withRequestCors(async (req) => {
         });
       }
 
-      const itensComEstoque = resultados.filter((r) => r.tem_estoque);
-      const itensSemEstoque = resultados.filter((r) => !r.tem_estoque);
+      // Cabeçalho + itens numa transação só, com a chave de reenvio. Reenviar a
+      // mesma requisição (duplo clique, resposta perdida) devolve a existente.
+      const clientRequestId = typeof body.client_request_id === "string" && body.client_request_id.trim()
+        ? body.client_request_id.trim()
+        : null;
 
-      let requisicao_id: string | null = null;
+      const { data: criada, error: criarError } = await supabaseUser.rpc("criar_requisicao_estoque", {
+        p_setor: setor,
+        p_observacao: observacao || "",
+        p_itens: resultados.map((r) => ({
+          produto_id: r.produto_id,
+          quantidade: Number(r.solicitado),
+          unidade: validatedUnits.get(r.produto_id)!,
+          saldo_snapshot: r.saldo,
+        })),
+        p_client_request_id: clientRequestId,
+      });
+      if (criarError) {
+        if (criarError.message?.includes("REQUEST_ID_REUTILIZADO")) {
+          return conflict("Este envio não confere com a requisição já registrada. Confira a lista de requisições antes de enviar de novo.");
+        }
+        throw criarError;
+      }
 
-      {
-        const { data: reqData, error: reqError } = await supabaseUser
-          .from("requisicoes_estoque")
-          .insert({
-            setor,
-            solicitante_user_id: userId,
-            status: "SOLICITADA",
-            observacao: observacao || "",
-            company_id: companyId,
-          })
-          .select("id")
-          .single();
+      const criacao = criada as {
+        requisicao_id: string;
+        idempotente: boolean;
+        itens: { id: string; produto_id: string; quantidade_solicitada: number; saldo_snapshot: number }[];
+      };
+      const requisicao_id = criacao.requisicao_id;
 
-        if (reqError) throw reqError;
-        requisicao_id = reqData.id;
-
-        const reqItens = resultados.map((r) => {
-          const item = itens.find((i) => i.produto_id === r.produto_id)!;
-          return {
-            requisicao_id: reqData.id,
-            produto_id: r.produto_id,
-            quantidade_solicitada: item.quantidade,
-            unidade: validatedUnits.get(r.produto_id)!,
-            saldo_snapshot: r.saldo,
-          };
+      if (criacao.idempotente) {
+        // Reenvio: a requisição, os alertas e o aviso já saíram no envio original.
+        return jsonRes({
+          success: true,
+          idempotente: true,
+          requisicao_id,
+          resultados: criacao.itens.map((i) => ({
+            produto_id: i.produto_id,
+            saldo: Number(i.saldo_snapshot) || 0,
+            solicitado: Number(i.quantidade_solicitada),
+            tem_estoque: (Number(i.saldo_snapshot) || 0) >= Number(i.quantidade_solicitada),
+          })),
+          request_id: requestId,
+          mensagem: "Esta requisição já estava registrada — nada foi duplicado.",
         });
+      }
 
-        const { error: itensError } = await supabaseUser.from("requisicao_estoque_itens").insert(reqItens);
-        if (itensError) throw itensError;
-
+      // Daqui para baixo a requisição já está gravada: nenhuma falha pode virar
+      // erro na resposta, senão a tela convida a repetir um envio que deu certo.
+      try {
         await writeAudit(adminClient, companyId, userId, {
           p_source: "edge",
           p_module: "estoque",
           p_entity: "requisicoes_estoque",
-          p_entity_id: reqData.id,
+          p_entity_id: requisicao_id,
           p_action: "REQUISICAO_CRIADA",
           p_after: {
             setor,
             itens: resultados.map((r) => ({ produto_id: r.produto_id, quantidade: r.solicitado, saldo: r.saldo, tem_estoque: r.tem_estoque })),
           },
         });
+      } catch (auditError) {
+        console.error("[requisicao-estoque] falha ao auditar criação:", auditError);
       }
+
+      const itensComEstoque = resultados.filter((r) => r.tem_estoque);
+      const itensSemEstoque = resultados.filter((r) => !r.tem_estoque);
 
       // ── Generate shortage ALERTS (not purchase orders) for out-of-stock items ──
       if (itensSemEstoque.length > 0) {
-        const prodIds = itensSemEstoque.map(r => r.produto_id);
-        const { data: prodRows } = await adminClient
-          .from("produtos")
-          .select("id, nome_produto, unidade_compra")
-          .in("id", prodIds)
-          .eq("company_id", companyId);
+        try {
+          const prodIds = itensSemEstoque.map(r => r.produto_id);
+          const { data: prodRows } = await adminClient
+            .from("produtos")
+            .select("id, nome_produto, unidade_compra")
+            .in("id", prodIds)
+            .eq("company_id", companyId);
 
-        const prodMap = new Map(
-          (prodRows || []).map((p: { id: string; nome_produto: string; unidade_compra: string | null }) => [p.id, p])
-        );
+          const prodMap = new Map(
+            (prodRows || []).map((p: { id: string; nome_produto: string; unidade_compra: string | null }) => [p.id, p])
+          );
 
-        // Fetch requisicao item IDs for linking
-        const { data: reqItemRows } = await adminClient
-          .from("requisicao_estoque_itens")
-        .select("id, produto_id")
-        .eq("requisicao_id", requisicao_id)
-        .eq("company_id", companyId)
-        .in("produto_id", prodIds);
+          // Itens recém-criados vêm no retorno da RPC: vínculo alerta → item.
+          const reqItemMap = new Map(criacao.itens.map((ri) => [ri.produto_id, ri.id]));
 
-        const reqItemMap = new Map(
-          (reqItemRows || []).map((ri: { id: string; produto_id: string }) => [ri.produto_id, ri.id])
-        );
+          const alertRows = itensSemEstoque.map(r => {
+            const item = itens.find(i => i.produto_id === r.produto_id)!;
+            const prod = prodMap.get(r.produto_id);
+            return {
+              company_id: companyId,
+              produto_id: r.produto_id,
+              produto_nome: prod?.nome_produto || r.produto_id.slice(0, 8),
+              quantidade_solicitada: item.quantidade,
+              unidade: validatedUnits.get(r.produto_id)!,
+              saldo_no_momento: r.saldo,
+              requisicao_id: requisicao_id,
+              requisicao_item_id: reqItemMap.get(r.produto_id) || null,
+              setor_solicitante: setor,
+              origem: "REQUISICAO_ESTOQUE",
+              status: "PENDENTE",
+              created_by: userId,
+            };
+          });
 
-        const alertRows = itensSemEstoque.map(r => {
-          const item = itens.find(i => i.produto_id === r.produto_id)!;
-          const prod = prodMap.get(r.produto_id);
-          return {
-            company_id: companyId,
-            produto_id: r.produto_id,
-            produto_nome: prod?.nome_produto || r.produto_id.slice(0, 8),
-            quantidade_solicitada: item.quantidade,
-            unidade: validatedUnits.get(r.produto_id)!,
-            saldo_no_momento: r.saldo,
-            requisicao_id: requisicao_id,
-            requisicao_item_id: reqItemMap.get(r.produto_id) || null,
-            setor_solicitante: setor,
-            origem: "REQUISICAO_ESTOQUE",
-            status: "PENDENTE",
-            created_by: userId,
-          };
-        });
+          // Idempotent insert (unique constraint on requisicao_id + produto_id)
+          const { error: alertError } = await adminClient
+            .from("alertas_falta_estoque")
+            .upsert(alertRows, { onConflict: "requisicao_id,produto_id", ignoreDuplicates: true });
 
-        // Idempotent insert (unique constraint on requisicao_id + produto_id)
-        const { error: alertError } = await adminClient
-          .from("alertas_falta_estoque")
-          .upsert(alertRows, { onConflict: "requisicao_id,produto_id", ignoreDuplicates: true });
+          if (alertError) {
+            console.error("Error creating shortage alerts:", alertError);
+            // Non-blocking: don't fail the requisition because of alert creation failure
+          }
 
-        if (alertError) {
-          console.error("Error creating shortage alerts:", alertError);
-          // Non-blocking: don't fail the requisition because of alert creation failure
+          // Audit
+          await writeAudit(adminClient, companyId, userId, {
+            p_source: "edge",
+            p_module: "compras",
+            p_entity: "alertas_falta_estoque",
+            p_entity_id: requisicao_id,
+            p_action: "ALERTA_FALTA_CRIADO",
+            p_after: {
+              setor,
+              requisicao_id,
+              itens_sem_estoque: itensSemEstoque.length,
+              produtos: itensSemEstoque.map(r => r.produto_id),
+            },
+          });
+        } catch (alertFlowError) {
+          console.error("[requisicao-estoque] falha ao registrar alertas de falta:", alertFlowError);
         }
-
-        // Audit
-        await writeAudit(adminClient, companyId, userId, {
-          p_source: "edge",
-          p_module: "compras",
-          p_entity: "alertas_falta_estoque",
-          p_entity_id: requisicao_id,
-          p_action: "ALERTA_FALTA_CRIADO",
-          p_after: {
-            setor,
-            requisicao_id,
-            itens_sem_estoque: itensSemEstoque.length,
-            produtos: itensSemEstoque.map(r => r.produto_id),
-          },
-        });
       }
 
-      if (requisicao_id) {
-        try {
-          const scopedAdmin = createClient(supabaseUrl, serviceKey, {
-            global: { headers: { "x-company-id": companyId } },
-          });
-          await notifyRequisicaoAberta(scopedAdmin, companyId, userId, {
-            id: requisicao_id,
-            setor,
-            totalItens: resultados.length,
-          });
-        } catch (notifyError) {
-          // A requisição já foi gravada: devolver erro aqui faria o usuário reenviar e duplicá-la.
-          console.error("[requisicao-estoque] falha ao notificar aprovadores:", notifyError);
-        }
+      try {
+        const scopedAdmin = createClient(supabaseUrl, serviceKey, {
+          global: { headers: { "x-company-id": companyId } },
+        });
+        await notifyRequisicaoAberta(scopedAdmin, companyId, userId, {
+          id: requisicao_id,
+          setor,
+          totalItens: resultados.length,
+        });
+      } catch (notifyError) {
+        // A requisição já foi gravada: devolver erro aqui faria o usuário reenviar e duplicá-la.
+        console.error("[requisicao-estoque] falha ao notificar aprovadores:", notifyError);
       }
 
       const mensagem =

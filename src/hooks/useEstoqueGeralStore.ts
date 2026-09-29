@@ -871,27 +871,44 @@ export function useEstoqueGeralStore() {
   }, [supabase, fetchMovimentacoes, movFilters, fetchSaldos, emitDataEvent]);
 
   /**
-   * Vários itens num único INSERT: o PostgREST roda a requisição numa só
-   * transação, então ou todas as linhas entram ou nenhuma — nunca um lote
-   * pela metade. Triggers de saldo/validação são por linha e seguem iguais.
+   * Vários itens numa transação só, via `estoque_registrar_movimentacoes_lote`
+   * (SECURITY INVOKER: a mesma RLS e os mesmos triggers do INSERT direto) —
+   * ou todas as linhas entram ou nenhuma. `clientRequestId` é a chave derivada
+   * do lote: reenviar o mesmo lote devolve as linhas já gravadas em vez de
+   * duplicar a entrada/saída.
    */
-  const addMovimentacoesLote = useCallback(async (itens: NovaMovimentacao[]) => {
+  const addMovimentacoesLote = useCallback(async (
+    itens: NovaMovimentacao[],
+    opts: { clientRequestId?: string } = {},
+  ) => {
     if (itens.length === 0) return [];
+    // Mantém o TenantError com a mensagem amigável quando a unidade não valida.
     const companyId = await resolveCompanyIdOrThrow(supabase);
-    const { data, error } = await supabase
-      .from('movimentacoes_estoque')
-      .insert(itens.map(m => toMovInsertPayload(m, companyId)))
-      .select();
+    const { data, error } = await supabase.rpc('estoque_registrar_movimentacoes_lote', {
+      p_itens: itens.map(m => {
+        const { company_id: _companyId, created_by: _createdBy, ...linha } = toMovInsertPayload(m, companyId);
+        return linha;
+      }),
+      p_client_request_id: opts.clientRequestId,
+    });
     if (error) {
-      console.error('[useEstoqueGeralStore.addMovimentacoesLote] insert error', error);
+      console.error('[useEstoqueGeralStore.addMovimentacoesLote] rpc error', error);
       throw error;
     }
-    const novas = ((data ?? []) as unknown as MovimentacaoRow[]).map(dbToMov);
+    const resultado = data as unknown as { movimentacoes?: MovimentacaoRow[] } | null;
+    const novas = (resultado?.movimentacoes ?? []).map(dbToMov);
+
+    // O lote já está gravado: falha no refresh não pode virar erro, senão a
+    // tela convida a registrar de novo.
     setMovCursor(null);
-    await Promise.all([
-      fetchMovimentacoes(movFilters, null, false),
-      fetchSaldos([...new Set(itens.map(m => m.produtoId))]),
-    ]);
+    try {
+      await Promise.all([
+        fetchMovimentacoes(movFilters, null, false),
+        fetchSaldos([...new Set(itens.map(m => m.produtoId))]),
+      ]);
+    } catch (refreshError) {
+      console.error('[useEstoqueGeralStore.addMovimentacoesLote] refresh após gravar', refreshError);
+    }
     emitDataEvent('estoque:movimentacoes');
     return novas;
   }, [supabase, fetchMovimentacoes, movFilters, fetchSaldos, emitDataEvent]);

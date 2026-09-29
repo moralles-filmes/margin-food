@@ -9,7 +9,9 @@
  *   · a busca filtra por nome (sem acento) e SKU, e quantidades digitadas em
  *     itens fora do filtro continuam na requisição;
  *   · Enter na busca vai para a quantidade do 1º item; Enter na última
- *     quantidade filtrada volta para a busca.
+ *     quantidade filtrada volta para a busca;
+ *   · envio: clique duplo não abre duas requisições, e o retry depois de erro
+ *     reaproveita a chave derivada (a Edge devolve a já gravada).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
@@ -28,8 +30,11 @@ const mockDb = vi.hoisted(() => ({
   eqCalls: [] as Array<[string, string, unknown]>,
 }));
 
+const mockInvoke = vi.hoisted(() => vi.fn());
+
 // Cliente estável: os efeitos dependem dele e rodariam a cada render.
 const mockSupabase = vi.hoisted(() => ({
+  functions: { invoke: mockInvoke },
   from: (table: string) => {
     const query = {
       select: () => query,
@@ -56,6 +61,8 @@ function renderTela() {
 }
 
 beforeEach(() => {
+  mockInvoke.mockReset();
+  mockToast.error.mockClear();
   mockDb.eqCalls = [];
   mockDb.tables = {
     stock_sectors: [{ name: 'Bar' }, { name: 'Cozinha restaurante' }, { name: 'Salão' }],
@@ -122,5 +129,51 @@ describe('Requisição por Lista Fixa — busca na lista', () => {
     fireEvent.change(quantidade, { target: { value: '5' } });
     fireEvent.keyDown(quantidade, { key: 'Enter' });
     await waitFor(() => expect(busca).toHaveFocus());
+  });
+});
+
+describe('Requisição por Lista Fixa — envio idempotente', () => {
+  async function irParaPrevia() {
+    renderTela();
+    fireEvent.change(await screen.findByLabelText('Quantidade de Arroz Japonês 5 kg'), { target: { value: '2' } });
+    fireEvent.click(screen.getByRole('button', { name: /Pré-visualizar \(1\)/ }));
+    return screen.getByRole('button', { name: /Confirmar e Enviar/ });
+  }
+
+  it('clique duplo antes do diálogo abre uma confirmação e envia uma vez', async () => {
+    mockInvoke.mockResolvedValue({ data: { success: true, mensagem: 'ok', resultados: [] }, error: null });
+    const enviar = await irParaPrevia();
+    fireEvent.click(enviar);
+    fireEvent.click(enviar);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Enviar Requisição' }));
+    await waitFor(() => expect(mockInvoke).toHaveBeenCalledTimes(1));
+    expect(mockInvoke.mock.calls[0][1].body).toMatchObject({
+      action: 'criar',
+      setor: 'Cozinha restaurante',
+      itens: [{ produto_id: 'p-arroz', quantidade: 2, unidade: 'UN' }],
+      client_request_id: expect.any(String),
+    });
+  });
+
+  it('retry depois de erro do servidor reaproveita a chave (a Edge devolve a requisição já gravada)', async () => {
+    const erro500 = { context: { status: 500, clone: () => ({ json: async () => ({ error: 'boom' }) }) } };
+    mockInvoke
+      .mockResolvedValueOnce({ data: null, error: erro500 })
+      .mockResolvedValueOnce({ data: { success: true, idempotente: true, mensagem: 'já registrada', resultados: [] }, error: null });
+    const enviar = await irParaPrevia();
+
+    fireEvent.click(enviar);
+    fireEvent.click(await screen.findByRole('button', { name: 'Enviar Requisição' }));
+    await waitFor(() => expect(mockInvoke).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mockToast.error).toHaveBeenCalledWith(
+      'Não foi possível confirmar o envio. Tente de novo — a mesma requisição não é duplicada.',
+    ));
+
+    fireEvent.click(screen.getByRole('button', { name: /Confirmar e Enviar/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Enviar Requisição' }));
+    await waitFor(() => expect(mockInvoke).toHaveBeenCalledTimes(2));
+
+    expect(mockInvoke.mock.calls[1][1].body.client_request_id).toBe(mockInvoke.mock.calls[0][1].body.client_request_id);
   });
 });

@@ -165,6 +165,59 @@ describe('NovaMovimentacaoModal', () => {
     expect(itens.every((i: { setor?: string }) => i.setor === undefined)).toBe(true);
   });
 
+  it('duplo envio antes do próximo render grava uma vez só', async () => {
+    // Promessa que não resolve: o 2º submit chega com o 1º ainda em voo.
+    const addMovimentacoesLote = vi.fn(() => new Promise(() => {}));
+    render(<NovaMovimentacaoModal {...defaultProps} preset="entrada" addMovimentacoesLote={addMovimentacoesLote} />);
+    escolherProduto(0, 'Arroz');
+    fireEvent.change(screen.getByLabelText('Quantidade do item 1'), { target: { value: '5' } });
+
+    // submit direto no form: não depende do botão já estar desabilitado.
+    const form = screen.getByRole('button', { name: 'Registrar' }).closest('form')!;
+    fireEvent.submit(form);
+    fireEvent.submit(form);
+
+    await waitFor(() => expect(addMovimentacoesLote).toHaveBeenCalledTimes(1));
+  });
+
+  it('retry depois de falha reaproveita a chave do lote; mudar o lote gera outra', async () => {
+    const addMovimentacoesLote = vi.fn()
+      .mockRejectedValueOnce(new Error('Failed to fetch'))
+      .mockResolvedValue([]);
+    render(<NovaMovimentacaoModal {...defaultProps} preset="entrada" addMovimentacoesLote={addMovimentacoesLote} />);
+    escolherProduto(0, 'Arroz');
+    fireEvent.change(screen.getByLabelText('Quantidade do item 1'), { target: { value: '5' } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar' }));
+    await waitFor(() => expect(addMovimentacoesLote).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Registrar' })).toBeEnabled());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar' }));
+    await waitFor(() => expect(addMovimentacoesLote).toHaveBeenCalledTimes(2));
+
+    const [, primeira] = addMovimentacoesLote.mock.calls[0];
+    const [, segunda] = addMovimentacoesLote.mock.calls[1];
+    expect(primeira.clientRequestId).toEqual(expect.any(String));
+    expect(segunda.clientRequestId).toBe(primeira.clientRequestId);
+  });
+
+  it('lote com quantidade diferente leva chave diferente', async () => {
+    const addMovimentacoesLote = vi.fn().mockRejectedValue(new Error('Failed to fetch'));
+    render(<NovaMovimentacaoModal {...defaultProps} preset="entrada" addMovimentacoesLote={addMovimentacoesLote} />);
+    escolherProduto(0, 'Arroz');
+    fireEvent.change(screen.getByLabelText('Quantidade do item 1'), { target: { value: '5' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar' }));
+    await waitFor(() => expect(addMovimentacoesLote).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Registrar' })).toBeEnabled());
+
+    fireEvent.change(screen.getByLabelText('Quantidade do item 1'), { target: { value: '6' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar' }));
+    await waitFor(() => expect(addMovimentacoesLote).toHaveBeenCalledTimes(2));
+
+    expect(addMovimentacoesLote.mock.calls[1][1].clientRequestId)
+      .not.toBe(addMovimentacoesLote.mock.calls[0][1].clientRequestId);
+  });
+
   it('starts with one item line and adds more with "Adicionar item"', () => {
     render(<NovaMovimentacaoModal {...defaultProps} preset="entrada" />);
     expect(screen.getAllByRole('button', { name: /Remover item/ })).toHaveLength(1);

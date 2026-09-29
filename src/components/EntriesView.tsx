@@ -1,6 +1,9 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useCan } from '@/permissions/hooks';
 import { useSalmonStore } from '@/hooks/useSalmonStore';
+import { novaSemente } from '@/lib/chaveOperacao';
+import { chaveEntradaSalmao } from '@/domain/estoque/idempotencia';
+import type { SalmonEntry } from '@/types/salmon';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DateInput } from '@/components/ui/DateInput';
@@ -57,6 +60,13 @@ export default function EntriesView({ store }: EntriesViewProps) {
   const [budgetAlertMsg, setBudgetAlertMsg] = useState('');
   const [overrideMotivo, setOverrideMotivo] = useState('');
   const [showSimulador, setShowSimulador] = useState(false);
+  const [saving, setSaving] = useState(false);
+  // Trava síncrona: cobre o submit e o "Continuar mesmo assim" do alerta de
+  // orçamento — `saving` só desabilita os botões no próximo render.
+  const salvandoRef = useRef(false);
+  // Semente do formulário: troca a cada formulário limpo. A chave enviada
+  // combina a semente com os dados da entrada (chaveEntradaSalmao).
+  const [semente, setSemente] = useState(novaSemente);
 
   const filtered = filterByPeriod(entries, period);
   const lots = [...new Set(entries.map(e => e.lot).filter(Boolean))];
@@ -78,21 +88,46 @@ export default function EntriesView({ store }: EntriesViewProps) {
     setForm(emptyForm());
     setEditingId(null);
     setShowForm(false);
+    setSemente(novaSemente());
   };
 
   const doSave = async (data: any, auditOverride?: { tipos: string[]; motivo: string }) => {
-    let newEntry: any;
-    if (editingId) {
-      await updateEntry(editingId, data);
-      toast.success('Entrada atualizada!');
-      resetForm();
-      return;
-    } else {
-      newEntry = await addEntry(data);
+    if (salvandoRef.current) return;
+    salvandoRef.current = true;
+    setSaving(true);
+    try {
+      if (editingId) {
+        await updateEntry(editingId, data);
+        toast.success('Entrada atualizada!');
+        resetForm();
+        return;
+      }
+      // Chave derivada dos dados: repetir a MESMA entrada devolve a já gravada;
+      // mudar qualquer campo gera outra. A edição (replace) não usa chave.
+      const newEntry = await addEntry(data, { clientRequestId: await chaveEntradaSalmao(semente, data) });
       toast.success('Entrada registrada!');
+      // A entrada já está gravada: a auditoria de orçamento não pode impedir a
+      // limpeza do formulário.
+      try {
+        registrarAuditoria(newEntry, data, auditOverride);
+      } catch (auditError) {
+        console.error('[EntriesView] auditoria de orçamento', auditError);
+      }
+      resetForm();
+    } catch {
+      // O store já mostrou o erro. O formulário fica como está: enviar de novo a
+      // mesma entrada reaproveita a chave e não grava o salmão duas vezes.
+    } finally {
+      salvandoRef.current = false;
+      setSaving(false);
     }
+  };
 
-    // Audit
+  const registrarAuditoria = (
+    newEntry: SalmonEntry,
+    data: Omit<SalmonEntry, 'id' | 'createdAt'>,
+    auditOverride?: { tipos: string[]; motivo: string },
+  ) => {
     if (newEntry && metaInfo.meta) {
       const entryMonth = data.date.slice(0, 7);
       const projectedGasto = metaInfo.gastoMes + data.totalValue;
@@ -132,11 +167,11 @@ export default function EntriesView({ store }: EntriesViewProps) {
         });
       }
     }
-    resetForm();
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (salvandoRef.current) return;
     const grossKg = normalizeBRLMoneyToNumber(form.grossKg);
     const totalValue = normalizeBRLMoneyToNumber(form.totalValue);
     if (!grossKg || !totalValue) { toast.error('Preencha kg bruto e valor total'); return; }
@@ -197,7 +232,7 @@ export default function EntriesView({ store }: EntriesViewProps) {
       }
     }
 
-    doSave(data);
+    void doSave(data);
   };
 
   const startEdit = (entry: typeof entries[0]) => {
@@ -353,8 +388,8 @@ export default function EntriesView({ store }: EntriesViewProps) {
             <span className="text-xs text-muted-foreground">Custo/kg: <strong className="text-primary">{calcPricePerKg()}</strong></span>
             <div className="flex gap-2">
               <Button type="button" variant="ghost" size="sm" onClick={resetForm}>Cancelar</Button>
-              <Button type="submit" size="sm" className="bg-primary-strong text-primary-foreground border-0 gap-1">
-                {editingId ? <><Check className="w-3.5 h-3.5" /> Atualizar</> : 'Salvar'}
+              <Button type="submit" size="sm" className="bg-primary-strong text-primary-foreground border-0 gap-1" disabled={saving}>
+                {saving ? 'Salvando...' : editingId ? <><Check className="w-3.5 h-3.5" /> Atualizar</> : 'Salvar'}
               </Button>
             </div>
           </div>
@@ -459,7 +494,7 @@ export default function EntriesView({ store }: EntriesViewProps) {
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => { setBudgetConfirmPending(null); setOverrideMotivo(''); }}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              disabled={!overrideMotivo.trim()}
+              disabled={!overrideMotivo.trim() || saving}
               onClick={() => { budgetConfirmPending?.(overrideMotivo.trim()); setBudgetConfirmPending(null); setOverrideMotivo(''); }}
               className="bg-destructive text-destructive-foreground disabled:opacity-50"
             >
