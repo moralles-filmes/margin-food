@@ -211,15 +211,17 @@ export function useInventarioStore() {
     }
   }, [invoke, nextCursor, toast]);
 
-  const loadInventario = useCallback(async (id: string) => {
+  const loadInventario = useCallback(async (id: string): Promise<Inventario | null> => {
     setLoading(true);
     try {
       const data = await invoke('get', { id });
       setCurrentInventario(data.inventario);
       setCurrentItens(data.itens || []);
       setAuditLogs(data.auditLogs || []);
+      return data.inventario ?? null;
     } catch (e: any) {
       toast.error(e.message || 'Erro ao carregar inventário');
+      return null;
     } finally {
       setLoading(false);
     }

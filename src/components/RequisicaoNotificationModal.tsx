@@ -10,9 +10,11 @@ import {
   AlertDialogFooter,
   AlertDialogAction,
 } from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
 import { useNotificationsContext } from '@/contexts/NotificationsContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useScopedToast } from '@/hooks/useScopedToast';
+import { useOpenNotification } from '@/hooks/useOpenNotification';
 
 const AUTH_ROUTES = ['/login', '/reset-password'];
 
@@ -21,19 +23,14 @@ export default function RequisicaoNotificationModal() {
   const supabase = useSupabase();
   const { user } = useAuth();
   const location = useLocation();
-  const { notifications, markAsRead } = useNotificationsContext();
+  const { pendingRequisicaoAck: pending, markAsRead } = useNotificationsContext();
+  const openNotification = useOpenNotification();
   const [confirming, setConfirming] = useState(false);
 
   if (!user || AUTH_ROUTES.includes(location.pathname)) return null;
-
-  // Pega a notificação pendente mais antiga (a lista vem desc; usamos o último não-lido)
-  const pending = notifications
-    .filter(n => n.type === 'REQUISICAO_ENCERRADA' && !n.read_at)
-    .at(-1);
-
   if (!pending) return null;
 
-  const handleConfirm = async () => {
+  const handleConfirm = async (openAfter: boolean) => {
     if (confirming) return;
     setConfirming(true);
     try {
@@ -41,7 +38,8 @@ export default function RequisicaoNotificationModal() {
         body: { action: 'marcar_requisicao_visto', requisicao_id: pending.entity_id },
       });
       if (error) throw error;
-      markAsRead(pending.id);
+      await markAsRead(pending.id);
+      if (openAfter) openNotification(pending);
     } catch (err) {
       console.error('[RequisicaoNotificationModal.handleConfirm]', err);
       toast.error('Não foi possível confirmar. Tente novamente.');
@@ -60,7 +58,10 @@ export default function RequisicaoNotificationModal() {
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogAction onClick={handleConfirm} disabled={confirming}>
+          <Button variant="outline" onClick={() => handleConfirm(true)} disabled={confirming}>
+            Confirmar e ver requisição
+          </Button>
+          <AlertDialogAction onClick={() => handleConfirm(false)} disabled={confirming}>
             {confirming ? 'Confirmando...' : 'Confirmar recebimento da informação'}
           </AlertDialogAction>
         </AlertDialogFooter>

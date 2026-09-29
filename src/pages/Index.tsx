@@ -26,8 +26,9 @@ const FinanceiroView = lazy(() => import('@/components/FinanceiroView'));
 import { Button } from '@/components/ui/button';
 import { RefreshCw, LogOut, AlertTriangle, ShieldAlert } from 'lucide-react';
 import { useScopedToast } from '@/hooks/useScopedToast';
-import { useMentionToast } from '@/hooks/useMentionToast';
 import { useModuleAccess } from '@/permissions/hooks';
+import { dropNavigationRequest, requestNavigation, useNavigationTab } from '@/hooks/useNavigationRequest';
+import { resolveNotificationTarget } from '@/lib/notificationTarget';
 
 // Map each TabId to its module key in the registry
 const TAB_MODULE_MAP: Record<TabId, string> = {
@@ -100,12 +101,7 @@ const Index = () => {
   const store = useSalmonStoreContext();
   const estoqueStore = useEstoqueGeralStoreContext();
   const permissionRetryCountRef = useRef(0);
-
-  const navigateToRequisicoes = useCallback(() => {
-    setActiveTab('compras' as TabId);
-  }, []);
-
-  useMentionToast(user?.id, navigateToRequisicoes);
+  const urlNavigationRef = useRef<string | null>(null);
 
   // Check if user can access a given tab — uses useModuleAccess results
   const canAccessTab = useCallback((tab: TabId): boolean => {
@@ -141,6 +137,22 @@ const Index = () => {
       setActiveTab(defaultTab);
     }
   }, [canAccessTab, defaultTab, toast]);
+
+  // Sininho, avisos e atalhos entre telas: sem acesso, fica onde está. Antes das
+  // permissões carregarem (o modal de requisição já aparece), qualquer aba
+  // pareceria proibida — o pedido espera e é aplicado quando ficarem prontas.
+  const [deferredNavigationTab, setDeferredNavigationTab] = useState<TabId | null>(null);
+  useNavigationTab((tab: TabId) => setDeferredNavigationTab(tab));
+  useEffect(() => {
+    if (!deferredNavigationTab || permissionState !== 'READY') return;
+    setDeferredNavigationTab(null);
+    if (canAccessTab(deferredNavigationTab)) {
+      setActiveTab(deferredNavigationTab);
+      return;
+    }
+    dropNavigationRequest();
+    toast.error('Sem permissão para acessar este módulo.');
+  }, [deferredNavigationTab, permissionState, canAccessTab, setActiveTab, toast]);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -195,7 +207,14 @@ const Index = () => {
     }
 
     setActiveTab('compras');
-  }, [location.pathname, permissionState, canAccessTab, navigate, toast]);
+    // `/compras?subtab=...&order=...`: mesmo formato do link gravado nas notificações.
+    // Uma vez por URL — o efeito também roda quando as permissões recarregam.
+    const link = path + location.search;
+    if (urlNavigationRef.current === link) return;
+    urlNavigationRef.current = link;
+    const target = resolveNotificationTarget({ link_path: link, module: null });
+    if (target?.tab === 'compras' && (target.subtab || target.record)) requestNavigation(target);
+  }, [location.pathname, location.search, permissionState, canAccessTab, navigate, toast]);
 
   useEffect(() => {
     if (permissionState !== 'READY' || !location.pathname.startsWith('/financeiro/')) return;

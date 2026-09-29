@@ -701,7 +701,7 @@ serve(withRequestCors(async (req) => {
       if (!inventario_id || !conferente_user_id) return json({ error: 'inventario_id e conferente_user_id obrigatórios' }, 400)
 
       const { data: inv } = await adminClient.from('inventarios')
-        .select('status').eq('id', inventario_id).eq('company_id', companyId).is('deleted_at', null).single()
+        .select('status, conferente_user_id').eq('id', inventario_id).eq('company_id', companyId).is('deleted_at', null).single()
       if (!inv) return json({ error: 'Inventário não encontrado' }, 404)
       if (inv.status === 'FINALIZADO') return json({ error: 'Inventário já finalizado' }, 400)
 
@@ -709,27 +709,48 @@ serve(withRequestCors(async (req) => {
         .select('id').eq('user_id', conferente_user_id).eq('company_id', companyId).maybeSingle()
       if (!conf) return json({ error: 'Usuário não está na lista de conferentes autorizados' }, 400)
 
-      await adminClient.from('inventarios').update({
+      // Reenvio da mesma atribuição: nada muda e o conferente não é avisado de novo.
+      if (inv.status === 'EM_REVISAO' && inv.conferente_user_id === conferente_user_id) {
+        return json({ success: true, idempotent: true })
+      }
+
+      const { error: assignError } = await adminClient.from('inventarios').update({
         conferente_user_id: conferente_user_id,
         conferente_atribuido_em: new Date().toISOString(),
         conferente_atribuido_por: user.id,
         status: 'EM_REVISAO',
       }).eq('id', inventario_id).eq('company_id', companyId)
+      if (assignError) throw assignError
 
-      await adminClient.from('notifications').insert({
-        company_id: companyId,
-        recipient_user_id: conferente_user_id,
-        type: 'inventario_conferencia',
-        title: '📋 Inventário atribuído para conferência',
-        message: `Você foi designado(a) para conferir e finalizar um inventário.`,
-        entity_type: 'inventario',
-        entity_id: inventario_id,
-        created_by: user.id,
-        module: 'inventario',
-        link_path: '/inventario',
-      })
+      // Daqui em diante a atribuição já está gravada: falha no aviso vai para o
+      // log, não para a resposta (que faria o usuário repetir a atribuição).
+      const previousConferente = inv.conferente_user_id as string | null
+      if (previousConferente && previousConferente !== conferente_user_id) {
+        const { error: clearError } = await adminClient.from('notifications')
+          .update({ read_at: new Date().toISOString() })
+          .eq('company_id', companyId).eq('recipient_user_id', previousConferente)
+          .eq('entity_type', 'inventario').eq('entity_id', inventario_id)
+          .eq('type', 'inventario_conferencia').is('read_at', null)
+        if (clearError) console.error('[inventario] falha ao limpar aviso do conferente anterior:', clearError)
+      }
 
-      await auditLog(inventario_id, 'ASSIGN_CONFERENTE', { status: inv.status }, {
+      if (conferente_user_id !== user.id) {
+        const { error: notifyError } = await adminClient.from('notifications').insert({
+          company_id: companyId,
+          recipient_user_id: conferente_user_id,
+          type: 'inventario_conferencia',
+          title: '📋 Inventário atribuído para conferência',
+          message: `Você foi designado(a) para conferir e finalizar um inventário.`,
+          entity_type: 'inventario',
+          entity_id: inventario_id,
+          created_by: user.id,
+          module: 'inventario',
+          link_path: '/inventario',
+        })
+        if (notifyError) console.error('[inventario] falha ao notificar conferente:', notifyError)
+      }
+
+      await auditLog(inventario_id, 'ASSIGN_CONFERENTE', { status: inv.status, conferente_user_id: previousConferente }, {
         conferente_user_id, status: 'EM_REVISAO',
       })
 

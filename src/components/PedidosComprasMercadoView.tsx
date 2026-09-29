@@ -32,8 +32,19 @@ import {
 } from 'lucide-react';
 import ExportPedidoModal from '@/components/compras/ExportPedidoModal';
 import StatusBadge, { type StatusType } from '@/components/ui/StatusBadge';
+import { useNavigationRecord } from '@/hooks/useNavigationRequest';
 
 type SubTab = 'pedidos' | 'recebimento' | 'concluidos' | 'nao-entregues';
+
+/** Mesmos filtros de `filteredOrders`. */
+const ORDER_STATUS_SUBTAB: Partial<Record<PurchaseOrder['status'], SubTab>> = {
+  OPEN: 'pedidos',
+  PENDING: 'pedidos',
+  IN_RECEIVING: 'recebimento',
+  SHOPPING_OK: 'recebimento',
+  COMPLETED: 'concluidos',
+  PARTIAL: 'nao-entregues',
+};
 
 // Severidade da prioridade não bate 1:1 com as 5 variantes do StatusBadge
 // (URGENTE e ALTA são ambas "danger" no design system, mas precisam de intensidade
@@ -219,29 +230,20 @@ export default function PedidosComprasMercadoView() {
   const [exportOrder, setExportOrder] = useState<PurchaseOrder | null>(null);
   const [exportItems, setExportItems] = useState<PurchaseOrderItem[]>([]);
 
-  // Deep-link: open specific order from notification
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const detail = (e as CustomEvent).detail;
-      if (detail?.linkPath) {
-        const url = new URL(detail.linkPath, 'https://placeholder');
-        const orderId = url.searchParams.get('order');
-        if (orderId) {
-          const order = store.orders.find(o => o.id === orderId);
-          if (order) {
-            openDetail(order);
-          } else {
-            // Order might not be loaded yet; try to refetch then open
-            store.fetchOrders().then(() => {
-              // Re-check after refetch (handled via store.orders reactivity)
-            });
-          }
-        }
-      }
-    };
-    window.addEventListener('notification-navigate', handler);
-    return () => window.removeEventListener('notification-navigate', handler);
-  }, [store.orders]);
+  // Sininho e atalhos: o pedido pode estar fora da página carregada (ou a lista
+  // ainda nem chegou, quando o clique veio de outro módulo) — busca pelo id.
+  // A lista por trás fica na aba do status: ao voltar do detalhe, o pedido e o
+  // "Confirmo ciência" (não entregues) estão à vista.
+  useNavigationRecord('compras', ['purchase_order'], async ({ id }) => {
+    const order = store.orders.find(o => o.id === id) ?? await store.fetchOrderById(id);
+    if (!order) {
+      toast.error('Pedido não encontrado. Ele pode ter sido excluído.');
+      return;
+    }
+    const listTab = ORDER_STATUS_SUBTAB[order.status];
+    if (listTab) setSubTab(listTab);
+    await openDetail(order);
+  });
 
   const filteredOrders = useMemo(() => {
     let list = store.orders;

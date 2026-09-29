@@ -38,7 +38,7 @@ import SearchableSelect from '@/components/ui/SearchableSelect';
 import { useEstoqueGeralStoreContext } from '@/contexts/EstoqueGeralStoreContext';
 import { useSalmonStoreContext } from '@/contexts/SalmonStoreContext';
 import { useModuleBadges } from '@/contexts/ModuleBadgesContext';
-import { useNotificationSubtab } from '@/hooks/useNotificationSubtab';
+import { dropNavigationRequest, useNavigationSubtab } from '@/hooks/useNavigationRequest';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCan, useModuleAccess } from '@/permissions';
 import { supabase } from '@/integrations/supabase/client';
@@ -108,10 +108,11 @@ export default function EstoqueGeralView() {
   useEffect(() => { refreshReqBadge(); }, [refreshReqBadge, activeView]);
 
   // Clique no sininho: aceita o id da aba (`solicitacoes`) ou a chave do registry (`requisicoes`).
-  useNotificationSubtab('estoque-geral', subtab => {
+  useNavigationSubtab('estoque-geral', subtab => {
     const view = (Object.keys(SUB_VIEW_REGISTRY_MAP) as SubView[])
       .find(id => id === subtab || SUB_VIEW_REGISTRY_MAP[id] === subtab);
     if (view && visibleSubtabs.includes(SUB_VIEW_REGISTRY_MAP[view])) setActiveView(view);
+    else dropNavigationRequest();
   });
 
   const movProductOptions: ProductOption[] = useMemo(() =>
