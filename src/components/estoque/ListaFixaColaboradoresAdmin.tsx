@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Loader2, Users, X } from 'lucide-react';
+import { AlertTriangle, Loader2, Users, X } from 'lucide-react';
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useCompanyId } from '@/hooks/useCompanyId';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
@@ -18,9 +18,9 @@ interface Props {
 /**
  * ─── Colaboradores da lista fixa ───
  *
- * Define quem vê a lista fixa na "Requisição por Lista Fixa". Lista sem
- * colaborador continua visível para todos que fazem requisição; com
- * colaboradores, só eles a veem. O filtro é aplicado pela RLS de
+ * Define quem vê a lista fixa na "Requisição por Lista Fixa": só os
+ * colaboradores selecionados. Lista sem colaborador fica visível apenas para
+ * quem gerencia requisições. O filtro é aplicado pela RLS de
  * `listas_fixas_setor` — esta tela só grava os vínculos.
  */
 export default function ListaFixaColaboradoresAdmin({ listaId, setor }: Props) {
@@ -92,16 +92,6 @@ export default function ListaFixaColaboradoresAdmin({ listaId, setor }: Props) {
     if (!userId) return;
     if (!companyId) { toast.error('Selecione uma unidade.'); return; }
 
-    // O 1º colaborador muda a lista de "todos" para "só os selecionados".
-    if (vinculos.length === 0) {
-      const ok = await confirm({
-        title: `Restringir a lista de ${setor}`,
-        description: `A partir de agora, só ${nomeDe(userId)} e os próximos colaboradores que você adicionar verão esta lista. Quem gerencia requisições continua vendo todas.`,
-        confirmLabel: 'Restringir lista',
-      });
-      if (!ok) return;
-    }
-
     setSalvando(true);
     const { error } = await supabase.from('listas_fixas_setor_usuarios').insert({
       company_id: companyId,
@@ -119,12 +109,9 @@ export default function ListaFixaColaboradoresAdmin({ listaId, setor }: Props) {
 
   const remover = async (vinculo: Vinculo) => {
     const nome = nomeDe(vinculo.user_id);
-    const ultimo = vinculos.length === 1;
     const ok = await confirm({
       title: `Remover ${nome}`,
-      description: ultimo
-        ? `Sem colaboradores selecionados, a lista de ${setor} volta a aparecer para todos que fazem requisição.`
-        : `${nome} deixa de ver a lista de ${setor}.`,
+      description: `${nome} deixa de ver a lista de ${setor}.`,
       confirmLabel: 'Remover',
       variant: 'destructive',
     });
@@ -166,8 +153,9 @@ export default function ListaFixaColaboradoresAdmin({ listaId, setor }: Props) {
       {status === 'ready' && (
         <>
           {vinculos.length === 0 ? (
-            <p className="text-xs text-muted-foreground">
-              Nenhum colaborador selecionado — a lista aparece para todos que fazem requisição.
+            <p role="status" className="flex items-start gap-1.5 rounded-md border border-warning-border bg-warning-soft p-2 text-xs text-warning">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span>Nenhum colaborador selecionado — nenhum operador vê esta lista. Só quem gerencia requisições tem acesso.</span>
             </p>
           ) : (
             <>

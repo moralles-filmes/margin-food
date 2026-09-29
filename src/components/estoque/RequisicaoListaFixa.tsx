@@ -4,8 +4,8 @@ import { useSupabase } from '@/contexts/CompanyScopeContext';
  * Steps: 1) Select sector → 2) Fill quantities → 3) Preview → 4) Confirm & submit
  *
  * Só aparecem os setores cuja lista está liberada para o usuário: a RLS de
- * `listas_fixas_setor` filtra pelos colaboradores vinculados a cada lista
- * (lista sem vínculo continua visível para todos que fazem requisição).
+ * `listas_fixas_setor` devolve apenas as listas em que ele foi selecionado
+ * (quem gerencia requisições recebe todas).
  */
 import { useState, useEffect, useCallback, useMemo, useRef, useId } from 'react';
 import { useAuth } from '@/contexts/AuthContext';

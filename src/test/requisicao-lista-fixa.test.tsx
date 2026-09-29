@@ -2,9 +2,9 @@
  * Requisição por Lista Fixa — setores liberados e busca dentro da lista.
  *
  * Cobre o que não pode regredir:
- *   · o seletor só oferece setores cuja lista a RLS devolveu (lista restrita a
- *     outros colaboradores não chega ao cliente), mesmo que o setor do perfil
- *     seja outro;
+ *   · o seletor só oferece setores cuja lista a RLS devolveu (lista em que o
+ *     usuário não foi selecionado não chega ao cliente), mesmo que o setor do
+ *     perfil seja outro;
  *   · sem nenhuma lista liberada, a tela explica em vez de mostrar setor vazio;
  *   · a busca filtra por nome (sem acento) e SKU, e quantidades digitadas em
  *     itens fora do filtro continuam na requisição;
