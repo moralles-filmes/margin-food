@@ -39,7 +39,7 @@ import {
   calcularItemLote, itemLoteVazio, novoItemLote, validarLote, type MovLoteItem,
 } from '@/domain/estoque/movimentacaoLote';
 import { chaveLoteMovimentacao } from '@/domain/estoque/idempotencia';
-import { novaSemente } from '@/lib/idempotencia';
+import { novaSemente } from '@/lib/chaveOperacao';
 import type { NovaMovimentacao } from '@/hooks/useEstoqueGeralStore';
 import type { MovimentacaoEstoque } from '@/types/salmon';
 import type { ProdutoExtended } from '@/types/estoque';
@@ -289,7 +289,7 @@ export default function NovaMovimentacaoModal({
       }));
       // Chave derivada do lote: repetir o MESMO lote (duplo clique, resposta
       // perdida) devolve as linhas já gravadas; mudar qualquer item gera outra.
-      const clientRequestId = chaveLoteMovimentacao(semente, {
+      const clientRequestId = await chaveLoteMovimentacao(semente, {
         tipo,
         observacao,
         itens: movimentacoes.map(m => ({

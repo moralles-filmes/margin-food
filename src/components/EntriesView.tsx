@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { useCan } from '@/permissions/hooks';
 import { useSalmonStore } from '@/hooks/useSalmonStore';
-import { novaSemente } from '@/lib/idempotencia';
+import { novaSemente } from '@/lib/chaveOperacao';
 import { chaveEntradaSalmao } from '@/domain/estoque/idempotencia';
 import type { SalmonEntry } from '@/types/salmon';
 import { Button } from '@/components/ui/button';
@@ -91,11 +91,7 @@ export default function EntriesView({ store }: EntriesViewProps) {
     setSemente(novaSemente());
   };
 
-  const doSave = async (
-    data: any,
-    clientRequestId: string | undefined,
-    auditOverride?: { tipos: string[]; motivo: string },
-  ) => {
+  const doSave = async (data: any, auditOverride?: { tipos: string[]; motivo: string }) => {
     if (salvandoRef.current) return;
     salvandoRef.current = true;
     setSaving(true);
@@ -106,7 +102,9 @@ export default function EntriesView({ store }: EntriesViewProps) {
         resetForm();
         return;
       }
-      const newEntry = await addEntry(data, { clientRequestId });
+      // Chave derivada dos dados: repetir a MESMA entrada devolve a já gravada;
+      // mudar qualquer campo gera outra. A edição (replace) não usa chave.
+      const newEntry = await addEntry(data, { clientRequestId: await chaveEntradaSalmao(semente, data) });
       toast.success('Entrada registrada!');
       // A entrada já está gravada: a auditoria de orçamento não pode impedir a
       // limpeza do formulário.
@@ -187,9 +185,6 @@ export default function EntriesView({ store }: EntriesViewProps) {
       totalValue, pricePerKg: form.pricePerKg ? normalizeBRLMoneyToNumber(form.pricePerKg) ?? undefined : undefined,
       boxes: parseInt(form.boxes) || 0, units: parseInt(form.units) || 0, grossKg, notes: form.notes,
     };
-    // Chave derivada dos dados: repetir a MESMA entrada devolve a já gravada;
-    // mudar qualquer campo gera outra. A edição (replace) não usa chave.
-    const clientRequestId = editingId ? undefined : chaveEntradaSalmao(semente, data);
 
     // Budget alerts (weekly + monthly only)
     if (!editingId && metaInfo.meta) {
@@ -205,13 +200,13 @@ export default function EntriesView({ store }: EntriesViewProps) {
         // Meta mensal alert
         if (projectedStatus === 'estourado' && metaInfo.status !== 'estourado') {
           setBudgetAlertMsg(`Essa compra vai estourar a meta mensal (${fmtR(projectedGasto)} de ${fmtR(metaInfo.meta.metaValorCompra)}). Deseja continuar?`);
-          setBudgetConfirmPending(() => (motivo: string) => doSave(data, clientRequestId, { tipos: ['meta_mensal'], motivo }));
+          setBudgetConfirmPending(() => (motivo: string) => doSave(data, { tipos: ['meta_mensal'], motivo }));
           return;
         }
         // Projeção mensal alert
         if (projStatus === 'estourado' && metaInfo.projecao.statusProjecao !== 'estourado') {
           setBudgetAlertMsg(`Com essa compra, a projeção indica estouro até o fim do mês (projeção: ${fmtR(projNova.projecaoFimMes)}). Continuar?`);
-          setBudgetConfirmPending(() => (motivo: string) => doSave(data, clientRequestId, { tipos: ['projecao'], motivo }));
+          setBudgetConfirmPending(() => (motivo: string) => doSave(data, { tipos: ['projecao'], motivo }));
           return;
         }
         if (projectedStatus === 'perto' && metaInfo.status === 'boa') {
@@ -227,7 +222,7 @@ export default function EntriesView({ store }: EntriesViewProps) {
           const gastoSemanaPos = week.gasto + totalValue;
           if (week.ideal > 0 && gastoSemanaPos >= week.ideal && week.gasto < week.ideal) {
             setBudgetAlertMsg(`Você vai estourar o orçamento ideal da semana ${weekLabel} (${fmtR(gastoSemanaPos)} / ${fmtR(week.ideal)}). Continuar?`);
-            setBudgetConfirmPending(() => (motivo: string) => doSave(data, clientRequestId, { tipos: ['semana'], motivo }));
+            setBudgetConfirmPending(() => (motivo: string) => doSave(data, { tipos: ['semana'], motivo }));
             return;
           }
           if (week.ideal > 0 && gastoSemanaPos >= week.ideal * 0.9 && week.gasto < week.ideal * 0.9) {
@@ -237,7 +232,7 @@ export default function EntriesView({ store }: EntriesViewProps) {
       }
     }
 
-    void doSave(data, clientRequestId);
+    void doSave(data);
   };
 
   const startEdit = (entry: typeof entries[0]) => {

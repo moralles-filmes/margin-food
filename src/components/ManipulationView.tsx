@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef } from 'react';
 import { useSalmonStore } from '@/hooks/useSalmonStore';
-import { novaSemente } from '@/lib/idempotencia';
+import { novaSemente } from '@/lib/chaveOperacao';
 import { chaveManipulacaoSalmao } from '@/domain/estoque/idempotencia';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -249,7 +249,7 @@ export default function ManipulationView({ store, preSelectedEntryId, onClearPre
         // Chave derivada dos dados: repetir a MESMA manipulação devolve a já
         // gravada em vez de dar saída do salmão bruto duas vezes.
         const saved = await addManipulation(data, {
-          clientRequestId: chaveManipulacaoSalmao(semente, data),
+          clientRequestId: await chaveManipulacaoSalmao(semente, data),
         });
         toast.success('Manipulação registrada! Estoque limpo atualizado.');
         setShowWizard(false);

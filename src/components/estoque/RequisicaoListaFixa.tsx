@@ -22,7 +22,7 @@ import RequisicaoQuantityList, { type RequisicaoQuantityListHandle } from './Req
 import type { ProdutoExtended } from '@/types/estoque';
 import { toRequisitionDisplayProduct } from '@/domain/estoque/requisition';
 import { chaveRequisicaoEstoque } from '@/domain/estoque/idempotencia';
-import { novaSemente } from '@/lib/idempotencia';
+import { novaSemente } from '@/lib/chaveOperacao';
 import { mensagemErroEdge } from '@/lib/edgeFunctionError';
 
 interface ListaFixaItem {
@@ -254,7 +254,7 @@ export default function RequisicaoListaFixa({ produtos, saldos, onSuccess, onCan
         setor,
         observacao,
         itens,
-        client_request_id: chaveRequisicaoEstoque(semente, {
+        client_request_id: await chaveRequisicaoEstoque(semente, {
           setor,
           observacao,
           itens: itens.map(item => ({ produtoId: item.produto_id, quantidade: item.quantidade, unidade: item.unidade })),

@@ -31,7 +31,7 @@ import RequisicaoCardHeader from './estoque/RequisicaoCardHeader';
 import RequisicaoProductPicker, { type ManualRequisitionItem } from './estoque/RequisicaoProductPicker';
 import { sortByName } from '@/lib/sortByName';
 import { useNavigationRecord } from '@/hooks/useNavigationRequest';
-import { novaSemente } from '@/lib/idempotencia';
+import { novaSemente } from '@/lib/chaveOperacao';
 import { mensagemErroEdge } from '@/lib/edgeFunctionError';
 import { chaveRequisicaoEstoque } from '@/domain/estoque/idempotencia';
 
@@ -312,7 +312,7 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
           setor,
           observacao,
           itens: itensPayload,
-          client_request_id: chaveRequisicaoEstoque(sementeManual, { setor, observacao, itens }),
+          client_request_id: await chaveRequisicaoEstoque(sementeManual, { setor, observacao, itens }),
         },
       });
 

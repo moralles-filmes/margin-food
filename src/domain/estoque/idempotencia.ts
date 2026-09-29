@@ -7,10 +7,10 @@
  * conteúdo aqui precisa ser o MESMO que o servidor compara no reenvio: campo
  * que entra na chave mas não na comparação faria um retry legítimo virar
  * REQUEST_ID_REUTILIZADO, e o contrário deixaria operações diferentes com a
- * mesma chave. Ver `@/lib/idempotencia`.
+ * mesma chave. Semente, derivação e o porquê: `@/lib/chaveOperacao`.
  */
 
-import { chaveIdempotente } from '@/lib/idempotencia';
+import { chaveOperacao } from '@/lib/chaveOperacao';
 
 export interface ItemRequisicaoChave {
   produtoId: string;
@@ -26,11 +26,11 @@ export interface ItemRequisicaoChave {
 export function chaveRequisicaoEstoque(
   semente: string,
   dados: { setor: string; observacao: string; itens: ItemRequisicaoChave[] },
-): string {
+): Promise<string> {
   const itens = dados.itens
     .map(item => [item.produtoId, item.quantidade, item.unidade] as const)
     .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : a[1] - b[1]));
-  return chaveIdempotente(semente, { tipo: 'requisicao', setor: dados.setor, observacao: dados.observacao, itens });
+  return chaveOperacao(semente, { tipo: 'requisicao', setor: dados.setor, observacao: dados.observacao, itens });
 }
 
 export interface ItemMovimentacaoChave {
@@ -49,8 +49,8 @@ export interface ItemMovimentacaoChave {
 export function chaveLoteMovimentacao(
   semente: string,
   dados: { tipo: string; observacao: string; itens: ItemMovimentacaoChave[] },
-): string {
-  return chaveIdempotente(semente, {
+): Promise<string> {
+  return chaveOperacao(semente, {
     tipo: 'movimentacao',
     movimento: dados.tipo,
     observacao: dados.observacao,
@@ -72,8 +72,8 @@ export interface EntradaSalmaoChave {
 }
 
 /** Entrada de salmão bruto: os mesmos campos que `create_salmon_entry_atomic` grava. */
-export function chaveEntradaSalmao(semente: string, dados: EntradaSalmaoChave): string {
-  return chaveIdempotente(semente, {
+export function chaveEntradaSalmao(semente: string, dados: EntradaSalmaoChave): Promise<string> {
+  return chaveOperacao(semente, {
     tipo: 'salmao-entrada',
     date: dados.date,
     expirationDate: dados.expirationDate || null,
@@ -98,8 +98,8 @@ export interface ManipulacaoSalmaoChave {
 }
 
 /** Manipulação de salmão: os mesmos campos que `create_salmon_manipulation_atomic` grava. */
-export function chaveManipulacaoSalmao(semente: string, dados: ManipulacaoSalmaoChave): string {
-  return chaveIdempotente(semente, {
+export function chaveManipulacaoSalmao(semente: string, dados: ManipulacaoSalmaoChave): Promise<string> {
+  return chaveOperacao(semente, {
     tipo: 'salmao-manipulacao',
     entryId: dados.entryId,
     date: dados.date,
