@@ -2,18 +2,23 @@ import { useSupabase } from '@/contexts/CompanyScopeContext';
 /**
  * Operator flow for creating requisitions from a fixed sector list.
  * Steps: 1) Select sector → 2) Fill quantities → 3) Preview → 4) Confirm & submit
+ *
+ * Só aparecem os setores cuja lista está liberada para o usuário: a RLS de
+ * `listas_fixas_setor` filtra pelos colaboradores vinculados a cada lista
+ * (lista sem vínculo continua visível para todos que fazem requisição).
  */
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, useId } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCan } from '@/permissions/hooks';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { useScopedToast } from '@/hooks/useScopedToast';
+import { includesNormalized } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ClipboardList, Eye, Send, ArrowLeft, Inbox, AlertTriangle, ShoppingCart, Loader2 } from 'lucide-react';
-import RequisicaoQuantityList from './RequisicaoQuantityList';
+import { ClipboardList, Eye, Send, ArrowLeft, Inbox, AlertTriangle, ShoppingCart, Loader2, Search, X } from 'lucide-react';
+import RequisicaoQuantityList, { type RequisicaoQuantityListHandle } from './RequisicaoQuantityList';
 import type { ProdutoExtended } from '@/types/estoque';
 import { toRequisitionDisplayProduct } from '@/domain/estoque/requisition';
 
@@ -22,6 +27,11 @@ interface ListaFixaItem {
   produto_id: string;
   ordem: number;
   observacao: string;
+}
+
+interface ListaDisponivel {
+  id: string;
+  setor: string;
 }
 
 type Step = 'fill' | 'preview';
@@ -43,63 +53,71 @@ export default function RequisicaoListaFixa({ produtos, saldos, onSuccess, onCan
   const { profile } = useAuth();
   const canCreate = useCan('estoque:requisicoes:create');
   const { confirm, ConfirmDialog } = useConfirmDialog();
+  const searchId = useId();
   const previewRef = useRef<HTMLButtonElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const quantityListRef = useRef<RequisicaoQuantityListHandle>(null);
   const requestId = useRef(0);
-  const [listError, setListError] = useState(false);
+  const [listas, setListas] = useState<ListaDisponivel[]>([]);
+  const [listasStatus, setListasStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [setor, setSetor] = useState(profile?.sector || '');
-  const [setores, setSetores] = useState<string[]>([]);
-  useEffect(() => {
-    if (!canCreate) return;
-    supabase.from('stock_sectors').select('name').eq('is_active', true).order('name')
-      .then(({ data, error }) => {
-        if (error) { toast.error('Erro ao carregar setores. Tente novamente.'); return; }
-        const nomes = (data || []).map((s: { name: string }) => s.name);
-        setSetores(nomes);
-        setSetor(current => nomes.includes(current) ? current : nomes[0] || '');
-      });
-  }, [canCreate, supabase, toast]);
   const [observacao, setObservacao] = useState('');
+  const [busca, setBusca] = useState('');
   const [items, setItems] = useState<ListaFixaItem[]>([]);
+  const [loadedListaId, setLoadedListaId] = useState('');
   const [quantities, setQuantities] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
+  const [listError, setListError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [step, setStep] = useState<Step>('fill');
-  const [listaExists, setListaExists] = useState<boolean | null>(null);
 
-  const loadListaFixa = useCallback(async (sectorName: string) => {
+  const loadListas = useCallback(async () => {
+    setListasStatus('loading');
+    const [setoresRes, listasRes] = await Promise.all([
+      supabase.from('stock_sectors').select('name').eq('is_active', true).order('name'),
+      supabase.from('listas_fixas_setor').select('id, setor').eq('ativo', true),
+    ]);
+    if (setoresRes.error || listasRes.error) {
+      console.error('Erro ao carregar listas fixas:', setoresRes.error || listasRes.error);
+      setListasStatus('error');
+      return;
+    }
+    // Setor inativo sai da requisição mesmo que a lista dele continue ativa.
+    const listaPorSetor = new Map((listasRes.data || []).map(lista => [lista.setor, lista.id]));
+    const disponiveis = (setoresRes.data || []).flatMap(({ name }) => {
+      const id = listaPorSetor.get(name);
+      return id ? [{ id, setor: name }] : [];
+    });
+    setListas(disponiveis);
+    setSetor(current => disponiveis.some(lista => lista.setor === current) ? current : disponiveis[0]?.setor || '');
+    setListasStatus('ready');
+  }, [supabase]);
+
+  useEffect(() => {
+    if (canCreate) void loadListas();
+  }, [canCreate, loadListas]);
+
+  const listaAtualId = useMemo(() => listas.find(lista => lista.setor === setor)?.id || '', [listas, setor]);
+
+  const loadItens = useCallback(async (listaId: string) => {
     const currentRequest = ++requestId.current;
     setLoading(true);
     setListError(false);
     setItems([]);
+    setLoadedListaId('');
     setQuantities({});
-    setListaExists(null);
-    if (!sectorName) { setLoading(false); return; }
+    if (!listaId) { setLoading(false); return; }
     try {
-      const { data: lista, error: listaErr } = await supabase
-        .from('listas_fixas_setor')
-        .select('id, setor, ativo')
-        .eq('setor', sectorName)
-        .eq('ativo', true)
-        .maybeSingle();
-
-      if (currentRequest !== requestId.current) return;
-      if (listaErr) throw listaErr;
-      if (!lista) {
-        setListaExists(false);
-        return;
-      }
-
-      setListaExists(true);
-
       const { data: itens, error: itensErr } = await supabase
         .from('listas_fixas_setor_itens')
         .select('id, produto_id, ordem, observacao')
-        .eq('lista_fixa_id', lista.id)
+        .eq('lista_fixa_id', listaId)
         .order('ordem');
 
       if (currentRequest !== requestId.current) return;
       if (itensErr) throw itensErr;
       setItems((itens || []) as ListaFixaItem[]);
+      setLoadedListaId(listaId);
     } catch (err) {
       if (currentRequest !== requestId.current) return;
       console.error('Erro ao carregar lista fixa:', err);
@@ -111,9 +129,9 @@ export default function RequisicaoListaFixa({ produtos, saldos, onSuccess, onCan
   }, [supabase, toast]);
 
   useEffect(() => {
-    if (canCreate) loadListaFixa(setor);
+    if (canCreate) loadItens(listaAtualId);
     return () => { requestId.current += 1; };
-  }, [setor, canCreate, loadListaFixa]);
+  }, [listaAtualId, canCreate, loadItens]);
 
   const productsById = useMemo(() => new Map(produtos.map(prod => [prod.id, prod])), [produtos]);
   const getProd = useCallback((id: string) => productsById.get(id), [productsById]);
@@ -125,6 +143,23 @@ export default function RequisicaoListaFixa({ produtos, saldos, onSuccess, onCan
       return prod && prod.ativo;
     });
   }, [items, getProd]);
+
+  // A busca só esconde linhas da tela: quantidades já digitadas em itens fora
+  // do filtro continuam em `filledItems` e vão na requisição.
+  const termoBusca = busca.trim();
+  const visibleItems = useMemo(() => {
+    if (!termoBusca) return activeItems;
+    return activeItems.filter(item => {
+      const prod = getProd(item.produto_id);
+      return !!prod && (includesNormalized(prod.nomeProduto, termoBusca) || includesNormalized(prod.sku || '', termoBusca));
+    });
+  }, [activeItems, getProd, termoBusca]);
+
+  const quantityRows = useMemo(() => visibleItems.map(item => {
+    const prod = getProd(item.produto_id)!;
+    const display = getRequisitionProductDisplay(prod);
+    return { id: item.produto_id, name: prod.nomeProduto, unit: display.displayUnitForRequisition, issue: display.issueMessage, observation: item.observacao };
+  }), [visibleItems, getProd]);
 
   const invalidUnitItemsCount = useMemo(() => {
     return activeItems.filter(item => {
@@ -145,18 +180,34 @@ export default function RequisicaoListaFixa({ produtos, saldos, onSuccess, onCan
       .filter(item => Number.isFinite(item.quantidade) && item.quantidade > 0 && item.prod && item.display?.hasValidPurchaseUnit && item.display.displayUnitForRequisition);
   }, [activeItems, quantities, getProd]);
 
+  // Entre a lista chegar e o efeito disparar a carga dos itens, mostrar o
+  // carregamento em vez de piscar "lista vazia".
+  const itensCarregando = loading || (!!listaAtualId && loadedListaId !== listaAtualId && !listError);
+  const itensProntos = !itensCarregando && !listError && !!listaAtualId && loadedListaId === listaAtualId;
+
   const handleSetorChange = (newSetor: string) => {
     const hasData = Object.values(quantities).some(value => parseFloat(value) > 0);
     if (hasData) {
       toast.info('Setor alterado. Quantidades anteriores foram limpas.');
     }
     setSetor(newSetor);
+    setBusca('');
     setStep('fill');
   };
 
   const handleQtyChange = (produtoId: string, value: string) => {
     if (value && !/^\d*[.,]?\d*$/.test(value)) return;
     setQuantities(prev => ({ ...prev, [produtoId]: value.replace(',', '.') }));
+  };
+
+  const handleListComplete = () => {
+    // Buscando item a item: volta para a busca, pronta para o próximo produto.
+    if (termoBusca) {
+      searchRef.current?.focus();
+      searchRef.current?.select();
+    } else {
+      previewRef.current?.focus();
+    }
   };
 
   const handleGoToPreview = () => {
@@ -245,79 +296,135 @@ export default function RequisicaoListaFixa({ produtos, saldos, onSuccess, onCan
 
         {step === 'fill' && (
           <div className="space-y-3">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <Label className="text-sm text-muted-foreground">Setor</Label>
-                <Select value={setor} onValueChange={handleSetorChange}>
-                  <SelectTrigger className="h-auto min-h-12 text-base whitespace-normal bg-secondary border-border text-foreground [&>span]:line-clamp-none [&>span]:text-left [&>span]:break-words"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {setores.map(sector => <SelectItem key={sector} value={sector}>{sector}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-sm text-muted-foreground">Observação</Label>
-                <Input value={observacao} onChange={event => setObservacao(event.target.value)} className="h-12 text-base md:text-base bg-secondary border-border text-foreground" placeholder="Opcional" />
-              </div>
-            </div>
-
-            {loading && (
+            {listasStatus === 'loading' && (
               <div className="flex justify-center py-6">
                 <Loader2 className="w-6 h-6 animate-spin text-primary" />
               </div>
             )}
 
-            {listError && (
+            {listasStatus === 'error' && (
               <div role="alert" className="space-y-2 text-base text-destructive">
-                <p>Não foi possível carregar a lista fixa.</p>
-                <Button type="button" variant="outline" onClick={() => loadListaFixa(setor)}>Tentar novamente</Button>
+                <p>Não foi possível carregar as listas fixas.</p>
+                <Button type="button" variant="outline" onClick={() => loadListas()}>Tentar novamente</Button>
               </div>
             )}
 
-            {!loading && listaExists === false && (
+            {listasStatus === 'ready' && listas.length === 0 && (
               <div className="bg-background-subtle border border-border rounded-lg p-6 text-center">
                 <Inbox className="w-10 h-10 mx-auto text-muted-foreground/40 mb-2" />
-                <p className="text-sm font-medium text-foreground mb-1">Nenhuma lista fixa para {setor}</p>
+                <p className="text-sm font-medium text-foreground mb-1">Nenhuma lista fixa liberada para você</p>
                 <p className="text-sm text-muted-foreground">
-                  Solicite ao administrador que crie uma lista fixa para este setor, ou use a requisição manual.
+                  Peça ao administrador para liberar a lista do seu setor, ou use a requisição manual.
                 </p>
               </div>
             )}
 
-            {!loading && listaExists && activeItems.length > 0 && (
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground font-medium">{activeItems.length} itens • Preencha as quantidades desejadas</p>
-                <RequisicaoQuantityList
-                  rows={activeItems.map(item => {
-                    const prod = getProd(item.produto_id)!;
-                    const display = getRequisitionProductDisplay(prod);
-                    return { id: item.produto_id, name: prod.nomeProduto, unit: display.displayUnitForRequisition, issue: display.issueMessage, observation: item.observacao };
-                  })}
-                  quantities={quantities}
-                  onChange={handleQtyChange}
-                  onComplete={() => previewRef.current?.focus()}
-                />
+            {listasStatus === 'ready' && listas.length > 0 && (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-sm text-muted-foreground">Setor</Label>
+                    <Select value={setor} onValueChange={handleSetorChange}>
+                      <SelectTrigger className="h-auto min-h-12 text-base whitespace-normal bg-secondary border-border text-foreground [&>span]:line-clamp-none [&>span]:text-left [&>span]:break-words"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {listas.map(lista => <SelectItem key={lista.id} value={lista.setor}>{lista.setor}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-sm text-muted-foreground">Observação</Label>
+                    <Input value={observacao} onChange={event => setObservacao(event.target.value)} className="h-12 text-base md:text-base bg-secondary border-border text-foreground" placeholder="Opcional" />
+                  </div>
+                </div>
 
-                {invalidUnitItemsCount > 0 && (
-                  <div className="flex flex-wrap items-center gap-2 p-2 bg-warning-soft border border-warning-border rounded-lg text-sm text-warning">
-                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                    <span>{invalidUnitItemsCount} item(ns) bloqueado(s) por falta de unidade de compra no cadastro.</span>
+                {itensCarregando && (
+                  <div className="flex justify-center py-6">
+                    <Loader2 className="w-6 h-6 animate-spin text-primary" />
                   </div>
                 )}
 
-                {filledItems.some(item => item.quantidade > getSaldo(item.produto_id)) && (
-                  <div className="flex flex-wrap items-center gap-2 p-2 bg-warning-soft border border-warning-border rounded-lg text-sm text-warning">
-                    <ShoppingCart className="w-3.5 h-3.5 shrink-0" />
-                    <span>Itens sem estoque serão enviados como Solicitação de Compra.</span>
+                {listError && (
+                  <div role="alert" className="space-y-2 text-base text-destructive">
+                    <p>Não foi possível carregar a lista fixa.</p>
+                    <Button type="button" variant="outline" onClick={() => loadItens(listaAtualId)}>Tentar novamente</Button>
                   </div>
                 )}
-              </div>
-            )}
 
-            {!loading && listaExists && activeItems.length === 0 && (
-              <div className="bg-background-subtle border border-border rounded-lg p-6 text-center">
-                <p className="text-sm text-muted-foreground">A lista está vazia. Solicite ao administrador que adicione produtos.</p>
-              </div>
+                {itensProntos && activeItems.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="space-y-1">
+                      <Label htmlFor={searchId} className="text-sm text-muted-foreground">Buscar na lista</Label>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          id={searchId}
+                          ref={searchRef}
+                          value={busca}
+                          onChange={event => setBusca(event.target.value)}
+                          onKeyDown={event => {
+                            if (event.key !== 'Enter' || event.nativeEvent.isComposing) return;
+                            event.preventDefault();
+                            quantityListRef.current?.focusFirst();
+                          }}
+                          placeholder="Nome ou SKU"
+                          autoComplete="off"
+                          enterKeyHint="search"
+                          className="h-12 pl-10 pr-12 text-base md:text-base bg-secondary border-border"
+                        />
+                        {busca && (
+                          <Button type="button" variant="ghost" size="icon" aria-label="Limpar busca na lista"
+                            className="absolute right-1 top-1/2 h-11 w-11 -translate-y-1/2"
+                            onClick={() => { setBusca(''); searchRef.current?.focus(); }}>
+                            <X />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <p role="status" className="text-sm text-muted-foreground font-medium">
+                        {termoBusca
+                          ? `${visibleItems.length} de ${activeItems.length} itens`
+                          : `${activeItems.length} itens • Preencha as quantidades desejadas`}
+                        {filledItems.length > 0 && ` • ${filledItems.length} preenchido(s)`}
+                      </p>
+                      <RequisicaoQuantityList
+                        ref={quantityListRef}
+                        rows={quantityRows}
+                        quantities={quantities}
+                        onChange={handleQtyChange}
+                        onComplete={handleListComplete}
+                      />
+
+                      {termoBusca && visibleItems.length === 0 && (
+                        <p className="rounded-lg bg-background-subtle p-4 text-base text-muted-foreground break-words">
+                          Nenhum item da lista corresponde a “{termoBusca}”.
+                        </p>
+                      )}
+
+                      {invalidUnitItemsCount > 0 && (
+                        <div className="flex flex-wrap items-center gap-2 p-2 bg-warning-soft border border-warning-border rounded-lg text-sm text-warning">
+                          <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                          <span>{invalidUnitItemsCount} item(ns) bloqueado(s) por falta de unidade de compra no cadastro.</span>
+                        </div>
+                      )}
+
+                      {filledItems.some(item => item.quantidade > getSaldo(item.produto_id)) && (
+                        <div className="flex flex-wrap items-center gap-2 p-2 bg-warning-soft border border-warning-border rounded-lg text-sm text-warning">
+                          <ShoppingCart className="w-3.5 h-3.5 shrink-0" />
+                          <span>Itens sem estoque serão enviados como Solicitação de Compra.</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {itensProntos && activeItems.length === 0 && (
+                  <div className="bg-background-subtle border border-border rounded-lg p-6 text-center">
+                    <p className="text-sm text-muted-foreground">A lista está vazia. Solicite ao administrador que adicione produtos.</p>
+                  </div>
+                )}
+              </>
             )}
 
             <div className="flex flex-wrap justify-end gap-2">

@@ -4667,6 +4667,48 @@ export type Database = {
           },
         ]
       }
+      listas_fixas_setor_usuarios: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          lista_fixa_id: string
+          user_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          lista_fixa_id: string
+          user_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          lista_fixa_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "listas_fixas_setor_usuarios_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "listas_fixas_setor_usuarios_lista_fk"
+            columns: ["company_id", "lista_fixa_id"]
+            isOneToOne: false
+            referencedRelation: "listas_fixas_setor"
+            referencedColumns: ["company_id", "id"]
+          },
+        ]
+      }
       metas_cmv: {
         Row: {
           alerta_amarelo_percent: number
