@@ -7,6 +7,8 @@ import { useNotificationsContext } from '@/contexts/NotificationsContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { resolveNotificationTarget } from '@/lib/notificationTarget';
+import { requestNotificationSubtab } from '@/hooks/useNotificationSubtab';
 
 interface Props {
   onNavigate?: (tabId: string, linkPath?: string) => void;
@@ -14,9 +16,13 @@ interface Props {
 
 const MODULE_LABELS: Record<string, string> = {
   purchases: 'Compras',
+  compras: 'Compras',
   stock: 'Estoque',
+  estoque: 'Estoque',
   inventory: 'Inventário',
+  inventario: 'Inventário',
   finance: 'Financeiro',
+  financeiro: 'Financeiro',
   rh: 'RH',
 };
 
@@ -40,24 +46,11 @@ export default function NotificationBell({ onNavigate }: Props) {
 
   const handleClick = (n: AppNotification) => {
     markAsRead(n.id);
-    if (n.link_path && onNavigate) {
-      // Parse link_path for tab + query params
-      const url = new URL(n.link_path, 'https://placeholder');
-      const tab = url.pathname.replace('/', '').split('/')[0];
-      if (tab) {
-        // Pass full link_path so parent can extract subtab/order params
-        onNavigate(tab, n.link_path);
-      }
-    } else if (n.module && onNavigate) {
-      const moduleTabMap: Record<string, string> = {
-        purchases: 'compras',
-        stock: 'estoque-geral',
-        inventory: 'inventario',
-        finance: 'financeiro',
-        rh: 'rh',
-      };
-      const tabId = moduleTabMap[n.module];
-      if (tabId) onNavigate(tabId);
+    const target = resolveNotificationTarget(n.link_path, n.module);
+    if (target && onNavigate) {
+      if (target.subtab) requestNotificationSubtab(target.tab, target.subtab);
+      // Pass full link_path so parent can extract subtab/order params
+      onNavigate(target.tab, n.link_path ?? undefined);
     }
     setOpen(false);
   };

@@ -1,4 +1,3 @@
-import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useMemo, useEffect } from 'react';
 import { usePersistedTab } from '@/hooks/usePersistedTab';
 import { ShoppingCart, Calendar, BarChart3, ClipboardList, ShoppingBag, Building2, ShieldAlert, PackageX, FileText } from 'lucide-react';
@@ -14,6 +13,7 @@ import CalendarioLembretesView from '@/components/compras/CalendarioLembretesVie
 import RankingFornecedoresView from '@/components/compras/RankingFornecedoresView';
 import CotacaoView from '@/components/compras/cotacao/CotacaoView';
 import { useCotacoesStore } from '@/hooks/useCotacoesStore';
+import { useModuleBadges } from '@/contexts/ModuleBadgesContext';
 import { useModuleAccess, useCan } from '@/permissions/hooks';
 
 // Map internal subtab keys to registry keys
@@ -33,7 +33,6 @@ const DIAS = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domi
 const CATEGORIAS = ['Peixe', 'Oriental', 'Bebidas', 'Limpeza', 'Embalagens', 'Cozinha', 'Descartáveis', 'Proteínas', 'Hortifruti', 'Outros'];
 
 export default function ComprasView() {
-  const supabase = useSupabase();
   const { user } = useAuth();
   const { visibleSubtabs, canView } = useModuleAccess('compras');
   
@@ -51,7 +50,6 @@ export default function ComprasView() {
   const salmonStore = useSalmonStoreContext();
   const purchaseOrdersStore = usePurchaseOrdersStoreContext();
   const cotacoesStore = useCotacoesStore();
-  const shoppingCount = purchaseOrdersStore.shoppingCount;
 
   // Calendário form
   const [showCalForm, setShowCalForm] = useState(false);
@@ -88,15 +86,12 @@ export default function ComprasView() {
     }));
   };
 
-  // Alertas falta count
-  const [alertasFaltaCount, setAlertasFaltaCount] = useState(0);
-  useEffect(() => {
-    supabase
-      .from('alertas_falta_estoque')
-      .select('id', { count: 'exact', head: true })
-      .eq('status', 'PENDENTE')
-      .then(({ count }) => setAlertasFaltaCount(count ?? 0));
-  }, [activeView, supabase]);
+  // Contadores das abas: mesma fonte do menu lateral. As listas desta tela mudam
+  // por Realtime (inclusive por outros usuários) — cada mudança reconta.
+  const moduleBadges = useModuleBadges();
+  const badges = moduleBadges.counts.compras;
+  const refreshBadges = moduleBadges.refresh;
+  useEffect(() => { refreshBadges(); }, [refreshBadges, activeView, purchaseOrdersStore.orders, cotacoesStore.cotacoes]);
 
   // Deep-link from notification
   useEffect(() => {
@@ -115,10 +110,10 @@ export default function ComprasView() {
   }, [availableViews]);
 
   const allSubViews: { id: SubView; label: string; icon: typeof ShoppingCart; badge?: number }[] = [
-    { id: 'pedidos-compras', label: 'Pedidos & Compras Mercado', icon: ShoppingBag, badge: (purchaseOrdersStore.openCount + purchaseOrdersStore.receivingCount + purchaseOrdersStore.unackedPartialCount) || undefined },
-    { id: 'requisicoes', label: 'Checklist Compra', icon: ClipboardList, badge: shoppingCount || undefined },
-    { id: 'alertas-falta', label: 'Itens em Falta', icon: PackageX, badge: alertasFaltaCount || undefined },
-    { id: 'cotacao', label: 'Cotação', icon: FileText, badge: cotacoesStore.openCount || undefined },
+    { id: 'pedidos-compras', label: 'Pedidos & Compras Mercado', icon: ShoppingBag, badge: badges.pedidos || undefined },
+    { id: 'requisicoes', label: 'Checklist Compra', icon: ClipboardList, badge: badges.checklist || undefined },
+    { id: 'alertas-falta', label: 'Itens em Falta', icon: PackageX, badge: badges.alertas_falta || undefined },
+    { id: 'cotacao', label: 'Cotação', icon: FileText, badge: badges.cotacao || undefined },
     { id: 'calendario', label: 'Calendário', icon: Calendar },
     { id: 'ranking', label: 'Ranking', icon: BarChart3 },
     { id: 'fornecedores', label: 'Fornecedores', icon: Building2 },

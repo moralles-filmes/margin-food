@@ -5,6 +5,7 @@ import { TabId } from '@/types/salmon';
 import { SalmonStoreProvider, useSalmonStoreContext } from '@/contexts/SalmonStoreContext';
 import { EstoqueGeralStoreProvider, useEstoqueGeralStoreContext } from '@/contexts/EstoqueGeralStoreContext';
 import { PurchaseOrdersStoreProvider } from '@/contexts/PurchaseOrdersStoreContext';
+import { ModuleBadgesProvider } from '@/contexts/ModuleBadgesContext';
 import { useAuth } from '@/contexts/AuthContext';
 import AppLayout from '@/components/AppLayout';
 
@@ -313,7 +314,9 @@ function IndexWithProviders() {
   return (
     <SalmonStoreProvider>
       <EstoqueGeralStoreProvider>
-        <Index />
+        <ModuleBadgesProvider>
+          <Index />
+        </ModuleBadgesProvider>
       </EstoqueGeralStoreProvider>
     </SalmonStoreProvider>
   );

@@ -4,6 +4,12 @@ import { getCorsHeaders } from "../_shared/cors.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { isEstornoMovement } from "./stock-reversal.ts";
+import {
+  buildRequisicaoAbertaNotification,
+  REQUISICAO_ABERTA_TYPE,
+  REQUISICAO_APPROVER_PERMISSIONS,
+  REQUISICOES_LINK_PATH,
+} from "./approvers.ts";
 
 const corsHeaders = getCorsHeaders();
 
@@ -150,6 +156,85 @@ async function writeAudit(
     p_metadata: toSerializableJson(metadata),
   });
   if (error) throw error;
+}
+
+/**
+ * Avisa no sininho os membros ativos da unidade que podem atender a requisição
+ * (ver approvers.ts), menos o próprio solicitante. `scopedAdmin` precisa levar o
+ * `x-company-id` da requisição: sem o cabeçalho, `get_effective_permissions` com
+ * service_role usa a empresa de origem do usuário consultado, não esta unidade.
+ */
+async function notifyRequisicaoAberta(
+  scopedAdmin: SupabaseClient,
+  companyId: string,
+  actorId: string,
+  requisicao: { id: string; setor: string; totalItens: number },
+): Promise<number> {
+  const { data: members, error: membersError } = await scopedAdmin
+    .from("company_memberships")
+    .select("user_id")
+    .eq("company_id", companyId)
+    .eq("status", "active");
+  if (membersError) throw membersError;
+
+  const candidates = [...new Set((members ?? []).map((m: { user_id: string }) => m.user_id))]
+    .filter((candidateId) => candidateId && candidateId !== actorId);
+
+  const approvers = await Promise.all(candidates.map(async (candidateId) => {
+    const { data, error } = await scopedAdmin.rpc("has_any_permission", {
+      _user_id: candidateId,
+      _permissions: [...REQUISICAO_APPROVER_PERMISSIONS],
+    });
+    if (error) throw error;
+    return data === true ? candidateId : null;
+  }));
+  const recipients = approvers.filter((recipientId): recipientId is string => recipientId !== null);
+  if (recipients.length === 0) return 0;
+
+  const { data: solicitante } = await scopedAdmin
+    .from("profiles")
+    .select("nome")
+    .eq("id", actorId)
+    .maybeSingle();
+
+  const { title, message } = buildRequisicaoAbertaNotification({
+    requisicaoId: requisicao.id,
+    setor: requisicao.setor,
+    totalItens: requisicao.totalItens,
+    solicitanteNome: solicitante?.nome ?? null,
+  });
+
+  const { error: insertError } = await scopedAdmin.from("notifications").insert(
+    recipients.map((recipientId) => ({
+      company_id: companyId,
+      recipient_user_id: recipientId,
+      type: REQUISICAO_ABERTA_TYPE,
+      module: "estoque",
+      title,
+      message,
+      entity_type: "requisicao_estoque",
+      entity_id: requisicao.id,
+      link_path: REQUISICOES_LINK_PATH,
+      created_by: actorId,
+      metadata: { setor: requisicao.setor, total_itens: requisicao.totalItens },
+    })),
+  );
+  if (insertError) throw insertError;
+  return recipients.length;
+}
+
+/** Requisição encerrada ou cancelada não deixa aviso de "aberta" pendente no sininho de ninguém. */
+async function clearRequisicaoAberta(adminClient: SupabaseClient, companyId: string, requisicaoId: string) {
+  const { error } = await adminClient
+    .from("notifications")
+    .update({ read_at: new Date().toISOString() })
+    .eq("company_id", companyId)
+    .eq("entity_type", "requisicao_estoque")
+    .eq("entity_id", requisicaoId)
+    .eq("type", REQUISICAO_ABERTA_TYPE)
+    .is("read_at", null);
+  // A operação principal já foi gravada; o aviso sobra no máximo como "não lido".
+  if (error) console.error("[requisicao-estoque] falha ao limpar aviso de requisição aberta:", error);
 }
 
 // ─── Main Handler ───────────────────────────────────────────────────────────
@@ -501,6 +586,22 @@ serve(withRequestCors(async (req) => {
         });
       }
 
+      if (requisicao_id) {
+        try {
+          const scopedAdmin = createClient(supabaseUrl, serviceKey, {
+            global: { headers: { "x-company-id": companyId } },
+          });
+          await notifyRequisicaoAberta(scopedAdmin, companyId, userId, {
+            id: requisicao_id,
+            setor,
+            totalItens: resultados.length,
+          });
+        } catch (notifyError) {
+          // A requisição já foi gravada: devolver erro aqui faria o usuário reenviar e duplicá-la.
+          console.error("[requisicao-estoque] falha ao notificar aprovadores:", notifyError);
+        }
+      }
+
       const mensagem =
         itensSemEstoque.length === 0
           ? "Requisição criada com sucesso."
@@ -554,9 +655,11 @@ serve(withRequestCors(async (req) => {
         .eq("company_id", cId)
         .single();
 
-      if (!req || !req.solicitante_user_id) return;
+      if (!req) return;
       const FINAL = ["ATENDIDA", "PARCIALMENTE_ATENDIDA", "NEGADA"];
       if (!FINAL.includes(req.status)) return;
+      await clearRequisicaoAberta(adminClient, cId, reqId);
+      if (!req.solicitante_user_id) return;
 
       const reqShort = reqId.slice(0, 8);
       let title: string, message: string;
@@ -1029,6 +1132,8 @@ serve(withRequestCors(async (req) => {
         p_before: { status: reqCheck.status, ativo: true },
         p_after: { status: "CANCELADA", ativo: false, deleted_by: userId },
       });
+
+      await clearRequisicaoAberta(adminClient, companyId, requisicao_id);
 
       return jsonRes({ success: true, mensagem: "Requisição cancelada.", request_id: requestId });
     }

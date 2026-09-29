@@ -1,5 +1,5 @@
-import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
+import { useModuleBadges } from '@/contexts/ModuleBadgesContext';
 import { usePersistedTab } from '@/hooks/usePersistedTab';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -162,7 +162,6 @@ const TAB_REGISTRY_MAP: Record<FinSubTab, string> = {
 
 // ==================== MAIN VIEW ====================
 export default function FinanceiroView() {
-  const supabase = useSupabase();
   const [activeTab, setActiveTab] = usePersistedTab<FinSubTab>('app:tab:financeiro', 'dashboard');
   const [extratoContaId, setExtratoContaId] = useState<string | undefined>(undefined);
   const [fluxoDateFrom, setFluxoDateFrom] = useState<string | undefined>(undefined);
@@ -194,15 +193,11 @@ export default function FinanceiroView() {
     setActiveTab(tab);
   }, [location.pathname, navigate, setActiveTab]);
 
-  // Contas a Pagar pending count
-  const [pagarPendingCount, setPagarPendingCount] = useState(0);
-  useEffect(() => {
-    supabase
-      .from('fin_contas_pagar')
-      .select('id', { count: 'exact', head: true })
-      .in('status', ['pendente', 'vencido'])
-      .then(({ count }) => setPagarPendingCount(count ?? 0));
-  }, [activeTab, supabase]);
+  // Contas a Pagar pending count — mesma fonte do menu lateral
+  const moduleBadges = useModuleBadges();
+  const pagarPendingCount = moduleBadges.counts.financeiro.pagar;
+  const refreshBadges = moduleBadges.refresh;
+  useEffect(() => { refreshBadges(); }, [activeTab, refreshBadges]);
 
   // Handle "Ver extrato" navigation from ContasBancarias
   const handleNavigateExtrato = useCallback((contaId: string) => {

@@ -18,6 +18,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { MODULE_MANIFESTS } from '@/permissions/registry';
+import { useModuleBadges } from '@/contexts/ModuleBadgesContext';
+import { formatBadgeCount } from '@/lib/moduleBadges';
 
 function parseLocalDate(s: string) { const [y,m,d] = s.split('-').map(Number); return new Date(y,m-1,d); }
 
@@ -146,6 +148,7 @@ export default function AppLayout({ children, activeTab, onTabChange, isOffline,
   });
   const [isResizing, setIsResizing] = useState(false);
   const isSuperAdmin = permissionState === 'READY' && hasPermission('system:global:manage');
+  const { totalsByTab: badgeTotals } = useModuleBadges();
 
   const permissionsReady = permissionState === 'READY';
 
@@ -306,6 +309,9 @@ export default function AppLayout({ children, activeTab, onTabChange, isOffline,
                     const Icon = item.icon;
                     const active = activeTab === item.id;
                     const key = `${section.title}-${item.id}-${idx}`;
+                    // Soma dos contadores das abas internas do módulo (ModuleBadgesProvider).
+                    const badgeTotal = badgeTotals[item.id] ?? 0;
+                    const pendingLabel = badgeTotal === 1 ? '1 pendência' : `${badgeTotal} pendências`;
                     const navButton = (
                       <button
                         onClick={() => handleNav(item.id)}
@@ -322,14 +328,29 @@ export default function AppLayout({ children, activeTab, onTabChange, isOffline,
                         )}
                         <Icon className="w-4 h-4 flex-shrink-0" />
                         {!sidebarCollapsed && (
-                          <span className="text-[13.5px] truncate tracking-tight">{item.label}</span>
+                          <span className="min-w-0 text-[13.5px] truncate tracking-tight">{item.label}</span>
+                        )}
+                        {badgeTotal > 0 && (
+                          <>
+                            <span
+                              aria-hidden="true"
+                              className={sidebarCollapsed
+                                ? 'absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-destructive text-[9px] text-destructive-foreground flex items-center justify-center font-bold leading-none'
+                                : 'ml-auto shrink-0 min-w-5 h-5 px-1 rounded-full bg-destructive text-[10px] text-destructive-foreground flex items-center justify-center font-bold leading-none'}
+                            >
+                              {formatBadgeCount(badgeTotal)}
+                            </span>
+                            <span className="sr-only">{pendingLabel}</span>
+                          </>
                         )}
                       </button>
                     );
                     return sidebarCollapsed ? (
                       <Tooltip key={key}>
                         <TooltipTrigger asChild>{navButton}</TooltipTrigger>
-                        <TooltipContent side="right">{item.label}</TooltipContent>
+                        <TooltipContent side="right">
+                          {badgeTotal > 0 ? `${item.label} · ${pendingLabel}` : item.label}
+                        </TooltipContent>
                       </Tooltip>
                     ) : (
                       <div key={key}>{navButton}</div>
