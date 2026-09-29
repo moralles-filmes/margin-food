@@ -1,5 +1,5 @@
 import { useSupabase } from '@/contexts/CompanyScopeContext';
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { includesNormalized, normalizeSearchText } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCan } from '@/permissions/hooks';
@@ -21,6 +21,7 @@ import { fmtBRL, formatDateBR, formatDateTimeBR, formatDateValueBR, formatPercen
 import { formatNumberToBRL, normalizeBRLMoneyToNumber } from '@/lib/money';
 import { BRLInput, CurrencyInput } from '@/components/ui/brl-input';
 import { compararTotais, getPrecoSugerido, getUltimaCompra } from '@/domain/compras/pedidoPrecos';
+import { novaSemente } from '@/lib/chaveOperacao';
 import UserMentionSelect from '@/components/UserMentionSelect';
 import ProductSearchCombobox, { type ProductOption } from '@/components/ui/ProductSearchCombobox';
 import { SubmoduleSwitcher } from '@/components/ui/SubmoduleSwitcher';
@@ -169,6 +170,11 @@ export default function PedidosComprasMercadoView() {
   };
   const [form, setForm] = useState(emptyForm);
   const [formItems, setFormItems] = useState<FormItem[]>([]);
+  // Semente da solicitação em andamento: troca só quando o formulário fecha. A
+  // chave enviada é derivada dela + conteúdo (duplo clique/retry reaproveitam).
+  const [sementePedido, setSementePedido] = useState(novaSemente);
+  const submittingRef = useRef(false);
+  const [submitting, setSubmitting] = useState(false);
   const [itemProdId, setItemProdId] = useState('');
   const [itemQtd, setItemQtd] = useState('');
   const [itemPreco, setItemPreco] = useState('');
@@ -354,47 +360,59 @@ export default function PedidosComprasMercadoView() {
       return;
     }
 
-    if (editingOrder) {
-      // EDIT mode
-      const isCompleted = editingOrder.status === 'COMPLETED';
-      const result = await store.editOrder(
-        editingOrder.id,
-        {
-          title: form.title,
-          type: form.type,
-          priority: form.priority,
-          category: form.category,
-          supplier_name: form.supplier_name,
-          payment_type: form.payment_type,
-          need_by_date: form.need_by_date,
-          delivery_forecast_date: form.delivery_forecast_date,
-          responsible_user_id: form.responsible_user_id,
-          notes: form.notes,
-        },
-        isCompleted ? undefined : formItems.length > 0 ? formItems : undefined
-      );
-      if (result) {
-        closeForm();
-        if (selectedOrder?.id === editingOrder.id) setSelectedOrder(null);
+    // Trava antes do primeiro await: o 2º clique do mesmo render ainda vê
+    // `submitting` falso.
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    setSubmitting(true);
+    try {
+      if (editingOrder) {
+        // EDIT mode
+        const isCompleted = editingOrder.status === 'COMPLETED';
+        const result = await store.editOrder(
+          editingOrder.id,
+          {
+            title: form.title,
+            type: form.type,
+            priority: form.priority,
+            category: form.category,
+            supplier_name: form.supplier_name,
+            payment_type: form.payment_type,
+            need_by_date: form.need_by_date,
+            delivery_forecast_date: form.delivery_forecast_date,
+            responsible_user_id: form.responsible_user_id,
+            notes: form.notes,
+          },
+          isCompleted ? undefined : formItems.length > 0 ? formItems : undefined
+        );
+        if (result) {
+          closeForm();
+          if (selectedOrder?.id === editingOrder.id) setSelectedOrder(null);
+        }
+      } else {
+        // CREATE mode
+        const result = await store.createOrder({
+          ...form,
+          status: (form.type === 'MERCADO' || form.type === 'SAZONAL') ? 'PENDING' : 'OPEN',
+          total_estimated: 0,
+          responsible_user_id: form.responsible_user_id || null,
+          supplier_name: form.supplier_name || null,
+          payment_type: form.payment_type || null,
+          need_by_date: form.need_by_date || null,
+          delivery_forecast_date: form.delivery_forecast_date || null,
+          origin: 'MANUAL',
+          origin_ref: null,
+        }, formItems, { semente: sementePedido });
+        if (result) {
+          toast.success(result.idempotent
+            ? 'Esta solicitação já tinha sido criada — nada foi duplicado.'
+            : 'Solicitação criada!');
+          closeForm();
+        }
       }
-    } else {
-      // CREATE mode
-      const result = await store.createOrder({
-        ...form,
-        status: (form.type === 'MERCADO' || form.type === 'SAZONAL') ? 'PENDING' : 'OPEN',
-        total_estimated: 0,
-        responsible_user_id: form.responsible_user_id || null,
-        supplier_name: form.supplier_name || null,
-        payment_type: form.payment_type || null,
-        need_by_date: form.need_by_date || null,
-        delivery_forecast_date: form.delivery_forecast_date || null,
-        origin: 'MANUAL',
-        origin_ref: null,
-      }, formItems);
-      if (result) {
-        toast.success('Solicitação criada!');
-        closeForm();
-      }
+    } finally {
+      submittingRef.current = false;
+      setSubmitting(false);
     }
   };
 
@@ -405,6 +423,8 @@ export default function PedidosComprasMercadoView() {
     setForm(emptyForm);
     setFormItems([]);
     setItemProdId(''); setItemQtd(''); setItemPreco('');
+    // A próxima solicitação é outra operação, mesmo que tenha o mesmo conteúdo.
+    setSementePedido(novaSemente());
   };
 
   const startEdit = async (order: PurchaseOrder) => {
@@ -1246,9 +1266,9 @@ export default function PedidosComprasMercadoView() {
           )}
 
           <div className="flex justify-end gap-2">
-            <Button variant="ghost" size="sm" onClick={closeForm}>Cancelar</Button>
-            <Button size="sm" className="bg-primary-strong text-primary-foreground border-0" onClick={handleSubmit}>
-              {editingOrder ? 'Salvar Alterações' : 'Criar Solicitação'}
+            <Button variant="ghost" size="sm" onClick={closeForm} disabled={submitting}>Cancelar</Button>
+            <Button size="sm" className="bg-primary-strong text-primary-foreground border-0" onClick={handleSubmit} disabled={submitting}>
+              {submitting ? 'Salvando…' : editingOrder ? 'Salvar Alterações' : 'Criar Solicitação'}
             </Button>
           </div>
         </div>

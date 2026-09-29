@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,6 +14,7 @@ import { Plus, X, Package, Building2, Download, PencilLine } from 'lucide-react'
 import { includesNormalized } from '@/lib/utils';
 import { formatMoneyBR } from '@/lib/formatters';
 import { mapCotacaoError } from '@/lib/cotacaoErrors';
+import { novaSemente } from '@/lib/chaveOperacao';
 import type { useCotacoesStore, CotacaoItemInput, CotacaoFornecedorInput } from '@/hooks/useCotacoesStore';
 import type { Cotacao, CotacaoItem, CotacaoFornecedor } from '@/types/cotacao';
 import ImportItensDialog from './ImportItensDialog';
@@ -53,6 +54,10 @@ export default function CotacaoFormDialog({ open, onOpenChange, store, editing, 
     () => (editing ? (editingDetail?.fornecedores ?? []) : []).map(f => f.supplier_id).filter(Boolean) as string[],
   );
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
+  // O diálogo é montado a cada abertura: uma semente por cotação em
+  // preenchimento. A chave do envio é derivada dela + conteúdo.
+  const [semente] = useState(novaSemente);
   const [importOpen, setImportOpen] = useState(false);
 
   // Add-item form
@@ -146,6 +151,9 @@ export default function CotacaoFormDialog({ open, onOpenChange, store, editing, 
       };
     });
 
+    // Trava antes do primeiro await (o estado `saving` chega tarde ao 2º clique).
+    if (savingRef.current) return;
+    savingRef.current = true;
     setSaving(true);
     try {
       const payload = {
@@ -159,8 +167,10 @@ export default function CotacaoFormDialog({ open, onOpenChange, store, editing, 
         await store.updateCotacao(editing.id, payload, editing.updated_at);
         toast.success('Cotação atualizada!');
       } else {
-        const res = await store.createCotacao({ ...payload, origin_type: 'MANUAL' });
-        toast.success(`Cotação ${res?.codigo ?? ''} criada!`);
+        const res = await store.createCotacao({ ...payload, origin_type: 'MANUAL' }, semente);
+        toast.success(res?.idempotent
+          ? `Cotação ${res.codigo ?? ''} já tinha sido criada — nada foi duplicado.`
+          : `Cotação ${res?.codigo ?? ''} criada!`);
       }
       markClean();
       onOpenChange(false);
@@ -169,6 +179,7 @@ export default function CotacaoFormDialog({ open, onOpenChange, store, editing, 
       console.error('[CotacaoFormDialog.handleSubmit]', err);
       toast.error(mapCotacaoError(err));
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   };

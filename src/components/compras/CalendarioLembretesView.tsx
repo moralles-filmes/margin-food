@@ -1,7 +1,7 @@
 import { useCompanyId } from '@/hooks/useCompanyId';
 import { withCompanyId } from '@/lib/companyPayload';
 import { useSupabase } from '@/contexts/CompanyScopeContext';
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEstoqueGeralStoreContext } from '@/contexts/EstoqueGeralStoreContext';
 import { useSalmonStoreContext } from '@/contexts/SalmonStoreContext';
@@ -19,9 +19,10 @@ import { useScopedToast } from '@/hooks/useScopedToast';
 import { Plus, Calendar, Pencil, Trash2, Zap } from 'lucide-react';
 import UserMentionSelect from '@/components/UserMentionSelect';
 import { todayBR } from '@/lib/datetime';
+import { operacaoLembrete } from '@/domain/compras/pedidoIdempotencia';
 
 import { useCan } from '@/permissions/hooks';
-import { sortByName } from '@/lib/sortByName';
+import { compareNames, sortByName } from '@/lib/sortByName';
 const DIAS = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
 const CATEGORIAS = ['Bebidas', 'Cozinha', 'Descartáveis', 'Embalagens', 'Hortifruti', 'Limpeza', 'Oriental', 'Peixe', 'Proteínas', 'Outros'];
 
@@ -72,6 +73,10 @@ export default function CalendarioLembretesView() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [generating, setGenerating] = useState<string | null>(null);
+  // Travas síncronas: o estado só chega no próximo render, tarde para o 2º clique.
+  const generatingRef = useRef<string | null>(null);
+  const savingRef = useRef(false);
+  const [saving, setSaving] = useState(false);
 
   const fetchReminders = useCallback(async () => {
     const { data } = await supabase
@@ -91,6 +96,9 @@ export default function CalendarioLembretesView() {
 
   const handleSave = async () => {
     if (!user || !form.title.trim()) { toast.error('Preencha o título'); return; }
+    if (savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
 
     const payload = {
       title: form.title,
@@ -109,19 +117,24 @@ export default function CalendarioLembretesView() {
       // W5: updated_at handled by server trigger
     };
 
-    if (editingId) {
-      const { error } = await supabase.from('purchase_reminders').update(payload).eq('id', editingId);
-      if (error) { toast.error('Erro: ' + error.message); return; }
-      toast.success('Lembrete atualizado!');
-    } else {
-      const { error } = await supabase.from('purchase_reminders').insert(withCompanyId(companyId, payload));
-      if (error) { toast.error('Erro: ' + error.message); return; }
-      toast.success('Lembrete criado!');
+    try {
+      if (editingId) {
+        const { error } = await supabase.from('purchase_reminders').update(payload).eq('id', editingId);
+        if (error) { console.error('[CalendarioLembretesView.save]', error); toast.error('Erro: ' + error.message); return; }
+        toast.success('Lembrete atualizado!');
+      } else {
+        const { error } = await supabase.from('purchase_reminders').insert(withCompanyId(companyId, payload));
+        if (error) { console.error('[CalendarioLembretesView.save]', error); toast.error('Erro: ' + error.message); return; }
+        toast.success('Lembrete criado!');
+      }
+      setShowForm(false);
+      setEditingId(null);
+      setForm(emptyForm);
+      fetchReminders();
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
     }
-    setShowForm(false);
-    setEditingId(null);
-    setForm(emptyForm);
-    fetchReminders();
   };
 
   const handleDelete = async (id: string) => {
@@ -150,18 +163,21 @@ export default function CalendarioLembretesView() {
   };
 
   const handleGenerateOrder = async (r: Reminder) => {
-    if (!user) return;
+    if (!user || generatingRef.current) return;
+    generatingRef.current = r.id;
     setGenerating(r.id);
     try {
       // Gather items from categories + specific items
       const itemsToAdd: { stock_item_id: string; name_snapshot: string; unit_snapshot: string; estimated_unit_value: number; qty_requested: number; purchase_unit_snapshot: string; purchase_unit_cost_snapshot: number; conversion_factor_snapshot: number }[] = [];
 
+      // Ordem fixa (nome, depois id): a identidade do pedido no servidor inclui a
+      // lista de itens, e ela não pode mudar só porque o catálogo recarregou.
       const relevantProducts = produtos.filter(p => {
         if (!p.ativo) return false;
         const inCategory = r.category_ids.length > 0 && r.category_ids.includes(p.categoria);
         const inItems = r.item_ids.length > 0 && r.item_ids.includes(p.id);
         return inCategory || inItems;
-      });
+      }).sort((a, b) => compareNames(a.nomeProduto, b.nomeProduto) || a.id.localeCompare(b.id));
 
       relevantProducts.forEach(p => {
         itemsToAdd.push({
@@ -178,7 +194,6 @@ export default function CalendarioLembretesView() {
 
       if (itemsToAdd.length === 0) {
         toast.error('Nenhum item encontrado para as categorias/itens configurados');
-        setGenerating(null);
         return;
       }
 
@@ -200,15 +215,23 @@ export default function CalendarioLembretesView() {
         total_estimated: 0,
         origin: 'MANUAL',
         origin_ref: null,
-      }, itemsToAdd);
+      }, itemsToAdd, { operacao: operacaoLembrete(r.id, today) });
 
-      if (result) {
+      // Um pedido por lembrete por dia: o clique seguinte devolve o já gerado.
+      if (result?.deleted) {
+        toast.info(`A solicitação "${r.title}" de hoje já foi gerada e depois excluída. Para pedir de novo hoje, crie a solicitação em Pedidos.`);
+      } else if (result?.idempotent) {
+        toast.info(`A solicitação "${r.title}" de hoje já foi gerada — nada foi duplicado.`);
+      } else if (result) {
         toast.success(`Solicitação "${r.title}" gerada com ${itemsToAdd.length} itens!`);
       }
     } catch (err: any) {
+      console.error('[CalendarioLembretesView.handleGenerateOrder]', err);
       toast.error('Erro ao gerar solicitação: ' + err.message);
+    } finally {
+      generatingRef.current = null;
+      setGenerating(null);
     }
-    setGenerating(null);
   };
 
   const toggleCat = (cat: string) => {
@@ -281,7 +304,7 @@ export default function CalendarioLembretesView() {
                       <Button size="sm" variant="ghost" className="h-5 w-5 p-0 text-destructive" onClick={() => handleDelete(r.id)}>
                         <Trash2 className="w-3 h-3" />
                       </Button>
-                      <Button size="sm" variant="ghost" className="h-5 w-5 p-0 text-primary" disabled={generating === r.id}
+                      <Button size="sm" variant="ghost" className="h-5 w-5 p-0 text-primary" disabled={generating !== null}
                         onClick={() => handleGenerateOrder(r)} title="Gerar solicitação">
                         <Zap className="w-3 h-3" />
                       </Button>
@@ -384,8 +407,8 @@ export default function CalendarioLembretesView() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" size="sm" onClick={() => setShowForm(false)}>Cancelar</Button>
-            <Button size="sm" onClick={handleSave}>{editingId ? 'Salvar' : 'Criar'}</Button>
+            <Button variant="outline" size="sm" onClick={() => setShowForm(false)} disabled={saving}>Cancelar</Button>
+            <Button size="sm" onClick={handleSave} disabled={saving}>{saving ? 'Salvando…' : editingId ? 'Salvar' : 'Criar'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

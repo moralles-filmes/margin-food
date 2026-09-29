@@ -1,5 +1,6 @@
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect } from 'react';
+import { novaSemente } from '@/lib/chaveOperacao';
 import { useScopedToast } from '@/hooks/useScopedToast';
 import { useInventarioStore, Inventario } from '@/hooks/useInventarioStore';
 import { useQuantityNavigation } from '@/hooks/useQuantityNavigation';
@@ -96,6 +97,9 @@ export default function InventarioView() {
   const [formCategorias, setFormCategorias] = useState('');
   const [formObs, setFormObs] = useState('');
   const [createStep, setCreateStep] = useState<'form' | 'metodo'>('form');
+  // Semente do inventário em criação: troca só depois do sucesso. A chave
+  // enviada é derivada dela + conteúdo, então o retry não abre um 2º inventário.
+  const [sementeCriacao, setSementeCriacao] = useState(novaSemente);
 
   useEffect(() => {
     store.loadList();
@@ -129,8 +133,9 @@ export default function InventarioView() {
       categorias: formTipo === 'parcial' ? formCategorias.split(',').map(c => c.trim()).filter(Boolean) : [],
       observacao: formObs,
       metodo_contagem: metodoContagem,
-    });
+    }, sementeCriacao);
     if (!inv) return;
+    setSementeCriacao(novaSemente());
     setCreateStep('form');
     if (metodoContagem === 'codigo') {
       await store.loadInventario(inv.id);

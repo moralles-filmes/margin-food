@@ -10590,6 +10590,7 @@ export type Database = {
         Args: {
           p_data_validade?: string
           p_fornecedores?: Json
+          p_idempotency_key?: string
           p_itens?: Json
           p_observacao?: string
           p_origin_ref?: string
@@ -10604,11 +10605,12 @@ export type Database = {
           p_data: string
           p_hora: string
           p_idempotency_key?: string
+          p_metodo_contagem?: string
           p_observacao?: string
           p_tipo: string
           p_turno_id: string
         }
-        Returns: string
+        Returns: Json
       }
       create_purchase_order_atomic: {
         Args: { p_idempotency_key: string; p_payload: Json }

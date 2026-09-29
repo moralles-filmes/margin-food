@@ -1,8 +1,9 @@
 import { useSupabase } from '@/contexts/CompanyScopeContext';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useEmitDataEvent } from '@/lib/dataEvents';
 import { useScopedToast } from '@/hooks/useScopedToast';
 import { mensagemErroContagem } from '@/hooks/useContagemPorCodigo';
+import { chaveOperacao } from '@/lib/chaveOperacao';
 
 export interface Inventario {
   id: string;
@@ -171,6 +172,10 @@ export function useInventarioStore() {
       let corpo: { error?: string } | null = null;
       try { corpo = await resposta?.json(); } catch { /* corpo não-JSON */ }
       if (corpo?.error && resposta && resposta.status < 500) throw new Error(corpo.error);
+      // Vem como 500 (a Edge repassa a exceção da RPC), mas é deliberado.
+      if (corpo?.error?.includes('REQUEST_ID_REUTILIZADO')) {
+        throw new Error('Este envio não confere com o inventário registrado antes. Confira a lista antes de criar de novo.');
+      }
       if (corpo?.error) console.error(`[inventario] ${action}`, corpo.error);
       throw new Error(error.message);
     }
@@ -221,7 +226,14 @@ export function useInventarioStore() {
   }, [invoke, toast]);
 
   const [savingCreate, setSavingCreate] = useState(false);
+  // Trava síncrona: `savingCreate` é estado e chega atrasado ao 2º clique.
+  const savingCreateRef = useRef(false);
 
+  /**
+   * `semente` identifica o inventário em criação (a tela troca depois do
+   * sucesso). A chave é derivada dela + conteúdo: o retry depois de a resposta
+   * se perder devolve o inventário já criado em vez de abrir outro.
+   */
   const createInventario = useCallback(async (payload: {
     tipo: string;
     data: string;
@@ -230,14 +242,15 @@ export function useInventarioStore() {
     categorias?: string[];
     observacao?: string;
     metodo_contagem?: 'lista' | 'codigo';
-  }) => {
-    if (savingCreate) return null;
+  }, semente: string) => {
+    if (savingCreateRef.current) return null;
+    savingCreateRef.current = true;
     setSavingCreate(true);
     try {
-      const idempotency_key = crypto.randomUUID();
+      const idempotency_key = await chaveOperacao(semente, payload);
       const data = await invoke('create', { ...payload, idempotency_key });
       if (data.idempotent) {
-        toast.info('Inventário já existente (operação idempotente)');
+        toast.info('Este inventário já tinha sido criado — nada foi duplicado.');
       } else {
         toast.success(`Inventário criado com ${data.itensCount} itens`);
       }
@@ -245,12 +258,14 @@ export function useInventarioStore() {
       emitDataEvent('inventario:lista');
       return data.inventario;
     } catch (e: any) {
+      console.error('[useInventarioStore.createInventario]', e);
       toast.error(e.message || 'Erro ao criar inventário');
       return null;
     } finally {
+      savingCreateRef.current = false;
       setSavingCreate(false);
     }
-  }, [invoke, loadList, savingCreate, emitDataEvent, toast]);
+  }, [invoke, loadList, emitDataEvent, toast]);
 
   const updateStatus = useCallback(async (id: string, status: string) => {
     try {

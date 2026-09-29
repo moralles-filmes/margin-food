@@ -1,15 +1,20 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
-import { Send, RefreshCw, Check, AlertTriangle, Clock, MessageCircle, Sparkles } from 'lucide-react';
+import { Send, RefreshCw, Check, AlertTriangle, Clock, MessageCircle, Sparkles, HelpCircle } from 'lucide-react';
 import { useScopedToast } from '@/hooks/useScopedToast';
+import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { useCan } from '@/permissions';
 import { buildTemplateContext, renderTemplate, WHATSAPP_TIPO_LABEL } from '@/lib/cotacaoTemplates';
 import type { useCotacoesStore } from '@/hooks/useCotacoesStore';
 import type { Cotacao, CotacaoItem, CotacaoFornecedor, CotacaoWhatsappLog, CotacaoWhatsappTipo } from '@/types/cotacao';
 import { parseUTCToBR } from '@/lib/datetime';
+import { chaveOperacao, novaSemente } from '@/lib/chaveOperacao';
+import {
+  interpretarEnvioWhatsapp, interpretarFalhaEnvioWhatsapp, type ResultadoEnvioWhatsapp,
+} from '@/domain/compras/cotacaoWhatsappEnvio';
 
 const TIPOS: CotacaoWhatsappTipo[] = ['SOLICITACAO_COTACAO', 'COBRANCA_RESPOSTA', 'NEGOCIACAO', 'FECHAMENTO_PEDIDO', 'CONFIRMACAO_PRAZO'];
 
@@ -24,11 +29,14 @@ interface Props {
 function logIcon(status: string) {
   if (status === 'SENT') return <Check className="w-3 h-3 text-success" />;
   if (status === 'ERROR') return <AlertTriangle className="w-3 h-3 text-destructive" />;
+  // Sem confirmação: pode ter saído (timeout/queda na Z-API).
+  if (status === 'UNKNOWN') return <HelpCircle className="w-3 h-3 text-warning" aria-label="Envio sem confirmação" />;
   return <Clock className="w-3 h-3 text-muted-foreground" />;
 }
 
 export default function CotacaoWhatsappPanel({ cotacao, itens, fornecedores, store, onChanged }: Props) {
   const toast = useScopedToast();
+  const { confirm, ConfirmDialog } = useConfirmDialog();
   const canSend = useCan('compras:cotacao:manage');
   const [fornId, setFornId] = useState<string>(fornecedores[0]?.id ?? '');
   const [tipo, setTipo] = useState<CotacaoWhatsappTipo>('SOLICITACAO_COTACAO');
@@ -36,6 +44,14 @@ export default function CotacaoWhatsappPanel({ cotacao, itens, fornecedores, sto
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [generatingIA, setGeneratingIA] = useState(false);
+  // Travas síncronas: o estado só desabilita o botão no render seguinte.
+  const sendingRef = useRef(false);
+  const generatingIARef = useRef(false);
+  // Semente do envio em andamento: troca depois de um envio confirmado ou
+  // quando o usuário decide reenviar mesmo sem confirmação. A chave enviada é
+  // derivada dela + conteúdo, então repetir o mesmo envio nunca duplica.
+  const [semente, setSemente] = useState(novaSemente);
+  const [envioIncerto, setEnvioIncerto] = useState<string | null>(null);
   const [logs, setLogs] = useState<CotacaoWhatsappLog[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
 
@@ -61,36 +77,82 @@ export default function CotacaoWhatsappPanel({ cotacao, itens, fornecedores, sto
     setPhone(forn?.whatsapp_snapshot ?? '');
   }, [fornId, tipo, cotacao, itens]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleSend = async () => {
+  const enviar = async (sementeEnvio: string) => {
     if (!forn) { toast.error('Selecione um fornecedor'); return; }
     if (!phone.trim()) { toast.error('Informe o telefone do fornecedor'); return; }
     if (!message.trim()) { toast.error('Mensagem vazia'); return; }
+    if (sendingRef.current) return;
+    sendingRef.current = true;
     setSending(true);
+    let resultado: ResultadoEnvioWhatsapp;
     try {
-      const res = await store.sendWhatsapp({
+      const conteudo = {
         cotacao_id: cotacao.id,
         cotacao_fornecedor_id: forn.id,
         tipo,
         phone: phone.trim(),
         message: message.trim(),
+      };
+      const res = await store.sendWhatsapp({
+        ...conteudo,
+        idempotency_key: await chaveOperacao(sementeEnvio, conteudo),
       });
-      if (res?.success) {
-        toast.success('Mensagem enviada!');
-        onChanged();
-      } else {
-        toast.error(res?.message ?? 'Falha no envio');
-      }
-      await loadLogs();
-    } catch (err: any) {
+      resultado = interpretarEnvioWhatsapp(res);
+    } catch (err) {
       console.error('[CotacaoWhatsappPanel.handleSend]', err);
-      toast.error(err?.message?.includes('PERMISSION') ? 'Sem permissão para enviar mensagens' : 'Erro ao enviar mensagem');
+      resultado = interpretarFalhaEnvioWhatsapp(err);
     } finally {
+      sendingRef.current = false;
       setSending(false);
     }
+
+    switch (resultado.tipo) {
+      case 'enviado':
+        setEnvioIncerto(null);
+        setSemente(novaSemente());
+        if (resultado.repetido) toast.info('Esta mensagem já tinha sido enviada — não foi mandada de novo.');
+        else toast.success('Mensagem enviada!');
+        if (resultado.aviso) toast.warning(resultado.aviso);
+        onChanged();
+        break;
+      case 'incerto':
+        // Não convida a reenviar: a Z-API pode ter entregado.
+        setEnvioIncerto(resultado.mensagem);
+        break;
+      case 'sem_resposta':
+        toast.warning('Não recebemos a confirmação do servidor. Pode tocar em Enviar de novo: se a mensagem já saiu, ela não será repetida.');
+        break;
+      case 'reutilizado':
+        setSemente(novaSemente());
+        toast.error('Este envio não confere com o registrado antes. Confira o histórico e envie de novo.');
+        break;
+      case 'recusado':
+        toast.error(resultado.mensagem);
+        break;
+    }
+    void loadLogs();
+  };
+
+  const handleSend = () => { void enviar(semente); };
+
+  /** Reenvio consciente depois de um envio sem confirmação: vira outra operação. */
+  const handleReenviarMesmoAssim = async () => {
+    const ok = await confirm({
+      title: 'Enviar de novo?',
+      description: 'A mensagem anterior pode ter chegado ao fornecedor. Confira a conversa no WhatsApp: se ela chegou, o fornecedor vai receber duas vezes.',
+      confirmLabel: 'Enviar de novo',
+    });
+    if (!ok) return;
+    const nova = novaSemente();
+    setSemente(nova);
+    setEnvioIncerto(null);
+    void enviar(nova);
   };
 
   const handleGenerateIA = async () => {
     if (!forn) { toast.error('Selecione um fornecedor'); return; }
+    if (generatingIARef.current) return;
+    generatingIARef.current = true;
     setGeneratingIA(true);
     try {
       const res = await store.runIA({ cotacao_id: cotacao.id, task: 'gerar_mensagem', fornecedor_id: forn.id, tipo });
@@ -104,6 +166,7 @@ export default function CotacaoWhatsappPanel({ cotacao, itens, fornecedores, sto
       console.error('[CotacaoWhatsappPanel.handleGenerateIA]', err);
       toast.error(err?.message?.includes('PERMISSION') ? 'Sem permissão para usar a IA' : 'Erro ao gerar mensagem');
     } finally {
+      generatingIARef.current = false;
       setGeneratingIA(false);
     }
   };
@@ -157,6 +220,23 @@ export default function CotacaoWhatsappPanel({ cotacao, itens, fornecedores, sto
             className="text-xs bg-secondary border-border resize-y" />
         </div>
 
+        {envioIncerto && (
+          <div role="alert" className="bg-warning-soft border border-warning-border rounded-lg p-2.5 space-y-2">
+            <p className="text-[11px] text-warning flex items-start gap-1.5">
+              <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" /> {envioIncerto}
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button size="sm" variant="ghost" className="h-7 text-[11px]" onClick={() => setEnvioIncerto(null)}>
+                Entendi
+              </Button>
+              <Button size="sm" variant="outline" className="h-7 text-[11px]" onClick={() => void handleReenviarMesmoAssim()}
+                disabled={!canSend || sending}>
+                Enviar de novo mesmo assim
+              </Button>
+            </div>
+          </div>
+        )}
+
         <div className="flex justify-end">
           <Button size="sm" className="bg-primary-strong text-primary-foreground border-0 gap-1.5 h-8 text-xs"
             onClick={handleSend} disabled={!canSend || sending}>
@@ -197,6 +277,7 @@ export default function CotacaoWhatsappPanel({ cotacao, itens, fornecedores, sto
           </div>
         )}
       </div>
+      <ConfirmDialog />
     </div>
   );
 }
