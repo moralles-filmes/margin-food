@@ -110,3 +110,65 @@ describe('erro da Edge Function', () => {
     consoleError.mockRestore();
   });
 });
+
+describe('createInventario — duplo clique e reenvio', () => {
+  const payload = {
+    tipo: 'parcial', data: '2026-09-29', hora: '10:00', turno_id: 'turno-1',
+    categorias: ['Bebidas'], observacao: '', metodo_contagem: 'lista' as const,
+  };
+  const criado = { inventario: { id: 'inv-1' }, itensCount: 0, idempotent: false };
+  const createCalls = () => invoke.mock.calls.filter(([, opts]) => opts.body.action === 'create');
+
+  it('duplo clique: só a 1ª chamada chega à Edge', async () => {
+    let liberar: (v: unknown) => void = () => {};
+    invoke.mockImplementation((_fn: string, opts: { body: { action: string } }) => (
+      opts.body.action === 'create'
+        ? new Promise(resolve => { liberar = resolve; })
+        : Promise.resolve({ data: { inventarios: [] }, error: null })
+    ));
+    const { result } = renderHook(() => useInventarioStore());
+
+    let primeira: Promise<unknown> = Promise.resolve();
+    let segunda: unknown = 'não chamada';
+    await act(async () => {
+      primeira = result.current.createInventario(payload, 'semente-1');
+      segunda = await result.current.createInventario(payload, 'semente-1');
+    });
+    // A chave é derivada de forma assíncrona (SHA-256) antes da chamada.
+    await vi.waitFor(() => expect(createCalls()).toHaveLength(1));
+    await act(async () => { liberar({ data: criado, error: null }); await primeira; });
+
+    expect(createCalls()).toHaveLength(1);
+    expect(segunda).toBeNull();
+  });
+
+  it('retry depois de falha reaproveita a chave; conteúdo diferente usa outra', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    invoke.mockResolvedValue({ data: null, error: erroHttp(502, {}) });
+    const { result } = renderHook(() => useInventarioStore());
+    await act(async () => { await result.current.createInventario(payload, 'semente-1'); });
+
+    invoke.mockResolvedValue({ data: { ...criado, idempotent: true, inventarios: [] }, error: null });
+    await act(async () => { await result.current.createInventario(payload, 'semente-1'); });
+    await act(async () => { await result.current.createInventario({ ...payload, hora: '11:00' }, 'semente-1'); });
+
+    const [primeira, retry, outro] = createCalls().map(([, opts]) => opts.body.idempotency_key);
+    expect(retry).toBe(primeira);
+    expect(outro).not.toBe(primeira);
+    expect(toast.info).toHaveBeenCalledWith(expect.stringMatching(/já tinha sido criado/));
+    consoleError.mockRestore();
+  });
+
+  it('REQUEST_ID_REUTILIZADO (500 da Edge) vira orientação legível', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    invoke.mockResolvedValue({
+      data: null,
+      error: erroHttp(500, { error: 'REQUEST_ID_REUTILIZADO: a chave pertence a outro inventário' }),
+    });
+    const { result } = renderHook(() => useInventarioStore());
+    await act(async () => { await result.current.createInventario(payload, 'semente-1'); });
+
+    expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/não confere com o inventário registrado/));
+    consoleError.mockRestore();
+  });
+});

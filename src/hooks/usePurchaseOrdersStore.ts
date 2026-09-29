@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useScopedToast } from '@/hooks/useScopedToast';
 import { useEmitDataEvent } from '@/lib/dataEvents';
 import { includesNormalized } from '@/lib/utils';
+import { chavePedidoCompra, mensagemErroCriarPedido, type IdempotenciaPedido } from '@/domain/compras/pedidoIdempotencia';
 
 export interface PurchaseOrder {
   id: string;
@@ -272,16 +273,27 @@ export function usePurchaseOrdersStore() {
   }, [supabase]);
 
   // ===== W2: ATOMIC createOrder via RPC =====
+  // Trava síncrona: `saving` é estado e chega atrasado ao 2º clique do mesmo render.
+  const creatingOrderRef = useRef(false);
+  /**
+   * `idempotencia` diz de onde vem a chave — ver `IdempotenciaPedido`. A chave é
+   * derivada, nunca sorteada por chamada: o retry do mesmo envio reaproveita a
+   * chave e o servidor devolve o pedido já gravado.
+   */
   const createOrder = useCallback(async (
     orderData: Omit<PurchaseOrder, 'id' | 'created_at' | 'updated_at' | 'concluded_at' | 'total_confirmed' | 'created_by' | 'shopping_done_at' | 'shopping_done_by' | 'not_delivered_ack_at' | 'not_delivered_ack_by'>,
-    items: { stock_item_id?: string; name_snapshot: string; unit_snapshot: string; estimated_unit_value: number; qty_requested: number; purchase_unit_snapshot?: string; purchase_unit_cost_snapshot?: number; conversion_factor_snapshot?: number }[]
-  ) => {
-    if (!user || saving) return null;
+    items: { stock_item_id?: string; name_snapshot: string; unit_snapshot: string; estimated_unit_value: number; qty_requested: number; purchase_unit_snapshot?: string; purchase_unit_cost_snapshot?: number; conversion_factor_snapshot?: number }[],
+    idempotencia: IdempotenciaPedido,
+  ): Promise<{ id: string; idempotent: boolean; deleted: boolean } | null> => {
+    if (!user) return null;
+    if (creatingOrderRef.current) {
+      toast.info('Aguarde: a solicitação anterior ainda está sendo salva.');
+      return null;
+    }
+    creatingOrderRef.current = true;
     setSaving(true);
 
     try {
-      const idempotencyKey = crypto.randomUUID();
-
       const payload = {
         title: orderData.title,
         type: orderData.type,
@@ -305,25 +317,36 @@ export function usePurchaseOrdersStore() {
         })),
       };
 
+      const idempotencyKey = await chavePedidoCompra(idempotencia, payload);
       const { data: result, error } = await supabase.rpc('create_purchase_order_atomic', {
         p_payload: payload as any,
         p_idempotency_key: idempotencyKey,
       });
 
-      if (error) { toast.error('Erro ao criar pedido: ' + error.message); return null; }
-
-      const res = result as any;
-      const orderId = res?.order_id;
-
-      await fetchOrders();
-      if (res?.status === 'idempotent') {
-        toast.info('Pedido já criado (operação duplicada ignorada).');
+      if (error) {
+        console.error('[usePurchaseOrdersStore.createOrder]', error);
+        toast.error(mensagemErroCriarPedido(error.message));
+        return null;
       }
-      return { id: orderId };
+
+      const res = result as { status?: string; order_id?: string; deleted?: boolean } | null;
+      // O pedido já está gravado: falha ao recarregar a lista não pode parecer
+      // erro do envio (induziria a criar de novo).
+      try {
+        await fetchOrders();
+      } catch (refreshError) {
+        console.error('[usePurchaseOrdersStore.createOrder] recarregar lista', refreshError);
+      }
+      return {
+        id: res?.order_id ?? '',
+        idempotent: res?.status === 'idempotent',
+        deleted: res?.deleted === true,
+      };
     } finally {
+      creatingOrderRef.current = false;
       setSaving(false);
     }
-  }, [user, saving, supabase, fetchOrders, toast]);
+  }, [user, supabase, fetchOrders, toast]);
 
   // ===== SHOPPING CHECKLIST FUNCTIONS =====
   const confirmShopping = useCallback(async (orderId: string, decisions: ShoppingDecision[]) => {

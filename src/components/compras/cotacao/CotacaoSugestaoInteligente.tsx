@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { useScopedToast } from '@/hooks/useScopedToast';
 import { Check, AlertTriangle, Save, Wand2, RotateCcw, ArrowRight, Truck, Coins, TrendingDown, Users, Sparkles } from 'lucide-react';
@@ -33,6 +33,10 @@ export default function CotacaoSugestaoInteligente({ cotacaoId, itens, fornecedo
   const [showAdjust, setShowAdjust] = useState(false);
   const [iaText, setIaText] = useState<string | null>(null);
   const [iaLoading, setIaLoading] = useState(false);
+  // Travas síncronas: `disabled` só vale a partir do render seguinte, e cada
+  // "Salvar sugestão" grava uma linha nova em cotacao_sugestoes.
+  const savingRef = useRef(false);
+  const iaLoadingRef = useRef(false);
 
   const base = set.scenarios[selectedType];
   const overridden = Object.keys(overrides).length > 0;
@@ -56,6 +60,8 @@ export default function CotacaoSugestaoInteligente({ cotacaoId, itens, fornecedo
     const selecoes = Object.entries(scenario.assignment).map(([itemId, supplierId]) => ({
       cotacao_fornecedor_id: supplierId, cotacao_item_id: itemId,
     }));
+    if (savingRef.current) return;
+    savingRef.current = true;
     setSaving(true);
     try {
       await store.saveSugestao(cotacaoId, {
@@ -71,11 +77,14 @@ export default function CotacaoSugestaoInteligente({ cotacaoId, itens, fornecedo
       console.error('[CotacaoSugestaoInteligente.handleSave]', err);
       toast.error(mapCotacaoError(err));
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   };
 
   const handleAnalisarIA = async () => {
+    if (iaLoadingRef.current) return;
+    iaLoadingRef.current = true;
     setIaLoading(true);
     try {
       const res = await store.runIA({ cotacao_id: cotacaoId, task: 'analise_precos', allow_competitor_context: true });
@@ -85,6 +94,7 @@ export default function CotacaoSugestaoInteligente({ cotacaoId, itens, fornecedo
       console.error('[CotacaoSugestaoInteligente.handleAnalisarIA]', err);
       toast.error(err?.message?.includes('PERMISSION') ? 'Sem permissão para usar a IA' : 'Erro ao analisar com IA');
     } finally {
+      iaLoadingRef.current = false;
       setIaLoading(false);
     }
   };

@@ -5,6 +5,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import type { Cotacao, CotacaoCounts, CotacaoItem, CotacaoFornecedor, CotacaoResposta, CotacaoWhatsappLog, CotacaoWhatsappTipo } from '@/types/cotacao';
 import { COTACAO_STATUS_ABERTOS } from '@/types/cotacao';
 import { formatDateISO, todayBR } from '@/lib/datetime';
+import { chaveOperacao } from '@/lib/chaveOperacao';
+import type { RespostaEnvioWhatsapp } from '@/domain/compras/cotacaoWhatsappEnvio';
 
 /** Linha da matriz de respostas enviada à RPC save_cotacao_respostas_atomic. */
 export interface CotacaoRespostaInput {
@@ -135,8 +137,13 @@ export function useCotacoesStore() {
   const openCount = counts.emAberto;
 
   // ── Mutations (via RPCs atômicas) — lançam em erro; componente faz os toasts ──
-  const createCotacao = useCallback(async (input: CotacaoCreateInput) => {
-    const { data, error: err } = await db.rpc('create_cotacao_atomic', {
+  /**
+   * `semente` identifica a cotação em preenchimento (troca a cada formulário
+   * novo). A chave enviada é derivada dela + conteúdo: reenviar o mesmo
+   * formulário devolve a cotação já criada em vez de gerar COT-000N+1.
+   */
+  const createCotacao = useCallback(async (input: CotacaoCreateInput, semente: string) => {
+    const args = {
       p_titulo: input.titulo,
       p_observacao: input.observacao ?? null,
       p_data_validade: input.data_validade ?? null,
@@ -144,10 +151,14 @@ export function useCotacoesStore() {
       p_origin_ref: input.origin_ref ?? null,
       p_itens: input.itens,
       p_fornecedores: input.fornecedores,
+    };
+    const { data, error: err } = await db.rpc('create_cotacao_atomic', {
+      ...args,
+      p_idempotency_key: await chaveOperacao(semente, args),
     });
     if (err) throw err;
     await fetchCotacoes();
-    return data as { success: boolean; id: string; codigo: string };
+    return data as { success: boolean; id: string; codigo: string; idempotent?: boolean };
   }, [db, fetchCotacoes]);
 
   const updateCotacao = useCallback(async (
@@ -249,7 +260,10 @@ export function useCotacoesStore() {
 
   /**
    * Envia uma mensagem de WhatsApp via Edge Function `send-whatsapp-zapi`
-   * (credenciais Z-API ficam no servidor). Retorna {success, message, ...}.
+   * (credenciais Z-API ficam no servidor). `idempotency_key` é derivada da
+   * operação pelo componente: com ela o servidor registra a tentativa antes de
+   * enviar e um reenvio nunca manda a mesma mensagem duas vezes.
+   * Interpretar a resposta com `interpretarEnvioWhatsapp`.
    */
   const sendWhatsapp = useCallback(async (payload: {
     cotacao_id: string;
@@ -257,11 +271,13 @@ export function useCotacoesStore() {
     tipo: CotacaoWhatsappTipo;
     phone: string;
     message: string;
+    idempotency_key: string;
   }) => {
     const { data, error: err } = await supabase.functions.invoke('send-whatsapp-zapi', { body: payload });
     if (err) throw err;
+    // Pós-envio: atualizar a lista não pode transformar um envio feito em erro.
     await fetchCotacoes();
-    return data as { success: boolean; status?: string; log_id?: string | null; message?: string };
+    return data as RespostaEnvioWhatsapp;
   }, [fetchCotacoes]);
 
   /**

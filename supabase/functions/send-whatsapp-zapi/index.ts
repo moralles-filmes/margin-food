@@ -7,8 +7,16 @@ import { getCorsHeaders } from "../_shared/cors.ts";
 // Credenciais Z-API ficam SÓ no banco (cotacao_zapi_config, por empresa) e são
 // lidas aqui via service-role — nunca vão para o bundle do frontend.
 // Fluxo: valida JWT → resolve tenant (fail-closed, bloqueia placeholder) →
-// checa compras:cotacao:manage → lê config da empresa → POST send-text na Z-API
-// → grava log em cotacao_whatsapp_logs → (se solicitação) marca fornecedor ENVIADO.
+// checa compras:cotacao:manage → lê config da empresa → registra a tentativa
+// (PENDING) em cotacao_whatsapp_logs → POST send-text na Z-API → grava o
+// desfecho → (se solicitação) marca fornecedor ENVIADO.
+//
+// Idempotência: a Z-API não aceita id de deduplicação, então a linha de log é
+// a única defesa contra mensagem duplicada. Ela nasce ANTES do envio, com a
+// chave da operação (derivada no cliente) sob índice único; um reenvio com a
+// mesma chave encontra a linha e nunca manda de novo, exceto depois de uma
+// recusa explícita da Z-API (ERROR), quando nada saiu. Timeout, queda e 5xx
+// viram UNKNOWN: a mensagem pode ter saído, e o cliente avisa em vez de reenviar.
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
@@ -31,7 +39,31 @@ interface Body {
   tipo?: string;
   phone?: string;
   message?: string;
+  idempotency_key?: string;
 }
+
+type EnvioStatus = "SENT" | "ERROR" | "UNKNOWN";
+
+interface Tentativa {
+  cotacao_id: string;
+  cotacao_fornecedor_id: string | null;
+  tipo: string;
+  phone: string;
+  message: string;
+}
+
+interface LogExistente extends Tentativa {
+  id: string;
+  status: string;
+}
+
+const MSG_INCERTO =
+  "Não foi possível confirmar se a mensagem saiu. Ela pode ter sido enviada: " +
+  "confira a conversa com o fornecedor no WhatsApp antes de enviar de novo.";
+
+// Chave derivada no cliente (hash da operação). Formato restrito: ela vai para
+// um índice único e não pode virar lixo arbitrário.
+const IDEMPOTENCY_KEY_RE = /^[A-Za-z0-9_:.|-]{16,128}$/;
 
 function jsonRes(body: Record<string, unknown>, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -83,6 +115,79 @@ function normalizePhone(raw: string | null | undefined): string {
   return (raw ?? "").replace(/\D/g, "");
 }
 
+function mesmaTentativa(log: LogExistente, t: Tentativa): boolean {
+  return log.cotacao_id === t.cotacao_id &&
+    (log.cotacao_fornecedor_id ?? null) === t.cotacao_fornecedor_id &&
+    log.tipo === t.tipo &&
+    (log.phone ?? "") === t.phone &&
+    (log.message ?? "") === t.message;
+}
+
+/**
+ * Envia pela Z-API e classifica o desfecho. Só é ERROR o que a Z-API recusou
+ * explicitamente (4xx): nada saiu. Timeout, queda de conexão e 5xx (que pode
+ * vir de um proxy depois do envio) são UNKNOWN.
+ */
+async function enviarZapi(
+  url: string,
+  clientToken: string | null,
+  phone: string,
+  message: string,
+): Promise<{ status: EnvioStatus; resposta: unknown }> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (clientToken) headers["Client-Token"] = clientToken;
+  let resp: Response;
+  try {
+    resp = await fetch(url, {
+      method: "POST",
+      redirect: "error",
+      signal: AbortSignal.timeout(20_000),
+      headers,
+      body: JSON.stringify({ phone, message }),
+    });
+  } catch (e) {
+    // Erros de transporte podem conter a URL com o token da instância: não
+    // registrar o erro cru.
+    const timeout = e instanceof DOMException && (e.name === "TimeoutError" || e.name === "AbortError");
+    return { status: "UNKNOWN", resposta: { error: timeout ? "ZAPI_TIMEOUT" : "ZAPI_TRANSPORT_FAILED" } };
+  }
+
+  let corpo: unknown;
+  try {
+    const text = await resp.text();
+    try { corpo = JSON.parse(text); } catch { corpo = { raw: text }; }
+  } catch {
+    corpo = { error: "ZAPI_BODY_UNREADABLE" };
+  }
+
+  if (resp.ok) return { status: "SENT", resposta: corpo };
+  return {
+    status: resp.status >= 500 ? "UNKNOWN" : "ERROR",
+    resposta: { http_status: resp.status, body: corpo },
+  };
+}
+
+/** Só na solicitação inicial e se ainda AGUARDANDO — repetir é inofensivo. */
+async function marcarFornecedorEnviado(
+  adminClient: SupabaseClient,
+  companyId: string,
+  t: Tentativa,
+): Promise<string | null> {
+  if (t.tipo !== "SOLICITACAO_COTACAO" || !t.cotacao_fornecedor_id) return null;
+  const { error } = await adminClient
+    .from("cotacao_fornecedores")
+    .update({ status: "ENVIADO", mensagem_enviada_em: new Date().toISOString() })
+    .eq("id", t.cotacao_fornecedor_id)
+    .eq("cotacao_id", t.cotacao_id)
+    .eq("company_id", companyId)
+    .eq("status", "AGUARDANDO");
+  if (error) {
+    console.error("[send-whatsapp-zapi] status do fornecedor não atualizado", error.message);
+    return "Mensagem enviada, mas o status do fornecedor não foi atualizado. Atualize a tela para conferir.";
+  }
+  return null;
+}
+
 serve(withRequestCors(async (req) => {
   const corsHeaders = getCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -131,6 +236,13 @@ serve(withRequestCors(async (req) => {
     if (!tipo || !ALLOWED_TIPOS.has(tipo)) return jsonRes({ error: "BAD_REQUEST", message: "tipo de mensagem inválido" }, 400);
     if (!phone || phone.length < 10) return jsonRes({ error: "BAD_REQUEST", message: "Telefone inválido" }, 400);
     if (!message) return jsonRes({ error: "BAD_REQUEST", message: "Mensagem vazia" }, 400);
+    // Sem chave (front anterior): a tentativa ainda é registrada antes do envio,
+    // só não é reconhecida num reenvio.
+    const rawKey = typeof body.idempotency_key === "string" ? body.idempotency_key.trim() : "";
+    if (rawKey && !IDEMPOTENCY_KEY_RE.test(rawKey)) {
+      return jsonRes({ error: "BAD_REQUEST", message: "Chave de envio inválida" }, 400);
+    }
+    const idempotencyKey = rawKey || crypto.randomUUID();
 
     // Confirma que a cotação é do tenant (defesa extra; RLS já protege o resto).
     const { data: cot } = await adminClient
@@ -169,76 +281,116 @@ serve(withRequestCors(async (req) => {
     const baseUrl = (cfg.base_url || "https://api.z-api.io").replace(/\/+$/, "");
     const url = `${baseUrl}/instances/${cfg.instance_id}/token/${cfg.token}/send-text`;
 
-    // ── Envio ──
-    let zapiResponse: unknown = null;
-    let sendOk = false;
-    try {
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (cfg.client_token) headers["Client-Token"] = cfg.client_token;
-      const resp = await fetch(url, {
-        method: "POST",
-        redirect: 'error',
-        signal: AbortSignal.timeout(20_000),
-        headers,
-        body: JSON.stringify({ phone, message }),
-      });
-      const text = await resp.text();
-      try { zapiResponse = JSON.parse(text); } catch { zapiResponse = { raw: text }; }
-      sendOk = resp.ok;
-    } catch (e) {
-      // Erros de transporte podem conter a URL com o token da instância.
-      zapiResponse = { error: 'ZAPI_TRANSPORT_FAILED' };
-      sendOk = false;
-    }
+    const tentativa: Tentativa = {
+      cotacao_id,
+      cotacao_fornecedor_id: cotacao_fornecedor_id ?? null,
+      tipo,
+      phone,
+      message,
+    };
 
-    // ── Log (service-role: company_id e created_by explícitos) ──
-    const { data: logRow, error: logError } = await adminClient
+    // ── 1. Registra a tentativa ANTES de enviar (service-role: company_id e
+    //       created_by explícitos). Falha aqui é segura: nada foi enviado. ──
+    let logId: string;
+    const { data: novo, error: insertError } = await adminClient
       .from("cotacao_whatsapp_logs")
       .insert({
-        cotacao_id,
-        cotacao_fornecedor_id: cotacao_fornecedor_id ?? null,
+        ...tentativa,
         company_id: companyId,
-        tipo,
-        phone,
-        message,
-        zapi_response: zapiResponse,
-        status: sendOk ? "SENT" : "ERROR",
-        sent_at: sendOk ? new Date().toISOString() : null,
+        status: "PENDING",
+        idempotency_key: idempotencyKey,
         created_by: userId,
       })
       .select("id")
       .single();
-    if (logError) {
-      // O envio pode ter ocorrido: não sugerir retry automático/duplicação.
-      return jsonRes({ success: false, status: sendOk ? 'SENT_LOG_FAILED' : 'ERROR',
-        error: 'DELIVERY_REVIEW_REQUIRED', request_id: requestId,
-        message: 'Não foi possível registrar o resultado. Confira o envio antes de tentar novamente.' }, 502);
-    }
 
-    // ── Marca fornecedor como ENVIADO (só na solicitação inicial e se ainda AGUARDANDO) ──
-    if (sendOk && tipo === "SOLICITACAO_COTACAO" && cotacao_fornecedor_id) {
-      const { error: updateError } = await adminClient
-        .from("cotacao_fornecedores")
-        .update({ status: "ENVIADO", mensagem_enviada_em: new Date().toISOString() })
-        .eq("id", cotacao_fornecedor_id)
-        .eq("cotacao_id", cotacao_id)
+    if (novo) {
+      logId = novo.id;
+    } else if (insertError?.code === "23505") {
+      // Mesma chave: é reenvio da mesma operação. Nunca manda de novo, salvo
+      // depois de recusa explícita da Z-API.
+      const { data: existente, error: lookupError } = await adminClient
+        .from("cotacao_whatsapp_logs")
+        .select("id, cotacao_id, cotacao_fornecedor_id, tipo, phone, message, status")
         .eq("company_id", companyId)
-        .eq("status", "AGUARDANDO");
-      if (updateError) return jsonRes({ success: false, status: 'SENT_STATUS_FAILED',
-        log_id: logRow.id, error: 'DELIVERY_REVIEW_REQUIRED', request_id: requestId }, 502);
+        .eq("idempotency_key", idempotencyKey)
+        .maybeSingle();
+      if (lookupError || !existente) throw new Error("LOG_LOOKUP_FAILED");
+      const log = existente as LogExistente;
+
+      if (!mesmaTentativa(log, tentativa)) {
+        return jsonRes({
+          success: false,
+          error: "REQUEST_ID_REUTILIZADO",
+          message: "Este envio não confere com o registrado antes.",
+          request_id: requestId,
+        });
+      }
+      if (log.status === "SENT") {
+        const aviso = await marcarFornecedorEnviado(adminClient, companyId, tentativa);
+        return jsonRes({ success: true, status: "SENT", idempotent: true, log_id: log.id, aviso });
+      }
+      if (log.status !== "ERROR") {
+        // PENDING (em andamento ou sem desfecho gravado) ou UNKNOWN.
+        return jsonRes({ success: false, status: log.status === "PENDING" ? "PENDING" : "UNKNOWN", log_id: log.id, message: MSG_INCERTO });
+      }
+      // ERROR: nada saiu. O UPDATE condicional garante que só um reenvio
+      // concorrente reivindica a nova tentativa.
+      const { data: reivindicado, error: claimError } = await adminClient
+        .from("cotacao_whatsapp_logs")
+        .update({ status: "PENDING", zapi_response: null })
+        .eq("id", log.id)
+        .eq("company_id", companyId)
+        .eq("status", "ERROR")
+        .select("id")
+        .maybeSingle();
+      if (claimError) throw new Error("LOG_CLAIM_FAILED");
+      if (!reivindicado) {
+        return jsonRes({ success: false, status: "PENDING", log_id: log.id, message: MSG_INCERTO });
+      }
+      logId = reivindicado.id;
+    } else {
+      throw new Error("LOG_INSERT_FAILED");
     }
 
-    if (!sendOk) {
-      return jsonRes({
-        success: false,
-        status: "ERROR",
-        log_id: logRow?.id ?? null,
-        message: "A Z-API recusou o envio. Verifique as credenciais e o número.",
-        zapi_response: zapiResponse,
-      });
+    // ── 2. Envio ──
+    const envio = await enviarZapi(url, cfg.client_token ?? null, phone, message);
+
+    // ── 3. Desfecho. Daqui em diante a mensagem pode ter saído: nenhuma falha
+    //       vira erro que convide a reenviar. ──
+    const { error: resultError } = await adminClient
+      .from("cotacao_whatsapp_logs")
+      .update({
+        status: envio.status,
+        zapi_response: envio.resposta,
+        sent_at: envio.status === "SENT" ? new Date().toISOString() : null,
+      })
+      .eq("id", logId)
+      .eq("company_id", companyId);
+    if (resultError) {
+      // A linha fica PENDING: um reenvio com a mesma chave é tratado como incerto.
+      console.error("[send-whatsapp-zapi] desfecho não registrado", { request_id: requestId, log_id: logId, status: envio.status });
     }
 
-    return jsonRes({ success: true, status: "SENT", log_id: logRow?.id ?? null, zapi_response: zapiResponse });
+    if (envio.status === "SENT") {
+      const avisoFornecedor = await marcarFornecedorEnviado(adminClient, companyId, tentativa);
+      const aviso = resultError
+        ? "Mensagem enviada, mas o histórico não foi atualizado."
+        : avisoFornecedor;
+      return jsonRes({ success: true, status: "SENT", log_id: logId, aviso, zapi_response: envio.resposta });
+    }
+
+    if (envio.status === "UNKNOWN") {
+      return jsonRes({ success: false, status: "UNKNOWN", log_id: logId, message: MSG_INCERTO, request_id: requestId });
+    }
+
+    return jsonRes({
+      success: false,
+      status: "ERROR",
+      log_id: logId,
+      message: "A Z-API recusou o envio. Verifique as credenciais e o número.",
+      zapi_response: envio.resposta,
+    });
   } catch (e) {
     console.error("[send-whatsapp-zapi]", e);
     return jsonRes({ error: "INTERNAL", message: "Erro interno", request_id: requestId }, 500);

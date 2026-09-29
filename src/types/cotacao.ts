@@ -42,7 +42,8 @@ export type CotacaoWhatsappTipo =
   | 'FECHAMENTO_PEDIDO'
   | 'CONFIRMACAO_PRAZO';
 
-type CotacaoWhatsappStatus = 'PENDING' | 'SENT' | 'ERROR';
+/** PENDING = tentativa registrada, sem desfecho; UNKNOWN = pode ter saído (timeout/queda na Z-API). */
+type CotacaoWhatsappStatus = 'PENDING' | 'SENT' | 'ERROR' | 'UNKNOWN';
 
 /** Cabeçalho da cotação (tabela `cotacoes`). */
 export interface Cotacao {
