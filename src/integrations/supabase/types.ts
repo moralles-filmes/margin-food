@@ -10384,6 +10384,7 @@ export type Database = {
       _salmon_create_entry_guarded: {
         Args: {
           p_boxes: number
+          p_client_request_id?: string
           p_entry_date: string
           p_expiration_date?: string
           p_gross_kg: number
@@ -10399,6 +10400,7 @@ export type Database = {
       _salmon_create_manipulation_guarded: {
         Args: {
           p_clean_in_kg: number
+          p_client_request_id?: string
           p_entry_id: string
           p_fish_count: number
           p_gross_out_kg: number
@@ -10631,6 +10633,7 @@ export type Database = {
       create_salmon_entry_atomic: {
         Args: {
           p_boxes: number
+          p_client_request_id?: string
           p_entry_date: string
           p_expiration_date?: string
           p_gross_kg: number
@@ -10646,6 +10649,7 @@ export type Database = {
       create_salmon_manipulation_atomic: {
         Args: {
           p_clean_in_kg: number
+          p_client_request_id?: string
           p_entry_id: string
           p_fish_count: number
           p_gross_out_kg: number
@@ -10666,6 +10670,15 @@ export type Database = {
         }
         Returns: Json
       }
+      criar_requisicao_estoque: {
+        Args: {
+          p_client_request_id?: string
+          p_itens: Json
+          p_observacao: string
+          p_setor: string
+        }
+        Returns: Json
+      }
       deactivate_produto: { Args: { p_produto_id: string }; Returns: string }
       debug_company_inventory: { Args: never; Returns: Json }
       debug_stock_last_movements: { Args: { p_limit?: number }; Returns: Json }
@@ -10680,6 +10693,10 @@ export type Database = {
         Returns: Json
       }
       ensure_salmon_raw_product: { Args: never; Returns: string }
+      estoque_registrar_movimentacoes_lote: {
+        Args: { p_client_request_id?: string; p_itens: Json }
+        Returns: Json
+      }
       ficha_salvar_componente_itens_atomic: {
         Args: { _componente_pai_id: string; _itens: Json }
         Returns: Json

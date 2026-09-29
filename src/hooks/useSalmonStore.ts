@@ -420,7 +420,15 @@ export function useSalmonStore() {
 
   // ── ENTRY CRUD via atomic RPCs ──
 
-  const addEntry = useCallback(async (entry: Omit<SalmonEntry, 'id' | 'createdAt'>) => {
+  /**
+   * `clientRequestId` é a chave derivada do formulário (chaveEntradaSalmao):
+   * reenviar a mesma entrada devolve a já gravada (`idempotente`) em vez de
+   * lançar o salmão — e o espelho no estoque — duas vezes.
+   */
+  const addEntry = useCallback(async (
+    entry: Omit<SalmonEntry, 'id' | 'createdAt'>,
+    opts: { clientRequestId?: string } = {},
+  ) => {
     const { data, error } = await supabase.rpc('_salmon_create_entry_guarded' as any, {
       p_entry_date: entry.date,
       p_lot: entry.lot || '',
@@ -432,6 +440,7 @@ export function useSalmonStore() {
       p_total_value: entry.totalValue,
       p_notes: entry.notes || '',
       p_expiration_date: entry.expirationDate || null,
+      p_client_request_id: opts.clientRequestId,
     });
 
     if (error) {
@@ -447,7 +456,8 @@ export function useSalmonStore() {
       createdAt: new Date().toISOString(),
     };
 
-    setEntries(prev => [newEntry, ...prev]);
+    // Reenvio devolve uma entrada que a lista local pode já ter.
+    setEntries(prev => (prev.some(e => e.id === newEntry.id) ? prev : [newEntry, ...prev]));
     emitDataEvent('salmao:entradas');
     return newEntry;
   }, [supabase, emitDataEvent, toast]);
@@ -514,7 +524,11 @@ export function useSalmonStore() {
 
   // ── MANIPULATION CRUD via atomic RPCs ──
 
-  const addManipulation = useCallback(async (m: Omit<Manipulation, 'id' | 'createdAt' | 'lossKg' | 'lossPercent' | 'yieldKg' | 'yieldPercent' | 'perdaValor' | 'valorTotalBruto' | 'valorTotalLimpo'>) => {
+  /** `clientRequestId`: chave derivada do assistente (chaveManipulacaoSalmao), ver `addEntry`. */
+  const addManipulation = useCallback(async (
+    m: Omit<Manipulation, 'id' | 'createdAt' | 'lossKg' | 'lossPercent' | 'yieldKg' | 'yieldPercent' | 'perdaValor' | 'valorTotalBruto' | 'valorTotalLimpo'>,
+    opts: { clientRequestId?: string } = {},
+  ) => {
     const { data, error } = await supabase.rpc('_salmon_create_manipulation_guarded' as any, {
       p_entry_id: m.entryId,
       p_manipulation_date: m.date,
@@ -523,6 +537,7 @@ export function useSalmonStore() {
       p_clean_in_kg: m.cleanKg,
       p_leftover_kg: m.leftoverKg || 0,
       p_notes: '',
+      p_client_request_id: opts.clientRequestId,
     });
 
     if (error) {
@@ -547,7 +562,8 @@ export function useSalmonStore() {
       createdAt: new Date().toISOString(),
     };
 
-    setManipulations(prev => [newM, ...prev]);
+    // Reenvio devolve uma manipulação que a lista local pode já ter.
+    setManipulations(prev => (prev.some(x => x.id === newM.id) ? prev : [newM, ...prev]));
     emitDataEvent('salmao:manipulacoes');
     return newM;
   }, [supabase, emitDataEvent, toast]);

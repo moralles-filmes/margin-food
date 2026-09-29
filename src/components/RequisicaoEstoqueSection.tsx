@@ -31,6 +31,9 @@ import RequisicaoCardHeader from './estoque/RequisicaoCardHeader';
 import RequisicaoProductPicker, { type ManualRequisitionItem } from './estoque/RequisicaoProductPicker';
 import { sortByName } from '@/lib/sortByName';
 import { useNavigationRecord } from '@/hooks/useNavigationRequest';
+import { novaSemente } from '@/lib/idempotencia';
+import { mensagemErroEdge } from '@/lib/edgeFunctionError';
+import { chaveRequisicaoEstoque } from '@/domain/estoque/idempotencia';
 
 interface Props {
   produtos: ProdutoExtended[];
@@ -128,6 +131,12 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
   }, [supabase, toast]);
   const [observacao, setObservacao] = useState('');
   const [itens, setItens] = useState<ManualRequisitionItem[]>([]);
+  // Semente do formulário manual: só troca quando ele é limpo. A chave enviada
+  // combina a semente com o conteúdo — retry da mesma requisição reaproveita a
+  // chave e o servidor devolve a existente em vez de criar outra.
+  const [sementeManual, setSementeManual] = useState(novaSemente);
+  // Trava síncrona: o estado `submitting` só chega ao botão no próximo render.
+  const enviandoRef = useRef(false);
   const [cancelling, setCancelling] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
@@ -268,6 +277,7 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
   const resetManualForm = () => {
     setItens([]);
     setObservacao('');
+    setSementeManual(novaSemente());
     setFormMode('none');
   };
 
@@ -281,29 +291,36 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (submitting || !canCreate) return;
+    if (enviandoRef.current || !canCreate) return;
     if (!setor) { toast.error('Selecione o setor da requisição'); return; }
     if (itens.length === 0) {
       toast.error('Adicione pelo menos 1 item');
       return;
     }
 
+    enviandoRef.current = true;
     setSubmitting(true);
     try {
+      const itensPayload = itens.map(item => ({
+        produto_id: item.produtoId,
+        quantidade: item.quantidade,
+        unidade: item.unidade,
+      }));
       const { data, error } = await supabase.functions.invoke('requisicao-estoque', {
         body: {
           action: 'criar',
           setor,
           observacao,
-          itens: itens.map(item => ({
-            produto_id: item.produtoId,
-            quantidade: item.quantidade,
-            unidade: item.unidade,
-          })),
+          itens: itensPayload,
+          client_request_id: chaveRequisicaoEstoque(sementeManual, { setor, observacao, itens }),
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error creating requisicao:', error);
+        toast.error(await mensagemErroEdge(error, 'Não foi possível confirmar o envio. Tente de novo — a mesma requisição não é duplicada.'));
+        return;
+      }
 
       if (data?.success) {
         toast.success(data.mensagem, { duration: 5000 });
@@ -323,8 +340,9 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
       }
     } catch (err) {
       console.error('Error creating requisicao:', err);
-      toast.error('Erro ao processar requisição');
+      toast.error('Não foi possível confirmar o envio. Tente de novo — a mesma requisição não é duplicada.');
     } finally {
+      enviandoRef.current = false;
       setSubmitting(false);
     }
   };

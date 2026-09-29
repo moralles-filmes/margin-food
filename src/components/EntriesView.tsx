@@ -1,6 +1,9 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useCan } from '@/permissions/hooks';
 import { useSalmonStore } from '@/hooks/useSalmonStore';
+import { novaSemente } from '@/lib/idempotencia';
+import { chaveEntradaSalmao } from '@/domain/estoque/idempotencia';
+import type { SalmonEntry } from '@/types/salmon';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DateInput } from '@/components/ui/DateInput';
@@ -57,6 +60,13 @@ export default function EntriesView({ store }: EntriesViewProps) {
   const [budgetAlertMsg, setBudgetAlertMsg] = useState('');
   const [overrideMotivo, setOverrideMotivo] = useState('');
   const [showSimulador, setShowSimulador] = useState(false);
+  const [saving, setSaving] = useState(false);
+  // Trava síncrona: cobre o submit e o "Continuar mesmo assim" do alerta de
+  // orçamento — `saving` só desabilita os botões no próximo render.
+  const salvandoRef = useRef(false);
+  // Semente do formulário: troca a cada formulário limpo. A chave enviada
+  // combina a semente com os dados da entrada (chaveEntradaSalmao).
+  const [semente, setSemente] = useState(novaSemente);
 
   const filtered = filterByPeriod(entries, period);
   const lots = [...new Set(entries.map(e => e.lot).filter(Boolean))];
@@ -78,21 +88,48 @@ export default function EntriesView({ store }: EntriesViewProps) {
     setForm(emptyForm());
     setEditingId(null);
     setShowForm(false);
+    setSemente(novaSemente());
   };
 
-  const doSave = async (data: any, auditOverride?: { tipos: string[]; motivo: string }) => {
-    let newEntry: any;
-    if (editingId) {
-      await updateEntry(editingId, data);
-      toast.success('Entrada atualizada!');
-      resetForm();
-      return;
-    } else {
-      newEntry = await addEntry(data);
+  const doSave = async (
+    data: any,
+    clientRequestId: string | undefined,
+    auditOverride?: { tipos: string[]; motivo: string },
+  ) => {
+    if (salvandoRef.current) return;
+    salvandoRef.current = true;
+    setSaving(true);
+    try {
+      if (editingId) {
+        await updateEntry(editingId, data);
+        toast.success('Entrada atualizada!');
+        resetForm();
+        return;
+      }
+      const newEntry = await addEntry(data, { clientRequestId });
       toast.success('Entrada registrada!');
+      // A entrada já está gravada: a auditoria de orçamento não pode impedir a
+      // limpeza do formulário.
+      try {
+        registrarAuditoria(newEntry, data, auditOverride);
+      } catch (auditError) {
+        console.error('[EntriesView] auditoria de orçamento', auditError);
+      }
+      resetForm();
+    } catch {
+      // O store já mostrou o erro. O formulário fica como está: enviar de novo a
+      // mesma entrada reaproveita a chave e não grava o salmão duas vezes.
+    } finally {
+      salvandoRef.current = false;
+      setSaving(false);
     }
+  };
 
-    // Audit
+  const registrarAuditoria = (
+    newEntry: SalmonEntry,
+    data: Omit<SalmonEntry, 'id' | 'createdAt'>,
+    auditOverride?: { tipos: string[]; motivo: string },
+  ) => {
     if (newEntry && metaInfo.meta) {
       const entryMonth = data.date.slice(0, 7);
       const projectedGasto = metaInfo.gastoMes + data.totalValue;
@@ -132,11 +169,11 @@ export default function EntriesView({ store }: EntriesViewProps) {
         });
       }
     }
-    resetForm();
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (salvandoRef.current) return;
     const grossKg = normalizeBRLMoneyToNumber(form.grossKg);
     const totalValue = normalizeBRLMoneyToNumber(form.totalValue);
     if (!grossKg || !totalValue) { toast.error('Preencha kg bruto e valor total'); return; }
@@ -150,6 +187,9 @@ export default function EntriesView({ store }: EntriesViewProps) {
       totalValue, pricePerKg: form.pricePerKg ? normalizeBRLMoneyToNumber(form.pricePerKg) ?? undefined : undefined,
       boxes: parseInt(form.boxes) || 0, units: parseInt(form.units) || 0, grossKg, notes: form.notes,
     };
+    // Chave derivada dos dados: repetir a MESMA entrada devolve a já gravada;
+    // mudar qualquer campo gera outra. A edição (replace) não usa chave.
+    const clientRequestId = editingId ? undefined : chaveEntradaSalmao(semente, data);
 
     // Budget alerts (weekly + monthly only)
     if (!editingId && metaInfo.meta) {
@@ -165,13 +205,13 @@ export default function EntriesView({ store }: EntriesViewProps) {
         // Meta mensal alert
         if (projectedStatus === 'estourado' && metaInfo.status !== 'estourado') {
           setBudgetAlertMsg(`Essa compra vai estourar a meta mensal (${fmtR(projectedGasto)} de ${fmtR(metaInfo.meta.metaValorCompra)}). Deseja continuar?`);
-          setBudgetConfirmPending(() => (motivo: string) => doSave(data, { tipos: ['meta_mensal'], motivo }));
+          setBudgetConfirmPending(() => (motivo: string) => doSave(data, clientRequestId, { tipos: ['meta_mensal'], motivo }));
           return;
         }
         // Projeção mensal alert
         if (projStatus === 'estourado' && metaInfo.projecao.statusProjecao !== 'estourado') {
           setBudgetAlertMsg(`Com essa compra, a projeção indica estouro até o fim do mês (projeção: ${fmtR(projNova.projecaoFimMes)}). Continuar?`);
-          setBudgetConfirmPending(() => (motivo: string) => doSave(data, { tipos: ['projecao'], motivo }));
+          setBudgetConfirmPending(() => (motivo: string) => doSave(data, clientRequestId, { tipos: ['projecao'], motivo }));
           return;
         }
         if (projectedStatus === 'perto' && metaInfo.status === 'boa') {
@@ -187,7 +227,7 @@ export default function EntriesView({ store }: EntriesViewProps) {
           const gastoSemanaPos = week.gasto + totalValue;
           if (week.ideal > 0 && gastoSemanaPos >= week.ideal && week.gasto < week.ideal) {
             setBudgetAlertMsg(`Você vai estourar o orçamento ideal da semana ${weekLabel} (${fmtR(gastoSemanaPos)} / ${fmtR(week.ideal)}). Continuar?`);
-            setBudgetConfirmPending(() => (motivo: string) => doSave(data, { tipos: ['semana'], motivo }));
+            setBudgetConfirmPending(() => (motivo: string) => doSave(data, clientRequestId, { tipos: ['semana'], motivo }));
             return;
           }
           if (week.ideal > 0 && gastoSemanaPos >= week.ideal * 0.9 && week.gasto < week.ideal * 0.9) {
@@ -197,7 +237,7 @@ export default function EntriesView({ store }: EntriesViewProps) {
       }
     }
 
-    doSave(data);
+    void doSave(data, clientRequestId);
   };
 
   const startEdit = (entry: typeof entries[0]) => {
@@ -353,8 +393,8 @@ export default function EntriesView({ store }: EntriesViewProps) {
             <span className="text-xs text-muted-foreground">Custo/kg: <strong className="text-primary">{calcPricePerKg()}</strong></span>
             <div className="flex gap-2">
               <Button type="button" variant="ghost" size="sm" onClick={resetForm}>Cancelar</Button>
-              <Button type="submit" size="sm" className="bg-primary-strong text-primary-foreground border-0 gap-1">
-                {editingId ? <><Check className="w-3.5 h-3.5" /> Atualizar</> : 'Salvar'}
+              <Button type="submit" size="sm" className="bg-primary-strong text-primary-foreground border-0 gap-1" disabled={saving}>
+                {saving ? 'Salvando...' : editingId ? <><Check className="w-3.5 h-3.5" /> Atualizar</> : 'Salvar'}
               </Button>
             </div>
           </div>
@@ -459,7 +499,7 @@ export default function EntriesView({ store }: EntriesViewProps) {
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => { setBudgetConfirmPending(null); setOverrideMotivo(''); }}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              disabled={!overrideMotivo.trim()}
+              disabled={!overrideMotivo.trim() || saving}
               onClick={() => { budgetConfirmPending?.(overrideMotivo.trim()); setBudgetConfirmPending(null); setOverrideMotivo(''); }}
               className="bg-destructive text-destructive-foreground disabled:opacity-50"
             >

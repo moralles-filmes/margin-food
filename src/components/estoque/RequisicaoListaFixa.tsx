@@ -21,6 +21,9 @@ import { ClipboardList, Eye, Send, ArrowLeft, Inbox, AlertTriangle, ShoppingCart
 import RequisicaoQuantityList, { type RequisicaoQuantityListHandle } from './RequisicaoQuantityList';
 import type { ProdutoExtended } from '@/types/estoque';
 import { toRequisitionDisplayProduct } from '@/domain/estoque/requisition';
+import { chaveRequisicaoEstoque } from '@/domain/estoque/idempotencia';
+import { novaSemente } from '@/lib/idempotencia';
+import { mensagemErroEdge } from '@/lib/edgeFunctionError';
 
 interface ListaFixaItem {
   id: string;
@@ -69,6 +72,12 @@ export default function RequisicaoListaFixa({ produtos, saldos, onSuccess, onCan
   const [loading, setLoading] = useState(false);
   const [listError, setListError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  // Trava síncrona, tomada antes do diálogo de confirmação: o estado
+  // `submitting` só desabilita o botão no próximo render.
+  const enviandoRef = useRef(false);
+  // Semente desta requisição: a tela é desmontada no sucesso, e a próxima
+  // começa com outra. Retry do mesmo conteúdo reaproveita a chave.
+  const [semente, setSemente] = useState(novaSemente);
   const [step, setStep] = useState<Step>('fill');
 
   const loadListas = useCallback(async () => {
@@ -219,37 +228,48 @@ export default function RequisicaoListaFixa({ produtos, saldos, onSuccess, onCan
   };
 
   const handleSubmit = async () => {
-    if (submitting) return;
+    if (enviandoRef.current) return;
     if (!canCreate) {
       toast.error('Sem permissão para criar requisições.');
       return;
     }
 
-    const ok = await confirm({
-      title: 'Confirmar requisição',
-      description: `Enviar requisição com ${filledItems.length} item(ns) para o setor ${setor}?`,
-      confirmLabel: 'Enviar Requisição',
-    });
-    if (!ok) return;
-
-    setSubmitting(true);
+    enviandoRef.current = true;
     try {
+      const ok = await confirm({
+        title: 'Confirmar requisição',
+        description: `Enviar requisição com ${filledItems.length} item(ns) para o setor ${setor}?`,
+        confirmLabel: 'Enviar Requisição',
+      });
+      if (!ok) return;
+
+      setSubmitting(true);
+      const itens = filledItems.map(item => ({
+        produto_id: item.produto_id,
+        quantidade: item.quantidade,
+        unidade: item.display!.displayUnitForRequisition!,
+      }));
       const payload = {
         action: 'criar',
         setor,
         observacao,
-        itens: filledItems.map(item => ({
-          produto_id: item.produto_id,
-          quantidade: item.quantidade,
-          unidade: item.display!.displayUnitForRequisition!,
-        })),
+        itens,
+        client_request_id: chaveRequisicaoEstoque(semente, {
+          setor,
+          observacao,
+          itens: itens.map(item => ({ produtoId: item.produto_id, quantidade: item.quantidade, unidade: item.unidade })),
+        }),
       };
 
       const { data, error } = await supabase.functions.invoke('requisicao-estoque', {
         body: payload,
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Erro ao enviar requisição:', error);
+        toast.error(await mensagemErroEdge(error, 'Não foi possível confirmar o envio. Tente de novo — a mesma requisição não é duplicada.'));
+        return;
+      }
 
       if (data?.success) {
         toast.success(data.mensagem || 'Requisição enviada com sucesso!', { duration: 5000 });
@@ -265,14 +285,16 @@ export default function RequisicaoListaFixa({ produtos, saldos, onSuccess, onCan
           });
         }
 
+        setSemente(novaSemente());
         onSuccess();
       } else {
         toast.error(data?.error || 'Erro ao criar requisição');
       }
     } catch (err) {
       console.error('Erro ao enviar requisição:', err);
-      toast.error('Erro ao processar requisição');
+      toast.error('Não foi possível confirmar o envio. Tente de novo — a mesma requisição não é duplicada.');
     } finally {
+      enviandoRef.current = false;
       setSubmitting(false);
     }
   };
