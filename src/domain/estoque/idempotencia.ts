@@ -1,14 +1,16 @@
 /**
- * ─── Chaves de idempotência dos envios do Estoque e do Salmão ───
+ * ─── Conteúdo que identifica os envios do Estoque e do Salmão ───
  *
- * Cada função descreve o que identifica a operação para o servidor
+ * Cada função descreve, em forma canônica, o que o servidor compara no reenvio
  * (`criar_requisicao_estoque`, `estoque_registrar_movimentacoes_lote`,
  * `_salmon_create_entry_guarded`, `_salmon_create_manipulation_guarded`,
- * `stock_transfer_between_locations`, `estoque_criar_produto`). O
- * conteúdo aqui precisa ser o MESMO que o servidor compara no reenvio: campo
- * que entra na chave mas não na comparação faria um retry legítimo virar
- * REQUEST_ID_REUTILIZADO, e o contrário deixaria operações diferentes com a
- * mesma chave. Semente, derivação e o porquê: `@/lib/chaveOperacao`.
+ * `stock_transfer_between_locations`, `estoque_criar_produto`). A tela passa o
+ * conteúdo a `useChavesPendentes`, que deriva a chave dele + a semente pendente
+ * (`@/lib/chaveOperacao`); transferência e cadastro de produto ainda derivam a
+ * chave aqui (`chaveX(semente, …)`). Campo que entra aqui mas não na
+ * comparação do servidor faria um retry legítimo virar REQUEST_ID_REUTILIZADO,
+ * e o contrário deixaria operações diferentes com a mesma chave. Conteúdos que
+ * o servidor considera iguais precisam produzir o mesmo JSON.
  */
 
 import { chaveOperacao } from '@/lib/chaveOperacao';
@@ -20,18 +22,17 @@ export interface ItemRequisicaoChave {
 }
 
 /**
- * Requisição de estoque (manual e por lista fixa). A ordem dos itens não muda
- * o pedido — o servidor compara o conjunto —, então a chave também não depende
- * dela.
+ * Requisição de estoque (manual e por lista fixa, mesma RPC). A ordem dos itens
+ * não muda o pedido — o servidor compara o conjunto —, então o conteúdo sai
+ * ordenado.
  */
-export function chaveRequisicaoEstoque(
-  semente: string,
+export function conteudoRequisicaoEstoque(
   dados: { setor: string; observacao: string; itens: ItemRequisicaoChave[] },
-): Promise<string> {
+) {
   const itens = dados.itens
     .map(item => [item.produtoId, item.quantidade, item.unidade] as const)
     .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : a[1] - b[1]));
-  return chaveOperacao(semente, { tipo: 'requisicao', setor: dados.setor, observacao: dados.observacao, itens });
+  return { tipo: 'requisicao', setor: dados.setor, observacao: dados.observacao, itens };
 }
 
 export interface ItemMovimentacaoChave {
@@ -47,16 +48,15 @@ export interface ItemMovimentacaoChave {
  * fica de fora de propósito — é o dia do envio, não uma escolha do usuário, e
  * um retry depois da meia-noite continua sendo o mesmo lote.
  */
-export function chaveLoteMovimentacao(
-  semente: string,
+export function conteudoLoteMovimentacao(
   dados: { tipo: string; observacao: string; itens: ItemMovimentacaoChave[] },
-): Promise<string> {
-  return chaveOperacao(semente, {
+) {
+  return {
     tipo: 'movimentacao',
     movimento: dados.tipo,
     observacao: dados.observacao,
     itens: dados.itens.map(item => [item.produtoId, item.quantidade, item.custoUnitario, item.setor ?? '']),
-  });
+  };
 }
 
 export interface EntradaSalmaoChave {
@@ -73,8 +73,8 @@ export interface EntradaSalmaoChave {
 }
 
 /** Entrada de salmão bruto: os mesmos campos que `create_salmon_entry_atomic` grava. */
-export function chaveEntradaSalmao(semente: string, dados: EntradaSalmaoChave): Promise<string> {
-  return chaveOperacao(semente, {
+export function conteudoEntradaSalmao(dados: EntradaSalmaoChave) {
+  return {
     tipo: 'salmao-entrada',
     date: dados.date,
     expirationDate: dados.expirationDate || null,
@@ -86,7 +86,7 @@ export function chaveEntradaSalmao(semente: string, dados: EntradaSalmaoChave): 
     boxes: dados.boxes || 0,
     units: dados.units || 0,
     notes: dados.notes || '',
-  });
+  };
 }
 
 export interface ManipulacaoSalmaoChave {
@@ -99,8 +99,8 @@ export interface ManipulacaoSalmaoChave {
 }
 
 /** Manipulação de salmão: os mesmos campos que `create_salmon_manipulation_atomic` grava. */
-export function chaveManipulacaoSalmao(semente: string, dados: ManipulacaoSalmaoChave): Promise<string> {
-  return chaveOperacao(semente, {
+export function conteudoManipulacaoSalmao(dados: ManipulacaoSalmaoChave) {
+  return {
     tipo: 'salmao-manipulacao',
     entryId: dados.entryId,
     date: dados.date,
@@ -108,7 +108,7 @@ export function chaveManipulacaoSalmao(semente: string, dados: ManipulacaoSalmao
     grossKg: dados.grossKg,
     cleanKg: dados.cleanKg,
     leftoverKg: dados.leftoverKg || 0,
-  });
+  };
 }
 
 export interface TransferenciaChave {

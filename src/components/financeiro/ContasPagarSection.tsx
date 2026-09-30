@@ -30,7 +30,8 @@ import SearchableSelect from '@/components/ui/SearchableSelect';
 import { buildCategoriaFilterOptions, categoriaFiltroToParams, CATEGORIA_FILTRO_TODOS } from './categoriaFiltro';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { getRecurrenceValidationMessage } from '@/domain/financeiro/recurrence';
-import { criarChavesPendentes, traduzirErroIdempotencia } from '@/domain/financeiro/idempotencia';
+import { traduzirErroIdempotencia } from '@/domain/financeiro/idempotencia';
+import { useChavesPendentes } from '@/hooks/useChavesPendentes';
 
 /* ─── Types ─── */
 interface ContaPagar {
@@ -103,7 +104,7 @@ export default function ContasPagarSection({ initialStatus }: ContasPagarSection
   // Trava síncrona do save: `saving` só chega ao botão no próximo render.
   const salvandoRef = useRef(false);
   // Chaves de idempotência da criação: semente por conteúdo ainda não confirmado.
-  const [chavesCriacao] = useState(() => criarChavesPendentes('conta_pagar'));
+  const chavesCriacao = useChavesPendentes('conta_pagar');
   const [showForm, setShowForm] = useState(false);
   const [filtroStatus, setFiltroStatus] = useState(initialStatus || 'todos');
   const [filtroDataDe, setFiltroDataDe] = useState('');

@@ -16,6 +16,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import RequisicaoListaFixa from '@/components/estoque/RequisicaoListaFixa';
+import { limparRegistroDaAba } from '@/lib/chaveOperacao';
 import type { ProdutoExtended } from '@/types/estoque';
 
 // Toast estável como o hook real: a carga dos itens depende dele, e um objeto
@@ -46,7 +47,10 @@ const mockSupabase = vi.hoisted(() => ({
     return query;
   },
 }));
-vi.mock('@/contexts/CompanyScopeContext', () => ({ useSupabase: () => mockSupabase }));
+vi.mock('@/contexts/CompanyScopeContext', () => ({
+  useSupabase: () => mockSupabase,
+  useCompanyScope: () => ({ companyId: 'company-1' }),
+}));
 
 const produtos = [
   { id: 'p-arroz', nomeProduto: 'Arroz Japonês 5 kg', sku: 'ARZ-01', unidadeCompra: 'UN', unidadeMedida: 'UN', ativo: true },
@@ -61,6 +65,8 @@ function renderTela() {
 }
 
 beforeEach(() => {
+  limparRegistroDaAba();
+  sessionStorage.clear();
   mockInvoke.mockReset();
   mockToast.error.mockClear();
   mockDb.eqCalls = [];
@@ -175,5 +181,38 @@ describe('Requisição por Lista Fixa — envio idempotente', () => {
     await waitFor(() => expect(mockInvoke).toHaveBeenCalledTimes(2));
 
     expect(mockInvoke.mock.calls[1][1].body.client_request_id).toBe(mockInvoke.mock.calls[0][1].body.client_request_id);
+  });
+
+  it('fechar a lista depois de um envio sem resposta e reabrir: a mesma requisição reaproveita a chave', async () => {
+    const erro500 = { context: { status: 500, clone: () => ({ json: async () => ({ error: 'boom' }) }) } };
+    mockInvoke
+      .mockResolvedValueOnce({ data: null, error: erro500 })
+      .mockResolvedValueOnce({ data: { success: true, idempotente: true, mensagem: 'já registrada', resultados: [] }, error: null });
+
+    fireEvent.click(await irParaPrevia());
+    fireEvent.click(await screen.findByRole('button', { name: 'Enviar Requisição' }));
+    await waitFor(() => expect(mockInvoke).toHaveBeenCalledTimes(1));
+
+    cleanup(); // a tela desmonta ao fechar
+    fireEvent.click(await irParaPrevia());
+    fireEvent.click(await screen.findByRole('button', { name: 'Enviar Requisição' }));
+    await waitFor(() => expect(mockInvoke).toHaveBeenCalledTimes(2));
+
+    expect(mockInvoke.mock.calls[1][1].body.client_request_id).toBe(mockInvoke.mock.calls[0][1].body.client_request_id);
+  });
+
+  it('depois de uma requisição confirmada, a mesma requisição de novo é outra (chave nova)', async () => {
+    mockInvoke.mockResolvedValue({ data: { success: true, mensagem: 'ok', resultados: [] }, error: null });
+
+    fireEvent.click(await irParaPrevia());
+    fireEvent.click(await screen.findByRole('button', { name: 'Enviar Requisição' }));
+    await waitFor(() => expect(mockInvoke).toHaveBeenCalledTimes(1));
+
+    cleanup();
+    fireEvent.click(await irParaPrevia());
+    fireEvent.click(await screen.findByRole('button', { name: 'Enviar Requisição' }));
+    await waitFor(() => expect(mockInvoke).toHaveBeenCalledTimes(2));
+
+    expect(mockInvoke.mock.calls[1][1].body.client_request_id).not.toBe(mockInvoke.mock.calls[0][1].body.client_request_id);
   });
 });

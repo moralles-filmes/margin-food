@@ -11,7 +11,7 @@ import { buildTemplateContext, renderTemplate, WHATSAPP_TIPO_LABEL } from '@/lib
 import type { useCotacoesStore } from '@/hooks/useCotacoesStore';
 import type { Cotacao, CotacaoItem, CotacaoFornecedor, CotacaoWhatsappLog, CotacaoWhatsappTipo } from '@/types/cotacao';
 import { parseUTCToBR } from '@/lib/datetime';
-import { chaveOperacao, novaSemente } from '@/lib/chaveOperacao';
+import { useChavesPendentes } from '@/hooks/useChavesPendentes';
 import {
   interpretarEnvioWhatsapp, interpretarFalhaEnvioWhatsapp, type ResultadoEnvioWhatsapp,
 } from '@/domain/compras/cotacaoWhatsappEnvio';
@@ -47,10 +47,11 @@ export default function CotacaoWhatsappPanel({ cotacao, itens, fornecedores, sto
   // Travas síncronas: o estado só desabilita o botão no render seguinte.
   const sendingRef = useRef(false);
   const generatingIARef = useRef(false);
-  // Semente do envio em andamento: troca depois de um envio confirmado ou
-  // quando o usuário decide reenviar mesmo sem confirmação. A chave enviada é
-  // derivada dela + conteúdo, então repetir o mesmo envio nunca duplica.
-  const [semente, setSemente] = useState(novaSemente);
+  // Semente por mensagem ainda não confirmada: só troca quando AQUELA mensagem
+  // é confirmada, ou quando o usuário decide reenviá-la mesmo sem confirmação.
+  // Mandar outra mensagem no meio (outro fornecedor, outro modelo) não troca a
+  // chave de uma que pode ter saído — repetir o mesmo envio nunca duplica.
+  const chavesEnvio = useChavesPendentes('cotacao-whatsapp');
   const [envioIncerto, setEnvioIncerto] = useState<string | null>(null);
   const [logs, setLogs] = useState<CotacaoWhatsappLog[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
@@ -77,7 +78,8 @@ export default function CotacaoWhatsappPanel({ cotacao, itens, fornecedores, sto
     setPhone(forn?.whatsapp_snapshot ?? '');
   }, [fornId, tipo, cotacao, itens]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const enviar = async (sementeEnvio: string) => {
+  /** `reenviarMesmoAssim`: a pessoa confirmou que quer mandar de novo uma mensagem sem confirmação. */
+  const enviar = async (reenviarMesmoAssim: boolean) => {
     if (!forn) { toast.error('Selecione um fornecedor'); return; }
     if (!phone.trim()) { toast.error('Informe o telefone do fornecedor'); return; }
     if (!message.trim()) { toast.error('Mensagem vazia'); return; }
@@ -85,17 +87,19 @@ export default function CotacaoWhatsappPanel({ cotacao, itens, fornecedores, sto
     sendingRef.current = true;
     setSending(true);
     let resultado: ResultadoEnvioWhatsapp;
+    const conteudo = {
+      cotacao_id: cotacao.id,
+      cotacao_fornecedor_id: forn.id,
+      tipo,
+      phone: phone.trim(),
+      message: message.trim(),
+    };
     try {
-      const conteudo = {
-        cotacao_id: cotacao.id,
-        cotacao_fornecedor_id: forn.id,
-        tipo,
-        phone: phone.trim(),
-        message: message.trim(),
-      };
+      // Reenvio consciente vira outra operação só para esta mensagem.
+      if (reenviarMesmoAssim) chavesEnvio.renovar(conteudo);
       const res = await store.sendWhatsapp({
         ...conteudo,
-        idempotency_key: await chaveOperacao(sementeEnvio, conteudo),
+        idempotency_key: await chavesEnvio.chave(conteudo),
       });
       resultado = interpretarEnvioWhatsapp(res);
     } catch (err) {
@@ -109,7 +113,7 @@ export default function CotacaoWhatsappPanel({ cotacao, itens, fornecedores, sto
     switch (resultado.tipo) {
       case 'enviado':
         setEnvioIncerto(null);
-        setSemente(novaSemente());
+        chavesEnvio.confirmar(conteudo);
         if (resultado.repetido) toast.info('Esta mensagem já tinha sido enviada — não foi mandada de novo.');
         else toast.success('Mensagem enviada!');
         if (resultado.aviso) toast.warning(resultado.aviso);
@@ -123,7 +127,7 @@ export default function CotacaoWhatsappPanel({ cotacao, itens, fornecedores, sto
         toast.warning('Não recebemos a confirmação do servidor. Pode tocar em Enviar de novo: se a mensagem já saiu, ela não será repetida.');
         break;
       case 'reutilizado':
-        setSemente(novaSemente());
+        chavesEnvio.renovar(conteudo);
         toast.error('Este envio não confere com o registrado antes. Confira o histórico e envie de novo.');
         break;
       case 'recusado':
@@ -133,7 +137,7 @@ export default function CotacaoWhatsappPanel({ cotacao, itens, fornecedores, sto
     void loadLogs();
   };
 
-  const handleSend = () => { void enviar(semente); };
+  const handleSend = () => { void enviar(false); };
 
   /** Reenvio consciente depois de um envio sem confirmação: vira outra operação. */
   const handleReenviarMesmoAssim = async () => {
@@ -143,10 +147,8 @@ export default function CotacaoWhatsappPanel({ cotacao, itens, fornecedores, sto
       confirmLabel: 'Enviar de novo',
     });
     if (!ok) return;
-    const nova = novaSemente();
-    setSemente(nova);
     setEnvioIncerto(null);
-    void enviar(nova);
+    void enviar(true);
   };
 
   const handleGenerateIA = async () => {

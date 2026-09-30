@@ -3,7 +3,7 @@ import { useState, useCallback, useRef } from 'react';
 import { useEmitDataEvent } from '@/lib/dataEvents';
 import { useScopedToast } from '@/hooks/useScopedToast';
 import { mensagemErroContagem } from '@/hooks/useContagemPorCodigo';
-import { chaveOperacao } from '@/lib/chaveOperacao';
+import type { ChavesPendentes } from '@/lib/chaveOperacao';
 
 export interface Inventario {
   id: string;
@@ -232,9 +232,11 @@ export function useInventarioStore() {
   const savingCreateRef = useRef(false);
 
   /**
-   * `semente` identifica o inventário em criação (a tela troca depois do
-   * sucesso). A chave é derivada dela + conteúdo: o retry depois de a resposta
-   * se perder devolve o inventário já criado em vez de abrir outro.
+   * `chaves`: sementes por inventário ainda não confirmado
+   * (`useChavesPendentes('inventario-criacao')`). A chave é derivada da semente
+   * + conteúdo: o retry depois de a resposta se perder — mesmo com outro
+   * inventário criado no meio — devolve o inventário já criado em vez de abrir
+   * outro.
    */
   const createInventario = useCallback(async (payload: {
     tipo: string;
@@ -244,13 +246,14 @@ export function useInventarioStore() {
     categorias?: string[];
     observacao?: string;
     metodo_contagem?: 'lista' | 'codigo';
-  }, semente: string) => {
+  }, chaves: ChavesPendentes) => {
     if (savingCreateRef.current) return null;
     savingCreateRef.current = true;
     setSavingCreate(true);
     try {
-      const idempotency_key = await chaveOperacao(semente, payload);
+      const idempotency_key = await chaves.chave(payload);
       const data = await invoke('create', { ...payload, idempotency_key });
+      chaves.confirmar(payload);
       if (data.idempotent) {
         toast.info('Este inventário já tinha sido criado — nada foi duplicado.');
       } else {

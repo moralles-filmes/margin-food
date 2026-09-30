@@ -5,6 +5,7 @@
  */
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { criarChavesPendentes, type ChavesPendentes } from '@/lib/chaveOperacao';
 
 const rpc = vi.fn();
 const invoke = vi.fn();
@@ -118,6 +119,11 @@ describe('createInventario — duplo clique e reenvio', () => {
   };
   const criado = { inventario: { id: 'inv-1' }, itensCount: 0, idempotent: false };
   const createCalls = () => invoke.mock.calls.filter(([, opts]) => opts.body.action === 'create');
+  let chaves: ChavesPendentes;
+  beforeEach(() => {
+    let n = 0;
+    chaves = criarChavesPendentes('inventario-criacao', { gerarSemente: () => `semente-${++n}` });
+  });
 
   it('duplo clique: só a 1ª chamada chega à Edge', async () => {
     let liberar: (v: unknown) => void = () => {};
@@ -131,8 +137,8 @@ describe('createInventario — duplo clique e reenvio', () => {
     let primeira: Promise<unknown> = Promise.resolve();
     let segunda: unknown = 'não chamada';
     await act(async () => {
-      primeira = result.current.createInventario(payload, 'semente-1');
-      segunda = await result.current.createInventario(payload, 'semente-1');
+      primeira = result.current.createInventario(payload, chaves);
+      segunda = await result.current.createInventario(payload, chaves);
     });
     // A chave é derivada de forma assíncrona (SHA-256) antes da chamada.
     await vi.waitFor(() => expect(createCalls()).toHaveLength(1));
@@ -146,11 +152,11 @@ describe('createInventario — duplo clique e reenvio', () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     invoke.mockResolvedValue({ data: null, error: erroHttp(502, {}) });
     const { result } = renderHook(() => useInventarioStore());
-    await act(async () => { await result.current.createInventario(payload, 'semente-1'); });
+    await act(async () => { await result.current.createInventario(payload, chaves); });
 
     invoke.mockResolvedValue({ data: { ...criado, idempotent: true, inventarios: [] }, error: null });
-    await act(async () => { await result.current.createInventario(payload, 'semente-1'); });
-    await act(async () => { await result.current.createInventario({ ...payload, hora: '11:00' }, 'semente-1'); });
+    await act(async () => { await result.current.createInventario(payload, chaves); });
+    await act(async () => { await result.current.createInventario({ ...payload, hora: '11:00' }, chaves); });
 
     const [primeira, retry, outro] = createCalls().map(([, opts]) => opts.body.idempotency_key);
     expect(retry).toBe(primeira);
@@ -166,7 +172,7 @@ describe('createInventario — duplo clique e reenvio', () => {
       error: erroHttp(500, { error: 'REQUEST_ID_REUTILIZADO: a chave pertence a outro inventário' }),
     });
     const { result } = renderHook(() => useInventarioStore());
-    await act(async () => { await result.current.createInventario(payload, 'semente-1'); });
+    await act(async () => { await result.current.createInventario(payload, chaves); });
 
     expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/não confere com o inventário registrado/));
     consoleError.mockRestore();

@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import {
-  chaveIdempotencia,
-  criarChavesPendentes,
-  traduzirErroIdempotencia,
-} from '@/domain/financeiro/idempotencia';
-import { novaSemente } from '@/lib/chaveOperacao';
+import { traduzirErroIdempotencia } from '@/domain/financeiro/idempotencia';
+import { chaveComEscopo, criarChavesPendentes, novaSemente } from '@/lib/chaveOperacao';
+
+// Chave das criações do Financeiro: `useChavesPendentes(escopo)` deriva
+// `chaveComEscopo(escopo, semente pendente, payload da RPC)`.
+const chaveIdempotencia = (escopo: string, semente: string, identidade: unknown) =>
+  chaveComEscopo(escopo, semente, identidade);
 
 // Payload no formato que o Livro Razão envia a _guarded_upsert_lancamento.
 const lancamento = {
@@ -78,18 +79,18 @@ describe('criarChavesPendentes', () => {
   }
 
   it('reenvio do mesmo conteúdo ainda não confirmado repete a chave', async () => {
-    const chaves = criarChavesPendentes('lancamento', sequencial());
+    const chaves = criarChavesPendentes('lancamento', { gerarSemente: sequencial() });
     expect(await chaves.chave(lancamento)).toBe(await chaves.chave({ ...lancamento }));
   });
 
   it('duplo clique simultâneo (antes da 1ª chave resolver) usa a mesma semente', async () => {
-    const chaves = criarChavesPendentes('lancamento', sequencial());
+    const chaves = criarChavesPendentes('lancamento', { gerarSemente: sequencial() });
     const [a, b] = await Promise.all([chaves.chave(lancamento), chaves.chave({ ...lancamento })]);
     expect(a).toBe(b);
   });
 
   it('A sem resposta → B confirmado → reenvio de A: a chave de A não muda (não duplica)', async () => {
-    const chaves = criarChavesPendentes('lancamento', sequencial());
+    const chaves = criarChavesPendentes('lancamento', { gerarSemente: sequencial() });
     const primeiraDeA = await chaves.chave(lancamento); // servidor gravou, resposta perdida
     await chaves.chave(outro);
     chaves.confirmar(outro); // B deu certo no meio
@@ -97,21 +98,21 @@ describe('criarChavesPendentes', () => {
   });
 
   it('depois de confirmado, o mesmo conteúdo é um lançamento novo (dois iguais seguidos são legítimos)', async () => {
-    const chaves = criarChavesPendentes('lancamento', sequencial());
+    const chaves = criarChavesPendentes('lancamento', { gerarSemente: sequencial() });
     const primeiro = await chaves.chave(lancamento);
     chaves.confirmar(lancamento);
     expect(await chaves.chave(lancamento)).not.toBe(primeiro);
   });
 
   it('mudar qualquer campo gera chave nova mesmo com a mesma instância', async () => {
-    const chaves = criarChavesPendentes('lancamento', sequencial());
+    const chaves = criarChavesPendentes('lancamento', { gerarSemente: sequencial() });
     expect(await chaves.chave({ ...lancamento, p_valor: 1 })).not.toBe(await chaves.chave(lancamento));
   });
 
   it('instâncias de fluxos diferentes (lançamento × transferência) não compartilham semente', async () => {
     const sementes = sequencial();
-    const lancamentos = criarChavesPendentes('lancamento', sementes);
-    const transferencias = criarChavesPendentes('transferencia', sementes);
+    const lancamentos = criarChavesPendentes('lancamento', { gerarSemente: sementes });
+    const transferencias = criarChavesPendentes('transferencia', { gerarSemente: sementes });
     const chaveA = await lancamentos.chave(lancamento);
     await transferencias.chave(outro);
     transferencias.confirmar(outro);

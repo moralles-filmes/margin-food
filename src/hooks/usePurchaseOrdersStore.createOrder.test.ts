@@ -6,6 +6,7 @@
  */
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { criarChavesPendentes, type ChavesPendentes } from '@/lib/chaveOperacao';
 
 const rpc = vi.fn();
 const toast = { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() };
@@ -59,6 +60,15 @@ beforeEach(() => {
 });
 
 describe('usePurchaseOrdersStore.createOrder', () => {
+  // Uma instância por teste: a semente é fixa por formulário, como a tela faz com
+  // useChavesPendentes('compras-pedido', 'uuid').
+  let form1: { pendentes: ChavesPendentes };
+  let form2: { pendentes: ChavesPendentes };
+  beforeEach(() => {
+    form1 = { pendentes: criarChavesPendentes('compras-pedido', { formato: 'uuid', gerarSemente: () => 'form-1' }) };
+    form2 = { pendentes: criarChavesPendentes('compras-pedido', { formato: 'uuid', gerarSemente: () => 'form-2' }) };
+  });
+
   it('duplo clique: só a 1ª chamada chega ao servidor', async () => {
     let liberar: (v: unknown) => void = () => {};
     createResponse = () => new Promise(resolve => { liberar = resolve; });
@@ -67,8 +77,8 @@ describe('usePurchaseOrdersStore.createOrder', () => {
     let primeira: Promise<unknown> = Promise.resolve();
     let segunda: unknown = 'não chamada';
     await act(async () => {
-      primeira = result.current.createOrder(orderData, items, { semente: 'form-1' });
-      segunda = await result.current.createOrder(orderData, items, { semente: 'form-1' });
+      primeira = result.current.createOrder(orderData, items, form1);
+      segunda = await result.current.createOrder(orderData, items, form1);
     });
     // A chave é derivada de forma assíncrona (SHA-256) antes da RPC.
     await vi.waitFor(() => expect(createCalls()).toHaveLength(1));
@@ -85,11 +95,11 @@ describe('usePurchaseOrdersStore.createOrder', () => {
   it('retry depois de erro reaproveita a chave; o servidor devolve o pedido já gravado', async () => {
     createResponse = async () => ({ data: null, error: { message: 'Failed to fetch' } });
     const { result } = renderHook(() => usePurchaseOrdersStore());
-    await act(async () => { await result.current.createOrder(orderData, items, { semente: 'form-1' }); });
+    await act(async () => { await result.current.createOrder(orderData, items, form1); });
 
     createResponse = async () => ({ data: { status: 'idempotent', order_id: 'order-1', deleted: false }, error: null });
     let res: unknown;
-    await act(async () => { res = await result.current.createOrder(orderData, items, { semente: 'form-1' }); });
+    await act(async () => { res = await result.current.createOrder(orderData, items, form1); });
 
     const [primeira, segunda] = createCalls();
     expect(segunda[1].p_idempotency_key).toBe(primeira[1].p_idempotency_key);
@@ -98,9 +108,9 @@ describe('usePurchaseOrdersStore.createOrder', () => {
 
   it('pedido alterado ou formulário novo usam outra chave', async () => {
     const { result } = renderHook(() => usePurchaseOrdersStore());
-    await act(async () => { await result.current.createOrder(orderData, items, { semente: 'form-1' }); });
-    await act(async () => { await result.current.createOrder({ ...orderData, title: 'Outro' }, items, { semente: 'form-1' }); });
-    await act(async () => { await result.current.createOrder(orderData, items, { semente: 'form-2' }); });
+    await act(async () => { await result.current.createOrder(orderData, items, form1); });
+    await act(async () => { await result.current.createOrder({ ...orderData, title: 'Outro' }, items, form1); });
+    await act(async () => { await result.current.createOrder(orderData, items, form2); });
 
     const chaves = createCalls().map(([, args]) => args.p_idempotency_key);
     expect(new Set(chaves).size).toBe(3);
@@ -109,7 +119,7 @@ describe('usePurchaseOrdersStore.createOrder', () => {
   it('REQUEST_ID_REUTILIZADO vira orientação, não "tente de novo"', async () => {
     createResponse = async () => ({ data: null, error: { message: 'REQUEST_ID_REUTILIZADO: a chave pertence a outro pedido' } });
     const { result } = renderHook(() => usePurchaseOrdersStore());
-    await act(async () => { await result.current.createOrder(orderData, items, { semente: 'form-1' }); });
+    await act(async () => { await result.current.createOrder(orderData, items, form1); });
 
     expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/Confira a lista de pedidos/));
   });

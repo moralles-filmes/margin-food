@@ -1,15 +1,26 @@
 import { describe, expect, it } from 'vitest';
-import { novaSemente } from '@/lib/chaveOperacao';
+import { chaveOperacao, novaSemente } from '@/lib/chaveOperacao';
 import {
   chaveCadastroProduto,
-  chaveEntradaSalmao,
-  chaveLoteMovimentacao,
-  chaveManipulacaoSalmao,
-  chaveRequisicaoEstoque,
   chaveTransferencia,
+  conteudoEntradaSalmao,
+  conteudoLoteMovimentacao,
+  conteudoManipulacaoSalmao,
+  conteudoRequisicaoEstoque,
 } from './idempotencia';
 
-describe('chaveRequisicaoEstoque', () => {
+// A tela deriva a chave do conteúdo + semente pendente; aqui a semente é fixa
+// para isolar o que o conteúdo distingue.
+const chaveRequisicaoEstoque = (s: string, d: Parameters<typeof conteudoRequisicaoEstoque>[0]) =>
+  chaveOperacao(s, conteudoRequisicaoEstoque(d));
+const chaveLoteMovimentacao = (s: string, d: Parameters<typeof conteudoLoteMovimentacao>[0]) =>
+  chaveOperacao(s, conteudoLoteMovimentacao(d));
+const chaveEntradaSalmao = (s: string, d: Parameters<typeof conteudoEntradaSalmao>[0]) =>
+  chaveOperacao(s, conteudoEntradaSalmao(d));
+const chaveManipulacaoSalmao = (s: string, d: Parameters<typeof conteudoManipulacaoSalmao>[0]) =>
+  chaveOperacao(s, conteudoManipulacaoSalmao(d));
+
+describe('conteudoRequisicaoEstoque', () => {
   const itens = [
     { produtoId: 'p-b', quantidade: 2, unidade: 'UN' },
     { produtoId: 'p-a', quantidade: 1.5, unidade: 'KG' },
@@ -44,7 +55,7 @@ describe('chaveRequisicaoEstoque', () => {
   });
 });
 
-describe('chaveLoteMovimentacao', () => {
+describe('conteudoLoteMovimentacao', () => {
   const itens = [
     { produtoId: 'p-a', quantidade: 20, custoUnitario: 80 },
     { produtoId: 'p-b', quantidade: 5, custoUnitario: 3.2, setor: 'Bar' },
@@ -69,7 +80,7 @@ describe('chaveLoteMovimentacao', () => {
   });
 });
 
-describe('chaveEntradaSalmao', () => {
+describe('conteudoEntradaSalmao', () => {
   const entrada = {
     date: '2026-09-29', expirationDate: '2026-10-03', lot: 'L1', sif: '123', supplier: 'Fornecedor',
     totalValue: 420, grossKg: 10.5, boxes: 1, units: 2, notes: '',
@@ -91,7 +102,7 @@ describe('chaveEntradaSalmao', () => {
   });
 });
 
-describe('chaveManipulacaoSalmao', () => {
+describe('conteudoManipulacaoSalmao', () => {
   const manipulacao = { entryId: 'e1', date: '2026-09-29', fishCount: 1, grossKg: 2.5, cleanKg: 1.8, leftoverKg: 0 };
 
   it('retry da mesma manipulação reaproveita a chave', async () => {

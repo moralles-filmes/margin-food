@@ -9,6 +9,7 @@
  *   · erro do servidor chega traduzido ao operador.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { limparRegistroDaAba } from '@/lib/chaveOperacao';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import FluxoMovimentacao from '@/components/estoque-operacional/FluxoMovimentacao';
 import type {
@@ -118,7 +119,11 @@ async function escanear(codigo: string) {
   return campo;
 }
 
-beforeEach(() => { mockToastError.mockClear(); });
+beforeEach(() => {
+  mockToastError.mockClear();
+  limparRegistroDaAba();
+  sessionStorage.clear();
+});
 afterEach(() => cleanup());
 
 describe('FluxoMovimentacao — navegação', () => {
@@ -534,6 +539,51 @@ describe('FluxoMovimentacao — confirmação', () => {
     const [primeira, segunda] = dados.registrar.mock.calls;
     expect(segunda[0].produtoId).toBe('prod-agua');
     expect(segunda[0].clientRequestId).not.toBe(primeira[0].clientRequestId);
+  });
+
+  it('saída A sem resposta → saída B confirmada → A de novo: a chave de A não muda', async () => {
+    // Sem isto, a semente girava no sucesso de B e o reenvio de A (que o
+    // servidor já tinha gravado) dava saída do mesmo item duas vezes.
+    const dados = dadosBase();
+    dados.buscarProdutos = vi.fn().mockResolvedValue({
+      produtos: [COCA, AGUA], erro: null, obsoleto: false,
+    });
+    const ok = await dadosBase().registrar();
+    dados.registrar = vi.fn()
+      .mockResolvedValueOnce({ ok: false, erro: 'Falha de rede' }) // A: gravado, resposta perdida
+      .mockResolvedValue(ok);
+    renderFluxo(dados);
+
+    await irAteQuantidade(); // Coca
+    await clicar(/Confirmar saída/);
+    await waitFor(() => expect(dados.registrar).toHaveBeenCalledTimes(1));
+
+    await clicar('Voltar');
+    await clicar(/Água Mineral 500ml/);
+    await clicar(/Confirmar saída/); // B dá certo
+    await waitFor(() => expect(screen.getByText(/Saída realizada/i)).toBeInTheDocument());
+
+    await clicar(/Outra saída manual/);
+    await clicar('Cozinha');
+    await clicar(/Coca-Cola Lata 350ml/);
+    await clicar(/Confirmar saída/); // A de novo
+    await waitFor(() => expect(dados.registrar).toHaveBeenCalledTimes(3));
+
+    const [a, b, aDeNovo] = dados.registrar.mock.calls.map(c => c[0].clientRequestId);
+    expect(b).not.toBe(a);
+    expect(aDeNovo).toBe(a);
+  });
+
+  it('duplo toque em Confirmar antes do próximo render registra uma vez só', async () => {
+    const dados = dadosBase();
+    dados.registrar = vi.fn(() => new Promise(() => {}));
+    renderFluxo(dados);
+    await irAteQuantidade();
+
+    const confirmar = await screen.findByRole('button', { name: /Confirmar saída/ });
+    fireEvent.click(confirmar);
+    fireEvent.click(confirmar);
+    await waitFor(() => expect(dados.registrar).toHaveBeenCalledTimes(1));
   });
 
   it('renova o clientRequestId quando a quantidade muda', async () => {

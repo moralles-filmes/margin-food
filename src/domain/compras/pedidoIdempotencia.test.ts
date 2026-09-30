@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { chavePedidoCompra, mensagemErroCriarPedido, operacaoLembrete } from '@/domain/compras/pedidoIdempotencia';
+import {
+  chavePedidoCompra,
+  confirmarPedidoCompra,
+  mensagemErroCriarPedido,
+  operacaoLembrete,
+} from '@/domain/compras/pedidoIdempotencia';
+import { criarChavesPendentes } from '@/lib/chaveOperacao';
 
 const pedido = {
   title: 'Hortifruti',
@@ -9,24 +15,39 @@ const pedido = {
 };
 const comPreco = (preco: number) => ({ ...pedido, items: [{ ...pedido.items[0], estimated_unit_value: preco }] });
 
-describe('chave do pedido de compra — formulário (semente + conteúdo)', () => {
+function formulario() {
+  let n = 0;
+  return { pendentes: criarChavesPendentes('compras-pedido', { formato: 'uuid', gerarSemente: () => `form-${++n}` }) };
+}
+
+describe('chave do pedido de compra — formulário (semente pendente + conteúdo)', () => {
   it('duplo clique / retry do mesmo pedido usam a mesma chave', async () => {
-    const semente = 'form-1';
-    expect(await chavePedidoCompra({ semente }, pedido)).toBe(await chavePedidoCompra({ semente }, { ...pedido }));
+    const idem = formulario();
+    expect(await chavePedidoCompra(idem, pedido)).toBe(await chavePedidoCompra(idem, { ...pedido }));
   });
 
   it('mudar o pedido depois de uma falha gera chave nova (não devolve o pedido anterior)', async () => {
-    const semente = 'form-1';
-    expect(await chavePedidoCompra({ semente }, comPreco(12))).not.toBe(await chavePedidoCompra({ semente }, pedido));
+    const idem = formulario();
+    expect(await chavePedidoCompra(idem, comPreco(12))).not.toBe(await chavePedidoCompra(idem, pedido));
   });
 
-  it('formulário novo com o mesmo conteúdo é outro pedido', async () => {
-    expect(await chavePedidoCompra({ semente: 'form-2' }, pedido))
-      .not.toBe(await chavePedidoCompra({ semente: 'form-1' }, pedido));
+  it('A sem resposta → B confirmado → reenvio de A: a chave de A não muda', async () => {
+    const idem = formulario();
+    const primeiraDeA = await chavePedidoCompra(idem, pedido);
+    await chavePedidoCompra(idem, comPreco(12));
+    confirmarPedidoCompra(idem, comPreco(12));
+    expect(await chavePedidoCompra(idem, pedido)).toBe(primeiraDeA);
+  });
+
+  it('depois de confirmado, o mesmo conteúdo é outro pedido', async () => {
+    const idem = formulario();
+    const primeiro = await chavePedidoCompra(idem, pedido);
+    confirmarPedidoCompra(idem, pedido);
+    expect(await chavePedidoCompra(idem, pedido)).not.toBe(primeiro);
   });
 
   it('a chave é um UUID (coluna idempotency_key é uuid)', async () => {
-    expect(await chavePedidoCompra({ semente: 'form-1' }, pedido)).toMatch(/^[0-9a-f-]{36}$/);
+    expect(await chavePedidoCompra(formulario(), pedido)).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
   });
 });
 

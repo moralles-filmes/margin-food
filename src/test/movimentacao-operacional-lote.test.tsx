@@ -11,6 +11,7 @@
  *   · item recusado pelo servidor aparece na própria linha.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { limparRegistroDaAba } from '@/lib/chaveOperacao';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import FluxoMovimentacao from '@/components/estoque-operacional/FluxoMovimentacao';
 import type { ProdutoOperacional, SetorOperacional } from '@/domain/estoque/operacional';
@@ -113,6 +114,8 @@ const linhaDe = (nome: string) => screen.getByText(nome).closest('li') as HTMLEl
 beforeEach(() => {
   mockToastError.mockClear();
   mockToastSuccess.mockClear();
+  limparRegistroDaAba();
+  sessionStorage.clear();
 });
 afterEach(() => cleanup());
 
@@ -253,6 +256,26 @@ describe('Saída com vários itens — revisão e confirmação', () => {
     await montarListaComDoisItens();
     await clicar(/Confirmar saída de 2 itens/);
     await waitFor(() => expect(mockToastError).toHaveBeenCalledWith('Falha de rede'));
+    await clicar(/Confirmar saída de 2 itens/);
+
+    await waitFor(() => expect(dados.registrarLote).toHaveBeenCalledTimes(2));
+    const chaves = (n: number) =>
+      (dados.registrarLote.mock.calls[n][0] as { itens: ItemEnviado[] }).itens.map(i => i.clientRequestId);
+    expect(chaves(1)).toEqual(chaves(0));
+  });
+
+  it('lista sem resposta → descartar → montar a mesma lista de novo: as chaves se repetem', async () => {
+    // A lista pode ter sido gravada: remontá-la não pode dar saída duas vezes.
+    const dados = dadosBase();
+    dados.registrarLote.mockResolvedValueOnce({ ok: false, indice: null, erro: 'Falha de rede' });
+    renderFluxo(dados);
+    await montarListaComDoisItens();
+    await clicar(/Confirmar saída de 2 itens/);
+    await waitFor(() => expect(mockToastError).toHaveBeenCalledWith('Falha de rede'));
+
+    await clicar('Descartar lista');
+    await clicar('Descartar');
+    await montarListaComDoisItens();
     await clicar(/Confirmar saída de 2 itens/);
 
     await waitFor(() => expect(dados.registrarLote).toHaveBeenCalledTimes(2));

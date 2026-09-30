@@ -27,7 +27,10 @@ const mockSupabase = vi.hoisted(() => {
   };
   return { from: () => query };
 });
-vi.mock('@/contexts/CompanyScopeContext', () => ({ useSupabase: () => mockSupabase }));
+vi.mock('@/contexts/CompanyScopeContext', () => ({
+  useSupabase: () => mockSupabase,
+  useCompanyScope: () => ({ companyId: 'company-1' }),
+}));
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ user: { id: 'user-1' } }) }));
 vi.mock('@/permissions/hooks', () => ({ useCan: () => true }));
 vi.mock('@/contexts/EstoqueGeralStoreContext', () => ({ useEstoqueGeralStoreContext: () => ({ produtos: [] }) }));

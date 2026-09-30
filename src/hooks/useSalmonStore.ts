@@ -421,7 +421,7 @@ export function useSalmonStore() {
   // ── ENTRY CRUD via atomic RPCs ──
 
   /**
-   * `clientRequestId` é a chave derivada do formulário (chaveEntradaSalmao):
+   * `clientRequestId` é a chave derivada do formulário (`conteudoEntradaSalmao` + semente pendente):
    * reenviar a mesma entrada devolve a já gravada (`idempotente`) em vez de
    * lançar o salmão — e o espelho no estoque — duas vezes.
    */
@@ -524,7 +524,7 @@ export function useSalmonStore() {
 
   // ── MANIPULATION CRUD via atomic RPCs ──
 
-  /** `clientRequestId`: chave derivada do assistente (chaveManipulacaoSalmao), ver `addEntry`. */
+  /** `clientRequestId`: chave derivada do assistente (`conteudoManipulacaoSalmao`), ver `addEntry`. */
   const addManipulation = useCallback(async (
     m: Omit<Manipulation, 'id' | 'createdAt' | 'lossKg' | 'lossPercent' | 'yieldKg' | 'yieldPercent' | 'perdaValor' | 'valorTotalBruto' | 'valorTotalLimpo'>,
     opts: { clientRequestId?: string } = {},

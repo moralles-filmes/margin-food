@@ -14,7 +14,7 @@ import { Plus, X, Package, Building2, Download, PencilLine } from 'lucide-react'
 import { includesNormalized } from '@/lib/utils';
 import { formatMoneyBR } from '@/lib/formatters';
 import { mapCotacaoError } from '@/lib/cotacaoErrors';
-import { novaSemente } from '@/lib/chaveOperacao';
+import { useChavesPendentes } from '@/hooks/useChavesPendentes';
 import type { useCotacoesStore, CotacaoItemInput, CotacaoFornecedorInput } from '@/hooks/useCotacoesStore';
 import type { Cotacao, CotacaoItem, CotacaoFornecedor } from '@/types/cotacao';
 import ImportItensDialog from './ImportItensDialog';
@@ -55,9 +55,10 @@ export default function CotacaoFormDialog({ open, onOpenChange, store, editing, 
   );
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
-  // O diálogo é montado a cada abertura: uma semente por cotação em
-  // preenchimento. A chave do envio é derivada dela + conteúdo.
-  const [semente] = useState(novaSemente);
+  // O diálogo desmonta ao fechar: a semente por cotação ainda não confirmada
+  // mora fora dele, senão fechar e reabrir depois de um envio sem resposta
+  // criaria a mesma cotação de novo.
+  const chavesCotacao = useChavesPendentes('cotacao-criacao');
   const [importOpen, setImportOpen] = useState(false);
 
   // Add-item form
@@ -167,7 +168,7 @@ export default function CotacaoFormDialog({ open, onOpenChange, store, editing, 
         await store.updateCotacao(editing.id, payload, editing.updated_at);
         toast.success('Cotação atualizada!');
       } else {
-        const res = await store.createCotacao({ ...payload, origin_type: 'MANUAL' }, semente);
+        const res = await store.createCotacao({ ...payload, origin_type: 'MANUAL' }, chavesCotacao);
         toast.success(res?.idempotent
           ? `Cotação ${res.codigo ?? ''} já tinha sido criada — nada foi duplicado.`
           : `Cotação ${res?.codigo ?? ''} criada!`);

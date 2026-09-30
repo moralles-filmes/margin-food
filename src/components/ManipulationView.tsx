@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef } from 'react';
 import { useSalmonStore } from '@/hooks/useSalmonStore';
-import { novaSemente } from '@/lib/chaveOperacao';
-import { chaveManipulacaoSalmao } from '@/domain/estoque/idempotencia';
+import { conteudoManipulacaoSalmao } from '@/domain/estoque/idempotencia';
+import { useChavesPendentes } from '@/hooks/useChavesPendentes';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DateInput } from '@/components/ui/DateInput';
@@ -65,9 +65,10 @@ export default function ManipulationView({ store, preSelectedEntryId, onClearPre
   // Trava síncrona: Enter no campo e clique no botão chegam antes de `saving`
   // desabilitar qualquer coisa.
   const salvandoRef = useRef(false);
-  // Semente do assistente: troca a cada manipulação nova. A chave enviada
-  // combina a semente com os dados (chaveManipulacaoSalmao).
-  const [semente, setSemente] = useState(novaSemente);
+  // Semente por manipulação ainda não confirmada: fechar o assistente e
+  // começar outro não troca a chave de uma que pode ter sido gravada sem
+  // resposta (daria saída do salmão bruto duas vezes).
+  const chavesManipulacao = useChavesPendentes('salmao-manipulacao');
 
   const filtered = filterByPeriod(manipulations, period);
 
@@ -149,7 +150,6 @@ export default function ManipulationView({ store, preSelectedEntryId, onClearPre
     setConfirmed([false, false, false, false, false, false]);
     setShowWizard(true);
     setEditingId(null);
-    setSemente(novaSemente());
     onClearPreSelected?.();
   };
 
@@ -248,13 +248,14 @@ export default function ManipulationView({ store, preSelectedEntryId, onClearPre
       } else {
         // Chave derivada dos dados: repetir a MESMA manipulação devolve a já
         // gravada em vez de dar saída do salmão bruto duas vezes.
+        const conteudo = conteudoManipulacaoSalmao(data);
         const saved = await addManipulation(data, {
-          clientRequestId: await chaveManipulacaoSalmao(semente, data),
+          clientRequestId: await chavesManipulacao.chave(conteudo),
         });
+        chavesManipulacao.confirmar(conteudo);
         toast.success('Manipulação registrada! Estoque limpo atualizado.');
         setShowWizard(false);
         setEditingId(null);
-        setSemente(novaSemente());
         // Show etiqueta modal
         setEtiquetaManip(saved);
       }

@@ -1,7 +1,7 @@
 import { useCompanyId } from '@/hooks/useCompanyId';
 import { withCompanyId } from '@/lib/companyPayload';
 import { useSupabase } from '@/contexts/CompanyScopeContext';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCan } from '@/permissions';
 import { useEmitDataEvent, useDataEvent } from '@/lib/dataEvents';
@@ -378,6 +378,9 @@ export default function CadastroBaseTree() {
   const [items, setItems] = useState<CatRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  // Trava síncrona: `saving` só chega ao botão no próximo render, e dois cliques
+  // no mesmo render gravavam a categoria duas vezes.
+  const salvandoRef = useRef(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -510,7 +513,7 @@ export default function CadastroBaseTree() {
   if (!canView) return <NoAccess />;
 
   const save = async () => {
-    if (saving) return;
+    if (salvandoRef.current) return;
     if (!form.nome.trim()) { toast.error('Nome obrigatório'); return; }
 
     // Cycle detection on edit
@@ -521,6 +524,7 @@ export default function CadastroBaseTree() {
       }
     }
 
+    salvandoRef.current = true;
     setSaving(true);
     try {
       const payload = {
@@ -557,6 +561,7 @@ export default function CadastroBaseTree() {
       load();
       emitDataEvent('financeiro:cadastros');
     } finally {
+      salvandoRef.current = false;
       setSaving(false);
     }
   };

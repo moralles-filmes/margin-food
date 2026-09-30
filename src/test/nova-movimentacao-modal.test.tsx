@@ -3,10 +3,11 @@
  * Ensures the modal-based movement creation flow works correctly
  * and prevents regression to the old inline form pattern.
  */
-import { describe, it, expect, vi } from 'vitest';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import NovaMovimentacaoModal, { type MovModalPreset } from '@/components/estoque/NovaMovimentacaoModal';
 import type { ProdutoExtended } from '@/types/estoque';
+import { limparRegistroDaAba } from '@/lib/chaveOperacao';
 
 // NovaMovimentacaoModal fetches setores from stock_sectors on open — mock the
 // client so tests don't depend on VITE_SUPABASE_* env vars or the network.
@@ -105,6 +106,11 @@ function escolherProduto(linha: number, nome: string) {
 // ─── Tests ───
 
 describe('NovaMovimentacaoModal', () => {
+  beforeEach(() => {
+    limparRegistroDaAba();
+    sessionStorage.clear();
+  });
+
   it('renders with "Nova Entrada" title when preset=entrada', () => {
     render(<NovaMovimentacaoModal {...defaultProps} preset="entrada" />);
     expect(screen.getByText('Nova Entrada')).toBeInTheDocument();
@@ -211,6 +217,77 @@ describe('NovaMovimentacaoModal', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Registrar' })).toBeEnabled());
 
     fireEvent.change(screen.getByLabelText('Quantidade do item 1'), { target: { value: '6' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar' }));
+    await waitFor(() => expect(addMovimentacoesLote).toHaveBeenCalledTimes(2));
+
+    expect(addMovimentacoesLote.mock.calls[1][1].clientRequestId)
+      .not.toBe(addMovimentacoesLote.mock.calls[0][1].clientRequestId);
+  });
+
+  it('lote sem resposta → fechar e reabrir o modal → o mesmo lote reaproveita a chave', async () => {
+    const addMovimentacoesLote = vi.fn()
+      .mockRejectedValueOnce(new Error('Failed to fetch'))
+      .mockResolvedValue([]);
+    const props = { ...defaultProps, preset: 'entrada' as MovModalPreset, addMovimentacoesLote };
+    const { rerender } = render(<NovaMovimentacaoModal {...props} />);
+    escolherProduto(0, 'Arroz');
+    fireEvent.change(screen.getByLabelText('Quantidade do item 1'), { target: { value: '5' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar' }));
+    await waitFor(() => expect(addMovimentacoesLote).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Registrar' })).toBeEnabled());
+
+    // Fechar limpa o formulário; reabrir começa do zero.
+    rerender(<NovaMovimentacaoModal {...props} open={false} />);
+    rerender(<NovaMovimentacaoModal {...props} open />);
+    escolherProduto(0, 'Arroz');
+    fireEvent.change(screen.getByLabelText('Quantidade do item 1'), { target: { value: '5' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar' }));
+    await waitFor(() => expect(addMovimentacoesLote).toHaveBeenCalledTimes(2));
+
+    expect(addMovimentacoesLote.mock.calls[1][1].clientRequestId)
+      .toBe(addMovimentacoesLote.mock.calls[0][1].clientRequestId);
+  });
+
+  it('lote A sem resposta → lote B confirmado → A de novo: a chave de A não muda', async () => {
+    const addMovimentacoesLote = vi.fn()
+      .mockRejectedValueOnce(new Error('Failed to fetch')) // A: gravado, resposta perdida
+      .mockResolvedValue([]);
+    const props = { ...defaultProps, preset: 'entrada' as MovModalPreset, addMovimentacoesLote };
+    const { rerender } = render(<NovaMovimentacaoModal {...props} />);
+    const registrar = async (quantidade: string, chamadas: number) => {
+      escolherProduto(0, 'Arroz');
+      fireEvent.change(screen.getByLabelText('Quantidade do item 1'), { target: { value: quantidade } });
+      fireEvent.click(screen.getByRole('button', { name: 'Registrar' }));
+      await waitFor(() => expect(addMovimentacoesLote).toHaveBeenCalledTimes(chamadas));
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Registrar' })).toBeEnabled());
+    };
+
+    await registrar('5', 1); // A
+    rerender(<NovaMovimentacaoModal {...props} open={false} />);
+    rerender(<NovaMovimentacaoModal {...props} open />);
+    await registrar('7', 2); // B dá certo
+    rerender(<NovaMovimentacaoModal {...props} open={false} />);
+    rerender(<NovaMovimentacaoModal {...props} open />);
+    await registrar('5', 3); // A de novo
+
+    const [a, b, aDeNovo] = addMovimentacoesLote.mock.calls.map(c => c[1].clientRequestId);
+    expect(b).not.toBe(a);
+    expect(aDeNovo).toBe(a);
+  });
+
+  it('lote confirmado: o mesmo lote registrado de novo é outro (chave nova)', async () => {
+    const addMovimentacoesLote = vi.fn().mockResolvedValue([]);
+    const props = { ...defaultProps, preset: 'entrada' as MovModalPreset, addMovimentacoesLote };
+    const { rerender } = render(<NovaMovimentacaoModal {...props} />);
+    escolherProduto(0, 'Arroz');
+    fireEvent.change(screen.getByLabelText('Quantidade do item 1'), { target: { value: '5' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar' }));
+    await waitFor(() => expect(addMovimentacoesLote).toHaveBeenCalledTimes(1));
+
+    rerender(<NovaMovimentacaoModal {...props} open={false} />);
+    rerender(<NovaMovimentacaoModal {...props} open />);
+    escolherProduto(0, 'Arroz');
+    fireEvent.change(screen.getByLabelText('Quantidade do item 1'), { target: { value: '5' } });
     fireEvent.click(screen.getByRole('button', { name: 'Registrar' }));
     await waitFor(() => expect(addMovimentacoesLote).toHaveBeenCalledTimes(2));
 

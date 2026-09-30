@@ -5,11 +5,18 @@
  * item); aqui fica a resposta imediata da tela e as chaves de idempotência.
  */
 import { describe, it, expect } from 'vitest';
-import type { ProdutoOperacional, SetorOperacional } from '@/domain/estoque/operacional';
+import {
+  chaveSaida,
+  type IdentidadeSaida,
+  type ProdutoOperacional,
+  type SetorOperacional,
+} from '@/domain/estoque/operacional';
+import { criarChavesPendentes } from '@/lib/chaveOperacao';
 import {
   adicionarAoLote,
   alterarQuantidadeNoLote,
   chaveItemLote,
+  identidadeItemLote,
   quantidadeNoLote,
   removerDoLote,
   traduzirErroLote,
@@ -111,24 +118,46 @@ describe('alterar e remover', () => {
 });
 
 describe('chaveItemLote', () => {
+  function pendentes() {
+    let n = 0;
+    return criarChavesPendentes<IdentidadeSaida>('operacional-saida', { gerarSemente: () => `s${++n}` });
+  }
+
   it('é determinística: reenviar a mesma lista reaproveita as chaves', () => {
+    const chaves = pendentes();
     const a = item('a', COCA, COZINHA, 2);
-    expect(chaveItemLote('s1', a)).toBe(chaveItemLote('s1', { ...a }));
+    expect(chaveItemLote(chaves, a)).toBe(chaveItemLote(chaves, { ...a }));
   });
 
-  it('duas linhas iguais em setores diferentes têm chaves diferentes', () => {
-    expect(chaveItemLote('s1', item('a', COCA, COZINHA, 2)))
-      .not.toBe(chaveItemLote('s1', item('b', COCA, DELIVERY, 2)));
+  it('a lista remontada (linha com outro id) é reconhecida como o mesmo item', () => {
+    const chaves = pendentes();
+    expect(chaveItemLote(chaves, item('b', COCA, COZINHA, 2))).toBe(chaveItemLote(chaves, item('a', COCA, COZINHA, 2)));
+  });
+
+  it('mesmo produto em setores diferentes tem chaves diferentes', () => {
+    const chaves = pendentes();
+    expect(chaveItemLote(chaves, item('a', COCA, COZINHA, 2)))
+      .not.toBe(chaveItemLote(chaves, item('b', COCA, DELIVERY, 2)));
   });
 
   it('muda quando a quantidade do item muda', () => {
+    const chaves = pendentes();
     const a = item('a', COCA, COZINHA, 2);
-    expect(chaveItemLote('s1', a)).not.toBe(chaveItemLote('s1', { ...a, quantidade: 3 }));
+    expect(chaveItemLote(chaves, a)).not.toBe(chaveItemLote(chaves, { ...a, quantidade: 3 }));
   });
 
-  it('muda quando começa um lançamento novo', () => {
+  it('é a mesma chave da saída unitária igual: a que saiu sem resposta não sai de novo na lista', () => {
+    const chaves = pendentes();
+    const unitaria = chaveSaida(chaves, { produtoId: COCA.produtoId, setorId: COZINHA.setorId, quantidade: 2 });
+    expect(chaveItemLote(chaves, item('a', COCA, COZINHA, 2))).toBe(unitaria);
+  });
+
+  it('depois de confirmado, o mesmo item é uma saída nova', () => {
+    const chaves = pendentes();
     const a = item('a', COCA, COZINHA, 2);
-    expect(chaveItemLote('s1', a)).not.toBe(chaveItemLote('s2', a));
+    const antes = chaveItemLote(chaves, a);
+    chaves.confirmar(identidadeItemLote(a));
+    expect(chaveItemLote(chaves, a)).not.toBe(antes);
   });
 });
 

@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import type { Cotacao, CotacaoCounts, CotacaoItem, CotacaoFornecedor, CotacaoResposta, CotacaoWhatsappLog, CotacaoWhatsappTipo } from '@/types/cotacao';
 import { COTACAO_STATUS_ABERTOS } from '@/types/cotacao';
 import { formatDateISO, todayBR } from '@/lib/datetime';
-import { chaveOperacao } from '@/lib/chaveOperacao';
+import type { ChavesPendentes } from '@/lib/chaveOperacao';
 import type { RespostaEnvioWhatsapp } from '@/domain/compras/cotacaoWhatsappEnvio';
 
 /** Linha da matriz de respostas enviada à RPC save_cotacao_respostas_atomic. */
@@ -138,11 +138,12 @@ export function useCotacoesStore() {
 
   // ── Mutations (via RPCs atômicas) — lançam em erro; componente faz os toasts ──
   /**
-   * `semente` identifica a cotação em preenchimento (troca a cada formulário
-   * novo). A chave enviada é derivada dela + conteúdo: reenviar o mesmo
-   * formulário devolve a cotação já criada em vez de gerar COT-000N+1.
+   * `chaves`: sementes por cotação ainda não confirmada
+   * (`useChavesPendentes('cotacao-criacao')`). A chave enviada é derivada da
+   * semente + conteúdo: reenviar o mesmo formulário — mesmo depois de fechá-lo
+   * e reabri-lo — devolve a cotação já criada em vez de gerar COT-000N+1.
    */
-  const createCotacao = useCallback(async (input: CotacaoCreateInput, semente: string) => {
+  const createCotacao = useCallback(async (input: CotacaoCreateInput, chaves: ChavesPendentes) => {
     const args = {
       p_titulo: input.titulo,
       p_observacao: input.observacao ?? null,
@@ -154,9 +155,10 @@ export function useCotacoesStore() {
     };
     const { data, error: err } = await db.rpc('create_cotacao_atomic', {
       ...args,
-      p_idempotency_key: await chaveOperacao(semente, args),
+      p_idempotency_key: await chaves.chave(args),
     });
     if (err) throw err;
+    chaves.confirmar(args);
     await fetchCotacoes();
     return data as { success: boolean; id: string; codigo: string; idempotent?: boolean };
   }, [db, fetchCotacoes]);

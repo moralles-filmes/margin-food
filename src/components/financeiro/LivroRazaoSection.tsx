@@ -25,7 +25,8 @@ import DateRangePresets from './DateRangePresets';
 import MonthNavigator, { monthBounds } from './MonthNavigator';
 import SearchableSelect from '@/components/ui/SearchableSelect';
 import { buildCategoriaFilterOptions, categoriaFiltroToParams, CATEGORIA_FILTRO_TODOS } from './categoriaFiltro';
-import { criarChavesPendentes, traduzirErroIdempotencia } from '@/domain/financeiro/idempotencia';
+import { traduzirErroIdempotencia } from '@/domain/financeiro/idempotencia';
+import { useChavesPendentes } from '@/hooks/useChavesPendentes';
 
 // ─── Types ───
 interface Lancamento {
@@ -136,8 +137,8 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
   const salvandoRef = useRef(false);
   // Chaves de idempotência das criações: semente por conteúdo pendente, uma
   // instância por fluxo para lançamento e transferência nunca se misturarem.
-  const [chavesLancamento] = useState(() => criarChavesPendentes('lancamento'));
-  const [chavesTransferencia] = useState(() => criarChavesPendentes('transferencia'));
+  const chavesLancamento = useChavesPendentes('lancamento');
+  const chavesTransferencia = useChavesPendentes('transferencia');
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [editUpdatedAt, setEditUpdatedAt] = useState<string | null>(null);

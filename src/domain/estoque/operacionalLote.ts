@@ -8,19 +8,21 @@
  * gate é o banco, que confere cada item com as regras da saída unitária.
  */
 
+import type { ChavesPendentes } from '@/lib/chaveOperacao';
 import {
-  chaveRequisicao,
+  chaveSaida,
   formatarQuantidade,
   QUANTIDADE_MAXIMA,
   traduzirErroOperacional,
   validarQuantidade,
+  type IdentidadeSaida,
   type ProdutoOperacional,
   type SetorOperacional,
   type ValidacaoQuantidade,
 } from './operacional';
 
 export interface ItemSaidaLote {
-  /** Estável enquanto a linha existir — entra na chave de idempotência. */
+  /** Estável enquanto a linha existir — identifica a linha na tela (editar, remover, erro). */
   id: string;
   produto: ProdutoOperacional;
   setor: SetorOperacional;
@@ -106,21 +108,22 @@ export function removerDoLote(itens: ItemSaidaLote[], id: string): ItemSaidaLote
   return itens.filter(i => i.id !== id);
 }
 
+/** O que o servidor compara em cada item do lote (a mesma identidade da saída unitária). */
+export function identidadeItemLote(item: ItemSaidaLote): IdentidadeSaida {
+  return { produtoId: item.produto.produtoId, setorId: item.setor.setorId, quantidade: item.quantidade };
+}
+
 /**
- * Chave de idempotência de cada item.
- *
- * Semente do lançamento + id da linha + identidade da operação: reenviar a
- * MESMA lista depois de uma falha de rede reaproveita as chaves (o servidor
+ * Chave de idempotência de cada item: a mesma de uma saída unitária igual
+ * (`chaveSaida`). Reenviar a MESMA lista reaproveita as chaves (o servidor
  * devolve os lançamentos originais); mudar a quantidade de um item muda só a
- * chave dele. O id da linha separa duas linhas iguais em setores diferentes.
+ * chave dele; e um item que já saiu sozinho sem resposta, posto depois numa
+ * lista, é reconhecido em vez de sair de novo. Não há duas linhas com o mesmo
+ * produto e setor na lista (`adicionarAoLote` soma), então as chaves de uma
+ * lista nunca se repetem.
  */
-export function chaveItemLote(semente: string, item: ItemSaidaLote): string {
-  return chaveRequisicao(
-    `${semente}:${item.id}`,
-    item.produto.produtoId,
-    item.setor.setorId,
-    item.quantidade,
-  );
+export function chaveItemLote(pendentes: ChavesPendentes<IdentidadeSaida>, item: ItemSaidaLote): string {
+  return chaveSaida(pendentes, identidadeItemLote(item));
 }
 
 /**
