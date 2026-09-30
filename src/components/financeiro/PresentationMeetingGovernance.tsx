@@ -1,5 +1,5 @@
 import { useSupabase } from '@/contexts/CompanyScopeContext';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   AlertCircle,
@@ -54,6 +54,7 @@ import {
   writePresentationMeetingUrlState,
 } from '@/lib/presentationDetailNavigation';
 import { todayBR } from '@/lib/formatters';
+import { novaSemente } from '@/lib/chaveOperacao';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -140,6 +141,8 @@ function mutationMessage(error: unknown): string {
     PERMISSION_DENIED: 'Sua permissão não permite esta operação.',
     PARTICIPANT_OUT_OF_TENANT: 'Um participante não pertence mais à empresa atual.',
     RESPONSIBLE_OUT_OF_TENANT: 'O responsável pela ata não pertence mais à empresa atual.',
+    RESPONSIBLE_WITHOUT_ACCESS: 'O responsável pela ata não tem acesso à Apresentação Sócios nesta unidade. Escolha outra pessoa ou peça a permissão ao administrador.',
+    REQUEST_ID_REUTILIZADO: 'Este envio não confere com a sessão registrada antes. Confira a lista de sessões antes de criar de novo.',
     REFERENCE_OUT_OF_TENANT_OR_PERIOD: 'Uma referência não pertence à empresa ou não é compatível com o período.',
     SNAPSHOT_REFERENCE_MISSING: 'A pauta e as referências do snapshot ficaram divergentes. Recarregue a sessão.',
     TRANSITION_INVALID: 'Esta transição não é permitida no estado atual.',
@@ -186,6 +189,10 @@ export default function PresentationMeetingGovernance({
   const [conflict, setConflict] = useState<string | null>(null);
   const [conflictDraft, setConflictDraft] = useState<PresentationMeetingDraft | null>(null);
   const [exporting, setExporting] = useState<'pdf' | 'pptx' | null>(null);
+  // Semente da sessão em criação: troca só depois do sucesso. A chave enviada é
+  // derivada dela + conteúdo, então o retry não abre uma 2ª sessão.
+  const [sementeCriacao, setSementeCriacao] = useState(novaSemente);
+  const savingRef = useRef(false);
 
   const profilesQuery = usePresentationResponsibleProfiles(companyId, true);
   const decisionsQuery = usePresentationDecisions(companyId, {
@@ -248,6 +255,10 @@ export default function PresentationMeetingGovernance({
   });
 
   const handleSave = async (draft: PresentationMeetingDraft): Promise<boolean> => {
+    // Trava antes do primeiro await: o `saving` do botão só chega no próximo
+    // render, e um duplo clique no mesmo tick enviaria duas vezes.
+    if (savingRef.current) return false;
+    savingRef.current = true;
     try {
       if (editingExisting && detail) {
         await mutations.saveSession.mutateAsync({
@@ -258,9 +269,11 @@ export default function PresentationMeetingGovernance({
         });
         toast.success('Sessão atualizada com trilha auditável.');
       } else {
-        const created = await mutations.createSession.mutateAsync({ period, granularity, draft });
+        const created = await mutations.createSession.mutateAsync({ period, granularity, draft, semente: sementeCriacao });
+        setSementeCriacao(novaSemente());
         selectSession(created.id);
-        toast.success('Sessão executiva preparada.');
+        if (created.idempotent) toast.info('Esta sessão já tinha sido criada — nada foi duplicado.');
+        else toast.success('Sessão executiva preparada.');
       }
       setConflict(null);
       setConflictDraft(null);
@@ -272,7 +285,13 @@ export default function PresentationMeetingGovernance({
         setConflict(message);
         setConflictDraft(draft);
       } else toast.error(message);
+      // Chave igual com outro conteúdo: a próxima tentativa começa operação nova.
+      if (error instanceof PresentationMeetingMutationError && error.code === 'REQUEST_ID_REUTILIZADO') {
+        setSementeCriacao(novaSemente());
+      }
       return false;
+    } finally {
+      savingRef.current = false;
     }
   };
 
