@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Loader2 } from 'lucide-react';
 import { useScopedToast } from '@/hooks/useScopedToast';
 import {
@@ -12,8 +12,12 @@ import {
   type PresentationScenarioResult,
   type TimeSeriesGranularity,
 } from '@/domain/financeiro/presentation';
-import { usePresentationDecisionMutations } from '@/hooks/usePresentationDecisions';
+import {
+  PresentationDecisionMutationError,
+  usePresentationDecisionMutations,
+} from '@/hooks/usePresentationDecisions';
 import { useFormDirtyGuard } from '@/hooks/useFormDirtyGuard';
+import { novaSemente } from '@/lib/chaveOperacao';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
@@ -101,6 +105,11 @@ export default function PresentationDecisionRegisterDialog({
   const toast = useScopedToast();
   const [draft, setDraft] = useState<RegistrationDraft>(() => createInitialDraft(defaultMode));
   const [hydrated, setHydrated] = useState(false);
+  // Semente da decisão em registro: troca só depois do sucesso. A chave enviada
+  // é derivada dela + escolhas do usuário, então o retry (mesmo depois de
+  // fechar e reabrir o diálogo) não registra uma 2ª decisão.
+  const [semente, setSemente] = useState(novaSemente);
+  const submittingRef = useRef(false);
   const mutations = usePresentationDecisionMutations(companyId);
   const key = useMemo(() => storageKey(companyId, userId, period), [companyId, period, userId]);
   const close = () => onOpenChange(false);
@@ -172,6 +181,10 @@ export default function PresentationDecisionRegisterDialog({
       toast.error('Informe título e contexto/justificativa.');
       return;
     }
+    // Trava antes do primeiro await: o isPending do botão só chega no próximo
+    // render, e um duplo clique no mesmo tick enviaria duas vezes.
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     try {
       const snapshot = buildPresentationDecisionSnapshot({
         plan,
@@ -192,14 +205,25 @@ export default function PresentationDecisionRegisterDialog({
         referenceType: snapshot.referenceType,
         snapshot,
         executiveResponsibleUserId: responsibleUserId,
+        semente,
       });
+      setSemente(novaSemente());
       sessionStorage.removeItem(key);
-      toast.success('Decisão registrada como rascunho.');
+      if (result.idempotent) toast.info('Esta decisão já tinha sido registrada — nada foi duplicado.');
+      else toast.success('Decisão registrada como rascunho.');
       onCreated(result.id);
       onOpenChange(false);
     } catch (error) {
       console.error('Erro ao registrar decisão:', error);
-      toast.error(error instanceof Error ? error.message : 'Não foi possível registrar a decisão.');
+      if (error instanceof PresentationDecisionMutationError && error.code === 'REQUEST_ID_REUTILIZADO') {
+        // Chave igual com outro conteúdo: a próxima tentativa começa operação nova.
+        setSemente(novaSemente());
+        toast.error('Este envio não confere com a decisão registrada antes. Confira a lista de decisões antes de registrar de novo.');
+      } else {
+        toast.error(error instanceof Error ? error.message : 'Não foi possível registrar a decisão.');
+      }
+    } finally {
+      submittingRef.current = false;
     }
   };
 

@@ -3429,6 +3429,8 @@ export type Database = {
           executive_responsible_user_id: string | null
           granularity: string
           id: string
+          idempotency_fingerprint: string | null
+          idempotency_key: string | null
           latest_justification: string | null
           period_end_exclusive: string
           period_start: string
@@ -3458,6 +3460,8 @@ export type Database = {
           executive_responsible_user_id?: string | null
           granularity: string
           id?: string
+          idempotency_fingerprint?: string | null
+          idempotency_key?: string | null
           latest_justification?: string | null
           period_end_exclusive: string
           period_start: string
@@ -3487,6 +3491,8 @@ export type Database = {
           executive_responsible_user_id?: string | null
           granularity?: string
           id?: string
+          idempotency_fingerprint?: string | null
+          idempotency_key?: string | null
           latest_justification?: string | null
           period_end_exclusive?: string
           period_start?: string
@@ -3647,6 +3653,8 @@ export type Database = {
           current_revision_id: string | null
           granularity: string
           id: string
+          idempotency_fingerprint: string | null
+          idempotency_key: string | null
           latest_justification: string | null
           meeting_date: string
           meeting_snapshot: Json | null
@@ -3679,6 +3687,8 @@ export type Database = {
           current_revision_id?: string | null
           granularity: string
           id?: string
+          idempotency_fingerprint?: string | null
+          idempotency_key?: string | null
           latest_justification?: string | null
           meeting_date: string
           meeting_snapshot?: Json | null
@@ -3711,6 +3721,8 @@ export type Database = {
           current_revision_id?: string | null
           granularity?: string
           id?: string
+          idempotency_fingerprint?: string | null
+          idempotency_key?: string | null
           latest_justification?: string | null
           meeting_date?: string
           meeting_snapshot?: Json | null
@@ -10020,6 +10032,7 @@ export type Database = {
           p_context: string
           p_executive_responsible_user_id?: string
           p_granularity: string
+          p_idempotency_key?: string
           p_period_end_exclusive: string
           p_period_start: string
           p_reference_type: string
@@ -10045,6 +10058,7 @@ export type Database = {
           p_agenda_items: Json
           p_context: string
           p_granularity: string
+          p_idempotency_key?: string
           p_meeting_date: string
           p_minutes_responsible_user_id: string
           p_participant_user_ids: string[]
