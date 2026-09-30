@@ -1,4 +1,5 @@
 import { useCompanyId } from '@/hooks/useCompanyId';
+import { mensagemCadastroDuplicado } from '@/domain/financeiro/cadastros';
 import { withCompanyId } from '@/lib/companyPayload';
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useRef } from 'react';
@@ -79,6 +80,14 @@ export default function PlanoContasFinSection({
   const { showConfirm, guardedClose, confirmClose, cancelClose } =
     useFormDirtyGuard({ current: form, onClose: handleCloseForm });
 
+  const falhaAoSalvar = (error: { message?: string }) => {
+    console.error('[PlanoContasFinSection.save]', error);
+    const duplicado = mensagemCadastroDuplicado(error.message);
+    toast.error(duplicado ?? error.message ?? 'Erro ao salvar conta');
+    // O que já existe (inclusive um envio anterior sem resposta) aparece na lista.
+    if (duplicado) load();
+  };
+
   const save = async () => {
     if (salvandoRef.current) return;
     if (!form.codigo.trim() || !form.nome.trim()) { toast.error('Código e nome obrigatórios'); return; }
@@ -95,11 +104,11 @@ export default function PlanoContasFinSection({
           p_linha_dre: form.linha_dre || '',
           p_expected_updated_at: editUpdatedAt
         });
-        if (error) { console.error('[PlanoContasFinSection.save]', error); toast.error(error.message); return; }
+        if (error) { falhaAoSalvar(error); return; }
         toast.success('Conta atualizada');
       } else {
         const { error } = await supabase.from('fin_plano_contas').insert(withCompanyId(companyId, { ...form, created_by: user?.id }));
-        if (error) { console.error('[PlanoContasFinSection.save]', error); toast.error(error.message); return; }
+        if (error) { falhaAoSalvar(error); return; }
         toast.success('Conta criada');
       }
       handleCloseForm();

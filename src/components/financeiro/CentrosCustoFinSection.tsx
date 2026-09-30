@@ -1,4 +1,5 @@
 import { useCompanyId } from '@/hooks/useCompanyId';
+import { mensagemCadastroDuplicado } from '@/domain/financeiro/cadastros';
 import { withCompanyId } from '@/lib/companyPayload';
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useRef } from 'react';
@@ -73,6 +74,14 @@ export default function CentrosCustoFinSection({
   };
   const { showConfirm, guardedClose, confirmClose, cancelClose } = useFormDirtyGuard({ current: form, onClose: handleCloseForm });
 
+  const falhaAoSalvar = (error: { message?: string }) => {
+    console.error('[CentrosCustoFinSection.save]', error);
+    const duplicado = mensagemCadastroDuplicado(error.message);
+    toast.error(duplicado ?? error.message ?? 'Erro ao salvar centro de custo');
+    // O que já existe (inclusive um envio anterior sem resposta) aparece na lista.
+    if (duplicado) load();
+  };
+
   const save = async () => {
     if (salvandoRef.current) return;
     if (!form.nome.trim()) { toast.error('Nome obrigatório'); return; }
@@ -86,11 +95,11 @@ export default function CentrosCustoFinSection({
           p_descricao: form.descricao || '',
           p_expected_updated_at: editUpdatedAt
         });
-        if (error) { console.error('[CentrosCustoFinSection.save]', error); toast.error(error.message); return; }
+        if (error) { falhaAoSalvar(error); return; }
         toast.success('Centro de custo atualizado');
       } else {
         const { error } = await supabase.from('fin_centros_custo').insert(withCompanyId(companyId, { ...form, created_by: user?.id }));
-        if (error) { console.error('[CentrosCustoFinSection.save]', error); toast.error(error.message); return; }
+        if (error) { falhaAoSalvar(error); return; }
         toast.success('Centro de custo criado');
       }
       handleCloseForm();
