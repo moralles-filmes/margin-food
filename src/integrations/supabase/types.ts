@@ -2169,6 +2169,7 @@ export type Database = {
           fornecedor: string | null
           fornecedor_unaccent: string | null
           id: string
+          idempotency_key: string | null
           justificativa: string | null
           lancamento_id: string | null
           lancamento_pai_id: string | null
@@ -2206,6 +2207,7 @@ export type Database = {
           fornecedor?: string | null
           fornecedor_unaccent?: string | null
           id?: string
+          idempotency_key?: string | null
           justificativa?: string | null
           lancamento_id?: string | null
           lancamento_pai_id?: string | null
@@ -2243,6 +2245,7 @@ export type Database = {
           fornecedor?: string | null
           fornecedor_unaccent?: string | null
           id?: string
+          idempotency_key?: string | null
           justificativa?: string | null
           lancamento_id?: string | null
           lancamento_pai_id?: string | null
@@ -2436,6 +2439,7 @@ export type Database = {
           excluir_dos_relatorios: boolean
           forma_pagamento: string | null
           id: string
+          idempotency_key: string | null
           lancamento_id: string | null
           lancamento_pai_id: string | null
           observacoes: string | null
@@ -2466,6 +2470,7 @@ export type Database = {
           excluir_dos_relatorios?: boolean
           forma_pagamento?: string | null
           id?: string
+          idempotency_key?: string | null
           lancamento_id?: string | null
           lancamento_pai_id?: string | null
           observacoes?: string | null
@@ -2496,6 +2501,7 @@ export type Database = {
           excluir_dos_relatorios?: boolean
           forma_pagamento?: string | null
           id?: string
+          idempotency_key?: string | null
           lancamento_id?: string | null
           lancamento_pai_id?: string | null
           observacoes?: string | null
@@ -9978,6 +9984,7 @@ export type Database = {
           p_descricao: string
           p_forma_pagamento?: string
           p_fornecedor?: string
+          p_idempotency_key?: string
           p_observacoes?: string
           p_rateios?: Json
           p_recorrencia?: Json
@@ -9996,6 +10003,7 @@ export type Database = {
           p_data_vencimento?: string
           p_descricao: string
           p_forma_pagamento?: string
+          p_idempotency_key?: string
           p_observacoes?: string
           p_rateios?: Json
           p_recorrencia?: Json
@@ -10290,6 +10298,7 @@ export type Database = {
           p_descricao?: string
           p_forma_pagamento?: string
           p_id?: string
+          p_idempotency_key?: string
           p_justificativa_edicao?: string
           p_observacoes?: string
           p_origem?: string
@@ -10303,6 +10312,7 @@ export type Database = {
         }
         Returns: {
           id: string
+          idempotente: boolean
           updated_at: string
         }[]
       }
@@ -10666,6 +10676,7 @@ export type Database = {
           p_created_by?: string
           p_data: string
           p_descricao: string
+          p_idempotency_key?: string
           p_valor: number
         }
         Returns: Json
@@ -10770,7 +10781,7 @@ export type Database = {
       }
       generate_next_sku: { Args: { p_prefix?: string }; Returns: string }
       gerar_parcela_recorrente: {
-        Args: { p_lancamento_pai_id: string }
+        Args: { p_lancamento_pai_id: string; p_parcela_esperada?: number }
         Returns: Json
       }
       get_all_saldos_contas: {
@@ -11612,6 +11623,21 @@ export type Database = {
           p_external_id: string
           p_lancamento_id: string
           p_tipo: string
+        }
+        Returns: Json
+      }
+      reconcile_create_titulo_from_extrato: {
+        Args: {
+          p_categoria_id?: string
+          p_cliente?: string
+          p_data_baixa?: string
+          p_data_competencia?: string
+          p_data_vencimento?: string
+          p_descricao: string
+          p_destino: string
+          p_lancamento_id: string
+          p_observacoes?: string
+          p_supplier_id?: string
         }
         Returns: Json
       }

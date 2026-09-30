@@ -15,6 +15,7 @@ import { fmtBRL, todayBR } from '@/lib/formatters';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import * as XLSX from '@/lib/safeXlsx';
+import { traduzirErroIdempotencia } from '@/domain/financeiro/idempotencia';
 
 // ─── Types ───
 type OrigemType = 'lancamento' | 'conta_pagar' | 'conta_receber';
@@ -113,6 +114,8 @@ export default function RecorrenciasSection({ onNavigate }: Props) {
   const [cursorId, setCursorId] = useState<string | null>(null);
   const [errorState, setErrorState] = useState(false);
   const [gerandoById, setGerandoById] = useState<Record<string, boolean>>({});
+  // Trava síncrona por linha: `gerandoById` só desabilita o botão no próximo render.
+  const gerandoRef = useRef<Set<string>>(new Set());
 
   const now = new Date();
   const [mesAno, setMesAno] = useState(() => {
@@ -213,18 +216,26 @@ export default function RecorrenciasSection({ onNavigate }: Props) {
     }
 
     const rowKey = item.chave_unica;
+    if (gerandoRef.current.has(rowKey)) return;
+    gerandoRef.current.add(rowKey);
     setGerandoById(prev => ({ ...prev, [rowKey]: true }));
     try {
+      // O número da parcela vem do que a tela mostra, não do contador do servidor:
+      // repetir depois de uma resposta perdida devolve a mesma parcela em vez de
+      // gerar a seguinte.
       const { data, error } = await supabase.rpc('gerar_parcela_recorrente', {
         p_lancamento_pai_id: item.id,
+        p_parcela_esperada: (item.parcelas_geradas ?? 0) + 1,
       });
 
       if (error) {
+        console.error('[RecorrenciasSection.gerarParcela]', error);
         if (error.message?.includes('PERMISSION_DENIED')) {
           toast.error('Seu perfil não possui permissão para gerar parcelas recorrentes.');
         } else {
-          toast.error(error.message);
+          toast.error(traduzirErroIdempotencia(error.message) ?? error.message);
         }
+        if (error.message?.includes('PARCELA_FORA_DE_ORDEM')) loadPage(null, null, true);
         return;
       }
 
@@ -245,6 +256,7 @@ export default function RecorrenciasSection({ onNavigate }: Props) {
       console.error(err);
       toast.error('Erro ao gerar parcela');
     } finally {
+      gerandoRef.current.delete(rowKey);
       setGerandoById(prev => ({ ...prev, [rowKey]: false }));
     }
   };

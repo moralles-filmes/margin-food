@@ -1,7 +1,7 @@
 import { useCompanyId } from '@/hooks/useCompanyId';
 import { withCompanyId } from '@/lib/companyPayload';
 import { useSupabase } from '@/contexts/CompanyScopeContext';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEmitDataEvent } from '@/lib/dataEvents';
 import { useScopedToast } from '@/hooks/useScopedToast';
@@ -45,6 +45,9 @@ export default function CentrosCustoFinSection({
   const [editId, setEditId] = useState<string | null>(null);
   const [editUpdatedAt, setEditUpdatedAt] = useState<string | null>(null);
   const [form, setForm] = useState({ nome: '', descricao: '' });
+  const [saving, setSaving] = useState(false);
+  // Trava síncrona: sem ela, dois cliques em "Salvar" gravavam dois centros de custo.
+  const salvandoRef = useRef(false);
 
   useEffect(() => { load(); }, []);
 
@@ -71,24 +74,32 @@ export default function CentrosCustoFinSection({
   const { showConfirm, guardedClose, confirmClose, cancelClose } = useFormDirtyGuard({ current: form, onClose: handleCloseForm });
 
   const save = async () => {
+    if (salvandoRef.current) return;
     if (!form.nome.trim()) { toast.error('Nome obrigatório'); return; }
-    if (editId) {
-      const { error } = await (supabase.rpc as any)('_guarded_update_centro_custo', {
-        p_id: editId,
-        p_nome: form.nome,
-        p_descricao: form.descricao || '',
-        p_expected_updated_at: editUpdatedAt
-      });
-      if (error) { toast.error(error.message); return; }
-      toast.success('Centro de custo atualizado');
-    } else {
-      const { error } = await supabase.from('fin_centros_custo').insert(withCompanyId(companyId, { ...form, created_by: user?.id }));
-      if (error) { toast.error(error.message); return; }
-      toast.success('Centro de custo criado');
+    salvandoRef.current = true;
+    setSaving(true);
+    try {
+      if (editId) {
+        const { error } = await (supabase.rpc as any)('_guarded_update_centro_custo', {
+          p_id: editId,
+          p_nome: form.nome,
+          p_descricao: form.descricao || '',
+          p_expected_updated_at: editUpdatedAt
+        });
+        if (error) { console.error('[CentrosCustoFinSection.save]', error); toast.error(error.message); return; }
+        toast.success('Centro de custo atualizado');
+      } else {
+        const { error } = await supabase.from('fin_centros_custo').insert(withCompanyId(companyId, { ...form, created_by: user?.id }));
+        if (error) { console.error('[CentrosCustoFinSection.save]', error); toast.error(error.message); return; }
+        toast.success('Centro de custo criado');
+      }
+      handleCloseForm();
+      load();
+      emitDataEvent('financeiro:cadastros');
+    } finally {
+      salvandoRef.current = false;
+      setSaving(false);
     }
-    handleCloseForm();
-    load();
-    emitDataEvent('financeiro:cadastros');
   };
 
   const remove = async (id: string) => {
@@ -119,7 +130,7 @@ export default function CentrosCustoFinSection({
             <div className="space-y-3">
               <div><Label>Nome</Label><Input value={form.nome} onChange={e => setForm({...form, nome: e.target.value})} /></div>
               <div><Label>Descrição</Label><Textarea value={form.descricao} onChange={e => setForm({...form, descricao: e.target.value})} /></div>
-              <Button onClick={save} className="w-full">{editId ? 'Atualizar' : 'Salvar'}</Button>
+              <Button onClick={save} disabled={saving} className="w-full">{saving ? 'Salvando...' : editId ? 'Atualizar' : 'Salvar'}</Button>
             </div>
           </DialogContent>
         </Dialog>}

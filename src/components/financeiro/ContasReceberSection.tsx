@@ -1,5 +1,5 @@
 import { useSupabase } from '@/contexts/CompanyScopeContext';
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { CursorListResponse, FinStatusCounts } from '@/types/financeiro';
 import { useEmitDataEvent, useDataEvent } from '@/lib/dataEvents';
 import { fmtBRL, formatDateBR, parseLocalDate } from '@/lib/formatters';
@@ -29,6 +29,7 @@ import SearchableSelect from '@/components/ui/SearchableSelect';
 import { buildCategoriaFilterOptions, categoriaFiltroToParams, CATEGORIA_FILTRO_TODOS } from './categoriaFiltro';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { getRecurrenceValidationMessage } from '@/domain/financeiro/recurrence';
+import { criarChavesPendentes, traduzirErroIdempotencia } from '@/domain/financeiro/idempotencia';
 
 /* ─── Types ─── */
 interface ContaReceber {
@@ -45,7 +46,7 @@ interface ContaReceber {
 interface Categoria { id: string; nome: string; tipo: string; codigo: string | null; parent_id: string | null; centro_custo_padrao_id: string | null; groupLabel?: string; }
 interface Centro { id: string; nome: string; }
 interface Conta { id: string; nome: string; }
-interface SaveContaReceberResult { lancamentos_criados?: number; }
+interface SaveContaReceberResult { lancamentos_criados?: number; idempotente?: boolean; }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   RASCUNHO: { label: 'Rascunho', color: 'bg-muted text-muted-foreground' },
@@ -94,6 +95,10 @@ export default function ContasReceberSection({ initialStatus }: ContasReceberSec
   const [contas, setContas] = useState<Conta[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  // Trava síncrona do save: `saving` só chega ao botão no próximo render.
+  const salvandoRef = useRef(false);
+  // Chaves de idempotência da criação: semente por conteúdo ainda não confirmado.
+  const [chavesCriacao] = useState(() => criarChavesPendentes('conta_receber'));
   const [showForm, setShowForm] = useState(false);
   const [filtroStatus, setFiltroStatus] = useState(initialStatus || 'todos');
   const [filtroDataDe, setFiltroDataDe] = useState('');
@@ -337,7 +342,7 @@ export default function ContasReceberSection({ initialStatus }: ContasReceberSec
 
   /* ─── Save via RPC ─── */
   const save = async () => {
-    if (saving) return;
+    if (saving || salvandoRef.current) return;
     if (!form.descricao.trim() || form.valor <= 0) { toast.error('Descricao e valor obrigatorios'); return; }
     const recurrenceError = form.recorrente
       ? getRecurrenceValidationMessage(form.frequencia, form.parcelas)
@@ -346,6 +351,7 @@ export default function ContasReceberSection({ initialStatus }: ContasReceberSec
     const rateioValido = rateioLines.length === 0 || Math.abs(form.valor - rateioLines.reduce((s, l) => s + Number(l.valor || 0), 0)) < 0.01;
     if (rateioLines.length > 0 && !rateioValido) { toast.error('Rateio incompleto'); return; }
 
+    salvandoRef.current = true;
     setSaving(true);
     try {
       let catId: string | null = null;
@@ -362,7 +368,7 @@ export default function ContasReceberSection({ initialStatus }: ContasReceberSec
         ? { frequencia: form.frequencia, parcelas: form.parcelas, parcelas_geradas: 0 }
         : null;
 
-      const { data, error } = await (supabase.rpc as any)(editingItem ? '_guarded_update_conta_receber' : '_guarded_create_conta_receber', {
+      const params = {
         p_id: editingItem?.id,
         p_descricao: form.descricao,
         p_cliente: form.cliente || null,
@@ -377,18 +383,30 @@ export default function ContasReceberSection({ initialStatus }: ContasReceberSec
         p_rateios: rateiosPayload,
         p_recorrencia: recorrencia || null,
         p_expected_updated_at: editingItem?.updated_at,
-      });
+      };
+      // Só a criação leva chave: um reenvio não duplica o título nem as N parcelas.
+      const payload = editingItem ? params : { ...params, p_idempotency_key: await chavesCriacao.chave(params) };
 
-      if (error) { toast.error(error.message); return; }
+      const { data, error } = await (supabase.rpc as any)(editingItem ? '_guarded_update_conta_receber' : '_guarded_create_conta_receber', payload);
+
+      if (error) {
+        console.error('[ContasReceberSection.save]', error);
+        toast.error(traduzirErroIdempotencia(error.message) ?? error.message);
+        return;
+      }
       const result = data as SaveContaReceberResult | null;
       const createdCount = Number(result?.lancamentos_criados) || 1;
+      if (!editingItem) chavesCriacao.confirmar(params);
       toast.success(editingItem
         ? 'Conta atualizada'
-        : `${createdCount} conta${createdCount > 1 ? 's' : ''} a receber criada${createdCount > 1 ? 's' : ''}`);
+        : result?.idempotente
+          ? 'Esta conta a receber ja estava registrada.'
+          : `${createdCount} conta${createdCount > 1 ? 's' : ''} a receber criada${createdCount > 1 ? 's' : ''}`);
       handleCloseForm();
       emitDataEvent('financeiro:receber');
       emitDataEvent('financeiro:lancamentos');
     } finally {
+      salvandoRef.current = false;
       setSaving(false);
     }
   };

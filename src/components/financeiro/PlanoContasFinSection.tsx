@@ -1,7 +1,7 @@
 import { useCompanyId } from '@/hooks/useCompanyId';
 import { withCompanyId } from '@/lib/companyPayload';
 import { useSupabase } from '@/contexts/CompanyScopeContext';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEmitDataEvent } from '@/lib/dataEvents';
 import { useScopedToast } from '@/hooks/useScopedToast';
@@ -49,6 +49,9 @@ export default function PlanoContasFinSection({
   const [editId, setEditId] = useState<string | null>(null);
   const [editUpdatedAt, setEditUpdatedAt] = useState<string | null>(null);
   const [form, setForm] = useState({ codigo: '', nome: '', tipo: 'despesa', natureza: 'operacional', linha_dre: '' });
+  const [saving, setSaving] = useState(false);
+  // Trava síncrona: sem ela, dois cliques em "Salvar" gravavam duas contas.
+  const salvandoRef = useRef(false);
 
   useEffect(() => { load(); }, []);
 
@@ -77,27 +80,35 @@ export default function PlanoContasFinSection({
     useFormDirtyGuard({ current: form, onClose: handleCloseForm });
 
   const save = async () => {
+    if (salvandoRef.current) return;
     if (!form.codigo.trim() || !form.nome.trim()) { toast.error('Código e nome obrigatórios'); return; }
-    if (editId) {
-      const { error } = await (supabase.rpc as any)('_guarded_update_plano_contas', {
-        p_id: editId,
-        p_codigo: form.codigo,
-        p_nome: form.nome,
-        p_tipo: form.tipo,
-        p_natureza: form.natureza,
-        p_linha_dre: form.linha_dre || '',
-        p_expected_updated_at: editUpdatedAt
-      });
-      if (error) { toast.error(error.message); return; }
-      toast.success('Conta atualizada');
-    } else {
-      const { error } = await supabase.from('fin_plano_contas').insert(withCompanyId(companyId, { ...form, created_by: user?.id }));
-      if (error) { toast.error(error.message); return; }
-      toast.success('Conta criada');
+    salvandoRef.current = true;
+    setSaving(true);
+    try {
+      if (editId) {
+        const { error } = await (supabase.rpc as any)('_guarded_update_plano_contas', {
+          p_id: editId,
+          p_codigo: form.codigo,
+          p_nome: form.nome,
+          p_tipo: form.tipo,
+          p_natureza: form.natureza,
+          p_linha_dre: form.linha_dre || '',
+          p_expected_updated_at: editUpdatedAt
+        });
+        if (error) { console.error('[PlanoContasFinSection.save]', error); toast.error(error.message); return; }
+        toast.success('Conta atualizada');
+      } else {
+        const { error } = await supabase.from('fin_plano_contas').insert(withCompanyId(companyId, { ...form, created_by: user?.id }));
+        if (error) { console.error('[PlanoContasFinSection.save]', error); toast.error(error.message); return; }
+        toast.success('Conta criada');
+      }
+      handleCloseForm();
+      load();
+      emitDataEvent('financeiro:cadastros');
+    } finally {
+      salvandoRef.current = false;
+      setSaving(false);
     }
-    handleCloseForm();
-    load();
-    emitDataEvent('financeiro:cadastros');
   };
 
   const remove = async (id: string) => {
@@ -151,7 +162,7 @@ export default function PlanoContasFinSection({
                 </Select>
               </div>
               <div><Label>Linha DRE</Label><Input value={form.linha_dre} onChange={e => setForm({...form, linha_dre: e.target.value})} /></div>
-              <Button onClick={save} className="w-full">{editId ? 'Atualizar' : 'Salvar'}</Button>
+              <Button onClick={save} disabled={saving} className="w-full">{saving ? 'Salvando...' : editId ? 'Atualizar' : 'Salvar'}</Button>
             </div>
           </DialogContent>
         </Dialog>}
