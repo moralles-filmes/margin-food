@@ -17,6 +17,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Slider } from '@/components/ui/slider';
 import { useScopedToast } from '@/hooks/useScopedToast';
+import { useTravaEnvio } from '@/hooks/useTravaEnvio';
+import { novaSemente } from '@/lib/chaveOperacao';
+import { chaveCriacaoComponente } from '@/domain/fichaTecnica/idempotencia';
 import ProductSearchCombobox, { type ProductOption } from '@/components/ui/ProductSearchCombobox';
 import { LoteSalmaoLimpo } from '@/types/salmon';
 import { DecimalInput, parseDecimal } from '@/components/ui/decimal-input';
@@ -573,7 +576,10 @@ function ComponenteFormDialog({ open, onClose, componente, forcedTipo, component
     tempo_preparo_min: '', modo_preparo: '', observacoes: '',
   });
   const [bomItens, setBomItens] = useState<BomItem[]>([]);
-  const [saving, setSaving] = useState(false);
+  const { enviando: saving, executar } = useTravaEnvio();
+  // Semente da criação: só troca depois do sucesso. A chave enviada combina a
+  // semente com o formulário — o retry do mesmo componente recebe o já criado.
+  const [sementeCriacao, setSementeCriacao] = useState(novaSemente);
 
   const fichaProductOptions: ProductOption[] = useMemo(() =>
     produtos.map((p: { id: string; nome_produto: string; sku?: string; unidade_medida?: string }) => ({
@@ -621,36 +627,49 @@ function ComponenteFormDialog({ open, onClose, componente, forcedTipo, component
     }
   }, [componente, forcedTipo, open, supabase]);
 
-  const handleSave = async () => {
+  const handleSave = () => executar(async () => {
     if (!form.nome.trim()) { toast.error('Nome obrigatório'); return; }
-    setSaving(true);
     try {
-      const res = await invokeApi(supabase, 'salvar_componente', {
-        id: componente?.id, tipo: form.tipo, nome: form.nome, categoria: form.categoria,
+      const campos = {
+        tipo: form.tipo, nome: form.nome, categoria: form.categoria,
         rendimento: parseDecimal(form.rendimento) || 1, unidade_rendimento: form.unidade_rendimento,
         perda_estimada_percent: parseDecimal(form.perda_estimada_percent) || 0,
         custo_indireto: normalizeBRLMoneyToNumber(form.custo_indireto) || 0,
         peso_por_unidade: form.peso_por_unidade ? parseDecimal(form.peso_por_unidade) : null,
         tempo_preparo_min: form.tempo_preparo_min ? parseDecimal(form.tempo_preparo_min) : null,
         modo_preparo: form.modo_preparo, observacoes: form.observacoes,
-      });
-      const compId = componente?.id || res.id;
-      if (bomItens.length > 0) {
-        await invokeApi(supabase, 'salvar_componente_itens', {
-          componente_pai_id: compId,
-          itens: bomItens.map(i => ({
-            produto_id: i.produto_id || null, componente_filho_id: i.componente_filho_id || null,
-            quantidade: i.quantidade, unidade: i.unidade, custo_snapshot: i.custoBase || 0,
-            origem: i.origem || 'ESTOQUE_GERAL',
-            unidade_original: i.unidade_original || '', quantidade_original: i.quantidade_original || 0,
-          })),
+      };
+      const itens = bomItens.map(i => ({
+        produto_id: i.produto_id || null, componente_filho_id: i.componente_filho_id || null,
+        quantidade: i.quantidade, unidade: i.unidade, custo_snapshot: i.custoBase || 0,
+        origem: i.origem || 'ESTOQUE_GERAL',
+        unidade_original: i.unidade_original || '', quantidade_original: i.quantidade_original || 0,
+      }));
+
+      if (componente) {
+        // Edição: regravar cabeçalho e itens de novo dá o mesmo resultado.
+        await invokeApi(supabase, 'salvar_componente', { id: componente.id, ...campos });
+        if (itens.length > 0) {
+          await invokeApi(supabase, 'salvar_componente_itens', { componente_pai_id: componente.id, itens });
+        }
+        toast.success('Salvo com sucesso');
+      } else {
+        // Criação: cabeçalho e itens numa transação — falhou um item, não
+        // sobra componente órfão; o retry recebe o componente já criado.
+        const res = await invokeApi(supabase, 'criar_componente', {
+          ...campos,
+          itens,
+          client_request_id: await chaveCriacaoComponente(sementeCriacao, { campos, itens }),
         });
+        setSementeCriacao(novaSemente());
+        toast.success(res?.idempotente ? 'Componente já estava salvo' : 'Salvo com sucesso');
       }
-      toast.success('Salvo com sucesso');
       onSaved();
-    } catch (e: any) { toast.error(e.message); }
-    setSaving(false);
-  };
+    } catch (e: any) {
+      console.error('Erro ao salvar componente:', e);
+      toast.error(e.message);
+    }
+  });
 
   const addBomInsumo = (prodId: string) => {
     const prod = produtos.find(p => p.id === prodId);
@@ -905,7 +924,7 @@ function CanalFormDialog({ open, onClose, canal, onSaved }: {
   const toast = useScopedToast();
   const supabase = useSupabase();
   const [form, setForm] = useState({ nome: '', taxa_percentual: '0', taxa_fixa: '0', imposto_percent: '0', custo_embalagem_adicional: '0' });
-  const [saving, setSaving] = useState(false);
+  const { enviando: saving, executar } = useTravaEnvio();
 
   useEffect(() => {
     if (canal) {
@@ -915,9 +934,8 @@ function CanalFormDialog({ open, onClose, canal, onSaved }: {
     }
   }, [canal, open]);
 
-  const handleSave = async () => {
+  const handleSave = () => executar(async () => {
     if (!form.nome.trim()) { toast.error('Nome obrigatório'); return; }
-    setSaving(true);
     try {
       await invokeApi(supabase, 'salvar_canal', {
         id: canal?.id,
@@ -930,8 +948,7 @@ function CanalFormDialog({ open, onClose, canal, onSaved }: {
       toast.success('Canal salvo');
       onSaved();
     } catch (e: any) { toast.error(e.message); }
-    setSaving(false);
-  };
+  });
 
   return (
     <Dialog open={open} onOpenChange={onClose}>

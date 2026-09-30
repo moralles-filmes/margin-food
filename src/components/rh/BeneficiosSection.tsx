@@ -6,6 +6,7 @@ import { DecimalInput, parseDecimal } from '@/components/ui/decimal-input';
 import { CurrencyInput } from '@/components/ui/brl-input';
 import { useAuth } from '@/contexts/AuthContext';
 import { useScopedToast } from '@/hooks/useScopedToast';
+import { useTravaEnvio } from '@/hooks/useTravaEnvio';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -101,7 +102,9 @@ export default function BeneficiosSection({
   const [benPage, setBenPage] = useState(0);
   const [benHasMore, setBenHasMore] = useState(true);
   const [savingBen, setSavingBen] = useState(false);
+  const { enviando: atribuindoLote, executar: executarLote } = useTravaEnvio();
   const PAGE_SIZE = 50;
+  const LOTE_LEITURA = 1000;
 
   const fetchData = useCallback(async (p = 0, append = false) => {
     if (!append) setLoading(true);
@@ -195,13 +198,29 @@ export default function BeneficiosSection({
     fetchData();
   };
 
-  const handleAtribuirEmLote = async (tipo: string) => {
+  const handleAtribuirEmLote = (tipo: string) => executarLote(async () => {
     const tipoInfo = TIPOS_BENEFICIO.find(t => t.value === tipo);
     if (!tipoInfo) return;
 
-    const colabsSemBeneficio = colaboradores.filter(c =>
-      !beneficios.some(b => b.colaborador_id === c.id && b.tipo === tipo && b.status === 'ATIVO')
-    );
+    // Quem já tem o benefício ativo vem do banco, não da lista da tela: ela é
+    // paginada e deixava de fora quem estava nas páginas seguintes.
+    const jaPossuem = new Set<string>();
+    for (let from = 0; ; from += LOTE_LEITURA) {
+      const { data, error } = await supabase.from('rh_beneficios')
+        .select('colaborador_id')
+        .eq('tipo', tipo).eq('status', 'ATIVO')
+        .order('id')
+        .range(from, from + LOTE_LEITURA - 1);
+      if (error) {
+        console.error('Erro ao conferir benefícios ativos:', error);
+        toast.error('Erro ao conferir quem já tem o benefício: ' + error.message);
+        return;
+      }
+      for (const b of data || []) jaPossuem.add(b.colaborador_id);
+      if (!data || data.length < LOTE_LEITURA) break;
+    }
+
+    const colabsSemBeneficio = colaboradores.filter(c => !jaPossuem.has(c.id));
 
     if (colabsSemBeneficio.length === 0) {
       toast.info('Todos os colaboradores já possuem este benefício');
@@ -224,7 +243,7 @@ export default function BeneficiosSection({
     if (error) { toast.error('Erro: ' + error.message); return; }
     toast.success(`${tipoInfo.label} atribuído a ${colabsSemBeneficio.length} colaboradores!`);
     fetchData();
-  };
+  });
 
   if (loading) {
     return (
@@ -295,9 +314,9 @@ export default function BeneficiosSection({
         </div>
         {canManage && (
           <div className="flex gap-2">
-            <Select onValueChange={handleAtribuirEmLote}>
+            <Select value="" onValueChange={handleAtribuirEmLote} disabled={atribuindoLote}>
               <SelectTrigger className="h-8 text-xs w-44">
-                <SelectValue placeholder="Atribuir em lote..." />
+                <SelectValue placeholder={atribuindoLote ? 'Atribuindo...' : 'Atribuir em lote...'} />
               </SelectTrigger>
               <SelectContent>
                 {TIPOS_BENEFICIO.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}

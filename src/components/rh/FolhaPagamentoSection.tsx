@@ -1,9 +1,8 @@
-import { useCompanyId } from '@/hooks/useCompanyId';
-import { withCompanyId } from '@/lib/companyPayload';
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
 import { useScopedToast } from '@/hooks/useScopedToast';
+import { useTravaEnvio } from '@/hooks/useTravaEnvio';
+import { mensagemErroFolha, type ResultadoCalculoFolha, type ResultadoStatusFolha } from '@/domain/rh/folha';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import KpiCard from '@/components/ui/KpiCard';
 import { Button } from '@/components/ui/button';
@@ -95,14 +94,13 @@ export default function FolhaPagamentoSection({
  colaboradores, canManage }: Props) {
   const toast = useScopedToast();
   const supabase = useSupabase();
-  const { companyId } = useCompanyId();
   const canViewRbac = useCan('rh:folha:view');
-  const { user } = useAuth();
   const [folhas, setFolhas] = useState<FolhaPagamento[]>([]);
   const [loading, setLoading] = useState(true);
   const [periodo, setPeriodo] = useState(formatInBR(new Date(), 'yyyy-MM'));
   const [selectedFolha, setSelectedFolha] = useState<FolhaPagamento | null>(null);
-  const [generating, setGenerating] = useState(false);
+  const { enviando: generating, executar: executarCalculo } = useTravaEnvio();
+  const { enviando: mudandoStatus, executar: executarStatus } = useTravaEnvio();
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -124,20 +122,21 @@ export default function FolhaPagamentoSection({
 
   const getColabNome = (id: string) => colaboradores.find(c => c.id === id)?.nome || 'Desconhecido';
 
-  const handleGerarFolha = async () => {
+  const handleGerarFolha = () => executarCalculo(async () => {
     if (!canManage) { toast.error('Sem permissão'); return; }
-    setGenerating(true);
 
     try {
       // Fetch banco_horas for period
-      const { data: bancoData } = await supabase
+      const { data: bancoData, error: bancoError } = await supabase
         .from('rh_banco_horas')
         .select('id, colaborador_id, periodo, horas_trabalhadas, horas_extras, banco_horas_saldo, observacoes')
         .eq('periodo', periodo);
+      // Sem o banco de horas a folha sairia com zero hora extra para todos.
+      if (bancoError) throw bancoError;
 
       const bancoMap = new Map((bancoData || []).map((b: any) => [b.colaborador_id, b]));
 
-      const inserts = colaboradores.map(colab => {
+      const linhas = colaboradores.map(colab => {
         const banco: any = bancoMap.get(colab.id) || {};
         const salarioBase = colab.salario || 0;
         const valorHora = colab.valor_hora || (salarioBase / 220);
@@ -165,7 +164,6 @@ export default function FolhaPagamentoSection({
 
         return {
           colaborador_id: colab.id,
-          periodo,
           salario_base: salarioBase,
           valor_hora: Math.round(valorHora * 100) / 100,
           horas_normais: horasNormais,
@@ -188,48 +186,50 @@ export default function FolhaPagamentoSection({
           dias_trabalhados: banco.dias_trabalhados || 0,
           faltas,
           atrasos_min: atrasos,
-          status: 'CALCULADO',
-          calculado_por: user?.id,
         };
       });
+      if (linhas.length === 0) { toast.error('Nenhum colaborador para calcular'); return; }
 
-      // Upsert to handle existing records
-      for (const insert of inserts) {
-        const existing = folhas.find(f => f.colaborador_id === insert.colaborador_id);
-        if (existing) {
-          await supabase.from('rh_folha_pagamento').update(insert).eq('id', existing.id);
-        } else {
-          await supabase.from('rh_folha_pagamento').insert(withCompanyId(companyId, insert));
-        }
+      // Uma transação para o período inteiro: upsert por colaborador, e folha
+      // aprovada/paga fica como está (volta em `fechadas`).
+      const { data, error } = await supabase.rpc('rh_folha_salvar_calculo', {
+        p_periodo: periodo,
+        p_linhas: linhas,
+      });
+      if (error) throw error;
+      const resultado = data as unknown as ResultadoCalculoFolha;
+
+      if (resultado.fechadas.length > 0) {
+        toast.warning(`${resultado.fechadas.length} folha(s) já aprovada(s) ou paga(s) mantida(s) sem recálculo.`);
       }
-
-      toast.success(`Folha de ${periodo} calculada para ${inserts.length} colaboradores!`);
+      const gravadas = resultado.inseridas + resultado.recalculadas;
+      if (gravadas > 0) toast.success(`Folha de ${periodo} calculada para ${gravadas} colaboradores!`);
       fetchData();
     } catch (e) {
-      console.error(e);
-      toast.error('Erro ao gerar folha');
+      console.error('Erro ao gerar folha:', e);
+      toast.error('Erro ao gerar folha: ' + mensagemErroFolha(e instanceof Error ? e.message : (e as { message?: string })?.message));
     }
-    setGenerating(false);
-  };
+  });
 
-  const handleAprovar = async (id: string) => {
-    const { error } = await supabase.from('rh_folha_pagamento').update({
-      status: 'APROVADO',
-      aprovado_por: user?.id,
-    }).eq('id', id);
-    if (error) { toast.error('Erro: ' + error.message); return; }
-    toast.success('Folha aprovada!');
+  const handleMudarStatus = (id: string, status: 'APROVADO' | 'PAGO') => executarStatus(async () => {
+    const { data, error } = await supabase.rpc('rh_folha_mudar_status', { p_id: id, p_status: status });
+    if (error) {
+      console.error('Erro ao mudar status da folha:', error);
+      toast.error(mensagemErroFolha(error.message));
+      setSelectedFolha(null);
+      fetchData();
+      return;
+    }
+    const resultado = data as unknown as ResultadoStatusFolha;
+    // O detalhe mostra a folha que foi aberta: sem isso ele continuava
+    // oferecendo "Aprovar" para a folha já aprovada.
+    setSelectedFolha(prev => (prev && prev.id === id ? { ...prev, status: resultado.status } : prev));
+    toast.success(status === 'APROVADO' ? 'Folha aprovada!' : 'Marcado como pago!');
     fetchData();
-  };
+  });
 
-  const handleMarcarPago = async (id: string) => {
-    const { error } = await supabase.from('rh_folha_pagamento').update({
-      status: 'PAGO',
-    }).eq('id', id);
-    if (error) { toast.error('Erro: ' + error.message); return; }
-    toast.success('Marcado como pago!');
-    fetchData();
-  };
+  const handleAprovar = (id: string) => handleMudarStatus(id, 'APROVADO');
+  const handleMarcarPago = (id: string) => handleMudarStatus(id, 'PAGO');
 
   if (loading) {
     return (
@@ -315,12 +315,12 @@ export default function FolhaPagamentoSection({
         {canManage && (
           <div className="flex gap-2">
             {f.status === 'CALCULADO' && (
-              <Button size="sm" onClick={() => handleAprovar(f.id)} className="gap-1">
+              <Button size="sm" onClick={() => handleAprovar(f.id)} disabled={mudandoStatus} className="gap-1">
                 <CheckCircle2 className="w-3.5 h-3.5" /> Aprovar
               </Button>
             )}
             {f.status === 'APROVADO' && (
-              <Button size="sm" variant="outline" onClick={() => handleMarcarPago(f.id)} className="gap-1">
+              <Button size="sm" variant="outline" onClick={() => handleMarcarPago(f.id)} disabled={mudandoStatus} className="gap-1">
                 <DollarSign className="w-3.5 h-3.5" /> Marcar como Pago
               </Button>
             )}

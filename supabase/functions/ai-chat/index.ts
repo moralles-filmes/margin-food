@@ -149,24 +149,71 @@ serve(withRequestCors(async (req) => {
     const companyId: string = profileData.company_id;
     if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY not configured");
 
-    // ── BLOCO 1: Idempotency check ──
-    const idemKey = idempotency_key || crypto.randomUUID();
-    const { data: existingLog } = await db.from("ai_logs")
-      .select("id, resposta_ia, created_at")
-      .eq("company_id", companyId)
-      .eq("user_id", user.id)
-      .eq("idempotency_key", idemKey)
-      .maybeSingle();
-
-    if (existingLog) {
-      structuredLog("info", requestId, { event: "idempotent_hit", log_id: existingLog.id });
-      return jsonResponse({
-        idempotent: true,
-        log_id: existingLog.id,
-        resposta_ia: existingLog.resposta_ia,
-        created_at: existingLog.created_at,
-      }, 200, requestId);
+    // ── BLOCO 1: Idempotência ──
+    // A chave vem do cliente (derivada da conversa). A linha em ai_logs é
+    // reservada ANTES da chamada paga: o índice único
+    // (company_id, user_id, idempotency_key) garante que só uma requisição com
+    // a mesma chave chega ao Gemini. Reenvio recebe a resposta gravada; falha,
+    // cancelamento ou reserva abandonada liberam a chave para nova tentativa.
+    const chaveCliente = typeof idempotency_key === "string" ? idempotency_key.trim() : "";
+    if (chaveCliente.length > 200) {
+      return jsonResponse({ error: { code: "BAD_REQUEST", message: "idempotency_key inválida" } }, 400, requestId);
     }
+    const idemKey = chaveCliente || crypto.randomUUID();
+
+    const buscarLog = async (): Promise<AiLogIdem | null> => {
+      const { data, error } = await db.from("ai_logs")
+        .select("id, resposta_ia, created_at, metadata")
+        .eq("company_id", companyId)
+        .eq("user_id", user.id)
+        .eq("idempotency_key", idemKey)
+        .maybeSingle();
+      if (error) throw error;
+      return data as AiLogIdem | null;
+    };
+
+    // Resposta para uma chave que já tem linha; `null` = pode tentar de novo.
+    const responderReenvio = (log: AiLogIdem): Response | null => {
+      const estado = estadoDoLog(log);
+      if (estado === "DONE") {
+        structuredLog("info", requestId, { event: "idempotent_hit", log_id: log.id });
+        return jsonResponse({
+          idempotent: true,
+          log_id: log.id,
+          resposta_ia: log.resposta_ia,
+          created_at: log.created_at,
+        }, 200, requestId);
+      }
+      if (estado === "PENDING") {
+        structuredLog("info", requestId, { event: "idempotent_in_progress", log_id: log.id });
+        return jsonResponse({
+          error: { code: "IN_PROGRESS", message: "Esta pergunta ainda está sendo respondida. Aguarde alguns segundos." },
+        }, 409, requestId);
+      }
+      return null;
+    };
+
+    let reaproveitar: AiLogIdem | null = null;
+    const existingLog = await buscarLog();
+    if (existingLog) {
+      const resposta = responderReenvio(existingLog);
+      if (resposta) return resposta;
+      reaproveitar = existingLog;
+    }
+
+    // Reivindica a linha de uma tentativa que falhou: o UPDATE só pega se
+    // ninguém a reivindicou antes (mesmo attempt_id), então dois reenvios
+    // simultâneos não chamam o Gemini duas vezes.
+    const reivindicar = async (log: AiLogIdem, patch: Record<string, unknown>): Promise<boolean> => {
+      const tentativaAnterior = (log.metadata as Record<string, unknown> | null)?.attempt_id;
+      let query = db.from("ai_logs").update(patch).eq("id", log.id);
+      query = typeof tentativaAnterior === "string"
+        ? query.eq("metadata->>attempt_id", tentativaAnterior)
+        : query.is("metadata->>attempt_id", null);
+      const { data, error } = await query.select("id").maybeSingle();
+      if (error) throw error;
+      return !!data;
+    };
 
     // ── Gather context with real data counts ──
     const context = await gatherContext(db, agente, periodo, companyId);
@@ -188,38 +235,97 @@ serve(withRequestCors(async (req) => {
     // ── Validate data sufficiency — block hallucination at the gate ──
     const noDataResponse = validateDataSufficiency(agente, context);
     if (noDataResponse) {
-      await db.from("ai_logs").insert({
-        user_id: user.id, agente, periodo: periodo || "",
+      const linha = {
         entrada_usuario: lastMessage,
         contexto_enviado: { status: "NO_DATA", data_check: redactedContext._data_check },
         resposta_ia: noDataResponse,
-        company_id: companyId,
-        idempotency_key: idemKey,
-        metadata: { ...contextMeta, no_data: true, request_id: requestId },
-      });
+        metadata: { ...contextMeta, no_data: true, request_id: requestId, status: "DONE", attempt_id: crypto.randomUUID() },
+      };
+      // Sem chamada paga: falha ao registrar não impede a resposta.
+      if (reaproveitar) {
+        await reivindicar(reaproveitar, linha).catch((e) =>
+          structuredLog("error", requestId, { event: "log_insert_failed", error: e instanceof Error ? e.message : String(e) }));
+      } else {
+        const { error } = await db.from("ai_logs").insert({
+          ...linha, user_id: user.id, agente, periodo: periodo || "", company_id: companyId, idempotency_key: idemKey,
+        });
+        if (error && error.code !== "23505") structuredLog("error", requestId, { event: "log_insert_failed", error: error.message });
+      }
       structuredLog("info", requestId, { event: "no_data_response", agente, company_id: companyId });
       return jsonResponse({ no_data: true, message: noDataResponse }, 200, requestId);
     }
+
+    // ── BLOCO 3: Reserva antes da chamada paga ──
+    const attemptId = crypto.randomUUID();
+    const metaBase = { ...contextMeta, request_id: requestId, attempt_id: attemptId };
+    const reserva = {
+      entrada_usuario: lastMessage,
+      contexto_enviado: redactedContext,
+      resposta_ia: "(streaming)",
+      metadata: { ...metaBase, status: "PENDING", attempt_at: new Date().toISOString() },
+    };
+    let logId: string;
+    if (reaproveitar) {
+      if (!(await reivindicar(reaproveitar, reserva))) {
+        const atual = await buscarLog();
+        return (atual && responderReenvio(atual)) || jsonResponse({
+          error: { code: "IN_PROGRESS", message: "Esta pergunta ainda está sendo respondida. Aguarde alguns segundos." },
+        }, 409, requestId);
+      }
+      logId = reaproveitar.id;
+    } else {
+      const { data: logRow, error: reservaError } = await db.from("ai_logs").insert({
+        ...reserva, user_id: user.id, agente, periodo: periodo || "", company_id: companyId, idempotency_key: idemKey,
+      }).select("id").single();
+      if (reservaError) {
+        if (reservaError.code === "23505") {
+          // Outra requisição com a mesma chave reservou primeiro.
+          const atual = await buscarLog();
+          return (atual && responderReenvio(atual)) || jsonResponse({
+            error: { code: "IN_PROGRESS", message: "Esta pergunta ainda está sendo respondida. Aguarde alguns segundos." },
+          }, 409, requestId);
+        }
+        // Sem reserva não há como garantir uma chamada só: nada é cobrado.
+        structuredLog("error", requestId, { event: "log_reserve_failed", error: reservaError.message });
+        return jsonResponse({ error: { code: "LOG_RESERVE_FAILED", message: "Não foi possível registrar a consulta. Tente de novo." } }, 500, requestId);
+      }
+      logId = logRow.id;
+    }
+
+    // Atualiza só a tentativa desta requisição (outra pode ter reivindicado a linha).
+    const atualizarLog = (patch: Record<string, unknown>) =>
+      db.from("ai_logs").update(patch).eq("id", logId).eq("metadata->>attempt_id", attemptId)
+        .then(({ error }: { error: { message: string } | null }) => {
+          if (error) structuredLog("error", requestId, { event: "update_log_failed", error: error.message });
+        });
+    const marcarFalha = (motivo: string) =>
+      atualizarLog({ resposta_ia: "(falhou)", metadata: { ...metaBase, status: "ERROR", error: motivo } });
 
     // ── BLOCO 4: Sanitize context before building prompt ──
     const sanitizedContext = sanitizeDbString(context);
     const systemPrompt = buildSystemPrompt(agente, sanitizedContext);
 
-    const response = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${GEMINI_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "gemini-2.0-flash",
-        messages: [
-          { role: "system", content: systemPrompt },
-          ...messages,
-        ],
-        stream: true,
-      }),
-    });
+    let response: Response;
+    try {
+      response = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${GEMINI_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "gemini-2.0-flash",
+          messages: [
+            { role: "system", content: systemPrompt },
+            ...messages,
+          ],
+          stream: true,
+        }),
+      });
+    } catch (e) {
+      await marcarFalha("GATEWAY_TRANSPORT");
+      throw e;
+    }
 
     if (!response.ok) {
       const errorCode = response.status === 429 ? "RATE_LIMITED" : response.status === 403 ? "INVALID_API_KEY" : "GATEWAY_ERROR";
@@ -230,21 +336,9 @@ serve(withRequestCors(async (req) => {
         : "Erro na API Gemini";
       const t = await response.text();
       structuredLog("error", requestId, { event: "gateway_error", status: response.status, error_code: errorCode, body: t.slice(0, 500) });
+      await marcarFalha(errorCode);
       return jsonResponse({ error: { code: errorCode, message: errorMsg } }, response.status >= 500 ? 500 : response.status, requestId);
     }
-
-    // ── Insert log with placeholder, then update after stream completes ──
-    const { data: logRow } = await db.from("ai_logs").insert({
-      user_id: user.id, agente, periodo: periodo || "",
-      entrada_usuario: lastMessage,
-      contexto_enviado: redactedContext,
-      resposta_ia: "(streaming)",
-      company_id: companyId,
-      idempotency_key: idemKey,
-      metadata: { ...contextMeta, request_id: requestId },
-    }).select("id").single();
-
-    const logId: string | null = logRow?.id || null;
 
     structuredLog("info", requestId, {
       event: "stream_started", agente, company_id: companyId,
@@ -258,24 +352,24 @@ serve(withRequestCors(async (req) => {
 
     const stream = new ReadableStream({
       async pull(controller) {
-        const { done, value } = await reader.read();
+        let lido: ReadableStreamReadResult<Uint8Array>;
+        try {
+          lido = await reader.read();
+        } catch (e) {
+          await marcarFalha("STREAM_INTERROMPIDO");
+          controller.error(e);
+          return;
+        }
+        const { done, value } = lido;
         if (done) {
           controller.close();
           // Update ai_logs with the real response
-          if (logId) {
-            const fullResponse = extractContentFromSSE(responseChunks.join(""));
-            const elapsed = Math.round(performance.now() - t0);
-            db.from("ai_logs")
-              .update({
-                resposta_ia: fullResponse || "(empty)",
-                metadata: { ...contextMeta, request_id: requestId, response_bytes: new TextEncoder().encode(fullResponse).length, elapsed_ms: elapsed },
-              })
-              .eq("id", logId)
-              .then(({ error }) => {
-                if (error) structuredLog("error", requestId, { event: "update_log_failed", error: error.message });
-                else structuredLog("info", requestId, { event: "stream_complete", log_id: logId, response_bytes: fullResponse.length, elapsed_ms: elapsed });
-              });
-          }
+          const fullResponse = extractContentFromSSE(responseChunks.join(""));
+          const elapsed = Math.round(performance.now() - t0);
+          atualizarLog({
+            resposta_ia: fullResponse || "(empty)",
+            metadata: { ...metaBase, status: "DONE", response_bytes: new TextEncoder().encode(fullResponse).length, elapsed_ms: elapsed },
+          }).then(() => structuredLog("info", requestId, { event: "stream_complete", log_id: logId, response_bytes: fullResponse.length, elapsed_ms: elapsed }));
           return;
         }
         try {
@@ -284,6 +378,8 @@ serve(withRequestCors(async (req) => {
         controller.enqueue(value);
       },
       cancel() {
+        // Cliente desconectou no meio: a resposta ficou incompleta, a chave é liberada.
+        marcarFalha("CANCELADO_PELO_CLIENTE");
         reader.cancel();
       },
     });
@@ -296,6 +392,29 @@ serve(withRequestCors(async (req) => {
     return jsonResponse({ error: e instanceof Error ? e.message : "Erro desconhecido" }, 500, requestId);
   }
 }));
+
+// ═══════════════════════════════════════════════════════
+// IDEMPOTÊNCIA: estado da linha de ai_logs de uma chave
+// ═══════════════════════════════════════════════════════
+interface AiLogIdem {
+  id: string;
+  resposta_ia: string;
+  created_at: string;
+  metadata: Record<string, unknown> | null;
+}
+
+// Reserva sem desfecho depois disso é tratada como abandonada (a função caiu).
+const RESERVA_ABANDONADA_MS = 2 * 60 * 1000;
+
+function estadoDoLog(log: AiLogIdem): "DONE" | "PENDING" | "RETRY" {
+  const meta = log.metadata ?? {};
+  const status = typeof meta.status === "string" ? meta.status : null;
+  if (status === "ERROR") return "RETRY";
+  const pendente = status === "PENDING" || (status === null && log.resposta_ia === "(streaming)");
+  if (!pendente) return "DONE";
+  const desde = Date.parse(typeof meta.attempt_at === "string" ? meta.attempt_at : log.created_at);
+  return Number.isFinite(desde) && Date.now() - desde < RESERVA_ABANDONADA_MS ? "PENDING" : "RETRY";
+}
 
 // ═══════════════════════════════════════════════════════
 // EXTRACT CONTENT FROM SSE STREAM

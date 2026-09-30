@@ -4,6 +4,7 @@ import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useScopedToast } from '@/hooks/useScopedToast';
+import { useTravaEnvio } from '@/hooks/useTravaEnvio';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -140,7 +141,7 @@ export default function EscalasSection({
   useEffect(() => { fetchEscala(); }, [fetchEscala]);
 
   const [savingEscala, setSavingEscala] = useState(false);
-  const [savingSlot, setSavingSlot] = useState(false);
+  const { enviando: savingSlot, executar: executarSlot } = useTravaEnvio();
 
   const handleCreateEscala = async () => {
     if (savingEscala) return;
@@ -185,32 +186,26 @@ export default function EscalasSection({
     fetchEscala();
   };
 
-  const handleAddSlot = async () => {
-    if (savingSlot) return;
+  const handleAddSlot = () => executarSlot(async () => {
     if (!escala || !slotForm.colaborador_id || !selectedDay) {
       toast.error('Preencha todos os campos'); return;
     }
-    setSavingSlot(true);
-    try {
-      const { error } = await supabase.from('rh_escala_slots').insert(withCompanyId(companyId, {
-        escala_id: escala.id,
-        colaborador_id: slotForm.colaborador_id,
-        dia: selectedDay,
-        hora_inicio: slotForm.hora_inicio,
-        hora_fim: slotForm.hora_fim,
-        funcao: slotForm.funcao,
-        tipo: slotForm.tipo,
-        observacao: slotForm.observacao,
-      }));
-      if (error) { toast.error('Erro: ' + error.message); return; }
-      toast.success('Turno adicionado!');
-      setShowAddSlot(false);
-      setSlotForm({ colaborador_id: '', hora_inicio: '08:00', hora_fim: '16:00', funcao: 'Geral', tipo: 'TRABALHO', observacao: '' });
-      fetchEscala();
-    } finally {
-      setSavingSlot(false);
-    }
-  };
+    const { error } = await supabase.from('rh_escala_slots').insert(withCompanyId(companyId, {
+      escala_id: escala.id,
+      colaborador_id: slotForm.colaborador_id,
+      dia: selectedDay,
+      hora_inicio: slotForm.hora_inicio,
+      hora_fim: slotForm.hora_fim,
+      funcao: slotForm.funcao,
+      tipo: slotForm.tipo,
+      observacao: slotForm.observacao,
+    }));
+    if (error) { toast.error('Erro: ' + error.message); return; }
+    toast.success('Turno adicionado!');
+    setShowAddSlot(false);
+    setSlotForm({ colaborador_id: '', hora_inicio: '08:00', hora_fim: '16:00', funcao: 'Geral', tipo: 'TRABALHO', observacao: '' });
+    fetchEscala();
+  });
 
   const handleDeleteSlot = async (slotId: string) => {
     const ok = await confirm({
@@ -453,7 +448,7 @@ export default function EscalasSection({
             <div><Label>Função</Label><Input value={slotForm.funcao} onChange={e => setSlotForm(p => ({ ...p, funcao: e.target.value }))} /></div>
           </div>
           <DialogFooter>
-            <Button onClick={handleAddSlot} className="w-full">Adicionar</Button>
+            <Button onClick={handleAddSlot} disabled={savingSlot} className="w-full">{savingSlot ? 'Adicionando...' : 'Adicionar'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

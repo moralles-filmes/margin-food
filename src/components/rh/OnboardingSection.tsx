@@ -4,6 +4,7 @@ import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useScopedToast } from '@/hooks/useScopedToast';
+import { useTravaEnvio } from '@/hooks/useTravaEnvio';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -136,7 +137,9 @@ export default function OnboardingSection({
 
   useEffect(() => { fetchOnboardings(); }, [fetchOnboardings]);
 
-  const handleCreate = async () => {
+  const { enviando: criando, executar: executarCriacao } = useTravaEnvio();
+
+  const handleCreate = () => executarCriacao(async () => {
     if (!formColabId) { toast.error('Selecione o colaborador'); return; }
     const { error } = await supabase.from('rh_onboarding').insert(withCompanyId(companyId, [{
       colaborador_id: formColabId,
@@ -153,7 +156,7 @@ export default function OnboardingSection({
     setFormColabId('');
     setFormMentorId('');
     fetchOnboardings();
-  };
+  });
 
   const handleToggleCheck = async (onbId: string, field: string, idx: number) => {
     const onb = onboardings.find(o => o.id === onbId);
@@ -369,7 +372,7 @@ export default function OnboardingSection({
                     modal
                   />
                 </div>
-                <Button onClick={handleCreate}>Criar Onboarding</Button>
+                <Button onClick={handleCreate} disabled={criando}>{criando ? 'Criando...' : 'Criar Onboarding'}</Button>
               </div>
             </DialogContent>
           </Dialog>
