@@ -43,14 +43,17 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   linha: ExtratoLinha | null;
+  /** Índice da linha entre as linhas iguais do extrato (`@/lib/conciliacaoOcorrencia`). */
+  ocorrencia?: number;
   contaBancariaId: string;
-  onCreated: (result: { id: string; destino: string }) => void;
+  /** `ocorrencia` vem preenchido quando o lançamento foi gravado com o índice da linha. */
+  onCreated: (result: { id: string; destino: string; ocorrencia?: number }) => void;
 }
 
 type Destino = 'lancamento' | 'conta_pagar' | 'conta_receber';
 
 export default function CriarLancamentoExtratoDialog({
- open, onOpenChange, linha, contaBancariaId, onCreated }: Props) {
+ open, onOpenChange, linha, ocorrencia, contaBancariaId, onCreated }: Props) {
   const emitDataEvent = useEmitDataEvent();
   const toast = useScopedToast();
   const supabase = useSupabase();
@@ -206,6 +209,15 @@ export default function CriarLancamentoExtratoDialog({
         : null;
       const effectivePayload = rateioPayload ?? singleRateioPayload;
 
+      // O índice da linha só vale para o conteúdo dela: data, descrição, valor ou
+      // tipo editados são outro lançamento, que segue o padrão (índice 0).
+      const tipoEnviado = destino === 'lancamento' ? tipo : destino === 'conta_pagar' ? 'DESPESA' : 'RECEITA';
+      const ocorrenciaEnviada = linha && ocorrencia != null
+        && dataCompetencia === linha.data && descricao === linha.descricao
+        && valor === linha.valor && tipoEnviado === linha.tipo
+        ? ocorrencia
+        : undefined;
+
       if (destino === 'lancamento') {
         // Create via existing RPC (categoria já vai no payload → sem UPDATE de campo vigiado)
         const { data, error } = await supabase.rpc('reconcile_import_lancamento', {
@@ -217,6 +229,7 @@ export default function CriarLancamentoExtratoDialog({
           p_user_id: user?.id,
           p_rateio_linhas: effectivePayload,
           p_external_id: linha?.fitId || null,
+          p_occurrence_index: ocorrenciaEnviada ?? 0,
         });
         if (error) throw error;
         const importResult = data as { status?: string; lancamento_id?: string } | null;
@@ -251,7 +264,7 @@ export default function CriarLancamentoExtratoDialog({
 
         toast.success('Lançamento criado e conciliado com sucesso!');
         emitDataEvent('financeiro:lancamentos');
-        onCreated({ id: 'lancamento-created', destino: 'lancamento' });
+        onCreated({ id: 'lancamento-created', destino: 'lancamento', ocorrencia: ocorrenciaEnviada });
 
       } else {
         // conta_pagar | conta_receber.
@@ -268,6 +281,7 @@ export default function CriarLancamentoExtratoDialog({
           p_user_id: user?.id,
           p_rateio_linhas: effectivePayload,
           p_external_id: linha?.fitId || null,
+          p_occurrence_index: ocorrenciaEnviada ?? 0,
         });
         if (lancError) throw lancError;
         const lancResult = lancData as { status?: string; lancamento_id?: string } | null;
@@ -312,7 +326,7 @@ export default function CriarLancamentoExtratoDialog({
           : (titulo?.idempotente ? 'Esta conta a receber já estava registrada e conciliada.' : 'Conta a receber criada (já recebida) e conciliada!'));
         emitDataEvent(pagar ? 'financeiro:contas_pagar' : 'financeiro:contas_receber');
         emitDataEvent('financeiro:lancamentos');
-        onCreated({ id: titulo?.titulo_id || (pagar ? 'cp-created' : 'cr-created'), destino });
+        onCreated({ id: titulo?.titulo_id || (pagar ? 'cp-created' : 'cr-created'), destino, ocorrencia: ocorrenciaEnviada });
       }
 
       emitDataEvent('financeiro:conciliacao');

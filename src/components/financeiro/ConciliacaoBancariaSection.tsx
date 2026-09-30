@@ -36,6 +36,7 @@ import { extractSupabaseErrorMessage } from '@/lib/supabaseErrors';
 import { computeScore } from '@/lib/conciliacaoScore';
 import { matchTransferCandidate, findTransferWarnings, type TransferCandidate, type TransferWarning } from '@/lib/conciliacaoTransferMatch';
 import { bankLineKey, buildConciliadosCounts, findStaleImportedRows, fitidKey, type ConciliadoRow, type VinculoRow } from '@/lib/conciliacaoConciliados';
+import { registrarOcorrenciaUsada, reservarOcorrencias, type OcorrenciasLivres } from '@/lib/conciliacaoOcorrencia';
 import { getConsolidatedBankDelta, isAutomaticInvestmentLine, isPendingAutomaticInvestmentLine } from '@/lib/conciliacaoInvestimentoAutomatico';
 import {
   classifySaldoArquivo,
@@ -98,6 +99,9 @@ interface LinhaExtrato {
   /** Identifica exatamente a ocorrência persistida para que “Reconsiderar” não
    *  remova outra transação idêntica do mesmo dia. */
   ignoradaId?: string;
+  /** Índice com que a linha foi enviada e voltou `possible_duplicate`; o
+   *  reenvio usa o mesmo (ver `@/lib/conciliacaoOcorrencia`). */
+  ocorrencia?: number;
 }
 
 /** Classificação da diferença entre o valor do boleto e o que saiu do banco. */
@@ -132,6 +136,26 @@ function loadLinhas(contaId: string): LinhaExtrato[] | null {
 
 function clearLinhas(contaId: string) {
   try { sessionStorage.removeItem(SESSION_KEY(contaId)); } catch (_) { /* sessionStorage indisponível */ }
+}
+
+// Ocorrências já usadas por linhas que saíram da lista (ver `@/lib/conciliacaoOcorrencia`).
+// Acompanha as linhas: sobrevive ao recarregar a página e recomeça a cada arquivo novo.
+const OCORRENCIAS_KEY = (contaId: string) => `conciliacao_ocorrencias_${contaId}`;
+
+function loadOcorrenciasLivres(contaId: string): OcorrenciasLivres {
+  try {
+    const raw = sessionStorage.getItem(OCORRENCIAS_KEY(contaId));
+    const parsed: unknown = raw ? JSON.parse(raw) : null;
+    return parsed && typeof parsed === 'object' ? parsed as OcorrenciasLivres : {};
+  } catch (_) { /* sessionStorage indisponível — recomeça pelas linhas reconhecidas */ return {}; }
+}
+
+function saveOcorrenciasLivres(contaId: string, livres: OcorrenciasLivres) {
+  try { sessionStorage.setItem(OCORRENCIAS_KEY(contaId), JSON.stringify(livres)); } catch (_) { /* sessionStorage indisponível */ }
+}
+
+function clearOcorrenciasLivres(contaId: string) {
+  try { sessionStorage.removeItem(OCORRENCIAS_KEY(contaId)); } catch (_) { /* sessionStorage indisponível */ }
 }
 
 /**
@@ -225,6 +249,9 @@ export default function ConciliacaoBancariaSection() {
   const [linhas, setLinhasState] = useState<LinhaExtrato[]>([]);
   const [importFilter, setImportFilter] = useState<ImportFilter>('todos');
   const [importando, setImportando] = useState(false);
+  // Travas síncronas: `importando` só chega ao `disabled` no próximo render.
+  const importandoRef = useRef(false);
+  const forcandoRef = useRef(false);
 
   // Conferência de saldo pós-processamento: compara o saldo oficial do extrato
   // (confirmado no upload) com o saldo do sistema + linhas ainda pendentes.
@@ -1476,6 +1503,7 @@ export default function ConciliacaoBancariaSection() {
     setLinhasAntigasAusentes([]);
     if (draftKey) clearSaldoExtrato(draftKey);
     if (draftKey) clearLinhas(draftKey);
+    if (draftKey) clearOcorrenciasLivres(draftKey);
   };
 
   // ========== Ignorar linha ==========
@@ -1765,18 +1793,31 @@ export default function ConciliacaoBancariaSection() {
     return null;
   };
 
+  /** Índice da linha aberta em "Criar lançamento", pela mesma regra do Processar. */
+  const ocorrenciaDaLinhaCriar = (): number | undefined => {
+    const linha = criarDialog.open && criarDialog.linhaIndex >= 0 ? linhas[criarDialog.linhaIndex] : undefined;
+    if (!linha) return undefined;
+    const livres = draftKey ? loadOcorrenciasLivres(draftKey) : {};
+    return reservarOcorrencias(linhas, [linha], livres).indices.get(linha);
+  };
+
   /** Linha sinalizada como possível duplicata: usuário confirmou que é uma
    *  transação legítima repetida (ex.: duas vendas iguais no mesmo dia) e
    *  quer importar mesmo assim. */
   const forcarImportarDuplicata = async (item: { linha: LinhaExtrato; lancamentoId: string; criadoEm?: string }) => {
+    if (forcandoRef.current) return;
+    forcandoRef.current = true;
     const l = item.linha;
     try {
+      // O mesmo índice com que a linha foi recusada: sem FITID ele é a chave, e
+      // sem ele a venda repetida caía na chave da 1ª e voltava 'duplicate'.
       const { data, error } = await supabase.rpc('reconcile_import_lancamento', {
         p_data: l.data, p_descricao: l.descricao, p_valor: l.valor, p_tipo: l.tipo,
         p_conta_id: contaSel, p_user_id: user?.id,
         p_rateio_linhas: buildRateioPayload(l),
         p_external_id: l.fitId || null,
         p_force_duplicate: true,
+        p_occurrence_index: l.ocorrencia ?? 0,
       });
       if (error) throw error;
       const result = data as { lancamento_id?: string } | null;
@@ -1789,6 +1830,8 @@ export default function ConciliacaoBancariaSection() {
       toast.success('Lançamento importado como transação legítima repetida.');
     } catch (err: any) {
       toast.error(err.message || 'Erro ao importar');
+    } finally {
+      forcandoRef.current = false;
     }
   };
 
@@ -1967,35 +2010,28 @@ export default function ConciliacaoBancariaSection() {
       return;
     }
 
-    const duplicatasDetectadas: { linha: LinhaExtrato; lancamentoId: string; criadoEm?: string }[] = [];
+    const duplicatasDetectadas: { linha: LinhaExtrato; lancamentoId: string; criadoEm?: string; ocorrencia: number }[] = [];
 
+    if (importandoRef.current) return;
+    importandoRef.current = true;
+
+    // Índice de cada linha entre as linhas iguais, na ordem de criação: conta as
+    // já reconhecidas, as que esta sessão já gravou e a posição no envio (ver
+    // `@/lib/conciliacaoOcorrencia`). Sem FITID ele é a chave de idempotência.
+    // O registro da sessão só avança junto com a remoção das linhas gravadas:
+    // se o envio falhar no meio, repetir devolve os mesmos índices.
+    const reserva = reservarOcorrencias(linhas, toImport, draftKey ? loadOcorrenciasLivres(draftKey) : {});
     setImportando(true);
     try {
       if (toImport.length > 0) {
-        // Quantas linhas do MESMO conteúdo (mesma bankLineKey) já foram
-        // reconhecidas como "já conciliada" nesta conta — a RPC precisa saber
-        // isso para não recusar como duplicata uma 2ª/3ª venda idêntica no
-        // mesmo dia que já sobrou depois da 1ª ocorrência ser reconhecida.
-        const jaConciliadaKeyCounts = new Map<string, number>();
-        for (const l of linhas) {
-          if (!l.jaConciliada) continue;
-          const key = bankLineKey(l);
-          jaConciliadaKeyCounts.set(key, (jaConciliadaKeyCounts.get(key) || 0) + 1);
-        }
-        const occurrenceCounters = new Map<string, number>();
-
         for (const l of toImport) {
-          const key = bankLineKey(l);
-          const jaReconhecidas = jaConciliadaKeyCounts.get(key) || 0;
-          const dentroDoLote = occurrenceCounters.get(key) || 0;
-          occurrenceCounters.set(key, dentroDoLote + 1);
-
+          const ocorrencia = reserva.indices.get(l) ?? 0;
           const { data, error } = await supabase.rpc('reconcile_import_lancamento', {
             p_data: l.data, p_descricao: l.descricao, p_valor: l.valor, p_tipo: l.tipo,
             p_conta_id: contaSel, p_user_id: user?.id,
             p_rateio_linhas: buildRateioPayload(l),
             p_external_id: l.fitId || null,
-            p_occurrence_index: jaReconhecidas + dentroDoLote,
+            p_occurrence_index: ocorrencia,
           } as any);
           if (error) throw error;
           const result = data as { status?: string; lancamento_id?: string; criado_em?: string } | null;
@@ -2004,7 +2040,7 @@ export default function ConciliacaoBancariaSection() {
           // diferente — provável reimportação do mesmo extrato. Não insere:
           // fica pendente para a pessoa decidir (ver duplicataDialog).
           if (result?.status === 'possible_duplicate' && result.lancamento_id) {
-            duplicatasDetectadas.push({ linha: l, lancamentoId: result.lancamento_id, criadoEm: result.criado_em });
+            duplicatasDetectadas.push({ linha: l, lancamentoId: result.lancamento_id, criadoEm: result.criado_em, ocorrencia });
             processadas.delete(l);
             continue;
           }
@@ -2076,13 +2112,24 @@ export default function ConciliacaoBancariaSection() {
         ? ` (${toLinkExisting.length} vinculada(s) a baixas já lançadas, sem duplicar)`
         : '';
       if (total > 0) toast.success(`${total} operação(ões) processada(s) com sucesso${vinculadas}`);
+      // A linha recusada guarda o índice com que foi enviada: "Importar mesmo
+      // assim" e um novo "Processar" reenviam com ele.
+      const recusadas = new Map(duplicatasDetectadas.map(d => [d.linha, { ...d.linha, ocorrencia: d.ocorrencia }]));
       if (duplicatasDetectadas.length > 0) {
         toast.warning(`${duplicatasDetectadas.length} linha(s) não foram importadas por parecerem duplicatas de um lançamento já existente — revise antes de confirmar.`);
-        setDuplicataDialog({ open: true, itens: duplicatasDetectadas });
+        setDuplicataDialog({
+          open: true,
+          itens: duplicatasDetectadas.map(d => ({
+            linha: recusadas.get(d.linha) ?? d.linha, lancamentoId: d.lancamentoId, criadoEm: d.criadoEm,
+          })),
+        });
+      }
+      if (draftKey && isScopeActive() && currentAccount.current === contaSel) {
+        saveOcorrenciasLivres(draftKey, reserva.livres);
       }
       // Remove apenas as linhas processadas; as demais (não selecionadas, sem match, ignoradas, já conciliadas,
       // ou sinalizadas como possível duplicata) permanecem na lista. setLinhas já persiste no sessionStorage.
-      setLinhas(prev => prev.filter(l => !processadas.has(l)));
+      setLinhas(prev => prev.filter(l => !processadas.has(l)).map(l => recusadas.get(l) ?? l));
       loadLancamentos();
       emitDataEvent('financeiro:lancamentos');
       emitDataEvent('financeiro:conciliacao');
@@ -2091,8 +2138,10 @@ export default function ConciliacaoBancariaSection() {
     } catch (err: unknown) {
       console.error('[ConciliacaoBancariaSection.importarEConciliar]', err);
       toast.error(mapPagamentoError(err));
+    } finally {
+      importandoRef.current = false;
+      setImportando(false);
     }
-    setImportando(false);
   };
 
   const toggleAll = (checked: boolean) => {
@@ -3457,9 +3506,14 @@ export default function ConciliacaoBancariaSection() {
         open={criarDialog.open}
         onOpenChange={(open) => { if (!open) setCriarDialog({ open: false, linhaIndex: -1 }); }}
         linha={criarDialog.linhaIndex >= 0 ? linhas[criarDialog.linhaIndex] || null : null}
+        ocorrencia={ocorrenciaDaLinhaCriar()}
         contaBancariaId={contaSel}
         onCreated={(result) => {
           const idx = criarDialog.linhaIndex;
+          const linha = linhas[idx];
+          if (linha && result.ocorrencia != null && draftKey && isScopeActive() && currentAccount.current === contaSel) {
+            saveOcorrenciasLivres(draftKey, registrarOcorrenciaUsada(loadOcorrenciasLivres(draftKey), linha, result.ocorrencia));
+          }
           setLinhas(prev => prev.filter((_, i) => i !== idx));
           setCriarDialog({ open: false, linhaIndex: -1 });
           loadLancamentos();
@@ -3606,6 +3660,9 @@ export default function ConciliacaoBancariaSection() {
               if (draftKey && isScopeActive()) saveSaldoExtrato(draftKey, saldoConfirmado);
               emitDataEvent('financeiro:conciliacao');
             }
+            // Arquivo novo: as linhas iguais já gravadas voltam como reconhecidas,
+            // então as ocorrências recomeçam por elas (ver `@/lib/conciliacaoOcorrencia`).
+            if (draftKey && isScopeActive()) clearOcorrenciasLivres(draftKey);
             setLoading(true);
             await processarLinhas(pending);
             setLoading(false);
