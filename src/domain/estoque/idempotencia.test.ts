@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { novaSemente } from '@/lib/chaveOperacao';
 import {
+  chaveCadastroProduto,
   chaveEntradaSalmao,
   chaveLoteMovimentacao,
   chaveManipulacaoSalmao,
   chaveRequisicaoEstoque,
+  chaveTransferencia,
 } from './idempotencia';
 
 describe('chaveRequisicaoEstoque', () => {
@@ -101,5 +103,75 @@ describe('chaveManipulacaoSalmao', () => {
     for (const mudanca of [{ entryId: 'e2' }, { date: '2026-09-30' }, { fishCount: 2 }, { grossKg: 2.6 }, { cleanKg: 1.9 }]) {
       expect(await chaveManipulacaoSalmao('s', { ...manipulacao, ...mudanca }), JSON.stringify(mudanca)).not.toBe(base);
     }
+  });
+});
+
+describe('chaveTransferencia', () => {
+  const transferencia = { produtoId: 'p-a', origem: 'Câmara fria', destino: 'Cozinha', quantidade: 2.5, motivo: 'reposição' };
+
+  it('retry da mesma transferência reaproveita a chave', async () => {
+    expect(await chaveTransferencia('s', transferencia)).toBe(await chaveTransferencia('s', { ...transferencia }));
+  });
+
+  it('motivo vazio e ausente são o mesmo envio (o servidor grava coalesce(motivo, \'\'))', async () => {
+    const semMotivo = { ...transferencia, motivo: '' };
+    expect(await chaveTransferencia('s', { ...semMotivo, motivo: null })).toBe(await chaveTransferencia('s', semMotivo));
+    expect(await chaveTransferencia('s', { ...semMotivo, motivo: undefined })).toBe(await chaveTransferencia('s', semMotivo));
+  });
+
+  it('produto, origem, destino, quantidade ou motivo diferente geram chave nova', async () => {
+    const base = await chaveTransferencia('s', transferencia);
+    for (const mudanca of [
+      { produtoId: 'p-b' }, { origem: 'Bar' }, { destino: 'Bar' }, { quantidade: 3 }, { motivo: 'outro' },
+    ]) {
+      expect(await chaveTransferencia('s', { ...transferencia, ...mudanca }), JSON.stringify(mudanca)).not.toBe(base);
+    }
+  });
+
+  it('inverter origem e destino é outra transferência', async () => {
+    const invertida = { ...transferencia, origem: transferencia.destino, destino: transferencia.origem };
+    expect(await chaveTransferencia('s', invertida)).not.toBe(await chaveTransferencia('s', transferencia));
+  });
+
+  it('transferência nova (semente nova) é outra operação, e a chave cabe no limite de 180 do servidor', async () => {
+    const chave = await chaveTransferencia(novaSemente(), transferencia);
+    expect(chave).not.toBe(await chaveTransferencia('s', transferencia));
+    expect(chave).toMatch(/^[0-9a-f]{64}$/);
+  });
+});
+
+describe('chaveCadastroProduto', () => {
+  const produto = {
+    nomeProduto: 'Arroz japonês', sku: '', categoria: 'Grãos', unidadeMedida: 'KG', unidadeCompra: 'SC',
+    fatorConversaoPadrao: 5, defaultCostPurchaseUnit: 42.9, estoqueMinimo: 10, estoqueIdeal: 20,
+    fornecedoresPreferenciais: ['Fornecedor A'],
+  };
+
+  it('retry do mesmo formulário reaproveita a chave, qualquer que seja a ordem dos campos', async () => {
+    const reordenado = Object.fromEntries(Object.entries(produto).reverse());
+    expect(await chaveCadastroProduto('s', reordenado)).toBe(await chaveCadastroProduto('s', produto));
+  });
+
+  it('todo campo que o servidor compara no reenvio muda a chave', async () => {
+    // estoque_criar_produto compara nome, categoria, unidades, fator, custo de
+    // compra e o SKU digitado: mudar um deles com a mesma chave viraria
+    // REQUEST_ID_REUTILIZADO em vez de outro cadastro.
+    const base = await chaveCadastroProduto('s', produto);
+    for (const mudanca of [
+      { nomeProduto: 'Arroz' }, { categoria: 'Outros' }, { unidadeMedida: 'G' }, { unidadeCompra: 'KG' },
+      { fatorConversaoPadrao: 1 }, { defaultCostPurchaseUnit: 43 }, { sku: 'ARZ-01' },
+    ]) {
+      expect(await chaveCadastroProduto('s', { ...produto, ...mudanca }), JSON.stringify(mudanca)).not.toBe(base);
+    }
+  });
+
+  it('o resto do formulário também identifica o cadastro', async () => {
+    const base = await chaveCadastroProduto('s', produto);
+    expect(await chaveCadastroProduto('s', { ...produto, estoqueMinimo: 11 })).not.toBe(base);
+    expect(await chaveCadastroProduto('s', { ...produto, fornecedoresPreferenciais: [] })).not.toBe(base);
+  });
+
+  it('produto seguinte do lote (semente nova) é outro cadastro, mesmo com o formulário igual', async () => {
+    expect(await chaveCadastroProduto('s2', produto)).not.toBe(await chaveCadastroProduto('s', produto));
   });
 });
