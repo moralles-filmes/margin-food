@@ -3,7 +3,8 @@
  *
  * Cada função descreve o que identifica a operação para o servidor
  * (`criar_requisicao_estoque`, `estoque_registrar_movimentacoes_lote`,
- * `_salmon_create_entry_guarded`, `_salmon_create_manipulation_guarded`). O
+ * `_salmon_create_entry_guarded`, `_salmon_create_manipulation_guarded`,
+ * `stock_transfer_between_locations`, `estoque_criar_produto`). O
  * conteúdo aqui precisa ser o MESMO que o servidor compara no reenvio: campo
  * que entra na chave mas não na comparação faria um retry legítimo virar
  * REQUEST_ID_REUTILIZADO, e o contrário deixaria operações diferentes com a
@@ -108,4 +109,40 @@ export function chaveManipulacaoSalmao(semente: string, dados: ManipulacaoSalmao
     cleanKg: dados.cleanKg,
     leftoverKg: dados.leftoverKg || 0,
   });
+}
+
+export interface TransferenciaChave {
+  produtoId: string;
+  origem: string;
+  destino: string;
+  quantidade: number;
+  motivo?: string | null;
+}
+
+/**
+ * Transferência entre locais: os campos que `stock_transfer_between_locations`
+ * compara no reenvio (produto, locais, quantidade e o motivo, que vai para a
+ * observação). Os valores entram como são enviados — o servidor aplica o mesmo
+ * `btrim` na gravação e na comparação.
+ */
+export function chaveTransferencia(semente: string, dados: TransferenciaChave): Promise<string> {
+  return chaveOperacao(semente, {
+    tipo: 'transferencia',
+    produtoId: dados.produtoId,
+    origem: dados.origem,
+    destino: dados.destino,
+    quantidade: dados.quantidade,
+    motivo: dados.motivo || '',
+  });
+}
+
+/**
+ * Cadastro de produto: o formulário inteiro que vai para `estoque_criar_produto`.
+ * O servidor compara nome, categoria, unidades, fator, custo de compra e o SKU
+ * digitado — todos dentro do formulário. Retry do MESMO formulário devolve o
+ * produto já criado em vez de gerar outro SKU; qualquer campo alterado é outro
+ * cadastro.
+ */
+export function chaveCadastroProduto(semente: string, produto: object): Promise<string> {
+  return chaveOperacao(semente, { tipo: 'produto', produto });
 }

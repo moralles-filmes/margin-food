@@ -18,6 +18,8 @@ import { fmtBRL, formatFixedBR } from '@/lib/formatters';
 import { useScopedToast } from '@/hooks/useScopedToast';
 import { TenantError } from '@/lib/tenant';
 import { extractSupabaseErrorMessage } from '@/lib/supabaseErrors';
+import { novaSemente } from '@/lib/chaveOperacao';
+import { chaveCadastroProduto } from '@/domain/estoque/idempotencia';
 import type { Produto } from '@/types/salmon';
 import type { ProdutoExtended, ProdutoFormData } from '@/types/estoque';
 import type { ProdutoCreateInput, ProdutoUpdateInput } from '@/hooks/useEstoqueGeralStore';
@@ -61,7 +63,7 @@ interface ProdutoFormPanelProps {
   onClose: () => void;
   onSave: (created: ProdutoExtended, shouldClose: boolean) => void;
   onUpdate: (shouldClose: boolean) => void;
-  addProduto: (p: ProdutoCreateInput) => Promise<ProdutoExtended>;
+  addProduto: (p: ProdutoCreateInput, opts?: { clientRequestId?: string }) => Promise<ProdutoExtended>;
   updateProduto: (id: string, u: ProdutoUpdateInput) => Promise<void>;
   fetchCodigosBarras: (produtoId: string) => Promise<CodigoBarrasProduto[]>;
   salvarCodigosBarras: (produtoId: string, diff: DiffCodigos) => Promise<CodigoBarrasProduto[]>;
@@ -77,6 +79,12 @@ export default function ProdutoFormPanel({
   const toast = useScopedToast();
   const prodNameInputRef = useRef<HTMLInputElement>(null);
   const didFocusRef = useRef(false);
+  // Trava síncrona: `saving` só desabilita o botão no próximo render, e
+  // Ctrl+Enter repetido chega antes disso.
+  const salvandoRef = useRef(false);
+  // Semente do cadastro: troca a cada produto criado. A chave enviada combina a
+  // semente com o formulário (chaveCadastroProduto).
+  const [semente, setSemente] = useState(novaSemente);
 
   // ─── Códigos de barras ───
   //
@@ -183,6 +191,7 @@ export default function ProdutoFormPanel({
 
   const handleSaveProduto = async (e: React.FormEvent, closeAfterSave?: boolean) => {
     e.preventDefault();
+    if (salvandoRef.current) return;
     const shouldClose = closeAfterSave !== undefined ? closeAfterSave : !(batchMode && !editProdId);
     const trimmedName = prodForm.nomeProduto.trim();
     if (!trimmedName) { toast.error('Nome é obrigatório'); return; }
@@ -201,6 +210,7 @@ export default function ProdutoFormPanel({
     }
     if (minBase <= 0) { toast.error('Estoque mínimo obrigatório'); return; }
     if (idealBase > 0 && idealBase < minBase) { toast.error('Ideal deve ser maior ou igual ao mínimo.'); return; }
+    salvandoRef.current = true;
     setSaving(true);
     try {
       const thresholdVal = prodForm.inactivityDaysThreshold === '' ? null : Number(prodForm.inactivityDaysThreshold);
@@ -240,7 +250,6 @@ export default function ProdutoFormPanel({
         );
         if (conflito) {
           toast.error(conflito);
-          setSaving(false);
           return;
         }
       }
@@ -255,9 +264,26 @@ export default function ProdutoFormPanel({
         setCodigosOriginais(salvos);
         onUpdate(shouldClose);
       } else {
-        const created = await addProduto(savePayload);
-        await salvarCodigosBarras(created.id, diff);
+        // Chave derivada do formulário: repetir o MESMO cadastro (duplo envio,
+        // resposta perdida) devolve o produto já criado em vez de outro com SKU
+        // novo; mudar qualquer campo gera outra chave.
+        const clientRequestId = await chaveCadastroProduto(semente, savePayload);
+        const created = await addProduto(savePayload, { clientRequestId });
+        setSemente(novaSemente());
+
+        // Os códigos rodam depois que o produto já existe. Falha aqui não pode
+        // parecer falha do cadastro: salvar de novo criaria outro produto.
+        let avisoCodigos: string | null = null;
+        try {
+          await salvarCodigosBarras(created.id, diff);
+        } catch (err) {
+          console.error('[produto.save.codigos]', err);
+          avisoCodigos = extractSupabaseErrorMessage(err, 'Erro ao salvar os códigos de barras');
+        }
         onSave(created, shouldClose);
+        if (avisoCodigos) {
+          toast.warning(`Produto cadastrado, mas os códigos de barras não foram salvos (${avisoCodigos}). Abra o produto para adicioná-los.`);
+        }
         if (!shouldClose) {
           // Código de barras é da embalagem, não da categoria: o próximo item
           // do lote nunca herda o código do anterior.
@@ -286,13 +312,18 @@ export default function ProdutoFormPanel({
       const tag = editProdId ? '[produto.save.update]' : '[produto.save.create]';
       console.error(tag, err);
       const baseMsg = err instanceof Error ? err.message : '';
+      const rawMsg = baseMsg || (err as { message?: string } | null)?.message || '';
       if (err instanceof TenantError || isTenantErrorMessage(baseMsg)) {
         toast.error(baseMsg || 'Seu usuário não está vinculado a uma empresa válida.');
+      } else if (rawMsg.includes('REQUEST_ID_REUTILIZADO')) {
+        toast.error('Este produto já foi cadastrado e alterado depois. Confira a lista de produtos antes de cadastrar de novo.');
       } else {
         toast.error(extractSupabaseErrorMessage(err, 'Erro ao salvar produto'));
       }
+    } finally {
+      salvandoRef.current = false;
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   // Wire up ref for keyboard shortcuts

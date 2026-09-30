@@ -633,25 +633,24 @@ export function useEstoqueGeralStore() {
   }, [produtos, fetchSaldos]);
 
   // === Produto CRUD (DB) ===
-  const addProduto = useCallback(async (p: ProdutoCreateInput) => {
+  const addProduto = useCallback(async (
+    p: ProdutoCreateInput,
+    opts: { clientRequestId?: string } = {},
+  ) => {
     if (!companyId) throw new Error('Selecione uma unidade para cadastrar o produto.');
-    let sku: string | null = p.sku || null;
-    if (!sku) {
-      const { data: skuData, error: skuError } = await supabase.rpc('generate_next_sku', { p_prefix: 'MP' });
-      if (skuError) throw skuError;
-      sku = skuData as string;
-    }
 
     const fator = p.fatorConversaoPadrao || 1;
     const costPurchase = p.defaultCostPurchaseUnit || p.custoPadrao || 0;
     const costBase = fator > 0 ? costPurchase / fator : costPurchase;
 
-    const { data, error } = await supabase
-      .from('produtos')
-      .insert({
-        company_id: companyId,
+    // SKU em branco é gerado no servidor, e só quando o INSERT acontece: o
+    // reenvio da mesma operação (clientRequestId) devolve o produto já criado
+    // em vez de outro com SKU novo. company_id sai do assert_tenant da RPC.
+    const { data, error } = await supabase.rpc('estoque_criar_produto', {
+      p_client_request_id: opts.clientRequestId,
+      p_produto: {
         nome_produto: p.nomeProduto,
-        sku,
+        sku: p.sku || null,
         categoria: p.categoria || 'Outros',
         unidade_medida: p.unidadeMedida || 'UN',
         unidade_compra: p.unidadeCompra || 'UN',
@@ -670,16 +669,17 @@ export function useEstoqueGeralStore() {
         package_quantity: p.packageQuantity ?? null,
         package_measure_unit: p.packageMeasureUnit || null,
         conversion_mode: p.conversionMode || 'manual',
-      })
-      .select()
-      .single();
+      },
+    });
     if (error) {
-      console.error('[useEstoqueGeralStore.addProduto] insert error', error);
+      console.error('[useEstoqueGeralStore.addProduto] estoque_criar_produto error', error);
       throw error;
     }
-    const newProd = dbToProduto(data as unknown as ProdutoRow);
-    setProdutos(prev => sortByName([newProd, ...prev], p => p.nomeProduto));
-    setSaldos(prev => ({ ...prev, [newProd.id]: { saldo: 0 } }));
+    const { produto } = data as unknown as { idempotente: boolean; produto: ProdutoRow };
+    const newProd = dbToProduto(produto);
+    // Reenvio devolve o produto já criado: substitui em vez de duplicar na lista.
+    setProdutos(prev => sortByName([newProd, ...prev.filter(x => x.id !== newProd.id)], p => p.nomeProduto));
+    setSaldos(prev => (newProd.id in prev ? prev : { ...prev, [newProd.id]: { saldo: 0 } }));
     fetchProdutoGlobalCounts();
     emitDataEvent('estoque:produtos');
     return newProd;

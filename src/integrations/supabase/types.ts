@@ -5231,6 +5231,7 @@ export type Database = {
           avg30_variation_percent: number
           barcode: string | null
           categoria: string
+          client_request_id: string | null
           company_id: string
           conta_no_cmv: boolean
           conversion_mode: string
@@ -5274,6 +5275,7 @@ export type Database = {
           avg30_variation_percent?: number
           barcode?: string | null
           categoria?: string
+          client_request_id?: string | null
           company_id?: string
           conta_no_cmv?: boolean
           conversion_mode?: string
@@ -5317,6 +5319,7 @@ export type Database = {
           avg30_variation_percent?: number
           barcode?: string | null
           categoria?: string
+          client_request_id?: string | null
           company_id?: string
           conta_no_cmv?: boolean
           conversion_mode?: string
@@ -10704,6 +10707,10 @@ export type Database = {
         Returns: Json
       }
       ensure_salmon_raw_product: { Args: never; Returns: string }
+      estoque_criar_produto: {
+        Args: { p_client_request_id?: string; p_produto: Json }
+        Returns: Json
+      }
       estoque_registrar_movimentacoes_lote: {
         Args: { p_client_request_id?: string; p_itens: Json }
         Returns: Json
@@ -11899,6 +11906,7 @@ export type Database = {
       }
       stock_transfer_between_locations: {
         Args: {
+          p_client_request_id?: string
           p_from_location: string
           p_product_id: string
           p_quantity: number
