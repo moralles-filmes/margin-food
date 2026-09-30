@@ -7,6 +7,10 @@ import { createPresentationPlanData } from '@/test/fixtures/presentationSocios';
 const createDecision = vi.fn();
 
 vi.mock('@/hooks/usePresentationDecisions', () => ({
+  PresentationDecisionMutationError: class extends Error {
+    readonly code: string;
+    constructor(code: string, message: string) { super(message); this.code = code; }
+  },
   usePresentationDecisionMutations: () => ({
     createDecision: { mutateAsync: createDecision, isPending: false },
   }),
@@ -73,6 +77,36 @@ describe('registro explícito de decisão', () => {
     }));
     expect(sessionStorage.getItem(key)).toBeNull();
     expect(props.onCreated).toHaveBeenCalledWith('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+  });
+
+  it('duplo clique envia uma vez; o retry depois de falha reaproveita a semente e o sucesso a troca', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    let liberar: (value: { id: string }) => void = () => undefined;
+    createDecision.mockImplementationOnce(() => new Promise(resolve => { liberar = resolve; }));
+    renderDialog();
+    fireEvent.change(screen.getByLabelText('Título *'), { target: { value: 'Decisão de custos' } });
+    fireEvent.change(screen.getByLabelText('Contexto e justificativa *'), { target: { value: 'Contexto informado.' } });
+    const botao = screen.getByRole('button', { name: 'Registrar decisão' });
+
+    fireEvent.click(botao);
+    fireEvent.click(botao);
+    await waitFor(() => expect(createDecision).toHaveBeenCalledOnce());
+    liberar({ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' });
+    await waitFor(() => expect(createDecision).toHaveBeenCalledOnce());
+    const sementeSucesso = createDecision.mock.calls[0][0].semente as string;
+
+    createDecision.mockRejectedValueOnce(new Error('rede caiu'));
+    fireEvent.change(screen.getByLabelText('Título *'), { target: { value: 'Outra decisão' } });
+    fireEvent.change(screen.getByLabelText('Contexto e justificativa *'), { target: { value: 'Outro contexto.' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar decisão' }));
+    await waitFor(() => expect(createDecision).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(consoleError).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar decisão' }));
+    await waitFor(() => expect(createDecision).toHaveBeenCalledTimes(3));
+
+    const [falha, retry] = [createDecision.mock.calls[1][0].semente, createDecision.mock.calls[2][0].semente];
+    expect(falha).toBe(retry);
+    expect(falha).not.toBe(sementeSucesso);
   });
 
   it('restaura rascunho válido da sessão e descarta conteúdo expirado', async () => {

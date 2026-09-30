@@ -1,5 +1,5 @@
 import { useSupabase } from '@/contexts/CompanyScopeContext';
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useEstoqueGeralStoreContext } from '@/contexts/EstoqueGeralStoreContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,8 +11,20 @@ import { useScopedToast } from '@/hooks/useScopedToast';
 import { ArrowRight, ArrowLeftRight, Loader2, Package, MapPin, RefreshCw } from 'lucide-react';
 import { format, subDays } from 'date-fns';
 import { fmtBRL, formatFixedBR } from '@/lib/formatters';
+import { novaSemente } from '@/lib/chaveOperacao';
+import { chaveTransferencia } from '@/domain/estoque/idempotencia';
 
 import { useCan } from '@/permissions/hooks';
+
+/**
+ * Nova transferência fica desligada até o CMV (Edge `cmv`) e os relatórios de
+ * consumo/entrada desconsiderarem `internal_transfer`: cada transferência grava
+ * uma SAÍDA e uma ENTRADA, e hoje elas seriam somadas como consumo e compra.
+ * O histórico continua visível; a RPC já grava, é idempotente e o cancelamento
+ * estorna as duas pernas.
+ */
+const NOVA_TRANSFERENCIA_LIBERADA = false;
+
 interface Transfer {
   transfer_group_id: string;
   produto_id: string;
@@ -53,6 +65,11 @@ export default function StockTransfersSection({
   const [formQty, setFormQty] = useState('');
   const [formReason, setFormReason] = useState('');
   const [saving, setSaving] = useState(false);
+  // Trava síncrona: `saving` só desabilita o botão no próximo render.
+  const salvandoRef = useRef(false);
+  // Semente da transferência: troca a cada transferência gravada. A chave
+  // enviada combina a semente com o conteúdo (chaveTransferencia).
+  const [semente, setSemente] = useState(novaSemente);
 
   // History state
   const [transfers, setTransfers] = useState<Transfer[]>([]);
@@ -106,7 +123,7 @@ export default function StockTransfersSection({
   // Submit transfer
   const handleTransfer = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (saving) return;
+    if (salvandoRef.current) return;
     if (!formProduct) { toast.error('Selecione um produto'); return; }
     if (!formFrom) { toast.error('Selecione local de origem'); return; }
     if (!formTo) { toast.error('Selecione local de destino'); return; }
@@ -118,30 +135,51 @@ export default function StockTransfersSection({
       return;
     }
 
+    salvandoRef.current = true;
     setSaving(true);
     try {
-      const { data, error } = await supabase.rpc('stock_transfer_between_locations', {
+      // Chave derivada: repetir a MESMA transferência (duplo clique, resposta
+      // perdida) devolve a já gravada; mudar produto, local, quantidade ou
+      // motivo gera outra.
+      const clientRequestId = await chaveTransferencia(semente, {
+        produtoId: formProduct,
+        origem: formFrom,
+        destino: formTo,
+        quantidade: qty,
+        motivo: formReason,
+      });
+      const { error } = await supabase.rpc('stock_transfer_between_locations', {
         p_product_id: formProduct,
         p_from_location: formFrom,
         p_to_location: formTo,
         p_quantity: qty,
-        p_reason: formReason || null,
+        p_reason: formReason || undefined,
+        p_client_request_id: clientRequestId,
       });
       if (error) throw error;
       toast.success(`Transferência realizada! ${qty} ${selectedProd?.unidadeMedida || ''} de ${formFrom} → ${formTo}`);
+      setSemente(novaSemente());
       setFormProduct('');
       setFormFrom('');
       setFormTo('');
       setFormQty('');
       setFormReason('');
       setShowForm(false);
-      store.refreshSaldos();
-      fetchTransfers(0);
-    } catch (err: any) {
+      // Recarregar a tela depois do commit não pode virar erro da transferência.
+      void store.refreshSaldos().catch(err => console.error('[transferencia.refreshSaldos]', err));
+      void fetchTransfers(0);
+    } catch (err: unknown) {
       console.error('Error creating stock transfer:', err);
-      toast.error(err?.message || 'Erro ao realizar transferência');
+      const msg = (err as { message?: string } | null)?.message || '';
+      if (msg.includes('REQUEST_ID_REUTILIZADO')) {
+        toast.error('Esta transferência não confere com a que já foi registrada. Confira o histórico antes de registrar de novo.');
+      } else {
+        toast.error(msg || 'Erro ao realizar transferência');
+      }
+    } finally {
+      salvandoRef.current = false;
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
@@ -159,13 +197,17 @@ export default function StockTransfersSection({
           </h3>
           <p className="text-[10px] text-muted-foreground">Mova saldo entre locais de armazenamento de forma controlada</p>
         </div>
-        <Button size="sm" className="h-8 text-xs" onClick={() => setShowForm(!showForm)}>
-          {showForm ? 'Cancelar' : 'Nova Transferência'}
-        </Button>
+        {NOVA_TRANSFERENCIA_LIBERADA ? (
+          <Button size="sm" className="h-8 text-xs" onClick={() => setShowForm(!showForm)}>
+            {showForm ? 'Cancelar' : 'Nova Transferência'}
+          </Button>
+        ) : (
+          <span className="text-[10px] text-muted-foreground">Nova transferência temporariamente indisponível</span>
+        )}
       </div>
 
       {/* Transfer Form */}
-      {showForm && (
+      {NOVA_TRANSFERENCIA_LIBERADA && showForm && (
         <form onSubmit={handleTransfer} className="bg-card border border-border rounded-xl p-4 space-y-3 animate-fade-up">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="sm:col-span-2">

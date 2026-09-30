@@ -4,6 +4,7 @@ import {
   parsePresentationMeetingDetail,
   parsePresentationMeetingDraft,
   parsePresentationMeetingList,
+  presentationSessionCreateKey,
   type NormalizedDateRange,
   type PresentationMeetingDraft,
   type PresentationMeetingSnapshot,
@@ -44,7 +45,9 @@ function mutationError(error: { message?: string }): PresentationMeetingMutation
     'PARTICIPANT_OUT_OF_TENANT',
     'PARTICIPANT_DUPLICATE',
     'RESPONSIBLE_OUT_OF_TENANT',
+    'RESPONSIBLE_WITHOUT_ACCESS',
     'RESPONSIBLE_REQUIRED',
+    'REQUEST_ID_REUTILIZADO',
     'REFERENCE_OUT_OF_TENANT_OR_PERIOD',
     'REFERENCE_OUT_OF_TENANT',
     'REFERENCE_REQUIRED',
@@ -155,12 +158,23 @@ export function usePresentationMeetingMutations(companyId: string | undefined) {
   };
 
   const createSession = useMutation({
+    /**
+     * `semente` identifica a sessão em criação (a tela troca depois do
+     * sucesso). A chave é derivada dela + conteúdo: o retry depois de a
+     * resposta se perder devolve a sessão já criada em vez de abrir outra.
+     */
     mutationFn: async (input: {
       period: NormalizedDateRange;
       granularity: TimeSeriesGranularity;
       draft: PresentationMeetingDraft;
+      semente: string;
     }) => {
       const draft = parsePresentationMeetingDraft(input.draft);
+      const idempotencyKey = await presentationSessionCreateKey(input.semente, {
+        period: input.period,
+        granularity: input.granularity,
+        draft,
+      });
       const { data, error } = await supabase.rpc('_guarded_create_presentation_session', {
         p_title: draft.title,
         p_context: draft.context,
@@ -172,9 +186,10 @@ export function usePresentationMeetingMutations(companyId: string | undefined) {
         p_participant_user_ids: [...draft.participantUserIds],
         p_previous_session_id: draft.previousSessionId,
         p_agenda_items: draft.agendaItems as unknown as Json,
+        p_idempotency_key: idempotencyKey,
       });
       if (error) throw mutationError(error);
-      return data as { id: string };
+      return data as { id: string; idempotent?: boolean };
     },
     onSuccess: result => invalidate(result.id),
   });

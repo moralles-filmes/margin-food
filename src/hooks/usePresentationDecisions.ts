@@ -6,6 +6,7 @@ import {
   parsePresentationDecisionTransition,
   parsePresentationResponsibleProfiles,
   PRESENTATION_DECISION_API_VERSION,
+  presentationDecisionCreateKey,
   type NormalizedDateRange,
   type PresentationActionPriority,
   type PresentationActionStatus,
@@ -47,7 +48,9 @@ function mutationError(error: { message?: string }): PresentationDecisionMutatio
     'OPTIMISTIC_LOCK_REQUIRED',
     'PERMISSION_DENIED',
     'RESPONSIBLE_OUT_OF_TENANT',
+    'RESPONSIBLE_WITHOUT_ACCESS',
     'RESPONSIBLE_REQUIRED',
+    'REQUEST_ID_REUTILIZADO',
     'JUSTIFICATION_REQUIRED',
     'SCENARIO_WITHOUT_EXPLICIT_LEVER',
     'SNAPSHOT_VERSION_UNKNOWN',
@@ -159,6 +162,11 @@ export function usePresentationDecisionMutations(companyId: string | undefined) 
   };
 
   const createDecision = useMutation({
+    /**
+     * `semente` identifica a decisão em registro (a tela troca depois do
+     * sucesso). A chave é derivada dela + escolhas do usuário: o retry depois de
+     * a resposta se perder devolve a decisão já registrada.
+     */
     mutationFn: async (input: {
       title: string;
       context: string;
@@ -167,7 +175,9 @@ export function usePresentationDecisionMutations(companyId: string | undefined) 
       referenceType: PresentationDecisionReferenceType;
       snapshot: PresentationDecisionSnapshot;
       executiveResponsibleUserId: string | null;
+      semente: string;
     }) => {
+      const idempotencyKey = await presentationDecisionCreateKey(input.semente, input);
       const { data, error } = await supabase.rpc('_guarded_create_presentation_decision', {
         p_title: input.title,
         p_context: input.context,
@@ -177,9 +187,10 @@ export function usePresentationDecisionMutations(companyId: string | undefined) 
         p_reference_type: input.referenceType,
         p_snapshot: input.snapshot as unknown as Json,
         p_executive_responsible_user_id: input.executiveResponsibleUserId,
+        p_idempotency_key: idempotencyKey,
       });
       if (error) throw mutationError(error);
-      return data as { id: string };
+      return data as { id: string; idempotent?: boolean };
     },
     onSuccess: result => invalidate(result.id),
   });

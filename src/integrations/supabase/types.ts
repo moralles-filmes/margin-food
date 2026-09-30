@@ -3435,6 +3435,8 @@ export type Database = {
           executive_responsible_user_id: string | null
           granularity: string
           id: string
+          idempotency_fingerprint: string | null
+          idempotency_key: string | null
           latest_justification: string | null
           period_end_exclusive: string
           period_start: string
@@ -3464,6 +3466,8 @@ export type Database = {
           executive_responsible_user_id?: string | null
           granularity: string
           id?: string
+          idempotency_fingerprint?: string | null
+          idempotency_key?: string | null
           latest_justification?: string | null
           period_end_exclusive: string
           period_start: string
@@ -3493,6 +3497,8 @@ export type Database = {
           executive_responsible_user_id?: string | null
           granularity?: string
           id?: string
+          idempotency_fingerprint?: string | null
+          idempotency_key?: string | null
           latest_justification?: string | null
           period_end_exclusive?: string
           period_start?: string
@@ -3653,6 +3659,8 @@ export type Database = {
           current_revision_id: string | null
           granularity: string
           id: string
+          idempotency_fingerprint: string | null
+          idempotency_key: string | null
           latest_justification: string | null
           meeting_date: string
           meeting_snapshot: Json | null
@@ -3685,6 +3693,8 @@ export type Database = {
           current_revision_id?: string | null
           granularity: string
           id?: string
+          idempotency_fingerprint?: string | null
+          idempotency_key?: string | null
           latest_justification?: string | null
           meeting_date: string
           meeting_snapshot?: Json | null
@@ -3717,6 +3727,8 @@ export type Database = {
           current_revision_id?: string | null
           granularity?: string
           id?: string
+          idempotency_fingerprint?: string | null
+          idempotency_key?: string | null
           latest_justification?: string | null
           meeting_date?: string
           meeting_snapshot?: Json | null
@@ -5237,6 +5249,7 @@ export type Database = {
           avg30_variation_percent: number
           barcode: string | null
           categoria: string
+          client_request_id: string | null
           company_id: string
           conta_no_cmv: boolean
           conversion_mode: string
@@ -5280,6 +5293,7 @@ export type Database = {
           avg30_variation_percent?: number
           barcode?: string | null
           categoria?: string
+          client_request_id?: string | null
           company_id?: string
           conta_no_cmv?: boolean
           conversion_mode?: string
@@ -5323,6 +5337,7 @@ export type Database = {
           avg30_variation_percent?: number
           barcode?: string | null
           categoria?: string
+          client_request_id?: string | null
           company_id?: string
           conta_no_cmv?: boolean
           conversion_mode?: string
@@ -10026,6 +10041,7 @@ export type Database = {
           p_context: string
           p_executive_responsible_user_id?: string
           p_granularity: string
+          p_idempotency_key?: string
           p_period_end_exclusive: string
           p_period_start: string
           p_reference_type: string
@@ -10051,6 +10067,7 @@ export type Database = {
           p_agenda_items: Json
           p_context: string
           p_granularity: string
+          p_idempotency_key?: string
           p_meeting_date: string
           p_minutes_responsible_user_id: string
           p_participant_user_ids: string[]
@@ -10713,6 +10730,10 @@ export type Database = {
         Returns: Json
       }
       ensure_salmon_raw_product: { Args: never; Returns: string }
+      estoque_criar_produto: {
+        Args: { p_client_request_id?: string; p_produto: Json }
+        Returns: Json
+      }
       estoque_registrar_movimentacoes_lote: {
         Args: { p_client_request_id?: string; p_itens: Json }
         Returns: Json
@@ -11933,6 +11954,7 @@ export type Database = {
       }
       stock_transfer_between_locations: {
         Args: {
+          p_client_request_id?: string
           p_from_location: string
           p_product_id: string
           p_quantity: number
