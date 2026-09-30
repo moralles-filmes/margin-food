@@ -6,10 +6,10 @@ function ler(caminho: string): string {
   return readFileSync(resolve(process.cwd(), caminho), 'utf8').replace(/\r\n/g, '\n');
 }
 
-const ponto = ler('supabase/migrations/20260930120000_rh_ponto_idempotencia.sql');
-const folha = ler('supabase/migrations/20260930120010_rh_folha_transicoes.sql');
-const ficha = ler('supabase/migrations/20260930120020_ficha_criar_componente_atomic.sql');
-const empresa = ler('supabase/migrations/20260930120030_onboard_company_idempotencia.sql');
+const ponto = ler('supabase/migrations/20260930042119_rh_ponto_idempotencia.sql');
+const folha = ler('supabase/migrations/20260930042210_rh_folha_transicoes.sql');
+const ficha = ler('supabase/migrations/20260930042302_ficha_criar_componente_atomic.sql');
+const empresa = ler('supabase/migrations/20260930042342_onboard_company_idempotencia.sql');
 const aiChat = ler('supabase/functions/ai-chat/index.ts');
 const fichaEdge = ler('supabase/functions/ficha-tecnica/index.ts');
 
