@@ -118,6 +118,46 @@ describe('cache e transporte das reuniões executivas', () => {
     client.clear();
   });
 
+  it('cria sessão com chave derivada: o retry da mesma operação reenvia a mesma chave', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValue({ data: { id: MEETING_ID, idempotent: false }, error: null } as never);
+    const { client, wrapper } = setupClient();
+    const detail = createPresentationMeetingDetail();
+    const { result } = renderHook(() => usePresentationMeetingMutations(companyId), { wrapper });
+    const input = {
+      period: detail.session.period,
+      granularity: 'month' as const,
+      draft: {
+        title: detail.session.title,
+        context: detail.session.context,
+        meetingDate: detail.session.meetingDate,
+        minutesResponsibleUserId: RESPONSIBLE_ID,
+        participantUserIds: [RESPONSIBLE_ID],
+        previousSessionId: null,
+        agendaItems: [{
+          itemType: 'FREE_TEXT' as const,
+          title: 'Resultado',
+          objective: '',
+          discussionNotes: '',
+          conclusion: null,
+          reviewState: 'PENDING' as const,
+          referenceType: null,
+          referenceId: null,
+        }],
+      },
+    };
+    await result.current.createSession.mutateAsync({ ...input, semente: 'semente-1' });
+    await result.current.createSession.mutateAsync({ ...input, semente: 'semente-1' });
+    await result.current.createSession.mutateAsync({ ...input, semente: 'semente-2' });
+    const chaves = vi.mocked(supabase.rpc).mock.calls
+      .filter(([nome]) => nome === '_guarded_create_presentation_session')
+      .map(([, args]) => (args as { p_idempotency_key?: string }).p_idempotency_key);
+    expect(chaves).toHaveLength(3);
+    expect(chaves[0]).toMatch(/^[0-9a-f]{64}$/);
+    expect(chaves[1]).toBe(chaves[0]);
+    expect(chaves[2]).not.toBe(chaves[0]);
+    client.clear();
+  });
+
   it('usa a RPC protegida por export para obter o conteúdo da ata', async () => {
     const detail = createPresentationMeetingDetail();
     vi.mocked(supabase.rpc).mockResolvedValue({ data: detail, error: null } as never);
