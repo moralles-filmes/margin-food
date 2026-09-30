@@ -31,9 +31,9 @@ import RequisicaoCardHeader from './estoque/RequisicaoCardHeader';
 import RequisicaoProductPicker, { type ManualRequisitionItem } from './estoque/RequisicaoProductPicker';
 import { sortByName } from '@/lib/sortByName';
 import { useNavigationRecord } from '@/hooks/useNavigationRequest';
-import { novaSemente } from '@/lib/chaveOperacao';
 import { mensagemErroEdge } from '@/lib/edgeFunctionError';
-import { chaveRequisicaoEstoque } from '@/domain/estoque/idempotencia';
+import { conteudoRequisicaoEstoque } from '@/domain/estoque/idempotencia';
+import { useChavesPendentes } from '@/hooks/useChavesPendentes';
 
 interface Props {
   produtos: ProdutoExtended[];
@@ -131,10 +131,10 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
   }, [supabase, toast]);
   const [observacao, setObservacao] = useState('');
   const [itens, setItens] = useState<ManualRequisitionItem[]>([]);
-  // Semente do formulário manual: só troca quando ele é limpo. A chave enviada
-  // combina a semente com o conteúdo — retry da mesma requisição reaproveita a
-  // chave e o servidor devolve a existente em vez de criar outra.
-  const [sementeManual, setSementeManual] = useState(novaSemente);
+  // Semente por requisição ainda não confirmada (a mesma da lista fixa: é a
+  // mesma RPC). Cancelar o formulário ou enviar outra requisição no meio não
+  // troca a chave de uma que pode ter sido gravada sem resposta.
+  const chavesRequisicao = useChavesPendentes('estoque-requisicao');
   // Trava síncrona: o estado `submitting` só chega ao botão no próximo render.
   const enviandoRef = useRef(false);
   const [cancelling, setCancelling] = useState<string | null>(null);
@@ -277,7 +277,6 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
   const resetManualForm = () => {
     setItens([]);
     setObservacao('');
-    setSementeManual(novaSemente());
     setFormMode('none');
   };
 
@@ -306,13 +305,14 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
         quantidade: item.quantidade,
         unidade: item.unidade,
       }));
+      const conteudo = conteudoRequisicaoEstoque({ setor, observacao, itens });
       const { data, error } = await supabase.functions.invoke('requisicao-estoque', {
         body: {
           action: 'criar',
           setor,
           observacao,
           itens: itensPayload,
-          client_request_id: await chaveRequisicaoEstoque(sementeManual, { setor, observacao, itens }),
+          client_request_id: await chavesRequisicao.chave(conteudo),
         },
       });
 
@@ -323,6 +323,7 @@ export default function RequisicaoEstoqueSection({ produtos, saldos, onBadgeRefr
       }
 
       if (data?.success) {
+        chavesRequisicao.confirmar(conteudo);
         toast.success(data.mensagem, { duration: 5000 });
         const semEstoque = data.resultados?.filter((result: Record<string, unknown>) => !result.tem_estoque) || [];
         if (semEstoque.length > 0) {

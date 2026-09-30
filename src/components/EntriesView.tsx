@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react';
 import { useCan } from '@/permissions/hooks';
 import { useSalmonStore } from '@/hooks/useSalmonStore';
-import { novaSemente } from '@/lib/chaveOperacao';
-import { chaveEntradaSalmao } from '@/domain/estoque/idempotencia';
+import { conteudoEntradaSalmao } from '@/domain/estoque/idempotencia';
+import { useChavesPendentes } from '@/hooks/useChavesPendentes';
 import type { SalmonEntry } from '@/types/salmon';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -64,9 +64,10 @@ export default function EntriesView({ store }: EntriesViewProps) {
   // Trava síncrona: cobre o submit e o "Continuar mesmo assim" do alerta de
   // orçamento — `saving` só desabilita os botões no próximo render.
   const salvandoRef = useRef(false);
-  // Semente do formulário: troca a cada formulário limpo. A chave enviada
-  // combina a semente com os dados da entrada (chaveEntradaSalmao).
-  const [semente, setSemente] = useState(novaSemente);
+  // Semente por entrada ainda não confirmada: cancelar o formulário ou
+  // registrar outra entrada no meio não troca a chave de uma que pode ter sido
+  // gravada sem resposta.
+  const chavesEntrada = useChavesPendentes('salmao-entrada');
 
   const filtered = filterByPeriod(entries, period);
   const lots = [...new Set(entries.map(e => e.lot).filter(Boolean))];
@@ -88,7 +89,6 @@ export default function EntriesView({ store }: EntriesViewProps) {
     setForm(emptyForm());
     setEditingId(null);
     setShowForm(false);
-    setSemente(novaSemente());
   };
 
   const doSave = async (data: any, auditOverride?: { tipos: string[]; motivo: string }) => {
@@ -104,7 +104,9 @@ export default function EntriesView({ store }: EntriesViewProps) {
       }
       // Chave derivada dos dados: repetir a MESMA entrada devolve a já gravada;
       // mudar qualquer campo gera outra. A edição (replace) não usa chave.
-      const newEntry = await addEntry(data, { clientRequestId: await chaveEntradaSalmao(semente, data) });
+      const conteudo = conteudoEntradaSalmao(data);
+      const newEntry = await addEntry(data, { clientRequestId: await chavesEntrada.chave(conteudo) });
+      chavesEntrada.confirmar(conteudo);
       toast.success('Entrada registrada!');
       // A entrada já está gravada: a auditoria de orçamento não pode impedir a
       // limpeza do formulário.

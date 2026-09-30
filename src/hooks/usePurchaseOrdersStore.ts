@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useScopedToast } from '@/hooks/useScopedToast';
 import { useEmitDataEvent } from '@/lib/dataEvents';
 import { includesNormalized } from '@/lib/utils';
-import { chavePedidoCompra, mensagemErroCriarPedido, type IdempotenciaPedido } from '@/domain/compras/pedidoIdempotencia';
+import { chavePedidoCompra, confirmarPedidoCompra, mensagemErroCriarPedido, type IdempotenciaPedido } from '@/domain/compras/pedidoIdempotencia';
 
 export interface PurchaseOrder {
   id: string;
@@ -344,6 +344,7 @@ export function usePurchaseOrdersStore() {
         return null;
       }
 
+      confirmarPedidoCompra(idempotencia, payload);
       const res = result as { status?: string; order_id?: string; deleted?: boolean } | null;
       // O pedido já está gravado: falha ao recarregar a lista não pode parecer
       // erro do envio (induziria a criar de novo).

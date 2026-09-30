@@ -21,7 +21,7 @@ import { fmtBRL, formatDateBR, formatDateTimeBR, formatDateValueBR, formatPercen
 import { formatNumberToBRL, normalizeBRLMoneyToNumber } from '@/lib/money';
 import { BRLInput, CurrencyInput } from '@/components/ui/brl-input';
 import { compararTotais, getPrecoSugerido, getUltimaCompra } from '@/domain/compras/pedidoPrecos';
-import { novaSemente } from '@/lib/chaveOperacao';
+import { useChavesPendentes } from '@/hooks/useChavesPendentes';
 import UserMentionSelect from '@/components/UserMentionSelect';
 import ProductSearchCombobox, { type ProductOption } from '@/components/ui/ProductSearchCombobox';
 import { SubmoduleSwitcher } from '@/components/ui/SubmoduleSwitcher';
@@ -181,9 +181,10 @@ export default function PedidosComprasMercadoView() {
   };
   const [form, setForm] = useState(emptyForm);
   const [formItems, setFormItems] = useState<FormItem[]>([]);
-  // Semente da solicitação em andamento: troca só quando o formulário fecha. A
-  // chave enviada é derivada dela + conteúdo (duplo clique/retry reaproveitam).
-  const [sementePedido, setSementePedido] = useState(novaSemente);
+  // Semente por solicitação ainda não confirmada: fechar o formulário ou criar
+  // outra no meio não troca a chave de uma que pode ter sido gravada sem
+  // resposta. A chave é derivada dela + conteúdo (duplo clique/retry reaproveitam).
+  const chavesPedido = useChavesPendentes('compras-pedido', 'uuid');
   const submittingRef = useRef(false);
   const [submitting, setSubmitting] = useState(false);
   const [itemProdId, setItemProdId] = useState('');
@@ -404,7 +405,7 @@ export default function PedidosComprasMercadoView() {
           delivery_forecast_date: form.delivery_forecast_date || null,
           origin: 'MANUAL',
           origin_ref: null,
-        }, formItems, { semente: sementePedido });
+        }, formItems, { pendentes: chavesPedido });
         if (result) {
           toast.success(result.idempotent
             ? 'Esta solicitação já tinha sido criada — nada foi duplicado.'
@@ -425,8 +426,6 @@ export default function PedidosComprasMercadoView() {
     setForm(emptyForm);
     setFormItems([]);
     setItemProdId(''); setItemQtd(''); setItemPreco('');
-    // A próxima solicitação é outra operação, mesmo que tenha o mesmo conteúdo.
-    setSementePedido(novaSemente());
   };
 
   const startEdit = async (order: PurchaseOrder) => {

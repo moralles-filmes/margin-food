@@ -11,6 +11,8 @@
  * O banco recusa qualquer outro tipo (`TIPO_INVALIDO`).
  */
 
+import type { ChavesPendentes } from '@/lib/chaveOperacao';
+
 export interface SetorOperacional {
   setorId: string;
   nome: string;
@@ -151,8 +153,8 @@ export function quantidadeParaCampo(valor: number): string {
  * Determinística de propósito: repetir a MESMA operação (retry depois de falha
  * de rede) reaproveita a chave e o servidor devolve o lançamento original;
  * mudar produto, setor ou quantidade produz chave nova, então um reenvio
- * nunca é confundido com a operação anterior. `semente` só troca quando começa
- * um lançamento novo.
+ * nunca é confundido com a operação anterior. A `semente` é a pendente desta
+ * saída (`chaveSaida`), liberada só quando ela é confirmada.
  */
 export function chaveRequisicao(
   semente: string,
@@ -161,6 +163,24 @@ export function chaveRequisicao(
   quantidade: number | null,
 ): string {
   return [semente, produtoId, setorId, quantidade ?? ''].join('|');
+}
+
+/** O que `op_registrar_movimentacao` compara no reenvio (o tipo é sempre SAIDA). */
+export interface IdentidadeSaida {
+  produtoId: string;
+  setorId: string;
+  quantidade: number;
+}
+
+/**
+ * Chave de uma saída, unitária ou item de lista: semente pendente DESTE
+ * conteúdo (`useChavesPendentes('operacional-saida')`) + identidade. Uma saída
+ * gravada sem resposta mantém a chave até ser confirmada — mesmo que o
+ * operador lance outra no meio, ou a coloque numa lista —, e o servidor
+ * devolve a já gravada em vez de dar saída duas vezes. Chame só no envio.
+ */
+export function chaveSaida(pendentes: ChavesPendentes<IdentidadeSaida>, saida: IdentidadeSaida): string {
+  return chaveRequisicao(pendentes.semente(saida), saida.produtoId, saida.setorId, saida.quantidade);
 }
 
 /**

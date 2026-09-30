@@ -7,13 +7,14 @@ import { useScopedToast } from '@/hooks/useScopedToast';
 import LeitorCamera from '@/components/camera/LeitorCamera';
 import { mensagemBarcodeInvalido, validarBarcode } from '@/domain/estoque/barcode';
 import {
-  chaveRequisicao,
+  chaveSaida,
   formatarQuantidade,
   LOTE_MAXIMO_ITENS,
   parseQuantidade,
   quantidadeParaCampo,
   validarQuantidade,
   type MovimentacaoOperacionalRegistrada,
+  type IdentidadeSaida,
   type ProdutoOperacional,
   type SetorOperacional,
 } from '@/domain/estoque/operacional';
@@ -21,12 +22,15 @@ import {
   adicionarAoLote,
   alterarQuantidadeNoLote,
   chaveItemLote,
+  identidadeItemLote,
   quantidadeNoLote,
   removerDoLote,
   validarQuantidadeNoLote,
   type ItemSaidaLote,
 } from '@/domain/estoque/operacionalLote';
 import type { useMovimentacaoOperacional } from '@/hooks/useMovimentacaoOperacional';
+import { useChavesPendentes } from '@/hooks/useChavesPendentes';
+import { novaSemente } from '@/lib/chaveOperacao';
 import LeitorCodigoBarras from './LeitorCodigoBarras';
 import ProdutoPickerOperacional from './ProdutoPickerOperacional';
 import QuantidadeStepper from './QuantidadeStepper';
@@ -48,14 +52,6 @@ interface Props {
   setores: SetorOperacional[];
   dados: ReturnType<typeof useMovimentacaoOperacional>;
   onRegistrado: () => void;
-}
-
-/** Semente do identificador de confirmação — troca a cada lançamento novo. */
-function novaSemente(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-  return `op-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
 /**
@@ -106,27 +102,15 @@ export default function FluxoMovimentacao({ setores, dados, onRegistrado }: Prop
   // leitor): reabrir a cada item custaria ligar a câmera e o leitor de novo.
   const [cameraAberta, setCameraAberta] = useState(false);
 
-  // A semente só troca quando um lançamento novo começa; a chave enviada ao
-  // servidor combina a semente com a identidade da operação.
-  const [semente, setSemente] = useState(novaSemente);
+  // Semente por saída ainda não confirmada (unitária ou item de lista), fora do
+  // componente: lançar outra saída no meio, descartar a lista ou sair da tela
+  // não troca a chave de uma que pode ter sido gravada sem resposta.
+  const chavesSaida = useChavesPendentes<IdentidadeSaida>('operacional-saida');
+  // Trava síncrona: `salvando` só chega aos botões no próximo render.
+  const salvandoRef = useRef(false);
 
   const quantidade = useMemo(() => parseQuantidade(quantidadeTexto), [quantidadeTexto]);
 
-  // Chave derivada, não estado: repetir a MESMA confirmação depois de uma falha
-  // de rede reaproveita a chave (o servidor devolve o lançamento original em vez
-  // de duplicar), mas trocar de produto/setor/quantidade gera chave nova.
-  // Guardar a chave em estado deixava o id de uma confirmação que falhou preso
-  // no próximo produto — e um envio que o servidor já tinha gravado, mas cuja
-  // resposta se perdeu, devolvia "sucesso" sem registrar nada para o item novo.
-  const requestId = useMemo(
-    () => chaveRequisicao(
-      semente,
-      produto?.produtoId ?? '',
-      setor?.setorId ?? '',
-      quantidade,
-    ),
-    [semente, produto, setor, quantidade],
-  );
   // Com a lista em andamento, o saldo disponível desconta o que ela já retira
   // do mesmo produto (em qualquer setor — o saldo é um só).
   const validacao = useMemo(
@@ -241,19 +225,31 @@ export default function FluxoMovimentacao({ setores, dados, onRegistrado }: Prop
   }, [descartarLeituraEmVoo]);
 
   const confirmar = useCallback(async () => {
-    if (salvando || !produto || !setor) return;
+    if (salvandoRef.current || !produto || !setor) return;
     setTentouConfirmar(true);
     if (!validacao.valida || quantidade === null) return;
 
+    salvandoRef.current = true;
     setSalvando(true);
-    const res = await dados.registrar({
-      produtoId: produto.produtoId,
-      setorId: setor.setorId,
-      quantidade,
-      observacao,
-      clientRequestId: requestId,
-    });
-    setSalvando(false);
+    // Chave derivada, não estado: repetir a MESMA confirmação depois de uma
+    // falha de rede reaproveita a chave (o servidor devolve o lançamento
+    // original em vez de duplicar), mas trocar de produto/setor/quantidade gera
+    // chave nova. Guardar a chave em estado deixava o id de uma confirmação que
+    // falhou preso no próximo produto — e um envio que o servidor já tinha
+    // gravado, mas cuja resposta se perdeu, devolvia "sucesso" sem registrar
+    // nada para o item novo.
+    const saida: IdentidadeSaida = { produtoId: produto.produtoId, setorId: setor.setorId, quantidade };
+    let res: Awaited<ReturnType<Props['dados']['registrar']>>;
+    try {
+      res = await dados.registrar({
+        ...saida,
+        observacao,
+        clientRequestId: chaveSaida(chavesSaida, saida),
+      });
+    } finally {
+      salvandoRef.current = false;
+      setSalvando(false);
+    }
 
     // Comparação explícita: com `strict: false` o `!res.ok` não estreita a união.
     if (res.ok === false) {
@@ -261,10 +257,11 @@ export default function FluxoMovimentacao({ setores, dados, onRegistrado }: Prop
       return;
     }
 
+    chavesSaida.confirmar(saida);
     setResultado(res.resultado);
     setPasso('sucesso');
     onRegistrado();
-  }, [salvando, produto, setor, validacao, quantidade, dados, observacao, requestId, toast, onRegistrado]);
+  }, [produto, setor, validacao, quantidade, dados, observacao, chavesSaida, toast, onRegistrado]);
 
   // ─── Saída com vários itens ───
 
@@ -352,26 +349,31 @@ export default function FluxoMovimentacao({ setores, dados, onRegistrado }: Prop
     setItensLote([]);
     setErrosLote({});
     setObservacao('');
-    setSemente(novaSemente());
     setEditandoId(null);
     irParaLeitor();
   }, [irParaLeitor]);
 
   const confirmarLote = useCallback(async () => {
-    if (salvando || itensLote.length === 0) return;
+    if (salvandoRef.current || itensLote.length === 0) return;
 
+    salvandoRef.current = true;
     setSalvando(true);
     setErrosLote({});
-    const res = await dados.registrarLote({
-      itens: itensLote.map(item => ({
-        produtoId: item.produto.produtoId,
-        setorId: item.setor.setorId,
-        quantidade: item.quantidade,
-        clientRequestId: chaveItemLote(semente, item),
-      })),
-      observacao,
-    });
-    setSalvando(false);
+    let res: Awaited<ReturnType<Props['dados']['registrarLote']>>;
+    try {
+      res = await dados.registrarLote({
+        itens: itensLote.map(item => ({
+          produtoId: item.produto.produtoId,
+          setorId: item.setor.setorId,
+          quantidade: item.quantidade,
+          clientRequestId: chaveItemLote(chavesSaida, item),
+        })),
+        observacao,
+      });
+    } finally {
+      salvandoRef.current = false;
+      setSalvando(false);
+    }
 
     if (res.ok === false) {
       const recusado = res.indice !== null ? itensLote[res.indice] : undefined;
@@ -386,10 +388,11 @@ export default function FluxoMovimentacao({ setores, dados, onRegistrado }: Prop
       return;
     }
 
+    for (const item of itensLote) chavesSaida.confirmar(identidadeItemLote(item));
     setResultadosLote(res.resultados);
     setPasso('sucesso');
     onRegistrado();
-  }, [salvando, itensLote, dados, semente, observacao, toast, onRegistrado]);
+  }, [itensLote, dados, chavesSaida, observacao, toast, onRegistrado]);
 
   /**
    * Volta para o modo que originou o lançamento: quem estava bipando continua
@@ -404,7 +407,6 @@ export default function FluxoMovimentacao({ setores, dados, onRegistrado }: Prop
     setErrosLote({});
     setResultadosLote(null);
     setEditandoId(null);
-    setSemente(novaSemente());
     setAvisoLeitor(undefined);
 
     if (modo === 'leitor') {

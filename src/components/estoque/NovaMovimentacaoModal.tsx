@@ -38,8 +38,8 @@ import { Badge } from '@/components/ui/badge';
 import {
   calcularItemLote, itemLoteVazio, novoItemLote, validarLote, type MovLoteItem,
 } from '@/domain/estoque/movimentacaoLote';
-import { chaveLoteMovimentacao } from '@/domain/estoque/idempotencia';
-import { novaSemente } from '@/lib/chaveOperacao';
+import { conteudoLoteMovimentacao } from '@/domain/estoque/idempotencia';
+import { useChavesPendentes } from '@/hooks/useChavesPendentes';
 import type { NovaMovimentacao } from '@/hooks/useEstoqueGeralStore';
 import type { MovimentacaoEstoque } from '@/types/salmon';
 import type { ProdutoExtended } from '@/types/estoque';
@@ -115,9 +115,10 @@ export default function NovaMovimentacaoModal({
   const [saving, setSaving] = useState(false);
   // Trava síncrona: `saving` só desabilita o botão no próximo render.
   const salvandoRef = useRef(false);
-  // Semente do lançamento: troca a cada formulário limpo. A chave enviada
-  // combina a semente com o conteúdo do lote (chaveLoteMovimentacao).
-  const [semente, setSemente] = useState(novaSemente);
+  // Semente por lote ainda não confirmado, fora do modal: fechar e reabrir, ou
+  // registrar outro lote no meio, não troca a chave de um lote que pode ter sido
+  // gravado sem resposta.
+  const chavesLote = useChavesPendentes('estoque-movimentacao-lote');
   const ultimoItemRef = useRef<HTMLDivElement>(null);
 
   const resetForm = useCallback(() => {
@@ -126,7 +127,6 @@ export default function NovaMovimentacaoModal({
     setItens([novoItemLote(novaKey())]);
     setCustoDesbloqueado({});
     setErros({});
-    setSemente(novaSemente());
   }, [preset, novaKey]);
 
   // Reset form when modal opens with a new preset
@@ -289,14 +289,15 @@ export default function NovaMovimentacaoModal({
       }));
       // Chave derivada do lote: repetir o MESMO lote (duplo clique, resposta
       // perdida) devolve as linhas já gravadas; mudar qualquer item gera outra.
-      const clientRequestId = await chaveLoteMovimentacao(semente, {
+      const conteudo = conteudoLoteMovimentacao({
         tipo,
         observacao,
         itens: movimentacoes.map(m => ({
           produtoId: m.produtoId, quantidade: m.quantidade, custoUnitario: m.custoUnitario, setor: m.setor,
         })),
       });
-      await addMovimentacoesLote(movimentacoes, { clientRequestId });
+      await addMovimentacoesLote(movimentacoes, { clientRequestId: await chavesLote.chave(conteudo) });
+      chavesLote.confirmar(conteudo);
 
       const n = resultado.itens.length;
       toast.success(n === 1 ? `Movimentação ${tipo} registrada!` : `${n} movimentações ${tipo} registradas!`);

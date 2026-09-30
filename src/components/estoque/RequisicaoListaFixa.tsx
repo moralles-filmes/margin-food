@@ -21,8 +21,8 @@ import { ClipboardList, Eye, Send, ArrowLeft, Inbox, AlertTriangle, ShoppingCart
 import RequisicaoQuantityList, { type RequisicaoQuantityListHandle } from './RequisicaoQuantityList';
 import type { ProdutoExtended } from '@/types/estoque';
 import { toRequisitionDisplayProduct } from '@/domain/estoque/requisition';
-import { chaveRequisicaoEstoque } from '@/domain/estoque/idempotencia';
-import { novaSemente } from '@/lib/chaveOperacao';
+import { conteudoRequisicaoEstoque } from '@/domain/estoque/idempotencia';
+import { useChavesPendentes } from '@/hooks/useChavesPendentes';
 import { mensagemErroEdge } from '@/lib/edgeFunctionError';
 
 interface ListaFixaItem {
@@ -75,9 +75,9 @@ export default function RequisicaoListaFixa({ produtos, saldos, onSuccess, onCan
   // Trava síncrona, tomada antes do diálogo de confirmação: o estado
   // `submitting` só desabilita o botão no próximo render.
   const enviandoRef = useRef(false);
-  // Semente desta requisição: a tela é desmontada no sucesso, e a próxima
-  // começa com outra. Retry do mesmo conteúdo reaproveita a chave.
-  const [semente, setSemente] = useState(novaSemente);
+  // Semente por requisição ainda não confirmada, fora da tela (que desmonta ao
+  // fechar): reabrir a lista e reenviar a mesma requisição reaproveita a chave.
+  const chavesRequisicao = useChavesPendentes('estoque-requisicao');
   const [step, setStep] = useState<Step>('fill');
 
   const loadListas = useCallback(async () => {
@@ -249,16 +249,17 @@ export default function RequisicaoListaFixa({ produtos, saldos, onSuccess, onCan
         quantidade: item.quantidade,
         unidade: item.display!.displayUnitForRequisition!,
       }));
+      const conteudo = conteudoRequisicaoEstoque({
+        setor,
+        observacao,
+        itens: itens.map(item => ({ produtoId: item.produto_id, quantidade: item.quantidade, unidade: item.unidade })),
+      });
       const payload = {
         action: 'criar',
         setor,
         observacao,
         itens,
-        client_request_id: await chaveRequisicaoEstoque(semente, {
-          setor,
-          observacao,
-          itens: itens.map(item => ({ produtoId: item.produto_id, quantidade: item.quantidade, unidade: item.unidade })),
-        }),
+        client_request_id: await chavesRequisicao.chave(conteudo),
       };
 
       const { data, error } = await supabase.functions.invoke('requisicao-estoque', {
@@ -272,6 +273,7 @@ export default function RequisicaoListaFixa({ produtos, saldos, onSuccess, onCan
       }
 
       if (data?.success) {
+        chavesRequisicao.confirmar(conteudo);
         toast.success(data.mensagem || 'Requisição enviada com sucesso!', { duration: 5000 });
 
         const semEstoque = data.resultados?.filter((result: Record<string, unknown>) => !result.tem_estoque) || [];
@@ -285,7 +287,6 @@ export default function RequisicaoListaFixa({ produtos, saldos, onSuccess, onCan
           });
         }
 
-        setSemente(novaSemente());
         onSuccess();
       } else {
         toast.error(data?.error || 'Erro ao criar requisição');

@@ -1,4 +1,4 @@
-import { chaveOperacaoUuid } from '@/lib/chaveOperacao';
+import { chaveOperacaoUuid, type ChavesPendentes } from '@/lib/chaveOperacao';
 
 /**
  * De onde vem a chave de idempotência de um pedido de compra
@@ -6,10 +6,12 @@ import { chaveOperacaoUuid } from '@/lib/chaveOperacao';
  */
 export type IdempotenciaPedido =
   /**
-   * Formulário: semente da tela + conteúdo do pedido. Duplo clique e retry do
-   * mesmo pedido reaproveitam a chave; qualquer campo alterado gera outra.
+   * Formulário: semente por pedido ainda não confirmado + conteúdo
+   * (`useChavesPendentes('compras-pedido', 'uuid')`). Duplo clique, retry,
+   * fechar e reabrir o formulário e outros pedidos criados no meio reaproveitam
+   * a chave; qualquer campo alterado gera outra.
    */
-  | { semente: string }
+  | { pendentes: ChavesPendentes }
   /**
    * Operação única por natureza (ex.: lembrete do calendário no dia). A chave
    * NÃO depende do conteúdo: o gerador relê o preço do catálogo a cada clique,
@@ -18,9 +20,14 @@ export type IdempotenciaPedido =
   | { operacao: string };
 
 export function chavePedidoCompra(idem: IdempotenciaPedido, payload: unknown): Promise<string> {
-  return 'semente' in idem
-    ? chaveOperacaoUuid(idem.semente, payload)
+  return 'pendentes' in idem
+    ? idem.pendentes.chave(payload)
     : chaveOperacaoUuid('operacao', idem.operacao);
+}
+
+/** Pedido gravado: libera a semente do conteúdo (o próximo pedido igual é outro). */
+export function confirmarPedidoCompra(idem: IdempotenciaPedido, payload: unknown): void {
+  if ('pendentes' in idem) idem.pendentes.confirmar(payload);
 }
 
 /** Um pedido por lembrete por dia: o 2º clique devolve o pedido já gerado. */
