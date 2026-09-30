@@ -4,6 +4,7 @@ import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useScopedToast } from '@/hooks/useScopedToast';
+import { useTravaEnvio } from '@/hooks/useTravaEnvio';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -164,8 +165,9 @@ function EpisTab({ epis, colaboradores, canManage, user, getColabNome, onRefresh
   const [showForm, setShowForm] = useState(false);
   const emptyForm = { colaborador_id: '', nome: '', tipo: 'Luva', ca_numero: '', data_entrega: format(new Date(), 'yyyy-MM-dd'), data_validade: '', quantidade: 1, observacoes: '' };
   const [form, setForm] = useState(emptyForm);
+  const { enviando, executar } = useTravaEnvio();
 
-  const handleSave = async () => {
+  const handleSave = () => executar(async () => {
     if (!form.colaborador_id || !form.nome) { toast.error('Preencha colaborador e nome'); return; }
     const { error } = await supabase.from('rh_epis').insert(withCompanyId(companyId, {
       ...form, data_validade: form.data_validade || null, created_by: user?.id,
@@ -175,7 +177,7 @@ function EpisTab({ epis, colaboradores, canManage, user, getColabNome, onRefresh
     setShowForm(false);
     setForm(emptyForm);
     onRefresh();
-  };
+  });
 
   const handleDelete = async (id: string) => {
     const { error } = await supabase.from('rh_epis').update({ status: 'INATIVO' }).eq('id', id);
@@ -218,7 +220,7 @@ function EpisTab({ epis, colaboradores, canManage, user, getColabNome, onRefresh
                   <div><Label className="text-xs">Validade</Label><DateInput className="h-8 text-xs" value={form.data_validade} onValueChange={v => setForm(p => ({ ...p, data_validade: v }))} /></div>
                 </div>
                 <div><Label className="text-xs">Qtd</Label><Input type="number" className="h-8 text-xs w-20" value={form.quantidade || ''} onChange={e => setForm(p => ({ ...p, quantidade: Number(e.target.value) }))} /></div>
-                <Button onClick={handleSave} className="w-full">Registrar</Button>
+                <Button onClick={handleSave} disabled={enviando} className="w-full">{enviando ? 'Registrando...' : 'Registrar'}</Button>
               </div>
             </DialogContent>
           </Dialog>
@@ -295,8 +297,9 @@ function ExamesTab({ exames, colaboradores, canManage, user, getColabNome, onRef
   const [showForm, setShowForm] = useState(false);
   const emptyForm = { colaborador_id: '', tipo: 'periodico', descricao: '', data_realizacao: '', data_vencimento: '', resultado: 'APTO', clinica: '', medico: '', observacoes: '' };
   const [form, setForm] = useState(emptyForm);
+  const { enviando, executar } = useTravaEnvio();
 
-  const handleSave = async () => {
+  const handleSave = () => executar(async () => {
     if (!form.colaborador_id) { toast.error('Selecione um colaborador'); return; }
     const { error } = await supabase.from('rh_exames').insert(withCompanyId(companyId, {
       ...form,
@@ -310,7 +313,7 @@ function ExamesTab({ exames, colaboradores, canManage, user, getColabNome, onRef
     setShowForm(false);
     setForm(emptyForm);
     onRefresh();
-  };
+  });
 
   const handleDelete = async (id: string) => {
     const { error } = await supabase.from('rh_exames').update({ status: 'CANCELADO' }).eq('id', id);
@@ -365,7 +368,7 @@ function ExamesTab({ exames, colaboradores, canManage, user, getColabNome, onRef
                   <div><Label className="text-xs">Clínica</Label><Input className="h-8 text-xs" value={form.clinica} onChange={e => setForm(p => ({ ...p, clinica: e.target.value }))} /></div>
                   <div><Label className="text-xs">Médico</Label><Input className="h-8 text-xs" value={form.medico} onChange={e => setForm(p => ({ ...p, medico: e.target.value }))} /></div>
                 </div>
-                <Button onClick={handleSave} className="w-full">Registrar</Button>
+                <Button onClick={handleSave} disabled={enviando} className="w-full">{enviando ? 'Registrando...' : 'Registrar'}</Button>
               </div>
             </DialogContent>
           </Dialog>
@@ -445,8 +448,9 @@ function IncidentesTab({ incidentes, colaboradores, canManage, user, getColabNom
     afastamento_dias: 0, cat_emitida: false, cat_numero: '', testemunhas: '',
   };
   const [form, setForm] = useState(emptyForm);
+  const { enviando, executar } = useTravaEnvio();
 
-  const handleSave = async () => {
+  const handleSave = () => executar(async () => {
     if (!form.descricao.trim()) { toast.error('Descrição é obrigatória'); return; }
     const { error } = await supabase.from('rh_incidentes').insert(withCompanyId(companyId, {
       ...form,
@@ -458,7 +462,7 @@ function IncidentesTab({ incidentes, colaboradores, canManage, user, getColabNom
     setShowForm(false);
     setForm(emptyForm);
     onRefresh();
-  };
+  });
 
   const handleEncerrar = async (id: string) => {
     const { error } = await supabase.from('rh_incidentes').update({
@@ -521,7 +525,7 @@ function IncidentesTab({ incidentes, colaboradores, canManage, user, getColabNom
                   <div><Label className="text-xs">Dias Afastamento</Label><Input type="number" className="h-8 text-xs" value={form.afastamento_dias || ''} onChange={e => setForm(p => ({ ...p, afastamento_dias: Number(e.target.value) }))} /></div>
                   <div><Label className="text-xs">CAT Nº (se emitida)</Label><Input className="h-8 text-xs" value={form.cat_numero} onChange={e => setForm(p => ({ ...p, cat_numero: e.target.value, cat_emitida: !!e.target.value }))} /></div>
                 </div>
-                <Button onClick={handleSave} variant="destructive" className="w-full">Registrar Incidente</Button>
+                <Button onClick={handleSave} disabled={enviando} variant="destructive" className="w-full">{enviando ? 'Registrando...' : 'Registrar Incidente'}</Button>
               </div>
             </DialogContent>
           </Dialog>

@@ -18,6 +18,8 @@ function structuredLog(data: Record<string, any>) {
 }
 
 // ─── AUDIT HELPER (via serviço; identidade validada no handler) ───
+// Roda depois da escrita já confirmada: falhar aqui não desfaz nada e, como
+// 500, convidaria o usuário a reenviar o que já foi gravado. Vai para o log.
 async function writeAudit(
   adminClient: any, companyId: string, actorId: string,
   module: string, action: string, entityType: string,
@@ -33,7 +35,9 @@ async function writeAudit(
     p_after: after ? JSON.parse(JSON.stringify(after)) : null,
     p_metadata: metadata ? JSON.parse(JSON.stringify(metadata)) : null,
   })
-  if (error) throw error
+  if (error) {
+    structuredLog({ event: 'audit_failed', request_id: metadata?.request_id, company_id: companyId, action, entity: entityType, entity_id: entityId, error: error.message })
+  }
 }
 
 serve(withRequestCors(async (req) => {
@@ -152,6 +156,22 @@ serve(withRequestCors(async (req) => {
         payload.id || resultBody?.id, beforeData, resultBody, auditMeta({ tipo }))
 
       structuredLog({ request_id: requestId, action, company_id: companyId, user_id: user.id, status: 200, entity_id: payload.id || resultBody?.id, is_update: !!payload.id, duration_ms: Date.now() - startTime })
+      return result
+    }
+    // Componente novo + BOM numa transação, idempotente pela chave do cliente.
+    if (action === 'criar_componente') {
+      const tipo = payload.tipo || 'PRE_PREPARO'
+      const subtab = TIPO_SUBTAB[tipo] || 'pre-preparos'
+      await requirePerm(`ficha:${subtab}:create`)
+
+      const result = await criarComponente(userClient, payload)
+      const resultBody = await result.clone().json()
+
+      // Reenvio devolve o componente já criado: não audita de novo.
+      if (result.ok && !resultBody?.idempotente) await writeAudit(adminClient, companyId, user.id, 'ficha_tecnica', 'CREATE', 'ficha_componentes',
+        resultBody?.id, null, resultBody, auditMeta({ tipo, itens_count: payload.itens?.length || 0 }))
+
+      structuredLog({ request_id: requestId, action, company_id: companyId, user_id: user.id, status: 200, entity_id: resultBody?.id, idempotente: !!resultBody?.idempotente, itens_count: payload.itens?.length || 0, duration_ms: Date.now() - startTime })
       return result
     }
     if (action === 'salvar_componente_itens') {
@@ -532,6 +552,52 @@ async function salvarComponente(client: any, companyId: string, userId: string, 
     if (error) throw error
     return json(data)
   }
+}
+
+// criar_componente → cabeçalho + BOM na mesma transação (ficha_criar_componente_atomic)
+async function criarComponente(userClient: any, payload: any) {
+  const { tipo, nome, categoria, rendimento, unidade_rendimento, perda_estimada_percent,
+    custo_indireto, peso_por_unidade, tempo_preparo_min, modo_preparo, checklist, observacoes,
+    itens, client_request_id } = payload
+
+  if (!tipo || !nome) badRequest('tipo e nome obrigatórios')
+  if (itens !== undefined && !Array.isArray(itens)) badRequest('itens deve ser uma lista')
+  if (client_request_id !== undefined && client_request_id !== null
+    && (typeof client_request_id !== 'string' || client_request_id.length > 200)) {
+    badRequest('client_request_id inválido')
+  }
+
+  const { data, error } = await userClient.rpc('ficha_criar_componente_atomic', {
+    _componente: {
+      tipo, nome,
+      categoria: categoria || 'Geral',
+      rendimento: Number(rendimento) || 1,
+      unidade_rendimento: unidade_rendimento || 'un',
+      perda_estimada_percent: Number(perda_estimada_percent) || 0,
+      custo_indireto: Number(custo_indireto) || 0,
+      peso_por_unidade: peso_por_unidade ? Number(peso_por_unidade) : null,
+      tempo_preparo_min: tempo_preparo_min ? Number(tempo_preparo_min) : null,
+      modo_preparo: modo_preparo || '',
+      checklist: checklist || [],
+      observacoes: observacoes || '',
+    },
+    _itens: itens || [],
+    _client_request_id: client_request_id || null,
+  })
+
+  if (error) {
+    const msg = error.message || 'Erro ao criar componente'
+    if (msg.includes('REQUEST_ID_REUTILIZADO'))
+      conflict('Este envio já foi usado para outro componente. Recarregue a tela e confira antes de salvar de novo.')
+    if (msg.includes('PERMISSION_DENIED')) rbacForbidden('Sem permissão para criar este componente')
+    if (msg.includes('não permitido') || msg.includes('não pode usar') || msg.includes('circular')
+      || msg.includes('TIPO_INVALIDO') || msg.includes('NOME_OBRIGATORIO') || msg.includes('ITENS_INVALIDOS'))
+      badRequest(msg)
+    if (msg.includes('não encontrado') || msg.includes('não pertence'))
+      tenantForbidden('Componente/Item')
+    throw new Error(msg)
+  }
+  return json(data)
 }
 
 // salvar_componente_itens → delegates to ATOMIC RPC

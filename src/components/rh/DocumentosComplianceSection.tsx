@@ -4,6 +4,9 @@ import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useScopedToast } from '@/hooks/useScopedToast';
+import { useTravaEnvio } from '@/hooks/useTravaEnvio';
+import { novaSemente } from '@/lib/chaveOperacao';
+import { idDocumentoRh } from '@/domain/rh/idempotencia';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,9 +24,9 @@ import { Plus, FileText, Download, AlertTriangle, CheckCircle2, Clock, Shield, F
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { cn, includesNormalized } from '@/lib/utils';
 import {
-  completeRhDocumentUpload,
   createRhDocumentStorageOps,
   deleteRhDocumentStorage,
+  registerRhDocument,
 } from '@/lib/rhDocumentStorageSaga';
 
 import { useCan } from '@/permissions/hooks';
@@ -88,7 +91,10 @@ export default function DocumentosComplianceSection({
   const [documentos, setDocumentos] = useState<Documento[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNew, setShowNew] = useState(false);
-  const [uploading, setUploading] = useState(false);
+  const { enviando: uploading, executar: executarUpload } = useTravaEnvio();
+  // Semente do cadastro: só troca depois do sucesso. O id do documento é
+  // derivado dela + conteúdo, então o retry do mesmo envio reaproveita o id.
+  const [sementeDoc, setSementeDoc] = useState(novaSemente);
   const [filterColab, setFilterColab] = useState('all');
   const [filterTipo, setFilterTipo] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -139,7 +145,7 @@ export default function DocumentosComplianceSection({
     }));
   };
 
-  const handleUpload = async () => {
+  const handleUpload = () => executarUpload(async () => {
     if (!companyId || !user) {
       toast.error('Unidade ou usuário não identificado'); return;
     }
@@ -147,9 +153,23 @@ export default function DocumentosComplianceSection({
       toast.error('Preencha colaborador e nome do documento'); return;
     }
 
-    setUploading(true);
     try {
-      const documentId = crypto.randomUUID();
+      const data_emissao = dateEmissao ? format(dateEmissao, 'yyyy-MM-dd') : null;
+      const data_vencimento = dateVencimento ? format(dateVencimento, 'yyyy-MM-dd') : null;
+      const documentId = await idDocumentoRh(sementeDoc, {
+        colaboradorId: form.colaborador_id,
+        tipo: form.tipo,
+        nome: form.nome,
+        descricao: form.descricao,
+        dataEmissao: data_emissao,
+        dataVencimento: data_vencimento,
+        obrigatorio: form.obrigatorio,
+        alertarVencimento: form.alertar_vencimento,
+        diasAlertaAntes: form.dias_alerta_antes,
+        arquivo: selectedFile
+          ? { nome: selectedFile.name, tamanho: selectedFile.size, tipo: selectedFile.type, modificadoEm: selectedFile.lastModified }
+          : null,
+      });
       let arquivo_path: string | null = null;
       let arquivo_nome = '';
       let arquivo_tamanho = 0;
@@ -170,25 +190,21 @@ export default function DocumentosComplianceSection({
         arquivo_path,
         arquivo_nome,
         arquivo_tamanho,
-        data_emissao: dateEmissao ? format(dateEmissao, 'yyyy-MM-dd') : null,
-        data_vencimento: dateVencimento ? format(dateVencimento, 'yyyy-MM-dd') : null,
+        data_emissao,
+        data_vencimento,
         obrigatorio: form.obrigatorio,
         alertar_vencimento: form.alertar_vencimento,
         dias_alerta_antes: form.dias_alerta_antes,
         uploaded_by: user?.id ?? null,
         storage_state: selectedFile ? 'PENDING_UPLOAD' : 'ACTIVE',
       });
-      const { error: metadataError } = await supabase.from('rh_documentos').insert(metadata as any);
-      if (metadataError) throw metadataError;
-
-      if (selectedFile && arquivo_path) {
-        await completeRhDocumentUpload(createRhDocumentStorageOps(supabase), {
-          id: documentId,
-          path: arquivo_path,
-          file: selectedFile,
-        });
-      }
-      toast.success('Documento registrado!');
+      const resultado = await registerRhDocument(createRhDocumentStorageOps(supabase), {
+        metadata,
+        path: arquivo_path,
+        file: selectedFile,
+      });
+      toast.success(resultado === 'created' ? 'Documento registrado!' : 'Documento registrado (envio anterior concluído).');
+      setSementeDoc(novaSemente());
       setShowNew(false);
       resetForm();
       fetchData();
@@ -196,8 +212,7 @@ export default function DocumentosComplianceSection({
       console.error(e);
       toast.error(e instanceof Error ? e.message : 'Erro inesperado');
     }
-    setUploading(false);
-  };
+  });
 
   const resetForm = () => {
     setForm({ colaborador_id: '', tipo: 'aso', nome: '', descricao: '', obrigatorio: true, alertar_vencimento: true, dias_alerta_antes: 30 });

@@ -1,8 +1,10 @@
 import { useCompanyId } from '@/hooks/useCompanyId';
 import { withCompanyId } from '@/lib/companyPayload';
 import { useSupabase } from '@/contexts/CompanyScopeContext';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { usePersistedTab } from '@/hooks/usePersistedTab';
+import { useTravaEnvio } from '@/hooks/useTravaEnvio';
+import { chavePonto, sementeDaBatida, type BatidaPonto } from '@/domain/rh/idempotencia';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { DecimalInput, parseDecimal } from '@/components/ui/decimal-input';
 import { CurrencyInput } from '@/components/ui/brl-input';
@@ -183,7 +185,10 @@ function RhViewInner({ visibleSubtabs, user }: {
   // Double-click protection
   const [savingColab, setSavingColab] = useState(false);
   const [savingEditColab, setSavingEditColab] = useState(false);
-  const [savingPonto, setSavingPonto] = useState(false);
+  const { enviando: savingPonto, executar: executarPonto } = useTravaEnvio();
+  // Semente da batida em andamento: o retry da mesma batida reaproveita a chave
+  // (o servidor devolve o registro já gravado); some depois do sucesso.
+  const batidaRef = useRef<BatidaPonto | null>(null);
   const [approvingPonto, setApprovingPonto] = useState<string | null>(null);
   const [rejectingPonto, setRejectingPonto] = useState<string | null>(null);
   const [savingEditPonto, setSavingEditPonto] = useState(false);
@@ -360,29 +365,30 @@ function RhViewInner({ visibleSubtabs, user }: {
     fetchColaboradores();
   };
 
-  const handleRegistrarPonto = async (tipo: string) => {
-    if (savingPonto) return;
+  const handleRegistrarPonto = (tipo: string) => executarPonto(async () => {
     if (!myColaboradorId) {
       toast.error('Seu cadastro de colaborador não foi encontrado. Solicite ao gestor.');
       return;
     }
-    setSavingPonto(true);
-    try {
-      const { error } = await supabase.from('rh_ponto_registros').insert(withCompanyId(companyId, {
-        colaborador_id: myColaboradorId,
-        tipo,
-        data: todayBR(),
-        hora: new Date().toISOString(),
-        metodo: 'app',
-        created_by: user?.id,
-      }));
-      if (error) { toast.error('Erro ao registrar ponto: ' + error.message); return; }
-      toast.success(`${tipo.replace('_', ' ')} registrado!`);
-      fetchPontos();
-    } finally {
-      setSavingPonto(false);
+    const batida = sementeDaBatida(batidaRef.current, tipo);
+    batidaRef.current = batida;
+    const { data, error } = await supabase.rpc('rh_registrar_ponto', {
+      p_colaborador_id: myColaboradorId,
+      p_tipo: tipo,
+      p_client_request_id: await chavePonto(batida.semente, { colaboradorId: myColaboradorId, tipo, data: todayBR() }),
+    });
+    if (error) {
+      console.error('Erro ao registrar ponto:', error);
+      toast.error('Erro ao registrar ponto: ' + error.message);
+      return;
     }
-  };
+    batidaRef.current = null;
+    const rotulo = tipo.replace('_', ' ');
+    toast.success((data as { idempotente?: boolean } | null)?.idempotente
+      ? `${rotulo} já estava registrado.`
+      : `${rotulo} registrado!`);
+    fetchPontos();
+  });
 
   const handleAprovarPonto = async (pontoId: string) => {
     if (approvingPonto) return;

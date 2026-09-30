@@ -1,5 +1,5 @@
 import { useSupabase } from '@/contexts/CompanyScopeContext';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCan } from '@/permissions/hooks';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,8 @@ import TableActions from '@/components/ui/TableActions';
 import { Building2, Plus, Loader2, Users, RefreshCw, UserPlus } from 'lucide-react';
 import { useScopedToast } from '@/hooks/useScopedToast';
 import { sortByName } from '@/lib/sortByName';
+import { novaSemente } from '@/lib/chaveOperacao';
+import { chaveCriacaoEmpresa, mensagemErroCriacaoEmpresa } from '@/domain/admin/empresa';
 
 interface Company {
   id: string;
@@ -47,6 +49,11 @@ export default function AdminCompaniesView() {
   const [creating, setCreating] = useState(false);
   const [newNome, setNewNome] = useState('');
   const [newCnpj, setNewCnpj] = useState('');
+  // Semente do cadastro: só troca depois do sucesso. O retry do mesmo cadastro
+  // reaproveita a chave e o servidor devolve a empresa já criada.
+  const [sementeCriacao, setSementeCriacao] = useState(novaSemente);
+  // Trava síncrona: `creating` só chega ao botão no próximo render.
+  const criandoRef = useRef(false);
 
   // Edit dialog
   const [editCompany, setEditCompany] = useState<Company | null>(null);
@@ -81,25 +88,36 @@ export default function AdminCompaniesView() {
 
   // ── Create ──
   const handleCreate = async () => {
+    if (criandoRef.current) return;
     if (!newNome.trim()) {
       toast.error('Nome da empresa é obrigatório');
       return;
     }
+    criandoRef.current = true;
     setCreating(true);
     try {
-      const { data, error: rpcError } = await (supabase.rpc as any)('onboard_new_company', {
+      const cnpj = newCnpj.trim() || null;
+      const { data, error: rpcError } = await supabase.rpc('onboard_new_company', {
         p_company_name: newNome.trim(),
-        p_cnpj: newCnpj.trim() || null,
+        p_cnpj: cnpj ?? undefined,
+        p_onboarding_request_id: await chaveCriacaoEmpresa(sementeCriacao, { nome: newNome, cnpj }),
       });
       if (rpcError) throw rpcError;
-      toast.success(`Empresa "${newNome.trim()}" criada com sucesso!`);
+      const jaExistia = (data as { idempotente?: boolean } | null)?.idempotente;
+      toast.success(jaExistia
+        ? `Empresa "${newNome.trim()}" já estava criada.`
+        : `Empresa "${newNome.trim()}" criada com sucesso!`);
+      setSementeCriacao(novaSemente());
       setShowCreate(false);
       setNewNome('');
       setNewCnpj('');
-      await fetchCompanies();
+      // Recarregar a lista é depois do commit: falhar aqui não é erro do cadastro.
+      fetchCompanies();
     } catch (e: any) {
-      toast.error(e?.message || 'Erro ao criar empresa');
+      console.error('onboard_new_company error:', e);
+      toast.error(mensagemErroCriacaoEmpresa(e?.message));
     } finally {
+      criandoRef.current = false;
       setCreating(false);
     }
   };

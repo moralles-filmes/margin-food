@@ -10,6 +10,8 @@ import {
 } from 'lucide-react';
 import { useModuleAccess, useCan } from '@/permissions/hooks';
 import { useToast } from '@/hooks/use-toast';
+import { novaSemente } from '@/lib/chaveOperacao';
+import { chaveMensagemIa, interpretarRespostaJsonIa } from '@/domain/ia/chatIdempotencia';
 
 type Msg = { role: 'user' | 'assistant'; content: string };
 type AgenteId = 'geral' | 'salmao' | 'estoque' | 'cmv' | 'compras' | 'ficha-tecnica' | 'financeiro' | 'rh';
@@ -143,6 +145,12 @@ export default function CentralIAView() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  // Trava síncrona: `isLoading` só chega ao botão no próximo render, e Enter +
+  // clique enviava a mesma pergunta duas vezes (duas chamadas pagas ao modelo).
+  const enviandoRef = useRef(false);
+  // Semente da conversa: troca depois de cada resposta concluída. A chave de
+  // idempotência combina a semente com o que foi enviado.
+  const [semente, setSemente] = useState(novaSemente);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -164,7 +172,8 @@ export default function CentralIAView() {
   };
 
   const sendMessage = useCallback(async (text: string) => {
-    if (!text.trim() || isLoading || !canCreate) return;
+    if (!text.trim() || enviandoRef.current || !canCreate) return;
+    enviandoRef.current = true;
 
     const userMsg: Msg = { role: 'user', content: text.trim() };
     const newMessages = [...messages, userMsg];
@@ -186,19 +195,28 @@ export default function CentralIAView() {
 
     try {
       const { data: responseData, error: requestError, response: resp } = await supabase.functions.invoke('ai-chat', {
-        body: { messages: newMessages, agente: activeAgent },
+        body: {
+          messages: newMessages,
+          agente: activeAgent,
+          idempotency_key: await chaveMensagemIa(semente, { agente: activeAgent, mensagens: newMessages }),
+        },
       });
       if (!resp) throw requestError ?? new Error('Sem resposta do servidor');
 
       const contentType = resp.headers.get('content-type') || '';
       if (contentType.includes('application/json')) {
-        const json = resp.ok ? responseData : await resp.json();
-        if (json.no_data) {
-          setMessages(prev => [...prev, { role: 'assistant', content: json.message }]);
+        const json = resp.ok ? responseData : await resp.json().catch(() => null);
+        const resultado = interpretarRespostaJsonIa(json, resp.status);
+        if (resultado.tipo === 'resposta') {
+          setMessages(prev => [...prev, { role: 'assistant', content: resultado.texto }]);
+          setSemente(novaSemente());
           return;
         }
-        if (json.error) throw new Error(json.error);
-        if (!resp.ok) throw new Error(`Erro ${resp.status}`);
+        if (resultado.tipo === 'em_andamento') {
+          toast({ title: 'Aguarde', description: resultado.mensagem });
+          return;
+        }
+        throw new Error(resultado.mensagem);
       } else if (!resp.ok) {
         throw new Error(`Erro ${resp.status}`);
       }
@@ -250,14 +268,16 @@ export default function CentralIAView() {
           } catch { /* ignore */ }
         }
       }
+      setSemente(novaSemente());
     } catch (e: any) {
       console.error('AI chat error:', e);
       toast({ variant: 'destructive', title: 'Erro na IA', description: e.message });
       setMessages(prev => [...prev, { role: 'assistant', content: `❌ Erro: ${e.message}` }]);
     } finally {
+      enviandoRef.current = false;
       setIsLoading(false);
     }
-  }, [messages, isLoading, activeAgent, toast, canCreate]);
+  }, [messages, activeAgent, toast, canCreate, semente, supabase]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {

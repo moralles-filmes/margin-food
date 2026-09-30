@@ -700,6 +700,7 @@ export type Database = {
           created_at: string
           id: string
           nome: string
+          onboarding_request_id: string | null
           updated_at: string
         }
         Insert: {
@@ -708,6 +709,7 @@ export type Database = {
           created_at?: string
           id?: string
           nome: string
+          onboarding_request_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -716,6 +718,7 @@ export type Database = {
           created_at?: string
           id?: string
           nome?: string
+          onboarding_request_id?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -1677,6 +1680,7 @@ export type Database = {
           ativo: boolean
           categoria: string
           checklist: Json | null
+          client_request_id: string | null
           company_id: string
           created_at: string
           created_by: string | null
@@ -1702,6 +1706,7 @@ export type Database = {
           ativo?: boolean
           categoria?: string
           checklist?: Json | null
+          client_request_id?: string | null
           company_id?: string
           created_at?: string
           created_by?: string | null
@@ -1727,6 +1732,7 @@ export type Database = {
           ativo?: boolean
           categoria?: string
           checklist?: Json | null
+          client_request_id?: string | null
           company_id?: string
           created_at?: string
           created_by?: string | null
@@ -8040,6 +8046,7 @@ export type Database = {
           aprovado: boolean | null
           aprovado_em: string | null
           aprovado_por: string | null
+          client_request_id: string | null
           colaborador_id: string
           company_id: string
           created_at: string
@@ -8063,6 +8070,7 @@ export type Database = {
           aprovado?: boolean | null
           aprovado_em?: string | null
           aprovado_por?: string | null
+          client_request_id?: string | null
           colaborador_id: string
           company_id?: string
           created_at?: string
@@ -8086,6 +8094,7 @@ export type Database = {
           aprovado?: boolean | null
           aprovado_em?: string | null
           aprovado_por?: string | null
+          client_request_id?: string | null
           colaborador_id?: string
           company_id?: string
           created_at?: string
@@ -10708,6 +10717,14 @@ export type Database = {
         Args: { p_client_request_id?: string; p_itens: Json }
         Returns: Json
       }
+      ficha_criar_componente_atomic: {
+        Args: {
+          _client_request_id?: string
+          _componente: Json
+          _itens: Json
+        }
+        Returns: Json
+      }
       ficha_salvar_componente_itens_atomic: {
         Args: { _componente_pai_id: string; _itens: Json }
         Returns: Json
@@ -11471,6 +11488,7 @@ export type Database = {
           p_admin_user_id?: string
           p_cnpj?: string
           p_company_name: string
+          p_onboarding_request_id?: string
         }
         Returns: Json
       }
@@ -11754,6 +11772,22 @@ export type Database = {
       reserve_company_invitation: {
         Args: { p_actor_user_id: string; p_company_id: string; p_email: string }
         Returns: undefined
+      }
+      rh_folha_mudar_status: {
+        Args: { p_id: string; p_status: string }
+        Returns: Json
+      }
+      rh_folha_salvar_calculo: {
+        Args: { p_linhas: Json; p_periodo: string }
+        Returns: Json
+      }
+      rh_registrar_ponto: {
+        Args: {
+          p_client_request_id?: string
+          p_colaborador_id: string
+          p_tipo: string
+        }
+        Returns: Json
       }
       rpc_confirmacoes_approve: {
         Args: { p_confirmacao_id: string }

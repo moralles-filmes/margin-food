@@ -4,6 +4,7 @@ import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useScopedToast } from '@/hooks/useScopedToast';
+import { useTravaEnvio } from '@/hooks/useTravaEnvio';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -125,7 +126,9 @@ export default function TreinamentoSection({
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  const handleCreateTrilha = async () => {
+  const { enviando: criandoTrilha, executar: executarCriacaoTrilha } = useTravaEnvio();
+
+  const handleCreateTrilha = () => executarCriacaoTrilha(async () => {
     if (!form.titulo.trim()) { toast.error('Título obrigatório'); return; }
     try {
       const { error } = await supabase.from('rh_trilhas_treinamento').insert(withCompanyId(companyId, {
@@ -147,7 +150,7 @@ export default function TreinamentoSection({
       console.error(e);
       toast.error('Erro inesperado');
     }
-  };
+  });
 
   const handleAddModulo = () => {
     if (!newModulo.titulo.trim()) { toast.error('Título do módulo obrigatório'); return; }
@@ -437,7 +440,7 @@ export default function TreinamentoSection({
                   </div>
                 </div>
 
-                <Button onClick={handleCreateTrilha} className="w-full">Criar Trilha</Button>
+                <Button onClick={handleCreateTrilha} disabled={criandoTrilha} className="w-full">{criandoTrilha ? 'Criando...' : 'Criar Trilha'}</Button>
               </div>
             </DialogContent>
           </Dialog>
