@@ -46,14 +46,14 @@ describe('adicionarCodigo', () => {
     // de "outro produto", quando o código já está ali na tela.
     const dois = adicionarCodigo(um.lista, '7891234567890', 'Caravelas');
     expect(dois.ok).toBe(false);
-    if (dois.ok) return;
+    if (dois.ok !== false) return;
     expect(dois.erro).toContain('já está na lista');
   });
 
   it('recusa código inválido com a mensagem do domínio', () => {
     const curto = adicionarCodigo([], '12', '');
     expect(curto.ok).toBe(false);
-    if (curto.ok) return;
+    if (curto.ok !== false) return;
     expect(curto.erro).toContain('curto');
 
     const vazio = adicionarCodigo([], '   ', '');
