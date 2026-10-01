@@ -1,3 +1,5 @@
+import { useNavigationRecord } from '@/hooks/useNavigationRequest';
+import { validarCodigoPagamento, dadosPagamentoPayload } from '@/domain/financeiro/codigoPagamento';
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { CursorListResponse, FinStatusCounts } from '@/types/financeiro';
@@ -253,11 +255,11 @@ export default function ContasPagarSection({ initialStatus }: ContasPagarSection
   };
 
   /* ─── Detail view ─── */
-  const openDetail = async (item: ContaPagar) => {
+  const openDetail = async (item: Pick<ContaPagar, 'id'>) => {
     try {
       const { data: detail, error: detailErr } = await supabase
         .from('fin_contas_pagar')
-        .select('id, descricao, fornecedor, supplier_id, valor, status, data_competencia, data_vencimento, data_pagamento, forma_pagamento, categoria_id, centro_custo_id, conta_id, observacoes, recorrente, recorrencia_config, updated_at')
+        .select('id, descricao, fornecedor, supplier_id, valor, status, data_competencia, data_vencimento, data_pagamento, forma_pagamento, tipo_codigo_pagamento, codigo_pagamento, categoria_id, centro_custo_id, conta_id, observacoes, recorrente, recorrencia_config, updated_at')
         .eq('id', item.id)
         .single();
       if (detailErr) throw detailErr;
@@ -290,6 +292,8 @@ export default function ContasPagarSection({ initialStatus }: ContasPagarSection
         data_vencimento: detail.data_vencimento,
         data_pagamento: detail.data_pagamento,
         forma_pagamento: detail.forma_pagamento,
+        tipo_codigo_pagamento: detail.tipo_codigo_pagamento,
+        codigo_pagamento: detail.codigo_pagamento,
         fornecedor: detail.fornecedor,
         conta_nome: detail.conta_id ? contas.find(c => c.id === detail.conta_id)?.nome || null : null,
         categoria_nome: detail.categoria_id ? categorias.find(c => c.id === detail.categoria_id)?.nome || null : (rateios.length > 1 ? `${rateios.length} informadas` : null),
@@ -299,7 +303,7 @@ export default function ContasPagarSection({ initialStatus }: ContasPagarSection
         rateios,
         updated_at: detail.updated_at,
       });
-      setDetailRawItem(item);
+      setDetailRawItem(detail);
       setShowDetail(true);
     } catch (err: any) {
       toast.error('Erro ao carregar detalhes: ' + err.message);
@@ -315,6 +319,10 @@ export default function ContasPagarSection({ initialStatus }: ContasPagarSection
   };
   const { showConfirm, guardedClose, confirmClose, cancelClose } = useFormDirtyGuard({ current: form, onClose: handleCloseForm });
 
+  useNavigationRecord('financeiro', ['conta_pagar'], record => {
+    if (canView) void openDetail({ id: record.id });
+  });
+
   if (!canView) return <NoAccess />;
 
   /* ─── Open edit from detail or table ─── */
@@ -323,7 +331,7 @@ export default function ContasPagarSection({ initialStatus }: ContasPagarSection
     try {
       const { data: detail, error: detailErr } = await supabase
         .from('fin_contas_pagar')
-        .select('id, descricao, fornecedor, supplier_id, valor, status, data_competencia, data_vencimento, data_pagamento, forma_pagamento, categoria_id, centro_custo_id, conta_id, observacoes, recorrente, recorrencia_config, updated_at')
+        .select('id, descricao, fornecedor, supplier_id, valor, status, data_competencia, data_vencimento, data_pagamento, forma_pagamento, tipo_codigo_pagamento, codigo_pagamento, categoria_id, centro_custo_id, conta_id, observacoes, recorrente, recorrencia_config, updated_at')
         .eq('id', item.id)
         .single();
       if (detailErr) throw detailErr;
@@ -346,6 +354,8 @@ export default function ContasPagarSection({ initialStatus }: ContasPagarSection
         centro_custo_id: detail.centro_custo_id || '',
         conta_id: detail.conta_id || '',
         forma_pagamento: detail.forma_pagamento || 'boleto',
+        tipo_codigo_pagamento: detail.tipo_codigo_pagamento || '',
+        codigo_pagamento: detail.codigo_pagamento || '',
         observacoes: detail.observacoes || '',
         recorrente: detail.recorrente || false,
         frequencia: (detail.recorrencia_config as any)?.frequencia || 'mensal',
@@ -389,6 +399,8 @@ export default function ContasPagarSection({ initialStatus }: ContasPagarSection
   const save = async () => {
     if (saving || salvandoRef.current) return;
     if (!form.descricao.trim() || form.valor <= 0) { toast.error('Descricao e valor obrigatorios'); return; }
+    const paymentError = validarCodigoPagamento(form);
+    if (paymentError) { toast.error(paymentError); return; }
     const recurrenceError = form.recorrente
       ? getRecurrenceValidationMessage(form.frequencia, form.parcelas)
       : null;
@@ -433,6 +445,8 @@ export default function ContasPagarSection({ initialStatus }: ContasPagarSection
         p_centro_custo_id: ccId,
         p_conta_id: form.conta_id || null,
         p_forma_pagamento: form.forma_pagamento,
+        // Criação sem código mantém a identidade dos envios pendentes do cliente antigo.
+        p_dados_pagamento: editingItem || form.tipo_codigo_pagamento ? dadosPagamentoPayload(form) : undefined,
         p_observacoes: form.observacoes || null,
         p_rateios: rateiosPayload,
         p_recorrencia: recorrencia || null,
@@ -444,8 +458,9 @@ export default function ContasPagarSection({ initialStatus }: ContasPagarSection
       const { data, error } = await (supabase.rpc as any)(editingItem ? '_guarded_update_conta_pagar' : '_guarded_create_conta_pagar', payload);
 
       if (error) {
-        console.error('[ContasPagarSection.save]', error);
-        toast.error(traduzirErroIdempotencia(error.message) ?? error.message);
+        console.error('[ContasPagarSection.save]', { code: error.code });
+        toast.error(traduzirErroIdempotencia(error.message) ?? (error.message.includes('CODIGO_PAGAMENTO')
+          ? 'Confira o tipo e o código de pagamento informado.' : error.message));
         return;
       }
       const result = data as SaveContaPagarResult | null;

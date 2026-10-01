@@ -14,6 +14,7 @@ import { fmtBRL, formatPercentBR } from '@/lib/formatters';
 import CategoryCombobox from './CategoryCombobox';
 import SupplierCombobox from './SupplierCombobox';
 import { Plus, Trash2, Repeat } from 'lucide-react';
+import { TIPOS_CODIGO_PAGAMENTO, MAX_CODIGO_PAGAMENTO } from '@/domain/financeiro/codigoPagamento';
 import { getRecurrenceLimit } from '@/domain/financeiro/recurrence';
 
 /* ─── Types ─── */
@@ -40,6 +41,8 @@ export interface ContaFormData {
   centro_custo_id: string;
   conta_id: string;
   conta_destino_id?: string;
+  tipo_codigo_pagamento?: string;
+  codigo_pagamento?: string;
   forma_pagamento: string;
   observacoes: string;
   recorrente: boolean;
@@ -230,7 +233,7 @@ export default function ContaFormDialog({
             </div>
 
             {/* Fornecedor/Cliente, Data competencia, Valor */}
-            <div className={`grid gap-4 ${variant === 'lancamento' ? 'grid-cols-2' : 'grid-cols-3'}`}>
+            <div className={`grid gap-4 ${variant === 'pagar' ? 'grid-cols-1 sm:grid-cols-3' : variant === 'lancamento' ? 'grid-cols-2' : 'grid-cols-3'}`}>
               {variant === 'pagar' && (
                 <div>
                   <Label className="text-xs text-muted-foreground">Fornecedor</Label>
@@ -275,7 +278,7 @@ export default function ContaFormDialog({
 
             {/* Rateio toggle + Categoria + Centro de custo */}
             {!isTransfer && (
-              <div className="grid grid-cols-3 gap-4 items-end">
+              <div className={`grid gap-4 items-end ${variant === 'pagar' ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-3'}`}>
                 <div className="flex items-center gap-2 self-center">
                   <Label className="text-xs text-muted-foreground">Habilitar rateio</Label>
                   <Switch
@@ -435,7 +438,7 @@ export default function ContaFormDialog({
           {/* Condicao de pagamento */}
           {!classificationOnly && <section className="bg-card border border-border rounded-xl p-5 space-y-4">
             <h3 className="text-sm font-semibold text-foreground">Condicao de pagamento</h3>
-            <div className="grid grid-cols-4 gap-4 items-end">
+            <div className={`grid gap-4 items-end ${variant === 'pagar' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4' : 'grid-cols-4'}`}>
               {variant !== 'lancamento' && (
                 <div>
                   <Label className="text-xs text-muted-foreground">Parcelamento *</Label>
@@ -508,6 +511,36 @@ export default function ContaFormDialog({
               </div>
             )}
           </section>}
+
+          {variant === 'pagar' && (
+            <section className="bg-card border border-border rounded-xl p-5 space-y-4">
+              <h3 className="text-sm font-semibold">Dados para pagamento</h3>
+              <p className="text-xs text-muted-foreground">Opcional. Informe o código desta conta para copiá-lo na aba Códigos de Pagamento.</p>
+              <div>
+                <Label htmlFor="tipo-codigo-pagamento">Tipo do código</Label>
+                <Select value={form.tipo_codigo_pagamento || 'sem_codigo'} onValueChange={v => set(v === 'sem_codigo'
+                  ? { tipo_codigo_pagamento: '', codigo_pagamento: '' }
+                  : { tipo_codigo_pagamento: v })}>
+                  <SelectTrigger id="tipo-codigo-pagamento" className="mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="sem_codigo">Sem código</SelectItem>
+                    {Object.entries(TIPOS_CODIGO_PAGAMENTO).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              {form.tipo_codigo_pagamento && (
+                <div>
+                  <Label htmlFor="codigo-pagamento">Código / chave de pagamento</Label>
+                  <Textarea id="codigo-pagamento" value={form.codigo_pagamento || ''}
+                    onChange={e => set({ codigo_pagamento: e.target.value })}
+                    maxLength={MAX_CODIGO_PAGAMENTO} rows={3} autoComplete="off" spellCheck={false}
+                    className="mt-1 font-mono text-sm break-all" aria-describedby="codigo-pagamento-ajuda" />
+                  <p id="codigo-pagamento-ajuda" className="mt-1 text-xs text-muted-foreground">Cole o código completo. A formatação será preservada. Para remover, selecione “Sem código”.</p>
+                </div>
+              )}
+              {form.recorrente && <p className="text-xs text-muted-foreground">O código será salvo somente nesta parcela. Preencha o código de cada uma das demais parcelas ao recebê-lo.</p>}
+            </section>
+          )}
 
           {/* Justificativa for REALIZADO edits */}
           {variant === 'lancamento' && isEditing && (classificationOnly || editPrevStatus === 'REALIZADO') && (
