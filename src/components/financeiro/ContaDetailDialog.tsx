@@ -1,3 +1,5 @@
+import CodigoPagamento from './CodigoPagamento';
+import { TIPOS_CODIGO_PAGAMENTO, type TipoCodigoPagamento } from '@/domain/financeiro/codigoPagamento';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -29,6 +31,8 @@ export interface ContaDetailData {
   data_competencia: string;
   data_vencimento: string | null;
   data_pagamento?: string | null;
+  tipo_codigo_pagamento?: string | null;
+  codigo_pagamento?: string | null;
   forma_pagamento: string | null;
   fornecedor?: string | null;
   cliente?: string | null;
@@ -258,6 +262,14 @@ export default function ContaDetailDialog({
               </div>
             </div>
           </section>
+
+          {variant === 'pagar' && data.codigo_pagamento && (
+            <section className="bg-card border border-border rounded-xl p-5 space-y-3">
+              <h3 className="text-sm font-semibold">Dados para pagamento</h3>
+              <p className="text-xs text-muted-foreground">{TIPOS_CODIGO_PAGAMENTO[data.tipo_codigo_pagamento as TipoCodigoPagamento]}</p>
+              <CodigoPagamento codigo={data.codigo_pagamento} />
+            </section>
+          )}
 
           {/* Observacoes */}
           <Accordion type="single" collapsible defaultValue={data.observacoes ? 'obs' : undefined}>

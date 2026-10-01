@@ -1823,6 +1823,7 @@ export type Database = {
           grupo: string | null
           id: string
           linha_dre: string | null
+          nome_unaccent: string | null
           nome: string
           ordem: number | null
           parent_id: string | null
@@ -1843,6 +1844,7 @@ export type Database = {
           grupo?: string | null
           id?: string
           linha_dre?: string | null
+          nome_unaccent?: never
           nome: string
           ordem?: number | null
           parent_id?: string | null
@@ -1863,6 +1865,7 @@ export type Database = {
           grupo?: string | null
           id?: string
           linha_dre?: string | null
+          nome_unaccent?: never
           nome?: string
           ordem?: number | null
           parent_id?: string | null
@@ -2161,6 +2164,9 @@ export type Database = {
           aprovado_por: string | null
           categoria_id: string | null
           centro_custo_id: string | null
+          tipo_codigo_pagamento: string | null
+          codigo_pagamento: string | null
+          codigo_pagamento_unaccent: string | null
           company_id: string
           conta_id: string | null
           created_at: string
@@ -2199,6 +2205,9 @@ export type Database = {
           aprovado_por?: string | null
           categoria_id?: string | null
           centro_custo_id?: string | null
+          tipo_codigo_pagamento?: string | null
+          codigo_pagamento?: string | null
+          codigo_pagamento_unaccent?: never
           company_id?: string
           conta_id?: string | null
           created_at?: string
@@ -2237,6 +2246,9 @@ export type Database = {
           aprovado_por?: string | null
           categoria_id?: string | null
           centro_custo_id?: string | null
+          tipo_codigo_pagamento?: string | null
+          codigo_pagamento?: string | null
+          codigo_pagamento_unaccent?: never
           company_id?: string
           conta_id?: string | null
           created_at?: string
@@ -10000,6 +10012,7 @@ export type Database = {
       }
       _guarded_create_conta_pagar: {
         Args: {
+          p_dados_pagamento?: Json
           p_categoria_id?: string
           p_centro_custo_id?: string
           p_conta_id?: string
@@ -10226,6 +10239,7 @@ export type Database = {
       }
       _guarded_update_conta_pagar: {
         Args: {
+          p_dados_pagamento?: Json
           p_categoria_id?: string
           p_centro_custo_id?: string
           p_conta_id?: string
@@ -11194,6 +11208,21 @@ export type Database = {
           p_limit?: number
           p_search?: string
           p_valor?: number
+        }
+        Returns: Json
+      }
+      list_fin_codigos_pagamento: {
+        Args: {
+          p_status?: string
+          p_tipo?: string
+          p_search?: string
+          p_data_de?: string
+          p_data_ate?: string
+          p_categoria_id?: string
+          p_sem_categoria?: boolean
+          p_limit?: number
+          p_cursor_date?: string
+          p_cursor_id?: string
         }
         Returns: Json
       }

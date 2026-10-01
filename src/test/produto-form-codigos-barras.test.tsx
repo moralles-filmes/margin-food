@@ -8,7 +8,7 @@
  *   · o que vai ao banco é o diff, com o DELETE antes do INSERT.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { useState } from 'react';
+import { useState, type ComponentProps } from 'react';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import ProdutoFormPanel, { emptyProdForm } from '@/components/estoque/ProdutoFormPanel';
 import type { ProdutoFormData, ProdutoExtended } from '@/types/estoque';
@@ -28,7 +28,12 @@ const FORM_VALIDO: ProdutoFormData = {
   idealPurchaseQty: 4,
 };
 
-function criarProps(over: Partial<Record<string, unknown>> = {}) {
+type HarnessProps = Omit<ComponentProps<typeof ProdutoFormPanel>,
+  'editProdId' | 'prodForm' | 'setProdForm' | 'saving' | 'setSaving'> & {
+  editProdId?: string | null;
+};
+
+function criarProps(over: Partial<HarnessProps> = {}) {
   return {
     categorias: ['Mercearia'],
     locais: ['Estoque Seco'],
@@ -48,12 +53,12 @@ function criarProps(over: Partial<Record<string, unknown>> = {}) {
 }
 
 /** Segura `prodForm`/`saving` como o EstoqueGeralView faz. */
-function Harness({ editProdId = null, ...props }: Record<string, unknown> & { editProdId?: string | null }) {
+function Harness({ editProdId = null, ...props }: HarnessProps) {
   const [prodForm, setProdForm] = useState<ProdutoFormData>(FORM_VALIDO);
   const [saving, setSaving] = useState(false);
   return (
     <ProdutoFormPanel
-      {...(props as never)}
+      {...props}
       editProdId={editProdId}
       prodForm={prodForm}
       setProdForm={setProdForm}

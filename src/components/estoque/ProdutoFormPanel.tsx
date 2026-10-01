@@ -174,7 +174,7 @@ export default function ProdutoFormPanel({
 
   const handleAdicionarCodigo = useCallback(() => {
     const resultado = adicionarCodigo(codigos, codigoInput, rotuloInput);
-    if (!resultado.ok) {
+    if (resultado.ok === false) {
       setErroCodigo(resultado.erro);
       return;
     }

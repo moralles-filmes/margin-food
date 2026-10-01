@@ -1,3 +1,4 @@
+import { useNavigationSubtab } from '@/hooks/useNavigationRequest';
 import { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
 import { useModuleBadges } from '@/contexts/ModuleBadgesContext';
 import { usePersistedTab } from '@/hooks/usePersistedTab';
@@ -19,6 +20,7 @@ import FluxoCaixaSection, { type FluxoNavigateParams } from '@/components/financ
 import DRESection from '@/components/financeiro/DRESection';
 import DFCSection from '@/components/financeiro/DFCSection';
 import DashboardFinanceiroSection, { type DashboardNavigateParams } from '@/components/financeiro/DashboardFinanceiroSection';
+const CodigosPagamentoSection = lazy(() => import('@/components/financeiro/CodigosPagamentoSection'));
 const OrcamentoSection = lazy(() => import('@/components/financeiro/OrcamentoSection'));
 const ConciliacaoBancariaSection = lazy(() => import('@/components/financeiro/ConciliacaoBancariaSection'));
 import AlertasSection from '@/components/financeiro/AlertasSection';
@@ -37,7 +39,7 @@ import LivroRazaoSection from '@/components/financeiro/LivroRazaoSection';
 import PlanoContasFinSection from '@/components/financeiro/PlanoContasFinSection';
 import CentrosCustoFinSection from '@/components/financeiro/CentrosCustoFinSection';
 
-type FinSubTab = 'dashboard' | 'cadastros' | 'contas' | 'lancamentos' | 'pagar' | 'receber' | 'fluxo' | 'dre' | 'orcamento' | 'conciliacao' | 'alertas' | 'recorrencias' | 'categorizacao' | 'bordero' | 'apresentacao_socios' | 'projecao' | 'kpis' | 'auditoria' | 'comparativo' | 'fechamento';
+type FinSubTab = 'dashboard' | 'cadastros' | 'contas' | 'lancamentos' | 'pagar' | 'codigos_pagamento' | 'receber' | 'fluxo' | 'dre' | 'orcamento' | 'conciliacao' | 'alertas' | 'recorrencias' | 'categorizacao' | 'bordero' | 'apresentacao_socios' | 'projecao' | 'kpis' | 'auditoria' | 'comparativo' | 'fechamento';
 
 // DashboardFinanceiro extracted to src/components/financeiro/DashboardFinanceiroSection.tsx
 
@@ -143,6 +145,7 @@ const TAB_REGISTRY_MAP: Record<FinSubTab, string> = {
   contas: 'contas',
   lancamentos: 'lancamentos',
   pagar: 'pagar',
+  codigos_pagamento: 'pagar', // Mesma autorização e fonte de Contas a Pagar.
   receber: 'receber',
   fluxo: 'fluxo',
   dre: 'dre',
@@ -193,6 +196,10 @@ export default function FinanceiroView() {
     setActiveTab(tab);
   }, [location.pathname, navigate, setActiveTab]);
 
+  useNavigationSubtab('financeiro', subtab => {
+    if (subtab === 'pagar' && visibleSubtabs.includes('pagar')) handleTabSelect('pagar');
+  });
+
   // Contas a Pagar pending count — mesma fonte do menu lateral
   const moduleBadges = useModuleBadges();
   const pagarPendingCount = moduleBadges.counts.financeiro.pagar;
@@ -240,6 +247,7 @@ export default function FinanceiroView() {
     { id: 'fechamento',       label: 'Fechamento de Caixa', icon: DollarSign,      group: 'operacoes'  },
     { id: 'lancamentos',      label: 'Lançamentos',          icon: Receipt,         group: 'operacoes'  },
     { id: 'pagar',            label: 'Contas a Pagar',       icon: CreditCard,      group: 'operacoes', badge: pagarPendingCount || undefined },
+    { id: 'codigos_pagamento', label: 'Códigos de Pagamento', icon: ClipboardList, group: 'operacoes' },
     { id: 'receber',          label: 'Contas a Receber',     icon: ArrowDownToLine, group: 'operacoes'  },
     { id: 'alertas',          label: 'Alertas',              icon: Bell,            group: 'operacoes'  },
     { id: 'recorrencias',     label: 'Recorrências',         icon: RefreshCw,       group: 'operacoes'  },
@@ -336,6 +344,7 @@ export default function FinanceiroView() {
       {effectiveTab === 'contas' && <ContasBancariasSection onNavigateExtrato={handleNavigateExtrato} />}
       {effectiveTab === 'lancamentos' && <LancamentosSection initialContaId={extratoContaId} initialDateFrom={fluxoDateFrom} initialDateTo={fluxoDateTo} initialTipo={lancamentosInitialTipo} />}
       {effectiveTab === 'pagar' && <ContasPagarSection initialStatus={pagarInitialStatus} />}
+      {effectiveTab === 'codigos_pagamento' && <Suspense fallback={<FinSpinner />}><CodigosPagamentoSection /></Suspense>}
       {effectiveTab === 'receber' && <ContasReceberSection initialStatus={receberInitialStatus} />}
       {effectiveTab === 'fluxo' && <FluxoCaixaSection onNavigate={handleFluxoNavigate} />}
       {effectiveTab === 'dre' && <DREDFCSection />}
