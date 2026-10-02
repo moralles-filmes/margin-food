@@ -214,9 +214,8 @@ export function parsePresentationPlan(value: unknown): PresentationPlanData {
   if (actualSource !== 'fin_lancamentos') throw new TypeError('sources.actual inválido.');
   if (budgetSource !== 'fin_orcamentos') throw new TypeError('sources.budget inválido.');
   if (cmvTargetSource !== 'metas_cmv.meta_cmv_total') throw new TypeError('sources.cmvTarget inválido.');
-  // O realizado já é por caixa (Livro Razão); 'competencia' é o rótulo antigo que o banco
-  // devolve até a migration que troca o texto do contrato.
-  if (regime !== 'caixa' && regime !== 'competencia') throw new TypeError('rules.regime inválido.');
+  // Realizado por caixa (Livro Razão), o mesmo de Resultados; competência é só da DRE.
+  if (regime !== 'caixa') throw new TypeError('rules.regime inválido.');
   if (openItemsIncluded) throw new TypeError('rules.openItemsIncluded deve ser falso.');
 
   return {

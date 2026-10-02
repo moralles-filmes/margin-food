@@ -145,7 +145,7 @@ export function createPresentationPlanData(
       cmvTarget: 'metas_cmv.meta_cmv_total',
     },
     rules: {
-      regime: 'competencia',
+      regime: 'caixa',
       budgetProration: 'valor mensal proporcional aos dias do intervalo',
       hierarchyPrecedence: 'orçamento mais específico prevalece sobre o ancestral',
       projectionFormula: 'realizado até o corte / dias observados * dias totais',

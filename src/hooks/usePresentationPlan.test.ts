@@ -27,11 +27,10 @@ describe('contrato de transporte do planejamento executivo', () => {
     expect(() => parsePresentationPlan({ ...plan, rules: { ...plan.rules, openItemsIncluded: true } })).toThrow(/openItemsIncluded/);
   });
 
-  it('aceita o realizado por caixa e o rótulo legado de competência, e recusa outro regime', () => {
+  it('exige o realizado por caixa, igual a Resultados', () => {
     const plan = createPresentationPlanData();
-    expect(parsePresentationPlan({ ...plan, rules: { ...plan.rules, regime: 'caixa' } }).rules.regime).toBe('caixa');
-    expect(parsePresentationPlan({ ...plan, rules: { ...plan.rules, regime: 'competencia' } }).rules.regime).toBe('competencia');
-    expect(() => parsePresentationPlan({ ...plan, rules: { ...plan.rules, regime: 'vencimento' } })).toThrow(/rules\.regime/);
+    expect(parsePresentationPlan(plan).rules.regime).toBe('caixa');
+    expect(() => parsePresentationPlan({ ...plan, rules: { ...plan.rules, regime: 'competencia' } })).toThrow(/rules\.regime/);
   });
 
   it('distingue ausência de permissão de falha técnica', () => {
