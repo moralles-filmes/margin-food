@@ -27,6 +27,13 @@ describe('contrato de transporte do planejamento executivo', () => {
     expect(() => parsePresentationPlan({ ...plan, rules: { ...plan.rules, openItemsIncluded: true } })).toThrow(/openItemsIncluded/);
   });
 
+  it('aceita o realizado por caixa e o rótulo legado de competência, e recusa outro regime', () => {
+    const plan = createPresentationPlanData();
+    expect(parsePresentationPlan({ ...plan, rules: { ...plan.rules, regime: 'caixa' } }).rules.regime).toBe('caixa');
+    expect(parsePresentationPlan({ ...plan, rules: { ...plan.rules, regime: 'competencia' } }).rules.regime).toBe('competencia');
+    expect(() => parsePresentationPlan({ ...plan, rules: { ...plan.rules, regime: 'vencimento' } })).toThrow(/rules\.regime/);
+  });
+
   it('distingue ausência de permissão de falha técnica', () => {
     expect(isPresentationPlanPermissionError({ code: '42501' })).toBe(true);
     expect(isPresentationPlanPermissionError({ message: 'PERMISSION_DENIED: financeiro:relatorio-socios:view' })).toBe(true);

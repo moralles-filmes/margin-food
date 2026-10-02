@@ -4,6 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useScopedToast } from '@/hooks/useScopedToast';
@@ -22,6 +23,21 @@ interface ProjecaoDia {
   saldo: number;
   entradas: number;
   saidas: number;
+  receita_estimada?: number;
+  despesa_estimada?: number;
+  saldo_com_estimativa?: number;
+}
+
+/** Receita/despesa que não passam por títulos: média do mesmo dia da semana nas 4 semanas fechadas do Livro Razão. */
+interface ProjecaoEstimativa {
+  disponivel: boolean;
+  janela_inicio: string | null;
+  janela_fim: string | null;
+  receita_estimada: number;
+  despesa_estimada: number;
+  saldo_final: number;
+  dias_negativo: number;
+  saldo_minimo: number;
 }
 
 interface ProjecaoResult {
@@ -31,6 +47,7 @@ interface ProjecaoResult {
   saldo_final: number;
   dias_negativo: number;
   saldo_minimo: number;
+  estimativa?: ProjecaoEstimativa;
   timeline: ProjecaoDia[];
 }
 
@@ -64,6 +81,7 @@ export default function ProjecaoFluxoSection() {
   const [result, setResult] = useState<ProjecaoResult | null>(null);
   const [dias, setDias] = useState(30);
   const [saldoManual, setSaldoManual] = useState<number | null>(null);
+  const [incluirEstimativa, setIncluirEstimativa] = useState(true);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingExcel, setExportingExcel] = useState(false);
 
@@ -119,13 +137,25 @@ export default function ProjecaoFluxoSection() {
 
   const fmt = fmtBRL;
 
-  const timeline = result?.timeline ?? [];
+  const estimativa = result?.estimativa?.disponivel ? result.estimativa : null;
+  const comEstimativa = incluirEstimativa && estimativa !== null;
+  const timeline = (result?.timeline ?? []).map(d => ({
+    ...d,
+    receitaEstimada: comEstimativa ? d.receita_estimada ?? 0 : 0,
+    despesaEstimada: comEstimativa ? d.despesa_estimada ?? 0 : 0,
+    saldo: comEstimativa ? d.saldo_com_estimativa ?? d.saldo : d.saldo,
+  }));
   const saldoInicial = result?.saldo_inicial ?? 0;
   const totalEntradas = result?.entradas ?? 0;
   const totalSaidas = result?.saidas ?? 0;
-  const saldoFinal = result?.saldo_final ?? 0;
-  const diasNegativo = result?.dias_negativo ?? 0;
-  const saldoMin = result?.saldo_minimo ?? 0;
+  const receitaEstimada = comEstimativa ? estimativa.receita_estimada : 0;
+  const despesaEstimada = comEstimativa ? estimativa.despesa_estimada : 0;
+  const saldoFinal = (comEstimativa ? estimativa.saldo_final : result?.saldo_final) ?? 0;
+  const diasNegativo = (comEstimativa ? estimativa.dias_negativo : result?.dias_negativo) ?? 0;
+  const saldoMin = (comEstimativa ? estimativa.saldo_minimo : result?.saldo_minimo) ?? 0;
+  const janelaEstimativa = estimativa?.janela_inicio && estimativa.janela_fim
+    ? `${formatDateBR(parseLocalDate(estimativa.janela_inicio))} a ${formatDateBR(parseLocalDate(estimativa.janela_fim))}`
+    : null;
 
   const exportExcel = async () => {
     if (exportingExcel || timeline.length === 0) return;
@@ -135,6 +165,7 @@ export default function ProjecaoFluxoSection() {
         Data: formatDateBR(parseLocalDate(d.data)),
         Entradas: d.entradas,
         Saídas: d.saidas,
+        ...(comEstimativa ? { 'Receita estimada': d.receitaEstimada, 'Despesa estimada': d.despesaEstimada } : {}),
         Saldo: d.saldo,
       }));
       const ws = XLSX.utils.json_to_sheet(rows);
@@ -157,14 +188,20 @@ export default function ProjecaoFluxoSection() {
       doc.text('Projeção de Fluxo de Caixa', 14, 15);
       doc.setFontSize(9);
       doc.text(`Horizonte: ${dias} dias | Saldo Inicial: ${fmt(saldoInicial)}`, 14, 23);
+      if (comEstimativa && janelaEstimativa) {
+        doc.text(`Inclui estimativa (média por dia da semana de ${janelaEstimativa}, fora de contas a pagar/receber)`, 14, 28);
+      }
 
       autoTable(doc, {
-        startY: 30,
-        head: [['Data', 'Entradas', 'Saídas', 'Saldo']],
+        startY: comEstimativa ? 33 : 30,
+        head: [comEstimativa
+          ? ['Data', 'Entradas', 'Saídas', 'Receita estimada', 'Despesa estimada', 'Saldo']
+          : ['Data', 'Entradas', 'Saídas', 'Saldo']],
         body: timeline.map(d => [
           formatDateBR(parseLocalDate(d.data)),
           fmt(d.entradas),
           fmt(d.saidas),
+          ...(comEstimativa ? [fmt(d.receitaEstimada), fmt(d.despesaEstimada)] : []),
           fmt(d.saldo),
         ]),
         styles: { fontSize: 8 },
@@ -182,7 +219,7 @@ export default function ProjecaoFluxoSection() {
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <h2 className="text-xl font-bold text-foreground">Projeção de Fluxo de Caixa</h2>
-          <p className="text-sm text-muted-foreground">Simulação baseada em lançamentos previstos e contas pendentes</p>
+          <p className="text-sm text-muted-foreground">Contas pendentes (as vencidas entram no dia de hoje), lançamentos previstos e, opcionalmente, a estimativa do que entra e sai sem título</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-1">
@@ -194,6 +231,10 @@ export default function ProjecaoFluxoSection() {
               onChange={e => setSaldoManual(e.target.value ? Number(e.target.value) : null)}
               placeholder="Automático"
             />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Switch id="projecao-estimativa" checked={incluirEstimativa} onCheckedChange={setIncluirEstimativa} />
+            <Label htmlFor="projecao-estimativa" className="text-xs whitespace-nowrap">Incluir estimativa</Label>
           </div>
           <div className="flex items-center gap-1">
             <Label className="text-xs whitespace-nowrap">Dias:</Label>
@@ -241,7 +282,7 @@ export default function ProjecaoFluxoSection() {
         </CardContent></Card>
       ) : (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <div className={`grid grid-cols-2 gap-3 ${comEstimativa ? 'md:grid-cols-4 xl:grid-cols-7' : 'md:grid-cols-5'}`}>
             <Card>
               <CardContent className="p-3">
                 <p className="text-xs text-muted-foreground">Saldo Inicial</p>
@@ -260,6 +301,22 @@ export default function ProjecaoFluxoSection() {
                 <p className="text-lg font-bold text-destructive">{fmt(totalSaidas)}</p>
               </CardContent>
             </Card>
+            {comEstimativa && (
+              <>
+                <Card>
+                  <CardContent className="p-3">
+                    <p className="text-xs text-muted-foreground flex items-center gap-1"><TrendingUp className="w-3 h-3 text-success" /> Receita estimada</p>
+                    <p className="text-lg font-bold text-success">{fmt(receitaEstimada)}</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-3">
+                    <p className="text-xs text-muted-foreground flex items-center gap-1"><TrendingDown className="w-3 h-3 text-destructive" /> Despesa estimada</p>
+                    <p className="text-lg font-bold text-destructive">{fmt(despesaEstimada)}</p>
+                  </CardContent>
+                </Card>
+              </>
+            )}
             <Card>
               <CardContent className="p-3">
                 <p className="text-xs text-muted-foreground">Saldo Final</p>
@@ -279,6 +336,14 @@ export default function ProjecaoFluxoSection() {
               </CardContent>
             </Card>
           </div>
+
+          {incluirEstimativa && (
+            <p className="text-xs text-muted-foreground">
+              {comEstimativa && janelaEstimativa
+                ? `Estimativa: média do mesmo dia da semana de ${janelaEstimativa} no Livro Razão (último dia com receita lançada), só com o que não passa por contas a pagar/receber — esses já entram pelo vencimento. Lucro de sócios e outros não operacionais ficam fora.`
+                : 'Sem receita lançada no Livro Razão para estimar; a projeção usa só lançamentos previstos e contas pendentes.'}
+            </p>
+          )}
 
           <Card>
             <CardContent className="p-4">

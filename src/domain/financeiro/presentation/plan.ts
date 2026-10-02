@@ -23,7 +23,8 @@ export interface PresentationPlanCoverage {
 }
 
 export interface PresentationPlanRules {
-  regime: 'competencia';
+  /** 'competencia' é o valor legado gravado antes do realizado passar a ser por caixa. */
+  regime: 'caixa' | 'competencia';
   budgetProration: string;
   hierarchyPrecedence: string;
   projectionFormula: string;

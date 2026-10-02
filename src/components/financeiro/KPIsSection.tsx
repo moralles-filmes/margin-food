@@ -240,7 +240,7 @@ export default function KPIsSection() {
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <h2 className="text-xl font-bold text-foreground">KPIs Inteligentes & Analytics</h2>
-          <p className="text-sm text-muted-foreground">Indicadores automáticos de performance financeira</p>
+          <p className="text-sm text-muted-foreground">Indicadores automáticos de performance financeira • regime de caixa (Livro Razão)</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {canExport && kpis && (

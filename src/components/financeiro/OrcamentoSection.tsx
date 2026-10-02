@@ -56,6 +56,7 @@ interface FlatRow {
   isLeaf: boolean;
   isSectionHeader?: boolean;
   isTotalRow?: boolean;
+  isUnassigned?: boolean;
   orcado: number;
   realizado: number;
   ownBudget: OrcamentoRow | null;
@@ -128,6 +129,7 @@ export default function OrcamentoSection() {
   const [categorias, setCategorias] = useState<Omit<CatNode, 'children'>[]>([]);
   const [orcamentos, setOrcamentos] = useState<OrcamentoRow[]>([]);
   const [realizadoMap, setRealizadoMap] = useState<Record<string, number>>({});
+  const [semCategoria, setSemCategoria] = useState<{ receita: number; despesa: number }>({ receita: 0, despesa: 0 });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [mesAtual, setMesAtual] = useState(formatInBR(new Date(), 'yyyy-MM'));
@@ -169,10 +171,15 @@ export default function OrcamentoSection() {
         categorias?: Omit<CatNode, 'children'>[];
         orcamentos?: OrcamentoRow[];
         valores_realizado?: Record<string, number>;
+        valores_sem_categoria?: { receita?: number; despesa?: number };
       } | null;
       setCategorias(result?.categorias || []);
       setOrcamentos((result?.orcamentos || []).map(o => ({ ...o, valor_orcado: Number(o.valor_orcado) })));
       setRealizadoMap(result?.valores_realizado || {});
+      setSemCategoria({
+        receita: Number(result?.valores_sem_categoria?.receita) || 0,
+        despesa: Number(result?.valores_sem_categoria?.despesa) || 0,
+      });
     } catch (err) {
       console.error(err);
       toast.error('Erro ao carregar orçamento');
@@ -248,26 +255,44 @@ export default function OrcamentoSection() {
       }
     };
 
+    // Realizado sem categoria (ou em categoria inativa) não tem linha na árvore, mas entra
+    // no total da seção — senão o total diverge do Dashboard e da Apresentação Sócios.
+    const pushSemCategoria = (tipo: 'receita' | 'despesa') => {
+      const realizado = semCategoria[tipo];
+      if (!realizado) return;
+      result.push({
+        key: `_sem_categoria_${tipo}`, categoriaId: null, codigo: '', nome: 'Sem categoria', tipo,
+        depth: 1, hasChildren: false, isLeaf: false, isUnassigned: true,
+        orcado: 0, realizado, ownBudget: null, locked: false,
+      });
+    };
+
     const receitaNodes = tree.filter(n => n.tipo === 'receita');
     const despesaNodes = tree.filter(n => n.tipo === 'despesa');
     const totalReceitas = receitaNodes.reduce((s, n) => s + calcOrcado(n), 0);
-    const totalReceitasReal = receitaNodes.reduce((s, n) => s + calcRealizado(n), 0);
+    const totalReceitasReal = receitaNodes.reduce((s, n) => s + calcRealizado(n), 0) + semCategoria.receita;
     const totalDespesas = despesaNodes.reduce((s, n) => s + calcOrcado(n), 0);
-    const totalDespesasReal = despesaNodes.reduce((s, n) => s + calcRealizado(n), 0);
+    const totalDespesasReal = despesaNodes.reduce((s, n) => s + calcRealizado(n), 0) + semCategoria.despesa;
 
     result.push({
       key: '_receitas', categoriaId: null, codigo: '', nome: 'TOTAL DE RECEITAS', tipo: 'receita',
-      depth: 0, hasChildren: receitaNodes.length > 0, isLeaf: false, isSectionHeader: true,
+      depth: 0, hasChildren: receitaNodes.length > 0 || semCategoria.receita !== 0, isLeaf: false, isSectionHeader: true,
       orcado: totalReceitas, realizado: totalReceitasReal, ownBudget: null, locked: false,
     });
-    if (expanded.has('_receitas')) flatten(receitaNodes, 1, false);
+    if (expanded.has('_receitas')) {
+      flatten(receitaNodes, 1, false);
+      pushSemCategoria('receita');
+    }
 
     result.push({
       key: '_despesas', categoriaId: null, codigo: '', nome: 'TOTAL DE DESPESAS', tipo: 'despesa',
-      depth: 0, hasChildren: despesaNodes.length > 0, isLeaf: false, isSectionHeader: true,
+      depth: 0, hasChildren: despesaNodes.length > 0 || semCategoria.despesa !== 0, isLeaf: false, isSectionHeader: true,
       orcado: totalDespesas, realizado: totalDespesasReal, ownBudget: null, locked: false,
     });
-    if (expanded.has('_despesas')) flatten(despesaNodes, 1, false);
+    if (expanded.has('_despesas')) {
+      flatten(despesaNodes, 1, false);
+      pushSemCategoria('despesa');
+    }
 
     result.push({
       key: '_resultado', categoriaId: null, codigo: '', nome: 'RESULTADO PROJETADO', tipo: 'receita',
@@ -277,7 +302,7 @@ export default function OrcamentoSection() {
     });
 
     return result;
-  }, [tree, expanded, calcOrcado, calcRealizado, orcamentosByCategoria]);
+  }, [tree, expanded, calcOrcado, calcRealizado, orcamentosByCategoria, semCategoria]);
 
   const toggleExpand = (id: string) => {
     setExpanded(prev => {
@@ -389,14 +414,14 @@ export default function OrcamentoSection() {
 
   // ── PDF Export ──
   const gerarPDF = () => {
-    const exportRows = rows.filter(r => !r.isSectionHeader && !r.isTotalRow && r.categoriaId);
+    const exportRows = rows.filter(r => !r.isSectionHeader && !r.isTotalRow && (r.categoriaId || r.isUnassigned));
     if (exportRows.length === 0) return;
     const doc = new jsPDF();
     const w = doc.internal.pageSize.getWidth();
     doc.setFontSize(16);
     doc.text('Orçamento vs Realizado', w / 2, 18, { align: 'center' });
     doc.setFontSize(10);
-    doc.text(`Período: ${formatMonthBR(mesAtual)}  |  Regime de competência`, w / 2, 26, { align: 'center' });
+    doc.text(`Período: ${formatMonthBR(mesAtual)}  |  Regime de caixa (Livro Razão)`, w / 2, 26, { align: 'center' });
     doc.text(
       `Receita: ${fmt(totalReceitaRow?.realizado ?? 0)} / ${fmt(totalReceitaRow?.orcado ?? 0)}  |  Despesa: ${fmt(totalDespesaRow?.realizado ?? 0)} / ${fmt(totalDespesaRow?.orcado ?? 0)} (realizado / orçado)`,
       w / 2, 31, { align: 'center' },
@@ -426,7 +451,7 @@ export default function OrcamentoSection() {
 
   // ── Excel Export ──
   const gerarExcel = () => {
-    const exportRows = rows.filter(r => !r.isSectionHeader && !r.isTotalRow && r.categoriaId);
+    const exportRows = rows.filter(r => !r.isSectionHeader && !r.isTotalRow && (r.categoriaId || r.isUnassigned));
     if (exportRows.length === 0) return;
     const wb = XLSX.utils.book_new();
     const dataRows = [
@@ -465,7 +490,7 @@ export default function OrcamentoSection() {
         <div>
           <h2 className="text-xl font-bold text-foreground">Orçamento vs Realizado</h2>
           <p className="text-sm text-muted-foreground">
-            Competência • Receita {fmt(totalReceitaRow?.realizado ?? 0)} / {fmt(totalReceitaRow?.orcado ?? 0)} • Despesa {fmt(totalDespesaRow?.realizado ?? 0)} / {fmt(totalDespesaRow?.orcado ?? 0)} (realizado / orçado)
+            Caixa (Livro Razão) • Receita {fmt(totalReceitaRow?.realizado ?? 0)} / {fmt(totalReceitaRow?.orcado ?? 0)} • Despesa {fmt(totalDespesaRow?.realizado ?? 0)} / {fmt(totalDespesaRow?.orcado ?? 0)} (realizado / orçado)
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -595,7 +620,7 @@ export default function OrcamentoSection() {
                             row.depth === 1 && !row.isSectionHeader && 'font-semibold',
                             row.locked && 'text-muted-foreground',
                           )}>
-                            {row.locked ? '—' : fmt(row.orcado)}
+                            {row.locked || row.isUnassigned ? '—' : fmt(row.orcado)}
                           </span>
                         )}
                       </TableCell>

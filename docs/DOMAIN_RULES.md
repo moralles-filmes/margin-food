@@ -22,10 +22,10 @@
 | **Descrição** | Soma de lançamentos tipo RECEITA com status REALIZADO ou CONCILIADO |
 | **Fórmula** | `SUM(valor) WHERE tipo=RECEITA AND status IN (REALIZADO, CONCILIADO)` |
 | **Exclusões** | `tipo = TRANSFERENCIA`, `status = CANCELADO` |
-| **Regime** | Competência para DRE/KPIs; caixa pela data efetiva para Dashboard e Apresentação Sócios — Resultados |
+| **Regime** | Competência só na DRE; caixa pela data efetiva do DFC (Livro Razão) em todos os demais relatórios — Dashboard, KPIs, Comparativo, Orçamento, Fluxo, Borderô e Apresentação Sócios |
 | **Rateio** | Se houver rateio, usar itens de rateio. Se não, categoria do pai |
 | **Fonte** | RPCs `get_fin_dashboard_summary`, `get_fin_presentation_socios`, `get_fin_dre_summary` |
-| **Consumidores** | Dashboard, DRE, KPIs, Comparativo |
+| **Consumidores** | Dashboard, DRE, KPIs, Comparativo, Orçamento |
 | **Selector** | `isElegivelParaReceita()` |
 
 ### FIN-DESPESA — Despesa Oficial
@@ -35,10 +35,10 @@
 | **Descrição** | Soma de lançamentos tipo DESPESA com status REALIZADO ou CONCILIADO |
 | **Fórmula** | `SUM(valor) WHERE tipo=DESPESA AND status IN (REALIZADO, CONCILIADO)` |
 | **Exclusões** | `tipo = TRANSFERENCIA`, `status = CANCELADO` |
-| **Regime** | Competência para DRE/KPIs; caixa pela data efetiva para Dashboard e Apresentação Sócios — Resultados |
+| **Regime** | Competência só na DRE; caixa pela data efetiva do DFC (Livro Razão) em todos os demais relatórios — Dashboard, KPIs, Comparativo, Orçamento, Fluxo, Borderô e Apresentação Sócios |
 | **Rateio** | Se houver rateio, usar itens de rateio. Se não, categoria do pai |
 | **Fonte** | RPCs `get_fin_dashboard_summary`, `get_fin_presentation_socios`, `get_fin_dre_summary` |
-| **Consumidores** | Dashboard, DRE, KPIs, Comparativo |
+| **Consumidores** | Dashboard, DRE, KPIs, Comparativo, Orçamento |
 | **Selector** | `isElegivelParaDespesa()` |
 
 ### FIN-RESULTADO — Resultado Oficial
@@ -49,7 +49,7 @@
 | **Fórmula** | `receita - despesa` |
 | **Invariante** | `assertResultado(receita, despesa, resultado)` deve ser `true` |
 | **Fonte** | `calcResultado()` em `domain/financeiro/selectors.ts` |
-| **Consumidores** | Dashboard, DRE, KPIs, Comparativo |
+| **Consumidores** | Dashboard, DRE, KPIs, Comparativo, Orçamento |
 
 ### FIN-MARGEM — Margem Oficial
 
@@ -109,7 +109,7 @@
 | Campo | Valor |
 |-------|-------|
 | **Descrição** | Visão diária Real + Projetado |
-| **Realizado** | Lançamentos REALIZADO/CONCILIADO |
+| **Realizado** | Lançamentos REALIZADO/CONCILIADO pela data efetiva de caixa, incluindo não operacionais — fecha com o Livro Razão e o DFC |
 | **Projetado** | CP/CR pendentes por data de vencimento |
 | **Fonte** | RPC `get_fin_cashflow` |
 | **Consumidores** | Fluxo de Caixa |
@@ -118,10 +118,11 @@
 
 | Campo | Valor |
 |-------|-------|
-| **Descrição** | Saldo inicial + entradas/saídas projetadas ao longo do horizonte |
-| **Recorrências** | Expandidas via `generate_series` |
+| **Descrição** | Saldo atual + entradas/saídas projetadas ao longo do horizonte |
+| **Vencidos** | CP/CR em aberto já vencidos entram no dia de hoje; não operacionais entram (dinheiro real) |
+| **Estimativa** | Opcional (ligada por padrão na tela): receita e despesa que não passam por títulos, pela média do mesmo dia da semana nas 4 semanas fechadas do Livro Razão até o último dia com receita lançada. Exclui baixas de CP/CR (já entram pelo vencimento) e não operacionais. Campos `estimativa`/`*_com_estimativa`; `saldo` continua só com títulos |
 | **Saldo inicial** | Pode ser sobreposto por valor manual para simulação |
-| **Fonte** | RPC `get_fin_projecao` |
+| **Fonte** | RPC `get_fin_fluxo_projecao` |
 | **Consumidores** | Projeção de Fluxo |
 
 ### FIN-BORDERO — Borderô (despesa completa do período e saldo final provisionado)
@@ -146,15 +147,16 @@
 |-------|-------|
 | **Descrição** | Compara valores orçados (meta) contra realizados por categoria |
 | **Status** | REALIZADO, CONCILIADO |
-| **Regime** | Competência |
-| **Fonte** | RPC `get_fin_orcamento_vs_realizado` |
-| **Consumidores** | Orçamento |
+| **Regime** | Caixa — mesma fonte do DFC (`_fin_dfc_effective_allocations`), com rateio |
+| **Sem categoria** | Realizado sem categoria (ou em categoria inativa) aparece em linha própria, para o total bater com o Dashboard e a Apresentação Sócios |
+| **Fonte** | RPCs `get_fin_orcamento_arvore` (aba Orçamento) e `get_fin_presentation_plan` (metas da Apresentação Sócios) |
+| **Consumidores** | Orçamento, Apresentação Sócios — metas e projeção |
 
 ### FIN-COMPARATIVO — Comparativo entre Períodos
 
 | Campo | Valor |
 |-------|-------|
-| **Descrição** | Compara FinancialSummary entre dois meses |
+| **Descrição** | Compara FinancialSummary entre dois meses pelo regime de caixa (data efetiva do DFC) |
 | **Fórmula variação** | `(A − B) / |B| × 100` |
 | **Selector** | `calcVariacaoPct()` |
 | **Fonte** | RPC `comparativo_periodos` |

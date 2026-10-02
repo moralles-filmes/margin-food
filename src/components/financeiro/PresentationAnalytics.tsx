@@ -661,7 +661,7 @@ export default function PresentationAnalytics({
         <div className="flex flex-wrap items-end justify-between gap-2">
           <div>
             <h2 id="executive-summary-title" className="text-sm font-semibold text-foreground">Resumo executivo</h2>
-            <p className="text-xs text-muted-foreground">{data.periodLabel} • regime de competência</p>
+            <p className="text-xs text-muted-foreground">{data.periodLabel} • regime de caixa</p>
           </div>
           <Badge variant="outline" className="border-primary/30 text-[10px] text-foreground">Transferências excluídas</Badge>
         </div>
