@@ -249,7 +249,7 @@ export default function ComparativoSection() {
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <h2 className="text-xl font-bold text-foreground">Comparativo Período vs Período</h2>
-          <p className="text-sm text-muted-foreground">Compare indicadores entre dois meses</p>
+          <p className="text-sm text-muted-foreground">Compare indicadores entre dois meses • regime de caixa (Livro Razão)</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {canExport && data && (

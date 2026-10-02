@@ -22,8 +22,8 @@ export const PRESENTATION_CONTRACT_VERSION = '1.0' as const;
 
 export const MANAGERIAL_RESULT_CONTRACT = {
   source: 'fin_lancamentos',
-  dateField: 'data_competencia',
-  regime: 'competencia',
+  dateField: 'COALESCE(data_pagamento, conciliado_em::date, data_competencia)',
+  regime: 'caixa',
   includedStatuses: REALIZADO_STATUSES,
   includedTypes: ['RECEITA', 'DESPESA'] as const,
   excludedTypes: ['TRANSFERENCIA'] as const,

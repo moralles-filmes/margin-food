@@ -792,6 +792,11 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
             <span className="text-muted-foreground">Total de transferencias: <strong className="text-foreground">{fmt(totais.total_transferencia)}</strong></span>
           )}
           <span className="text-muted-foreground ml-auto">Saldo atual: <strong className={saldoAtual >= 0 ? 'text-foreground' : 'text-destructive'}>{fmt(saldoAtual)}</strong></span>
+          {filtroCategoria !== CATEGORIA_FILTRO_TODOS && (
+            <span className="w-full text-xs text-muted-foreground">
+              Com filtro de categoria, os totais somam só a parte rateada na categoria e nas subcategorias (mesmo valor do DFC); a coluna Valor mostra o lançamento inteiro.
+            </span>
+          )}
         </div>
 
         <Table>

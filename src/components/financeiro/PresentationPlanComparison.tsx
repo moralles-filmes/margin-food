@@ -435,7 +435,7 @@ export default function PresentationPlanComparison({
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 id="presentation-plan-title" className="text-sm font-semibold text-foreground">Metas, orçamento e projeção</h2>
-          <p className="text-xs text-muted-foreground">Comparação por competência, sem contas em aberto e sem valores presumidos.</p>
+          <p className="text-xs text-muted-foreground">Comparação pelo regime de caixa (Livro Razão), sem contas em aberto e sem valores presumidos.</p>
         </div>
         <PresentationPlanModeToggle mode={mode} onChange={onModeChange} />
       </div>
