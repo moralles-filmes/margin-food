@@ -53,7 +53,7 @@ export default function DFCSection() {
   const toast = useScopedToast();
   const supabase = useSupabase();
   const [mesAncora, setMesAncora] = useState(() => formatInBR(new Date(), 'yyyy-MM'));
-  const [meses, setMeses] = useState('3');
+  const [meses, setMeses] = useState('1');
   const [loading, setLoading] = useState(true);
   const [categorias, setCategorias] = useState<DfcCategoria[]>([]);
   const [lancamentos, setLancamentos] = useState<{ id: string; categoria_id: string; valor: number; tipo: string; status: string }[]>([]);
