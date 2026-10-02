@@ -470,7 +470,10 @@ export default function AppLayout({ children, activeTab, onTabChange, isOffline,
               </div>
             )}
             {isOffline && (
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-warning-soft border border-warning-border">
+              <div
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-warning-soft border border-warning-border"
+                title="Sem conexão com o servidor. Tentando reconectar a cada 15 segundos."
+              >
                 <div className="w-1.5 h-1.5 rounded-full bg-warning animate-pulse-soft" />
                 <span className="text-[11px] font-medium text-warning">Offline</span>
               </div>
