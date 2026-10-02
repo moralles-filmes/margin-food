@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { usePersistedTab } from '@/hooks/usePersistedTab';
+import { useServidorOffline } from '@/hooks/useServidorOffline';
 import { TabId } from '@/types/salmon';
 import { SalmonStoreProvider, useSalmonStoreContext } from '@/contexts/SalmonStoreContext';
 import { EstoqueGeralStoreProvider, useEstoqueGeralStoreContext } from '@/contexts/EstoqueGeralStoreContext';
@@ -97,7 +98,7 @@ const Index = () => {
   }), [salmonAccess, estoqueAccess, operacionalAccess, inventarioAccess, comprasAccess, cmvAccess, fichaAccess, planningAccess, relatoriosAccess, iaAccess, rhAccess, financeiroAccess, configAccess]);
   const navigate = useNavigate();
   const location = useLocation();
-  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const isOffline = useServidorOffline();
   const store = useSalmonStoreContext();
   const estoqueStore = useEstoqueGeralStoreContext();
   const permissionRetryCountRef = useRef(0);
@@ -225,17 +226,6 @@ const Index = () => {
     }
     setActiveTab('financeiro');
   }, [location.pathname, permissionState, canAccessTab, navigate, setActiveTab, toast]);
-
-  useEffect(() => {
-    const handleOnline = () => setIsOffline(false);
-    const handleOffline = () => setIsOffline(true);
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
 
   // Auth loading
   if (loading) {
