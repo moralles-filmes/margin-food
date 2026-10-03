@@ -45,6 +45,7 @@ export function isCmvIndisponivel(error: unknown): boolean {
 const MENSAGENS: [RegExp, string][] = [
   [/OPTIMISTIC_LOCK_CONFLICT/, 'Este boleto foi alterado por outra pessoa. Recarregue e tente de novo.'],
   [/CMV_DECISAO_OBRIGATORIA/, 'Informe se o boleto aparece no CMV financeiro.'],
+  [/Could not find the function|PGRST202/, 'Recurso ainda não disponível neste ambiente. Tente de novo em alguns minutos.'],
   [/RATEIO_NAO_FECHA/, 'A soma do rateio precisa fechar com o valor do boleto.'],
   [/CMV_ALVO_INVALIDO/, 'Este boleto tem rateio: classifique cada linha.'],
   [/CMV_LOTE_INVALIDO/, 'Selecione de 1 a 500 linhas por vez.'],
@@ -199,6 +200,8 @@ export interface CmvLinhaDetalhe {
   linhaCentavos: number;
   cmvIncluir: CmvDecisao;
   updatedAt: string;
+  /** Boletos da mesma série de recorrência, contando este (1 = avulso). */
+  serieBoletos: number;
 }
 
 export interface CmvListaDetalhe {
@@ -244,6 +247,7 @@ export function parseCmvLista(raw: unknown): CmvListaDetalhe {
         linhaCentavos: Number(l.linha_centavos) || 0,
         cmvIncluir: typeof l.cmv_incluir === 'boolean' ? l.cmv_incluir : null,
         updatedAt: texto(l.updated_at) ?? '',
+        serieBoletos: Math.max(1, Number(l.serie_boletos) || 1),
       }];
     }),
   };
@@ -323,6 +327,42 @@ export async function classificarCmv(supabase: Supabase, itens: CmvItemClassific
     throw error;
   }
   return data as { titulos: number; itens: number };
+}
+
+export interface CmvSerieResultado {
+  serieTitulos: number;
+  titulosAlterados: number;
+  linhasAlteradas: number;
+  /** Versão do boleto de referência lida pelo servidor (lock da confirmação). */
+  referenciaUpdatedAt: string | null;
+}
+
+/**
+ * Copia a decisão de um boleto para as outras parcelas da série, categoria por
+ * categoria. Com `simular`, só conta o que mudaria.
+ */
+export async function aplicarCmvSerie(
+  supabase: Supabase,
+  contaPagarId: string,
+  opcoes: { expectedUpdatedAt?: string | null; justificativa?: string; simular?: boolean } = {},
+): Promise<CmvSerieResultado> {
+  const { data, error } = await rpc(supabase)('fin_cmv_aplicar_serie', {
+    p_conta_pagar_id: contaPagarId,
+    p_expected_updated_at: opcoes.expectedUpdatedAt || null,
+    p_justificativa: opcoes.justificativa?.trim() || null,
+    p_simular: opcoes.simular ?? false,
+  });
+  if (error) {
+    if (!opcoes.simular) console.error('[CMV Financeiro] Falha em fin_cmv_aplicar_serie:', error);
+    throw error;
+  }
+  const o = (typeof data === 'object' && data !== null ? data : {}) as Record<string, unknown>;
+  return {
+    serieTitulos: Number(o.serie_titulos) || 0,
+    titulosAlterados: Number(o.titulos_alterados) || 0,
+    linhasAlteradas: Number(o.linhas_alteradas) || 0,
+    referenciaUpdatedAt: typeof o.referencia_updated_at === 'string' ? o.referencia_updated_at : null,
+  };
 }
 
 export async function definirPadraoCategoria(supabase: Supabase, categoriaId: string, sugerir: CmvDecisao, expectedUpdatedAt: string) {

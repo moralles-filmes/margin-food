@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, ExternalLink, Loader2 } from 'lucide-react';
+import { AlertTriangle, ExternalLink, Loader2, Repeat } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
@@ -20,7 +20,7 @@ import { useTravaEnvio } from '@/hooks/useTravaEnvio';
 import { requestNavigation } from '@/hooks/useNavigationRequest';
 import { formatarCentavos, formatarData, type CmvDecisao } from '@/domain/financeiro/cmv';
 import {
-  CMV_QUERY_ROOT, classificarCmv, mensagemErroCmv, useCmvLinhas,
+  CMV_QUERY_ROOT, aplicarCmvSerie, classificarCmv, mensagemErroCmv, useCmvLinhas,
   type CmvLinhaDetalhe, type CmvSituacao,
 } from '@/hooks/useCmvFinanceiro';
 import CmvDecisaoToggle from './CmvDecisaoToggle';
@@ -75,11 +75,13 @@ export default function CmvBoletosDialog({ alvo, onClose, companyId, canClassifi
   const [salvando, setSalvando] = useState<string | null>(null);
   const [lote, setLote] = useState<{ incluir: boolean } | null>(null);
   const [justificativa, setJustificativa] = useState('');
+  const [serie, setSerie] = useState<CmvLinhaDetalhe | null>(null);
 
   useEffect(() => {
     setPagina(0);
     setSelecionadas(new Map());
     setLote(null);
+    setSerie(null);
     setJustificativa('');
   }, [alvo]);
 
@@ -199,6 +201,30 @@ export default function CmvBoletosDialog({ alvo, onClose, companyId, canClassifi
     });
   };
 
+  const aplicarSerie = async () => {
+    if (!serie) return;
+    const referencia = serie;
+    await trava(async () => {
+      setSalvando('serie');
+      try {
+        const resultado = await aplicarCmvSerie(supabase, referencia.contaPagarId, { expectedUpdatedAt: referencia.updatedAt });
+        toast.success(resultado.titulosAlterados === 0
+          ? 'As outras parcelas da série já estavam com esta resposta.'
+          : `${resultado.titulosAlterados} ${resultado.titulosAlterados === 1 ? 'parcela da série atualizada' : 'parcelas da série atualizadas'}.`);
+        setSerie(null);
+        // As parcelas mudaram de versão: a seleção do lote pode estar velha.
+        setSelecionadas(new Map());
+        await aposGravar();
+      } catch (error) {
+        toast.error(`${mensagemErroCmv(error)} Nada foi alterado.`);
+        setSerie(null);
+        void query.refetch();
+      } finally {
+        setSalvando(null);
+      }
+    });
+  };
+
   const abrirBoleto = (id: string) => {
     onClose();
     requestNavigation({ tab: 'financeiro', subtab: 'pagar', record: { type: 'conta_pagar', id } });
@@ -251,7 +277,7 @@ export default function CmvBoletosDialog({ alvo, onClose, companyId, canClassifi
               <EmptyState title="Nenhum boleto neste recorte" description="Não há linhas de rateio com esta situação no intervalo consultado." compact />
             ) : (
               <div className="overflow-x-auto rounded-xl border border-border">
-                <table className="w-full min-w-[940px] border-collapse text-sm">
+                <table className="w-full min-w-[1020px] border-collapse text-sm">
                   <caption className="sr-only">Boletos e linhas de rateio do recorte</caption>
                   <thead>
                     <tr className="border-b border-border bg-muted/60 text-xs text-muted-foreground">
@@ -306,6 +332,16 @@ export default function CmvBoletosDialog({ alvo, onClose, companyId, canClassifi
                                 />
                                 {salvando === chave && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" aria-label="Salvando" />}
                                 {linha.cmvIncluir === null && salvando !== chave && <span className="text-xs font-medium text-warning">Pendente</span>}
+                                {canLote && linha.serieBoletos > 1 && linha.cmvIncluir !== null && (
+                                  <Button
+                                    type="button" variant="outline" size="sm" className="h-7 gap-1 px-2 text-xs" disabled={salvando !== null}
+                                    onClick={() => setSerie(linha)}
+                                    title={`Aplicar esta resposta às outras ${linha.serieBoletos - 1} parcelas da série`}
+                                    aria-label={`Aplicar a resposta de ${linha.descricao} às outras ${linha.serieBoletos - 1} parcelas da série`}
+                                  >
+                                    <Repeat className="h-3.5 w-3.5" aria-hidden="true" />Série
+                                  </Button>
+                                )}
                               </span>
                             ) : (
                               <span className={linha.cmvIncluir === null ? 'font-medium text-warning' : undefined}>{textoDecisao(linha.cmvIncluir)}</span>
@@ -363,6 +399,29 @@ export default function CmvBoletosDialog({ alvo, onClose, companyId, canClassifi
             <AlertDialogCancel disabled={salvando !== null}>Cancelar</AlertDialogCancel>
             <AlertDialogAction disabled={salvando !== null} onClick={e => { e.preventDefault(); void aplicarLote(); }}>
               {salvando === 'lote' ? 'Aplicando…' : 'Confirmar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={serie !== null} onOpenChange={aberto => { if (!aberto && salvando === null) setSerie(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Aplicar à série toda?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <p>
+                  <strong className="text-foreground">{serie?.fornecedor || serie?.descricao}</strong> faz parte de uma série de{' '}
+                  <strong className="text-foreground">{serie?.serieBoletos}</strong> boletos. As outras parcelas, de todos os meses, recebem a mesma resposta deste boleto para cada categoria.
+                </p>
+                <p>Só a decisão do CMV muda: valor, categoria, cobrança e pagamento ficam como estão. Parcela cancelada não é alterada. A alteração fica registrada na auditoria e pode ser revertida linha a linha.</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={salvando !== null}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction disabled={salvando !== null} onClick={e => { e.preventDefault(); void aplicarSerie(); }}>
+              {salvando === 'serie' ? 'Aplicando…' : 'Aplicar à série'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

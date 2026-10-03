@@ -123,3 +123,11 @@ Aceito / em aberto (P3):
 - Por unidade: definir padrões por categoria, ligar a pergunta nos novos boletos e classificar o histórico (775 boletos pendentes em 2026-10-03).
 - Regenerar `src/integrations/supabase/types.ts` após a migration (as chamadas novas usam `rpc` sem tipo gerado).
 - Avaliar meta de CMV financeiro por categoria se o negócio quiser a coluna "Status".
+
+## Depois da publicação (2026-10-03)
+
+- **Incidente e correção (PR #140):** o helper de RPC do CMV devolvia `supabase.rpc` sem o `this`; toda chamada do CMV estourava no navegador e derrubava o carregamento de categorias/fornecedores de Contas a Pagar. Nenhum dado foi alterado. Corrigido com `.bind`, `fetchCmvConfig` que nunca lança e um teste com cliente dependente de `this`.
+- **Decisão por série de recorrência:** migration `20261003203219_cmv_financeiro_serie.sql` (aplicada por MCP; só funções, sem DROP). Na lista de boletos do CMV, o botão "Série" copia a resposta do boleto para as outras parcelas; em Contas a Pagar, ao salvar uma edição que mudou a resposta de um boleto de série, a tela oferece aplicar às demais. As duas exigem `financeiro:cmv:manage`, gravam auditoria por boleto e alcançam parcelas pagas e de meses anteriores (parcela cancelada fica de fora).
+- Série = parcelas criadas juntas (`created_at` idêntico + `parcela_total`, autor e fornecedor) ou ligadas por `lancamento_pai_id`. No histórico (11 séries, 476 boletos) o vínculo de pai está vazio porque a 1ª parcela foi excluída.
+- Conferido em produção: corpo das 3 funções idêntico ao do banco de teste (md5), helpers sem EXECUTE para clientes, prévia (`p_simular`) executada como admin sem gravar nada.
+- Limite aceito: `serie_boletos` é calculado por linha da página, sem índice próprio — rever se o volume de boletos crescer muito.

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { classificarCmv, fetchCmvConfig, fetchCmvLinhas, fetchCmvReport } from './useCmvFinanceiro';
+import { aplicarCmvSerie, classificarCmv, fetchCmvConfig, fetchCmvLinhas, fetchCmvReport, parseCmvLista } from './useCmvFinanceiro';
 import { CMV_FILTRO_SEMANA, cmvPayloadCru } from '@/test/fixtures/cmvFinanceiro';
 
 /**
@@ -27,6 +27,7 @@ describe('useCmvFinanceiro — chamadas ao cliente Supabase', () => {
       get_fin_cmv_financeiro: cmvPayloadCru(),
       list_fin_cmv_linhas: { total_linhas: 0, total_titulos: 0, total_centavos: 0, itens: [] },
       fin_cmv_classificar: { titulos: 1, itens: 1 },
+      fin_cmv_aplicar_serie: { serie_titulos: 36, titulos_alterados: 35, linhas_alteradas: 35, simulado: false, referencia_updated_at: 't1' },
     });
 
     const config = await fetchCmvConfig(como(cliente));
@@ -40,9 +41,21 @@ describe('useCmvFinanceiro — chamadas ao cliente Supabase', () => {
 
     await classificarCmv(como(cliente), [{ contaPagarId: 'a', rateioId: null, incluir: true, expectedUpdatedAt: '2026-01-01T00:00:00Z' }]);
 
+    const serie = await aplicarCmvSerie(como(cliente), 'a', { expectedUpdatedAt: '2026-01-01T00:00:00Z' });
+    expect(serie).toEqual({ serieTitulos: 36, titulosAlterados: 35, linhasAlteradas: 35, referenciaUpdatedAt: 't1' });
+
     expect(cliente.chamadas.map(c => c.fn)).toEqual([
-      'get_fin_cmv_config', 'get_fin_cmv_financeiro', 'list_fin_cmv_linhas', 'fin_cmv_classificar',
+      'get_fin_cmv_config', 'get_fin_cmv_financeiro', 'list_fin_cmv_linhas', 'fin_cmv_classificar', 'fin_cmv_aplicar_serie',
     ]);
+    expect(cliente.chamadas[4].args).toEqual({
+      p_conta_pagar_id: 'a', p_expected_updated_at: '2026-01-01T00:00:00Z', p_justificativa: null, p_simular: false,
+    });
+  });
+
+  it('tamanho da série: banco antigo (sem o campo) vira boleto avulso', () => {
+    const linha = { conta_pagar_id: 'a', descricao: 'x', updated_at: 't' };
+    expect(parseCmvLista({ itens: [linha] }).itens[0].serieBoletos).toBe(1);
+    expect(parseCmvLista({ itens: [{ ...linha, serie_boletos: 36 }] }).itens[0].serieBoletos).toBe(36);
   });
 
   it('a configuração nunca lança: falha inesperada vira "indisponível"', async () => {
