@@ -16,6 +16,8 @@ import { useCompanyId } from '@/hooks/useCompanyId';
 import { useEmitDataEvent } from '@/lib/dataEvents';
 import { buildCategoryOptions } from '@/lib/categoriaOptions';
 import { filterEligibleMarcaCategoryOptions } from '@/domain/financeiro/marcaCategoriaOptions';
+import { FORMA_VENDA_LABEL, FORMA_VENDA_OPTIONS, type FormaVenda } from '@/domain/financeiro/fechamentoMarcas';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { Plus, Store } from 'lucide-react';
 import { useScopedToast } from '@/hooks/useScopedToast';
 
@@ -25,6 +27,7 @@ export interface FechamentoMarca {
   ativo: boolean;
   ordem: number;
   categoria_id: string | null;
+  forma_venda: FormaVenda | null;
 }
 
 interface CategoriaRow {
@@ -48,6 +51,7 @@ const MARCA_ERROR_MESSAGES: Record<string, string> = {
   financeiro_fechamento_marcas_nome_unique: 'Já existe uma marca com esse nome',
   CATEGORIA_MARCA_OBRIGATORIA: 'Selecione a categoria vinculada à marca',
   CATEGORIA_MARCA_INVALIDA: 'A categoria precisa ser de receita, ativa e operacional',
+  FORMA_VENDA_OBRIGATORIA: 'Selecione a forma de venda da marca (pedidos ou pessoas)',
   CATEGORIA_MARCA_NAO_FOLHA: 'Só é possível vincular a uma categoria/sub-categoria sem itens abaixo dela',
 };
 
@@ -70,6 +74,7 @@ export default function FechamentoMarcasTab({
   const [editItem, setEditItem] = useState<FechamentoMarca | null>(null);
   const [nome, setNome] = useState('');
   const [categoriaId, setCategoriaId] = useState('');
+  const [formaVenda, setFormaVenda] = useState<FormaVenda | ''>('');
   const [saving, setSaving] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [categorias, setCategorias] = useState<CategoriaRow[]>([]);
@@ -104,11 +109,13 @@ export default function FechamentoMarcasTab({
   }, [categorias]);
 
   const marcasPendentes = useMemo(() => items.filter(item => !item.categoria_id), [items]);
+  const marcasSemForma = useMemo(() => items.filter(item => item.ativo && !item.forma_venda), [items]);
 
   const openNew = () => {
     setEditItem(null);
     setNome('');
     setCategoriaId('');
+    setFormaVenda('');
     setShowForm(true);
   };
 
@@ -116,6 +123,7 @@ export default function FechamentoMarcasTab({
     setEditItem(item);
     setNome(item.nome);
     setCategoriaId(item.categoria_id || '');
+    setFormaVenda(item.forma_venda || '');
     setShowForm(true);
   };
 
@@ -124,6 +132,7 @@ export default function FechamentoMarcasTab({
     setEditItem(null);
     setNome('');
     setCategoriaId('');
+    setFormaVenda('');
   };
 
   const save = async () => {
@@ -137,6 +146,10 @@ export default function FechamentoMarcasTab({
       toast.error('Selecione a categoria vinculada à marca');
       return;
     }
+    if (!formaVenda) {
+      toast.error('Selecione a forma de venda da marca (pedidos ou pessoas)');
+      return;
+    }
     if (!companyId) {
       toast.error(companyError || 'Não foi possível identificar a empresa');
       return;
@@ -147,7 +160,7 @@ export default function FechamentoMarcasTab({
       if (editItem) {
         const { error } = await supabase
           .from('financeiro_fechamento_marcas')
-          .update({ nome: normalizedName, categoria_id: categoriaId })
+          .update({ nome: normalizedName, categoria_id: categoriaId, forma_venda: formaVenda })
           .eq('id', editItem.id);
         if (error) throw error;
         toast.success('Marca atualizada');
@@ -159,6 +172,7 @@ export default function FechamentoMarcasTab({
             company_id: companyId,
             nome: normalizedName,
             categoria_id: categoriaId,
+            forma_venda: formaVenda,
             ordem: nextOrder,
           });
         if (error) throw error;
@@ -237,10 +251,30 @@ export default function FechamentoMarcasTab({
         </Card>
       )}
 
+      {!loading && marcasSemForma.length > 0 && (
+        <Card className="border-warning/40 bg-warning-soft">
+          <CardContent className="flex items-start gap-2 p-4 text-sm text-foreground">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+            <div>
+              <p className="font-medium">
+                {marcasSemForma.length === 1
+                  ? '1 marca sem forma de venda'
+                  : `${marcasSemForma.length} marcas sem forma de venda`}
+              </p>
+              <p className="text-muted-foreground">
+                Edite a marca e escolha Pedidos ou Pessoas para o fechamento diário pedir a quantidade:{' '}
+                {marcasSemForma.map(m => m.nome).join(', ')}.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Table>
         <TableHeader>
           <TableRow>
             <TableHead>Marca / operação</TableHead>
+            <TableHead className="w-36">Forma de venda</TableHead>
             <TableHead>Categoria vinculada</TableHead>
             <TableHead className="w-28">Status</TableHead>
             {canEdit && <TableHead className="w-28 text-right">Ações</TableHead>}
@@ -251,6 +285,7 @@ export default function FechamentoMarcasTab({
             Array.from({ length: 3 }).map((_, index) => (
               <TableRow key={index}>
                 <TableCell><Skeleton className="h-4 w-48" /></TableCell>
+                <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                 <TableCell><Skeleton className="h-4 w-40" /></TableCell>
                 <TableCell><Skeleton className="h-5 w-16" /></TableCell>
                 {canEdit && <TableCell><Skeleton className="ml-auto h-7 w-20" /></TableCell>}
@@ -258,7 +293,7 @@ export default function FechamentoMarcasTab({
             ))
           ) : items.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={canEdit ? 4 : 3} className="py-10 text-center text-muted-foreground">
+              <TableCell colSpan={canEdit ? 5 : 4} className="py-10 text-center text-muted-foreground">
                 <Store className="mx-auto mb-2 h-8 w-8 opacity-30" />
                 Nenhuma marca cadastrada
               </TableCell>
@@ -266,6 +301,15 @@ export default function FechamentoMarcasTab({
           ) : items.map(item => (
             <TableRow key={item.id}>
               <TableCell className="font-medium">{item.nome}</TableCell>
+              <TableCell>
+                {item.forma_venda ? (
+                  <span className="text-sm">{FORMA_VENDA_LABEL[item.forma_venda]}</span>
+                ) : (
+                  <Badge variant="warning" className="gap-1">
+                    <AlertTriangle className="h-3 w-3" /> Não definida
+                  </Badge>
+                )}
+              </TableCell>
               <TableCell>
                 {item.categoria_id ? (
                   <span className="text-sm">{categoriaNomeById.get(item.categoria_id) || '—'}</span>
@@ -322,6 +366,19 @@ export default function FechamentoMarcasTab({
               />
             </div>
             <div className="space-y-1.5">
+              <Label id="fechamento-marca-forma-label">Forma de venda</Label>
+              <SegmentedControl
+                options={FORMA_VENDA_OPTIONS}
+                value={formaVenda}
+                onChange={value => setFormaVenda(value as FormaVenda)}
+                className="flex w-full"
+              />
+              <p className="text-xs text-muted-foreground">
+                Define o que será contado no fechamento do dia: quantidade de pedidos (delivery, balcão) ou de
+                pessoas atendidas (salão).
+              </p>
+            </div>
+            <div className="space-y-1.5">
               <Label htmlFor="fechamento-marca-categoria">Categoria vinculada (livro razão)</Label>
               <CategoryCombobox
                 value={categoriaId}
@@ -334,7 +391,7 @@ export default function FechamentoMarcasTab({
                 apontar para a mesma categoria (ex.: Salão e Jantar caindo na mesma linha do extrato).
               </p>
             </div>
-            <Button className="w-full" onClick={save} disabled={saving || !nome.trim() || !categoriaId}>
+            <Button className="w-full" onClick={save} disabled={saving || !nome.trim() || !categoriaId || !formaVenda}>
               {saving ? 'Salvando...' : editItem ? 'Salvar alterações' : 'Cadastrar marca'}
             </Button>
           </div>

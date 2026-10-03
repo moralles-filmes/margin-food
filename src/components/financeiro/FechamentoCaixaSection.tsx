@@ -4,6 +4,7 @@ import { useEmitDataEvent, useDataEvent } from '@/lib/dataEvents';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { DateInput } from '@/components/ui/DateInput';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { CurrencyInput } from '@/components/ui/brl-input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -20,15 +21,26 @@ import { startOfMonth, endOfMonth } from 'date-fns';
 import { formatDateISO, todayBR } from '@/lib/datetime';
 import { fmtBRL, formatDateBR, normalizeBRLMoneyToNumber, parseLocalDate } from '@/lib/formatters';
 import { useCan } from '@/permissions/hooks';
+import { useAuth } from '@/contexts/AuthContext';
+import { useCompanyId } from '@/hooks/useCompanyId';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
-import { APP_NAME } from '@/lib/brand';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import * as XLSX from '@/lib/safeXlsx';
 import { mapFinanceiroDeleteError } from '@/lib/financeiroErrorMap';
 import DateRangePresets from './DateRangePresets';
 import FechamentoMarcasTab, { type FechamentoMarca } from './FechamentoMarcasTab';
-import { buildFechamentoMarcaPayload } from '@/domain/financeiro/fechamentoMarcas';
+import {
+  buildFechamentoDias,
+  buildFechamentoMarcaPayload,
+  formatQuantidadeForma,
+  resolveFormaVendaDoDia,
+  type FormaVenda,
+} from '@/domain/financeiro/fechamentoMarcas';
+import {
+  buildFechamentoExcelSheets,
+  buildFechamentoPdf,
+  fechamentoExportFilename,
+  summarizeFechamentoPeriodo,
+} from '@/lib/fechamentoCaixaExport';
 import {
   ResponsiveContainer,
   AreaChart,
@@ -59,6 +71,8 @@ interface FechamentoMarcaValor {
   fechamento_id: string;
   marca_id: string;
   valor_bruto: number;
+  quantidade: number | null;
+  forma_venda: FormaVenda | null;
 }
 
 type FechamentoTab = 'diario' | 'marcas';
@@ -67,6 +81,9 @@ const FECHAMENTO_TABS: SubmoduleItem<FechamentoTab>[] = [
   { id: 'diario', label: 'Fechamentos diários', icon: DollarSign },
   { id: 'marcas', label: 'Marcas e dark kitchens', icon: Store },
 ];
+
+// Fechamentos por requisição ao ler o detalhamento por marca.
+const BRAND_VALUES_CHUNK = 40;
 
 function parseMoney(value: string) {
   return normalizeBRLMoneyToNumber(value) ?? 0;
@@ -94,6 +111,9 @@ export default function FechamentoCaixaSection() {
   const canEdit = useCan('financeiro:fechamento:edit');
   const canDelete = useCan('financeiro:fechamento:delete');
   const canExport = useCan('financeiro:fechamento:export');
+  const { accessibleCompanies } = useAuth();
+  const { companyId } = useCompanyId();
+  const companyName = accessibleCompanies.find(company => company.id === companyId)?.nome || '';
 
   const { confirm, ConfirmDialog } = useConfirmDialog();
 
@@ -121,6 +141,10 @@ export default function FechamentoCaixaSection() {
   const [formDescontos, setFormDescontos] = useState('');
   const [formObs, setFormObs] = useState('');
   const [formBrandValues, setFormBrandValues] = useState<Record<string, string>>({});
+  const [formBrandQuantities, setFormBrandQuantities] = useState<Record<string, string>>({});
+  // Do fechamento em edição: forma de venda já gravada no dia e marcas lançadas sem quantidade.
+  const [formBrandFormas, setFormBrandFormas] = useState<Record<string, FormaVenda | null>>({});
+  const [formLegacyQtyBrands, setFormLegacyQtyBrands] = useState<ReadonlySet<string>>(() => new Set());
   const [formUsesBrands, setFormUsesBrands] = useState(false);
 
   // ── Load ──
@@ -129,7 +153,7 @@ export default function FechamentoCaixaSection() {
     setBrandsLoading(true);
     const { data, error } = await supabase
       .from('financeiro_fechamento_marcas')
-      .select('id, nome, ativo, ordem, categoria_id')
+      .select('id, nome, ativo, ordem, categoria_id, forma_venda')
       .order('ativo', { ascending: false })
       .order('ordem')
       .order('nome');
@@ -163,17 +187,26 @@ export default function FechamentoCaixaSection() {
       if (loadedItems.length === 0) {
         setBrandValues([]);
       } else {
-        const { data: valuesData, error: valuesError } = await supabase
-          .from('financeiro_fechamento_marca_valores')
-          .select('fechamento_id, marca_id, valor_bruto')
-          .in('fechamento_id', loadedItems.map(item => item.id));
+        // Em lotes: período longo com várias marcas passa do limite de linhas
+        // do PostgREST e o detalhamento dos últimos dias sumiria em silêncio.
+        const ids = loadedItems.map(item => item.id);
+        const valuesData: FechamentoMarcaValor[] = [];
+        let valuesError: unknown = null;
+        for (let start = 0; start < ids.length && !valuesError; start += BRAND_VALUES_CHUNK) {
+          const { data: chunk, error: chunkError } = await supabase
+            .from('financeiro_fechamento_marca_valores')
+            .select('fechamento_id, marca_id, valor_bruto, quantidade, forma_venda')
+            .in('fechamento_id', ids.slice(start, start + BRAND_VALUES_CHUNK));
+          if (chunkError) valuesError = chunkError;
+          else valuesData.push(...((chunk || []) as FechamentoMarcaValor[]));
+        }
 
         if (valuesError) {
           console.error('[FechamentoCaixaSection.loadBrandValues]', valuesError);
           setBrandValues([]);
           toast.error('Erro ao carregar a divisão por marcas');
         } else {
-          setBrandValues((valuesData || []) as FechamentoMarcaValor[]);
+          setBrandValues(valuesData);
         }
       }
     }
@@ -198,10 +231,13 @@ export default function FechamentoCaixaSection() {
     setFormDescontos('');
     setFormObs('');
     setFormBrandValues({});
+    setFormBrandQuantities({});
+    setFormBrandFormas({});
+    setFormLegacyQtyBrands(new Set());
     setFormUsesBrands(false);
     setShowForm(false);
   };
-  const fechFormSnapshot = { formData, formBruto, formTaxas, formDescontos, formObs, formBrandValues };
+  const fechFormSnapshot = { formData, formBruto, formTaxas, formDescontos, formObs, formBrandValues, formBrandQuantities };
   const { showConfirm, guardedClose, confirmClose, cancelClose } = useFormDirtyGuard({ current: fechFormSnapshot, onClose: resetForm });
 
   const openNew = () => {
@@ -222,13 +258,23 @@ export default function FechamentoCaixaSection() {
     setFormObs(row.observacao || '');
     const existingValues = brandValues.filter(value => value.fechamento_id === row.id);
     setFormBrandValues(Object.fromEntries(existingValues.map(value => [value.marca_id, String(value.valor_bruto)])));
+    setFormBrandQuantities(Object.fromEntries(
+      existingValues
+        .filter(value => value.quantidade != null)
+        .map(value => [value.marca_id, String(value.quantidade)])
+    ));
+    setFormBrandFormas(Object.fromEntries(existingValues.map(value => [value.marca_id, value.forma_venda])));
+    setFormLegacyQtyBrands(new Set(
+      existingValues.filter(value => value.quantidade == null).map(value => value.marca_id)
+    ));
     setFormUsesBrands(existingValues.length > 0);
     setShowForm(true);
   };
 
-  const brandsForForm = useMemo(() => brands.filter(
-    brand => brand.ativo || Object.prototype.hasOwnProperty.call(formBrandValues, brand.id)
-  ), [brands, formBrandValues]);
+  const brandsForForm = useMemo(() => resolveFormaVendaDoDia(
+    brands.filter(brand => brand.ativo || Object.prototype.hasOwnProperty.call(formBrandValues, brand.id)),
+    formBrandFormas
+  ), [brands, formBrandValues, formBrandFormas]);
 
   const brandsForFormSemCategoria = useMemo(
     () => brandsForForm.filter(brand => !brand.categoria_id),
@@ -236,8 +282,8 @@ export default function FechamentoCaixaSection() {
   );
 
   const brandBreakdownPayload = useMemo(
-    () => buildFechamentoMarcaPayload(brandsForForm, formBrandValues),
-    [brandsForForm, formBrandValues]
+    () => buildFechamentoMarcaPayload(brandsForForm, formBrandValues, formBrandQuantities, formLegacyQtyBrands),
+    [brandsForForm, formBrandValues, formBrandQuantities, formLegacyQtyBrands]
   );
   const brandGrossTotal = brandBreakdownPayload.total;
 
@@ -258,6 +304,14 @@ export default function FechamentoCaixaSection() {
     if (taxas < 0) { toast.error('Taxas não podem ser negativas'); return; }
     if (descontos < 0) { toast.error('Descontos não podem ser negativos'); return; }
     if (descontos > bruto) { toast.error('Descontos não podem ser maiores que o faturamento bruto'); return; }
+    if (formUsesBrands && brandBreakdownPayload.missingQuantidade.length > 0) {
+      const nomes = brandsForForm
+        .filter(brand => brandBreakdownPayload.missingQuantidade.includes(brand.id))
+        .map(brand => brand.nome)
+        .join(', ');
+      toast.error(`Informe a quantidade de pedidos/pessoas de: ${nomes}`);
+      return;
+    }
 
     // Future date warning
     if (formData > todayBR()) {
@@ -286,6 +340,8 @@ export default function FechamentoCaixaSection() {
         toast.error('Este fechamento foi alterado por outro usuário. Atualize a tela e tente novamente.');
       } else if (error.message?.includes('TOTAL_MARCAS_DIVERGENTE')) {
         toast.error('A soma das marcas precisa ser igual ao faturamento bruto.');
+      } else if (error.message?.includes('QUANTIDADE_INVALIDA')) {
+        toast.error('A quantidade de pedidos/pessoas precisa ser um número inteiro.');
       } else {
         toast.error(error.message);
       }
@@ -335,32 +391,12 @@ export default function FechamentoCaixaSection() {
     return b - t - d;
   }, [formUsesBrands, brandGrossTotal, formBruto, formTaxas, formDescontos]);
 
-  const brandNameById = useMemo(
-    () => new Map(brands.map(brand => [brand.id, brand.nome])),
-    [brands]
+  const dias = useMemo(
+    () => buildFechamentoDias(items, brandValues, brands),
+    [items, brandValues, brands]
   );
-
-  const brandBreakdownByClosing = useMemo(() => {
-    const grouped = new Map<string, FechamentoMarcaValor[]>();
-    brandValues.forEach(value => {
-      const current = grouped.get(value.fechamento_id) || [];
-      current.push(value);
-      grouped.set(value.fechamento_id, current);
-    });
-
-    return new Map(Array.from(grouped.entries()).map(([fechamentoId, values]) => [
-      fechamentoId,
-      [...values]
-        .sort((a, b) => (brandNameById.get(a.marca_id) || '').localeCompare(brandNameById.get(b.marca_id) || ''))
-        .map(value => `${brandNameById.get(value.marca_id) || 'Marca removida'}: ${fmtBRL(Number(value.valor_bruto))}`)
-        .join(' · '),
-    ]));
-  }, [brandValues, brandNameById]);
-
-  const getBrandBreakdown = useCallback(
-    (fechamentoId: string) => brandBreakdownByClosing.get(fechamentoId) || '',
-    [brandBreakdownByClosing]
-  );
+  const diaById = useMemo(() => new Map(dias.map(dia => [dia.id, dia])), [dias]);
+  const totaisPeriodo = useMemo(() => summarizeFechamentoPeriodo(dias), [dias]);
 
   const tableColumnCount = canEdit || canDelete ? 8 : 7;
 
@@ -382,35 +418,11 @@ export default function FechamentoCaixaSection() {
     if (exportingPdf) return;
     setExportingPdf(true);
     try {
-      const doc = new jsPDF();
-      doc.setFontSize(16);
-      doc.text(APP_NAME, 14, 15);
-      doc.setFontSize(10);
-      doc.text(`Fechamento de Caixa — ${formatDateBR(parseLocalDate(startDate))} a ${formatDateBR(parseLocalDate(endDate))}`, 14, 22);
-      doc.setFontSize(8);
-      doc.text(`Dias: ${items.length} | Bruto: ${fmtBRL(totalBruto)} | Líquido: ${fmtBRL(totalLiquido)}`, 14, 28);
-
-      autoTable(doc, {
-        startY: 35,
-        head: [['Data', 'Bruto', 'Por marca', 'Taxas', 'Descontos', 'Líquido', 'Observação']],
-        body: items.map(r => [
-          formatDateBR(parseLocalDate(r.data)),
-          fmtBRL(Number(r.faturamento_bruto)),
-          getBrandBreakdown(r.id) || 'Não detalhado',
-          fmtBRL(Number(r.taxas)),
-          fmtBRL(Number(r.descontos)),
-          fmtBRL(Number(r.faturamento_liquido)),
-          r.observacao || '—',
-        ]),
-        styles: { fontSize: 8, cellPadding: 3 },
-        headStyles: { fillColor: [220, 80, 50], textColor: 255 },
-      });
-
-      doc.setFontSize(7);
-      doc.text(`Gerado por ${APP_NAME}`, 14, doc.internal.pageSize.height - 10);
-      doc.save(`fechamento-caixa-${startDate}-${endDate}.pdf`);
+      const exportInput = { companyName, startDate, endDate, dias };
+      buildFechamentoPdf(exportInput).save(fechamentoExportFilename(exportInput, 'pdf'));
       toast.success('PDF exportado');
-    } catch {
+    } catch (error) {
+      console.error('[FechamentoCaixaSection.exportPdf]', error);
       toast.error('Erro ao exportar PDF');
     }
     setExportingPdf(false);
@@ -422,30 +434,17 @@ export default function FechamentoCaixaSection() {
     if (exportingExcel) return;
     setExportingExcel(true);
     try {
-      const rows = items.map(r => ({
-        Data: formatDateBR(parseLocalDate(r.data)),
-        'Faturamento Bruto': Number(r.faturamento_bruto),
-        'Detalhamento por Marca': getBrandBreakdown(r.id) || 'Não detalhado',
-        Taxas: Number(r.taxas),
-        Descontos: Number(r.descontos),
-        'Faturamento Líquido': Number(r.faturamento_liquido),
-        Observação: r.observacao || '',
-      }));
-      rows.push({
-        Data: 'TOTAL',
-        'Faturamento Bruto': totalBruto,
-        'Detalhamento por Marca': '',
-        Taxas: items.reduce((s, r) => s + Number(r.taxas), 0),
-        Descontos: items.reduce((s, r) => s + Number(r.descontos), 0),
-        'Faturamento Líquido': totalLiquido,
-        Observação: '',
-      });
-      const ws = XLSX.utils.json_to_sheet(rows);
+      const exportInput = { companyName, startDate, endDate, dias };
+      const sheets = buildFechamentoExcelSheets(exportInput);
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Fechamento');
-      XLSX.writeFile(wb, `fechamento-caixa-${startDate}-${endDate}.xlsx`);
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(sheets.fechamento), 'Fechamento');
+      if (sheets.porMarca.length > 0) {
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(sheets.porMarca), 'Por marca');
+      }
+      XLSX.writeFile(wb, fechamentoExportFilename(exportInput, 'xlsx'));
       toast.success('Excel exportado');
-    } catch {
+    } catch (error) {
+      console.error('[FechamentoCaixaSection.exportExcel]', error);
       toast.error('Erro ao exportar Excel');
     }
     setExportingExcel(false);
@@ -479,10 +478,10 @@ export default function FechamentoCaixaSection() {
 
           {canExport && (
             <>
-              <Button variant="outline" size="sm" onClick={exportPdf} disabled={exportingPdf || items.length === 0}>
+              <Button variant="outline" size="sm" onClick={exportPdf} disabled={exportingPdf || loading || items.length === 0}>
                 <FileDown className="w-4 h-4 mr-1" /> PDF
               </Button>
-              <Button variant="outline" size="sm" onClick={exportExcel} disabled={exportingExcel || items.length === 0}>
+              <Button variant="outline" size="sm" onClick={exportExcel} disabled={exportingExcel || loading || items.length === 0}>
                 <FileSpreadsheet className="w-4 h-4 mr-1" /> Excel
               </Button>
             </>
@@ -527,31 +526,80 @@ export default function FechamentoCaixaSection() {
                           kitchens”.
                         </div>
                       )}
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        {brandsForForm.map(brand => (
-                          <div key={brand.id} className="space-y-1.5">
-                            <div className="flex items-center justify-between gap-2">
-                              <Label htmlFor={`marca-${brand.id}`}>{brand.nome}</Label>
-                              {!brand.ativo && <span className="text-[10px] text-muted-foreground">Inativa</span>}
+                      <div className="space-y-2">
+                        {brandsForForm.map(brand => {
+                          const semQuantidade = brandBreakdownPayload.missingQuantidade.includes(brand.id);
+                          return (
+                            <div key={brand.id} className="rounded-lg border p-3">
+                              <div className="mb-2 flex items-center justify-between gap-2">
+                                <p className="text-sm font-medium text-foreground">{brand.nome}</p>
+                                {!brand.ativo && <span className="text-[10px] text-muted-foreground">Inativa</span>}
+                              </div>
+                              <div className="grid gap-3 sm:grid-cols-2">
+                                <div className="space-y-1.5">
+                                  <Label htmlFor={`marca-${brand.id}`} className="text-xs text-muted-foreground">
+                                    Faturamento
+                                  </Label>
+                                  <CurrencyInput
+                                    id={`marca-${brand.id}`}
+                                    value={formBrandValues[brand.id] || ''}
+                                    onValueChange={raw => {
+                                      setFormBrandValues(current => ({ ...current, [brand.id]: raw }));
+                                      setFormUsesBrands(true);
+                                    }}
+                                    showPrefix
+                                    placeholder="0,00"
+                                  />
+                                </div>
+                                {brand.forma_venda ? (
+                                  <div className="space-y-1.5">
+                                    <Label htmlFor={`marca-qtd-${brand.id}`} className="text-xs text-muted-foreground">
+                                      {brand.forma_venda === 'PEDIDOS' ? 'Qtd. de pedidos' : 'Qtd. de pessoas'}
+                                    </Label>
+                                    <Input
+                                      id={`marca-qtd-${brand.id}`}
+                                      inputMode="numeric"
+                                      value={formBrandQuantities[brand.id] || ''}
+                                      onChange={event => {
+                                        const digits = event.target.value.replace(/\D/g, '').slice(0, 9);
+                                        setFormBrandQuantities(current => ({ ...current, [brand.id]: digits }));
+                                        setFormUsesBrands(true);
+                                      }}
+                                      placeholder="0"
+                                      aria-invalid={semQuantidade}
+                                      className={semQuantidade ? 'border-warning' : undefined}
+                                    />
+                                  </div>
+                                ) : (
+                                  <p className="self-end pb-2 text-xs text-muted-foreground">
+                                    Defina a forma de venda desta marca em “Marcas e dark kitchens” para informar
+                                    a quantidade.
+                                  </p>
+                                )}
+                              </div>
                             </div>
-                            <CurrencyInput
-                              id={`marca-${brand.id}`}
-                              value={formBrandValues[brand.id] || ''}
-                              onValueChange={raw => {
-                                setFormBrandValues(current => ({ ...current, [brand.id]: raw }));
-                                setFormUsesBrands(true);
-                              }}
-                              showPrefix
-                              placeholder="0,00"
-                            />
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
-                      <div className="rounded-lg border bg-muted/40 p-3">
-                        <p className="text-xs text-muted-foreground">Faturamento bruto — soma das marcas</p>
-                        <p className="text-lg font-bold text-success">
-                          {fmtBRL(formUsesBrands ? brandGrossTotal : parseMoney(formBruto))}
-                        </p>
+                      <div className="grid gap-3 rounded-lg border bg-muted/40 p-3 sm:grid-cols-3">
+                        <div>
+                          <p className="text-xs text-muted-foreground">Faturamento bruto — soma das marcas</p>
+                          <p className="text-lg font-bold text-success">
+                            {fmtBRL(formUsesBrands ? brandGrossTotal : parseMoney(formBruto))}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Total de pedidos</p>
+                          <p className="text-lg font-bold text-foreground">
+                            {brandBreakdownPayload.totalPedidos.toLocaleString('pt-BR')}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Total de pessoas</p>
+                          <p className="text-lg font-bold text-foreground">
+                            {brandBreakdownPayload.totalPessoas.toLocaleString('pt-BR')}
+                          </p>
+                        </div>
                       </div>
                     </div>
                   ) : (
@@ -622,8 +670,8 @@ export default function FechamentoCaixaSection() {
 
       {/* Summary cards */}
       {loading ? (
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          {[1, 2, 3].map(i => (
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          {[1, 2, 3, 4, 5].map(i => (
             <Card key={i}><CardContent className="p-4 space-y-2">
               <Skeleton className="h-3 w-24" />
               <Skeleton className="h-8 w-32" />
@@ -631,7 +679,7 @@ export default function FechamentoCaixaSection() {
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           <Card>
             <CardContent className="p-4">
               <p className="text-xs text-muted-foreground">Dias registrados</p>
@@ -648,6 +696,18 @@ export default function FechamentoCaixaSection() {
             <CardContent className="p-4">
               <p className="text-xs text-muted-foreground">Total Líquido</p>
               <p className="text-2xl font-bold text-primary">{fmtBRL(totalLiquido)}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground">Total de pedidos</p>
+              <p className="text-2xl font-bold text-foreground">{totaisPeriodo.pedidos.toLocaleString('pt-BR')}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground">Total de pessoas</p>
+              <p className="text-2xl font-bold text-foreground">{totaisPeriodo.pessoas.toLocaleString('pt-BR')}</p>
             </CardContent>
           </Card>
         </div>
@@ -700,13 +760,27 @@ export default function FechamentoCaixaSection() {
               Nenhum fechamento no período
             </TableCell></TableRow>
           ) : items.map(row => (
-            <TableRow key={row.id}>
+            <TableRow key={row.id} className="align-top">
               <TableCell className="font-mono text-sm">{formatDateBR(parseLocalDate(row.data))}</TableCell>
               <TableCell className="text-right font-medium text-success">{fmtBRL(Number(row.faturamento_bruto))}</TableCell>
-              <TableCell className="max-w-[260px] text-xs text-muted-foreground">
-                <span className="line-clamp-2" title={getBrandBreakdown(row.id) || 'Não detalhado'}>
-                  {getBrandBreakdown(row.id) || 'Não detalhado'}
-                </span>
+              <TableCell className="min-w-[260px] text-xs">
+                {(diaById.get(row.id)?.marcas.length ?? 0) === 0 ? (
+                  <span className="text-muted-foreground">Não detalhado</span>
+                ) : (
+                  <ul className="space-y-1">
+                    {diaById.get(row.id)!.marcas.map(linha => (
+                      <li key={linha.marcaId} className="flex items-baseline justify-between gap-3">
+                        <span className="text-foreground">{linha.nome}</span>
+                        <span className="whitespace-nowrap text-muted-foreground">
+                          <span className="font-medium text-foreground">{fmtBRL(linha.valor)}</span>
+                          {linha.quantidade != null && linha.formaVenda && (
+                            <> · {formatQuantidadeForma(linha.quantidade, linha.formaVenda)}</>
+                          )}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </TableCell>
               <TableCell className="text-right text-muted-foreground">{fmtBRL(Number(row.taxas))}</TableCell>
               <TableCell className="text-right text-muted-foreground">{fmtBRL(Number(row.descontos))}</TableCell>

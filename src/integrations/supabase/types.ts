@@ -4001,8 +4001,10 @@ export type Database = {
           created_at: string
           created_by: string | null
           fechamento_id: string
+          forma_venda: string | null
           id: string
           marca_id: string
+          quantidade: number | null
           updated_at: string
           valor_bruto: number
         }
@@ -4011,8 +4013,10 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           fechamento_id: string
+          forma_venda?: string | null
           id?: string
           marca_id: string
+          quantidade?: number | null
           updated_at?: string
           valor_bruto?: number
         }
@@ -4021,8 +4025,10 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           fechamento_id?: string
+          forma_venda?: string | null
           id?: string
           marca_id?: string
+          quantidade?: number | null
           updated_at?: string
           valor_bruto?: number
         }
@@ -4057,6 +4063,7 @@ export type Database = {
           company_id: string
           created_at: string
           created_by: string | null
+          forma_venda: string | null
           id: string
           nome: string
           nome_unaccent: string | null
@@ -4069,6 +4076,7 @@ export type Database = {
           company_id: string
           created_at?: string
           created_by?: string | null
+          forma_venda?: string | null
           id?: string
           nome: string
           nome_unaccent?: string | null
@@ -4081,6 +4089,7 @@ export type Database = {
           company_id?: string
           created_at?: string
           created_by?: string | null
+          forma_venda?: string | null
           id?: string
           nome?: string
           nome_unaccent?: string | null
