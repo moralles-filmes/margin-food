@@ -19,6 +19,8 @@ export interface ContaDetailRateio {
   centro_custo_nome: string;
   valor: number;
   percentual: number;
+  /** CMV financeiro: `undefined` = recurso indisponível (coluna não aparece). */
+  cmv_incluir?: boolean | null;
 }
 
 export interface ContaDetailData {
@@ -301,6 +303,9 @@ export default function ContaDetailDialog({
                         <TableHead className="text-xs">Categoria</TableHead>
                         <TableHead className="text-xs">Valor</TableHead>
                         <TableHead className="text-xs">Porcentagem</TableHead>
+                        {data.rateios.some(r => r.cmv_incluir !== undefined) && (
+                          <TableHead className="text-xs">CMV financeiro</TableHead>
+                        )}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -318,6 +323,13 @@ export default function ContaDetailDialog({
                           </TableCell>
                           <TableCell className="text-sm">{fmt(r.valor)}</TableCell>
                           <TableCell className="text-sm">{formatPercentBR(r.percentual, 2)}</TableCell>
+                          {data.rateios.some(x => x.cmv_incluir !== undefined) && (
+                            <TableCell className="text-sm">
+                              {r.cmv_incluir === true ? 'Sim (entra no CMV)'
+                                : r.cmv_incluir === false ? 'Não (fora do CMV)'
+                                  : <span className="font-medium text-warning">Pendente de classificação</span>}
+                            </TableCell>
+                          )}
                         </TableRow>
                       ))}
                     </TableBody>

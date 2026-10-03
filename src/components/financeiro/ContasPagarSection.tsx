@@ -22,7 +22,8 @@ import { gerarPDFContasPagar } from '@/lib/pdfFinanceiro';
 import { todayBR, formatInBR } from '@/lib/datetime';
 import TableActions from '@/components/ui/TableActions';
 import ContaDetailDialog, { type ContaDetailData, type ContaDetailRateio } from './ContaDetailDialog';
-import ContaFormDialog, { type ContaFormData, type RateioLine } from './ContaFormDialog';
+import ContaFormDialog, { type ContaFormCmv, type ContaFormData, type RateioLine } from './ContaFormDialog';
+import { fetchCmvConfig, mensagemErroCmv } from '@/hooks/useCmvFinanceiro';
 import * as XLSX from '@/lib/safeXlsx';
 import { mapFinanceiroDeleteError, mapPagamentoError } from '@/lib/financeiroErrorMap';
 import { buildCategoryOptions } from '@/lib/categoriaOptions';
@@ -63,6 +64,8 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: typeof
 };
 
 const PAGE_SIZE = 50;
+
+const CP_DETAIL_COLUMNS = 'id, descricao, fornecedor, supplier_id, valor, status, data_competencia, data_vencimento, data_pagamento, forma_pagamento, tipo_codigo_pagamento, codigo_pagamento, categoria_id, centro_custo_id, conta_id, observacoes, recorrente, recorrencia_config, updated_at';
 
 function SkeletonRows() {
   return (<>{Array.from({ length: 5 }).map((_, i) => (
@@ -129,6 +132,10 @@ export default function ContasPagarSection({ initialStatus }: ContasPagarSection
     recorrente: false, frequencia: 'mensal', parcelas: 0,
   });
   const [rateioLines, setRateioLines] = useState<RateioLine[]>([]);
+  // CMV Financeiro: `null` enquanto o recurso não existe neste banco — o formulário,
+  // as consultas e os parâmetros das RPCs ficam exatamente como antes.
+  const [cmvForm, setCmvForm] = useState<ContaFormCmv | null>(null);
+  const cmvLidoNaEdicao = useRef(false);
   const [editingItem, setEditingItem] = useState<ContaPagar | null>(null);
   const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
 
@@ -208,12 +215,17 @@ export default function ContasPagarSection({ initialStatus }: ContasPagarSection
   }, []);
 
   const loadAux = useCallback(async () => {
-    const [catRes, ccRes, contRes, supRes] = await Promise.all([
+    const [catRes, ccRes, contRes, supRes, cmvConfig] = await Promise.all([
       supabase.from('fin_categorias').select('id, nome, tipo, codigo, parent_id, centro_custo_padrao_id').eq('ativo', true).order('nome'),
       supabase.from('fin_centros_custo').select('id, nome').eq('ativo', true).order('nome'),
       supabase.from('fin_contas').select('id, nome').eq('ativo', true).order('nome'),
       supabase.from('suppliers').select('id, name').eq('is_active', true).order('name'),
+      fetchCmvConfig(supabase),
     ]);
+    setCmvForm(cmvConfig && {
+      ativo: cmvConfig.classificacaoAtiva,
+      padroes: new Map(cmvConfig.categorias.map(c => [c.id, c.cmvSugerir])),
+    });
     setCategorias(buildCategoryOptions((catRes.data as Categoria[]) || []));
     setCentros((ccRes.data as Centro[]) || []);
     setContas((contRes.data as Conta[]) || []);
@@ -259,9 +271,9 @@ export default function ContasPagarSection({ initialStatus }: ContasPagarSection
     try {
       const { data: detail, error: detailErr } = await supabase
         .from('fin_contas_pagar')
-        .select('id, descricao, fornecedor, supplier_id, valor, status, data_competencia, data_vencimento, data_pagamento, forma_pagamento, tipo_codigo_pagamento, codigo_pagamento, categoria_id, centro_custo_id, conta_id, observacoes, recorrente, recorrencia_config, updated_at')
+        .select(cmvForm ? `${CP_DETAIL_COLUMNS}, cmv_incluir` : CP_DETAIL_COLUMNS)
         .eq('id', item.id)
-        .single();
+        .single<any>();
       if (detailErr) throw detailErr;
 
       const { data: rates } = await supabase
@@ -274,13 +286,17 @@ export default function ContasPagarSection({ initialStatus }: ContasPagarSection
         centro_custo_nome: r.fin_centros_custo?.nome || centros.find(c => c.id === r.centro_custo_id)?.nome || '',
         valor: r.valor,
         percentual: r.percentual,
+        cmv_incluir: cmvForm ? (r.cmv_incluir ?? null) : undefined,
       }));
 
       // If no rateios but has a single categoria, show it
       if (rateios.length === 0 && detail.categoria_id) {
         const catName = categorias.find(c => c.id === detail.categoria_id)?.nome || '-';
         const ccName = detail.centro_custo_id ? centros.find(c => c.id === detail.centro_custo_id)?.nome || '' : '';
-        rateios.push({ categoria_nome: catName, centro_custo_nome: ccName, valor: detail.valor, percentual: 100 });
+        rateios.push({
+          categoria_nome: catName, centro_custo_nome: ccName, valor: detail.valor, percentual: 100,
+          cmv_incluir: cmvForm ? (detail.cmv_incluir ?? null) : undefined,
+        });
       }
 
       setDetailData({
@@ -331,17 +347,19 @@ export default function ContasPagarSection({ initialStatus }: ContasPagarSection
     try {
       const { data: detail, error: detailErr } = await supabase
         .from('fin_contas_pagar')
-        .select('id, descricao, fornecedor, supplier_id, valor, status, data_competencia, data_vencimento, data_pagamento, forma_pagamento, tipo_codigo_pagamento, codigo_pagamento, categoria_id, centro_custo_id, conta_id, observacoes, recorrente, recorrencia_config, updated_at')
+        .select(cmvForm ? `${CP_DETAIL_COLUMNS}, cmv_incluir` : CP_DETAIL_COLUMNS)
         .eq('id', item.id)
-        .single();
+        .single<any>();
       if (detailErr) throw detailErr;
 
       const { data: rates, error: rateErr } = await supabase
         .from('fin_lancamento_rateios')
-        .select('id, categoria_id, centro_custo_id, valor, percentual')
+        .select(cmvForm ? 'id, categoria_id, centro_custo_id, valor, percentual, cmv_incluir' : 'id, categoria_id, centro_custo_id, valor, percentual')
         .eq('lancamento_id', item.id);
       if (rateErr) throw rateErr;
 
+      // Sem as colunas do CMV na leitura, o salvamento não pode enviar a decisão (gravaria "pendente" por cima).
+      cmvLidoNaEdicao.current = Boolean(cmvForm);
       setEditingItem(detail);
       setForm({
         descricao: detail.descricao,
@@ -360,9 +378,12 @@ export default function ContasPagarSection({ initialStatus }: ContasPagarSection
         recorrente: detail.recorrente || false,
         frequencia: (detail.recorrencia_config as any)?.frequencia || 'mensal',
         parcelas: (detail.recorrencia_config as any)?.parcelas || 0,
+        cmv_incluir: detail.cmv_incluir ?? null,
       });
-      setRateioLines(rates.map((r: any) => ({
+      setRateioLines((rates as any[]).map((r: any) => ({
         key: r.id,
+        id: r.id,
+        cmv_incluir: r.cmv_incluir ?? null,
         categoria_id: r.categoria_id,
         centro_custo_id: r.centro_custo_id,
         valor: r.valor,
@@ -407,6 +428,22 @@ export default function ContasPagarSection({ initialStatus }: ContasPagarSection
     if (recurrenceError) { toast.error(recurrenceError); return; }
     const rateioValido = rateioLines.length === 0 || Math.abs(form.valor - rateioLines.reduce((s, l) => s + Number(l.valor || 0), 0)) < 0.01;
     if (rateioLines.length > 0 && !rateioValido) { toast.error('Rateio incompleto'); return; }
+    // Edição aberta antes de o CMV carregar não leu as decisões: segue como cliente antigo (o servidor preserva).
+    const enviaCmv = Boolean(cmvForm) && (!editingItem || cmvLidoNaEdicao.current);
+    // Boleto novo com a classificação ativa precisa da decisão explícita (o servidor também exige).
+    if (cmvForm?.ativo && !editingItem) {
+      const pendente = rateioLines.length > 0
+        ? rateioLines.some(l => (l.cmv_incluir ?? null) === null)
+        : (form.cmv_incluir ?? null) === null;
+      if (pendente) { toast.error('Informe se o boleto aparece no CMV financeiro'); return; }
+    }
+    // Na edição, a troca de categoria que apagou uma decisão já tomada pede a resposta de novo (o servidor também exige).
+    if (cmvForm?.ativo && editingItem && enviaCmv) {
+      const redefinido = rateioLines.length > 0
+        ? rateioLines.some(l => (l.cmv_incluir ?? null) === null && l.cmv_aviso === 'redefinido')
+        : (form.cmv_incluir ?? null) === null && (form.cmv_aviso === 'redefinido' || form.cmv_aviso === 'unificar');
+      if (redefinido) { toast.error('Informe de novo se o boleto aparece no CMV financeiro'); return; }
+    }
 
     salvandoRef.current = true;
     setSaving(true);
@@ -426,7 +463,11 @@ export default function ContasPagarSection({ initialStatus }: ContasPagarSection
       }
 
       const rateiosPayload = rateioLines.length > 0
-        ? rateioLines.map(r => ({ categoria_id: r.categoria_id || null, centro_custo_id: r.centro_custo_id || null, valor: r.valor, percentual: r.percentual }))
+        ? rateioLines.map(r => ({
+          categoria_id: r.categoria_id || null, centro_custo_id: r.centro_custo_id || null, valor: r.valor, percentual: r.percentual,
+          // Só com o CMV disponível: o id mantém o identificador da linha e a decisão vai junto, na mesma transação.
+          ...(enviaCmv ? { id: r.id ?? null, cmv_incluir: r.cmv_incluir ?? null } : {}),
+        }))
         : [];
 
       const recorrencia = form.recorrente
@@ -451,6 +492,8 @@ export default function ContasPagarSection({ initialStatus }: ContasPagarSection
         p_rateios: rateiosPayload,
         p_recorrencia: recorrencia || null,
         p_expected_updated_at: editingItem?.updated_at,
+        // Com rateio a decisão é das linhas; sem rateio, do título.
+        ...(enviaCmv ? { p_cmv: { incluir: rateioLines.length > 0 ? null : (form.cmv_incluir ?? null) } } : {}),
       };
       // Só a criação leva chave: um reenvio não duplica o título nem as N parcelas.
       const payload = editingItem ? params : { ...params, p_idempotency_key: await chavesCriacao.chave(params) };
@@ -460,7 +503,8 @@ export default function ContasPagarSection({ initialStatus }: ContasPagarSection
       if (error) {
         console.error('[ContasPagarSection.save]', { code: error.code });
         toast.error(traduzirErroIdempotencia(error.message) ?? (error.message.includes('CODIGO_PAGAMENTO')
-          ? 'Confira o tipo e o código de pagamento informado.' : error.message));
+          ? 'Confira o tipo e o código de pagamento informado.'
+          : /CMV_|RATEIO_NAO_FECHA/.test(error.message) ? mensagemErroCmv(error, error.message) : error.message));
         return;
       }
       const result = data as SaveContaPagarResult | null;
@@ -864,6 +908,7 @@ export default function ContasPagarSection({ initialStatus }: ContasPagarSection
         suppliers={suppliers}
         isEditing={!!editingItem}
         saving={saving}
+        cmv={editingItem && !cmvLidoNaEdicao.current ? null : cmvForm}
         onSave={save}
         onClose={guardedClose}
       />

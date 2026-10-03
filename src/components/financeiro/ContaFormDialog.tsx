@@ -16,16 +16,34 @@ import SupplierCombobox from './SupplierCombobox';
 import { Plus, Trash2, Repeat } from 'lucide-react';
 import { TIPOS_CODIGO_PAGAMENTO, MAX_CODIGO_PAGAMENTO } from '@/domain/financeiro/codigoPagamento';
 import { getRecurrenceLimit } from '@/domain/financeiro/recurrence';
+import { decisaoSugerida, formatarCentavos, formatarData, resumirBoleto, type CmvDecisao } from '@/domain/financeiro/cmv';
+import CmvDecisaoToggle from './cmv/CmvDecisaoToggle';
 
 /* ─── Types ─── */
 type ContaFormVariant = 'pagar' | 'receber' | 'lancamento';
 
+/** Por que a decisão do CMV está como está, para o usuário conferir antes de salvar. */
+type CmvAviso = 'sugerido' | 'redefinido' | 'unificar';
+
 export interface RateioLine {
   key: string;
+  /** Id da linha já gravada: o servidor preserva o identificador do rateio na edição. */
+  id?: string;
   categoria_id: string;
   centro_custo_id: string;
   valor: number;
   percentual: number;
+  /** Aparecer no CMV financeiro? `null` = ainda não respondido. */
+  cmv_incluir?: CmvDecisao;
+  cmv_aviso?: CmvAviso;
+}
+
+/** Configuração do CMV Financeiro da empresa; ausente = recurso indisponível (formulário como antes). */
+export interface ContaFormCmv {
+  /** A empresa exige a decisão Sim/Não nos boletos novos. */
+  ativo: boolean;
+  /** Padrão sugerido por categoria (só sugere; a decisão fica gravada em cada linha). */
+  padroes: ReadonlyMap<string, CmvDecisao>;
 }
 
 export interface ContaFormData {
@@ -48,6 +66,9 @@ export interface ContaFormData {
   recorrente: boolean;
   frequencia: string;
   parcelas: number;
+  /** Decisão do CMV do boleto sem rateio (com rateio, a decisão é de cada linha). */
+  cmv_incluir?: CmvDecisao;
+  cmv_aviso?: CmvAviso;
   tipo?: string; // RECEITA | DESPESA | TRANSFERENCIA (for lancamento)
   status?: string; // PREVISTO | REALIZADO (for lancamento)
   pago?: boolean;
@@ -79,6 +100,7 @@ interface Props {
   justificativa?: string;
   onJustificativaChange?: (v: string) => void;
   classificationOnly?: boolean;
+  cmv?: ContaFormCmv | null;
 }
 
 export default function ContaFormDialog({
@@ -87,6 +109,7 @@ export default function ContaFormDialog({
   isEditing, saving, onSave, onClose,
   editPrevStatus, justificativa, onJustificativaChange,
   classificationOnly = false,
+  cmv = null,
 }: Props) {
   const [enableRateio, setEnableRateio] = useState(false);
 
@@ -100,9 +123,22 @@ export default function ContaFormDialog({
   const catFilterType = variant === 'pagar' ? 'despesa' : variant === 'receber' ? 'receita' : (form.tipo?.toLowerCase() || '');
   const recurrenceLimit = getRecurrenceLimit(form.frequencia);
 
+  // ─── CMV financeiro ───
+  const cmvTemDecisao = (form.cmv_incluir ?? null) !== null || rateioLines.some(l => (l.cmv_incluir ?? null) !== null);
+  const mostrarCmv = variant === 'pagar' && cmv !== null && (cmv.ativo || cmvTemDecisao);
+
+  /** Trocar a categoria reaplica o padrão dela — e avisa, para a decisão não mudar em silêncio. */
+  const cmvAoTrocarCategoria = (anterior: CmvDecisao | undefined, categoriaId: string): { cmv_incluir: CmvDecisao; cmv_aviso?: CmvAviso } => {
+    if (!cmv) return { cmv_incluir: anterior ?? null };
+    const sugestao = decisaoSugerida(categoriaId, cmv.padroes);
+    const antes = anterior ?? null;
+    if (antes !== null && antes !== sugestao) return { cmv_incluir: sugestao, cmv_aviso: 'redefinido' };
+    return { cmv_incluir: sugestao, cmv_aviso: sugestao !== null ? 'sugerido' : undefined };
+  };
+
   // ─── Rateio helpers ───
   const addRateioLine = () => {
-    const newLine: RateioLine = { key: crypto.randomUUID(), categoria_id: '', centro_custo_id: '', valor: 0, percentual: 0 };
+    const newLine: RateioLine = { key: crypto.randomUUID(), categoria_id: '', centro_custo_id: '', valor: 0, percentual: 0, cmv_incluir: null };
     onRateioLinesChange([...rateioLines, newLine]);
   };
 
@@ -117,6 +153,7 @@ export default function ContaFormDialog({
       if ('categoria_id' in fields) {
         const cat = categorias.find(c => c.id === fields.categoria_id);
         if (cat?.centro_custo_padrao_id) updated.centro_custo_id = cat.centro_custo_padrao_id;
+        if (fields.categoria_id !== l.categoria_id) Object.assign(updated, cmvAoTrocarCategoria(l.cmv_incluir, fields.categoria_id));
       }
       return updated;
     }));
@@ -147,6 +184,11 @@ export default function ContaFormDialog({
           ...form,
           categoria_id: first.categoria_id || form.categoria_id,
           centro_custo_id: first.centro_custo_id || form.centro_custo_id,
+          // Linhas com respostas diferentes não viram uma só em silêncio: o boleto
+          // inteiro passaria a contar (ou a sair) pelo valor cheio.
+          ...(new Set(rateioLines.map(l => l.cmv_incluir ?? null)).size > 1
+            ? { cmv_incluir: null, cmv_aviso: 'unificar' as const }
+            : { cmv_incluir: first.cmv_incluir ?? null, cmv_aviso: first.cmv_aviso }),
         });
       }
       onRateioLinesChange([]);
@@ -158,6 +200,8 @@ export default function ContaFormDialog({
         centro_custo_id: form.centro_custo_id || '',
         valor: form.valor || 0,
         percentual: 100,
+        cmv_incluir: form.cmv_incluir ?? null,
+        cmv_aviso: form.cmv_aviso,
       };
       onRateioLinesChange([newLine]);
     }
@@ -165,9 +209,66 @@ export default function ContaFormDialog({
 
   const set = (partial: Partial<ContaFormData>) => onFormChange({ ...form, ...partial });
 
+  const rateioAtivo = enableRateio && rateioLines.length > 0;
+  const cmvResumo = resumirBoleto(
+    form.valor,
+    rateioAtivo
+      ? rateioLines.map(l => ({ valor: l.valor, cmv_incluir: l.cmv_incluir ?? null }))
+      : [{ valor: form.valor, cmv_incluir: form.cmv_incluir ?? null }],
+  );
+  // Boleto novo exige a decisão; boleto legado em edição segue com a pendência à vista.
+  // Na edição só trava a decisão que existia e foi apagada nesta tela (categoria trocada, rateio desfeito).
+  const cmvApagadaNaEdicao = rateioAtivo
+    ? rateioLines.some(l => (l.cmv_incluir ?? null) === null && l.cmv_aviso === 'redefinido')
+    : (form.cmv_incluir ?? null) === null && (form.cmv_aviso === 'redefinido' || form.cmv_aviso === 'unificar');
+  const cmvBloqueiaSalvar = mostrarCmv && Boolean(cmv?.ativo)
+    && (isEditing ? cmvApagadaNaEdicao : cmvResumo.linhasPendentes > 0);
+  const cmvCompetencia = form.data_competencia || form.data_vencimento;
+  const marcarTodasCmv = (valor: boolean) =>
+    onRateioLinesChange(rateioLines.map(l => ({ ...l, cmv_incluir: valor, cmv_aviso: undefined })));
+  const textoAvisoCmv = (aviso?: CmvAviso) =>
+    aviso === 'unificar' ? 'O rateio tinha respostas diferentes: informe a do boleto inteiro.'
+      : aviso === 'redefinido' ? 'Categoria trocada: decisão redefinida. Confira.'
+      : aviso === 'sugerido' ? 'Sugestão do padrão da categoria.'
+        : null;
+
+  const cmvResumoBloco = mostrarCmv && (
+    <div className="rounded-lg border border-border bg-muted/40 p-3 space-y-2" aria-live="polite">
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs sm:grid-cols-4">
+        <div>
+          <dt className="text-muted-foreground">Total do boleto</dt>
+          <dd className="font-semibold tabular-nums text-foreground">{formatarCentavos(cmvResumo.totalCentavos)}</dd>
+        </div>
+        <div>
+          <dt className="text-muted-foreground">Incluído no CMV</dt>
+          <dd className="font-semibold tabular-nums text-primary-ink">{formatarCentavos(cmvResumo.incluidoCentavos)}</dd>
+        </div>
+        <div>
+          <dt className="text-muted-foreground">Fora do CMV</dt>
+          <dd className="font-semibold tabular-nums text-foreground">{formatarCentavos(cmvResumo.foraCentavos)}</dd>
+        </div>
+        {cmvResumo.pendenteCentavos !== 0 || cmvResumo.linhasPendentes > 0 ? (
+          <div>
+            <dt className="text-muted-foreground">Pendente de classificação</dt>
+            <dd className="font-semibold tabular-nums text-warning">{formatarCentavos(cmvResumo.pendenteCentavos)}</dd>
+          </div>
+        ) : null}
+      </dl>
+      <p className="text-[11px] text-muted-foreground">
+        {cmvCompetencia
+          ? <>Competência usada no CMV: <strong className="text-foreground">{formatarData(cmvCompetencia)}</strong>{!form.data_competencia && ' (vencimento, pois a competência não foi informada)'}.</>
+          : 'Sem data de competência o boleto não entra em nenhum período do CMV.'}
+        {' '}A cobrança e o pagamento do boleto não mudam.
+      </p>
+      {cmvBloqueiaSalvar && (
+        <p className="text-xs font-medium text-warning">Responda Sim ou Não{rateioAtivo ? ' em todas as linhas' : ''} para salvar.</p>
+      )}
+    </div>
+  );
+
   return (
     <Dialog open={open} onOpenChange={o => { if (!o) onClose(); }}>
-      <DialogContent className="max-w-3xl p-0 gap-0 max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className={`${mostrarCmv ? 'max-w-4xl' : 'max-w-3xl'} p-0 gap-0 max-h-[90vh] overflow-hidden flex flex-col`}>
         {/* Header */}
         <div className="flex items-center px-6 py-4 border-b">
           <h2 className="text-lg font-semibold text-foreground">
@@ -292,7 +393,10 @@ export default function ContaFormDialog({
                       <Label className="text-xs text-muted-foreground">Categoria *</Label>
                       <CategoryCombobox
                         value={form.categoria_id}
-                        onValueChange={v => set({ categoria_id: v })}
+                        onValueChange={v => set({
+                          categoria_id: v,
+                          ...(v !== form.categoria_id ? cmvAoTrocarCategoria(form.cmv_incluir, v) : {}),
+                        })}
                         options={categorias.filter(c => catFilterType ? c.tipo === catFilterType : true)}
                       />
                     </div>
@@ -308,12 +412,36 @@ export default function ContaFormDialog({
               </div>
             )}
 
+            {/* CMV financeiro — boleto de uma categoria */}
+            {!isTransfer && mostrarCmv && !rateioAtivo && (
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                  <Label className="text-sm font-medium text-foreground">Aparecer no CMV financeiro?</Label>
+                  <CmvDecisaoToggle
+                    value={form.cmv_incluir ?? null}
+                    onChange={v => set({ cmv_incluir: v, cmv_aviso: undefined })}
+                    label="Aparecer no CMV financeiro?"
+                  />
+                  {textoAvisoCmv(form.cmv_aviso) && (
+                    <span className="text-xs text-muted-foreground">{textoAvisoCmv(form.cmv_aviso)}</span>
+                  )}
+                </div>
+                {cmvResumoBloco}
+              </div>
+            )}
+
             {/* Rateio table */}
             {!isTransfer && enableRateio && rateioLines.length > 0 && (
               <div className="border border-border rounded-lg p-3 space-y-3">
                 <div className="flex items-center justify-between">
                   <Label className="text-sm font-semibold">Rateio por Categoria</Label>
-                  <div className="flex gap-1">
+                  <div className="flex flex-wrap justify-end gap-1">
+                    {mostrarCmv && (
+                      <>
+                        <Button type="button" size="sm" variant="outline" onClick={() => marcarTodasCmv(true)} className="text-xs h-7">Marcar todas</Button>
+                        <Button type="button" size="sm" variant="outline" onClick={() => marcarTodasCmv(false)} className="text-xs h-7">Desmarcar todas</Button>
+                      </>
+                    )}
                     {rateioLines.length > 1 && form.valor > 0 && (
                       <Button type="button" size="sm" variant="outline" onClick={ratearIgualmente} className="text-xs h-7">Ratear Igual</Button>
                     )}
@@ -327,8 +455,9 @@ export default function ContaFormDialog({
                     <TableRow>
                       <TableHead className="text-xs">Categoria</TableHead>
                       <TableHead className="text-xs">Centro Custo</TableHead>
-                      <TableHead className="text-xs w-24">Valor</TableHead>
+                      <TableHead className={`text-xs ${mostrarCmv ? 'min-w-[8.5rem]' : 'w-24'}`}>Valor</TableHead>
                       <TableHead className="text-xs w-16">%</TableHead>
+                      {mostrarCmv && <TableHead className="text-xs whitespace-nowrap">Aparecer no CMV financeiro?</TableHead>}
                       <TableHead className="text-xs w-8"></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -362,6 +491,19 @@ export default function ContaFormDialog({
                         <TableCell className="p-1 text-xs text-muted-foreground text-center">
                           {line.percentual ? formatPercentBR(line.percentual, 1) : '-'}
                         </TableCell>
+                        {mostrarCmv && (
+                          <TableCell className="p-1">
+                            <CmvDecisaoToggle
+                              size="sm"
+                              value={line.cmv_incluir ?? null}
+                              onChange={v => updateRateioLine(line.key, { cmv_incluir: v, cmv_aviso: undefined })}
+                              label={`Aparecer no CMV financeiro? — ${categorias.find(c => c.id === line.categoria_id)?.nome || 'linha sem categoria'}`}
+                            />
+                            {textoAvisoCmv(line.cmv_aviso) && (
+                              <p className="mt-1 max-w-[11rem] text-[11px] leading-tight text-muted-foreground">{textoAvisoCmv(line.cmv_aviso)}</p>
+                            )}
+                          </TableCell>
+                        )}
                         <TableCell className="p-1">
                           <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => removeRateioLine(line.key)}>
                             <Trash2 className="w-3 h-3 text-destructive" />
@@ -376,6 +518,7 @@ export default function ContaFormDialog({
                   {Math.abs(diffRateio) >= 0.01 && <span className="text-destructive font-medium">Diferenca: {fmt(diffRateio)}</span>}
                   {Math.abs(diffRateio) < 0.01 && rateioLines.length > 0 && <span className="text-success font-medium">Rateio fechado</span>}
                 </div>
+                {cmvResumoBloco}
               </div>
             )}
           </section>
@@ -599,7 +742,7 @@ export default function ContaFormDialog({
           </Button>
           <Button
             onClick={onSave}
-            disabled={saving || (enableRateio && rateioLines.length > 0 && !rateioValido)}
+            disabled={saving || (enableRateio && rateioLines.length > 0 && !rateioValido) || cmvBloqueiaSalvar}
           >
             {saving ? 'Salvando...' : isEditing ? 'Salvar' : 'Salvar'}
           </Button>

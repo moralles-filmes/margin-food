@@ -478,6 +478,12 @@ export const MODULE_MANIFESTS: ModuleManifest[] = [
       { key: 'kpis', label: 'KPIs', actions: VIEW_EXPORT },
       { key: 'auditoria', label: 'Auditoria', actions: VIEW_EXPORT },
       { key: 'comparativo', label: 'Comparativo', actions: VIEW_EXPORT },
+      // Fora do LEGACY_PERMISSION_MAP de propósito: finance:read não libera o CMV
+      // Financeiro, o acesso é concedido pela chave granular.
+      { key: 'cmv', label: 'CMV Financeiro', actions: [
+        ...VIEW_EXPORT,
+        { action: 'manage', label: 'Configurar padrões e revisar histórico' },
+      ] },
     ],
   },
   // 12. Configurações
