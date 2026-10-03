@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { useCan, useModuleAccess } from '@/permissions';
 import { ModuleNav, type ModuleNavItem } from '@/components/ui/ModuleNav';
 import { isPresentationDetailTarget } from '@/lib/presentationDetailNavigation';
-import { Shield } from 'lucide-react';
+import { Shield, Percent } from 'lucide-react';
 import {
   LayoutDashboard, FolderTree, Landmark, Receipt,
   DollarSign, TrendingUp, LayoutGrid, Settings,
@@ -32,6 +32,7 @@ const ProjecaoFluxoSection = lazy(() => import('@/components/financeiro/Projecao
 const KPIsSection = lazy(() => import('@/components/financeiro/KPIsSection'));
 const AuditoriaFinSection = lazy(() => import('@/components/financeiro/AuditoriaFinSection'));
 const ComparativoSection = lazy(() => import('@/components/financeiro/ComparativoSection'));
+const CmvFinanceiroSection = lazy(() => import('@/components/financeiro/cmv/CmvFinanceiroSection'));
 import FechamentoCaixaSection from '@/components/financeiro/FechamentoCaixaSection';
 import CadastroBaseTree from '@/components/financeiro/CadastroBaseTree';
 import ContasBancariasSection from '@/components/financeiro/ContasBancariasSection';
@@ -39,7 +40,7 @@ import LivroRazaoSection from '@/components/financeiro/LivroRazaoSection';
 import PlanoContasFinSection from '@/components/financeiro/PlanoContasFinSection';
 import CentrosCustoFinSection from '@/components/financeiro/CentrosCustoFinSection';
 
-type FinSubTab = 'dashboard' | 'cadastros' | 'contas' | 'lancamentos' | 'pagar' | 'codigos_pagamento' | 'receber' | 'fluxo' | 'dre' | 'orcamento' | 'conciliacao' | 'alertas' | 'recorrencias' | 'categorizacao' | 'bordero' | 'apresentacao_socios' | 'projecao' | 'kpis' | 'auditoria' | 'comparativo' | 'fechamento';
+type FinSubTab = 'dashboard' | 'cadastros' | 'contas' | 'lancamentos' | 'pagar' | 'codigos_pagamento' | 'receber' | 'fluxo' | 'dre' | 'orcamento' | 'conciliacao' | 'alertas' | 'recorrencias' | 'categorizacao' | 'bordero' | 'apresentacao_socios' | 'projecao' | 'kpis' | 'auditoria' | 'comparativo' | 'fechamento' | 'cmv';
 
 // DashboardFinanceiro extracted to src/components/financeiro/DashboardFinanceiroSection.tsx
 
@@ -161,6 +162,7 @@ const TAB_REGISTRY_MAP: Record<FinSubTab, string> = {
   kpis: 'kpis',
   auditoria: 'auditoria',
   comparativo: 'comparativo',
+  cmv: 'cmv',
 };
 
 // ==================== MAIN VIEW ====================
@@ -261,6 +263,7 @@ export default function FinanceiroView() {
     { id: 'orcamento',        label: 'Orçamento',            icon: Target,          group: 'relatorios' },
     { id: 'projecao',         label: 'Projeção',             icon: TrendingUp,      group: 'relatorios' },
     { id: 'kpis',             label: 'KPIs',                 icon: BarChart3,       group: 'relatorios' },
+    { id: 'cmv',              label: 'CMV',                  icon: Percent,         group: 'relatorios' },
     { id: 'bordero',          label: 'Borderô',              icon: ClipboardList,   group: 'relatorios' },
     { id: 'apresentacao_socios', label: 'Apresentação Sócios', icon: BarChart3,     group: 'relatorios' },
     { id: 'comparativo',      label: 'Comparativo',          icon: Activity,        group: 'relatorios' },
@@ -366,6 +369,7 @@ export default function FinanceiroView() {
       {effectiveTab === 'kpis' && <Suspense fallback={<FinSpinner />}><KPIsSection /></Suspense>}
       {effectiveTab === 'auditoria' && <Suspense fallback={<FinSpinner />}><AuditoriaFinSection /></Suspense>}
       {effectiveTab === 'comparativo' && <Suspense fallback={<FinSpinner />}><ComparativoSection /></Suspense>}
+      {effectiveTab === 'cmv' && <Suspense fallback={<FinSpinner />}><CmvFinanceiroSection /></Suspense>}
     </div>
   );
 }
