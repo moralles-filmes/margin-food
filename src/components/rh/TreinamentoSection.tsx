@@ -404,7 +404,7 @@ export default function TreinamentoSection({
                       <SelectContent>{SETORES.map(s => <SelectItem key={s} value={s}>{SETOR_LABELS[s]}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
-                  <div><Label>Carga Horária (min)</Label><Input type="number" value={form.carga_horaria_min || ''} onChange={e => setForm(p => ({ ...p, carga_horaria_min: Number(e.target.value) }))} /></div>
+                  <div><Label>Carga Horária (min)</Label><Input type="number" step="1" min="0" value={form.carga_horaria_min || ''} onChange={e => setForm(p => ({ ...p, carga_horaria_min: Number(e.target.value) }))} /></div>
                 </div>
                 <div className="flex items-center gap-2">
                   <Switch checked={form.obrigatoria} onCheckedChange={v => setForm(p => ({ ...p, obrigatoria: v }))} />

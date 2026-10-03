@@ -897,7 +897,7 @@ export default function CadastroBaseTree() {
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div><Label>Código</Label><Input value={form.codigo} onChange={e => setForm({ ...form, codigo: e.target.value })} placeholder="Ex: 3.01.01" /></div>
-              <div><Label>Ordem</Label><Input type="number" value={form.ordem} onChange={e => setForm({ ...form, ordem: parseInt(e.target.value) || 0 })} /></div>
+              <div><Label>Ordem</Label><Input type="number" step="1" min="0" value={form.ordem} onChange={e => setForm({ ...form, ordem: parseInt(e.target.value) || 0 })} /></div>
             </div>
             <div><Label>Nome</Label><Input value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} /></div>
             <div><Label>Tipo</Label>

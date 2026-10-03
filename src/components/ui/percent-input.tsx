@@ -1,5 +1,6 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
+import { isZeroNumericValue } from "@/lib/numericInputDisplay";
 
 /**
  * PercentInput — input for percentage values with % suffix.
@@ -24,6 +25,7 @@ export interface PercentInputProps
   maxDecimals?: number;
   /** Allow negative (default false) */
   allowNegative?: boolean;
+  showZero?: boolean;
 }
 
 function parsePercent(raw: string): number | null {
@@ -67,6 +69,7 @@ const PercentInput = React.forwardRef<HTMLInputElement, PercentInputProps>(
       onValueChange,
       allowNegative = false,
       maxDecimals = 2,
+      showZero = false,
       onBlur,
       onFocus,
       placeholder,
@@ -75,9 +78,11 @@ const PercentInput = React.forwardRef<HTMLInputElement, PercentInputProps>(
     ref
   ) => {
     const [focused, setFocused] = React.useState(false);
+    const lastTypedRef = React.useRef<string | null>(null);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const raw = filterPercentInput(e.target.value, allowNegative, maxDecimals);
+      lastTypedRef.current = raw;
       onValueChange(raw, parsePercent(raw));
     };
 
@@ -96,6 +101,7 @@ const PercentInput = React.forwardRef<HTMLInputElement, PercentInputProps>(
           onValueChange("", null);
         }
       }
+      lastTypedRef.current = null;
       onBlur?.(e);
     };
 
@@ -104,25 +110,27 @@ const PercentInput = React.forwardRef<HTMLInputElement, PercentInputProps>(
       onFocus?.(e);
     };
 
+    const displayValue = !showZero && isZeroNumericValue(value) && value !== lastTypedRef.current ? "" : value;
+
     return (
       <div className="relative">
         <input
           ref={ref}
           type="text"
           inputMode="decimal"
-          value={value}
+          value={displayValue}
           onChange={handleChange}
           onBlur={handleBlur}
           onFocus={handleFocus}
           placeholder={placeholder ?? "0,00"}
           className={cn(
             "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
-            !focused && value ? "pr-8" : "",
+            !focused && displayValue ? "pr-8" : "",
             className
           )}
           {...props}
         />
-        {!focused && value && (
+        {!focused && displayValue && (
           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm pointer-events-none">
             %
           </span>

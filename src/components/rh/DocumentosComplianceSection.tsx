@@ -431,7 +431,7 @@ export default function DocumentosComplianceSection({
                 {form.alertar_vencimento && (
                   <div>
                     <Label className="text-xs">Alertar X dias antes</Label>
-                    <Input type="number" value={form.dias_alerta_antes || ''} onChange={e => setForm(p => ({ ...p, dias_alerta_antes: Number(e.target.value) }))} className="h-8" />
+                    <Input type="number" step="1" min="0" value={form.dias_alerta_antes || ''} onChange={e => setForm(p => ({ ...p, dias_alerta_antes: Number(e.target.value) }))} className="h-8" />
                   </div>
                 )}
 

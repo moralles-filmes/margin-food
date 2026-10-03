@@ -421,11 +421,12 @@ export default function ContaFormDialog({
                       min={2}
                       max={recurrenceLimit}
                       step={1}
-                      value={form.parcelas || 2}
+                      value={form.parcelas}
                       onChange={e => {
                         const value = Number.parseInt(e.target.value, 10);
-                        set({ parcelas: Number.isNaN(value) ? 2 : Math.min(Math.max(value, 2), recurrenceLimit) });
+                        set({ parcelas: Number.isNaN(value) ? 0 : value });
                       }}
+                      onBlur={() => set({ parcelas: Math.min(Math.max(form.parcelas || 2, 2), recurrenceLimit) })}
                       className="mt-1"
                     />
                     <p className="mt-1 text-[11px] text-muted-foreground">Inclui o lançamento atual.</p>

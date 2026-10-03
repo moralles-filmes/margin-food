@@ -1,5 +1,6 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
+import { isZeroNumericValue } from "@/lib/numericInputDisplay";
 
 /**
  * DecimalInput — for quantities, percentages, measurements.
@@ -16,6 +17,7 @@ export interface DecimalInputProps
   maxDecimals?: number;
   allowNegative?: boolean;
   suffix?: string;
+  showZero?: boolean;
 }
 
 function parseDecimal(raw: string): number | null {
@@ -60,6 +62,7 @@ const DecimalInput = React.forwardRef<HTMLInputElement, DecimalInputProps>(
       allowNegative = false,
       maxDecimals = 2,
       suffix,
+      showZero = false,
       onBlur,
       onFocus,
       placeholder,
@@ -67,12 +70,12 @@ const DecimalInput = React.forwardRef<HTMLInputElement, DecimalInputProps>(
     },
     ref
   ) => {
-    const [raw, setRaw] = React.useState(value);
+    const [raw, setRaw] = React.useState(() => !showZero && isZeroNumericValue(value) ? "" : value);
     const [focused, setFocused] = React.useState(false);
 
     React.useEffect(() => {
-      if (!focused) setRaw(value);
-    }, [value, focused]);
+      if (!focused) setRaw(!showZero && isZeroNumericValue(value) ? "" : value);
+    }, [value, focused, showZero]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const nextRaw = filterDecimalInput(e.target.value, allowNegative, maxDecimals);
@@ -89,13 +92,13 @@ const DecimalInput = React.forwardRef<HTMLInputElement, DecimalInputProps>(
           const fixed = n.toFixed(maxDecimals);
           const trimmed = fixed.replace(/\.?0+$/, "");
           const display = trimmed.replace(".", ",");
-          setRaw(display);
+          setRaw(n === 0 && !showZero ? "" : display);
           onValueChange(display, n);
         } else {
           setRaw("");
           onValueChange("", null);
         }
-      } else if (value !== "") {
+      } else if (value !== "" && !isZeroNumericValue(value)) {
         onValueChange("", null);
       }
       onBlur?.(e);

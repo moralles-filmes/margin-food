@@ -1,6 +1,7 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 import { normalizeBRLMoneyToNumber } from "@/lib/money";
+import { isZeroNumericValue } from "@/lib/numericInputDisplay";
 
 /**
  * NumericInput — drop-in replacement for <Input type="number">
@@ -29,6 +30,7 @@ export interface NumericInputProps
   prefix?: string;
   /** Suffix shown after value (e.g. " kg") — visual only */
   suffix?: string;
+  showZero?: boolean;
 }
 
 /** Parse a raw string to number, handling BRL format */
@@ -97,6 +99,7 @@ const NumericInput = React.forwardRef<HTMLInputElement, NumericInputProps>(
       decimals = 2,
       prefix,
       suffix,
+      showZero = false,
       onBlur,
       onFocus,
       onPaste,
@@ -106,9 +109,11 @@ const NumericInput = React.forwardRef<HTMLInputElement, NumericInputProps>(
     ref
   ) => {
     const [focused, setFocused] = React.useState(false);
+    const lastTypedRef = React.useRef<string | null>(null);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const raw = filterInput(e.target.value, allowNegative, decimals);
+      lastTypedRef.current = raw;
       onValueChange(raw, parseRaw(raw));
     };
 
@@ -132,6 +137,7 @@ const NumericInput = React.forwardRef<HTMLInputElement, NumericInputProps>(
       if (normalised !== value) {
         onValueChange(normalised, parseRaw(normalised));
       }
+      lastTypedRef.current = null;
       onBlur?.(e);
     };
 
@@ -140,11 +146,11 @@ const NumericInput = React.forwardRef<HTMLInputElement, NumericInputProps>(
       onFocus?.(e);
     };
 
-    const displayValue = value;
+    const displayValue = !showZero && isZeroNumericValue(value) && value !== lastTypedRef.current ? "" : value;
 
     return (
       <div className="relative">
-        {prefix && !focused && value && (
+        {prefix && !focused && displayValue && (
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm pointer-events-none">
             {prefix}
           </span>
@@ -161,12 +167,12 @@ const NumericInput = React.forwardRef<HTMLInputElement, NumericInputProps>(
           placeholder={placeholder ?? "0"}
           className={cn(
             "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
-            prefix && !focused && value ? "pl-10" : "",
+            prefix && !focused && displayValue ? "pl-10" : "",
             className
           )}
           {...props}
         />
-        {suffix && !focused && value && (
+        {suffix && !focused && displayValue && (
           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm pointer-events-none">
             {suffix}
           </span>
