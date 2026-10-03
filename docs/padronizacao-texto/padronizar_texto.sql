@@ -9,14 +9,20 @@ language sql immutable as $$ select upper(left(p, 1)) || lower(substr(p, 2)) $$;
 create or replace function pg_temp.pt_sigla(p_chave text) returns text
 language sql immutable as $$
   select s from unnest(array[
-    'PIX','NF','NFe','NF-e','NFCe','NFC-e','CT-e','CNPJ','CPF','RG','CNH','CEP',
+    'PIX','NF','NFe','NF-e','NFCe','NFC-e','NFSe','NFS-e','CT-e','MDF-e','CNPJ','CPF','RG','CNH','CEP',
     'LTDA','ME','EPP','EIRELI','MEI','S/A','TED','DOC','TEF','PDV',
-    'INSS','FGTS','IPTU','IPVA','ICMS','ISS','ISSQN','PIS','COFINS','IRPJ','IRRF','CSLL',
-    'DAS','DARF','GPS','GRU','GNRE','CLT','PJ','PF','RH','TI','VR','VA','VT','EPI','EPIs',
+    'INSS','FGTS','IPTU','IPVA','ICMS','ST','DIFAL','ISS','ISSQN','PIS','COFINS','IRPJ','IRRF','CSLL',
+    'DAS','DAE','DARF','GPS','GRU','GNRE','CLT','PJ','PF','RH','TI','VR','VA','VT','EPI','EPIs',
     'CMV','DRE','DFC','SIF','UHT','PVC','LED','USB','TV','E-mail',
     'SP','RJ','MG','RS','SC','PR','DF','BA','PE','MS','MT','ES','RN','PB',
     'PP','GG','XG','XGG','II','III','IV','VI','VII','VIII','IX','XI','XII'
   ]) s where lower(s) = p_chave limit 1
+$$;
+
+-- Romanos e tamanhos só valem como palavra solta, nunca em pedaço de palavra composta.
+create or replace function pg_temp.pt_so_solta(p_chave text) returns boolean
+language sql immutable as $$
+  select p_chave = any(array['pp','gg','xg','xgg','ii','iii','iv','vi','vii','viii','ix','xi','xii'])
 $$;
 
 create or replace function pg_temp.pt_unidade(p_chave text) returns text
@@ -27,6 +33,18 @@ language sql immutable as $$
   ]) u where lower(u) = p_chave limit 1
 $$;
 
+-- Palavra curta sem vogal é sigla (JBS, GM, CPFL), menos unidade, tratamento e "Pç".
+create or replace function pg_temp.pt_sem_vogal(p_chave text) returns text
+language sql immutable as $$
+  select case
+    when p_chave ~ '^[[:alpha:]]{2,4}$'
+     and p_chave !~ '[aeiouyáàâãäéèêëíìîïóòôõöúùûüýÿ]'
+     and pg_temp.pt_unidade(p_chave) is null
+     and p_chave <> all(array['mr','mrs','sr','srs','dr','drs','pç','pçs'])
+    then upper(p_chave)
+  end
+$$;
+
 create or replace function pg_temp.pt_segmento(p_seg text, p_sep_anterior text, p_seg_anterior text)
 returns text language sql immutable as $$
   select case
@@ -35,7 +53,11 @@ returns text language sql immutable as $$
       'me','te','se','lhe','lhes','lo','la','los','las','nos','vos','o','a','os','as'
     ]) then lower(p_seg)
     when p_sep_anterior in ('''', '’') and length(p_seg_anterior) <> 1 then lower(p_seg)
-    else coalesce(pg_temp.pt_sigla(lower(p_seg)), pg_temp.pt_capitalizar(p_seg))
+    else coalesce(
+      case when pg_temp.pt_so_solta(lower(p_seg)) then null else pg_temp.pt_sigla(lower(p_seg)) end,
+      pg_temp.pt_sem_vogal(lower(p_seg)),
+      pg_temp.pt_capitalizar(p_seg)
+    )
   end
 $$;
 
@@ -81,13 +103,20 @@ begin
   return p_nucleo;
 end $$;
 
-create or replace function pg_temp.pt_nucleo(p_nucleo text, p_meio boolean, p_apos_numero boolean, p_antes_numero boolean)
+create or replace function pg_temp.pt_nucleo(
+  p_nucleo text, p_meio boolean, p_apos_numero boolean, p_antes_numero boolean,
+  p_apos_designador boolean, p_antes_palavra boolean
+)
 returns text language plpgsql immutable as $$
 declare
   v_chave text := lower(p_nucleo);
   v_r text;
 begin
   if p_nucleo ~ '[0-9]' then return pg_temp.pt_numero(p_nucleo); end if;
+  -- "Vitamina E 400mg", mas "Categoria e Subcategoria" (conjunção).
+  if p_apos_designador and length(p_nucleo) = 1 and not (v_chave = 'e' and p_antes_palavra) then
+    return upper(p_nucleo);
+  end if;
   if p_meio and v_chave = any(array[
     'a','à','ao','aos','as','às','com','da','das','de','do','dos','e','em',
     'na','nas','no','nos','o','os','ou','para','pela','pelas','pelo','pelos',
@@ -98,7 +127,7 @@ begin
     if v_r is not null then return v_r; end if;
   end if;
   if v_chave = 'x' and p_apos_numero and p_antes_numero then return 'x'; end if;
-  v_r := pg_temp.pt_sigla(v_chave);
+  v_r := coalesce(pg_temp.pt_sigla(v_chave), pg_temp.pt_sem_vogal(v_chave));
   if v_r is not null then return v_r; end if;
   if length(p_nucleo) = 1 then return upper(p_nucleo); end if;
   return pg_temp.pt_composto(p_nucleo);
@@ -149,7 +178,12 @@ begin
         v_nucleo[i],
         i <> v_primeiro and i <> v_ultimo,
         i > 1 and v_nucleo[i - 1] ~ '^[0-9]',
-        i < v_n and v_nucleo[i + 1] ~ '^[0-9]'
+        i < v_n and v_nucleo[i + 1] ~ '^[0-9]',
+        i > 1 and lower(v_nucleo[i - 1]) = any(array[
+          'tipo','vitamina','classe','grupo','série','serie','bloco','plano','lote',
+          'modelo','letra','nível','nivel','fase','turno','categoria'
+        ]),
+        i < v_n and v_nucleo[i + 1] ~ '^[[:alpha:]]'
       ) || v_suf[i]);
     end if;
   end loop;
