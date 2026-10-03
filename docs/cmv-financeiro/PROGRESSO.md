@@ -1,14 +1,23 @@
 # Progresso — CMV Financeiro
 
-Checkpoint por fase. Diagnóstico e decisões: [`PLANO.md`](./PLANO.md). Branch: `feat/cmv-financeiro`, com PR aberto para `main` (sem merge).
+Checkpoint por fase. Diagnóstico e decisões: [`PLANO.md`](./PLANO.md). Entregue pelo PR #138 (`feat/cmv-financeiro`, merge em `main` em 2026-10-03).
 
 ---
 
 ## Estado atual (2026-10-03)
 
-Fases 0 a 6 concluídas no código e auditadas. **A migration NÃO foi aplicada em produção**: a aplicação foi recusada na confirmação e o banco ficou intacto (só houve leituras). Ela existe como arquivo e rodou apenas em PostgreSQL local descartável. Ordem segura: aplicar a migration antes ou depois do merge — o frontend novo detecta a ausência das RPCs e esconde o CMV (roteiro em "Ativação").
+Fases 0 a 6 concluídas, auditadas e **em produção**: frontend publicado pelo PR #138 (deploy Vercel de `main` em 2026-10-03) e migration executada no SQL Editor do Supabase em 2026-10-03, registrada no histórico como `20261003140000 cmv_financeiro` (mesmo nome do arquivo; não renomear). Nenhuma unidade está com a classificação ligada e nada do histórico foi classificado — a ativação por unidade é decisão do negócio (ver "Ativação", passo 4).
 
-Conferido em produção (somente leitura, 2026-10-03): última migration `20261003120000`; as assinaturas atuais de `_guarded_create/update_conta_pagar` são as que a migration substitui (`20261001160354`); nenhuma coluna/trigger de CMV existe; PG 17.6; `fin_config` tem PK `(company_id, key)`, `fin_audit_logs` não tem CHECK de entidade/ação; `fin_categorias.tipo` usa `despesa`/`receita`.
+Conferido em produção depois da execução (2026-10-03):
+- 3 colunas novas anuláveis e sem default; nenhuma linha classificada, nenhum padrão de categoria, nenhuma unidade ativada.
+- `_guarded_create/update_conta_pagar` com uma única assinatura cada (as antigas saíram); 15 funções com `search_path` vazio, owner `postgres`; helpers e funções de trigger sem EXECUTE para clientes; RPCs só para `authenticated` (nenhuma para `anon`).
+- Corpo das 15 funções idêntico ao arquivo testado (md5 de `prosrc`, ignorando CRLF, comparado com o banco local da suíte efêmera).
+- Triggers `trg_fin_cmv_guard_decisao` (título e rateio) e `trg_fin_cmv_guard_config` ativos.
+- `role_permissions`: admin/diretor/gerente_geral com view/export/manage.
+- `_fin_cmv_payload` sobre as 5 empresas: no máximo 6,9 ms por empresa; 775 boletos pendentes de classificação no histórico.
+- Advisors de segurança: só o aviso genérico de SECURITY DEFINER executável por `authenticated`, o mesmo de todas as RPCs `_guarded_`.
+
+Antes da execução (somente leitura): a última migration era `20261003120000`, e as assinaturas substituídas eram as de `20261001160354`. O ambiente era PG 17.6; `fin_config` tem PK `(company_id, key)`, `fin_audit_logs` não tem CHECK de entidade/ação e `fin_categorias.tipo` usa `despesa`/`receita`.
 
 ## Fase 0 — Diagnóstico ✅
 
@@ -90,8 +99,7 @@ Aceito / em aberto (P3):
 9. **Cores de categoria** calculadas pelo índice estável do cadastro, não pela paleta fixa.
 
 ### Não verificado
-- Aplicação da migration no banco de produção (não autorizada) — inclusive os triggers que só existem lá (`audit_trigger_fn`, `fin_set_entity_report_exclusion`, `fin_rateio_valida_empresa`); o teste local usa o gatilho real de soma do rateio e simula tenant/permissão.
-- As travas de escrita direta dependem de o PostgREST rodar como papel `authenticated` e de as RPCs pertencerem a outro papel (owner) — é o padrão do Supabase, exercitado só no banco local. Conferir em produção logo após aplicar: um `UPDATE ... SET cmv_incluir` pelo cliente deve falhar e a edição normal de um boleto deve continuar passando.
+- Em produção a estrutura foi conferida, mas nenhuma escrita foi exercitada: os triggers que só existem lá (`audit_trigger_fn`, `fin_set_entity_report_exclusion`, `fin_rateio_valida_empresa`) ainda não rodaram junto com as RPCs novas, e as travas de escrita direta só foram provadas no banco local. Primeiro uso real a observar: editar um boleto normalmente (deve continuar passando) e, com a unidade ativada, criar um boleto respondendo Sim/Não.
 - As correções da auditoria na tela (lote, PDF de boletos, detalhe "lançado direto", corrida na edição) têm typecheck e a suíte passando, mas só o item do formulário ganhou teste próprio; não foram reexercitadas no navegador.
 - Fluxo ponta a ponta com login real no navegador (sem credenciais neste ambiente); a tela foi exercitada com cliente Supabase simulado.
 - Dark mode e larguras 1280/1024 só por inspeção de código/1 captura.
@@ -99,7 +107,7 @@ Aceito / em aberto (P3):
 
 ## Ativação (requer autorização)
 
-1. **Migration primeiro.** MCP `apply_migration` com o conteúdo de `20261003140000_cmv_financeiro.sql`; renomear o arquivo local para a versão que o MCP gravar (regra do repo; nunca `supabase db push`). É aditiva e compatível com o frontend atual: quem não envia `p_cmv` continua funcionando.
+1. **Migration** — ✅ executada em 2026-10-03 (SQL Editor) e registrada como `20261003140000`. Em outro ambiente: MCP `apply_migration` e renomear o arquivo para a versão gravada; nunca `supabase db push`.
 2. **Frontend.** PR `feat/cmv-financeiro` → `main` (deploy Vercel). Antes da migration o formulário de Contas a Pagar fica como hoje e a tela do CMV mostra "ainda não ativado neste ambiente".
 3. **Permissões.** As chaves `financeiro:cmv:*` (11 ações) **já existiam** em produção, geradas pela carga do catálogo, e já estavam em `role_permissions` de admin/diretor/gerente_geral; a migration só ajusta a descrição de view/export/manage. Há também concessões individuais em `user_permissions` — 5 ALLOW e 1 DENY, todas de admins ativos da própria unidade, em 2 unidades —, então a exposição não muda; o admin com DENY não verá o relatório até alguém liberar. Demais usuários: Admin → Permissões. Rodar `sync_permissions_from_registry` se a tela não listar a subtab.
 4. **Por unidade.** CMV → Regras de vínculo: definir os padrões por categoria, ligar "Pedir a resposta nos novos boletos" e revisar as pendências do histórico (nada é classificado automaticamente).
@@ -112,6 +120,6 @@ Aceito / em aberto (P3):
 
 ## Pendências
 
-- Aplicar/publicar (acima) e, depois, classificar o histórico por unidade.
+- Por unidade: definir padrões por categoria, ligar a pergunta nos novos boletos e classificar o histórico (775 boletos pendentes em 2026-10-03).
 - Regenerar `src/integrations/supabase/types.ts` após a migration (as chamadas novas usam `rpc` sem tipo gerado).
 - Avaliar meta de CMV financeiro por categoria se o negócio quiser a coluna "Status".
