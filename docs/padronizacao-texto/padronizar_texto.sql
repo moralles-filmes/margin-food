@@ -9,10 +9,10 @@ language sql immutable as $$ select upper(left(p, 1)) || lower(substr(p, 2)) $$;
 create or replace function pg_temp.pt_sigla(p_chave text) returns text
 language sql immutable as $$
   select s from unnest(array[
-    'PIX','NF','NFe','NF-e','NFCe','NFC-e','CT-e','CNPJ','CPF','RG','CNH','CEP',
+    'PIX','NF','NFe','NF-e','NFCe','NFC-e','NFSe','NFS-e','CT-e','MDF-e','CNPJ','CPF','RG','CNH','CEP',
     'LTDA','ME','EPP','EIRELI','MEI','S/A','TED','DOC','TEF','PDV',
-    'INSS','FGTS','IPTU','IPVA','ICMS','ISS','ISSQN','PIS','COFINS','IRPJ','IRRF','CSLL',
-    'DAS','DARF','GPS','GRU','GNRE','CLT','PJ','PF','RH','TI','VR','VA','VT','EPI','EPIs',
+    'INSS','FGTS','IPTU','IPVA','ICMS','ST','DIFAL','ISS','ISSQN','PIS','COFINS','IRPJ','IRRF','CSLL',
+    'DAS','DAE','DARF','GPS','GRU','GNRE','CLT','PJ','PF','RH','TI','VR','VA','VT','EPI','EPIs',
     'CMV','DRE','DFC','SIF','UHT','PVC','LED','USB','TV','E-mail',
     'SP','RJ','MG','RS','SC','PR','DF','BA','PE','MS','MT','ES','RN','PB',
     'PP','GG','XG','XGG','II','III','IV','VI','VII','VIII','IX','XI','XII'
@@ -27,15 +27,43 @@ language sql immutable as $$
   ]) u where lower(u) = p_chave limit 1
 $$;
 
-create or replace function pg_temp.pt_segmento(p_seg text, p_sep_anterior text, p_seg_anterior text)
+-- Palavra curta só de consoantes é sigla (JBS, GM, CPFL), menos unidade, tratamento
+-- e abreviação comum. Consoantes explícitas, não [[:alpha:]]: "ª"/"º" não contam,
+-- igual ao TS, qualquer que seja o ctype do banco ("Drª", "Nº").
+create or replace function pg_temp.pt_sem_vogal(p_chave text) returns text
+language sql immutable as $$
+  select case
+    when p_chave ~ '^[bcdfghjklmnpqrstvwxzçñ]{2,4}$'
+     and pg_temp.pt_unidade(p_chave) is null
+     and p_chave <> all(array[
+       'mr','mrs','sr','srs','dr','drs','jr','mc','pç','pçs','mç','mçs','dz','fd','hr','hrs'
+     ])
+    then upper(p_chave)
+  end
+$$;
+
+create or replace function pg_temp.pt_enclitico(p_seg text, p_sep_anterior text) returns boolean
+language sql immutable as $$
+  select p_sep_anterior = '-' and lower(p_seg) = any(array[
+    'me','te','se','lhe','lhes','lo','la','los','las','nos','vos','o','a','os','as'
+  ])
+$$;
+
+create or replace function pg_temp.pt_segmento(
+  p_seg text, p_sep_anterior text, p_seg_anterior text, p_apos_enclitico boolean
+)
 returns text language sql immutable as $$
   select case
     when p_seg = '' then p_seg
-    when p_sep_anterior = '-' and lower(p_seg) = any(array[
-      'me','te','se','lhe','lhes','lo','la','los','las','nos','vos','o','a','os','as'
-    ]) then lower(p_seg)
+    when pg_temp.pt_enclitico(p_seg, p_sep_anterior) then lower(p_seg)
     when p_sep_anterior in ('''', '’') and length(p_seg_anterior) <> 1 then lower(p_seg)
-    else coalesce(pg_temp.pt_sigla(lower(p_seg)), pg_temp.pt_capitalizar(p_seg))
+    -- Depois de pronome é palavra, não sigla: "Bem-te-Vi", não o romano VI.
+    when p_apos_enclitico then pg_temp.pt_capitalizar(p_seg)
+    else coalesce(
+      pg_temp.pt_sigla(lower(p_seg)),
+      pg_temp.pt_sem_vogal(lower(p_seg)),
+      pg_temp.pt_capitalizar(p_seg)
+    )
   end
 $$;
 
@@ -46,12 +74,14 @@ declare
   v_seg text := '';
   v_sep text := '';
   v_seg_anterior text := '';
+  v_apos_enclitico boolean := false;
   v_c text;
 begin
   for i in 1 .. length(p_nucleo) loop
     v_c := substr(p_nucleo, i, 1);
     if v_c in ('-', '/', '''', '’', '.') then
-      v_saida := v_saida || pg_temp.pt_segmento(v_seg, v_sep, v_seg_anterior) || v_c;
+      v_saida := v_saida || pg_temp.pt_segmento(v_seg, v_sep, v_seg_anterior, v_apos_enclitico) || v_c;
+      v_apos_enclitico := pg_temp.pt_enclitico(v_seg, v_sep);
       v_seg_anterior := v_seg;
       v_sep := v_c;
       v_seg := '';
@@ -59,7 +89,7 @@ begin
       v_seg := v_seg || v_c;
     end if;
   end loop;
-  return v_saida || pg_temp.pt_segmento(v_seg, v_sep, v_seg_anterior);
+  return v_saida || pg_temp.pt_segmento(v_seg, v_sep, v_seg_anterior, v_apos_enclitico);
 end $$;
 
 create or replace function pg_temp.pt_numero(p_nucleo text) returns text
@@ -81,13 +111,23 @@ begin
   return p_nucleo;
 end $$;
 
-create or replace function pg_temp.pt_nucleo(p_nucleo text, p_meio boolean, p_apos_numero boolean, p_antes_numero boolean)
+-- Letra solta depois de designador forte é designação ("Tipo A Grande"), salvo
+-- "e" + palavra; depois de fraco, só sem palavra em seguida ("Lote a Vencer").
+create or replace function pg_temp.pt_nucleo(
+  p_nucleo text, p_meio boolean, p_apos_numero boolean, p_antes_numero boolean,
+  p_designador text, p_antes_palavra boolean
+)
 returns text language plpgsql immutable as $$
 declare
   v_chave text := lower(p_nucleo);
   v_r text;
 begin
   if p_nucleo ~ '[0-9]' then return pg_temp.pt_numero(p_nucleo); end if;
+  if length(p_nucleo) = 1 and v_chave <> 'à'
+     and ((p_designador = 'forte' and not (v_chave = 'e' and p_antes_palavra))
+       or (p_designador = 'fraco' and not p_antes_palavra)) then
+    return upper(p_nucleo);
+  end if;
   if p_meio and v_chave = any(array[
     'a','à','ao','aos','as','às','com','da','das','de','do','dos','e','em',
     'na','nas','no','nos','o','os','ou','para','pela','pelas','pelo','pelos',
@@ -98,7 +138,7 @@ begin
     if v_r is not null then return v_r; end if;
   end if;
   if v_chave = 'x' and p_apos_numero and p_antes_numero then return 'x'; end if;
-  v_r := pg_temp.pt_sigla(v_chave);
+  v_r := coalesce(pg_temp.pt_sigla(v_chave), pg_temp.pt_sem_vogal(v_chave));
   if v_r is not null then return v_r; end if;
   if length(p_nucleo) = 1 then return upper(p_nucleo); end if;
   return pg_temp.pt_composto(p_nucleo);
@@ -149,7 +189,16 @@ begin
         v_nucleo[i],
         i <> v_primeiro and i <> v_ultimo,
         i > 1 and v_nucleo[i - 1] ~ '^[0-9]',
-        i < v_n and v_nucleo[i + 1] ~ '^[0-9]'
+        i < v_n and v_nucleo[i + 1] ~ '^[0-9]',
+        case
+          when i > 1 and lower(v_nucleo[i - 1]) = any(array[
+            'tipo','classe','vitamina','série','serie','bloco','modelo','letra'
+          ]) then 'forte'
+          when i > 1 and lower(v_nucleo[i - 1]) = any(array[
+            'lote','plano','fase','turno','categoria','grupo','nível','nivel'
+          ]) then 'fraco'
+        end,
+        i < v_n and v_nucleo[i + 1] ~ '^[[:alpha:]]'
       ) || v_suf[i]);
     end if;
   end loop;
@@ -205,8 +254,47 @@ begin
     ('EMPRESA S/A', 'Empresa S/A'),
     ('FOLHA 1ª QUINZENA', 'Folha 1ª Quinzena'),
     ('PAGAMENTO REN', 'Pagamento Ren'),
-    ('SANTANDER GM', 'Santander Gm'),
+    ('SANTANDER GM', 'Santander GM'),
     ('epis cozinha', 'EPIs Cozinha'),
+    ('JBS', 'JBS'),
+    ('GRAFICA JB', 'Grafica JB'),
+    ('TDG MIX', 'TDG Mix'),
+    ('dg clean', 'DG Clean'),
+    ('CPFL ENERGIA', 'CPFL Energia'),
+    ('BTG PACTUAL', 'BTG Pactual'),
+    ('Santander Gm', 'Santander GM'),
+    ('XYZ COMERCIO', 'Xyz Comercio'),
+    ('BROWNIE MR BAY', 'Brownie Mr Bay'),
+    ('DR. SILVA', 'Dr. Silva'),
+    ('CX PAPEL TOALHA', 'Cx Papel Toalha'),
+    ('ARROZ KG', 'Arroz Kg'),
+    ('PARAFUSO 5 PÇS', 'Parafuso 5 Pçs'),
+    ('NFS-E 55', 'NFS-e 55'),
+    ('DIFAL SP', 'DIFAL SP'),
+    ('DAE COLABORADOR', 'DAE Colaborador'),
+    ('ICMS-ST', 'ICMS-ST'),
+    ('BAURU/SP', 'Bauru/SP'),
+    ('BEM-TE-VI', 'Bem-te-Vi'),
+    ('DOM PEDRO II', 'Dom Pedro II'),
+    ('CAMISA GG', 'Camisa GG'),
+    ('OVO TIPO A GRANDE', 'Ovo Tipo A Grande'),
+    ('VITAMINA E 400MG', 'Vitamina E 400mg'),
+    ('CATEGORIA E SUBCATEGORIA', 'Categoria e Subcategoria'),
+    ('VENDA A PRAZO', 'Venda a Prazo'),
+    ('NOTA Nº 15', 'Nota Nº 15'),
+    ('AÇÚCAR SACHÊ 5G', 'Açúcar Sachê 5g'),
+    ('C6 BANK', 'C6 Bank'),
+    ('PLANO À VISTA', 'Plano à Vista'),
+    ('LOTE A VENCER', 'Lote a Vencer'),
+    ('CATEGORIA A DEFINIR', 'Categoria a Definir'),
+    ('GRUPO A 2026', 'Grupo A 2026'),
+    ('TIPO O POSITIVO', 'Tipo O Positivo'),
+    ('FASE II/III', 'Fase II/III'),
+    ('COZINHEIRO I/II', 'Cozinheiro I/II'),
+    ('DRª SILVA', 'Drª Silva'),
+    ('JOSE DA SILVA JR', 'Jose da Silva Jr'),
+    ('MC DONALDS', 'Mc Donalds'),
+    ('OVOS DZ', 'Ovos Dz'),
     ('de', 'De'),
     ('e', 'E'),
     ('-', '-'),
