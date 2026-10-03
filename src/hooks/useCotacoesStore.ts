@@ -6,6 +6,7 @@ import type { Cotacao, CotacaoCounts, CotacaoItem, CotacaoFornecedor, CotacaoRes
 import { COTACAO_STATUS_ABERTOS } from '@/types/cotacao';
 import { formatDateISO, todayBR } from '@/lib/datetime';
 import type { ChavesPendentes } from '@/lib/chaveOperacao';
+import { padronizarTexto } from '@/lib/padronizarTexto';
 import type { RespostaEnvioWhatsapp } from '@/domain/compras/cotacaoWhatsappEnvio';
 
 /** Linha da matriz de respostas enviada à RPC save_cotacao_respostas_atomic. */
@@ -153,8 +154,10 @@ export function useCotacoesStore() {
       p_itens: input.itens,
       p_fornecedores: input.fornecedores,
     };
+    // A chave fica com o texto digitado; o banco recebe o título padronizado.
     const { data, error: err } = await db.rpc('create_cotacao_atomic', {
       ...args,
+      p_titulo: padronizarTexto(args.p_titulo),
       p_idempotency_key: await chaves.chave(args),
     });
     if (err) throw err;
@@ -170,7 +173,7 @@ export function useCotacoesStore() {
   ) => {
     const { data, error: err } = await db.rpc('update_cotacao_atomic', {
       p_id: id,
-      p_titulo: input.titulo,
+      p_titulo: padronizarTexto(input.titulo),
       p_observacao: input.observacao ?? null,
       p_data_validade: input.data_validade ?? null,
       p_itens: input.itens,

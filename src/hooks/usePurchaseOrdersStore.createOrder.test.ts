@@ -116,6 +116,21 @@ describe('usePurchaseOrdersStore.createOrder', () => {
     expect(new Set(chaves).size).toBe(3);
   });
 
+  it('envia o título padronizado, com a chave derivada do texto digitado', async () => {
+    // Sem sucesso no 1º envio, a semente segue pendente: só o conteúdo da chave decide.
+    createResponse = async () => ({ data: null, error: { message: 'Failed to fetch' } });
+    const { result } = renderHook(() => usePurchaseOrdersStore());
+    await act(async () => { await result.current.createOrder({ ...orderData, title: 'PEDIDO DE HORTIFRUTI' }, items, form1); });
+    await act(async () => { await result.current.createOrder({ ...orderData, title: 'Pedido de Hortifruti' }, items, form1); });
+
+    const [caixaAlta, jaPadronizado] = createCalls();
+    expect(caixaAlta[1].p_payload.title).toBe('Pedido de Hortifruti');
+    expect(jaPadronizado[1].p_payload.title).toBe('Pedido de Hortifruti');
+    // Reenvio pendente de um cliente antigo (texto cru no banco) recebe
+    // REQUEST_ID_REUTILIZADO em vez de virar um 2º pedido.
+    expect(caixaAlta[1].p_idempotency_key).not.toBe(jaPadronizado[1].p_idempotency_key);
+  });
+
   it('REQUEST_ID_REUTILIZADO vira orientação, não "tente de novo"', async () => {
     createResponse = async () => ({ data: null, error: { message: 'REQUEST_ID_REUTILIZADO: a chave pertence a outro pedido' } });
     const { result } = renderHook(() => usePurchaseOrdersStore());

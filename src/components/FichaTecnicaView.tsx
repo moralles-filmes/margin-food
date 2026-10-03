@@ -28,6 +28,7 @@ import { Plus, Trash2, Save, RefreshCw, Search, ChefHat, Layers, ShoppingBag, Do
 import { SubmoduleSwitcher } from '@/components/ui/SubmoduleSwitcher';
 
 import { fmtBRL, formatDateValueBR, formatPercentBR, formatFixedBR, normalizeBRLMoneyToNumber } from '@/lib/formatters';
+import { padronizarTexto } from '@/lib/padronizarTexto';
 const R$ = (v: number) => fmtBRL(v);
 const pct = (v: number) => formatPercentBR(v);
 const qty = (v: number, d = 1) => formatFixedBR(v, d);
@@ -646,9 +647,12 @@ function ComponenteFormDialog({ open, onClose, componente, forcedTipo, component
         unidade_original: i.unidade_original || '', quantidade_original: i.quantidade_original || 0,
       }));
 
+      // A chave da criação fica com o texto digitado; o banco recebe nome e categoria padronizados.
+      const camposEnviados = { ...campos, nome: padronizarTexto(campos.nome), categoria: padronizarTexto(campos.categoria) };
+
       if (componente) {
         // Edição: regravar cabeçalho e itens de novo dá o mesmo resultado.
-        await invokeApi(supabase, 'salvar_componente', { id: componente.id, ...campos });
+        await invokeApi(supabase, 'salvar_componente', { id: componente.id, ...camposEnviados });
         if (itens.length > 0) {
           await invokeApi(supabase, 'salvar_componente_itens', { componente_pai_id: componente.id, itens });
         }
@@ -657,7 +661,7 @@ function ComponenteFormDialog({ open, onClose, componente, forcedTipo, component
         // Criação: cabeçalho e itens numa transação — falhou um item, não
         // sobra componente órfão; o retry recebe o componente já criado.
         const res = await invokeApi(supabase, 'criar_componente', {
-          ...campos,
+          ...camposEnviados,
           itens,
           client_request_id: await chaveCriacaoComponente(sementeCriacao, { campos, itens }),
         });

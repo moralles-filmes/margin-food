@@ -8,6 +8,7 @@ import { narrowRows } from '@/lib/guards';
 import { normalizeSearchText } from '@/lib/utils';
 import { sortByName, sortNames } from '@/lib/sortByName';
 import { useCompanyId } from '@/hooks/useCompanyId';
+import { padronizarTexto } from '@/lib/padronizarTexto';
 import type { CodigoBarrasProduto, DiffCodigos } from '@/domain/estoque/barcode';
 
 // ── DB → Frontend mappers ──
@@ -649,7 +650,8 @@ export function useEstoqueGeralStore() {
     const { data, error } = await supabase.rpc('estoque_criar_produto', {
       p_client_request_id: opts.clientRequestId,
       p_produto: {
-        nome_produto: p.nomeProduto,
+        // clientRequestId vem do formulário digitado; o banco recebe o nome padronizado.
+        nome_produto: padronizarTexto(p.nomeProduto),
         sku: p.sku || null,
         categoria: p.categoria || 'Outros',
         unidade_medida: p.unidadeMedida || 'UN',
@@ -685,7 +687,11 @@ export function useEstoqueGeralStore() {
     return newProd;
   }, [companyId, fetchProdutoGlobalCounts, supabase, emitDataEvent]);
 
-  const updateProduto = useCallback(async (id: string, updates: ProdutoUpdateInput) => {
+  const updateProduto = useCallback(async (id: string, alteracoes: ProdutoUpdateInput) => {
+    // Banco e lista local recebem o mesmo nome padronizado.
+    const updates = alteracoes.nomeProduto === undefined
+      ? alteracoes
+      : { ...alteracoes, nomeProduto: padronizarTexto(alteracoes.nomeProduto) };
     const dbUpdates: Record<string, unknown> = {};
     if (updates.nomeProduto !== undefined) dbUpdates.nome_produto = updates.nomeProduto;
     if (updates.sku !== undefined) dbUpdates.sku = updates.sku || null;
