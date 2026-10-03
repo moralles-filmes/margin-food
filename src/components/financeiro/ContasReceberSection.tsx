@@ -31,6 +31,7 @@ import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { getRecurrenceValidationMessage } from '@/domain/financeiro/recurrence';
 import { traduzirErroIdempotencia } from '@/domain/financeiro/idempotencia';
 import { useChavesPendentes } from '@/hooks/useChavesPendentes';
+import { padronizarTexto } from '@/lib/padronizarTexto';
 
 /* ─── Types ─── */
 interface ContaReceber {
@@ -387,8 +388,10 @@ export default function ContasReceberSection({ initialStatus }: ContasReceberSec
       };
       // Só a criação leva chave: um reenvio não duplica o título nem as N parcelas.
       const payload = editingItem ? params : { ...params, p_idempotency_key: await chavesCriacao.chave(params) };
+      // A chave fica com o texto digitado; o banco recebe a descrição padronizada.
+      const enviado = { ...payload, p_descricao: padronizarTexto(params.p_descricao) };
 
-      const { data, error } = await (supabase.rpc as any)(editingItem ? '_guarded_update_conta_receber' : '_guarded_create_conta_receber', payload);
+      const { data, error } = await (supabase.rpc as any)(editingItem ? '_guarded_update_conta_receber' : '_guarded_create_conta_receber', enviado);
 
       if (error) {
         console.error('[ContasReceberSection.save]', error);
