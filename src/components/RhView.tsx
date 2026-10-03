@@ -54,6 +54,7 @@ import ControleCustosRhSection from '@/components/rh/ControleCustosRhSection';
 import GestaoDisciplinarSection from '@/components/rh/GestaoDisciplinarSection';
 import { BookOpen, DollarSign, Heart, BarChart3, HardHat, Megaphone, Wallet, ShieldAlert } from 'lucide-react';
 import { sortByName } from '@/lib/sortByName';
+import { padronizarTexto } from '@/lib/padronizarTexto';
 
 const PAGE_SIZE = 50;
 const COLAB_BATCH_SIZE = 1000;
@@ -290,8 +291,8 @@ function RhViewInner({ visibleSubtabs, user }: {
     setSavingColab(true);
     try {
       const payload: any = {
-        nome: formColab.nome, email: formColab.email, telefone: formColab.telefone,
-        cpf: formColab.cpf, cargo: formColab.cargo, funcao: formColab.funcao,
+        nome: padronizarTexto(formColab.nome), email: formColab.email, telefone: formColab.telefone,
+        cpf: formColab.cpf, cargo: padronizarTexto(formColab.cargo), funcao: padronizarTexto(formColab.funcao),
         setor: formColab.setor, tipo_contrato: formColab.tipo_contrato,
         carga_horaria_semanal: parseDecimal(formColab.carga_horaria_semanal) ?? 44,
         salario: normalizeBRLMoneyToNumber(formColab.salario) ?? 0,
@@ -329,8 +330,8 @@ function RhViewInner({ visibleSubtabs, user }: {
     setSavingEditColab(true);
     try {
       const payload: any = {
-        nome: editForm.nome, email: editForm.email, telefone: editForm.telefone,
-        cpf: editForm.cpf || null, cargo: editForm.cargo, funcao: editForm.funcao,
+        nome: padronizarTexto(editForm.nome), email: editForm.email, telefone: editForm.telefone,
+        cpf: editForm.cpf || null, cargo: padronizarTexto(editForm.cargo), funcao: padronizarTexto(editForm.funcao),
         setor: editForm.setor, tipo_contrato: editForm.tipo_contrato,
         carga_horaria_semanal: parseDecimal(editForm.carga_horaria_semanal) ?? 44,
         salario: normalizeBRLMoneyToNumber(editForm.salario) ?? 0,

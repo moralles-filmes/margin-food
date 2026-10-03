@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useScopedToast } from '@/hooks/useScopedToast';
 import { useEmitDataEvent } from '@/lib/dataEvents';
 import { includesNormalized } from '@/lib/utils';
+import { padronizarTexto } from '@/lib/padronizarTexto';
 import { chavePedidoCompra, confirmarPedidoCompra, mensagemErroCriarPedido, type IdempotenciaPedido } from '@/domain/compras/pedidoIdempotencia';
 
 export interface PurchaseOrder {
@@ -332,9 +333,10 @@ export function usePurchaseOrdersStore() {
         })),
       };
 
+      // A chave fica com o texto digitado; o banco recebe o título padronizado.
       const idempotencyKey = await chavePedidoCompra(idempotencia, payload);
       const { data: result, error } = await supabase.rpc('create_purchase_order_atomic', {
-        p_payload: payload as any,
+        p_payload: { ...payload, title: padronizarTexto(payload.title) } as any,
         p_idempotency_key: idempotencyKey,
       });
 
@@ -499,7 +501,7 @@ export function usePurchaseOrdersStore() {
 
     try {
       const payload: Record<string, any> = {
-        title: updates.title || '',
+        title: padronizarTexto(updates.title || ''),
         type: updates.type || '',
         priority: updates.priority || '',
         category: updates.category ?? '',
