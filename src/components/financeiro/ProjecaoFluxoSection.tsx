@@ -2,7 +2,7 @@ import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { CurrencyInput } from '@/components/ui/brl-input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -224,11 +224,11 @@ export default function ProjecaoFluxoSection() {
         <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-1">
             <Label className="text-xs whitespace-nowrap">Saldo manual:</Label>
-            <Input
-              type="number"
+            <CurrencyInput
+              showZero
               className="w-32 h-9"
-              value={saldoManual ?? ''}
-              onChange={e => setSaldoManual(e.target.value ? Number(e.target.value) : null)}
+              value={saldoManual == null ? '' : String(saldoManual)}
+              onValueChange={(raw, parsed) => setSaldoManual(raw === '' ? null : parsed)}
               placeholder="Automático"
             />
           </div>

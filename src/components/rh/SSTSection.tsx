@@ -219,7 +219,7 @@ function EpisTab({ epis, colaboradores, canManage, user, getColabNome, onRefresh
                   <div><Label className="text-xs">Data Entrega</Label><DateInput className="h-8 text-xs" value={form.data_entrega} onValueChange={v => setForm(p => ({ ...p, data_entrega: v }))} /></div>
                   <div><Label className="text-xs">Validade</Label><DateInput className="h-8 text-xs" value={form.data_validade} onValueChange={v => setForm(p => ({ ...p, data_validade: v }))} /></div>
                 </div>
-                <div><Label className="text-xs">Qtd</Label><Input type="number" className="h-8 text-xs w-20" value={form.quantidade || ''} onChange={e => setForm(p => ({ ...p, quantidade: Number(e.target.value) }))} /></div>
+                <div><Label className="text-xs">Qtd</Label><Input type="number" step="1" min="0" className="h-8 text-xs w-20" value={form.quantidade || ''} onChange={e => setForm(p => ({ ...p, quantidade: Number(e.target.value) }))} /></div>
                 <Button onClick={handleSave} disabled={enviando} className="w-full">{enviando ? 'Registrando...' : 'Registrar'}</Button>
               </div>
             </DialogContent>
@@ -522,7 +522,7 @@ function IncidentesTab({ incidentes, colaboradores, canManage, user, getColabNom
                   <div><Label className="text-xs">Ação Corretiva</Label><Input className="h-8 text-xs" value={form.acao_corretiva} onChange={e => setForm(p => ({ ...p, acao_corretiva: e.target.value }))} /></div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <div><Label className="text-xs">Dias Afastamento</Label><Input type="number" className="h-8 text-xs" value={form.afastamento_dias || ''} onChange={e => setForm(p => ({ ...p, afastamento_dias: Number(e.target.value) }))} /></div>
+                  <div><Label className="text-xs">Dias Afastamento</Label><Input type="number" step="1" min="0" className="h-8 text-xs" value={form.afastamento_dias || ''} onChange={e => setForm(p => ({ ...p, afastamento_dias: Number(e.target.value) }))} /></div>
                   <div><Label className="text-xs">CAT Nº (se emitida)</Label><Input className="h-8 text-xs" value={form.cat_numero} onChange={e => setForm(p => ({ ...p, cat_numero: e.target.value, cat_emitida: !!e.target.value }))} /></div>
                 </div>
                 <Button onClick={handleSave} disabled={enviando} variant="destructive" className="w-full">{enviando ? 'Registrando...' : 'Registrar Incidente'}</Button>

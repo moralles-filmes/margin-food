@@ -1,6 +1,7 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 import { normalizeBRLMoneyToNumber, formatNumberToBRL } from "@/lib/money";
+import { isZeroNumericValue } from "@/lib/numericInputDisplay";
 
 function filterCurrencyInput(value: string, maxDecimals: number): string {
   let result = "";
@@ -63,14 +64,14 @@ export interface BRLInputProps
 const BRLInput = React.forwardRef<HTMLInputElement, BRLInputProps>(
   ({ className, numericValue, onNumericChange, showPrefix, onBlur, onFocus, onPaste, placeholder, ...props }, ref) => {
     const [raw, setRaw] = React.useState(() =>
-      numericValue != null ? formatNumberToBRL(numericValue) : ""
+      numericValue != null && numericValue !== 0 ? formatNumberToBRL(numericValue) : ""
     );
     const [focused, setFocused] = React.useState(false);
 
     // Sync from parent when not focused (e.g. form reset)
     React.useEffect(() => {
       if (!focused) {
-        setRaw(numericValue != null ? formatNumberToBRL(numericValue) : "");
+        setRaw(numericValue != null && numericValue !== 0 ? formatNumberToBRL(numericValue) : "");
       }
     }, [numericValue, focused]);
 
@@ -83,8 +84,8 @@ const BRLInput = React.forwardRef<HTMLInputElement, BRLInputProps>(
       const parsed = normalizeBRLMoneyToNumber(raw);
       const val = parsed ?? 0;
       onNumericChange(val);
-      // Format the display — always show formatted value including zero
-      setRaw(formatNumberToBRL(val));
+      // Zero fica no placeholder, sem ocupar o campo.
+      setRaw(val === 0 ? "" : formatNumberToBRL(val));
       onBlur?.(e);
     };
 
@@ -163,6 +164,7 @@ export interface CurrencyInputProps
   showPrefix?: boolean;
   /** Max decimal places (default 2) */
   maxDecimals?: number;
+  showZero?: boolean;
 }
 
 const CurrencyInput = React.forwardRef<HTMLInputElement, CurrencyInputProps>(
@@ -172,6 +174,7 @@ const CurrencyInput = React.forwardRef<HTMLInputElement, CurrencyInputProps>(
       value,
       onValueChange,
       showPrefix,
+      showZero = false,
       maxDecimals = 2,
       onBlur,
       onFocus,
@@ -183,7 +186,8 @@ const CurrencyInput = React.forwardRef<HTMLInputElement, CurrencyInputProps>(
   ) => {
     const [raw, setRaw] = React.useState(() => {
       const parsed = normalizeBRLMoneyToNumber(value);
-      return parsed == null ? "" : formatNumberToBRL(parsed, maxDecimals);
+      return parsed == null || (!showZero && isZeroNumericValue(value))
+        ? "" : formatNumberToBRL(parsed, maxDecimals);
     });
     const [focused, setFocused] = React.useState(false);
 
@@ -192,9 +196,10 @@ const CurrencyInput = React.forwardRef<HTMLInputElement, CurrencyInputProps>(
     React.useEffect(() => {
       if (!focused) {
         const parsed = normalizeBRLMoneyToNumber(value);
-        setRaw(parsed == null ? "" : formatNumberToBRL(parsed, maxDecimals));
+        setRaw(parsed == null || (!showZero && isZeroNumericValue(value))
+          ? "" : formatNumberToBRL(parsed, maxDecimals));
       }
-    }, [value, focused, maxDecimals]);
+    }, [value, focused, maxDecimals, showZero]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const nextRaw = filterCurrencyInput(e.target.value, maxDecimals);
@@ -209,13 +214,13 @@ const CurrencyInput = React.forwardRef<HTMLInputElement, CurrencyInputProps>(
         if (n != null) {
           // Format with thousand separators: 5000 → "5.000,00"
           const formatted = formatNumberToBRL(n, maxDecimals);
-          setRaw(formatted);
+          setRaw(n === 0 && !showZero ? "" : formatted);
           onValueChange(formatted, n);
         } else {
           setRaw("");
           onValueChange("", null);
         }
-      } else if (value !== "") {
+      } else if (value !== "" && !isZeroNumericValue(value)) {
         onValueChange("", null);
       }
       onBlur?.(e);

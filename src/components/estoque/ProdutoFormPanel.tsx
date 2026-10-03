@@ -659,7 +659,7 @@ export default function ProdutoFormPanel({
         </div>
         <div>
           <Label className="text-[11px] text-muted-foreground">Lead Time (dias)</Label>
-          <Input type="number" value={prodForm.leadTimeDias || ''} onChange={e => setProdForm(f => ({ ...f, leadTimeDias: parseInt(e.target.value) || 0 }))} className="bg-secondary border-border text-foreground" />
+          <Input type="number" step="1" min="0" value={prodForm.leadTimeDias || ''} onChange={e => setProdForm(f => ({ ...f, leadTimeDias: parseInt(e.target.value) || 0 }))} className="bg-secondary border-border text-foreground" />
         </div>
         <div>
           <Label className="text-[11px] text-muted-foreground">⏳ Alerta: sem mov. após (dias)</Label>

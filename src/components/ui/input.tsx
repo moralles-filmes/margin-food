@@ -1,17 +1,19 @@
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
+import { isZeroNumericValue, parseLooseNumber, stripLeadingZeros } from "@/lib/numericInputDisplay";
 
 /**
- * Enhanced Input component.
+ * Input numérico usa type="text" + inputMode="decimal" para evitar
+ * alterações por scroll e interferência do navegador na digitação.
  *
- * When type="number" is passed, it is automatically converted to
- * type="text" + inputMode="decimal" to avoid native browser quirks
- * (leading-zero lock, cursor jumping, scroll-to-change, etc.).
+ * Quando controlado, preserva o texto intermediário equivalente ao valor
+ * do pai, permite apagar tudo e mostra zero apenas como placeholder.
+ * Remove zeros à esquerda antes de emitir onChange; no blur, volta a
+ * exibir o valor do pai. Validação e limites ficam com o consumidor.
  *
- * A lightweight onBeforeInput filter blocks non-numeric characters
- * while still allowing the user to freely delete, paste, and edit
- * without the field "snapping back" to 0.
+ * onBeforeInput filtra caracteres, respeitando step inteiro e min não
+ * negativo. Outros tipos mantêm o comportamento original.
  */
 /**
  * Enterprise regex: allows valid intermediate numeric states only.
@@ -23,6 +25,28 @@ const NUMERIC_INTERMEDIATE_RE = /^$|^-?$|^-?\d+([.,]\d*)?$/;
 const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
   ({ className, type, onBeforeInput, inputMode, ...props }, ref) => {
     const isNumeric = type === "number";
+    const isControlledNumeric = isNumeric && props.value !== undefined;
+    const [draft, setDraft] = React.useState<string | null>(null);
+    const { value, step, min } = props;
+    const parentNumber = typeof value === "number"
+      ? value
+      : typeof value === "string" ? parseLooseNumber(value) : NaN;
+    const displayValue = draft !== null
+      && (!Number.isFinite(parentNumber) || parseLooseNumber(draft) === parentNumber)
+      ? draft
+      : isZeroNumericValue(value) || value === "" || value == null ? "" : String(value);
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const normalized = stripLeadingZeros(e.currentTarget.value);
+      e.currentTarget.value = normalized;
+      setDraft(normalized);
+      props.onChange?.(e);
+    };
+
+    const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+      setDraft(null);
+      props.onBlur?.(e);
+    };
 
     const handleBeforeInput = React.useCallback(
       (e: React.FormEvent<HTMLInputElement>) => {
@@ -37,7 +61,11 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
             // Compute what the value would be after this insertion
             const nextValue =
               input.value.slice(0, start) + data + input.value.slice(end);
-            if (!NUMERIC_INTERMEDIATE_RE.test(nextValue)) {
+            const numericPattern = /^\d+$/.test(String(step))
+              ? /^$|^-?$|^-?\d+$/
+              : NUMERIC_INTERMEDIATE_RE;
+            const disallowsNegative = min != null && min !== "" && Number(min) >= 0;
+            if (!numericPattern.test(nextValue) || (disallowsNegative && nextValue.includes("-"))) {
               e.preventDefault();
               return;
             }
@@ -46,7 +74,7 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
         // Forward to consumer's handler if provided
         (onBeforeInput as React.FormEventHandler<HTMLInputElement>)?.(e);
       },
-      [isNumeric, onBeforeInput],
+      [isNumeric, onBeforeInput, step, min],
     );
 
     return (
@@ -60,6 +88,8 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
         )}
         ref={ref}
         {...props}
+        placeholder={props.placeholder ?? (isNumeric ? "0" : undefined)}
+        {...(isControlledNumeric ? { value: displayValue, onChange: handleChange, onBlur: handleBlur } : {})}
       />
     );
   },
