@@ -31,19 +31,19 @@ const SIGLAS = porChave([
   'PP', 'GG', 'XG', 'XGG', 'II', 'III', 'IV', 'VI', 'VII', 'VIII', 'IX', 'XI', 'XII',
 ]);
 
-// Romanos e tamanhos só valem como palavra solta ("Dom Pedro II", "Camisa GG"),
-// nunca em pedaço de palavra composta ("Bem-te-Vi").
-const SO_PALAVRA_SOLTA = new Set(['pp', 'gg', 'xg', 'xgg', 'ii', 'iii', 'iv', 'vi', 'vii', 'viii', 'ix', 'xi', 'xii']);
-
 // Só valem logo depois de um número ("5 KG" → "5 kg"); soltas são palavras.
 const UNIDADES = porChave([
   'kg', 'kgs', 'g', 'gr', 'grs', 'mg', 'ml', 'L', 'lt', 'lts', 'm', 'cm', 'mm',
   'un', 'und', 'unid', 'cx', 'pct', 'pc', 'pcs',
 ]);
 
-// Palavra curta sem vogal é sigla (JBS, GM, CPFL), menos unidade, tratamento e "Pç".
-const SEM_VOGAL = /^[^\P{L}aeiouyáàâãäéèêëíìîïóòôõöúùûüýÿ]{2,4}$/u;
-const SEM_VOGAL_NAO_SIGLA = new Set(['mr', 'mrs', 'sr', 'srs', 'dr', 'drs', 'pç', 'pçs']);
+// Palavra curta só de consoantes é sigla (JBS, GM, CPFL), menos unidade, tratamento
+// e abreviação comum. Consoantes explícitas, não \p{L}: "ª"/"º" não contam, e o
+// resultado não depende de o banco considerá-los letra ("Drª", "Nº").
+const SEM_VOGAL = /^[bcdfghjklmnpqrstvwxzçñ]{2,4}$/;
+const SEM_VOGAL_NAO_SIGLA = new Set([
+  'mr', 'mrs', 'sr', 'srs', 'dr', 'drs', 'jr', 'mc', 'pç', 'pçs', 'mç', 'mçs', 'dz', 'fd', 'hr', 'hrs',
+]);
 
 // Em minúsculo só no meio do texto: "DAS Simples" e "Pagamento DAS" são siglas.
 const CONECTIVOS = new Set([
@@ -52,11 +52,12 @@ const CONECTIVOS = new Set([
   'por', 'pra', 'pro', 'sem', 'sob',
 ]);
 
-// Letra solta depois destes fica maiúscula mesmo no meio ("Tipo A Grande").
-const DESIGNADORES = new Set([
-  'tipo', 'vitamina', 'classe', 'grupo', 'série', 'serie', 'bloco', 'plano', 'lote',
-  'modelo', 'letra', 'nível', 'nivel', 'fase', 'turno', 'categoria',
-]);
+// Letra solta depois destes é designação, mesmo no meio ("Tipo A Grande"), salvo
+// "e" + palavra, que é conjunção ("Tipo e Marca").
+const DESIGNADORES = new Set(['tipo', 'classe', 'vitamina', 'série', 'serie', 'bloco', 'modelo', 'letra']);
+// Depois destes, só sem palavra em seguida: "Grupo A 2026", mas "Lote a Vencer".
+const DESIGNADORES_FRACOS = new Set(['lote', 'plano', 'fase', 'turno', 'categoria', 'grupo', 'nível', 'nivel']);
+type Designador = 'forte' | 'fraco' | undefined;
 
 // Pronome depois de hífen fica minúsculo ("Pague-me").
 const ENCLITICOS = new Set(['me', 'te', 'se', 'lhe', 'lhes', 'lo', 'la', 'los', 'las', 'nos', 'vos', 'o', 'a', 'os', 'as']);
@@ -90,21 +91,26 @@ function siglaSemVogal(chave: string): string | undefined {
   return maiusculo(chave);
 }
 
-function formatarSegmento(segmento: string, separadorAnterior: string, segmentoAnterior: string): string {
+const ehEnclitico = (segmento: string, separadorAnterior: string) =>
+  separadorAnterior === '-' && ENCLITICOS.has(minusculo(segmento));
+
+function formatarSegmento(segmento: string, separadorAnterior: string, segmentoAnterior: string, aposEnclitico: boolean): string {
   if (!segmento) return segmento;
   const chave = minusculo(segmento);
-  if (separadorAnterior === '-' && ENCLITICOS.has(chave)) return chave;
+  if (ehEnclitico(segmento, separadorAnterior)) return chave;
   // "D'Água" mantém a maiúscula; "Mcdonald's" não.
   if ((separadorAnterior === "'" || separadorAnterior === '’') && [...segmentoAnterior].length !== 1) return chave;
-  const sigla = SO_PALAVRA_SOLTA.has(chave) ? undefined : SIGLAS.get(chave);
-  return sigla ?? siglaSemVogal(chave) ?? capitalizar(segmento);
+  // Depois de pronome é palavra, não sigla: "Bem-te-Vi", não o romano VI.
+  if (aposEnclitico) return capitalizar(segmento);
+  return SIGLAS.get(chave) ?? siglaSemVogal(chave) ?? capitalizar(segmento);
 }
 
 function formatarComposto(nucleo: string): string {
   const pedacos = nucleo.split(SEPARADOR); // [segmento, separador, segmento, ...]
-  let saida = formatarSegmento(pedacos[0], '', '');
+  let saida = formatarSegmento(pedacos[0], '', '', false);
   for (let i = 2; i < pedacos.length; i += 2) {
-    saida += pedacos[i - 1] + formatarSegmento(pedacos[i], pedacos[i - 1], pedacos[i - 2]);
+    const aposEnclitico = ehEnclitico(pedacos[i - 2], pedacos[i - 3] ?? '');
+    saida += pedacos[i - 1] + formatarSegmento(pedacos[i], pedacos[i - 1], pedacos[i - 2], aposEnclitico);
   }
   return saida;
 }
@@ -127,15 +133,19 @@ interface Posicao {
   meio: boolean;
   aposNumero: boolean;
   antesNumero: boolean;
-  aposDesignador: boolean;
+  designador: Designador;
   antesPalavra: boolean;
 }
 
-function formatarNucleo(nucleo: string, { meio, aposNumero, antesNumero, aposDesignador, antesPalavra }: Posicao): string {
+function ehLetraDeDesignacao(chave: string, designador: Designador, antesPalavra: boolean): boolean {
+  if (!designador || [...chave].length !== 1 || chave === 'à') return false;
+  return designador === 'forte' ? !(chave === 'e' && antesPalavra) : !antesPalavra;
+}
+
+function formatarNucleo(nucleo: string, { meio, aposNumero, antesNumero, designador, antesPalavra }: Posicao): string {
   if (/[0-9]/.test(nucleo)) return formatarComNumero(nucleo);
   const chave = minusculo(nucleo);
-  // "Vitamina E 400mg", mas "Categoria e Subcategoria" (conjunção).
-  if (aposDesignador && [...nucleo].length === 1 && !(chave === 'e' && antesPalavra)) return maiusculo(nucleo);
+  if (ehLetraDeDesignacao(chave, designador, antesPalavra)) return maiusculo(nucleo);
   if (meio && CONECTIVOS.has(chave)) return chave;
   if (aposNumero) {
     const unidade = UNIDADES.get(chave);
@@ -150,7 +160,12 @@ function formatarNucleo(nucleo: string, { meio, aposNumero, antesNumero, aposDes
 
 const comecaComNumero = (token?: Token) => !!token && /^[0-9]/.test(token.nucleo);
 const comecaComLetra = (token?: Token) => !!token && /^\p{L}/u.test(token.nucleo);
-const ehDesignador = (token?: Token) => !!token && DESIGNADORES.has(minusculo(token.nucleo));
+function designadorDe(token?: Token): Designador {
+  const chave = token ? minusculo(token.nucleo) : '';
+  if (DESIGNADORES.has(chave)) return 'forte';
+  if (DESIGNADORES_FRACOS.has(chave)) return 'fraco';
+  return undefined;
+}
 
 export function padronizarTexto(texto: string): string {
   const tokens = texto.trim().split(/\s+/).filter(t => t !== '').map(separar);
@@ -164,7 +179,7 @@ export function padronizarTexto(texto: string): string {
         meio: i !== primeiro && i !== ultimo,
         aposNumero: comecaComNumero(tokens[i - 1]),
         antesNumero: comecaComNumero(tokens[i + 1]),
-        aposDesignador: ehDesignador(tokens[i - 1]),
+        designador: designadorDe(tokens[i - 1]),
         antesPalavra: comecaComLetra(tokens[i + 1]),
       }) + t.suf;
     })

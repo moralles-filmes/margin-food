@@ -19,12 +19,6 @@ language sql immutable as $$
   ]) s where lower(s) = p_chave limit 1
 $$;
 
--- Romanos e tamanhos só valem como palavra solta, nunca em pedaço de palavra composta.
-create or replace function pg_temp.pt_so_solta(p_chave text) returns boolean
-language sql immutable as $$
-  select p_chave = any(array['pp','gg','xg','xgg','ii','iii','iv','vi','vii','viii','ix','xi','xii'])
-$$;
-
 create or replace function pg_temp.pt_unidade(p_chave text) returns text
 language sql immutable as $$
   select u from unnest(array[
@@ -33,28 +27,40 @@ language sql immutable as $$
   ]) u where lower(u) = p_chave limit 1
 $$;
 
--- Palavra curta sem vogal é sigla (JBS, GM, CPFL), menos unidade, tratamento e "Pç".
+-- Palavra curta só de consoantes é sigla (JBS, GM, CPFL), menos unidade, tratamento
+-- e abreviação comum. Consoantes explícitas, não [[:alpha:]]: "ª"/"º" não contam,
+-- igual ao TS, qualquer que seja o ctype do banco ("Drª", "Nº").
 create or replace function pg_temp.pt_sem_vogal(p_chave text) returns text
 language sql immutable as $$
   select case
-    when p_chave ~ '^[[:alpha:]]{2,4}$'
-     and p_chave !~ '[aeiouyáàâãäéèêëíìîïóòôõöúùûüýÿ]'
+    when p_chave ~ '^[bcdfghjklmnpqrstvwxzçñ]{2,4}$'
      and pg_temp.pt_unidade(p_chave) is null
-     and p_chave <> all(array['mr','mrs','sr','srs','dr','drs','pç','pçs'])
+     and p_chave <> all(array[
+       'mr','mrs','sr','srs','dr','drs','jr','mc','pç','pçs','mç','mçs','dz','fd','hr','hrs'
+     ])
     then upper(p_chave)
   end
 $$;
 
-create or replace function pg_temp.pt_segmento(p_seg text, p_sep_anterior text, p_seg_anterior text)
+create or replace function pg_temp.pt_enclitico(p_seg text, p_sep_anterior text) returns boolean
+language sql immutable as $$
+  select p_sep_anterior = '-' and lower(p_seg) = any(array[
+    'me','te','se','lhe','lhes','lo','la','los','las','nos','vos','o','a','os','as'
+  ])
+$$;
+
+create or replace function pg_temp.pt_segmento(
+  p_seg text, p_sep_anterior text, p_seg_anterior text, p_apos_enclitico boolean
+)
 returns text language sql immutable as $$
   select case
     when p_seg = '' then p_seg
-    when p_sep_anterior = '-' and lower(p_seg) = any(array[
-      'me','te','se','lhe','lhes','lo','la','los','las','nos','vos','o','a','os','as'
-    ]) then lower(p_seg)
+    when pg_temp.pt_enclitico(p_seg, p_sep_anterior) then lower(p_seg)
     when p_sep_anterior in ('''', '’') and length(p_seg_anterior) <> 1 then lower(p_seg)
+    -- Depois de pronome é palavra, não sigla: "Bem-te-Vi", não o romano VI.
+    when p_apos_enclitico then pg_temp.pt_capitalizar(p_seg)
     else coalesce(
-      case when pg_temp.pt_so_solta(lower(p_seg)) then null else pg_temp.pt_sigla(lower(p_seg)) end,
+      pg_temp.pt_sigla(lower(p_seg)),
       pg_temp.pt_sem_vogal(lower(p_seg)),
       pg_temp.pt_capitalizar(p_seg)
     )
@@ -68,12 +74,14 @@ declare
   v_seg text := '';
   v_sep text := '';
   v_seg_anterior text := '';
+  v_apos_enclitico boolean := false;
   v_c text;
 begin
   for i in 1 .. length(p_nucleo) loop
     v_c := substr(p_nucleo, i, 1);
     if v_c in ('-', '/', '''', '’', '.') then
-      v_saida := v_saida || pg_temp.pt_segmento(v_seg, v_sep, v_seg_anterior) || v_c;
+      v_saida := v_saida || pg_temp.pt_segmento(v_seg, v_sep, v_seg_anterior, v_apos_enclitico) || v_c;
+      v_apos_enclitico := pg_temp.pt_enclitico(v_seg, v_sep);
       v_seg_anterior := v_seg;
       v_sep := v_c;
       v_seg := '';
@@ -81,7 +89,7 @@ begin
       v_seg := v_seg || v_c;
     end if;
   end loop;
-  return v_saida || pg_temp.pt_segmento(v_seg, v_sep, v_seg_anterior);
+  return v_saida || pg_temp.pt_segmento(v_seg, v_sep, v_seg_anterior, v_apos_enclitico);
 end $$;
 
 create or replace function pg_temp.pt_numero(p_nucleo text) returns text
@@ -103,9 +111,11 @@ begin
   return p_nucleo;
 end $$;
 
+-- Letra solta depois de designador forte é designação ("Tipo A Grande"), salvo
+-- "e" + palavra; depois de fraco, só sem palavra em seguida ("Lote a Vencer").
 create or replace function pg_temp.pt_nucleo(
   p_nucleo text, p_meio boolean, p_apos_numero boolean, p_antes_numero boolean,
-  p_apos_designador boolean, p_antes_palavra boolean
+  p_designador text, p_antes_palavra boolean
 )
 returns text language plpgsql immutable as $$
 declare
@@ -113,8 +123,9 @@ declare
   v_r text;
 begin
   if p_nucleo ~ '[0-9]' then return pg_temp.pt_numero(p_nucleo); end if;
-  -- "Vitamina E 400mg", mas "Categoria e Subcategoria" (conjunção).
-  if p_apos_designador and length(p_nucleo) = 1 and not (v_chave = 'e' and p_antes_palavra) then
+  if length(p_nucleo) = 1 and v_chave <> 'à'
+     and ((p_designador = 'forte' and not (v_chave = 'e' and p_antes_palavra))
+       or (p_designador = 'fraco' and not p_antes_palavra)) then
     return upper(p_nucleo);
   end if;
   if p_meio and v_chave = any(array[
@@ -179,10 +190,14 @@ begin
         i <> v_primeiro and i <> v_ultimo,
         i > 1 and v_nucleo[i - 1] ~ '^[0-9]',
         i < v_n and v_nucleo[i + 1] ~ '^[0-9]',
-        i > 1 and lower(v_nucleo[i - 1]) = any(array[
-          'tipo','vitamina','classe','grupo','série','serie','bloco','plano','lote',
-          'modelo','letra','nível','nivel','fase','turno','categoria'
-        ]),
+        case
+          when i > 1 and lower(v_nucleo[i - 1]) = any(array[
+            'tipo','classe','vitamina','série','serie','bloco','modelo','letra'
+          ]) then 'forte'
+          when i > 1 and lower(v_nucleo[i - 1]) = any(array[
+            'lote','plano','fase','turno','categoria','grupo','nível','nivel'
+          ]) then 'fraco'
+        end,
         i < v_n and v_nucleo[i + 1] ~ '^[[:alpha:]]'
       ) || v_suf[i]);
     end if;
@@ -269,6 +284,17 @@ begin
     ('NOTA Nº 15', 'Nota Nº 15'),
     ('AÇÚCAR SACHÊ 5G', 'Açúcar Sachê 5g'),
     ('C6 BANK', 'C6 Bank'),
+    ('PLANO À VISTA', 'Plano à Vista'),
+    ('LOTE A VENCER', 'Lote a Vencer'),
+    ('CATEGORIA A DEFINIR', 'Categoria a Definir'),
+    ('GRUPO A 2026', 'Grupo A 2026'),
+    ('TIPO O POSITIVO', 'Tipo O Positivo'),
+    ('FASE II/III', 'Fase II/III'),
+    ('COZINHEIRO I/II', 'Cozinheiro I/II'),
+    ('DRª SILVA', 'Drª Silva'),
+    ('JOSE DA SILVA JR', 'Jose da Silva Jr'),
+    ('MC DONALDS', 'Mc Donalds'),
+    ('OVOS DZ', 'Ovos Dz'),
     ('de', 'De'),
     ('e', 'E'),
     ('-', '-'),

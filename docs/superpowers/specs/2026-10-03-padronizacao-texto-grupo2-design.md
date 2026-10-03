@@ -65,20 +65,24 @@ observações.
 Ordem de avaliação de cada palavra (núcleo sem pontuação das pontas), com as mudanças em **negrito**:
 
 1. Tem dígito → tratamento de número/unidade (inalterado).
-2. **Letra solta logo depois de um designador → MAIÚSCULA**, exceto `e` seguido de palavra
-   (conjunção). Designadores: tipo, vitamina, classe, grupo, série/serie, bloco, plano, lote,
-   modelo, letra, nível/nivel, fase, turno, categoria.
+2. **Letra solta logo depois de um designador → MAIÚSCULA** ("à" nunca):
+   - designador forte (tipo, classe, vitamina, série/serie, bloco, modelo, letra): sempre, exceto
+     `e` seguido de palavra (conjunção) — "Tipo A Grande", "Tipo e Marca";
+   - designador fraco (lote, plano, fase, turno, categoria, grupo, nível/nivel): só quando não vem
+     palavra depois — "Grupo A 2026", mas "Lote a Vencer", "Plano à Vista".
 3. Conectivo no meio do texto → minúsculo (inalterado).
 4. Unidade logo depois de número; `x` entre números (inalterado).
 5. Sigla da lista (inalterado), com as **siglas novas NFS-e, NFSe, MDF-e, DIFAL, ST, DAE**.
-6. **Sigla sem vogal:** 2 a 4 letras, só letras, nenhuma vogal (`a e i o u y` com ou sem acento:
-   `áàâãäéèêëíìîïóòôõöúùûüýÿ`) → MAIÚSCULA. Exceções, que seguem para a capitalização normal:
+6. **Sigla sem vogal:** 2 a 4 letras, todas da classe explícita de consoantes
+   `[bcdfghjklmnpqrstvwxzçñ]` (não `\p{L}`/`[[:alpha:]]`, para "ª"/"º" não contarem e o resultado não
+   depender do ctype do banco) → MAIÚSCULA. Exceções, que seguem para a capitalização normal:
    as unidades da lista `UNIDADES` (Kg, Ml, Cm, Mm, Gr, Grs, Lt, Lts, Mg, Cx, Pct, Pc, Pcs, Kgs),
-   os tratamentos Mr, Mrs, Sr, Srs, Dr, Drs e as abreviações Pç, Pçs.
+   os tratamentos Mr, Mrs, Sr, Srs, Dr, Drs, Jr, Mc e as abreviações Pç, Pçs, Mç, Mçs, Dz, Fd, Hr, Hrs.
 7. Letra única → MAIÚSCULA (inalterado).
 8. Palavra composta (`-`, `/`, `'`, `’`, `.`): cada pedaço passa por enclítico, apóstrofo, sigla e
-   **sigla sem vogal** (mesmas exceções). **Romanos (II…XII) e tamanhos (PP, GG, XG, XGG) não valem
-   em pedaço de palavra composta**, só como palavra solta.
+   **sigla sem vogal** (mesmas exceções). **Pedaço logo depois de um pronome enclítico só é
+   capitalizado** ("Bem-te-Vi", não o romano VI); romanos continuam valendo nos demais pedaços
+   ("Fase II/III", "Cozinheiro I/II").
 
 Palavra com letra e número que não é unidade continua como foi digitada ("C6", "A4").
 "5G" continua virando "5g": num restaurante, gramas é o caso dominante e a regra não tem contexto
@@ -90,6 +94,10 @@ mxm, rh, sp. Só "mr" ("Brownie Mr Bay") e as unidades não são sigla.
 
 O item 2 não constava da aprovação em chat: a exceção para `e` evita "Categoria E Subcategoria" e
 "Grupo E Família". Hoje não há nenhuma ocorrência dos itens 2 e 8 nos dados.
+
+Revisão da branch (2026-10-03): a primeira versão dos itens 2, 6 e 8 regredia saídas corretas
+("Plano À Vista", "Lote A Vencer", "Fase Ii/Iii", "DRª Silva", "Jose da Silva JR"); o texto acima
+já é o corrigido, com casos para cada regressão.
 
 ### Implementação
 
@@ -124,6 +132,14 @@ O item 2 não constava da aprovação em chat: a exceção para `e` evita "Categ
   | `CATEGORIA E SUBCATEGORIA` | `Categoria e Subcategoria` |
   | `AÇÚCAR SACHÊ 5G` | `Açúcar Sachê 5g` |
   | `C6 BANK` | `C6 Bank` |
+  | `PLANO À VISTA` | `Plano à Vista` |
+  | `LOTE A VENCER` | `Lote a Vencer` |
+  | `GRUPO A 2026` | `Grupo A 2026` |
+  | `FASE II/III` | `Fase II/III` |
+  | `DRª SILVA` | `Drª Silva` |
+  | `JOSE DA SILVA JR` | `Jose da Silva Jr` |
+
+  Os demais casos de borda (Bauru/SP, Venda a Prazo, Nº, Mc Donalds, Ovos Dz…) estão no SQL.
 
 - CLAUDE.md não muda: a linha existente já aponta para o código e exige mudar os dois lados.
 
