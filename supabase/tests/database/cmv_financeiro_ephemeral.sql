@@ -111,6 +111,7 @@ CREATE FUNCTION public._guarded_update_conta_pagar(uuid,text,numeric,text,uuid,d
 RETURNS jsonb LANGUAGE sql AS $$ SELECT '{}'::jsonb $$;
 
 \ir ../../migrations/20261003140000_cmv_financeiro.sql
+\ir ../../migrations/20261003203219_cmv_financeiro_serie.sql
 
 -- ─────────────────────────────────────────────────────────────────────────────
 
@@ -152,6 +153,7 @@ DECLARE
   r jsonb; p jsonb; l jsonb;
   v_id uuid; v_rateado uuid; v_legado uuid; v_pago uuid; v_serie uuid; v_semcomp uuid; v_b uuid;
   v_upd timestamptz; v_ids uuid[]; v_ids2 uuid[]; v_created timestamptz; v_n int;
+  v_ref uuid; v_outra uuid[]; v_rat uuid[];
 BEGIN
   PERFORM set_config('test.user_id', U::text, false);
   PERFORM set_config('test.company_id', A::text, false);
@@ -440,6 +442,92 @@ BEGIN
   RESET ROLE;
   PERFORM cmv_assert((SELECT cmv_incluir FROM fin_contas_pagar WHERE id = v_id), 'decisão intacta após as tentativas diretas');
   PERFORM cmv_assert((SELECT value = 'true' FROM fin_config WHERE company_id = A AND key = 'cmv_financeiro_ativo'), 'ativação intacta após as tentativas diretas');
+  PERFORM set_config('test.company_id', '', false);
+
+  -- 21. Série: a decisão de um boleto vai para as outras parcelas
+  PERFORM set_config('test.company_id', A::text, false);
+  PERFORM cmv_assert(NOT has_function_privilege('authenticated', 'public._fin_cmv_serie(uuid,uuid)', 'EXECUTE'), 'helper de série não é executável por authenticated');
+  PERFORM cmv_assert(NOT has_function_privilege('anon', 'public.fin_cmv_aplicar_serie(uuid,timestamptz,text,boolean)', 'EXECUTE'), 'anon não aplica série');
+  PERFORM cmv_assert(has_function_privilege('authenticated', 'public.fin_cmv_aplicar_serie(uuid,timestamptz,text,boolean)', 'EXECUTE'), 'authenticated executa a RPC de série');
+
+  r := _guarded_create_conta_pagar(p_descricao => 'Aluguel de câmara fria', p_valor => 300, p_data_vencimento => '2027-05-10',
+    p_data_competencia => '2027-05-01', p_categoria_id => c_peixes, p_cmv => '{"incluir": true}',
+    p_recorrencia => '{"frequencia":"mensal","parcelas":4}');
+  SELECT array_agg(id ORDER BY parcela_atual) INTO v_ids FROM fin_contas_pagar
+  WHERE company_id = A AND (id = (r->>'id')::uuid OR lancamento_pai_id = (r->>'id')::uuid);
+  PERFORM cmv_assert(array_length(v_ids, 1) = 4, 'série de 4 parcelas criada');
+  -- Todo o teste roda numa transação só; em produção cada série tem o seu created_at.
+  UPDATE fin_contas_pagar SET created_at = '2027-01-01 10:00:00+00' WHERE id = ANY(v_ids);
+
+  r := _guarded_create_conta_pagar(p_descricao => 'Outra série de 4', p_valor => 80, p_data_vencimento => '2027-05-10',
+    p_data_competencia => '2027-05-01', p_categoria_id => c_peixes, p_cmv => '{"incluir": true}',
+    p_recorrencia => '{"frequencia":"mensal","parcelas":4}');
+  SELECT array_agg(id ORDER BY parcela_atual) INTO v_outra FROM fin_contas_pagar
+  WHERE company_id = A AND (id = (r->>'id')::uuid OR lancamento_pai_id = (r->>'id')::uuid);
+  UPDATE fin_contas_pagar SET created_at = '2027-01-02 10:00:00+00' WHERE id = ANY(v_outra);
+
+  -- Histórico real: a 1ª parcela foi excluída e as demais perderam o vínculo de pai.
+  UPDATE fin_contas_pagar SET lancamento_pai_id = NULL WHERE id = ANY(v_ids);
+  DELETE FROM fin_contas_pagar WHERE id = v_ids[1];
+  v_ref := v_ids[2];
+  UPDATE fin_contas_pagar SET status = 'CANCELADO' WHERE id = v_ids[4];
+
+  l := list_fin_cmv_linhas('2027-06-01', '2027-06-30', 'todos', c_peixes);
+  PERFORM cmv_assert((SELECT (x->>'serie_boletos')::int = 2 FROM jsonb_array_elements(l->'itens') x WHERE (x->>'conta_pagar_id')::uuid = v_ref), 'lista informa o tamanho da série (sem a cancelada e sem a excluída)');
+  PERFORM cmv_assert((SELECT bool_and((SELECT count(*) FROM _fin_cmv_serie(A, cp.id)) = 1) FROM fin_contas_pagar cp
+    WHERE cp.company_id = A AND cp.parcela_total IS NULL), 'boleto avulso tem série de 1, mesmo criado no mesmo instante que os outros');
+
+  PERFORM fin_cmv_classificar(jsonb_build_array(jsonb_build_object('conta_pagar_id', v_ref, 'rateio_id', NULL, 'incluir', false,
+    'expected_updated_at', (SELECT updated_at FROM fin_contas_pagar WHERE id = v_ref))));
+  v_upd := (SELECT updated_at FROM fin_contas_pagar WHERE id = v_ids[3]);
+
+  PERFORM cmv_expect_error(format($q$SELECT public.fin_cmv_aplicar_serie('%s', '2000-01-01T00:00:00Z')$q$, v_ref), 'OPTIMISTIC_LOCK_CONFLICT%', 'série com versão antiga da referência');
+  r := fin_cmv_aplicar_serie(v_ref, NULL, NULL, true);
+  PERFORM cmv_assert((r->>'serie_titulos')::int = 2 AND (r->>'titulos_alterados')::int = 1 AND (r->>'simulado')::boolean, 'prévia conta a série e o que mudaria');
+  PERFORM cmv_assert((SELECT cmv_incluir FROM fin_contas_pagar WHERE id = v_ids[3]), 'prévia não grava');
+
+  SELECT count(*) INTO v_n FROM fin_audit_logs WHERE acao = 'cmv_classificar';
+  r := fin_cmv_aplicar_serie(v_ref, (SELECT updated_at FROM fin_contas_pagar WHERE id = v_ref), 'aluguel não é CMV');
+  PERFORM cmv_assert((r->>'titulos_alterados')::int = 1 AND (r->>'linhas_alteradas')::int = 1, 'série aplica só no que difere');
+  PERFORM cmv_assert((SELECT cmv_incluir IS FALSE AND updated_at <> v_upd FROM fin_contas_pagar WHERE id = v_ids[3]), 'parcela irmã recebe a decisão e muda de versão');
+  PERFORM cmv_assert((SELECT cmv_incluir FROM fin_contas_pagar WHERE id = v_ids[4]), 'parcela cancelada fica como estava');
+  PERFORM cmv_assert((SELECT bool_and(cmv_incluir) FROM fin_contas_pagar WHERE id = ANY(v_outra)), 'outra série com o mesmo número de parcelas não é tocada');
+  PERFORM cmv_assert((SELECT cmv_incluir FROM fin_contas_pagar WHERE id = v_id), 'boleto avulso não é tocado');
+  PERFORM cmv_assert((SELECT count(*) = v_n + 1 FROM fin_audit_logs WHERE acao = 'cmv_classificar'), 'uma auditoria por boleto alterado');
+  PERFORM cmv_assert((SELECT (antes->>'incluido')::numeric = 300 AND (depois->>'fora')::numeric = 300 AND depois->>'serie_origem' = v_ref::text AND justificativa = 'aluguel não é CMV'
+    FROM fin_audit_logs WHERE entidade_id = v_ids[3] AND acao = 'cmv_classificar'), 'auditoria da série guarda antes/depois e a origem');
+  r := fin_cmv_aplicar_serie(v_ref);
+  PERFORM cmv_assert((r->>'titulos_alterados')::int = 0, 'repetir a série não altera nada');
+  PERFORM cmv_assert((SELECT count(*) = v_n + 1 FROM fin_audit_logs WHERE acao = 'cmv_classificar'), 'repetição não gera auditoria');
+
+  -- Série com vínculo de pai (sem depender do created_at) e com rateio: copia por categoria
+  r := _guarded_create_conta_pagar(p_descricao => 'NF mensal rateada', p_valor => 1000, p_data_vencimento => '2027-08-10',
+    p_data_competencia => '2027-08-01', p_cmv => '{"incluir": null}', p_recorrencia => '{"frequencia":"mensal","parcelas":2}',
+    p_rateios => jsonb_build_array(
+      jsonb_build_object('categoria_id', c_peixes, 'valor', 700, 'percentual', 70, 'cmv_incluir', true),
+      jsonb_build_object('categoria_id', c_escr, 'valor', 300, 'percentual', 30, 'cmv_incluir', false)));
+  SELECT array_agg(id ORDER BY parcela_atual) INTO v_rat FROM fin_contas_pagar
+  WHERE company_id = A AND (id = (r->>'id')::uuid OR lancamento_pai_id = (r->>'id')::uuid);
+  UPDATE fin_contas_pagar SET created_at = created_at + (parcela_atual || ' hours')::interval WHERE id = ANY(v_rat);
+  PERFORM fin_cmv_classificar(jsonb_build_array(jsonb_build_object('conta_pagar_id', v_rat[2],
+    'rateio_id', (SELECT id FROM fin_lancamento_rateios WHERE lancamento_id = v_rat[2] AND categoria_id = c_peixes), 'incluir', false,
+    'expected_updated_at', (SELECT updated_at FROM fin_contas_pagar WHERE id = v_rat[2]))));
+  r := fin_cmv_aplicar_serie(v_rat[2]);
+  PERFORM cmv_assert((r->>'serie_titulos')::int = 2 AND (r->>'titulos_alterados')::int = 1 AND (r->>'linhas_alteradas')::int = 1, 'série por vínculo de pai, a partir de uma parcela filha');
+  PERFORM cmv_assert((SELECT bool_and(cmv_incluir IS FALSE) AND count(*) = 2 FROM fin_lancamento_rateios WHERE lancamento_id = v_rat[1]), 'rateio da irmã recebe a decisão da mesma categoria; a outra linha fica como estava');
+  PERFORM cmv_assert((SELECT valor = 1000 AND cmv_incluir IS NULL FROM fin_contas_pagar WHERE id = v_rat[1]), 'título rateado não ganha decisão própria nem muda de valor');
+
+  -- Referência sem resposta não tem o que copiar
+  INSERT INTO fin_contas_pagar (descricao, valor, data_vencimento, status, company_id) VALUES ('Sem decisão', 10, '2027-09-01', 'APROVADO', A) RETURNING id INTO v_legado;
+  PERFORM cmv_expect_error(format($q$SELECT public.fin_cmv_aplicar_serie('%s')$q$, v_legado), 'CMV_DECISAO_OBRIGATORIA%', 'referência pendente');
+  PERFORM cmv_expect_error(format($q$SELECT public.fin_cmv_aplicar_serie('%s')$q$, v_ids[4]), 'STATUS_INVALIDO%', 'referência cancelada');
+
+  -- Permissão e unidade
+  PERFORM set_config('test.permissions', 'financeiro:cmv:view,financeiro:pagar:edit,finance:manage', false);
+  PERFORM cmv_expect_error(format($q$SELECT public.fin_cmv_aplicar_serie('%s', NULL, NULL, true)$q$, v_ref), 'PERMISSION_DENIED%', 'série exige gerenciar o CMV, até na prévia');
+  PERFORM set_config('test.permissions', TUDO, false);
+  PERFORM set_config('test.company_id', B::text, false);
+  PERFORM cmv_expect_error(format($q$SELECT public.fin_cmv_aplicar_serie('%s')$q$, v_ref), 'NOT_FOUND%', 'B tenta aplicar série da A');
   PERFORM set_config('test.company_id', '', false);
 
   RETURN 'cmv_financeiro_ephemeral: OK';

@@ -11,6 +11,10 @@ import { Input } from '@/components/ui/input';
 import { DateInput } from '@/components/ui/DateInput';
 import { BRLInput } from '@/components/ui/brl-input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -23,7 +27,7 @@ import { todayBR, formatInBR } from '@/lib/datetime';
 import TableActions from '@/components/ui/TableActions';
 import ContaDetailDialog, { type ContaDetailData, type ContaDetailRateio } from './ContaDetailDialog';
 import ContaFormDialog, { type ContaFormCmv, type ContaFormData, type RateioLine } from './ContaFormDialog';
-import { fetchCmvConfig, mensagemErroCmv } from '@/hooks/useCmvFinanceiro';
+import { aplicarCmvSerie, fetchCmvConfig, mensagemErroCmv } from '@/hooks/useCmvFinanceiro';
 import * as XLSX from '@/lib/safeXlsx';
 import { mapFinanceiroDeleteError, mapPagamentoError } from '@/lib/financeiroErrorMap';
 import { buildCategoryOptions } from '@/lib/categoriaOptions';
@@ -35,6 +39,7 @@ import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { getRecurrenceValidationMessage } from '@/domain/financeiro/recurrence';
 import { traduzirErroIdempotencia } from '@/domain/financeiro/idempotencia';
 import { useChavesPendentes } from '@/hooks/useChavesPendentes';
+import { useTravaEnvio } from '@/hooks/useTravaEnvio';
 
 /* ─── Types ─── */
 interface ContaPagar {
@@ -65,7 +70,17 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: typeof
 
 const PAGE_SIZE = 50;
 
-const CP_DETAIL_COLUMNS = 'id, descricao, fornecedor, supplier_id, valor, status, data_competencia, data_vencimento, data_pagamento, forma_pagamento, tipo_codigo_pagamento, codigo_pagamento, categoria_id, centro_custo_id, conta_id, observacoes, recorrente, recorrencia_config, updated_at';
+const CP_DETAIL_COLUMNS = 'id, descricao, fornecedor, supplier_id, valor, status, data_competencia, data_vencimento, data_pagamento, forma_pagamento, tipo_codigo_pagamento, codigo_pagamento, categoria_id, centro_custo_id, conta_id, observacoes, recorrente, recorrencia_config, parcela_total, lancamento_pai_id, updated_at';
+
+type DecisoesCmv = Map<string, boolean | null>;
+/** Decisões do CMV como estavam ao abrir a edição: '' = título, demais = id da linha de rateio. */
+const lerDecisoesCmv = (titulo: boolean | null | undefined, linhas: { id?: string; cmv_incluir?: boolean | null }[]): DecisoesCmv =>
+  new Map([['', titulo ?? null] as [string, boolean | null], ...linhas.flatMap(l => (l.id ? [[l.id, l.cmv_incluir ?? null] as [string, boolean | null]] : []))]);
+/** A edição trocou alguma resposta? Mudar só a categoria de uma linha não conta. */
+const decisaoCmvMudou = (antes: DecisoesCmv, titulo: boolean | null | undefined, linhas: { id?: string; cmv_incluir?: boolean | null }[]) =>
+  linhas.length > 0
+    ? linhas.some(l => (l.cmv_incluir ?? null) !== (l.id && antes.has(l.id) ? antes.get(l.id) : null))
+    : (titulo ?? null) !== (antes.get('') ?? null);
 
 function SkeletonRows() {
   return (<>{Array.from({ length: 5 }).map((_, i) => (
@@ -98,6 +113,7 @@ export default function ContasPagarSection({ initialStatus }: ContasPagarSection
   const canEdit = useCan('financeiro:pagar:edit');
   const canApprove = useCan('financeiro:pagar:approve');
   const canExport = useCan('financeiro:pagar:export');
+  const canCmvSerie = useCan('financeiro:cmv:manage');
 
   const [items, setItems] = useState<ContaPagar[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
@@ -136,6 +152,10 @@ export default function ContasPagarSection({ initialStatus }: ContasPagarSection
   // as consultas e os parâmetros das RPCs ficam exatamente como antes.
   const [cmvForm, setCmvForm] = useState<ContaFormCmv | null>(null);
   const cmvLidoNaEdicao = useRef(false);
+  const cmvNaAbertura = useRef<DecisoesCmv>(new Map());
+  const [serieCmv, setSerieCmv] = useState<{ id: string; descricao: string; parcelas: number; versao: string | null } | null>(null);
+  const [aplicandoSerie, setAplicandoSerie] = useState(false);
+  const { executar: travaSerie } = useTravaEnvio();
   const [editingItem, setEditingItem] = useState<ContaPagar | null>(null);
   const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
 
@@ -360,6 +380,7 @@ export default function ContasPagarSection({ initialStatus }: ContasPagarSection
 
       // Sem as colunas do CMV na leitura, o salvamento não pode enviar a decisão (gravaria "pendente" por cima).
       cmvLidoNaEdicao.current = Boolean(cmvForm);
+      cmvNaAbertura.current = lerDecisoesCmv(detail.cmv_incluir, rates as any[]);
       setEditingItem(detail);
       setForm({
         descricao: detail.descricao,
@@ -445,6 +466,7 @@ export default function ContasPagarSection({ initialStatus }: ContasPagarSection
       if (redefinido) { toast.error('Informe de novo se o boleto aparece no CMV financeiro'); return; }
     }
 
+    let ofertaSerie: { id: string; descricao: string } | null = null;
     salvandoRef.current = true;
     setSaving(true);
     try {
@@ -518,12 +540,47 @@ export default function ContasPagarSection({ initialStatus }: ContasPagarSection
             : `${createdCount} conta${createdCount > 1 ? 's' : ''} a pagar criada${createdCount > 1 ? 's' : ''}`;
       if (!editingItem) chavesCriacao.confirmar(params);
       toast.success(statusMsg);
+      const editado = editingItem as any;
+      if (editado && enviaCmv && canCmvSerie
+        && (Number(editado.parcela_total) > 1 || editado.lancamento_pai_id || editado.recorrente)
+        && decisaoCmvMudou(cmvNaAbertura.current, form.cmv_incluir, rateioLines)) {
+        ofertaSerie = { id: editado.id, descricao: form.descricao };
+      }
       handleCloseForm();
       emitDataEvent('financeiro:pagar');
     } finally {
       salvandoRef.current = false;
       setSaving(false);
     }
+    // Boleto de série com a resposta do CMV alterada: oferece repetir nas outras parcelas.
+    // Opcional e fora da trava do salvamento — o boleto já foi salvo, falha aqui fica em silêncio.
+    if (ofertaSerie) {
+      try {
+        const previa = await aplicarCmvSerie(supabase, ofertaSerie.id, { simular: true });
+        if (previa.titulosAlterados > 0) {
+          setSerieCmv({ ...ofertaSerie, parcelas: previa.titulosAlterados, versao: previa.referenciaUpdatedAt });
+        }
+      } catch { /* sem resposta para copiar, sem permissão ou recurso indisponível */ }
+    }
+  };
+
+  const confirmarSerieCmv = async () => {
+    const alvo = serieCmv;
+    if (!alvo) return;
+    await travaSerie(async () => {
+      setAplicandoSerie(true);
+      try {
+        const resultado = await aplicarCmvSerie(supabase, alvo.id, { expectedUpdatedAt: alvo.versao });
+        toast.success(`${resultado.titulosAlterados} ${resultado.titulosAlterados === 1 ? 'parcela da série atualizada' : 'parcelas da série atualizadas'} no CMV financeiro.`);
+        emitDataEvent('financeiro:pagar');
+      } catch (err) {
+        console.error('[ContasPagarSection.confirmarSerieCmv]', err);
+        toast.error(`${mensagemErroCmv(err)} As outras parcelas não foram alteradas.`);
+      } finally {
+        setAplicandoSerie(false);
+        setSerieCmv(null);
+      }
+    });
   };
 
   /* ─── Approve via RPC ─── */
@@ -912,6 +969,25 @@ export default function ContasPagarSection({ initialStatus }: ContasPagarSection
         onSave={save}
         onClose={guardedClose}
       />
+
+      <AlertDialog open={serieCmv !== null} onOpenChange={o => { if (!o && !aplicandoSerie) setSerieCmv(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Aplicar às outras recorrências?</AlertDialogTitle>
+            <AlertDialogDescription>
+              A resposta “Aparecer no CMV financeiro?” de <strong className="text-foreground">{serieCmv?.descricao}</strong> ficou diferente de{' '}
+              {serieCmv?.parcelas === 1 ? 'outra parcela' : `outras ${serieCmv?.parcelas} parcelas`} desta série.
+              Aplicar a mesma resposta a {serieCmv?.parcelas === 1 ? 'ela' : 'todas'}, inclusive parcelas de meses anteriores e já pagas? Só a decisão do CMV muda; valor, categoria e pagamento ficam como estão.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={aplicandoSerie}>Só este boleto</AlertDialogCancel>
+            <AlertDialogAction disabled={aplicandoSerie} onClick={e => { e.preventDefault(); void confirmarSerieCmv(); }}>
+              {aplicandoSerie ? 'Aplicando…' : 'Aplicar a todas'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Limite de aprovação */}
       <Dialog open={limiteOpen} onOpenChange={o => { if (!o) setLimiteOpen(false); }}>
