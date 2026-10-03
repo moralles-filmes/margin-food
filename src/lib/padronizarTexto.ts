@@ -1,8 +1,8 @@
 /**
  * Padroniza maiúsculas/minúsculas de nomes e descrições digitados (pt-BR):
  * cada palavra com inicial maiúscula, conectivos (de, da, e…) em minúsculo no
- * meio do texto, siglas conhecidas no padrão (PIX, INSS, LTDA) e unidades logo
- * depois de número (1kg, 350 ml, 2L, 20x30).
+ * meio do texto, siglas no padrão (PIX, INSS, LTDA e palavra curta sem vogal,
+ * como JBS e GM) e unidades logo depois de número (1kg, 350 ml, 2L, 20x30).
  *
  * Só muda caixa e espaços — `normalizeSearchText` do resultado é o mesmo do
  * original —, então buscas e o dedup da conciliação (que comparam sem caixa)
@@ -22,14 +22,18 @@ function porChave(lista: string[]): Map<string, string> {
 }
 
 const SIGLAS = porChave([
-  'PIX', 'NF', 'NFe', 'NF-e', 'NFCe', 'NFC-e', 'CT-e', 'CNPJ', 'CPF', 'RG', 'CNH', 'CEP',
+  'PIX', 'NF', 'NFe', 'NF-e', 'NFCe', 'NFC-e', 'NFSe', 'NFS-e', 'CT-e', 'MDF-e', 'CNPJ', 'CPF', 'RG', 'CNH', 'CEP',
   'LTDA', 'ME', 'EPP', 'EIRELI', 'MEI', 'S/A', 'TED', 'DOC', 'TEF', 'PDV',
-  'INSS', 'FGTS', 'IPTU', 'IPVA', 'ICMS', 'ISS', 'ISSQN', 'PIS', 'COFINS', 'IRPJ', 'IRRF', 'CSLL',
-  'DAS', 'DARF', 'GPS', 'GRU', 'GNRE', 'CLT', 'PJ', 'PF', 'RH', 'TI', 'VR', 'VA', 'VT', 'EPI', 'EPIs',
+  'INSS', 'FGTS', 'IPTU', 'IPVA', 'ICMS', 'ST', 'DIFAL', 'ISS', 'ISSQN', 'PIS', 'COFINS', 'IRPJ', 'IRRF', 'CSLL',
+  'DAS', 'DAE', 'DARF', 'GPS', 'GRU', 'GNRE', 'CLT', 'PJ', 'PF', 'RH', 'TI', 'VR', 'VA', 'VT', 'EPI', 'EPIs',
   'CMV', 'DRE', 'DFC', 'SIF', 'UHT', 'PVC', 'LED', 'USB', 'TV', 'E-mail',
   'SP', 'RJ', 'MG', 'RS', 'SC', 'PR', 'DF', 'BA', 'PE', 'MS', 'MT', 'ES', 'RN', 'PB',
   'PP', 'GG', 'XG', 'XGG', 'II', 'III', 'IV', 'VI', 'VII', 'VIII', 'IX', 'XI', 'XII',
 ]);
+
+// Romanos e tamanhos só valem como palavra solta ("Dom Pedro II", "Camisa GG"),
+// nunca em pedaço de palavra composta ("Bem-te-Vi").
+const SO_PALAVRA_SOLTA = new Set(['pp', 'gg', 'xg', 'xgg', 'ii', 'iii', 'iv', 'vi', 'vii', 'viii', 'ix', 'xi', 'xii']);
 
 // Só valem logo depois de um número ("5 KG" → "5 kg"); soltas são palavras.
 const UNIDADES = porChave([
@@ -37,11 +41,21 @@ const UNIDADES = porChave([
   'un', 'und', 'unid', 'cx', 'pct', 'pc', 'pcs',
 ]);
 
+// Palavra curta sem vogal é sigla (JBS, GM, CPFL), menos unidade, tratamento e "Pç".
+const SEM_VOGAL = /^[^\P{L}aeiouyáàâãäéèêëíìîïóòôõöúùûüýÿ]{2,4}$/u;
+const SEM_VOGAL_NAO_SIGLA = new Set(['mr', 'mrs', 'sr', 'srs', 'dr', 'drs', 'pç', 'pçs']);
+
 // Em minúsculo só no meio do texto: "DAS Simples" e "Pagamento DAS" são siglas.
 const CONECTIVOS = new Set([
   'a', 'à', 'ao', 'aos', 'as', 'às', 'com', 'da', 'das', 'de', 'do', 'dos', 'e', 'em',
   'na', 'nas', 'no', 'nos', 'o', 'os', 'ou', 'para', 'pela', 'pelas', 'pelo', 'pelos',
   'por', 'pra', 'pro', 'sem', 'sob',
+]);
+
+// Letra solta depois destes fica maiúscula mesmo no meio ("Tipo A Grande").
+const DESIGNADORES = new Set([
+  'tipo', 'vitamina', 'classe', 'grupo', 'série', 'serie', 'bloco', 'plano', 'lote',
+  'modelo', 'letra', 'nível', 'nivel', 'fase', 'turno', 'categoria',
 ]);
 
 // Pronome depois de hífen fica minúsculo ("Pague-me").
@@ -71,13 +85,19 @@ function capitalizar(s: string): string {
   return maiusculo(primeiro) + minusculo(resto.join(''));
 }
 
+function siglaSemVogal(chave: string): string | undefined {
+  if (!SEM_VOGAL.test(chave) || UNIDADES.has(chave) || SEM_VOGAL_NAO_SIGLA.has(chave)) return undefined;
+  return maiusculo(chave);
+}
+
 function formatarSegmento(segmento: string, separadorAnterior: string, segmentoAnterior: string): string {
   if (!segmento) return segmento;
   const chave = minusculo(segmento);
   if (separadorAnterior === '-' && ENCLITICOS.has(chave)) return chave;
   // "D'Água" mantém a maiúscula; "Mcdonald's" não.
   if ((separadorAnterior === "'" || separadorAnterior === '’') && [...segmentoAnterior].length !== 1) return chave;
-  return SIGLAS.get(chave) ?? capitalizar(segmento);
+  const sigla = SO_PALAVRA_SOLTA.has(chave) ? undefined : SIGLAS.get(chave);
+  return sigla ?? siglaSemVogal(chave) ?? capitalizar(segmento);
 }
 
 function formatarComposto(nucleo: string): string {
@@ -107,24 +127,30 @@ interface Posicao {
   meio: boolean;
   aposNumero: boolean;
   antesNumero: boolean;
+  aposDesignador: boolean;
+  antesPalavra: boolean;
 }
 
-function formatarNucleo(nucleo: string, { meio, aposNumero, antesNumero }: Posicao): string {
+function formatarNucleo(nucleo: string, { meio, aposNumero, antesNumero, aposDesignador, antesPalavra }: Posicao): string {
   if (/[0-9]/.test(nucleo)) return formatarComNumero(nucleo);
   const chave = minusculo(nucleo);
+  // "Vitamina E 400mg", mas "Categoria e Subcategoria" (conjunção).
+  if (aposDesignador && [...nucleo].length === 1 && !(chave === 'e' && antesPalavra)) return maiusculo(nucleo);
   if (meio && CONECTIVOS.has(chave)) return chave;
   if (aposNumero) {
     const unidade = UNIDADES.get(chave);
     if (unidade) return unidade;
   }
   if (chave === 'x' && aposNumero && antesNumero) return 'x';
-  const sigla = SIGLAS.get(chave);
+  const sigla = SIGLAS.get(chave) ?? siglaSemVogal(chave);
   if (sigla) return sigla;
   if ([...nucleo].length === 1) return maiusculo(nucleo);
   return formatarComposto(nucleo);
 }
 
 const comecaComNumero = (token?: Token) => !!token && /^[0-9]/.test(token.nucleo);
+const comecaComLetra = (token?: Token) => !!token && /^\p{L}/u.test(token.nucleo);
+const ehDesignador = (token?: Token) => !!token && DESIGNADORES.has(minusculo(token.nucleo));
 
 export function padronizarTexto(texto: string): string {
   const tokens = texto.trim().split(/\s+/).filter(t => t !== '').map(separar);
@@ -138,6 +164,8 @@ export function padronizarTexto(texto: string): string {
         meio: i !== primeiro && i !== ultimo,
         aposNumero: comecaComNumero(tokens[i - 1]),
         antesNumero: comecaComNumero(tokens[i + 1]),
+        aposDesignador: ehDesignador(tokens[i - 1]),
+        antesPalavra: comecaComLetra(tokens[i + 1]),
       }) + t.suf;
     })
     .join(' ');
