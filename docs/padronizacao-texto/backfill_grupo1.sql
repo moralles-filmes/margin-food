@@ -35,13 +35,19 @@ begin
      and t.descricao is distinct from pg_temp.padronizar_texto(t.descricao);
   get diagnostics v_cr = row_count;
 
-  -- Lançamento digitado e espelho de título; o espelho copia a descrição do
-  -- título, então os dois continuam iguais depois do backfill.
+  -- Lançamento digitado e espelho da baixa de título (que copia a descrição do
+  -- título). O espelho de título criado a partir do extrato
+  -- (reconcile_create_titulo_from_extrato) guarda o texto do banco: fica de fora.
   update public.fin_lancamentos t
      set descricao = pg_temp.padronizar_texto(t.descricao)
    where t.company_id is distinct from c_placeholder
      and t.origem in ('manual', 'espelho_cp', 'espelho_cr')
      and t.tipo <> 'TRANSFERENCIA'
+     and not exists (
+       select 1 from public.fin_audit_logs a
+        where a.acao = 'criar_baixado_extrato'
+          and a.depois->>'lancamento_id' = t.id::text
+     )
      and t.descricao is distinct from pg_temp.padronizar_texto(t.descricao);
   get diagnostics v_lancamentos = row_count;
 
