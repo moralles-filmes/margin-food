@@ -18,7 +18,9 @@ type Rpc = (fn: string, args?: Record<string, unknown>) => {
   abortSignal: (signal: AbortSignal) => Promise<{ data: unknown; error: { code?: string; message: string } | null }>;
 } & Promise<{ data: unknown; error: { code?: string; message: string } | null }>;
 
-const rpc = (supabase: Supabase): Rpc => supabase.rpc as unknown as Rpc;
+// `bind` é obrigatório: `rpc` usa `this` (o cliente). Devolver o método solto fazia toda
+// chamada estourar no navegador, antes de sair a requisição.
+const rpc = (supabase: Supabase): Rpc => (supabase.rpc as unknown as Rpc).bind(supabase) as Rpc;
 
 export const CMV_QUERY_ROOT = ['financeiro', 'cmv'] as const;
 
@@ -152,14 +154,21 @@ export function parseCmvConfig(raw: unknown): CmvConfig {
 
 /** `null` = CMV Financeiro indisponível neste banco (migration não aplicada) ou sem acesso. */
 export async function fetchCmvConfig(supabase: Supabase): Promise<CmvConfig | null> {
-  const { data, error } = await rpc(supabase)('get_fin_cmv_config');
-  if (error) {
-    if (!isCmvIndisponivel(error) && !isCmvPermissionError(error)) {
-      console.error('[CMV Financeiro] Falha ao carregar get_fin_cmv_config:', error);
+  // Nunca lança: Contas a Pagar carrega isto junto com categorias e fornecedores,
+  // e uma falha do CMV não pode derrubar o formulário.
+  try {
+    const { data, error } = await rpc(supabase)('get_fin_cmv_config');
+    if (error) {
+      if (!isCmvIndisponivel(error) && !isCmvPermissionError(error)) {
+        console.error('[CMV Financeiro] Falha ao carregar get_fin_cmv_config:', error);
+      }
+      return null;
     }
+    return parseCmvConfig(data);
+  } catch (error) {
+    console.error('[CMV Financeiro] Falha ao carregar get_fin_cmv_config:', error);
     return null;
   }
-  return parseCmvConfig(data);
 }
 
 export function useCmvConfig({ companyId, enabled }: { companyId: string | null | undefined; enabled: boolean }) {
