@@ -5,9 +5,9 @@ navegação. Não inicie a Fase 03.
 
 ESTADO REAL DEIXADO PELA FASE 01 (2026-10-03)
 - Branch feat/redesign-v2-f01, criada de main em
-  c6a9774f8fe42b15ae2bcae6eea3e344f8e090d2. NENHUM commit: a Fase 01 inteira
-  está no diff da branch (10 arquivos alterados, 5 novos em src/, e a pasta
-  docs/redesign-margin-food-v2/ ainda não versionada). main intocada.
+  c6a9774f8fe42b15ae2bcae6eea3e344f8e090d2. Fase 01 commitada em 875514a
+  (código) e ce512d4 (documentação), mais um commit de documentação com
+  estes SHAs. Sem push, PR ou merge. main intocada.
 - Fase 01 validada com ressalvas: bun run test = 174 arquivos / 1.719 testes;
   tsc --noEmit -p tsconfig.app.json = 0 erros; bun run lint = 0 erros e
   2.016 avisos; bun run build ok (vendor-charts 555,4 kB; FinanceiroView
@@ -20,10 +20,10 @@ ESTADO REAL DEIXADO PELA FASE 01 (2026-10-03)
   reduzido), leitor de tela.
 
 ANTES DE EDITAR
-1. Confirme diretório, branch, SHA e git status. Se a Fase 01 ainda estiver
-   sem commit, PERGUNTE ao proprietário se ele quer commitar a Fase 01 antes
-   (commit separado por fase) e em qual branch a Fase 02 deve seguir. Não
-   reverta nem sobrescreva o diff existente. Sem push, merge ou deploy.
+1. Confirme diretório, branch, SHA e git status. PERGUNTE ao proprietário se
+   a Fase 02 segue na mesma branch ou em uma nova a partir dela (ex.:
+   feat/redesign-v2-f02), com commit separado por fase. Não reverta nem
+   sobrescreva o que existir. Sem push, merge ou deploy sem pedido dele.
 2. Leia, nesta ordem:
    - CLAUDE.md (AGENTS.md é idêntico por regra do projeto)
    - docs/redesign-margin-food-v2/PROMPT-MESTRE.md

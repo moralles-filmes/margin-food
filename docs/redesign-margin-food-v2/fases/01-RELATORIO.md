@@ -4,7 +4,7 @@
 
 - Fase: 01. Data: 2026-10-03.
 - Repositório `moralles-filmes/margin-food`, diretório `C:\Users\Yuri\Documents\Desenvolvedor\margin.food`.
-- Branch `feat/redesign-v2-f01`, criada a partir de `main` em `c6a9774f8fe42b15ae2bcae6eea3e344f8e090d2`. **Nenhum commit**: todo o trabalho está no diff da branch. Sem push, merge ou deploy. `main` não foi alterada.
+- Branch `feat/redesign-v2-f01`, criada a partir de `main` em `c6a9774f8fe42b15ae2bcae6eea3e344f8e090d2`. Commits, feitos a pedido do proprietário ao fim da fase: `875514a` (código) e `ce512d4` (documentação). Sem push, merge ou deploy. `main` não foi alterada.
 - `git status` no início: só `?? docs/redesign-margin-food-v2/`. Nada anterior a preservar.
 - Ambiente: Windows 11, Bun, Vite em `http://127.0.0.1:8082` (8080 e 8081 estavam ocupadas), Chrome com a extensão conectada. Login feito pelo proprietário com usuário e empresa de teste. O navegador estava com `prefers-reduced-motion: reduce` ativo.
 - Roteamento (ai-router): TIER 0, agente principal. Auditoria de módulo exigida pelo router executada em modo `--audit-only`: nenhum P0/P1/P2 (relatório em `.saas-audit/modules/primitivas-ui-redesign-v2-f01/REPORT.md`, fora do versionamento).
@@ -80,8 +80,8 @@ As capturas de tela ficaram na pasta temporária da extensão e mostram dados da
 
 ## Rollback seletivo
 
-`git restore` nos 10 arquivos alterados e remoção dos 5 arquivos novos listados acima; ou descartar a branch `feat/redesign-v2-f01`. Como nenhum consumidor passa `appearance`, reverter só `KpiCard.tsx` também é seguro.
+`git revert 875514a` (código); ou descartar a branch `feat/redesign-v2-f01`. Como nenhum consumidor passa `appearance`, reverter só `KpiCard.tsx` também é seguro.
 
 ## Decisão de avanço
 
-Fase 01 **validada com ressalvas**: gates de linha de comando iguais ao baseline, compatibilidade dos consumidores medida em navegador e primitivas novas conferidas no catálogo nos dois temas. Ressalvas: sem commit, 320 px em iframe, movimento normal e tema escuro das telas reais não observados. Próxima: Fase 02.
+Fase 01 **validada com ressalvas**: gates de linha de comando iguais ao baseline, compatibilidade dos consumidores medida em navegador e primitivas novas conferidas no catálogo nos dois temas. Ressalvas: 320 px em iframe, movimento normal e tema escuro das telas reais não observados. Próxima: Fase 02.
