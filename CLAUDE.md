@@ -301,6 +301,7 @@ Todas as Edge Functions usam CORS compartilhado via `supabase/functions/_shared/
 - **DatePicker** / **DateRangePicker** (`components/ui/DatePicker.tsx`) — popover+calendário para campo `Date` único ou intervalo `from`/`to` ISO; não recompor `Popover`+`Calendar` manualmente.
 - **ChartCard** / **ChartTooltip** / **ChartLegend** + `src/lib/chartTheme.ts` — camada central de gráficos Recharts (cores de série, grade, eixo, tooltip, formatação BRL/%/qtd). Todo gráfico novo consome daqui, nunca `contentStyle`/cor inline.
 - **SegmentedControl** / **ModuleNav** (`components/ui/`) — grupo de opções exclusivas (`Mês|Ano|Total` etc.) e navegação de módulo em 2 níveis; **PageHeader** (`components/ui/PageHeader.tsx`) para cabeçalho de conteúdo de tela (título+ação, distinto do header global do `AppLayout`).
+- **CompanySelector** (`components/CompanySelector.tsx`) — único seletor de unidade: `appearance="card"`/`"compact"` na sidebar e `"inline"` no escopo da Apresentação Sócios. Lista só `accessibleCompanies` e troca só por `setActiveCompany` (ou `presentationUnit`); nunca criar seletor paralelo nem consulta própria de unidades.
 
 ### Padrões de Busca de Texto (OBRIGATÓRIO)
 

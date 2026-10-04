@@ -1,3 +1,61 @@
+# Handoff 02 → 03
+
+## Estado real
+
+- Repositório `moralles-filmes/margin-food`, branch `feat/redesign-v2-f02`, criada de `feat/redesign-v2-f01` em `7bf08a740a411ad6a53e90bba1a6891082e7101b`. Commits da Fase 02: `11ae4d6` (código) e `(SHA no commit seguinte)` (documentação), mais um commit de documentação com estes SHAs.
+- Sem push, PR ou merge; `main` intocada em `c6a9774`.
+- Fase 02 validada com ressalvas em 2026-10-03. Fase 03 pendente.
+
+## Contexto mínimo
+
+A V2 aplica ao sistema inteiro a identidade aprovada. A Fase 01 criou a base (tokens do destaque, `KpiCard` com `appearance`, gráficos e estados). A Fase 02 aplicou a estrutura global: sidebar clara com cartão da loja, item ativo com o gradiente do destaque, conta no rodapé (D07), gaveta acessível no celular, cabeçalho branco e `SegmentedControl` em pílula clara. Nenhuma tela de módulo foi migrada ainda; o Dashboard Financeiro é a primeira (Fase 03).
+
+Não reverter: D15–D19 (família de cards), D22 (item ativo), D23 (`CompanySelector` com `appearance`; o modo `inline` serve a Apresentação Sócios), D26 (largura padrão 256 px), D28 (gaveta: `key` distinta nos dois `<aside>`), D29 (`SegmentedControl`), D09, D13.
+
+## Leitura obrigatória do próximo chat
+
+1. `CLAUDE.md`
+2. `docs/redesign-margin-food-v2/PROMPT-MESTRE.md`
+3. `docs/redesign-margin-food-v2/PROGRESSO.md`
+4. `docs/redesign-margin-food-v2/DECISOES.md`
+5. `docs/redesign-margin-food-v2/fases/02-RELATORIO.md`
+6. `docs/redesign-margin-food-v2/MATRIZ-DE-COBERTURA.md` — linhas FIN-B-001 a FIN-B-010
+7. `docs/redesign-margin-food-v2/prompts/03-dashboard-financeiro.md`
+
+Código a inspecionar: `src/components/financeiro/DashboardFinanceiroSection.tsx`, `DashboardCharts.tsx`, `src/components/FinanceiroView.tsx`, `src/components/ui/KpiCard.tsx` (+ teste), `ChartCard.tsx`, `ChartTooltip.tsx`, `ChartLegend.tsx`, `src/lib/chartTheme.ts`.
+
+Referências: `01-dashboard-financeiro.png`, `01b-dashboard-detalhamento.png`, `01c-dashboard-mobile.png`, `00-card-azul-aprovado.png`.
+
+## Já implementado e validado
+
+Conferido em navegador (sessão do proprietário, quatro unidades reais, uso só de leitura autorizado):
+
+- Sidebar comparada lado a lado com o recorte aprovado; contraste do item ativo 6,14:1 (claro) / 6,66:1 (escuro) e do cartão da loja 16,05 / 17,28 (nome) e 5,09 / 7,75 (apoio).
+- Troca A → B → A sem quadro com cabeçalho de uma unidade e dados de outra; duplo clique = uma troca; falha simulada no cliente cai na tela de erro existente; formulário sujo protegido.
+- Recolhida, 160–480 px com largura salva, gaveta do celular (foco, Escape, `inert`), teclado, claro/escuro, 320/390/768/1024/1366/1920 px sem rolagem horizontal.
+- `SegmentedControl` nos 4 consumidores (Dashboard, Borderô, cadastro de marca, folha do CMV).
+
+Executado em linha de comando: testes 177 / 1.741, typecheck 0, lint 0 erros e 2.016 avisos, build com os mesmos tamanhos, catálogo ausente de `dist/`. Auditoria de módulo (identidade/acesso): aprovada com ressalvas; os dois P3 foram corrigidos com teste.
+
+Só em teste automatizado: uma loja, perfil com menos permissões, busca do seletor (4 unidades < limiar 8). Não executado: leitor de tela, movimento normal.
+
+## Trabalho seguinte
+
+Fase 03 — Dashboard Financeiro completo: oito indicadores em dois grupos (Saldo em `highlight`, demais em `summary`), cabeçalho da tela, gráficos com `ChartCard`, ranking de despesas por categoria e explicação de Despesas Provisionadas — sem mudar RPC, cálculo, filtros, exportações ou destinos dos cliques. Critérios: os do prompt 03 e a validação descrita no prompt abaixo.
+
+## Bloqueios / riscos / cuidado com dados
+
+- O proprietário precisa reautorizar o uso da sessão (ou logar com usuário de teste) a cada chat; o assistente não digita senha.
+- Os valores das imagens de referência coincidem com dados reais de uma unidade: não usar como fixture nem hardcodar (D09).
+- Capturas mostram dados reais; não versionar.
+- PF-072 (contagens HEAD dos badges com 503) e PF-073 (calculadora sobre a gaveta) registradas, não corrigidas.
+- 73 pendências em `PENDENCIAS-FUNCIONAIS.md`; as do Dashboard (PF-003, PF-004, PF-005, PF-008) não devem ser corrigidas no redesign.
+
+## Prompt completo para colar no próximo chat
+
+O texto integral está em `docs/redesign-margin-food-v2/PROXIMO-CHAT.md` e reproduzido abaixo.
+
+```text
 Continue o Redesign Visual V2 do MARGIN FOOD (sistema EMPRESARIAL de gestão
 para restaurantes), repositório moralles-filmes/margin-food.
 Execute exclusivamente a FASE 03 — Dashboard Financeiro completo. Não inicie
@@ -156,3 +214,4 @@ ENTREGA AO FINAL
    Fase 04 se os gates passaram com navegador; validação/correção da Fase 03
    caso contrário.
 4. PARAR. Não iniciar a Fase 04 no mesmo chat.
+```
