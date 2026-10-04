@@ -35,6 +35,11 @@ export interface ChartTooltipProps {
   valueFormatter?: (value: number | string, item: ChartTooltipPayloadItem) => React.ReactNode;
   /** `dataKey`s (ou `name`, se não houver `dataKey`) que devem exibir amostra tracejada. */
   dashedKeys?: Array<string | number>;
+  /**
+   * Limite opcional de linhas para gráficos com muitas séries: mostra as N primeiras e uma linha
+   * "+ X séries". Sem a prop, todas as séries aparecem (o valor completo nunca é omitido por padrão).
+   */
+  maxItems?: number;
   className?: string;
 }
 
@@ -47,23 +52,26 @@ export function ChartTooltip({
   unit,
   valueFormatter,
   dashedKeys,
+  maxItems,
   className,
 }: ChartTooltipProps) {
   if (!active || !payload?.length) return null;
 
   const heading = title ?? label;
+  const visible = maxItems && payload.length > maxItems ? payload.slice(0, maxItems) : payload;
+  const hiddenCount = payload.length - visible.length;
 
   return (
     <div
       className={cn(
-        'min-w-[10rem] rounded-lg border border-chart-tooltip-border bg-chart-tooltip px-3 py-2 text-xs shadow-md',
+        'min-w-[10rem] max-w-[min(20rem,calc(100vw-2rem))] rounded-lg border border-chart-tooltip-border bg-chart-tooltip px-3 py-2 text-xs shadow-md',
         className,
       )}
     >
       {heading != null && <div className="font-medium text-chart-tooltip-foreground">{heading}</div>}
       {period != null && <div className="text-muted-foreground">{period}</div>}
       <div className={cn('grid gap-1', (heading != null || period != null) && 'mt-1.5')}>
-        {payload.map((item, index) => {
+        {visible.map((item, index) => {
           const key = item.dataKey ?? (typeof item.name === 'string' ? item.name : index);
           const dashed = dashedKeys?.includes(key as string | number) ?? false;
           const displayValue = valueFormatter
@@ -80,14 +88,17 @@ export function ChartTooltip({
                 style={{ borderColor: item.color }}
                 aria-hidden
               />
-              <span className="flex-1 text-muted-foreground">{item.name}</span>
-              <span className="font-medium tabular-nums text-chart-tooltip-foreground">
+              <span className="min-w-0 flex-1 break-words text-muted-foreground">{item.name}</span>
+              <span className="whitespace-nowrap font-medium tabular-nums text-chart-tooltip-foreground">
                 {displayValue}
                 {itemUnit ? ` ${itemUnit}` : ''}
               </span>
             </div>
           );
         })}
+        {hiddenCount > 0 && (
+          <div className="text-muted-foreground">+ {hiddenCount} {hiddenCount === 1 ? 'série' : 'séries'}</div>
+        )}
       </div>
     </div>
   );

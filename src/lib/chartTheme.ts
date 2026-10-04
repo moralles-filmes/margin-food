@@ -86,6 +86,15 @@ export function makeActiveDot(strokeColor: string) {
   } as const;
 }
 
+/** `margin` padrão do gráfico cartesiano dentro de `ChartCard` — folga para rótulo de eixo sem cortar. */
+export const chartMargin = { top: 8, right: 12, bottom: 4, left: 4 } as const;
+
+/** Spread em `<Bar>` vertical — topo arredondado; a base continua em zero. */
+export const barProps = { radius: [6, 6, 0, 0] as [number, number, number, number], maxBarSize: 44 } as const;
+
+/** Spread em `<Bar>` de ranking horizontal (`layout="vertical"`) — nomes longos ficam no eixo Y. */
+export const horizontalBarProps = { radius: [0, 6, 6, 0] as [number, number, number, number], maxBarSize: 20 } as const;
+
 /** Props prontas para `<Tooltip {...tooltipProps} content={<ChartTooltip />} />` (Recharts cru). */
 export const tooltipProps = {
   cursor: cursorProps,
