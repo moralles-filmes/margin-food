@@ -15,18 +15,20 @@ import { useLayoutEffect, useState } from 'react';
  *
  * Histerese: depois de virar lista, só volta a tabela com `HISTERESE_PX` a mais. Sem ela, abrir um
  * diálogo (o Radix esconde a barra de rolagem e o contêiner ganha ~8–17 px) trocava a marcação perto
- * do limite e desmontava o botão que abriu o diálogo — o foco não tinha para onde voltar.
+ * do limite e desmontava o botão que abriu o diálogo — o foco não tinha para onde voltar. Contêiner
+ * com largura máxima pouco acima do limite (o rateio dentro do formulário) passa uma histerese menor,
+ * senão nunca voltaria a tabela.
  */
 const HISTERESE_PX = 32;
 
-export function useConteinerEstreito(limitePx: number) {
+export function useConteinerEstreito(limitePx: number, histerese = HISTERESE_PX) {
   const [el, setEl] = useState<HTMLElement | null>(null);
   const [estreito, setEstreito] = useState(() => typeof window !== 'undefined' && window.innerWidth > 0 && window.innerWidth < limitePx);
 
   useLayoutEffect(() => {
     if (!el) return;
     const aplicar = (largura: number) => {
-      if (largura > 0) setEstreito(atual => largura < limitePx + (atual ? HISTERESE_PX : 0));
+      if (largura > 0) setEstreito(atual => largura < limitePx + (atual ? histerese : 0));
     };
     aplicar(el.getBoundingClientRect().width);
     if (typeof ResizeObserver === 'undefined') return;
@@ -36,7 +38,7 @@ export function useConteinerEstreito(limitePx: number) {
     });
     observer.observe(el);
     return () => observer.disconnect();
-  }, [el, limitePx]);
+  }, [el, limitePx, histerese]);
 
   return [setEl, estreito] as const;
 }

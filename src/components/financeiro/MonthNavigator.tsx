@@ -9,6 +9,10 @@ interface MonthNavigatorProps {
   monthsBack?: number;
   monthsForward?: number;
   className?: string;
+  /** Id do seletor de mês, para um `<Label htmlFor>` externo. */
+  id?: string;
+  /** Nome acessível do seletor de mês (quando não há rótulo visível associado). */
+  ariaLabel?: string;
 }
 
 // Aritmetica pura em inteiros — evita o bug documentado de `new Date('yyyy-MM-01')`
@@ -36,7 +40,7 @@ function formatMonthLabel(value: string): string {
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
-export default function MonthNavigator({ value, onChange, monthsBack = 12, monthsForward = 3, className }: MonthNavigatorProps) {
+export default function MonthNavigator({ value, onChange, monthsBack = 12, monthsForward = 3, className, id, ariaLabel }: MonthNavigatorProps) {
   const currentMonth = formatInBR(new Date(), 'yyyy-MM');
   const options = Array.from({ length: monthsBack + monthsForward + 1 }, (_, i) => shiftMonth(currentMonth, monthsForward - i));
   if (!options.includes(value)) options.unshift(value);
@@ -48,12 +52,17 @@ export default function MonthNavigator({ value, onChange, monthsBack = 12, month
         variant="ghost"
         size="icon"
         className="h-9 w-9 shrink-0 hover:bg-surface-hover"
+        aria-label="Mês anterior"
         onClick={() => onChange(shiftMonth(value, -1))}
       >
-        <ChevronLeft className="w-4 h-4" />
+        <ChevronLeft aria-hidden="true" className="w-4 h-4" />
       </Button>
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger className="h-9 w-[168px] border-0 border-x border-border rounded-none justify-center gap-1.5 bg-transparent shadow-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset font-medium">
+        <SelectTrigger
+          id={id}
+          aria-label={id ? ariaLabel : (ariaLabel ?? 'Mês')}
+          className="h-9 w-[168px] border-0 border-x border-border rounded-none justify-center gap-1.5 bg-transparent shadow-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset font-medium"
+        >
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -65,9 +74,10 @@ export default function MonthNavigator({ value, onChange, monthsBack = 12, month
         variant="ghost"
         size="icon"
         className="h-9 w-9 shrink-0 hover:bg-surface-hover"
+        aria-label="Próximo mês"
         onClick={() => onChange(shiftMonth(value, 1))}
       >
-        <ChevronRight className="w-4 h-4" />
+        <ChevronRight aria-hidden="true" className="w-4 h-4" />
       </Button>
     </div>
   );

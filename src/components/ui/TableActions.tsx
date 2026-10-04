@@ -17,6 +17,10 @@ interface TableActionsProps {
   className?: string;
   size?: 'sm' | 'default' | 'icon';
   hideConfirm?: boolean;
+  /** Nome acessível do botão de editar (ex.: "Editar <descrição>"); sem ele o botão só tem o ícone. */
+  editLabel?: string;
+  /** Nome acessível do botão de excluir. */
+  deleteLabel?: string;
 }
 
 /**
@@ -36,6 +40,8 @@ export default function TableActions({
   className = 'flex gap-1',
   size = 'icon',
   hideConfirm = false,
+  editLabel,
+  deleteLabel,
 }: TableActionsProps) {
   const { confirm, ConfirmDialog } = useConfirmDialog();
   
@@ -81,8 +87,10 @@ export default function TableActions({
           className="h-7 w-7 text-muted-foreground hover:text-foreground"
           onClick={handleEdit}
           disabled={isDeleting}
+          aria-label={editLabel}
+          title={editLabel}
         >
-          <Pencil className="w-3.5 h-3.5" />
+          <Pencil aria-hidden={editLabel ? true : undefined} className="w-3.5 h-3.5" />
         </Button>
       )}
       {canShowDelete && (
@@ -92,11 +100,13 @@ export default function TableActions({
           className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
           onClick={handleDelete}
           disabled={isDeleting}
+          aria-label={deleteLabel}
+          title={deleteLabel}
         >
           {isDeleting ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            <Loader2 aria-hidden={deleteLabel ? true : undefined} className="w-3.5 h-3.5 animate-spin" />
           ) : (
-            <Trash2 className="w-3.5 h-3.5" />
+            <Trash2 aria-hidden={deleteLabel ? true : undefined} className="w-3.5 h-3.5" />
           )}
         </Button>
       )}

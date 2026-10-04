@@ -10,6 +10,8 @@ interface DateRangePresetsProps {
   className?: string;
   /** Oculta os presets "Últimos 7d/30d/90d" — usar quando o filtro de mês navegavel os substitui. */
   hideLastNDays?: boolean;
+  /** Nome acessível do grupo de atalhos. */
+  ariaLabel?: string;
 }
 
 type Preset = {
@@ -57,14 +59,14 @@ function buildPresets(): Preset[] {
   ];
 }
 
-export default function DateRangePresets({ from, to, onChange, className, hideLastNDays }: DateRangePresetsProps) {
+export default function DateRangePresets({ from, to, onChange, className, hideLastNDays, ariaLabel = 'Atalhos de período' }: DateRangePresetsProps) {
   const presets = buildPresets().filter(p => !hideLastNDays || !p.lastNDays);
 
   const activeIndex = presets.findIndex(p => p.from() === from && p.to() === to);
   const isCleared = from === '' && to === '';
 
   return (
-    <div className={`flex items-center gap-1.5 flex-wrap ${className ?? ''}`}>
+    <div role="group" aria-label={ariaLabel} className={`flex items-center gap-1.5 flex-wrap ${className ?? ''}`}>
       {presets.map((preset, idx) => {
         const isActive = activeIndex === idx;
         return (
@@ -72,6 +74,7 @@ export default function DateRangePresets({ from, to, onChange, className, hideLa
             key={preset.label}
             size="sm"
             variant={isActive ? 'default' : 'outline'}
+            aria-pressed={isActive}
             className={`text-[11px] h-7 px-2.5 whitespace-nowrap ${
               isActive
                 ? 'bg-primary-strong text-primary-strong-foreground border-0 hover:bg-primary-hover'
@@ -83,7 +86,7 @@ export default function DateRangePresets({ from, to, onChange, className, hideLa
           </Button>
         );
       })}
-      <span className="w-px h-4 bg-border mx-0.5" />
+      <span aria-hidden="true" className="w-px h-4 bg-border mx-0.5" />
       <Button
         size="sm"
         variant="ghost"

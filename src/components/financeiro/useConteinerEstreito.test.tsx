@@ -26,8 +26,8 @@ afterEach(() => {
   largura(larguraOriginal);
 });
 
-function Exemplo() {
-  const [ref, estreito] = useConteinerEstreito(1000);
+function Exemplo({ histerese }: { histerese?: number }) {
+  const [ref, estreito] = useConteinerEstreito(1000, histerese);
   return <div ref={ref}>{estreito ? 'lista' : 'tabela'}</div>;
 }
 
@@ -44,6 +44,14 @@ describe('useConteinerEstreito', () => {
     expect(screen.getByText('lista')).toBeInTheDocument();
 
     act(() => observado?.(1040));
+    expect(screen.getByText('tabela')).toBeInTheDocument();
+  });
+
+  it('histerese menor para contêiner com largura máxima pouco acima do limite', () => {
+    render(<Exemplo histerese={8} />);
+    act(() => observado?.(990));
+    expect(screen.getByText('lista')).toBeInTheDocument();
+    act(() => observado?.(1010));
     expect(screen.getByText('tabela')).toBeInTheDocument();
   });
 
