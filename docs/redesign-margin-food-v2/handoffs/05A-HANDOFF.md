@@ -1,3 +1,61 @@
+# Handoff 05A → 05B
+
+## Estado real
+
+- Repositório `moralles-filmes/margin-food`, branch `feat/redesign-v2-f05a`, criada de `feat/redesign-v2-f04b` em `2079f94`. Commits da Fase 05A: `be5a67e` (código) e `DOCS_SHA` (documentação), mais um commit de documentação registrando estes SHAs.
+- Sem push, PR ou merge; `main` intocada em `c6a9774`.
+- Fase 05A validada com ressalvas em 2026-10-04. Fase 05B pendente.
+
+## Contexto mínimo
+
+A V2 aplica ao sistema inteiro a identidade aprovada. Fases 01 e 02 criaram a base e a estrutura global; a 03 levou o padrão ao Dashboard Financeiro; a 04A, a Contas Bancárias, Livro Razão, Fluxo e Projeção; a 04B, à Conciliação; a 05A, a Contas a Pagar/Receber, Códigos de Pagamento, Recorrências, Alertas e aos diálogos de detalhe e formulário de conta — sem mudar RPC, parâmetro, payload, ordem de chamada, chave de idempotência, permissão nem condição de botão. A 05B fecha as operações e cadastros do Financeiro: Fechamento de Caixa (com marcas), Cadastros Base (árvore de categorias, Plano de Contas, Centros de Custo) e Categorização.
+
+Não reverter: D15–D19, D22–D30, D31–D36, D37–D44, D45–D50 e D51–D58 (resumo só das fontes atuais com rótulo do recorte e erro que nunca vira R$ 0,00; tabela ⇄ lista por largura medida com uma marcação ou container query com duas; estorno em `AlertDialog` com o mesmo texto e trava síncrona; foco inicial seguro e retorno de foco encadeado nos diálogos de conta; rateio em cartões sem perder o CMV por linha; cópia exata de código; erro dos alertas nunca vira "Tudo sob controle!"; nomes acessíveis nos compartilhados), D09, D13.
+
+## Leitura obrigatória do próximo chat
+
+1. `CLAUDE.md` (Fechamento por marca, forma de venda e quantidade, vínculo marca→categoria, categorias não operacionais, `seed_default_categories`, chave `financeiro:cadastros:*`, busca normalizada)
+2. `docs/redesign-margin-food-v2/PROMPT-MESTRE.md`
+3. `docs/redesign-margin-food-v2/PROGRESSO.md`
+4. `docs/redesign-margin-food-v2/DECISOES.md`
+5. `docs/redesign-margin-food-v2/fases/05A-RELATORIO.md`
+6. `docs/redesign-margin-food-v2/MATRIZ-DE-COBERTURA.md` — linhas FIN-A-051 a 055 e 060 a 066
+7. `docs/redesign-margin-food-v2/prompts/05-operacoes-e-cadastros-financeiros.md` (itens 4, 6, 7 e 8)
+
+Código a inspecionar: `FechamentoCaixaSection.tsx`, `FechamentoMarcasTab.tsx`, `CadastroBaseTree.tsx`, `PlanoContasFinSection.tsx`, `CentrosCustoFinSection.tsx`, `CategorizacaoSection.tsx` e o wrapper `CadastrosBase` em `src/components/FinanceiroView.tsx`. Exemplo do padrão: `ContasPagarSection.tsx`, `LivroRazaoSection.tsx`, `finV2Layout.tsx`, `kpiGrid.ts`, `useRetornoFoco.ts`, `useConteinerEstreito.ts`.
+
+## Já implementado e validado
+
+Conferido em navegador (login "Administrador Principal"; unidade de teste Moralles com títulos, códigos, recorrências, alertas e lançamentos sintéticos injetados no cliente; toda escrita interceptada; nenhuma chegou ao servidor, em três passagens):
+
+- Valores, datas, parcelas e contadores idênticos antes/depois nas cinco telas e nos detalhes; os quatro códigos copiados idênticos byte a byte.
+- Diálogos de detalhe, edição, Nova Conta (com rateio e CMV), pagamento, recebimento, limite, estorno e exclusão abertos e fechados sem confirmar; foco volta à origem (inclusive detalhe → editar, Livro Razão e Conciliação — ressalva da 04B resolvida); foco inicial do detalhe no próprio diálogo.
+- Estados de carregamento anunciado, erro com nova tentativa (antes R$ 0,00, "Nenhuma conta a pagar" e "Tudo sob controle! 🎉") e vazio; "Total filtrado" "—" com a lista em erro; claro/escuro; 320/390 (iframe), 768, 1024, 1366, 1920 px sem rolagem horizontal; sidebar recolhida e a 437 px; rateio em tabela/cartões medido; teclado; contraste ≥ 4,80 (claro) e ≥ 4,93 (escuro).
+
+Executado em linha de comando: testes 200 / 1.893, typecheck 0, lint 0 erros e 2.016 avisos, build ok (`FinanceiroView` 261,90 kB, CSS 123,23 kB). Auditoria de módulo (mapeador, identidade/acesso, processo de negócio, funcional): sem bloqueante; seis regressões da fase corrigidas e conferidas em navegador; preexistentes em PF-093 a PF-104.
+
+Só em teste: "Aplicar às outras recorrências?" (exige salvar), sem permissão, erro/vazio de Códigos, Recorrências e Receber. Não executado: leitor de tela, movimento normal, qualquer confirmação de gravação.
+
+Desvios registrados no relatório: botões de linha "Pagar", "Receber", "Estornar", editar e "Excluir" acionados só para abrir os diálogos (confirmado no código), com escrita interceptada.
+
+## Trabalho seguinte
+
+Fase 05B — Fechamento de Caixa, Cadastros Base e Categorização, só apresentação. Critérios: os do prompt 05 (itens 4, 6, 7 e 8) e a validação do prompt abaixo.
+
+## Bloqueios / riscos / cuidado com dados
+
+- Estas telas gravam com um clique: Switch de ativar marca, arrastar/subir/descer categoria, "Modelo Padrão", "Aplicar Regras". Não acionar; validar com dados sintéticos e escrita interceptada.
+- O Fechamento soma marcas contra o bruto e distingue pedidos de pessoas; a árvore tem raízes de sistema e flags herdadas. Nada disso muda na apresentação.
+- O proprietário precisa reautorizar sessão e unidade a cada chat; o assistente não digita senha.
+- Os valores das imagens de referência coincidem com os de uma unidade real (D09): nunca usar como fixture, no código ou nas docs.
+- Capturas mostram dados; ficam fora do repositório.
+- 104 pendências em `PENDENCIAS-FUNCIONAIS.md`; nenhuma deve ser corrigida no redesign. PF-097 (baixa de Conta a Receber sem conta bancária, impacto alto) e PF-088 aguardam decisão do proprietário.
+
+## Prompt completo para colar no próximo chat
+
+O texto integral está em `docs/redesign-margin-food-v2/PROXIMO-CHAT.md` e reproduzido abaixo.
+
+```text
 Continue o Redesign Visual V2 do MARGIN FOOD (sistema EMPRESARIAL de gestão
 para restaurantes), repositório moralles-filmes/margin-food.
 Execute exclusivamente a FASE 05B — Fechamento de Caixa (com Marcas e dark
@@ -264,3 +322,4 @@ ENTREGA AO FINAL
    PROGRESSO.md e prompts/06-analises-e-relatorios-financeiros.md) se os
    gates passaram com navegador; validação/correção da 05B caso contrário.
 4. PARAR. Não iniciar a Fase 06A no mesmo chat.
+```
