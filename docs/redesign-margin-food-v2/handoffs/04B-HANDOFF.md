@@ -1,3 +1,61 @@
+# Handoff 04B → 05A
+
+## Estado real
+
+- Repositório `moralles-filmes/margin-food`, branch `feat/redesign-v2-f04b`, criada de `feat/redesign-v2-f04a` em `ae30b6f`. Commits da Fase 04B: `9897f2f` (código) e `DOCS_SHA_PENDENTE` (documentação), mais um commit de documentação registrando estes SHAs.
+- Sem push, PR ou merge; `main` intocada em `c6a9774`.
+- Fase 04B validada com ressalvas em 2026-10-04. Fase 05A pendente.
+
+## Contexto mínimo
+
+A V2 aplica ao sistema inteiro a identidade aprovada. Fases 01 e 02 criaram a base e a estrutura global; a 03 levou o padrão ao Dashboard Financeiro; a 04A, a Contas Bancárias, Livro Razão, Fluxo e Projeção; a 04B, à Conciliação Bancária — sem mudar RPC, parâmetro, ordem de chamada, chave de `sessionStorage`, permissão, regra do banner nem condição de botão. A 05A leva o padrão às telas operacionais de títulos (Pagar, Receber, Códigos, Recorrências, Alertas) e aos diálogos de detalhe e formulário que elas compartilham com o Livro Razão e a Conciliação.
+
+Não reverter: D15–D19, D22–D30, D31–D36, D37–D44 e D45–D50 (tabela ⇄ lista por largura medida com uma só marcação; banner de conferência em painel com a mesma regra; selos com a mesma precedência e sem opacidade; KPIs da conta inteira rotulados como tal; `useRetornoFoco`; campo de arquivo acessível e `SegmentedControl` com ativação manual), D09, D13.
+
+## Leitura obrigatória do próximo chat
+
+1. `CLAUDE.md` (regras de Contas a Pagar/Receber, CMV financeiro, idempotência)
+2. `docs/redesign-margin-food-v2/PROMPT-MESTRE.md`
+3. `docs/redesign-margin-food-v2/PROGRESSO.md`
+4. `docs/redesign-margin-food-v2/DECISOES.md`
+5. `docs/redesign-margin-food-v2/fases/04B-RELATORIO.md`
+6. `docs/redesign-margin-food-v2/MATRIZ-DE-COBERTURA.md` — linhas FIN-A-012, 013, 041 a 050, 056 a 059, 067
+7. `docs/redesign-margin-food-v2/prompts/05-operacoes-e-cadastros-financeiros.md` (parte da 05A)
+
+Código a inspecionar: `ContasPagarSection.tsx`, `ContasReceberSection.tsx`, `CodigosPagamentoSection.tsx`, `RecorrenciasSection.tsx`, `AlertasSection.tsx`, `ContaDetailDialog.tsx`, `ContaFormDialog.tsx` e os combos/filtros compartilhados. Exemplo do padrão: `LivroRazaoSection.tsx`, `ConciliacaoBancariaSection.tsx`, `finV2Layout.tsx`, `kpiGrid.ts`, `useRetornoFoco.ts`.
+
+## Já implementado e validado
+
+Conferido em navegador (login "Administrador Principal"; unidade de teste Moralles com conta e OFX sintéticos injetados no cliente; toda escrita interceptada; nenhuma chegou ao servidor):
+
+- Chips, linhas, banner verde e vermelho e visão Lançamentos idênticos antes/depois.
+- Diálogos de sugestões, revisão de baixa, boleto, rateio, transferência, criar registro, conta diverge, substituir, saldo do extrato (passos 1 e 2) e edição abertos e fechados sem confirmar; foco volta ao elemento de origem (exceto edição, `ContaFormDialog`).
+- Estados de carregamento anunciado, vazio e erro; claro/escuro; 320/390 (iframe), 768, 1024, 1366, 1920 px sem rolagem horizontal; sidebar recolhida e a 437 px; teclado; contraste ≥ 4,80 (claro) e ≥ 5,11 (escuro); 250 linhas sem perda de desempenho (≈135 → ≈137 ms por clique).
+
+Executado em linha de comando: testes 192 / 1.852, typecheck 0, lint 0 erros e 2.016 avisos, build ok (chunk da Conciliação 137,05 kB, `FinanceiroView` 245,69 kB, CSS 122,54 kB). Auditoria de módulo (mapeador, processo de negócio, identidade/acesso, funcional): sem bloqueante; itens introduzidos corrigidos na fase; preexistentes em PF-086 a PF-092.
+
+Só em teste: diálogos "Já no Livro Razão" e de possível duplicata (exigem Processar), erro de leitura do banner, troca de conta com erro. Não executado: leitor de tela, movimento normal, qualquer confirmação de gravação.
+
+Desvios registrados no relatório: "Confirmar valor" do saldo acionado como parte do carregamento do OFX sintético (escritas bloqueadas); botões de linha "Baixar" e "Criar" (e Boleto, Ratear, Transf., sugestões) acionados só para abrir os diálogos, com escrita interceptada.
+
+## Trabalho seguinte
+
+Fase 05A — Contas a Pagar, Contas a Receber, Códigos de Pagamento, Recorrências e Alertas, só apresentação. Critérios: os do prompt 05 (parte da 05A) e a validação do prompt abaixo.
+
+## Bloqueios / riscos / cuidado com dados
+
+- Estas telas gravam com um clique (Aprovar, Pagar, Receber, Gerar parcela) e o estorno usa `window.confirm` nativo, que trava a aba: não acionar. Validar com dados sintéticos e escrita interceptada.
+- `ContaFormDialog`/`ContaDetailDialog` são compartilhados com Livro Razão e Conciliação: regressão obrigatória nesses consumidores.
+- O proprietário precisa reautorizar sessão e unidade a cada chat; o assistente não digita senha.
+- Os valores das imagens de referência coincidem com os de uma unidade real (D09): nunca usar como fixture, no código ou nas docs.
+- Capturas mostram dados; ficam fora do repositório.
+- 92 pendências em `PENDENCIAS-FUNCIONAIS.md`; nenhuma deve ser corrigida no redesign. PF-088 aguarda decisão do proprietário.
+
+## Prompt completo para colar no próximo chat
+
+O texto integral está em `docs/redesign-margin-food-v2/PROXIMO-CHAT.md` e reproduzido abaixo.
+
+```text
 Continue o Redesign Visual V2 do MARGIN FOOD (sistema EMPRESARIAL de gestão
 para restaurantes), repositório moralles-filmes/margin-food.
 Execute exclusivamente a FASE 05A — Contas a Pagar, Contas a Receber,
@@ -229,3 +287,4 @@ ENTREGA AO FINAL
    Fase 05B (Fechamento de Caixa, Cadastros Base, Categorização) se os
    gates passaram com navegador; validação/correção da 05A caso contrário.
 4. PARAR. Não iniciar a Fase 05B no mesmo chat.
+```

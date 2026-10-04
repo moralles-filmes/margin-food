@@ -1,11 +1,11 @@
 # Progresso — Margin Food V2
 
-- Branches: `feat/redesign-v2-f01` (de `main` em `c6a9774`; Fase 01 em `875514a`, `ce512d4`, `7bf08a7`) → `feat/redesign-v2-f02` (de `7bf08a7`; Fase 02 em `11ae4d6`, `1b381c6`, `1227af6`) → `feat/redesign-v2-f03` (de `1227af6`; Fase 03 em `8f755dd`, `709688b`, `197dea7`) → `feat/redesign-v2-f04a` (de `197dea7`; Fase 04A em `a170be6`, `44b8449` e um commit registrando estes SHAs). Sem push nem PR; `main` intocada.
-- Fase atual: 04A validada em 2026-10-04, com as ressalvas do relatório.
-- Última fase validada em navegador: 04A (Chrome, servidor local na porta 8080, login "Administrador Principal", unidade de teste Moralles e, com autorização do proprietário só nesta fase, leitura da unidade real Ren Sushi; nada gravado; cenários extremos simulados só no cliente).
+- Branches: `feat/redesign-v2-f01` (de `main` em `c6a9774`; Fase 01 em `875514a`, `ce512d4`, `7bf08a7`) → `feat/redesign-v2-f02` (de `7bf08a7`; Fase 02 em `11ae4d6`, `1b381c6`, `1227af6`) → `feat/redesign-v2-f03` (de `1227af6`; Fase 03 em `8f755dd`, `709688b`, `197dea7`) → `feat/redesign-v2-f04a` (de `197dea7`; Fase 04A em `a170be6`, `44b8449`, `ae30b6f`) → `feat/redesign-v2-f04b` (de `ae30b6f`; Fase 04B em `9897f2f` (código), um commit de documentação e um registrando os SHAs). Sem push nem PR; `main` intocada.
+- Fase atual: 04B validada em 2026-10-04, com as ressalvas do relatório.
+- Última fase validada em navegador: 04B (Chrome, servidor local na porta 8080, login "Administrador Principal", unidade de teste Moralles com conta e extrato OFX sintéticos injetados no cliente e toda escrita interceptada; nenhuma escrita chegou ao servidor).
 - Bloqueios: nenhum.
-- Decisões abertas: nenhuma.
-- Próximo prompt: `PROXIMO-CHAT.md` → Fase 04B (Conciliação Bancária).
+- Decisões abertas: PF-088 (banner verde com saldo projetado e regra em ponto flutuante) aguarda o proprietário; não bloqueia o redesign.
+- Próximo prompt: `PROXIMO-CHAT.md` → Fase 05A (Contas a Pagar, Contas a Receber, Códigos de Pagamento, Recorrências, Alertas).
 
 | Fase | Estado | Relatório | Evidências | Pendências |
 |---|---|---|---|---|
@@ -14,7 +14,7 @@
 | 02 | Validada com ressalvas | `fases/02-RELATORIO.md` | Testes 177/1.741 ok; typecheck 0 erros; lint 0 erros e 2.016 avisos; build ok com os mesmos tamanhos; sidebar, seletor, gaveta e cabeçalho em navegador (claro/escuro, 320–1920 px); troca A → B → A sem flash; falha simulada; formulário sujo; contraste medido | Uma loja, perfil reduzido e busca só em teste; leitor de tela e movimento normal não observados; PF-072, PF-073 |
 | 03 | Validada com ressalvas | `fases/03-RELATORIO.md` | Testes 180/1.779 ok; typecheck 0 erros; lint 0 erros e 2.016 avisos; build ok (`FinanceiroView` +13,42 kB, CSS +2,51 kB); 8 valores idênticos antes/depois (Out e Jun/2026); 8 destinos de clique; filtros, loading, erro, vazio; claro/escuro; 320–1920 px; sidebar recolhida/alargada; contraste medido; auditoria de módulo sem bloqueante | Sem acesso e exportação só em teste/diff; leitor de tela e movimento normal não observados; PF-074 a PF-077 |
 | 04A | Validada com ressalvas | `fases/04A-RELATORIO.md` | Testes 187/1.821 ok; typecheck 0 erros; lint 0 erros e 2.016 avisos; build ok (`FinanceiroView` +11,99 kB, CSS +1,43 kB); valores idênticos antes/depois nas quatro telas; total de contas = todas as ativas; navegação, estados, fixtures extremas, claro/escuro, 320–1920 px, sidebar, teclado e contraste em navegador; auditoria de módulo sem bloqueante | Exportação, diálogos destrutivos e sem acesso só em teste/diff; leitor de tela e movimento normal não observados; foco ao fechar o detalhe; PF-078 a PF-085 |
-| 04B | Não iniciada | — | — | — |
+| 04B | Validada com ressalvas | `fases/04B-RELATORIO.md` | Testes 192/1.852 ok; typecheck 0 erros; lint 0 erros e 2.016 avisos; build ok (chunk da Conciliação 117,35 → 137,05 kB, carregado só na sub-aba; `FinanceiroView` 245,69 kB; CSS +0,88 kB); chips, linhas, banner verde/vermelho e visão Lançamentos idênticos antes/depois com conta e OFX sintéticos; escrita interceptada (ContaMax e auto-vínculo bloqueados no carregamento); diálogos abertos e fechados; 320–1920 px; sidebar; teclado e foco ao fechar; contraste ≥ 4,80 (claro) e ≥ 5,11 (escuro); 250 linhas sem perda de desempenho; auditoria de módulo sem bloqueante | "Já no Livro Razão" e duplicata só em teste (exigem Processar); leitor de tela e movimento normal não observados; larguras pequenas em iframe; foco ao `body` após "Criar e Conciliar" e no `ContaFormDialog`; PF-086 a PF-092 |
 | 05A, 05B | Não iniciadas | — | — | — |
 | 06A, 06B | Não iniciadas | — | — | — |
 | 07 | Não iniciada | — | — | — |
