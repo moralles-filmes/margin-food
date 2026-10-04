@@ -1,3 +1,60 @@
+# Handoff 04A → 04B
+
+## Estado real
+
+- Repositório `moralles-filmes/margin-food`, branch `feat/redesign-v2-f04a`, criada de `feat/redesign-v2-f03` em `197dea7`. Commits da Fase 04A: `a170be6` (código) e `PENDENTE_SHA_DOCS` (documentação), mais um commit de documentação registrando estes SHAs.
+- Sem push, PR ou merge; `main` intocada em `c6a9774`.
+- Fase 04A validada com ressalvas em 2026-10-04. Fase 04B pendente.
+
+## Contexto mínimo
+
+A V2 aplica ao sistema inteiro a identidade aprovada. Fases 01 e 02 criaram a base e a estrutura global; a 03 levou o padrão ao Dashboard Financeiro; a 04A, a Contas Bancárias, Livro Razão, Fluxo de Caixa e Projeção — sem mudar RPC, cálculo, exportação, permissão nem destino de navegação. A Conciliação Bancária (04B) é a última tela do grupo e a mais arriscada: arquivo de ~3.700 linhas com as regras de duplicata, FITID, ocorrência e transferência descritas no `CLAUDE.md`.
+
+Não reverter: D15–D19, D22–D30, D31–D36 e D37–D44 (total azul de todas as contas ativas com contas brancas; `kpiGrid.ts` compartilhado; `SegmentedControl` com `ariaLabel`/`manualActivation`; primitivas `finV2Layout`; rótulos presos ao contrato das RPCs e aos parâmetros da resposta; "Resultado" no lugar de "Saldo" onde é entradas − saídas; Saldo Final crítico fora do azul; conferência extrato × sistema na mesma data, em centavos), D09, D13.
+
+## Leitura obrigatória do próximo chat
+
+1. `CLAUDE.md` (regras da Conciliação)
+2. `docs/redesign-margin-food-v2/PROMPT-MESTRE.md`
+3. `docs/redesign-margin-food-v2/PROGRESSO.md`
+4. `docs/redesign-margin-food-v2/DECISOES.md`
+5. `docs/redesign-margin-food-v2/fases/04A-RELATORIO.md`
+6. `docs/redesign-margin-food-v2/MATRIZ-DE-COBERTURA.md` — linhas FIN-A-016 a 035
+7. `docs/redesign-margin-food-v2/prompts/04-contas-bancarias-e-movimentacao-financeira.md` (parte de conciliação e importação)
+
+Código a inspecionar: `src/components/financeiro/ConciliacaoBancariaSection.tsx`, `CriarLancamentoExtratoDialog`, `ConfirmarSaldoExtratoDialog` e os diálogos que ela abre; só leitura de `src/lib/extratoParser.ts`, `conciliacaoConciliados.ts`, `conciliacaoOcorrencia.ts`, `conciliacaoTransferMatch.ts`, `conciliacaoSaldoExtrato.ts`. Exemplo do padrão: `LivroRazaoSection.tsx`, `ContasBancariasSection.tsx`, `finV2Layout.tsx`, `src/components/ui/kpiGrid.ts`.
+
+## Já implementado e validado
+
+Conferido em navegador (login "Administrador Principal"; unidade de teste Moralles e, só nesta fase e com autorização do proprietário, leitura da unidade real Ren Sushi; nada gravado; fixtures, erros e atraso só no cliente):
+
+- Valores idênticos antes/depois nas quatro telas; total de contas = todas as ativas, mesmo com busca; "Ver extrato" e card do Dashboard levam ao Livro Razão com a conta/tipo/datas certos.
+- Contas positiva, negativa, zerada, de milhões negativos, nome longo, caixa físico e maquininha; "Saldo na referência" com saldo de extrato sintético.
+- Loading, erro com nova tentativa e vazio nas quatro telas; guard de formulário sujo sem criar conta.
+- Claro/escuro; 320/390 (iframe), 768, 1024, 1366, 1920 px sem rolagem horizontal; sidebar recolhida e a 437 px; teclado no Livro Razão e no Fluxo; contraste ≥ 4,80 (claro) e ≥ 4,93 (escuro) nos pares medidos.
+- Comparação lado a lado com `02-contas-bancarias.png` (diferenças no relatório).
+
+Executado em linha de comando: testes 187 / 1.821, typecheck 0, lint 0 erros e 2.016 avisos, build ok (`FinanceiroView` 247,25 kB, CSS 121,66 kB). Auditoria de módulo (mapeador, processo de negócio, identidade/acesso, funcional): sem bloqueante; P2/P3 de texto e estado corrigidos na fase; preexistentes em PF-078 a PF-085.
+
+Só em teste/diff: exportação (download não autorizado), diálogos destrutivos (desativar, excluir, duplicidade, editar classificação), sem acesso. Não executado: leitor de tela, movimento normal, "Carregar mais".
+
+## Trabalho seguinte
+
+Fase 04B — Conciliação Bancária, só apresentação. Critérios: os do prompt 04 (parte de conciliação) e a validação do prompt abaixo.
+
+## Bloqueios / riscos / cuidado com dados
+
+- **Carregar um extrato já grava**: `processarLinhas` chama `reconcile_neutralize_contamax` e `reconcile_auto_bind_transfer_counterparts` antes de qualquer confirmação. Validar a visão Importar só em unidade de teste, com arquivo sintético e escrita bloqueada no cliente.
+- O proprietário precisa reautorizar sessão e unidade a cada chat; o assistente não digita senha.
+- Os valores da imagem `02-contas-bancarias.png` coincidem com os de uma unidade real (D09): nunca usar como fixture, no código ou nas docs.
+- Capturas mostram dados reais; ficam fora do repositório.
+- 85 pendências em `PENDENCIAS-FUNCIONAIS.md`; nenhuma deve ser corrigida no redesign.
+
+## Prompt completo para colar no próximo chat
+
+O texto integral está em `docs/redesign-margin-food-v2/PROXIMO-CHAT.md` e reproduzido abaixo.
+
+```text
 Continue o Redesign Visual V2 do MARGIN FOOD (sistema EMPRESARIAL de gestão
 para restaurantes), repositório moralles-filmes/margin-food.
 Execute exclusivamente a FASE 04B — Conciliação Bancária (sub-aba
@@ -191,3 +248,4 @@ ENTREGA AO FINAL
    Recorrências, Alertas) se os gates passaram com navegador;
    validação/correção da 04B caso contrário.
 4. PARAR. Não iniciar a Fase 05A no mesmo chat.
+```
