@@ -4,7 +4,7 @@
 
 - Fase: 02. Data: 2026-10-03.
 - Repositório `moralles-filmes/margin-food`, diretório `C:\Users\Yuri\Documents\Desenvolvedor\margin.food`.
-- Branch `feat/redesign-v2-f02`, criada a pedido do proprietário a partir de `feat/redesign-v2-f01` em `7bf08a740a411ad6a53e90bba1a6891082e7101b`. `git status` no início: limpo. Sem push, merge ou deploy; `main` intocada. Estado dos commits: ver `handoffs/02-HANDOFF.md`.
+- Branch `feat/redesign-v2-f02`, criada a pedido do proprietário a partir de `feat/redesign-v2-f01` em `7bf08a740a411ad6a53e90bba1a6891082e7101b`. `git status` no início: limpo. Sem push, merge ou deploy; `main` intocada. Commits a pedido do proprietário: `11ae4d6` (código) e `1b381c6` (documentação), mais um registrando estes SHAs.
 - Ambiente: Windows 11, Bun, Vite já em execução em `http://127.0.0.1:8080` (o servidor que eu tinha subido na 8081 foi parado). Chrome com a extensão, janela de 1278 × 888 px úteis, `prefers-reduced-motion: reduce` ativo.
 - Sessão do navegador: já logada pelo proprietário numa conta com quatro unidades reais. O proprietário autorizou o uso **só de leitura**: nada foi salvo, exportado ou enviado; a única gravação foi a preferência local de unidade/tema/largura, restaurada ao fim (tema claro, sem largura salva, unidade Moralles).
 - Roteamento (ai-router): TIER 0, agente principal. Auditoria de módulo em modo `--audit-only` (relatório local em `.saas-audit/modules/layout-sidebar-seletor-loja-redesign-v2-f02/REPORT.md`, fora do versionamento).

@@ -6,7 +6,7 @@ a Fase 04.
 ESTADO REAL DEIXADO PELA FASE 02 (2026-10-03)
 - Branch feat/redesign-v2-f02, criada de feat/redesign-v2-f01 em
   7bf08a740a411ad6a53e90bba1a6891082e7101b. Fase 02 commitada em 11ae4d6
-  (código) e (SHA no commit seguinte) (documentação), mais um commit de documentação com
+  (código) e 1b381c6 (documentação), mais um commit de documentação com
   estes SHAs. Sem push, PR ou merge. main intocada (c6a9774).
 - Fase 02 validada com ressalvas: bun run test = 177 arquivos / 1.741
   testes; tsc --noEmit -p tsconfig.app.json = 0 erros; bun run lint = 0
