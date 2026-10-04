@@ -1,0 +1,32 @@
+Quero implementar o Redesign Visual V2 do MARGIN FOOD, meu sistema EMPRESARIAL de gestão para restaurantes, no repositório moralles-filmes/margin-food. Não é meu sistema pessoal.
+
+O pacote está em docs/redesign-margin-food-v2/. Comece lendo:
+- PROMPT-MESTRE.md;
+- PLANO-DE-FASES.md;
+- referencias/MANIFESTO.md;
+- prompts/00-auditoria-e-inventario.md.
+
+Leia também CLAUDE.md e AGENTS.md nos nomes reais existentes, a arquitetura, as regras do domínio e o histórico pertinente. Confirme branch/SHA/git status e não sobrescreva alterações anteriores. A documentação antiga em docs/redesign/ é histórico: seus checkmarks NÃO comprovam a execução desta V2.
+
+Quero a sidebar e o seletor de loja no estilo aprovado, o card azul de saldo como variante de destaque e os demais cards claros com as cores semânticas corretas. Evolua os componentes já existentes; não crie um segundo design system. Preserve o tema escuro.
+
+O redesign abrange TODOS os módulos, submódulos, telas, detalhes, formulários, diálogos e estados encontrados no código. Inclui Financeiro inteiro, Estoque, Movimentação Operacional, Inventário, Salmão, Compras/Fornecedores, Centro de CMV, Ficha Técnica, Planejamento, Relatórios Gerais, RH, Central de IA, Usuários, Configurações, Administração e telas auxiliares. A lista deve ser conferida contra navegação, rotas, registry de permissões e componentes reais, e ampliada quando necessário.
+
+Os oito cards do Dashboard Financeiro são obrigatórios: Saldo em Caixa, Contas a Receber, Contas a Pagar, Contas Vencidas, Receita do Período, Despesa Realizada, Despesas Provisionadas e Resultado. Não remover cards, números, filtros, comparativos, cliques nem exportações. Dados das referências nunca podem ser hardcodados no produto.
+
+Mude apresentação, não o negócio. Preserve cálculos, regime, unidades, RPCs, dados, RLS, permissões, company_id, caches, eventos, rotas, estados e confirmações. O seletor de loja deve usar a lista autorizada e o fluxo existente, sem autenticação paralela ou exposição de dados de outra empresa. Não alterar schema, migrations, backend ou dependências por conveniência estética. Não executar escritas reais, push, merge ou deploy. Problemas funcionais encontrados entram em pendências separadas.
+
+Faça UMA fase por chat. Agora execute exclusivamente a FASE 00: inventário completo, diagnóstico atualizado, baseline, riscos, proposta por módulo e matriz de cobertura. Não altere o visual nesta fase.
+
+Nas fases de implementação, valide os componentes reais em navegador, desktop/mobile, claro/escuro, teclado, valores longos, negativos, zero, vazio, loading e erro. Não trate leitura de código como teste executado. Registre limitações e bloqueios, sem enfraquecer segurança para obter acesso.
+
+Ao final de cada fase:
+1. Atualize progresso, matriz e decisões, registrando arquivos, testes e evidências reais.
+2. Salve um relatório e handoff numerado.
+3. Escreva PROXIMO-CHAT.md e MOSTRE NA RESPOSTA o prompt completo para o outro chat executar a próxima fase, com contexto e critérios reais.
+4. Se a fase não passou, o próximo prompt será de correção/retomada, não de avanço.
+5. PARE, sem implementar a próxima fase automaticamente.
+
+Use checkpoints curtos; não dependa da memória desta conversa. Se o contexto ficar grande, grave o estado antes de usar compactação nativa disponível ou encerrar para outro chat. Não afirme que compactou ou testou sem realmente fazê-lo.
+
+Comece agora pela Fase 00 e entregue os artefatos dela e o prompt pronto para iniciar a Fase 01.

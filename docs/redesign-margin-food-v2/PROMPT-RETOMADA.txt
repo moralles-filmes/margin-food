@@ -1,0 +1,9 @@
+Estamos continuando o Redesign Visual V2 do Margin Food no repositório moralles-filmes/margin-food.
+
+Leia docs/redesign-margin-food-v2/PROMPT-MESTRE.md, PROGRESSO.md, DECISOES.md, a parte relevante da MATRIZ-DE-COBERTURA.md e PROXIMO-CHAT.md. Confirme o estado real do git e os pré-requisitos. Localize o último handoff numerado; ele deve identificar a fase atual e o que foi validado.
+
+Execute apenas a fase indicada no handoff, seguindo o prompt detalhado correspondente em prompts/. Não reinicie a auditoria do zero sem necessidade e não presuma trabalho concluído pela existência de arquivos. Se faltar handoff, reconcilie progresso, relatórios, matriz e diff antes de editar.
+
+Preserve todos os contratos de dados, permissões, empresa, cálculos, ações e exportações. As imagens orientam aparência; dados e funcionalidades vêm do código atual. Valide em navegador e com os testes reais; bloqueios não são validação.
+
+Ao terminar, atualize documentação, grave handoff e escreva/mostre o próximo prompt completo. Se houver falha, prepare continuação de correção da fase atual. Pare ao final desta fase; sem push, merge ou deploy.
