@@ -1,6 +1,6 @@
 # Progresso — Margin Food V2
 
-- Branches: `feat/redesign-v2-f01` (de `main` em `c6a9774`; Fase 01 em `875514a`, `ce512d4`, `7bf08a7`) → `feat/redesign-v2-f02` (de `7bf08a7`; Fase 02 em `11ae4d6`, `1b381c6`, `1227af6`) → `feat/redesign-v2-f03` (de `1227af6`; Fase 03 em `8f755dd`, `709688b`, `197dea7`) → `feat/redesign-v2-f04a` (de `197dea7`; Fase 04A em `a170be6`, `44b8449`, `ae30b6f`) → `feat/redesign-v2-f04b` (de `ae30b6f`; Fase 04B em `9897f2f` (código), um commit de documentação e um registrando os SHAs). Sem push nem PR; `main` intocada.
+- Branches: `feat/redesign-v2-f01` (de `main` em `c6a9774`; Fase 01 em `875514a`, `ce512d4`, `7bf08a7`) → `feat/redesign-v2-f02` (de `7bf08a7`; Fase 02 em `11ae4d6`, `1b381c6`, `1227af6`) → `feat/redesign-v2-f03` (de `1227af6`; Fase 03 em `8f755dd`, `709688b`, `197dea7`) → `feat/redesign-v2-f04a` (de `197dea7`; Fase 04A em `a170be6`, `44b8449`, `ae30b6f`) → `feat/redesign-v2-f04b` (de `ae30b6f`; Fase 04B em `9897f2f`, `eb66ed3` e um commit registrando estes SHAs). Sem push nem PR; `main` intocada.
 - Fase atual: 04B validada em 2026-10-04, com as ressalvas do relatório.
 - Última fase validada em navegador: 04B (Chrome, servidor local na porta 8080, login "Administrador Principal", unidade de teste Moralles com conta e extrato OFX sintéticos injetados no cliente e toda escrita interceptada; nenhuma escrita chegou ao servidor).
 - Bloqueios: nenhum.

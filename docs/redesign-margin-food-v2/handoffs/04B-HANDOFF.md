@@ -2,7 +2,7 @@
 
 ## Estado real
 
-- Repositório `moralles-filmes/margin-food`, branch `feat/redesign-v2-f04b`, criada de `feat/redesign-v2-f04a` em `ae30b6f`. Commits da Fase 04B: `9897f2f` (código) e `DOCS_SHA_PENDENTE` (documentação), mais um commit de documentação registrando estes SHAs.
+- Repositório `moralles-filmes/margin-food`, branch `feat/redesign-v2-f04b`, criada de `feat/redesign-v2-f04a` em `ae30b6f`. Commits da Fase 04B: `9897f2f` (código) e `eb66ed3` (documentação), mais um commit de documentação registrando estes SHAs.
 - Sem push, PR ou merge; `main` intocada em `c6a9774`.
 - Fase 04B validada com ressalvas em 2026-10-04. Fase 05A pendente.
 
@@ -67,7 +67,7 @@ Cadastros Base, Categorização).
 
 ESTADO REAL DEIXADO PELA FASE 04B (2026-10-04)
 - Branch feat/redesign-v2-f04b, criada de feat/redesign-v2-f04a em
-  ae30b6f. Fase 04B commitada em 9897f2f (código) e DOCS_SHA_PENDENTE
+  ae30b6f. Fase 04B commitada em 9897f2f (código) e eb66ed3
   (documentação), mais um commit de documentação com estes SHAs. Sem push,
   PR ou merge. main intocada (c6a9774).
 - Fase 04B validada com ressalvas: bun run test = 192 arquivos / 1.852
