@@ -1,3 +1,62 @@
+# Handoff 03 → 04A
+
+## Estado real
+
+- Repositório `moralles-filmes/margin-food`, branch `feat/redesign-v2-f03`, criada de `feat/redesign-v2-f02` em `1227af64d8a2ca62959884b6e7701eb543455d29`. Commits da Fase 03: `8f755dd` (código) e um commit de documentação, mais um commit registrando os SHAs (ver `git log` da branch).
+- Sem push, PR ou merge; `main` intocada em `c6a9774`.
+- Fase 03 validada com ressalvas em 2026-10-04. Fase 04A pendente.
+
+## Contexto mínimo
+
+A V2 aplica ao sistema inteiro a identidade aprovada. Fases 01 e 02 criaram a base (tokens do destaque, `KpiCard` com `appearance`, gráficos, estados) e a estrutura global (sidebar, seletor de loja, cabeçalho, `SegmentedControl`). A Fase 03 levou o padrão à primeira tela de módulo, o Dashboard Financeiro, sem mudar RPC, cálculo, filtros, exportações nem destinos de navegação.
+
+Não reverter: D15–D19 (família de cards), D22–D30 (estrutura global), D31 (grade por container query conforme o valor mais longo), D32 (textos de apoio derivados do contrato das RPCs), D33 (período dos valores × período aplicado × janela do comparativo, sempre identificados), D34 (ranking com Top 8 só no limite da RPC), D35 (receitas/despesas em verde/vermelho; linha monotone com linha de zero), D36 (sem atalhos, links "Ver…" e menu "Exportar" do mockup), D09, D13.
+
+## Leitura obrigatória do próximo chat
+
+1. `CLAUDE.md`
+2. `docs/redesign-margin-food-v2/PROMPT-MESTRE.md`
+3. `docs/redesign-margin-food-v2/PROGRESSO.md`
+4. `docs/redesign-margin-food-v2/DECISOES.md`
+5. `docs/redesign-margin-food-v2/fases/03-RELATORIO.md`
+6. `docs/redesign-margin-food-v2/MATRIZ-DE-COBERTURA.md` — linhas FIN-A-004 a 011, 014, 015 e 036 a 040
+7. `docs/redesign-margin-food-v2/prompts/04-contas-bancarias-e-movimentacao-financeira.md` (só a parte 04A)
+
+Código a inspecionar: `src/components/financeiro/ContasBancariasSection.tsx`, `LivroRazaoSection.tsx`, o wrapper de Lançamentos em `src/components/FinanceiroView.tsx`, `FluxoCaixaSection.tsx`, `ProjecaoFluxoSection.tsx` (+ teste), `KpiCard.tsx`, `ChartCard.tsx`, `chartTheme.ts` e, como exemplo do padrão aplicado, `DashboardFinanceiroSection.tsx`, `DashboardCharts.tsx` e `dashboardFinanceiroView.ts`.
+
+Referências: `02-contas-bancarias.png`, `00-card-azul-aprovado.png`, `07-sidebar-e-componentes.png` (e o `MANIFESTO.md` da pasta).
+
+## Já implementado e validado
+
+Conferido em navegador (login "Administrador Principal", unidade de teste Moralles confirmada pelo proprietário, só leitura; cenários extremos simulados só no cliente):
+
+- Os oito valores idênticos antes/depois em Outubro e Junho/2026; os oito destinos de clique (Fluxo; Receber "A Receber"; Pagar; Pagar "Vencido"; Livro Razão Receitas/Despesas com datas; Pagar; DRE).
+- Dia, Mês, Período (inclusive data final < inicial), Atualizar; loading, erro dos gráficos com nova tentativa, erro do resumo (legenda fica no período dos valores), vazio.
+- Claro/escuro; 320/390/768/1024/1366/1920 px sem rolagem horizontal; sidebar recolhida e alargada; nenhum valor cortado (inclusive milhões negativos).
+- Contraste no fundo real: card azul ≥ 5,64 (claro) / 6,12 (escuro), apoio sobre os arcos 4,50 / 4,79; summary ≥ 5,15 / 5,59.
+- Comparação lado a lado com `01`, `01b` e `01c` (diferenças registradas no relatório).
+
+Executado em linha de comando: testes 180 / 1.779, typecheck 0, lint 0 erros e 2.016 avisos, build ok (`FinanceiroView` 235,26 kB, CSS 120,23 kB). Auditoria de módulo (mapeador, processo de negócio, identidade/acesso, funcional): sem mudança de fronteira; 2 P2 e 4 P3 de texto corrigidos na fase; preexistentes registrados em PF-074 a PF-077.
+
+Só em teste/diff: sem acesso (sem perfil reduzido) e exportação (download não autorizado). Não executado: leitor de tela, movimento normal.
+
+## Trabalho seguinte
+
+Fase 04A — Contas Bancárias, Livro Razão/Lançamentos, Fluxo de Caixa e Projeção. A Conciliação Bancária fica para a 04B (chat próprio; arquivo de ~3.700 linhas com regras caras). Critérios: os do prompt 04 (parte 04A) e a validação descrita no prompt abaixo.
+
+## Bloqueios / riscos / cuidado com dados
+
+- O proprietário precisa reautorizar o uso da sessão (ou logar com usuário de teste) a cada chat; o assistente não digita senha.
+- Valores das imagens de referência podem coincidir com dados reais: não usar como fixture nem hardcodar (D09).
+- Capturas mostram dados da unidade de teste; não versionar.
+- Os cards do Dashboard levam a Lançamentos com `initialTipo`/datas e Contas Bancárias leva com `initialContaId` ("Ver extrato"): preservar essas props na 04A.
+- 77 pendências em `PENDENCIAS-FUNCIONAIS.md`; nenhuma deve ser corrigida no redesign.
+
+## Prompt completo para colar no próximo chat
+
+O texto integral está em `docs/redesign-margin-food-v2/PROXIMO-CHAT.md` e reproduzido abaixo.
+
+```text
 Continue o Redesign Visual V2 do MARGIN FOOD (sistema EMPRESARIAL de gestão
 para restaurantes), repositório moralles-filmes/margin-food.
 Execute exclusivamente a FASE 04A — Contas Bancárias, Livro Razão
@@ -173,3 +232,4 @@ ENTREGA AO FINAL
    Fase 04B (Conciliação) se os gates passaram com navegador;
    validação/correção da 04A caso contrário.
 4. PARAR. Não iniciar a Fase 04B no mesmo chat.
+```
