@@ -4,7 +4,7 @@
 
 - Fase: 03. Data: 2026-10-03/04.
 - Repositório `moralles-filmes/margin-food`, diretório `C:\Users\Yuri\Documents\Desenvolvedor\margin.food`.
-- Branch `feat/redesign-v2-f03`, criada a pedido do proprietário a partir de `feat/redesign-v2-f02` em `1227af64d8a2ca62959884b6e7701eb543455d29`. `git status` no início: limpo. Commits a pedido do proprietário (código, documentação e registro dos SHAs — ver handoff 03). Sem push, merge ou deploy; `main` intocada em `c6a9774`.
+- Branch `feat/redesign-v2-f03`, criada a pedido do proprietário a partir de `feat/redesign-v2-f02` em `1227af64d8a2ca62959884b6e7701eb543455d29`. `git status` no início: limpo. Commits a pedido do proprietário: `8f755dd` (código) e `709688b` (documentação), mais um registrando estes SHAs. Sem push, merge ou deploy; `main` intocada em `c6a9774`.
 - Ambiente: Windows 11, Bun, Vite do projeto já em execução em `http://127.0.0.1:8080`. Chrome com a extensão, janela de 1278 × 888 px úteis, `prefers-reduced-motion: reduce` ativo.
 - Sessão do navegador: login "Administrador Principal" (o mesmo da Fase 02). O proprietário escolheu "conta e unidade de teste" e confirmou a unidade **Moralles** como a de teste; uso **só de leitura**. Nada foi salvo, exportado nem enviado; nenhum download (o proprietário não autorizou abrir PDF/Excel). Gravações locais restauradas no fim: tema claro e largura da sidebar sem valor salvo.
 - Dados controlados: além dos dados reais da Moralles (Outubro e Junho/2026), cenários sintéticos injetados **só no cliente**, interceptando o `fetch` da aba (nenhuma chamada ao banco alterada): A (saldo e resultado negativos, vencidas zero, 8 categorias com nome longo, série com mês negativo e mês parcial) e B (valores de milhões). Erros e atraso também simulados só na aba.

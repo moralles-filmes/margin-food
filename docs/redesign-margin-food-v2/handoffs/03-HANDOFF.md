@@ -2,7 +2,7 @@
 
 ## Estado real
 
-- Repositório `moralles-filmes/margin-food`, branch `feat/redesign-v2-f03`, criada de `feat/redesign-v2-f02` em `1227af64d8a2ca62959884b6e7701eb543455d29`. Commits da Fase 03: `8f755dd` (código) e um commit de documentação, mais um commit registrando os SHAs (ver `git log` da branch).
+- Repositório `moralles-filmes/margin-food`, branch `feat/redesign-v2-f03`, criada de `feat/redesign-v2-f02` em `1227af64d8a2ca62959884b6e7701eb543455d29`. Commits da Fase 03: `8f755dd` (código) e `709688b` (documentação), mais um commit de documentação registrando estes SHAs.
 - Sem push, PR ou merge; `main` intocada em `c6a9774`.
 - Fase 03 validada com ressalvas em 2026-10-04. Fase 04A pendente.
 
@@ -66,9 +66,8 @@ Execute exclusivamente a FASE 04A — Contas Bancárias, Livro Razão
 ESTADO REAL DEIXADO PELA FASE 03 (2026-10-04)
 - Branch feat/redesign-v2-f03, criada de feat/redesign-v2-f02 em
   1227af64d8a2ca62959884b6e7701eb543455d29. Fase 03 commitada em 8f755dd
-  (código) e em commits de documentação registrados em
-  docs/redesign-margin-food-v2/handoffs/03-HANDOFF.md. Sem push, PR ou
-  merge. main intocada (c6a9774).
+  (código) e 709688b (documentação), mais um commit de documentação com
+  estes SHAs. Sem push, PR ou merge. main intocada (c6a9774).
 - Fase 03 validada com ressalvas: bun run test = 180 arquivos / 1.779
   testes; tsc --noEmit -p tsconfig.app.json = 0 erros; bun run lint = 0
   erros e 2.016 avisos; bun run build ok (vendor-charts 555,44 kB;

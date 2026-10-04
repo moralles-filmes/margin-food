@@ -1,6 +1,6 @@
 # Progresso — Margin Food V2
 
-- Branches: `feat/redesign-v2-f01` (de `main` em `c6a9774`; Fase 01 em `875514a`, `ce512d4`, `7bf08a7`) → `feat/redesign-v2-f02` (de `7bf08a7`; Fase 02 em `11ae4d6`, `1b381c6`, `1227af6`) → `feat/redesign-v2-f03` (de `1227af6`; Fase 03 em commits de código e documentação registrados no handoff 03). Sem push nem PR; `main` intocada.
+- Branches: `feat/redesign-v2-f01` (de `main` em `c6a9774`; Fase 01 em `875514a`, `ce512d4`, `7bf08a7`) → `feat/redesign-v2-f02` (de `7bf08a7`; Fase 02 em `11ae4d6`, `1b381c6`, `1227af6`) → `feat/redesign-v2-f03` (de `1227af6`; Fase 03 em `8f755dd`, `709688b` e um commit registrando estes SHAs). Sem push nem PR; `main` intocada.
 - Fase atual: 03 validada em 2026-10-04, com as ressalvas do relatório.
 - Última fase validada em navegador: 03 (Chrome, servidor local na porta 8080, login "Administrador Principal", unidade de teste Moralles confirmada pelo proprietário, uso só de leitura; cenários extremos simulados só no cliente).
 - Bloqueios: nenhum.
