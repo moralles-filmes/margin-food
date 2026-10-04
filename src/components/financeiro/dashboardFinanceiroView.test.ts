@@ -6,7 +6,6 @@ import {
   formatDashboardRangeLabel,
   historyWindow,
   isDashboardRangeInProgress,
-  kpiGridClassFor,
   previousDashboardRange,
 } from './dashboardFinanceiroView';
 
@@ -91,21 +90,6 @@ describe('buildProvisionedComposition', () => {
   it('total zero ou parcela negativa não desenha proporção', () => {
     expect(buildProvisionedComposition(0, 0)).toEqual({ total: 0, realizadaPercent: null, aPagarPercent: null });
     expect(buildProvisionedComposition(-5, 20)).toMatchObject({ total: 15, realizadaPercent: null, aPagarPercent: null });
-  });
-});
-
-describe('kpiGridClassFor', () => {
-  it('valor mais longo exige grupo mais largo para 2 e 4 colunas', () => {
-    expect(kpiGridClassFor(6)).toContain('[@container(min-width:55rem)]:grid-cols-4');
-    expect(kpiGridClassFor(12)).toContain('[@container(min-width:27rem)]:grid-cols-2');
-    expect(kpiGridClassFor(15)).toContain('[@container(min-width:66rem)]:grid-cols-4');
-    expect(kpiGridClassFor(17)).toContain('[@container(min-width:72rem)]:grid-cols-4');
-  });
-
-  it('valor fora da tabela nunca vai a quatro colunas', () => {
-    const cls = kpiGridClassFor(19);
-    expect(cls).not.toContain('grid-cols-4');
-    expect(cls).toContain('grid-cols-1');
   });
 });
 

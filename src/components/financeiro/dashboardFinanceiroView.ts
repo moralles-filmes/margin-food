@@ -108,30 +108,8 @@ export function buildProvisionedComposition(despesa: number, aPagar: number): Pr
   };
 }
 
-/**
- * Grade dos dois grupos de cards (família V2: Inter 24 px, `tabular-nums`, padding de 20 px).
- * Segue a largura do próprio grupo (container query), não a da janela — a sidebar redimensionável
- * (160–480 px) muda o espaço disponível. O limiar depende do valor mais longo exibido: cada caractere
- * ocupa ~13,5 px (medido em navegador: "R$123.456,78" = 162 px, "R$-1.234.567,89" = 197 px), e o
- * card só passa a 2 ou 4 colunas quando esse valor cabe inteiro. Nunca se reduz a fonte nem se
- * corta o valor; com valor maior, a grade reorganiza.
- *
- * As classes ficam literais para o Tailwind encontrá-las.
- */
-const KPI_GRID_BY_LENGTH: ReadonlyArray<{ maxChars: number; className: string }> = [
-  { maxChars: 12, className: 'grid grid-cols-1 gap-4 [@container(min-width:27rem)]:grid-cols-2 [@container(min-width:55rem)]:grid-cols-4' },
-  { maxChars: 13, className: 'grid grid-cols-1 gap-4 [@container(min-width:29rem)]:grid-cols-2 [@container(min-width:59rem)]:grid-cols-4' },
-  { maxChars: 14, className: 'grid grid-cols-1 gap-4 [@container(min-width:31rem)]:grid-cols-2 [@container(min-width:62rem)]:grid-cols-4' },
-  { maxChars: 15, className: 'grid grid-cols-1 gap-4 [@container(min-width:33rem)]:grid-cols-2 [@container(min-width:66rem)]:grid-cols-4' },
-  { maxChars: 16, className: 'grid grid-cols-1 gap-4 [@container(min-width:34rem)]:grid-cols-2 [@container(min-width:69rem)]:grid-cols-4' },
-  { maxChars: 17, className: 'grid grid-cols-1 gap-4 [@container(min-width:36rem)]:grid-cols-2 [@container(min-width:72rem)]:grid-cols-4' },
-];
-const KPI_GRID_FALLBACK = 'grid grid-cols-1 gap-4 [@container(min-width:40rem)]:grid-cols-2';
-
-/** Classe da grade para o valor formatado mais longo (em caracteres) entre os cards exibidos. */
-export function kpiGridClassFor(longestValueChars: number): string {
-  return KPI_GRID_BY_LENGTH.find(step => longestValueChars <= step.maxChars)?.className ?? KPI_GRID_FALLBACK;
-}
+// A grade dos cards (kpiGridClassFor) mudou para `@/components/ui/kpiGrid`: é usada também pelas
+// telas da Fase 04A.
 
 export interface HistoryWindow {
   startKey: string;

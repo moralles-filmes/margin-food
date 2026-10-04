@@ -25,9 +25,9 @@ import {
   formatDashboardDatesLabel,
   formatDashboardRangeLabel,
   isDashboardRangeInProgress,
-  kpiGridClassFor,
   previousDashboardRange,
 } from '@/components/financeiro/dashboardFinanceiroView';
+import { kpiGridClassFor } from '@/components/ui/kpiGrid';
 import {
   TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, Wallet, ReceiptText, BarChart3,
   RefreshCw, AlertTriangle, FileDown, FileSpreadsheet, CalendarDays, Info, Loader2,

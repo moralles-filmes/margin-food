@@ -11,9 +11,17 @@ interface SegmentedControlProps {
   value: string;
   onChange: (value: string) => void;
   className?: string;
+  /** nome do grupo para o leitor de tela quando não há rótulo visível associado */
+  ariaLabel?: string;
+  /**
+   * Setas só movem o foco; Enter/Espaço escolhem. Para quando trocar de opção desmonta uma tela com
+   * trabalho em andamento (ex.: Livro Razão ⇄ Conciliação Bancária) — uma seta acidental não pode
+   * descartar o extrato importado.
+   */
+  manualActivation?: boolean;
 }
 
-export function SegmentedControl({ options, value, onChange, className }: SegmentedControlProps) {
+export function SegmentedControl({ options, value, onChange, className, ariaLabel, manualActivation = false }: SegmentedControlProps) {
   const buttonRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   function handleKeyDown(e: KeyboardEvent<HTMLButtonElement>, index: number) {
@@ -25,7 +33,7 @@ export function SegmentedControl({ options, value, onChange, className }: Segmen
 
     if (nextIndex !== null) {
       e.preventDefault();
-      onChange(options[nextIndex].value);
+      if (!manualActivation) onChange(options[nextIndex].value);
       buttonRefs.current[nextIndex]?.focus();
     }
   }
@@ -33,6 +41,7 @@ export function SegmentedControl({ options, value, onChange, className }: Segmen
   return (
     <div
       role="radiogroup"
+      aria-label={ariaLabel}
       className={cn('inline-flex items-center gap-0.5 rounded-lg bg-muted p-1', className)}
     >
       {options.map((option, index) => {

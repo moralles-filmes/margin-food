@@ -6,6 +6,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useCan, useModuleAccess } from '@/permissions';
 import { ModuleNav, type ModuleNavItem } from '@/components/ui/ModuleNav';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { isPresentationDetailTarget } from '@/lib/presentationDetailNavigation';
 import { Shield, Percent } from 'lucide-react';
 import {
@@ -68,13 +69,23 @@ function CadastrosBase() {
 // ContasBancarias extracted to src/components/financeiro/ContasBancariasSection.tsx
 
 // LancamentosSection wrapper - LivroRazaoSection extracted to src/components/financeiro/LivroRazaoSection.tsx
+const LANCAMENTOS_VIEWS = [
+  { value: 'razao', label: 'Livro Razão' },
+  { value: 'conciliacao', label: 'Conciliação Bancária' },
+];
+
 function LancamentosSection({ initialContaId, initialDateFrom, initialDateTo, initialTipo }: { initialContaId?: string; initialDateFrom?: string; initialDateTo?: string; initialTipo?: string }) {
   const [innerTab, setInnerTab] = useState<'razao' | 'conciliacao'>('razao');
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2 mb-2">
-        <Button variant={innerTab === 'razao' ? 'default' : 'outline'} size="sm" onClick={() => setInnerTab('razao')}>Livro Razão</Button>
-        <Button variant={innerTab === 'conciliacao' ? 'default' : 'outline'} size="sm" onClick={() => setInnerTab('conciliacao')}>Conciliação Bancária</Button>
+      <div className="max-w-full overflow-x-auto">
+        <SegmentedControl
+          ariaLabel="Visão de lançamentos"
+          manualActivation
+          options={LANCAMENTOS_VIEWS}
+          value={innerTab}
+          onChange={v => setInnerTab(v as 'razao' | 'conciliacao')}
+        />
       </div>
       {innerTab === 'razao' ? <LivroRazaoSection initialContaId={initialContaId} initialDateFrom={initialDateFrom} initialDateTo={initialDateTo} initialTipo={initialTipo} /> : <Suspense fallback={<FinSpinner />}><ConciliacaoBancariaSection /></Suspense>}
     </div>

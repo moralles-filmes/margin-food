@@ -21,6 +21,21 @@ describe('SegmentedControl', () => {
     expect(visible('Dia')).not.toHaveClass('font-semibold');
   });
 
+  it('nomeia o grupo quando recebe ariaLabel', () => {
+    render(<SegmentedControl options={options} value="mes" onChange={vi.fn()} ariaLabel="Período do resumo" />);
+    expect(screen.getByRole('radiogroup', { name: 'Período do resumo' })).toBeInTheDocument();
+  });
+
+  it('com ativação manual, setas só movem o foco e Enter/clique escolhe', () => {
+    const onChange = vi.fn();
+    render(<SegmentedControl options={options} value="mes" onChange={onChange} manualActivation />);
+    fireEvent.keyDown(screen.getByRole('radio', { name: 'Mês' }), { key: 'ArrowRight' });
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByRole('radio', { name: 'Período' })).toHaveFocus();
+    fireEvent.click(screen.getByRole('radio', { name: 'Período' }));
+    expect(onChange).toHaveBeenCalledWith('periodo');
+  });
+
   it('setas mudam a opção e só a ativa entra no Tab', () => {
     const onChange = vi.fn();
     render(<SegmentedControl options={options} value="mes" onChange={onChange} />);
