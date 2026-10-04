@@ -2,7 +2,7 @@
 
 ## Estado real
 
-- Repositório `moralles-filmes/margin-food`, branch `feat/redesign-v2-f05a`, criada de `feat/redesign-v2-f04b` em `2079f94`. Commits da Fase 05A: `be5a67e` (código) e `DOCS_SHA` (documentação), mais um commit de documentação registrando estes SHAs.
+- Repositório `moralles-filmes/margin-food`, branch `feat/redesign-v2-f05a`, criada de `feat/redesign-v2-f04b` em `2079f94`. Commits da Fase 05A: `be5a67e` (código) e `43b44ad` (documentação), mais um commit de documentação registrando estes SHAs.
 - Sem push, PR ou merge; `main` intocada em `c6a9774`.
 - Fase 05A validada com ressalvas em 2026-10-04. Fase 05B pendente.
 
@@ -69,7 +69,7 @@ inicie a Fase 06A.
 
 ESTADO REAL DEIXADO PELA FASE 05A (2026-10-04)
 - Branch feat/redesign-v2-f05a, criada de feat/redesign-v2-f04b em
-  2079f94. Fase 05A commitada em be5a67e (código) e DOCS_SHA
+  2079f94. Fase 05A commitada em be5a67e (código) e 43b44ad
   (documentação), mais um commit de documentação com estes SHAs. Sem push,
   PR ou merge. main intocada (c6a9774).
 - Fase 05A validada com ressalvas: bun run test = 200 arquivos / 1.893
