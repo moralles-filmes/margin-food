@@ -7,7 +7,7 @@ concluída) e não inicie a Fase 05A.
 
 ESTADO REAL DEIXADO PELA FASE 04A (2026-10-04)
 - Branch feat/redesign-v2-f04a, criada de feat/redesign-v2-f03 em
-  197dea7. Fase 04A commitada em a170be6 (código) e PENDENTE_SHA_DOCS
+  197dea7. Fase 04A commitada em a170be6 (código) e 44b8449
   (documentação), mais um commit de documentação com estes SHAs. Sem push,
   PR ou merge. main intocada (c6a9774).
 - Fase 04A validada com ressalvas: bun run test = 187 arquivos / 1.821
