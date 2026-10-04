@@ -49,12 +49,18 @@ export function SegmentedControl({ options, value, onChange, className }: Segmen
             onKeyDown={e => handleKeyDown(e, index)}
             className={cn(
               'flex-1 whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium text-center transition-colors',
+              // Pílula clara com texto azul (prancha 07): o azul cheio fica para a sidebar e a ação principal.
               isActive
-                ? 'bg-primary-strong text-primary-strong-foreground'
+                ? 'bg-segmented-active text-primary-ink shadow-sm'
                 : 'text-muted-foreground hover:text-foreground',
             )}
           >
-            {option.label}
+            {/* O peso maior marca o ativo sem depender só da cor; a cópia invisível em negrito
+                reserva a largura para o controle não mudar de tamanho ao trocar de opção. */}
+            <span className="inline-grid">
+              <span aria-hidden="true" className="invisible col-start-1 row-start-1 font-semibold">{option.label}</span>
+              <span className={cn('col-start-1 row-start-1', isActive && 'font-semibold')}>{option.label}</span>
+            </span>
           </button>
         );
       })}

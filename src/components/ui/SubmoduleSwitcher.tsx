@@ -71,7 +71,8 @@ export function SubmoduleSwitcher<T extends string>({
   );
 
   const activeCls = 'bg-primary-soft text-primary-soft-foreground border border-primary-border font-medium';
-  const inactiveCls = 'bg-secondary text-foreground border border-transparent hover:bg-secondary/80 transition-colors';
+  // Grupo inativo do ModuleNav (único consumidor com groupLabel): texto discreto, sem preenchimento.
+  const inactiveCls = 'text-muted-foreground border border-transparent hover:bg-secondary hover:text-foreground transition-colors';
 
   if (isMobile) {
     return (

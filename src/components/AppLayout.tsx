@@ -1,7 +1,7 @@
-import { ReactNode, useMemo, useState, useCallback, useEffect } from 'react';
+import { ReactNode, useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { TabId, MetaCompraMensal, SalmonEntry } from '@/types/salmon';
-import { Package, ShoppingCart, ClipboardList, Settings, AlertTriangle, BarChart3, LayoutDashboard, Menu, Moon, Sun, User, ChevronLeft, ChevronRight, PanelLeftClose, X, LogOut, Users, Fish, ClipboardCheck, TrendingDown, BookOpen, Brain, UserCheck, DollarSign, Shield, ArrowDownUp } from 'lucide-react';
+import { Package, ShoppingCart, ClipboardList, Settings, AlertTriangle, BarChart3, LayoutDashboard, Menu, Moon, Sun, ChevronLeft, ChevronRight, ChevronsUpDown, X, LogOut, Users, Fish, ClipboardCheck, TrendingDown, BookOpen, Brain, UserCheck, DollarSign, Shield, ArrowDownUp } from 'lucide-react';
 import NotificationBell from '@/components/NotificationBell';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { useTheme } from '@/hooks/useTheme';
@@ -22,6 +22,15 @@ import { useModuleBadges } from '@/contexts/ModuleBadgesContext';
 import { formatBadgeCount } from '@/lib/moduleBadges';
 
 function parseLocalDate(s: string) { const [y,m,d] = s.split('-').map(Number); return new Date(y,m-1,d); }
+
+/** Iniciais para o avatar da conta: primeira letra do primeiro e do último nome. */
+function getInitials(text: string) {
+  const words = text.trim().split(/[\s@._-]+/).filter(Boolean);
+  if (words.length === 0) return '?';
+  const first = words[0][0] ?? '';
+  const last = words.length > 1 ? words[words.length - 1][0] ?? '' : words[0][1] ?? '';
+  return (first + last).toUpperCase();
+}
 
 interface LayoutProps {
   children: ReactNode;
@@ -144,13 +153,68 @@ export default function AppLayout({ children, activeTab, onTabChange, isOffline,
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem('app:sidebar:width');
-    return saved ? parseInt(saved, 10) : 240;
+    // Padrão de 256 px (faixa de 240–260 px da referência); a largura salva continua valendo.
+    return saved ? parseInt(saved, 10) : 256;
   });
   const [isResizing, setIsResizing] = useState(false);
   const isSuperAdmin = permissionState === 'READY' && hasPermission('system:global:manage');
   const { totalsByTab: badgeTotals } = useModuleBadges();
+  // A gaveta do celular mostra sempre o menu completo, mesmo se o desktop estava recolhido.
+  const collapsed = sidebarCollapsed && !isMobile;
+  // Sidebar expandida mas estreita (perto de 160 px): a marca fica só no "M" e o cartão da loja perde o ícone.
+  const narrow = !collapsed && !isMobile && sidebarWidth < 208;
+  const brandIconOnly = collapsed || narrow;
+  const navRef = useRef<HTMLElement>(null);
+  const mobileAsideRef = useRef<HTMLElement>(null);
+  const mainAreaRef = useRef<HTMLDivElement>(null);
+  const openMenuButtonRef = useRef<HTMLButtonElement>(null);
+  const closeMenuButtonRef = useRef<HTMLButtonElement>(null);
+  const drawerWasOpen = useRef(false);
 
   const permissionsReady = permissionState === 'READY';
+
+  // Gaveta do celular: fechada fica fora do Tab e do leitor de tela; aberta isola o conteúdo.
+  useEffect(() => {
+    const aside = mobileAsideRef.current;
+    const main = mainAreaRef.current;
+    if (aside) aside.inert = isMobile && !sidebarOpen;
+    if (main) main.inert = isMobile && sidebarOpen;
+    return () => {
+      if (aside) aside.inert = false;
+      if (main) main.inert = false;
+    };
+  }, [isMobile, sidebarOpen]);
+
+  // A gaveta só existe no celular: ao virar desktop ela fecha, para não reabrir sozinha depois.
+  useEffect(() => { if (!isMobile) setSidebarOpen(false); }, [isMobile]);
+
+  // Foco entra na gaveta ao abrir e volta ao botão "Abrir menu" ao fechar.
+  useEffect(() => {
+    if (!isMobile) { drawerWasOpen.current = false; return; }
+    if (sidebarOpen) {
+      drawerWasOpen.current = true;
+      closeMenuButtonRef.current?.focus();
+    } else if (drawerWasOpen.current) {
+      drawerWasOpen.current = false;
+      openMenuButtonRef.current?.focus();
+    }
+  }, [isMobile, sidebarOpen]);
+
+  useEffect(() => {
+    if (!isMobile || !sidebarOpen) return;
+    // Menus abertos dentro da gaveta tratam o Escape antes (Radix marca defaultPrevented).
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !event.defaultPrevented) setSidebarOpen(false);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [isMobile, sidebarOpen]);
+
+  // O item ativo fica à vista quando o menu é maior que a tela.
+  useEffect(() => {
+    if (!permissionsReady || (isMobile && !sidebarOpen)) return;
+    navRef.current?.querySelector<HTMLElement>('[aria-current="page"]')?.scrollIntoView?.({ block: 'nearest' });
+  }, [activeTab, permissionsReady, isMobile, sidebarOpen, collapsed]);
 
   const startResizing = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -229,24 +293,105 @@ export default function AppLayout({ children, activeTab, onTabChange, isOffline,
     if (isMobile) setSidebarOpen(false);
   };
 
+  const userName = profile?.nome || profile?.email || 'Usuário';
+  const userInitials = getInitials(userName);
+
+  const accountTrigger = (
+    <button
+      type="button"
+      aria-label={`Menu da conta: ${userName}`}
+      className={`flex items-center rounded-xl transition-colors duration-150 hover:bg-sidebar-hover
+        ${collapsed ? 'h-10 w-10 justify-center mx-auto' : 'w-full gap-3 px-2 py-2 text-left'}`}
+    >
+      <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-soft text-xs font-semibold text-primary-ink">
+        {userInitials}
+      </span>
+      {!collapsed && (
+        <>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[13px] font-semibold leading-tight text-sidebar-hover-foreground">{userName}</span>
+            {profile?.email && profile.email !== userName && (
+              <span className="mt-0.5 block truncate text-[11.5px] text-muted-foreground">{profile.email}</span>
+            )}
+          </span>
+          <ChevronsUpDown aria-hidden="true" className="h-4 w-4 shrink-0 text-muted-foreground" />
+        </>
+      )}
+    </button>
+  );
+
+  const accountMenu = (
+    <DropdownMenu>
+      {collapsed ? (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <DropdownMenuTrigger asChild>{accountTrigger}</DropdownMenuTrigger>
+          </TooltipTrigger>
+          <TooltipContent side="right">{userName}</TooltipContent>
+        </Tooltip>
+      ) : (
+        <DropdownMenuTrigger asChild>{accountTrigger}</DropdownMenuTrigger>
+      )}
+      <DropdownMenuContent
+        side={collapsed ? 'right' : 'top'}
+        align={collapsed ? 'end' : 'start'}
+        className={collapsed ? 'w-56' : 'w-[--radix-dropdown-menu-trigger-width] min-w-56'}
+      >
+        <div className="px-2 py-1.5">
+          <p className="text-xs font-semibold text-foreground truncate">{profile?.nome || 'Usuário'}</p>
+          <p className="text-[11px] text-muted-foreground truncate">{profile?.email}</p>
+          {roles.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-1.5">
+              {roles.map(r => (
+                <span key={r} className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary-soft text-primary-soft-foreground font-medium">
+                  {ROLE_DISPLAY[r] || r}
+                </span>
+              ))}
+            </div>
+          )}
+          {profile?.sector && (
+            <p className="text-[10px] text-muted-foreground mt-1.5">Setor: {profile.sector}</p>
+          )}
+        </div>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          onSelect={() => signOut()}
+          className="text-destructive focus:text-destructive focus:bg-destructive-soft cursor-pointer"
+        >
+          <LogOut className="w-3.5 h-3.5 mr-2" /> Sair
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
+  const navItemClass = (active: boolean) => `w-full flex items-center gap-2.5 rounded-xl transition-colors duration-150 relative
+    ${collapsed ? 'h-10 w-10 justify-center mx-auto' : 'min-h-[40px] px-3 py-2'}
+    ${active
+      ? 'bg-sidebar-active bg-gradient-highlight text-sidebar-active-foreground font-semibold shadow-sm'
+      : 'text-sidebar-foreground hover:bg-sidebar-hover hover:text-sidebar-hover-foreground'
+    }`;
+
   const sidebarContent = (
     <div className="flex flex-col h-full">
-      {/* Logo */}
-      <div className={`flex items-center gap-2.5 px-4 py-5 border-b border-sidebar-border ${sidebarCollapsed ? 'justify-center px-2' : ''}`}>
-        {sidebarCollapsed && accessibleCompanies.length > 1 ? <CompanySelector companies={accessibleCompanies} value={activeCompanyId!} onChange={id => void setActiveCompany(id)} compact label="Trocar unidade" /> : <div className="w-8 h-8 rounded-lg bg-primary-strong flex items-center justify-center shadow-sm shrink-0">
-          <span className="text-primary-strong-foreground font-black text-base tracking-tighter">M</span>
-        </div>}
-        {!sidebarCollapsed && (
-          <div className="flex flex-col min-w-0">
-            <span className="text-[15px] font-bold text-sidebar-foreground leading-tight tracking-tight truncate">Margin Food</span>
-            <div className="text-[11px] text-muted-foreground leading-tight truncate"><CompanySelector companies={accessibleCompanies} value={activeCompanyId!} onChange={id => void setActiveCompany(id)} label="Trocar unidade" /></div>
-          </div>
+      {/* Marca */}
+      <div className={`flex items-center gap-3 pt-5 pb-4 ${collapsed ? 'justify-center px-2' : 'px-4'}`}>
+        <div
+          role={brandIconOnly ? 'img' : undefined}
+          aria-label={brandIconOnly ? 'Margin Food' : undefined}
+          aria-hidden={brandIconOnly ? undefined : true}
+          className="w-9 h-9 rounded-xl bg-primary-strong flex items-center justify-center shadow-sm shrink-0"
+        >
+          <span aria-hidden="true" className="text-primary-strong-foreground font-black text-lg tracking-tighter">M</span>
+        </div>
+        {!brandIconOnly && (
+          <span className="min-w-0 truncate text-base font-bold text-sidebar-hover-foreground leading-tight tracking-tight">Margin Food</span>
         )}
 
-        {!isMobile && !sidebarCollapsed && (
+        {!isMobile && !collapsed && (
           <Tooltip>
             <TooltipTrigger asChild>
               <button
+                type="button"
                 onClick={() => setSidebarCollapsed(true)}
                 aria-label="Recolher menu"
                 className="ml-auto h-8 w-8 flex items-center justify-center shrink-0 text-muted-foreground hover:text-foreground hover:bg-sidebar-hover transition-colors rounded-md"
@@ -258,17 +403,25 @@ export default function AppLayout({ children, activeTab, onTabChange, isOffline,
           </Tooltip>
         )}
         {isMobile && (
-          <button onClick={() => setSidebarOpen(false)} aria-label="Fechar menu" className="ml-auto h-10 w-10 flex items-center justify-center shrink-0 text-muted-foreground hover:text-foreground transition-colors rounded-md">
+          <button
+            ref={closeMenuButtonRef}
+            type="button"
+            onClick={() => setSidebarOpen(false)}
+            aria-label="Fechar menu"
+            className="ml-auto h-10 w-10 flex items-center justify-center shrink-0 text-muted-foreground hover:text-foreground hover:bg-sidebar-hover transition-colors rounded-md"
+          >
             <X className="w-4 h-4" />
           </button>
         )}
       </div>
 
-      {!isMobile && sidebarCollapsed && (
-        <div className="flex justify-center py-2 border-b border-sidebar-border">
+      {/* Loja ativa */}
+      <div className={collapsed ? 'flex flex-col items-center gap-2 px-2 pb-3' : 'px-3 pb-3'}>
+        {!isMobile && collapsed && (
           <Tooltip>
             <TooltipTrigger asChild>
               <button
+                type="button"
                 onClick={() => setSidebarCollapsed(false)}
                 aria-label="Expandir menu"
                 className="h-8 w-8 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-sidebar-hover transition-colors rounded-md"
@@ -278,18 +431,28 @@ export default function AppLayout({ children, activeTab, onTabChange, isOffline,
             </TooltipTrigger>
             <TooltipContent side="right">Expandir menu</TooltipContent>
           </Tooltip>
-        </div>
-      )}
+        )}
+        {activeCompanyId && (
+          <CompanySelector
+            companies={accessibleCompanies}
+            value={activeCompanyId}
+            onChange={id => void setActiveCompany(id)}
+            appearance={collapsed ? 'compact' : 'card'}
+            showIcon={!narrow}
+            label="Trocar unidade"
+          />
+        )}
+      </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-5">
+      <nav ref={navRef} aria-label="Módulos" className={`flex-1 overflow-y-auto overscroll-contain pt-1 pb-3 space-y-4 ${collapsed ? 'px-2' : 'px-3'}`}>
         {!permissionsReady ? (
           /* Skeleton while permissions load — NEVER show full menu */
           <div className="space-y-4 px-3">
             {[1,2,3,4,5].map(i => (
               <div key={i} className="flex items-center gap-3">
                 <div className="w-4 h-4 rounded bg-muted animate-pulse" />
-                {!sidebarCollapsed && <div className="h-3 w-24 rounded bg-muted animate-pulse" />}
+                {!collapsed && <div className="h-3 w-24 rounded bg-muted animate-pulse" />}
               </div>
             ))}
           </div>
@@ -299,8 +462,8 @@ export default function AppLayout({ children, activeTab, onTabChange, isOffline,
             if (visibleItems.length === 0) return null;
             return (
               <div key={section.title}>
-                {!sidebarCollapsed && (
-                  <p className="text-[10px] font-semibold text-sidebar-section uppercase tracking-widest px-3 mb-1.5">
+                {!collapsed && (
+                  <p className="text-[10.5px] font-semibold text-sidebar-section uppercase tracking-[0.12em] px-3 mb-1">
                     {section.title}
                   </p>
                 )}
@@ -314,27 +477,21 @@ export default function AppLayout({ children, activeTab, onTabChange, isOffline,
                     const pendingLabel = badgeTotal === 1 ? '1 pendência' : `${badgeTotal} pendências`;
                     const navButton = (
                       <button
+                        type="button"
                         onClick={() => handleNav(item.id)}
                         aria-current={active ? 'page' : undefined}
-                        className={`w-full flex items-center gap-3 rounded-lg transition-colors duration-150 relative
-                          ${sidebarCollapsed ? 'h-10 w-10 justify-center mx-auto' : 'min-h-[40px] px-3 py-2.5'}
-                          ${active
-                            ? 'bg-sidebar-active text-sidebar-active-foreground font-semibold'
-                            : 'text-sidebar-foreground hover:bg-sidebar-hover hover:text-sidebar-hover-foreground'
-                          }`}
+                        title={collapsed ? undefined : item.label}
+                        className={navItemClass(active)}
                       >
-                        {active && (
-                          <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-full bg-sidebar-active-marker" />
-                        )}
-                        <Icon className="w-4 h-4 flex-shrink-0" />
-                        {!sidebarCollapsed && (
-                          <span className="min-w-0 text-[13.5px] truncate tracking-tight">{item.label}</span>
+                        <Icon className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
+                        {!collapsed && (
+                          <span className="min-w-0 flex-1 text-left text-[13.5px] truncate tracking-tight">{item.label}</span>
                         )}
                         {badgeTotal > 0 && (
                           <>
                             <span
                               aria-hidden="true"
-                              className={sidebarCollapsed
+                              className={collapsed
                                 ? 'absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-destructive text-[9px] text-destructive-foreground flex items-center justify-center font-bold leading-none'
                                 : 'ml-auto shrink-0 min-w-5 h-5 px-1 rounded-full bg-destructive text-[10px] text-destructive-foreground flex items-center justify-center font-bold leading-none'}
                             >
@@ -343,9 +500,10 @@ export default function AppLayout({ children, activeTab, onTabChange, isOffline,
                             <span className="sr-only">{pendingLabel}</span>
                           </>
                         )}
+                        {active && !collapsed && <ChevronRight aria-hidden="true" className="w-4 h-4 shrink-0" />}
                       </button>
                     );
-                    return sidebarCollapsed ? (
+                    return collapsed ? (
                       <Tooltip key={key}>
                         <TooltipTrigger asChild>{navButton}</TooltipTrigger>
                         <TooltipContent side="right">
@@ -364,25 +522,24 @@ export default function AppLayout({ children, activeTab, onTabChange, isOffline,
 
         {/* Admin link — super_admin only */}
         {permissionsReady && isSuperAdmin && (
-          <div className="px-2 pb-2">
-            {!sidebarCollapsed && (
-              <p className="text-[10px] font-semibold text-sidebar-section uppercase tracking-widest px-3 mb-1.5">
+          <div className="pb-2">
+            {!collapsed && (
+              <p className="text-[10.5px] font-semibold text-sidebar-section uppercase tracking-[0.12em] px-3 mb-1">
                 SISTEMA
               </p>
             )}
             {(() => {
               const adminButton = (
                 <button
+                  type="button"
                   onClick={() => { navigate('/admin'); if (isMobile) setSidebarOpen(false); }}
-                  className={`w-full flex items-center gap-3 rounded-lg transition-colors duration-150
-                    ${sidebarCollapsed ? 'h-10 w-10 justify-center mx-auto' : 'min-h-[40px] px-3 py-2.5'}
-                    text-sidebar-foreground hover:bg-sidebar-hover hover:text-sidebar-hover-foreground`}
+                  className={navItemClass(false)}
                 >
-                  <Shield className="w-4 h-4 flex-shrink-0" />
-                  {!sidebarCollapsed && <span className="text-[13.5px] truncate tracking-tight">Admin</span>}
+                  <Shield className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
+                  {!collapsed && <span className="min-w-0 flex-1 text-left text-[13.5px] truncate tracking-tight">Admin</span>}
                 </button>
               );
-              return sidebarCollapsed ? (
+              return collapsed ? (
                 <Tooltip>
                   <TooltipTrigger asChild>{adminButton}</TooltipTrigger>
                   <TooltipContent side="right">Admin</TooltipContent>
@@ -393,18 +550,10 @@ export default function AppLayout({ children, activeTab, onTabChange, isOffline,
         )}
       </nav>
 
-      {/* Footer collapse control */}
-      {!isMobile && !sidebarCollapsed && (
-        <div className="border-t border-sidebar-border p-2">
-          <button
-            onClick={() => setSidebarCollapsed(true)}
-            className="w-full flex items-center gap-3 rounded-lg min-h-[40px] px-3 py-2.5 text-sidebar-foreground hover:bg-sidebar-hover hover:text-sidebar-hover-foreground transition-colors duration-150"
-          >
-            <PanelLeftClose className="w-4 h-4 flex-shrink-0" />
-            <span className="text-[13.5px] truncate tracking-tight">Recolher menu</span>
-          </button>
-        </div>
-      )}
+      {/* Conta do usuário (D07) */}
+      <div className={`border-t border-sidebar-border ${collapsed ? 'p-2' : 'p-3'}`}>
+        {accountMenu}
+      </div>
 
       {/* Resizer Handle */}
       {!isMobile && (
@@ -421,23 +570,32 @@ export default function AppLayout({ children, activeTab, onTabChange, isOffline,
     <div className="min-h-screen bg-background flex w-full">
       {/* Mobile overlay */}
       {isMobile && sidebarOpen && (
-        <div className="fixed inset-0 z-40 bg-foreground/20 backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />
+        <div aria-hidden="true" className="fixed inset-0 z-40 bg-foreground/20 backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />
       )}
 
       {/* Sidebar */}
       {isMobile ? (
         <aside
-          className={`fixed inset-y-0 left-0 z-50 bg-sidebar border-r border-sidebar-border w-60 transition-transform duration-300 ${
+          // Chaves distintas: sem elas o React reaproveita o mesmo <aside> ao virar desktop
+          // e o `inert` da gaveta fechada ficava na sidebar fixa.
+          key="sidebar-mobile"
+          ref={mobileAsideRef}
+          id="app-sidebar"
+          role={sidebarOpen ? 'dialog' : undefined}
+          aria-modal={sidebarOpen ? true : undefined}
+          aria-label="Menu de navegação"
+          className={`fixed inset-y-0 left-0 z-50 bg-sidebar border-r border-sidebar-border w-64 max-w-[85vw] transition-transform duration-300 ${
             sidebarOpen ? 'translate-x-0' : '-translate-x-full'
           }`}
         >
           {sidebarContent}
         </aside>
       ) : (
-        <aside 
+        <aside
+          key="sidebar-desktop"
           className={`sticky top-0 h-screen bg-sidebar border-r border-sidebar-border transition-all duration-200 flex-shrink-0 group overflow-visible`}
-          style={{ 
-            width: sidebarCollapsed ? '64px' : `${sidebarWidth}px`,
+          style={{
+            width: collapsed ? '64px' : `${sidebarWidth}px`,
             transition: isResizing ? 'none' : 'width 300ms cubic-bezier(0.4, 0, 0.2, 1)'
           }}
         >
@@ -446,12 +604,20 @@ export default function AppLayout({ children, activeTab, onTabChange, isOffline,
       )}
 
       {/* Main area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div ref={mainAreaRef} className="flex-1 flex flex-col min-w-0">
         {/* Header */}
-        <header className="sticky top-0 z-30 bg-background border-b border-border h-16 flex items-center justify-between px-4 lg:px-8">
-          <div className="flex items-center gap-4 min-w-0">
+        <header className="sticky top-0 z-30 bg-card border-b border-border h-16 flex items-center justify-between gap-3 px-4 lg:px-8">
+          <div className="flex items-center gap-3 min-w-0">
             {isMobile && (
-              <button onClick={() => setSidebarOpen(true)} aria-label="Abrir menu" className="h-10 w-10 flex items-center justify-center shrink-0 text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-accent">
+              <button
+                ref={openMenuButtonRef}
+                type="button"
+                onClick={() => setSidebarOpen(true)}
+                aria-label="Abrir menu"
+                aria-expanded={sidebarOpen}
+                aria-controls="app-sidebar"
+                className="h-10 w-10 flex items-center justify-center shrink-0 text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-accent"
+              >
                 <Menu className="w-5 h-5" />
               </button>
             )}
@@ -488,38 +654,6 @@ export default function AppLayout({ children, activeTab, onTabChange, isOffline,
               {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </Button>
             <NotificationBell />
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button aria-label="Menu do usuário" className="h-9 w-9 rounded-full bg-primary-soft border border-border flex items-center justify-center hover:bg-primary-soft/70 transition-colors">
-                  <User className="w-4 h-4 text-primary-ink" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <div className="px-2 py-1.5">
-                  <p className="text-xs font-semibold text-foreground truncate">{profile?.nome || 'Usuário'}</p>
-                  <p className="text-[11px] text-muted-foreground truncate">{profile?.email}</p>
-                  {roles.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-1.5">
-                      {roles.map(r => (
-                        <span key={r} className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary-soft text-primary-soft-foreground font-medium">
-                          {ROLE_DISPLAY[r] || r}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  {profile?.sector && (
-                    <p className="text-[10px] text-muted-foreground mt-1.5">Setor: {profile.sector}</p>
-                  )}
-                </div>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onSelect={() => signOut()}
-                  className="text-destructive focus:text-destructive focus:bg-destructive-soft cursor-pointer"
-                >
-                  <LogOut className="w-3.5 h-3.5 mr-2" /> Sair
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
           </div>
         </header>
 

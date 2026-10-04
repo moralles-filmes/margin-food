@@ -36,6 +36,7 @@
     --surface-hover: 210 40% 97%;       /* #F5F8FB */
     --surface-active: 214 32% 94%;      /* #EBF0F6 */
     --surface-elevated: 0 0% 100%;      /* popovers/menus acima do card */
+    --segmented-active: 0 0% 100%;      /* pílula do item ativo do SegmentedControl, sobre --muted */
 
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
@@ -123,7 +124,7 @@
     --radius-summary: 1.125rem;         /* 18px — só a família de cards de resumo (KpiCard V2, ChartCard) */
 
     /* ── Sidebar ──────────────────────────────────────────────────── */
-    --sidebar-background: 0 0% 100%;
+    --sidebar-background: 220 100% 99%;        /* #FAFCFF — branco azulado do recorte aprovado */
     --sidebar-foreground: 215 25% 27%;
     --sidebar-primary: 221 83% 53%;
     --sidebar-primary-foreground: 0 0% 100%;
@@ -133,10 +134,14 @@
     --sidebar-ring: 221 83% 53%;
     --sidebar-hover: 214 32% 95%;              /* fundo do hover (cor cheia) */
     --sidebar-hover-foreground: 222 47% 11%;
-    --sidebar-active: 214 100% 97%;            /* fundo do item ativo (cor cheia) */
-    --sidebar-active-foreground: 224 76% 45%;  /* azul AA sobre o tint */
-    --sidebar-active-marker: 221 83% 53%;
+    /* Item ativo: azul cheio com o mesmo gradiente do card de destaque (D04/D18).
+       O fundo sólido é o fallback de `bg-gradient-highlight`. */
+    --sidebar-active: var(--highlight-from);
+    --sidebar-active-foreground: var(--highlight-foreground);
     --sidebar-section: 215 16% 47%;            /* rótulo de grupo */
+    --sidebar-card: 220 66% 96%;               /* #EEF3FC — cartão da loja */
+    --sidebar-card-hover: 220 60% 93%;
+    --sidebar-card-border: 220 50% 90%;
 
     /* ── Gráficos ─────────────────────────────────────────────────── */
     /* 8 séries com matizes distintos — nunca 5 tons do mesmo azul. */
@@ -192,6 +197,7 @@
     --surface-hover: 219 24% 14%;       /* #1A2130 */
     --surface-active: 218 23% 17%;      /* #212938 */
     --surface-elevated: 219 25% 13%;    /* #181E29 — popovers acima do card */
+    --segmented-active: 218 23% 20%;    /* mais clara que o trilho (--muted), como no tema claro */
 
     --popover: 219 25% 13%;
     --popover-foreground: 210 40% 98%;
@@ -278,10 +284,12 @@
     --sidebar-ring: 217 91% 60%;
     --sidebar-hover: 219 24% 13%;
     --sidebar-hover-foreground: 210 40% 98%;
-    --sidebar-active: 222 47% 18%;
-    --sidebar-active-foreground: 213 94% 78%;
-    --sidebar-active-marker: 217 91% 60%;
+    --sidebar-active: var(--highlight-from);
+    --sidebar-active-foreground: var(--highlight-foreground);
     --sidebar-section: 215 20% 60%;
+    --sidebar-card: 222 32% 10%;
+    --sidebar-card-hover: 220 28% 14%;
+    --sidebar-card-border: 220 26% 18%;
 
     /* ── Gráficos ─────────────────────────────────────────────────── */
     --chart-1: 213 94% 68%;   /* azul     #60A5FA */

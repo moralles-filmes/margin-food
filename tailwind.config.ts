@@ -94,6 +94,9 @@ export default {
           active: "hsl(var(--surface-active))",
           elevated: "hsl(var(--surface-elevated))",
         },
+        segmented: {
+          active: "hsl(var(--segmented-active))",
+        },
         success: {
           DEFAULT: "hsl(var(--success))",
           foreground: "hsl(var(--success-foreground))",
@@ -137,8 +140,10 @@ export default {
           "hover-foreground": "hsl(var(--sidebar-hover-foreground))",
           active: "hsl(var(--sidebar-active))",
           "active-foreground": "hsl(var(--sidebar-active-foreground))",
-          "active-marker": "hsl(var(--sidebar-active-marker))",
           section: "hsl(var(--sidebar-section))",
+          card: "hsl(var(--sidebar-card))",
+          "card-hover": "hsl(var(--sidebar-card-hover))",
+          "card-border": "hsl(var(--sidebar-card-border))",
         },
         chart: {
           1: "hsl(var(--chart-1))",
