@@ -1,13 +1,13 @@
 import { useSupabase } from '@/contexts/CompanyScopeContext';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
 import { useDataEvent } from '@/lib/dataEvents';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DateInput } from '@/components/ui/DateInput';
 import { DatePicker } from '@/components/ui/DatePicker';
 import { Skeleton } from '@/components/ui/skeleton';
-import KpiCard, { type KpiCardDelta, type KpiVariant } from '@/components/ui/KpiCard';
+import KpiCard, { type KpiAppearance, type KpiCardDelta, type KpiVariant } from '@/components/ui/KpiCard';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { useCan } from '@/permissions/hooks';
 import { useScopedToast } from '@/hooks/useScopedToast';
@@ -21,8 +21,17 @@ import autoTable from 'jspdf-autotable';
 import * as XLSX from '@/lib/safeXlsx';
 import DashboardCharts from '@/components/financeiro/DashboardCharts';
 import {
-  DollarSign, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight,
-  RefreshCw, AlertTriangle, FileDown, FileSpreadsheet,
+  buildProvisionedComposition,
+  formatDashboardDatesLabel,
+  formatDashboardRangeLabel,
+  isDashboardRangeInProgress,
+  kpiGridClassFor,
+  previousDashboardRange,
+} from '@/components/financeiro/dashboardFinanceiroView';
+import {
+  TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, Wallet, ReceiptText, BarChart3,
+  RefreshCw, AlertTriangle, FileDown, FileSpreadsheet, CalendarDays, Info, Loader2,
+  type LucideIcon,
 } from 'lucide-react';
 
 // ── Types ──
@@ -77,6 +86,103 @@ function buildDelta(current: number, previous: number, invert = false): KpiCardD
   };
 }
 
+/** Período anterior zerado: sem variação calculável — só o rótulo, nenhum número novo. */
+const NO_BASE_DELTA: KpiCardDelta = { label: 'vs. período anterior', formatted: 'Base zero', direction: 'none', tone: 'neutral' };
+
+function KpiGroup({ id, title, caption, gridClassName, children }: { id: string; title: string; caption?: string; gridClassName: string; children: ReactNode }) {
+  return (
+    <section aria-labelledby={id} className="space-y-3">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <h3 id={id} className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{title}</h3>
+        <div aria-hidden="true" className="hidden h-px min-w-6 flex-1 bg-border sm:block" />
+        {caption && <p className="ml-auto text-xs text-muted-foreground sm:ml-0">{caption}</p>}
+      </div>
+      <div className="[container-type:inline-size]">
+        <div className={gridClassName}>{children}</div>
+      </div>
+    </section>
+  );
+}
+
+function DashboardNote({ children }: { children: ReactNode }) {
+  return (
+    <p className="flex items-start gap-2 text-xs text-muted-foreground">
+      <Info aria-hidden="true" className="mt-px h-3.5 w-3.5 shrink-0" />
+      <span>{children}</span>
+    </p>
+  );
+}
+
+function KpiSkeletons() {
+  return (
+    <>
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className="space-y-3 rounded-summary border bg-card p-5 shadow-card">
+          <Skeleton className="h-3 w-24" />
+          <Skeleton className="h-7 w-32" />
+          <Skeleton className="h-3 w-40" />
+        </div>
+      ))}
+    </>
+  );
+}
+
+/** Composição de Despesas Provisionadas com os números já carregados do resumo — mesma fórmula do card. */
+function ProvisionedExplanation({ total, despesa, aPagar, loading }: { total: number; despesa: number; aPagar: number; loading: boolean }) {
+  const composition = buildProvisionedComposition(despesa, aPagar);
+  return (
+    <Card className="min-w-0 rounded-summary">
+      <CardHeader className="space-y-1 p-5">
+        <CardTitle className="leading-tight">Entenda as despesas provisionadas</CardTitle>
+        <CardDescription>Despesa realizada + contas a pagar do período, sem somar duas vezes</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4 p-5 pt-0">
+        {loading ? (
+          <div className="space-y-3">
+            <Skeleton className="h-3 w-40" />
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="h-2.5 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+        ) : (
+          <>
+            <div>
+              <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Despesas provisionadas</p>
+              <p className="mt-1 text-2xl font-bold leading-tight tracking-tight tabular-nums text-foreground">{fmtBRL(total)}</p>
+            </div>
+            {composition.realizadaPercent != null && composition.aPagarPercent != null && (
+              <div aria-hidden="true" className="flex h-2.5 w-full gap-0.5 overflow-hidden rounded-full bg-muted">
+                {composition.realizadaPercent > 0 && <div className="h-full bg-chart-1" style={{ width: `${composition.realizadaPercent}%` }} />}
+                {composition.aPagarPercent > 0 && <div className="h-full bg-chart-7" style={{ width: `${composition.aPagarPercent}%` }} />}
+              </div>
+            )}
+            <dl className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-2">
+              <div className="min-w-0">
+                <dt className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-[2px] bg-chart-1" />
+                  Despesa realizada
+                </dt>
+                <dd className="mt-1 text-sm font-semibold tabular-nums text-foreground">{fmtBRL(despesa)}</dd>
+              </div>
+              <div className="min-w-0">
+                <dt className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-[2px] bg-chart-7" />
+                  Contas a pagar
+                </dt>
+                <dd className="mt-1 text-sm font-semibold tabular-nums text-foreground">{fmtBRL(aPagar)}</dd>
+              </div>
+            </dl>
+            <p className="flex items-start gap-2 rounded-lg bg-primary-soft px-3 py-2.5 text-xs text-primary-soft-foreground">
+              <Info aria-hidden="true" className="mt-px h-4 w-4 shrink-0" />
+              Este total já inclui a despesa realizada — não some com o card Despesa Realizada.
+            </p>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 // ── Component ──
 
 export default function DashboardFinanceiroSection({ onNavigate }: { onNavigate?: (params: DashboardNavigateParams) => void }) {
@@ -103,6 +209,9 @@ export default function DashboardFinanceiroSection({ onNavigate }: { onNavigate?
   });
   const [selectedDate, setSelectedDate] = useState<Date>(now);
   const [appliedRange, setAppliedRange] = useState<{ start: string; endExclusive: string } | null>(null);
+  // Período a que os valores de `resumo` pertencem — só muda quando a RPC responde. Os rótulos dos
+  // cards seguem este, não o `appliedRange`, para nunca descrever um período que os números não são.
+  const [resumoRange, setResumoRange] = useState<{ start: string; endExclusive: string } | null>(null);
 
   const monthOptions = Array.from({ length: 12 }, (_, i) => {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
@@ -162,6 +271,7 @@ export default function DashboardFinanceiroSection({ onNavigate }: { onNavigate?
           despesaPrev: Number(d.despesa_prev) || 0,
           resultadoPrev: Number(d.resultado_prev) || 0,
         });
+        setResumoRange({ start: startDate, endExclusive: endDateFinal });
       }
     } catch (err) {
       console.error(err);
@@ -257,108 +367,159 @@ export default function DashboardFinanceiroSection({ onNavigate }: { onNavigate?
       })()
     : undefined;
 
-  const cards: { label: string; value: number; icon: typeof DollarSign; variant: KpiVariant; target?: FinSubTab; delta?: KpiCardDelta; sub?: string; status?: string; tipo?: 'RECEITA' | 'DESPESA'; dateFrom?: string; dateTo?: string }[] = [
-    { label: 'Saldo em Caixa', value: resumo.saldoCaixa, icon: DollarSign, variant: 'success', target: 'fluxo' },
-    { label: 'Contas a Receber', value: resumo.aReceber, icon: ArrowUpRight, variant: 'primary', target: 'receber', status: 'A_RECEBER' },
-    { label: 'Contas a Pagar', value: resumo.aPagar, icon: ArrowDownRight, variant: 'warning', target: 'pagar' },
-    { label: 'Contas Vencidas', value: resumo.aPagarVencido, icon: AlertTriangle, variant: 'danger', target: 'pagar', status: 'VENCIDO', sub: resumo.aPagarVencidoQtd > 0 ? `${resumo.aPagarVencidoQtd} boleto${resumo.aPagarVencidoQtd > 1 ? 's' : ''}` : undefined },
-    { label: 'Receita do Período', value: resumo.receita, icon: TrendingUp, variant: 'success', target: 'lancamentos', tipo: 'RECEITA', dateFrom: rangeDateFrom, dateTo: rangeDateTo, delta: buildDelta(resumo.receita, resumo.receitaPrev) },
-    { label: 'Despesa Realizada', value: resumo.despesa, icon: TrendingDown, variant: 'danger', target: 'lancamentos', tipo: 'DESPESA', dateFrom: rangeDateFrom, dateTo: rangeDateTo, delta: buildDelta(resumo.despesa, resumo.despesaPrev, true) },
-    { label: 'Despesas Provisionadas', value: despesasProvisionadas, icon: DollarSign, variant: 'warning', target: 'pagar' },
-    { label: 'Resultado', value: resumo.resultado, icon: DollarSign, variant: resumo.resultado >= 0 ? 'success' : 'danger', target: 'dre', delta: buildDelta(resumo.resultado, resumo.resultadoPrev) },
+  const vencidasAtivas = resumo.aPagarVencido !== 0 || resumo.aPagarVencidoQtd > 0;
+
+  type DashboardCard = { label: string; value: number; icon: LucideIcon; variant: KpiVariant; appearance: KpiAppearance; valueTone?: 'default' | 'negative'; target?: FinSubTab; delta?: KpiCardDelta; sub?: string; status?: string; tipo?: 'RECEITA' | 'DESPESA'; dateFrom?: string; dateTo?: string };
+
+  // Posição: saldo até o fim do período; receber/pagar com vencimento no período; vencidas até hoje (fora do período).
+  const posicaoCards: DashboardCard[] = [
+    { label: 'Saldo em Caixa', value: resumo.saldoCaixa, icon: Wallet, variant: 'success', appearance: 'highlight', target: 'fluxo', sub: 'Saldo realizado até o fim do período' },
+    { label: 'Contas a Receber', value: resumo.aReceber, icon: ArrowUpRight, variant: 'primary', appearance: 'summary', target: 'receber', status: 'A_RECEBER', sub: 'Em aberto, com vencimento no período' },
+    { label: 'Contas a Pagar', value: resumo.aPagar, icon: ArrowDownRight, variant: 'warning', appearance: 'summary', target: 'pagar', sub: 'Em aberto, com vencimento no período' },
+    // Zero vencido é neutro: a cor de perigo só aparece quando existe conta vencida.
+    { label: 'Contas Vencidas', value: resumo.aPagarVencido, icon: AlertTriangle, variant: vencidasAtivas ? 'danger' : 'default', appearance: 'summary', target: 'pagar', status: 'VENCIDO', sub: resumo.aPagarVencidoQtd > 0 ? `${resumo.aPagarVencidoQtd} boleto${resumo.aPagarVencidoQtd > 1 ? 's' : ''} · até hoje` : 'Nenhum boleto vencido até hoje' },
+  ];
+  const desempenhoCards: DashboardCard[] = [
+    { label: 'Receita do Período', value: resumo.receita, icon: TrendingUp, variant: 'success', appearance: 'summary', target: 'lancamentos', tipo: 'RECEITA', dateFrom: rangeDateFrom, dateTo: rangeDateTo, delta: buildDelta(resumo.receita, resumo.receitaPrev) ?? NO_BASE_DELTA },
+    { label: 'Despesa Realizada', value: resumo.despesa, icon: TrendingDown, variant: 'danger', appearance: 'summary', target: 'lancamentos', tipo: 'DESPESA', dateFrom: rangeDateFrom, dateTo: rangeDateTo, delta: buildDelta(resumo.despesa, resumo.despesaPrev, true) ?? NO_BASE_DELTA },
+    { label: 'Despesas Provisionadas', value: despesasProvisionadas, icon: ReceiptText, variant: 'warning', appearance: 'summary', target: 'pagar', sub: 'Realizada + a pagar do período' },
+    { label: 'Resultado', value: resumo.resultado, icon: BarChart3, variant: resumo.resultado >= 0 ? 'success' : 'danger', appearance: 'summary', valueTone: resumo.resultado < 0 ? 'negative' : 'default', target: 'dre', delta: buildDelta(resumo.resultado, resumo.resultadoPrev) ?? NO_BASE_DELTA },
   ];
 
+  const renderCard = (c: DashboardCard) => (
+    <KpiCard
+      key={c.label}
+      label={c.label}
+      value={fmtBRL(c.value)}
+      icon={c.icon}
+      variant={c.variant}
+      appearance={c.appearance}
+      valueTone={c.valueTone}
+      sub={c.sub}
+      delta={c.delta}
+      onClick={c.target && onNavigate ? () => onNavigate({ tab: c.target!, status: c.status, tipo: c.tipo, dateFrom: c.dateFrom, dateTo: c.dateTo }) : undefined}
+    />
+  );
+
+  // Os dois grupos usam a mesma grade, decidida pelo valor mais longo dos oito cards.
+  const kpiGrid = kpiGridClassFor(Math.max(...[...posicaoCards, ...desempenhoCards].map(c => fmtBRL(c.value).length)));
+  // Rótulos dos cards: período dos valores exibidos. Gráficos e categorias: período aplicado (é o que eles carregam).
+  const rangeLabel = resumoRange ? formatDashboardRangeLabel(resumoRange) : undefined;
+  const rangeInProgress = resumoRange ? isDashboardRangeInProgress(resumoRange, todayBR()) : false;
+  const comparativoLabel = resumoRange ? formatDashboardDatesLabel(previousDashboardRange(resumoRange)) : undefined;
+  const chartsPeriodLabel = appliedRange ? formatDashboardRangeLabel(appliedRange) : undefined;
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
+    <div className="space-y-8">
+      <div className="space-y-4">
         <div>
-          <h2 className="text-xl font-bold text-foreground">Dashboard Financeiro</h2>
-          <p className="text-sm text-muted-foreground">Visão executiva consolidada</p>
+          <h2 className="text-[22px] font-bold leading-tight tracking-tight text-foreground sm:text-2xl">Dashboard Financeiro</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Seu caixa, compromissos e resultados em um só lugar.</p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <SegmentedControl
-            options={[
-              { value: 'dia', label: 'Dia' },
-              { value: 'mes', label: 'Mês' },
-              { value: 'periodo', label: 'Período' },
-            ]}
-            value={filterType}
-            onChange={(v) => setFilterType(v as 'mes' | 'dia' | 'periodo')}
-          />
 
-          {filterType === 'mes' && (
-            <Select value={mesAno} onValueChange={setMesAno}>
-              <SelectTrigger className="w-[200px] h-9 text-sm"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {monthOptions.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          )}
-
-          {filterType === 'dia' && (
-            <DatePicker
-              date={selectedDate}
-              onDateChange={d => d && setSelectedDate(d)}
-              formatValue={d => format(d, "dd 'de' MMMM, yyyy", { locale: ptBR })}
-              className="h-9 w-[200px]"
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <SegmentedControl
+              options={[
+                { value: 'dia', label: 'Dia' },
+                { value: 'mes', label: 'Mês' },
+                { value: 'periodo', label: 'Período' },
+              ]}
+              value={filterType}
+              onChange={(v) => setFilterType(v as 'mes' | 'dia' | 'periodo')}
             />
+
+            {filterType === 'mes' && (
+              <Select value={mesAno} onValueChange={setMesAno}>
+                <SelectTrigger className="h-9 w-[200px] text-sm" aria-label="Mês do resumo">
+                  {/* div (não span): o SelectTrigger aplica line-clamp ao span filho e empilharia o ícone. */}
+                  <div className="flex min-w-0 items-center gap-2 [&>span]:truncate">
+                    <CalendarDays aria-hidden="true" className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <SelectValue />
+                  </div>
+                </SelectTrigger>
+                <SelectContent>
+                  {monthOptions.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
+
+            {filterType === 'dia' && (
+              <DatePicker
+                date={selectedDate}
+                onDateChange={d => d && setSelectedDate(d)}
+                formatValue={d => format(d, "dd 'de' MMMM, yyyy", { locale: ptBR })}
+                className="h-9 w-[200px]"
+                aria-label="Dia do resumo"
+              />
+            )}
+
+            {filterType === 'periodo' && (
+              <div className="flex flex-wrap items-center gap-2">
+                <DateInput value={periodoInicio} onValueChange={setPeriodoInicio} className="h-9 text-xs w-[140px]" aria-label="Data inicial" />
+                <span className="text-xs text-muted-foreground">a</span>
+                <DateInput value={periodoFim} onValueChange={setPeriodoFim} className="h-9 text-xs w-[140px]" aria-label="Data final" />
+                <Button size="sm" className="h-9" onClick={loadResumo} disabled={loading || !periodoInicio || !periodoFim}>Aplicar</Button>
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" size="sm" onClick={loadResumo} disabled={loading}>
+              <RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} /> Atualizar
+            </Button>
+
+            {canExport && (
+              <>
+                <Button variant="outline" size="sm" onClick={exportPdf} disabled={exportingPdf} aria-busy={exportingPdf || undefined}>
+                  {exportingPdf ? <Loader2 aria-hidden="true" className="w-4 h-4 mr-1 animate-spin" /> : <FileDown className="w-4 h-4 mr-1" />} PDF
+                </Button>
+                <Button variant="outline" size="sm" onClick={exportExcel} disabled={exportingExcel} aria-busy={exportingExcel || undefined}>
+                  {exportingExcel ? <Loader2 aria-hidden="true" className="w-4 h-4 mr-1 animate-spin" /> : <FileSpreadsheet className="w-4 h-4 mr-1" />} Excel
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* KPI Cards — dois grupos de quatro */}
+      <div className="space-y-6">
+        <div className="space-y-3">
+          <KpiGroup id="dash-fin-posicao" title="Posição Financeira" caption={rangeLabel ? `Caixa e compromissos · ${rangeLabel}` : 'Caixa e compromissos'} gridClassName={kpiGrid}>
+            {loading ? <KpiSkeletons /> : posicaoCards.map(renderCard)}
+          </KpiGroup>
+          {/* O card de vencidas não segue o período e conta só estes status (get_fin_dashboard_summary). */}
+          <DashboardNote>Contas Vencidas: boletos aprovados ou aguardando aprovação com vencimento antes de hoje, em qualquer período.</DashboardNote>
+        </div>
+
+        <div className="space-y-3">
+          <KpiGroup id="dash-fin-desempenho" title="Desempenho do Período" caption={rangeLabel} gridClassName={kpiGrid}>
+            {loading ? <KpiSkeletons /> : desempenhoCards.map(renderCard)}
+          </KpiGroup>
+          {comparativoLabel && (
+            <DashboardNote>Comparativo “vs. período anterior”: {comparativoLabel}, a mesma duração do período do resumo.</DashboardNote>
           )}
-
-          {filterType === 'periodo' && (
-            <div className="flex items-center gap-2">
-              <DateInput value={periodoInicio} onValueChange={setPeriodoInicio} className="h-9 text-xs w-[140px]" />
-              <span className="text-xs text-muted-foreground">a</span>
-              <DateInput value={periodoFim} onValueChange={setPeriodoFim} className="h-9 text-xs w-[140px]" />
-              <Button size="sm" className="h-9" onClick={loadResumo} disabled={loading || !periodoInicio || !periodoFim}>Aplicar</Button>
-            </div>
-          )}
-
-          <Button variant="outline" size="sm" onClick={loadResumo} disabled={loading}>
-            <RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} /> Atualizar
-          </Button>
-
-          {canExport && (
-            <>
-              <Button variant="outline" size="sm" onClick={exportPdf} disabled={exportingPdf}>
-                <FileDown className="w-4 h-4 mr-1" /> PDF
-              </Button>
-              <Button variant="outline" size="sm" onClick={exportExcel} disabled={exportingExcel}>
-                <FileSpreadsheet className="w-4 h-4 mr-1" /> Excel
-              </Button>
-            </>
+          {rangeInProgress && (
+            <DashboardNote>Período em andamento: receita, despesa e resultado vão até hoje; contas a pagar e a receber incluem vencimentos até o fim do período.</DashboardNote>
           )}
         </div>
       </div>
 
-      {/* KPI Cards */}
-      {loading ? (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-8 gap-3">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <Card key={i}><CardContent className="p-4 space-y-2">
-              <Skeleton className="h-3 w-20" />
-              <Skeleton className="h-6 w-28" />
-            </CardContent></Card>
-          ))}
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-8 gap-3">
-          {cards.map(c => (
-            <KpiCard
-              key={c.label}
-              label={c.label}
-              value={fmtBRL(c.value)}
-              icon={c.icon}
-              variant={c.variant}
-              sub={c.sub}
-              delta={c.delta}
-              onClick={c.target && onNavigate ? () => onNavigate({ tab: c.target!, status: c.status, tipo: c.tipo, dateFrom: c.dateFrom, dateTo: c.dateTo }) : undefined}
-            />
-          ))}
-        </div>
-      )}
-
       {appliedRange && (
-        <DashboardCharts periodStart={appliedRange.start} periodEndExclusive={appliedRange.endExclusive} />
+        <DashboardCharts
+          periodStart={appliedRange.start}
+          periodEndExclusive={appliedRange.endExclusive}
+          periodLabel={chartsPeriodLabel}
+          expenseAside={(
+            <ProvisionedExplanation
+              total={despesasProvisionadas}
+              despesa={resumo.despesa}
+              aPagar={resumo.aPagar}
+              loading={loading}
+            />
+          )}
+        />
       )}
     </div>
   );
