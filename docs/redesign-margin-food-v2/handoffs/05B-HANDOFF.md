@@ -2,7 +2,7 @@
 
 ## Estado real
 
-- Repositório `moralles-filmes/margin-food`, branch `feat/redesign-v2-f05b`, criada de `feat/redesign-v2-f05a` em `149f4b5`. Commits da Fase 05B: `c102ddb` (código) e um commit de documentação, mais um commit de documentação registrando estes SHAs.
+- Repositório `moralles-filmes/margin-food`, branch `feat/redesign-v2-f05b`, criada de `feat/redesign-v2-f05a` em `149f4b5`. Commits da Fase 05B: `c102ddb` (código) e `211353b` (documentação), mais um commit de documentação registrando estes SHAs.
 - Sem push, PR ou merge; `main` intocada em `c6a9774`.
 - Fase 05B validada com ressalvas em 2026-10-05. Fase 06A pendente.
 
@@ -162,8 +162,8 @@ no CMV Financeiro (07), e não inicie a Fase 06B.
 
 ESTADO REAL DEIXADO PELA FASE 05B (2026-10-05)
 - Branch feat/redesign-v2-f05b, criada de feat/redesign-v2-f05a em
-  149f4b5. Fase 05B commitada em c102ddb (código) e num commit de
-  documentação, mais um commit de documentação com estes SHAs. Sem push,
+  149f4b5. Fase 05B commitada em c102ddb (código) e 211353b
+  (documentação), mais um commit de documentação com estes SHAs. Sem push,
   PR ou merge. main intocada (c6a9774).
 - Fase 05B validada com ressalvas: bun run test = 205 arquivos / 1.933
   testes; tsc --noEmit -p tsconfig.app.json = 0 erros; bun run lint = 0
