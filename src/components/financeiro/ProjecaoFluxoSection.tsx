@@ -1,21 +1,26 @@
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CurrencyInput } from '@/components/ui/brl-input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import KpiCard from '@/components/ui/KpiCard';
+import EmptyState from '@/components/ui/EmptyState';
+import ErrorState from '@/components/ui/ErrorState';
+import { ChartCard } from '@/components/ui/ChartCard';
+import { kpiGridClassFor, longestValueLength } from '@/components/ui/kpiGrid';
 import { useScopedToast } from '@/hooks/useScopedToast';
-import { RefreshCw, TrendingUp, TrendingDown, Wallet, FileDown, Ban, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { RefreshCw, TrendingUp, TrendingDown, Wallet, FileDown, Ban, AlertTriangle, CheckCircle2, Sparkles, Flag } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { fmtBRL, formatDateBR, parseLocalDate } from '@/lib/formatters';
-import { axisProps, gridProps, tooltipProps, chartValueFormatters, makeActiveDot } from '@/lib/chartTheme';
+import { axisProps, gridProps, tooltipProps, chartMargin, chartValueFormatters, makeActiveDot, SEMANTIC_CHART_COLORS } from '@/lib/chartTheme';
 import { ChartTooltip } from '@/components/ui/ChartTooltip';
 import { useCan } from '@/permissions/hooks';
 import { useDataEvent } from '@/lib/dataEvents';
 import * as XLSX from '@/lib/safeXlsx';
+import { FinKpiGrid, FinNote, FinScreenHeader } from './finV2Layout';
 
 /* ─── Types ─── */
 interface ProjecaoDia {
@@ -61,14 +66,19 @@ function NoAccess() {
 
 function SkeletonKpis() {
   return (
-    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <Card key={i}><CardContent className="p-3"><Skeleton className="h-4 w-20 mb-2" /><Skeleton className="h-6 w-28" /></CardContent></Card>
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-busy="true">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} aria-hidden="true" className="rounded-summary border bg-card p-5 space-y-3">
+          <Skeleton className="h-3 w-24" />
+          <Skeleton className="h-7 w-32" />
+          <Skeleton className="h-3 w-40" />
+        </div>
       ))}
     </div>
   );
 }
 
+const HORIZONTE_OPTIONS = [15, 30, 60, 90];
 
 export default function ProjecaoFluxoSection() {
   const toast = useScopedToast();
@@ -79,6 +89,8 @@ export default function ProjecaoFluxoSection() {
   const [loading, setLoading] = useState(false);
   const [errorState, setErrorState] = useState(false);
   const [result, setResult] = useState<ProjecaoResult | null>(null);
+  // Parâmetros com que o resultado exibido foi calculado (o campo pode mudar antes de "Projetar").
+  const [resultParams, setResultParams] = useState<{ dias: number; saldoManual: number | null } | null>(null);
   const [dias, setDias] = useState(30);
   const [saldoManual, setSaldoManual] = useState<number | null>(null);
   const [incluirEstimativa, setIncluirEstimativa] = useState(true);
@@ -110,6 +122,7 @@ export default function ProjecaoFluxoSection() {
 
       const parsed = data as unknown as ProjecaoResult;
       setResult(parsed);
+      setResultParams({ dias, saldoManual });
     } catch (err) {
       console.error(err);
       toast.error('Erro ao gerar projeção');
@@ -214,161 +227,176 @@ export default function ProjecaoFluxoSection() {
     }
   };
 
+  // ─── Presentation ───
+  const primeiroDia = timeline[0]?.data;
+  const ultimoDia = timeline[timeline.length - 1]?.data;
+  const horizonteLabel = primeiroDia && ultimoDia
+    ? `${formatDateBR(parseLocalDate(primeiroDia))} a ${formatDateBR(parseLocalDate(ultimoDia))}`
+    : null;
+  const baseLabel = comEstimativa ? 'com estimativa' : 'só títulos e previstos';
+  // Primeiro dia exibido em que o saldo atinge o mínimo informado pela RPC (tolerância de meio centavo).
+  const diaDoMinimo = timeline.find(d => Math.abs(d.saldo - saldoMin) < 0.005)?.data;
+  const saldoFinalPositivo = saldoFinal >= 0;
+
+  type ProjecaoCard = {
+    key: string;
+    label: string;
+    value: string;
+    sub?: string;
+    icon?: typeof Wallet;
+    tone?: 'default' | 'positive' | 'negative';
+    variant?: 'default' | 'success' | 'danger';
+    highlight?: boolean;
+  };
+  const cards: ProjecaoCard[] = [
+    {
+      key: 'inicial', label: 'Saldo Inicial', value: fmt(saldoInicial), icon: Wallet,
+      sub: resultParams?.saldoManual != null ? 'Informado manualmente' : 'Saldo atual das contas ativas',
+      tone: saldoInicial < 0 ? 'negative' : 'default',
+    },
+    { key: 'entradas', label: 'Entradas', value: fmt(totalEntradas), icon: TrendingUp, tone: 'positive', sub: 'Títulos a receber e lançamentos previstos' },
+    { key: 'saidas', label: 'Saídas', value: fmt(totalSaidas), icon: TrendingDown, tone: 'negative', sub: 'Títulos a pagar e lançamentos previstos' },
+    ...(comEstimativa
+      ? [
+          { key: 'receita_est', label: 'Receita estimada', value: fmt(receitaEstimada), icon: Sparkles, tone: 'positive' as const, sub: 'Média por dia da semana, sem título' },
+          { key: 'despesa_est', label: 'Despesa estimada', value: fmt(despesaEstimada), icon: Sparkles, tone: 'negative' as const, sub: 'Média por dia da semana, sem título' },
+        ]
+      : []),
+    {
+      key: 'final', label: 'Saldo Final', value: fmt(saldoFinal), icon: Flag,
+      sub: `${ultimoDia ? `Em ${formatDateBR(parseLocalDate(ultimoDia))} · ` : ''}${baseLabel}`,
+      // Azul é destaque, não "bom": saldo final negativo sai do azul para o vermelho aparecer.
+      highlight: saldoFinalPositivo,
+      tone: saldoFinalPositivo ? 'default' : 'negative',
+      variant: saldoFinalPositivo ? 'default' : 'danger',
+    },
+    {
+      key: 'dias_negativo', label: 'Dias com saldo negativo', value: String(diasNegativo),
+      icon: diasNegativo > 0 ? AlertTriangle : CheckCircle2,
+      // A série vai de hoje até hoje + horizonte: 30 dias de horizonte são 31 dias na série.
+      sub: timeline.length === 1 ? 'de 1 dia, só hoje' : `de ${timeline.length} dias, contando hoje`,
+      tone: diasNegativo > 0 ? 'negative' : 'default',
+      variant: diasNegativo > 0 ? 'danger' : 'success',
+    },
+  ];
+  const cardsGrid = kpiGridClassFor(longestValueLength(cards.map(c => c.value)), 4);
+
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div>
-          <h2 className="text-xl font-bold text-foreground">Projeção de Fluxo de Caixa</h2>
-          <p className="text-sm text-muted-foreground">Contas pendentes (as vencidas entram no dia de hoje), lançamentos previstos e, opcionalmente, a estimativa do que entra e sai sem título</p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-1">
-            <Label className="text-xs whitespace-nowrap">Saldo manual:</Label>
+    <div className="space-y-6">
+      <FinScreenHeader
+        title="Projeção de Fluxo de Caixa"
+        description="Contas pendentes (as vencidas entram no dia de hoje), lançamentos previstos e, opcionalmente, a estimativa do que entra e sai sem título"
+      />
+
+      <div className="rounded-summary border bg-card p-4 shadow-card">
+        <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="projecao-saldo-manual" className="text-xs text-muted-foreground">Saldo inicial manual</Label>
             <CurrencyInput
+              id="projecao-saldo-manual"
               showZero
-              className="w-32 h-9"
+              className="w-40 h-9"
               value={saldoManual == null ? '' : String(saldoManual)}
               onValueChange={(raw, parsed) => setSaldoManual(raw === '' ? null : parsed)}
               placeholder="Automático"
             />
           </div>
-          <div className="flex items-center gap-1.5">
-            <Switch id="projecao-estimativa" checked={incluirEstimativa} onCheckedChange={setIncluirEstimativa} />
-            <Label htmlFor="projecao-estimativa" className="text-xs whitespace-nowrap">Incluir estimativa</Label>
-          </div>
-          <div className="flex items-center gap-1">
-            <Label className="text-xs whitespace-nowrap">Dias:</Label>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="projecao-horizonte" className="text-xs text-muted-foreground">Horizonte</Label>
             <Select value={String(dias)} onValueChange={v => setDias(Number(v))}>
-              <SelectTrigger className="w-20 h-9"><SelectValue /></SelectTrigger>
+              <SelectTrigger id="projecao-horizonte" className="w-28 h-9"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="15">15</SelectItem>
-                <SelectItem value="30">30</SelectItem>
-                <SelectItem value="60">60</SelectItem>
-                <SelectItem value="90">90</SelectItem>
+                {HORIZONTE_OPTIONS.map(n => <SelectItem key={n} value={String(n)}>{n} dias</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
-          {canExport && (
-            <>
-              <Button variant="outline" size="sm" onClick={exportPdf} disabled={exportingPdf || timeline.length === 0}>
-                <FileDown className="w-4 h-4 mr-1" /> PDF
-              </Button>
-              <Button variant="outline" size="sm" onClick={exportExcel} disabled={exportingExcel || timeline.length === 0}>
-                <FileDown className="w-4 h-4 mr-1" /> Excel
-              </Button>
-            </>
-          )}
-          <Button size="sm" onClick={projetar} disabled={loading}>
-            <RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} /> Projetar
-          </Button>
+          <div className="flex h-9 items-center gap-2">
+            <Switch id="projecao-estimativa" checked={incluirEstimativa} onCheckedChange={setIncluirEstimativa} />
+            <Label htmlFor="projecao-estimativa" className="text-sm whitespace-nowrap">Incluir estimativa</Label>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+            {canExport && (
+              <>
+                {/* Com a projeção em erro a tela não mostra o resultado antigo; o arquivo também não. */}
+                <Button variant="outline" size="sm" onClick={exportPdf} disabled={exportingPdf || timeline.length === 0 || errorState} aria-busy={exportingPdf || undefined}>
+                  <FileDown className="w-4 h-4 mr-1" /> PDF
+                </Button>
+                <Button variant="outline" size="sm" onClick={exportExcel} disabled={exportingExcel || timeline.length === 0 || errorState} aria-busy={exportingExcel || undefined}>
+                  <FileDown className="w-4 h-4 mr-1" /> Excel
+                </Button>
+              </>
+            )}
+            <Button size="sm" onClick={projetar} disabled={loading}>
+              <RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} /> Projetar
+            </Button>
+          </div>
         </div>
       </div>
 
       {errorState && !loading ? (
-        <Card className="border-destructive/50">
-          <CardContent className="p-8 text-center text-destructive">
-            <AlertTriangle className="w-10 h-10 mx-auto mb-3 opacity-50" />
-            <p className="font-medium">Erro ao carregar projeção</p>
-            <Button variant="outline" size="sm" className="mt-3" onClick={projetar}>Tentar novamente</Button>
-          </CardContent>
-        </Card>
+        <ErrorState
+          title="Não foi possível gerar a projeção"
+          description="Verifique a conexão e tente novamente."
+          onRetry={projetar}
+        />
       ) : loading && !result ? (
         <SkeletonKpis />
       ) : !result || timeline.length === 0 ? (
-        <Card><CardContent className="p-8 text-center text-muted-foreground">
-          <Wallet className="w-10 h-10 mx-auto mb-3 opacity-30" />
-          <p className="font-medium">Nenhum dado para projeção</p>
-          <p className="text-sm">Verifique se há lançamentos previstos ou contas pendentes no horizonte selecionado.</p>
-        </CardContent></Card>
+        <EmptyState
+          icon={Wallet}
+          title="Nenhum dado para projeção"
+          description="Verifique se há lançamentos previstos ou contas pendentes no horizonte selecionado."
+        />
       ) : (
         <>
-          <div className={`grid grid-cols-2 gap-3 ${comEstimativa ? 'md:grid-cols-4 xl:grid-cols-7' : 'md:grid-cols-5'}`}>
-            <Card>
-              <CardContent className="p-3">
-                <p className="text-xs text-muted-foreground">Saldo Inicial</p>
-                <p className="text-lg font-bold">{fmt(saldoInicial)}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-3">
-                <p className="text-xs text-muted-foreground flex items-center gap-1"><TrendingUp className="w-3 h-3 text-success" /> Entradas</p>
-                <p className="text-lg font-bold text-success">{fmt(totalEntradas)}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-3">
-                <p className="text-xs text-muted-foreground flex items-center gap-1"><TrendingDown className="w-3 h-3 text-destructive" /> Saídas</p>
-                <p className="text-lg font-bold text-destructive">{fmt(totalSaidas)}</p>
-              </CardContent>
-            </Card>
-            {comEstimativa && (
-              <>
-                <Card>
-                  <CardContent className="p-3">
-                    <p className="text-xs text-muted-foreground flex items-center gap-1"><TrendingUp className="w-3 h-3 text-success" /> Receita estimada</p>
-                    <p className="text-lg font-bold text-success">{fmt(receitaEstimada)}</p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="p-3">
-                    <p className="text-xs text-muted-foreground flex items-center gap-1"><TrendingDown className="w-3 h-3 text-destructive" /> Despesa estimada</p>
-                    <p className="text-lg font-bold text-destructive">{fmt(despesaEstimada)}</p>
-                  </CardContent>
-                </Card>
-              </>
-            )}
-            <Card>
-              <CardContent className="p-3">
-                <p className="text-xs text-muted-foreground">Saldo Final</p>
-                <p className={`text-lg font-bold ${saldoFinal >= 0 ? 'text-success' : 'text-destructive'}`}>{fmt(saldoFinal)}</p>
-              </CardContent>
-            </Card>
-            <Card className={diasNegativo > 0 ? 'border-destructive/50' : ''}>
-              <CardContent className="p-3">
-                <p className="text-xs text-muted-foreground">Dias Negativo</p>
-                <p className={`text-lg font-bold ${diasNegativo > 0 ? 'text-destructive' : 'text-success'} flex items-center gap-1`}>
-                  {diasNegativo}
-                  {diasNegativo > 0
-                    ? <AlertTriangle className="w-4 h-4" />
-                    : <CheckCircle2 className="w-4 h-4" />
-                  }
-                </p>
-              </CardContent>
-            </Card>
-          </div>
+          <FinKpiGrid className={cardsGrid}>
+            {cards.map(card => (
+              <KpiCard
+                key={card.key}
+                appearance={card.highlight ? 'highlight' : 'summary'}
+                icon={card.icon}
+                label={card.label}
+                value={card.value}
+                sub={card.sub}
+                valueTone={card.tone}
+                variant={card.variant}
+              />
+            ))}
+          </FinKpiGrid>
 
           {incluirEstimativa && (
-            <p className="text-xs text-muted-foreground">
+            <FinNote>
               {comEstimativa && janelaEstimativa
                 ? `Estimativa: média do mesmo dia da semana de ${janelaEstimativa} no Livro Razão (último dia com receita lançada), só com o que não passa por contas a pagar/receber — esses já entram pelo vencimento. Lucro de sócios e outros não operacionais ficam fora.`
                 : 'Sem receita lançada no Livro Razão para estimar; a projeção usa só lançamentos previstos e contas pendentes.'}
-            </p>
+            </FinNote>
           )}
 
-          <Card>
-            <CardContent className="p-4">
-              <ResponsiveContainer width="100%" height={300}>
-                <AreaChart data={timeline.map(d => ({ ...d, dataLabel: formatDateBR(parseLocalDate(d.data)) }))}>
-                  <CartesianGrid {...gridProps} />
-                  <XAxis dataKey="dataLabel" {...axisProps} tickFormatter={v => v.slice(0, 5)} />
-                  <YAxis {...axisProps} tickFormatter={chartValueFormatters.moneyCompact} />
-                  <Tooltip {...tooltipProps} content={<ChartTooltip valueFormatter={v => fmt(Number(v))} />} />
-                  <ReferenceLine y={0} stroke="hsl(var(--destructive))" strokeDasharray="3 3" />
-                  <Area type="monotone" dataKey="saldo" name="Saldo" stroke="hsl(var(--primary))" fill="hsl(var(--primary) / 0.2)" strokeWidth={2} activeDot={makeActiveDot('hsl(var(--primary))')} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
+          <ChartCard
+            title="Saldo projetado por dia"
+            subtitle={horizonteLabel ? `${horizonteLabel} · ${baseLabel}` : baseLabel}
+            height="h-[300px]"
+          >
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={timeline.map(d => ({ ...d, dataLabel: formatDateBR(parseLocalDate(d.data)) }))} margin={chartMargin}>
+                <CartesianGrid {...gridProps} />
+                <XAxis dataKey="dataLabel" {...axisProps} tickFormatter={v => v.slice(0, 5)} />
+                <YAxis {...axisProps} tickFormatter={chartValueFormatters.moneyCompact} />
+                <Tooltip {...tooltipProps} content={<ChartTooltip valueFormatter={v => fmt(Number(v))} />} />
+                <ReferenceLine y={0} stroke={SEMANTIC_CHART_COLORS.negative} strokeDasharray="3 3" />
+                <Area type="monotone" dataKey="saldo" name="Saldo" stroke="hsl(var(--primary))" fill="hsl(var(--primary-soft))" fillOpacity={1} strokeWidth={2} activeDot={makeActiveDot('hsl(var(--primary))')} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </ChartCard>
 
           {saldoMin < 0 && (
-            <Card className="border-destructive/50">
-              <CardContent className="p-4 flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5 text-destructive flex-shrink-0" />
-                <p className="text-sm font-medium text-destructive">
-                  Atenção: Saldo mínimo projetado de {fmt(saldoMin)}. Considere antecipar recebimentos ou renegociar prazos.
-                </p>
-              </CardContent>
-            </Card>
+            <div role="alert" className="flex items-start gap-3 rounded-summary border border-destructive-border bg-destructive-soft p-4">
+              <AlertTriangle aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+              <p className="text-sm font-medium text-destructive">
+                Atenção: saldo mínimo projetado de {fmt(saldoMin)}
+                {diaDoMinimo ? ` em ${formatDateBR(parseLocalDate(diaDoMinimo))}` : ''}. Considere antecipar recebimentos ou renegociar prazos.
+              </p>
+            </div>
           )}
         </>
       )}

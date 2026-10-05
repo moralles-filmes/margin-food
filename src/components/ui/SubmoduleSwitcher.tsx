@@ -32,6 +32,11 @@ interface SubmoduleSwitcherProps<T extends string> {
   groupLabel?: string;
   /** Icon to display on trigger when value is not in items */
   groupIcon?: LucideIcon;
+  /**
+   * O que o seletor escolhe (ex.: "Cadastro exibido"). O botão passa a se chamar "<ariaLabel>: <atual>"
+   * e vira o título da gaveta no celular; sem ela, nada muda para os demais consumidores.
+   */
+  ariaLabel?: string;
 }
 
 export function SubmoduleSwitcher<T extends string>({
@@ -41,6 +46,7 @@ export function SubmoduleSwitcher<T extends string>({
   className,
   groupLabel,
   groupIcon,
+  ariaLabel,
 }: SubmoduleSwitcherProps<T>) {
   const isMobile = useIsMobile();
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -51,6 +57,7 @@ export function SubmoduleSwitcher<T extends string>({
   const displayItem = active ?? (!groupLabel ? items[0] : undefined);
   const DisplayIcon = displayItem?.icon ?? groupIcon;
   const displayLabel = displayItem?.label ?? groupLabel ?? '';
+  const triggerAriaLabel = ariaLabel ? `${ariaLabel}: ${displayLabel}` : undefined;
 
   function handleSelect(id: T) {
     onChange(id);
@@ -71,7 +78,8 @@ export function SubmoduleSwitcher<T extends string>({
   );
 
   const activeCls = 'bg-primary-soft text-primary-soft-foreground border border-primary-border font-medium';
-  const inactiveCls = 'bg-secondary text-foreground border border-transparent hover:bg-secondary/80 transition-colors';
+  // Grupo inativo do ModuleNav (único consumidor com groupLabel): texto discreto, sem preenchimento.
+  const inactiveCls = 'text-muted-foreground border border-transparent hover:bg-secondary hover:text-foreground transition-colors';
 
   if (isMobile) {
     return (
@@ -80,6 +88,7 @@ export function SubmoduleSwitcher<T extends string>({
           <button
             type="button"
             onClick={() => setDrawerOpen(true)}
+            aria-label={triggerAriaLabel}
             className={cn(
               'w-full flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium',
               isGroupInactive ? inactiveCls : activeCls,
@@ -90,7 +99,7 @@ export function SubmoduleSwitcher<T extends string>({
           <DrawerContent>
             <DrawerHeader className="text-left pb-2">
               <div className="flex items-center justify-between">
-                <DrawerTitle className="text-sm font-semibold">Selecionar módulo</DrawerTitle>
+                <DrawerTitle className="text-sm font-semibold">{ariaLabel ?? 'Selecionar módulo'}</DrawerTitle>
                 <DrawerClose asChild>
                   <button type="button" className="text-xs text-muted-foreground px-2 py-1 rounded hover:bg-secondary">Fechar</button>
                 </DrawerClose>
@@ -136,6 +145,7 @@ export function SubmoduleSwitcher<T extends string>({
         <DropdownMenuTrigger asChild>
           <button
             type="button"
+            aria-label={triggerAriaLabel}
             className={cn(
               'flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium min-w-[180px] max-w-xs',
               isGroupInactive ? inactiveCls : activeCls,

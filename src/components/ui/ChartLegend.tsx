@@ -22,21 +22,34 @@ export interface ChartLegendProps {
   payload?: ChartLegendItem[];
   /** `dataKey`s (ou `value`, se não houver `dataKey`) que devem exibir amostra tracejada. */
   dashedKeys?: Array<string | number>;
+  /** Alinhamento da fileira — `center` (padrão) ou junto ao título/ações do card. */
+  justify?: 'start' | 'center' | 'end';
+  /** Muitas séries: limita a altura e rola dentro da legenda, sem empurrar o gráfico. */
+  scrollable?: boolean;
   className?: string;
 }
 
-export function ChartLegend({ payload, dashedKeys, className }: ChartLegendProps) {
+const ALIGN_CLASS = { start: 'justify-start', center: 'justify-center', end: 'justify-end' } as const;
+
+export function ChartLegend({ payload, dashedKeys, justify = 'center', scrollable = false, className }: ChartLegendProps) {
   if (!payload?.length) return null;
 
   return (
-    <div className={cn('flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-xs', className)}>
+    <ul
+      className={cn(
+        'm-0 flex list-none flex-wrap items-center gap-x-4 gap-y-1.5 p-0 text-xs',
+        ALIGN_CLASS[justify],
+        scrollable && 'max-h-20 overflow-y-auto',
+        className,
+      )}
+    >
       {payload.map((item, index) => {
         const key = item.dataKey ?? (typeof item.value === 'string' ? item.value : index);
         const dashed = dashedKeys?.includes(key as string | number) ?? false;
         const isSquare = item.type === 'square' || item.type === 'rect';
 
         return (
-          <div key={String(key)} className="flex items-center gap-1.5 text-muted-foreground">
+          <li key={String(key)} className="flex max-w-full items-center gap-1.5 text-muted-foreground">
             {isSquare ? (
               <span
                 className="h-2.5 w-2.5 shrink-0 rounded-[2px]"
@@ -50,10 +63,10 @@ export function ChartLegend({ payload, dashedKeys, className }: ChartLegendProps
                 aria-hidden
               />
             )}
-            <span>{item.value}</span>
-          </div>
+            <span className="min-w-0 break-words">{item.value}</span>
+          </li>
         );
       })}
-    </div>
+    </ul>
   );
 }

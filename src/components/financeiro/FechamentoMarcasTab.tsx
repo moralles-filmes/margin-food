@@ -1,16 +1,16 @@
 import { useSupabase } from '@/contexts/CompanyScopeContext';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { AlertTriangle } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import TableActions from '@/components/ui/TableActions';
+import StatusBadge from '@/components/ui/StatusBadge';
+import EmptyState from '@/components/ui/EmptyState';
+import ErrorState from '@/components/ui/ErrorState';
 import CategoryCombobox from '@/components/financeiro/CategoryCombobox';
 import { useCompanyId } from '@/hooks/useCompanyId';
 import { useEmitDataEvent } from '@/lib/dataEvents';
@@ -20,6 +20,11 @@ import { FORMA_VENDA_LABEL, FORMA_VENDA_OPTIONS, type FormaVenda } from '@/domai
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { Plus, Store } from 'lucide-react';
 import { useScopedToast } from '@/hooks/useScopedToast';
+import { FinSectionGroup } from './finV2Layout';
+import { ListaCarregando } from './ContasParts';
+import { useConteinerEstreito } from './useConteinerEstreito';
+import { useRetornoFoco } from './useRetornoFoco';
+import { MARCAS_LISTA_LIMITE_PX } from './fechamentoView';
 
 export interface FechamentoMarca {
   id: string;
@@ -45,6 +50,9 @@ interface FechamentoMarcasTabProps {
   loading: boolean;
   canCreate: boolean;
   canEdit: boolean;
+  /** A leitura das marcas falhou (o toast já saiu no pai): a lista não é "vazia", é indisponível. */
+  erro?: boolean;
+  onRetry?: () => void;
 }
 
 const MARCA_ERROR_MESSAGES: Record<string, string> = {
@@ -60,11 +68,26 @@ function mapMarcaError(message: string): string {
   return match ? MARCA_ERROR_MESSAGES[match] : 'Erro ao salvar marca';
 }
 
+/** Aviso de pendência das marcas (token de atenção, sem opacidade). */
+function AvisoMarcas({ titulo, children }: { titulo: string; children: ReactNode }) {
+  return (
+    <div className="flex items-start gap-3 rounded-summary border border-warning-border bg-warning-soft p-4 text-sm text-foreground">
+      <AlertTriangle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+      <div className="min-w-0">
+        <p className="font-medium">{titulo}</p>
+        <p className="text-muted-foreground">{children}</p>
+      </div>
+    </div>
+  );
+}
+
 export default function FechamentoMarcasTab({
   items,
   loading,
   canCreate,
   canEdit,
+  erro = false,
+  onRetry,
 }: FechamentoMarcasTabProps) {
   const emitDataEvent = useEmitDataEvent();
   const toast = useScopedToast();
@@ -78,6 +101,10 @@ export default function FechamentoMarcasTab({
   const [saving, setSaving] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [categorias, setCategorias] = useState<CategoriaRow[]>([]);
+  // Só apresentação: sem as categorias, o nome vinculado e as opções do formulário ficam indisponíveis.
+  const [categoriasErro, setCategoriasErro] = useState(false);
+  const [listaRef, listaEstreita] = useConteinerEstreito(MARCAS_LISTA_LIMITE_PX);
+  const retornoForm = useRetornoFoco();
 
   useEffect(() => {
     if (!companyId) return;
@@ -90,8 +117,10 @@ export default function FechamentoMarcasTab({
         if (cancelled) return;
         if (error) {
           console.error('[FechamentoMarcasTab.loadCategorias]', error);
+          setCategoriasErro(true);
           return;
         }
+        setCategoriasErro(false);
         setCategorias((data as CategoriaRow[]) || []);
       });
     return () => { cancelled = true; };
@@ -210,145 +239,175 @@ export default function FechamentoMarcasTab({
     }
   };
 
+  // ── Apresentação ──
+
+  const ativas = items.filter(item => item.ativo).length;
+  const legenda = items.length === 0
+    ? undefined
+    : `${items.length === 1 ? '1 marca' : `${items.length} marcas`} · ${ativas === 1 ? '1 ativa' : `${ativas} ativas`}`;
+
+  const formaVendaCelula = (item: FechamentoMarca) => item.forma_venda
+    ? <span className="text-sm text-foreground">{FORMA_VENDA_LABEL[item.forma_venda]}</span>
+    : <StatusBadge status="warning" label="Não definida" />;
+
+  const categoriaCelula = (item: FechamentoMarca) => {
+    if (!item.categoria_id) return <StatusBadge status="warning" label="Sem categoria" />;
+    if (categoriasErro) return <span className="text-sm text-muted-foreground">Indisponível</span>;
+    return <span className="break-words text-sm text-foreground">{categoriaNomeById.get(item.categoria_id) || '—'}</span>;
+  };
+
+  const statusCelula = (item: FechamentoMarca) => (
+    <StatusBadge status={item.ativo ? 'success' : 'neutral'} label={item.ativo ? 'Ativa' : 'Inativa'} />
+  );
+
+  // O Switch grava no clique (UPDATE direto), como antes; só ganhou dica visível.
+  const acoes = (item: FechamentoMarca) => (
+    <div className="flex items-center justify-end gap-2">
+      <Switch
+        checked={item.ativo}
+        disabled={togglingId === item.id}
+        onCheckedChange={ativo => toggleActive(item, ativo)}
+        aria-label={`${item.ativo ? 'Desativar' : 'Ativar'} ${item.nome}`}
+        title={`${item.ativo ? 'Desativar' : 'Ativar'} ${item.nome}`}
+      />
+      <TableActions
+        onEdit={() => openEdit(item)}
+        canEditOverride={canEdit}
+        editLabel={`Editar ${item.nome}`}
+      />
+    </div>
+  );
+
   return (
-    <div className="space-y-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h3 className="font-semibold text-foreground">Marcas e dark kitchens</h3>
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 space-y-1">
+          <h3 className="text-base font-semibold text-foreground">Marcas e dark kitchens</h3>
           <p className="text-sm text-muted-foreground">
             Cadastre Salão, deliveries e todas as marcas que precisam aparecer no fechamento diário.
           </p>
         </div>
         {canCreate && (
           <Button size="sm" onClick={openNew} disabled={companyLoading || !companyId}>
-            <Plus className="mr-1 h-4 w-4" /> Nova marca
+            <Plus aria-hidden="true" className="mr-1 h-4 w-4" /> Nova marca
           </Button>
         )}
       </div>
 
       {companyError && (
-        <Card className="border-destructive/40">
-          <CardContent className="p-4 text-sm text-destructive">{companyError}</CardContent>
-        </Card>
+        <div role="alert" className="rounded-summary border border-destructive-border bg-destructive-soft p-4 text-sm text-foreground">
+          {companyError}
+        </div>
       )}
 
       {!loading && marcasPendentes.length > 0 && (
-        <Card className="border-warning/40 bg-warning-soft">
-          <CardContent className="flex items-start gap-2 p-4 text-sm text-foreground">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
-            <div>
-              <p className="font-medium">
-                {marcasPendentes.length === 1
-                  ? '1 marca sem categoria vinculada'
-                  : `${marcasPendentes.length} marcas sem categoria vinculada`}
-              </p>
-              <p className="text-muted-foreground">
-                Sem a categoria, o faturamento líquido dessa loja não pode ser calculado na Apresentação Sócios:{' '}
-                {marcasPendentes.map(m => m.nome).join(', ')}.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        <AvisoMarcas
+          titulo={marcasPendentes.length === 1
+            ? '1 marca sem categoria vinculada'
+            : `${marcasPendentes.length} marcas sem categoria vinculada`}
+        >
+          Sem a categoria, o faturamento líquido dessa loja não pode ser calculado na Apresentação Sócios:{' '}
+          {marcasPendentes.map(m => m.nome).join(', ')}.
+        </AvisoMarcas>
       )}
 
       {!loading && marcasSemForma.length > 0 && (
-        <Card className="border-warning/40 bg-warning-soft">
-          <CardContent className="flex items-start gap-2 p-4 text-sm text-foreground">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
-            <div>
-              <p className="font-medium">
-                {marcasSemForma.length === 1
-                  ? '1 marca sem forma de venda'
-                  : `${marcasSemForma.length} marcas sem forma de venda`}
-              </p>
-              <p className="text-muted-foreground">
-                Edite a marca e escolha Pedidos ou Pessoas para o fechamento diário pedir a quantidade:{' '}
-                {marcasSemForma.map(m => m.nome).join(', ')}.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        <AvisoMarcas
+          titulo={marcasSemForma.length === 1
+            ? '1 marca sem forma de venda'
+            : `${marcasSemForma.length} marcas sem forma de venda`}
+        >
+          Edite a marca e escolha Pedidos ou Pessoas para o fechamento diário pedir a quantidade:{' '}
+          {marcasSemForma.map(m => m.nome).join(', ')}.
+        </AvisoMarcas>
       )}
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Marca / operação</TableHead>
-            <TableHead className="w-36">Forma de venda</TableHead>
-            <TableHead>Categoria vinculada</TableHead>
-            <TableHead className="w-28">Status</TableHead>
-            {canEdit && <TableHead className="w-28 text-right">Ações</TableHead>}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {loading ? (
-            Array.from({ length: 3 }).map((_, index) => (
-              <TableRow key={index}>
-                <TableCell><Skeleton className="h-4 w-48" /></TableCell>
-                <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                <TableCell><Skeleton className="h-4 w-40" /></TableCell>
-                <TableCell><Skeleton className="h-5 w-16" /></TableCell>
-                {canEdit && <TableCell><Skeleton className="ml-auto h-7 w-20" /></TableCell>}
-              </TableRow>
-            ))
+      {categoriasErro && !erro && (
+        <ErrorState
+          compact
+          title="Não foi possível carregar as categorias"
+          description="Os nomes das categorias vinculadas e as opções do formulário ficam indisponíveis. Atualize a tela para tentar de novo."
+        />
+      )}
+
+      <FinSectionGroup id="fech-marcas" title="Marcas" caption={loading || erro ? undefined : legenda}>
+        {erro && items.length > 0 && (
+          <ErrorState
+            compact
+            title="Não foi possível atualizar as marcas"
+            description="A lista abaixo é da última carga."
+            onRetry={onRetry}
+          />
+        )}
+        <div ref={listaRef}>
+          {loading && items.length === 0 ? (
+            <ListaCarregando estreito={listaEstreita} texto="Carregando marcas…" />
+          ) : erro && items.length === 0 ? (
+            <ErrorState title="Não foi possível carregar as marcas" onRetry={onRetry} />
           ) : items.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={canEdit ? 5 : 4} className="py-10 text-center text-muted-foreground">
-                <Store className="mx-auto mb-2 h-8 w-8 opacity-30" />
-                Nenhuma marca cadastrada
-              </TableCell>
-            </TableRow>
-          ) : items.map(item => (
-            <TableRow key={item.id}>
-              <TableCell className="font-medium">{item.nome}</TableCell>
-              <TableCell>
-                {item.forma_venda ? (
-                  <span className="text-sm">{FORMA_VENDA_LABEL[item.forma_venda]}</span>
-                ) : (
-                  <Badge variant="warning" className="gap-1">
-                    <AlertTriangle className="h-3 w-3" /> Não definida
-                  </Badge>
-                )}
-              </TableCell>
-              <TableCell>
-                {item.categoria_id ? (
-                  <span className="text-sm">{categoriaNomeById.get(item.categoria_id) || '—'}</span>
-                ) : (
-                  <Badge variant="warning" className="gap-1">
-                    <AlertTriangle className="h-3 w-3" /> Sem categoria
-                  </Badge>
-                )}
-              </TableCell>
-              <TableCell>
-                <Badge variant={item.ativo ? 'success' : 'outline'}>
-                  {item.ativo ? 'Ativa' : 'Inativa'}
-                </Badge>
-              </TableCell>
-              {canEdit && (
-                <TableCell>
-                  <div className="flex items-center justify-end gap-2">
-                    <Switch
-                      checked={item.ativo}
-                      disabled={togglingId === item.id}
-                      onCheckedChange={ativo => toggleActive(item, ativo)}
-                      aria-label={`${item.ativo ? 'Desativar' : 'Ativar'} ${item.nome}`}
-                    />
-                    <TableActions
-                      onEdit={() => openEdit(item)}
-                      canEditOverride={canEdit}
-                    />
+            <EmptyState
+              icon={Store}
+              title="Nenhuma marca cadastrada"
+              description={canCreate ? 'Use Nova marca para cadastrar Salão, deliveries e dark kitchens.' : undefined}
+            />
+          ) : listaEstreita ? (
+            <ul className="space-y-2">
+              {items.map(item => (
+                <li key={item.id} className="space-y-2 rounded-lg border bg-card p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="min-w-0 break-words text-sm font-medium text-foreground">{item.nome}</p>
+                    {statusCelula(item)}
                   </div>
-                </TableCell>
-              )}
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+                  <dl className="grid grid-cols-1 gap-2 text-xs min-[400px]:grid-cols-2">
+                    <div className="space-y-0.5">
+                      <dt className="text-muted-foreground">Forma de venda</dt>
+                      <dd>{formaVendaCelula(item)}</dd>
+                    </div>
+                    <div className="space-y-0.5">
+                      <dt className="text-muted-foreground">Categoria vinculada</dt>
+                      <dd>{categoriaCelula(item)}</dd>
+                    </div>
+                  </dl>
+                  {canEdit && <div className="border-t pt-2">{acoes(item)}</div>}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Marca / operação</TableHead>
+                  <TableHead className="w-36">Forma de venda</TableHead>
+                  <TableHead>Categoria vinculada</TableHead>
+                  <TableHead className="w-28">Status</TableHead>
+                  {canEdit && <TableHead className="w-28 text-right">Ações</TableHead>}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {items.map(item => (
+                  <TableRow key={item.id}>
+                    <TableCell className="font-medium">{item.nome}</TableCell>
+                    <TableCell>{formaVendaCelula(item)}</TableCell>
+                    <TableCell>{categoriaCelula(item)}</TableCell>
+                    <TableCell>{statusCelula(item)}</TableCell>
+                    {canEdit && <TableCell>{acoes(item)}</TableCell>}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </div>
+      </FinSectionGroup>
 
       <Dialog open={showForm} onOpenChange={open => { if (!open && !saving) closeForm(); }}>
-        <DialogContent>
+        {/* Sem `autoFocus` no Nome: o Radix já foca o primeiro campo, e o autoFocus do React rodava antes
+            de `useRetornoFoco` guardar a origem — o foco caía no corpo da página ao fechar. */}
+        <DialogContent {...retornoForm}>
           <DialogHeader>
             <DialogTitle>{editItem ? 'Editar marca' : 'Nova marca'}</DialogTitle>
+            <DialogDescription>
+              Nome, forma de venda e categoria de receita usados no fechamento diário.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1.5">
@@ -359,19 +418,19 @@ export default function FechamentoMarcasTab({
                 onChange={event => setNome(event.target.value)}
                 placeholder="Ex.: Salão, Delivery Ren, Delivery Royal"
                 maxLength={100}
-                autoFocus
                 onKeyDown={event => {
                   if (event.key === 'Enter') save();
                 }}
               />
             </div>
             <div className="space-y-1.5">
-              <Label id="fechamento-marca-forma-label">Forma de venda</Label>
+              <p aria-hidden="true" className="text-sm font-medium leading-none text-foreground">Forma de venda</p>
               <SegmentedControl
                 options={FORMA_VENDA_OPTIONS}
                 value={formaVenda}
                 onChange={value => setFormaVenda(value as FormaVenda)}
                 className="flex w-full"
+                ariaLabel="Forma de venda"
               />
               <p className="text-xs text-muted-foreground">
                 Define o que será contado no fechamento do dia: quantidade de pedidos (delivery, balcão) ou de
@@ -381,15 +440,22 @@ export default function FechamentoMarcasTab({
             <div className="space-y-1.5">
               <Label htmlFor="fechamento-marca-categoria">Categoria vinculada (livro razão)</Label>
               <CategoryCombobox
+                id="fechamento-marca-categoria"
                 value={categoriaId}
                 onValueChange={setCategoriaId}
                 options={categoryOptions}
                 placeholder="Selecione a categoria de receita desta marca..."
               />
-              <p className="text-xs text-muted-foreground">
-                Só aparecem categorias/sub-categorias de receita, ativas e sem itens abaixo delas. Duas marcas podem
-                apontar para a mesma categoria (ex.: Salão e Jantar caindo na mesma linha do extrato).
-              </p>
+              {categoriasErro ? (
+                <p role="alert" className="text-xs text-destructive">
+                  As categorias não carregaram; a lista está vazia. Feche e atualize a tela antes de salvar.
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Só aparecem categorias/sub-categorias de receita, ativas e sem itens abaixo delas. Duas marcas podem
+                  apontar para a mesma categoria (ex.: Salão e Jantar caindo na mesma linha do extrato).
+                </p>
+              )}
             </div>
             <Button className="w-full" onClick={save} disabled={saving || !nome.trim() || !categoriaId || !formaVenda}>
               {saving ? 'Salvando...' : editItem ? 'Salvar alterações' : 'Cadastrar marca'}

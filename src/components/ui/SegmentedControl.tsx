@@ -11,10 +11,21 @@ interface SegmentedControlProps {
   value: string;
   onChange: (value: string) => void;
   className?: string;
+  /** nome do grupo para o leitor de tela quando não há rótulo visível associado */
+  ariaLabel?: string;
+  /**
+   * Setas só movem o foco; Enter/Espaço escolhem. Para quando trocar de opção desmonta uma tela com
+   * trabalho em andamento (ex.: Livro Razão ⇄ Conciliação Bancária) — uma seta acidental não pode
+   * descartar o extrato importado.
+   */
+  manualActivation?: boolean;
 }
 
-export function SegmentedControl({ options, value, onChange, className }: SegmentedControlProps) {
+export function SegmentedControl({ options, value, onChange, className, ariaLabel, manualActivation = false }: SegmentedControlProps) {
   const buttonRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  // Sem opção escolhida (ex.: forma de venda de uma marca nova), a primeira entra no Tab — senão
+  // o grupo inteiro ficava fora do teclado.
+  const temAtivo = options.some(option => option.value === value);
 
   function handleKeyDown(e: KeyboardEvent<HTMLButtonElement>, index: number) {
     let nextIndex: number | null = null;
@@ -25,7 +36,7 @@ export function SegmentedControl({ options, value, onChange, className }: Segmen
 
     if (nextIndex !== null) {
       e.preventDefault();
-      onChange(options[nextIndex].value);
+      if (!manualActivation) onChange(options[nextIndex].value);
       buttonRefs.current[nextIndex]?.focus();
     }
   }
@@ -33,6 +44,7 @@ export function SegmentedControl({ options, value, onChange, className }: Segmen
   return (
     <div
       role="radiogroup"
+      aria-label={ariaLabel}
       className={cn('inline-flex items-center gap-0.5 rounded-lg bg-muted p-1', className)}
     >
       {options.map((option, index) => {
@@ -44,17 +56,23 @@ export function SegmentedControl({ options, value, onChange, className }: Segmen
             type="button"
             role="radio"
             aria-checked={isActive}
-            tabIndex={isActive ? 0 : -1}
+            tabIndex={isActive || (!temAtivo && index === 0) ? 0 : -1}
             onClick={() => onChange(option.value)}
             onKeyDown={e => handleKeyDown(e, index)}
             className={cn(
               'flex-1 whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium text-center transition-colors',
+              // Pílula clara com texto azul (prancha 07): o azul cheio fica para a sidebar e a ação principal.
               isActive
-                ? 'bg-primary-strong text-primary-strong-foreground'
+                ? 'bg-segmented-active text-primary-ink shadow-sm'
                 : 'text-muted-foreground hover:text-foreground',
             )}
           >
-            {option.label}
+            {/* O peso maior marca o ativo sem depender só da cor; a cópia invisível em negrito
+                reserva a largura para o controle não mudar de tamanho ao trocar de opção. */}
+            <span className="inline-grid">
+              <span aria-hidden="true" className="invisible col-start-1 row-start-1 font-semibold">{option.label}</span>
+              <span className={cn('col-start-1 row-start-1', isActive && 'font-semibold')}>{option.label}</span>
+            </span>
           </button>
         );
       })}

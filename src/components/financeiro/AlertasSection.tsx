@@ -1,17 +1,20 @@
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useDataEvent } from '@/lib/dataEvents';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import StatusBadge, { type StatusType } from '@/components/ui/StatusBadge';
+import ErrorState from '@/components/ui/ErrorState';
+import AccessDenied from '@/components/ui/AccessDenied';
+import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useScopedToast } from '@/hooks/useScopedToast';
 import { useCan } from '@/permissions/hooks';
-import { AlertTriangle, Bell, Clock, RefreshCw, ExternalLink, ShieldX, Download } from 'lucide-react';
+import { AlertTriangle, Bell, Check, Clock, RefreshCw, ExternalLink, Download } from 'lucide-react';
 import { fmtBRL } from '@/lib/money';
 import * as XLSX from '@/lib/safeXlsx';
 import { formatDateValueBR } from '@/lib/formatters';
 import { todayBR } from '@/lib/datetime';
+import { FinScreenHeader, FinSectionGroup } from './finV2Layout';
 
 // ─── Types ───
 interface AlertaFinanceiro {
@@ -43,10 +46,11 @@ const GRUPO_LABELS: Record<string, string> = {
   recorrencias: 'Recorrências',
 };
 
-const SEV_CONFIG = {
-  critical: { color: 'bg-destructive/10 text-destructive border-destructive/30', icon: AlertTriangle, label: 'Crítico' },
-  warning: { color: 'bg-warning/10 text-warning border-warning/30', icon: Clock, label: 'Atenção' },
-  info: { color: 'bg-primary/10 text-primary border-primary/30', icon: Bell, label: 'Info' },
+// Cor por token -soft/-border (sem opacidade); o texto do alerta fica em foreground/muted.
+const SEV_CONFIG: Record<'critical' | 'warning' | 'info', { card: string; icon: typeof Bell; iconColor: string; chip: string; badge: StatusType; label: string }> = {
+  critical: { card: 'border-destructive-border bg-destructive-soft', icon: AlertTriangle, iconColor: 'text-destructive', chip: 'bg-destructive-soft text-destructive border-destructive-border', badge: 'danger', label: 'Crítico' },
+  warning: { card: 'border-warning-border bg-warning-soft', icon: Clock, iconColor: 'text-warning', chip: 'bg-warning-soft text-warning border-warning-border', badge: 'warning', label: 'Atenção' },
+  info: { card: 'border-info-border bg-info-soft', icon: Bell, iconColor: 'text-info', chip: 'bg-info-soft text-info border-info-border', badge: 'info', label: 'Info' },
 };
 
 const ORIGEM_LABELS: Record<string, string> = {
@@ -57,30 +61,20 @@ const ORIGEM_LABELS: Record<string, string> = {
 
 type SeverityFilter = 'todos' | 'critical' | 'warning' | 'info';
 
-// ─── NoAccess ───
-function NoAccess() {
-  return (
-    <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-2">
-      <ShieldX className="w-10 h-10 opacity-40" />
-      <p className="font-medium">Acesso restrito</p>
-      <p className="text-sm">Você não tem permissão para visualizar os alertas financeiros.</p>
-    </div>
-  );
-}
-
 // ─── Skeleton Loading ───
 function SkeletonCards() {
   return (
-    <div className="space-y-3">
+    <div role="status" className="space-y-3">
+      <span className="sr-only">Carregando alertas…</span>
       {Array.from({ length: 4 }).map((_, i) => (
-        <Card key={i}><CardContent className="p-3 flex items-start gap-3">
+        <div key={i} aria-hidden="true" className="flex items-start gap-3 rounded-xl border bg-card p-3">
           <Skeleton className="w-5 h-5 rounded-full shrink-0" />
           <div className="flex-1 space-y-2">
             <Skeleton className="h-4 w-3/4" />
             <Skeleton className="h-3 w-1/2" />
           </div>
           <Skeleton className="h-5 w-14 rounded-full" />
-        </CardContent></Card>
+        </div>
       ))}
     </div>
   );
@@ -96,6 +90,9 @@ export default function AlertasSection({ onNavigate }: Props) {
   const [truncations, setTruncations] = useState<TruncationInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [filtroSeveridade, setFiltroSeveridade] = useState<SeverityFilter>('todos');
+  // Só apresentação: falha de carga nunca vira "Tudo sob controle" (PF-013).
+  const [erro, setErro] = useState(false);
+  const [carregado, setCarregado] = useState(false);
 
   // ─── Debounce ref ───
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -111,6 +108,7 @@ export default function AlertasSection({ onNavigate }: Props) {
       if (error) {
         toast.error('Erro ao carregar alertas financeiros');
         console.error(error);
+        setErro(true);
         setLoading(false);
         return;
       }
@@ -223,9 +221,12 @@ export default function AlertasSection({ onNavigate }: Props) {
 
       setAlertas(list);
       setTruncations(trunc);
+      setErro(false);
+      setCarregado(true);
     } catch (err) {
       console.error('Error loading alerts:', err);
       toast.error('Erro inesperado ao carregar alertas');
+      setErro(true);
     }
     setLoading(false);
   }, [supabase, toast]);
@@ -239,7 +240,7 @@ export default function AlertasSection({ onNavigate }: Props) {
   useDataEvent('financeiro:contas', debouncedLoad);
 
   // ─── RBAC gate ───
-  if (!canView) return <NoAccess />;
+  if (!canView) return <AccessDenied description="Você não tem permissão para visualizar os alertas financeiros." />;
 
   // ─── Filtered list ───
   const filtered = filtroSeveridade === 'todos'
@@ -273,106 +274,144 @@ export default function AlertasSection({ onNavigate }: Props) {
     toast.success('Exportação concluída');
   };
 
+  const chips = ([
+    { key: 'todos' as SeverityFilter, label: 'Todos', count: alertas.length, tom: 'bg-card text-foreground border-border hover:bg-card-hover' },
+    { key: 'critical' as SeverityFilter, label: 'Crítico', count: criticalCount, tom: SEV_CONFIG.critical.chip },
+    { key: 'warning' as SeverityFilter, label: 'Atenção', count: warningCount, tom: SEV_CONFIG.warning.chip },
+    { key: 'info' as SeverityFilter, label: 'Info', count: infoCount, tom: SEV_CONFIG.info.chip },
+  ]).filter(f => f.count > 0 || f.key === 'todos');
+  const rotuloFiltro = filtroSeveridade === 'todos' ? 'Todos' : SEV_CONFIG[filtroSeveridade].label;
+  // Sem "⚠️" na tela: o ícone do cartão já marca a severidade. O título do Excel não muda.
+  const tituloNaTela = (titulo: string) => titulo.replace(/^⚠️\s*/u, '');
+
+  const resumo = alertas.length > 0 ? (
+    <>
+      {criticalCount > 0 && <span className="font-medium text-destructive">{criticalCount} crítico(s)</span>}
+      {criticalCount > 0 && warningCount > 0 && ' • '}
+      {warningCount > 0 && <span className="font-medium text-warning">{warningCount} atenção</span>}
+      {(criticalCount > 0 || warningCount > 0) && infoCount > 0 && ' • '}
+      {infoCount > 0 && <span className="font-medium text-info">{infoCount} info</span>}
+      {truncations.length > 0 ? ` • ${alertas.length} listados` : ` • ${alertas.length} total`}
+    </>
+  ) : 'Pendências financeiras que pedem ação.';
+
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div>
-          <h2 className="text-xl font-bold text-foreground">Central de Alertas</h2>
-          <p className="text-sm text-muted-foreground">
-            {criticalCount > 0 && <span className="text-destructive font-medium">{criticalCount} crítico(s)</span>}
-            {criticalCount > 0 && warningCount > 0 && ' • '}
-            {warningCount > 0 && <span className="text-warning font-medium">{warningCount} atenção</span>}
-            {(criticalCount > 0 || warningCount > 0) && infoCount > 0 && ' • '}
-            {infoCount > 0 && <span className="text-primary font-medium">{infoCount} info</span>}
-            {alertas.length > 0 && ` • ${alertas.length} total`}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {canExport && alertas.length > 0 && (
-            <Button variant="outline" size="sm" onClick={handleExportExcel}>
-              <Download className="w-4 h-4 mr-1" /> Excel
+    <div className="space-y-6">
+      <FinScreenHeader
+        title="Central de Alertas"
+        description={erro && !carregado ? 'Pendências financeiras que pedem ação.' : resumo}
+        actions={(
+          <>
+            {canExport && alertas.length > 0 && (
+              <Button variant="outline" size="sm" onClick={handleExportExcel}>
+                <Download aria-hidden="true" className="w-4 h-4 mr-1" /> Excel
+              </Button>
+            )}
+            <Button variant="outline" size="sm" onClick={load} disabled={loading}>
+              <RefreshCw aria-hidden="true" className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} /> Atualizar
             </Button>
-          )}
-          <Button variant="outline" size="sm" onClick={load} disabled={loading}>
-            <RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} /> Atualizar
-          </Button>
-        </div>
-      </div>
+          </>
+        )}
+      />
 
       {/* Severity filter */}
       {!loading && alertas.length > 0 && (
-        <div className="flex gap-1 flex-wrap">
-          {([
-            { key: 'todos' as SeverityFilter, label: 'Todos', count: alertas.length },
-            { key: 'critical' as SeverityFilter, label: 'Crítico', count: criticalCount },
-            { key: 'warning' as SeverityFilter, label: 'Atenção', count: warningCount },
-            { key: 'info' as SeverityFilter, label: 'Info', count: infoCount },
-          ]).filter(f => f.count > 0 || f.key === 'todos').map(f => (
-            <Button
-              key={f.key}
-              variant={filtroSeveridade === f.key ? 'default' : 'outline'}
-              size="sm"
-              className="h-7 text-xs"
-              onClick={() => setFiltroSeveridade(f.key)}
-            >
-              {f.label} ({f.count})
-            </Button>
-          ))}
+        <div className="space-y-2">
+          <div role="group" aria-label="Filtrar por severidade" className="flex flex-wrap gap-2">
+            {chips.map(f => {
+              const ativo = filtroSeveridade === f.key;
+              return (
+                <button
+                  key={f.key}
+                  type="button"
+                  aria-pressed={ativo}
+                  onClick={() => setFiltroSeveridade(f.key)}
+                  className={cn(
+                    'inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition-colors',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+                    f.tom,
+                    // Ativo: anel azul + marca de seleção + peso maior — não depende só da cor.
+                    ativo && 'font-semibold ring-2 ring-primary ring-offset-1 ring-offset-background',
+                  )}
+                >
+                  {ativo && <Check aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />}
+                  {f.label} <span className="font-semibold tabular-nums">({f.count})</span>
+                </button>
+              );
+            })}
+          </div>
+          {truncations.length > 0 && (
+            <p className="text-xs text-muted-foreground">Contagens dos alertas listados.</p>
+          )}
         </div>
       )}
 
       {/* Truncation warnings */}
       {truncations.length > 0 && (
-        <div className="text-xs text-warning bg-warning/10 border border-warning/30 rounded-md px-3 py-2">
+        <div className="rounded-lg border border-warning-border bg-warning-soft px-3 py-2 text-xs text-foreground">
           {truncations.map(t => (
             <p key={t.key}>Mostrando {t.shown} de {t.total} alertas em "{GRUPO_LABELS[t.key] || t.key}"</p>
           ))}
         </div>
       )}
 
+      {erro && carregado && !loading && alertas.length > 0 && (
+        <ErrorState compact title="Não foi possível atualizar os alertas" description="A lista abaixo é da última carga." onRetry={load} />
+      )}
+
       {loading ? (
         <SkeletonCards />
+      ) : erro && (!carregado || alertas.length === 0) ? (
+        // Sem lista para mostrar, o erro não divide a tela com "Tudo sob controle!".
+        <ErrorState title="Não foi possível carregar os alertas" onRetry={load} />
       ) : alertas.length === 0 ? (
-        <Card><CardContent className="p-8 text-center text-muted-foreground">
-          <Bell className="w-10 h-10 mx-auto mb-3 opacity-30" />
-          <p className="font-medium">Nenhum alerta no momento</p>
-          <p className="text-sm">Tudo sob controle! 🎉</p>
-        </CardContent></Card>
+        <div className="space-y-3 rounded-xl border border-dashed border-border bg-card p-8 text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-muted">
+            <Bell aria-hidden="true" className="h-7 w-7 text-muted-foreground" />
+          </div>
+          <p className="font-medium text-foreground">Nenhum alerta no momento</p>
+          <p className="text-sm text-muted-foreground">Tudo sob controle!</p>
+        </div>
       ) : filtered.length === 0 ? (
-        <Card><CardContent className="p-8 text-center text-muted-foreground">
-          <p className="text-sm">Nenhum alerta com severidade "{filtroSeveridade}"</p>
-        </CardContent></Card>
+        <div className="rounded-xl border border-dashed border-border bg-card p-8 text-center">
+          <p className="text-sm text-muted-foreground">Nenhum alerta com severidade “{rotuloFiltro}”</p>
+        </div>
       ) : (
-        <div className="space-y-5">
+        <div className="space-y-6">
           {grouped.map(g => (
-            <div key={g.grupo} className="space-y-2">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-foreground">
-                  {g.label} <Badge variant="outline" className="ml-1 text-[10px]">{g.items.length}</Badge>
-                </h3>
-                {onNavigate && g.items[0]?.navigateTo && (
-                  <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground" onClick={() => onNavigate(g.items[0].navigateTo!)}>
-                    <ExternalLink className="w-3 h-3 mr-1" /> Abrir
-                  </Button>
-                )}
-              </div>
-              {g.items.map((alerta, i) => {
-                const config = SEV_CONFIG[alerta.severidade];
-                const Icon = config.icon;
-                return (
-                  <Card key={`${g.grupo}-${alerta.tipo}-${i}`} className={`border ${config.color}`}>
-                    <CardContent className="p-3 flex items-start gap-3">
-                      <Icon className="w-5 h-5 mt-0.5 shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm">{alerta.titulo}</p>
-                        <p className="text-xs text-muted-foreground">{alerta.descricao}</p>
+            <FinSectionGroup
+              key={g.grupo}
+              id={`alertas-${g.grupo}`}
+              title={`${g.label} (${g.items.length})`}
+              caption={onNavigate && g.items[0]?.navigateTo ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => onNavigate(g.items[0].navigateTo!)}
+                  aria-label={`Abrir ${g.label}`}
+                >
+                  <ExternalLink aria-hidden="true" className="w-3 h-3 mr-1" /> Abrir
+                </Button>
+              ) : undefined}
+            >
+              <ul className="space-y-2">
+                {g.items.map((alerta, i) => {
+                  const config = SEV_CONFIG[alerta.severidade];
+                  const Icon = config.icon;
+                  return (
+                    <li key={`${g.grupo}-${alerta.tipo}-${i}`} className={cn('flex items-start gap-3 rounded-xl border p-3', config.card)}>
+                      <Icon aria-hidden="true" className={cn('mt-0.5 h-5 w-5 shrink-0', config.iconColor)} />
+                      <div className="min-w-0 flex-1">
+                        <p className="break-words text-sm font-medium text-foreground">{tituloNaTela(alerta.titulo)}</p>
+                        <p className="break-words text-xs text-muted-foreground">{alerta.descricao}</p>
                       </div>
-                      <Badge variant="outline" className="text-[10px] shrink-0">{config.label}</Badge>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
+                      <StatusBadge status={config.badge} label={config.label} className="shrink-0" />
+                    </li>
+                  );
+                })}
+              </ul>
+            </FinSectionGroup>
           ))}
         </div>
       )}

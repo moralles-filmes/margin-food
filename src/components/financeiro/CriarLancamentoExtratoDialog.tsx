@@ -7,19 +7,20 @@ import { DateInput } from '@/components/ui/DateInput';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { BRLInput } from '@/components/ui/brl-input';
 import { DecimalInput } from '@/components/ui/decimal-input';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEmitDataEvent } from '@/lib/dataEvents';
 import { fmtBRL } from '@/lib/money';
-import { formatDateValueBR } from '@/lib/datetime';
+import { cn } from '@/lib/utils';
 import { useScopedToast } from '@/hooks/useScopedToast';
 import CategoryCombobox from '@/components/financeiro/CategoryCombobox';
+import { ExtratoLinhaResumo } from '@/components/financeiro/ConciliacaoParts';
+import { useRetornoFoco } from '@/components/financeiro/useRetornoFoco';
 import { buildCategoryOptions } from '@/lib/categoriaOptions';
 import SupplierCombobox from '@/components/financeiro/SupplierCombobox';
-import { Plus, Trash2, PieChart, CheckCircle, RefreshCw, FileText } from 'lucide-react';
+import { Plus, Trash2, PieChart, CheckCircle, CheckCircle2, Loader2, FileText, Calculator } from 'lucide-react';
 import { traduzirErroIdempotencia } from '@/domain/financeiro/idempotencia';
 import { padronizarTexto } from '@/lib/padronizarTexto';
 
@@ -53,6 +54,12 @@ interface Props {
 
 type Destino = 'lancamento' | 'conta_pagar' | 'conta_receber';
 
+const DESTINOS: { value: Destino; label: string }[] = [
+  { value: 'lancamento', label: 'Lançamento' },
+  { value: 'conta_pagar', label: 'Conta a Pagar' },
+  { value: 'conta_receber', label: 'Conta a Receber' },
+];
+
 export default function CriarLancamentoExtratoDialog({
  open, onOpenChange, linha, ocorrencia, contaBancariaId, onCreated }: Props) {
   const emitDataEvent = useEmitDataEvent();
@@ -60,6 +67,7 @@ export default function CriarLancamentoExtratoDialog({
   const supabase = useSupabase();
   const canViewRbac = useCan('financeiro:conciliacao:reconcile');
   const { user } = useAuth();
+  const retornoFoco = useRetornoFoco();
 
   // Form state
   const [destino, setDestino] = useState<Destino>('lancamento');
@@ -354,54 +362,41 @@ export default function CriarLancamentoExtratoDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" {...retornoFoco}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <FileText className="w-5 h-5 text-primary" />
+            <FileText aria-hidden="true" className="h-5 w-5 text-primary" />
             Criar Registro a partir do Extrato
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
           {/* Extrato source card */}
-          <Card className="border-primary/20">
-            <CardContent className="p-3">
-              <div className="flex justify-between items-center">
-                <div>
-                  <p className="text-[10px] text-muted-foreground font-medium uppercase">Linha do Extrato</p>
-                  <p className="text-sm font-medium">{linha.descricao}</p>
-                  <p className="text-xs text-muted-foreground">{formatDateValueBR(linha.data)}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-lg font-bold">{fmtBRL(linha.valor)}</p>
-                  <Badge variant={linha.tipo === 'RECEITA' ? 'default' : 'destructive'}>{linha.tipo}</Badge>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <ExtratoLinhaResumo descricao={linha.descricao} data={linha.data} valor={linha.valor} tipo={linha.tipo} />
 
-          {/* Destino */}
-          <div>
-            <Label className="text-xs font-medium">Tipo de Registro</Label>
-            <div className="flex gap-2 mt-1">
-              <Button size="sm" variant={destino === 'lancamento' ? 'default' : 'outline'} onClick={() => setDestino('lancamento')} className="text-xs">
-                Lançamento
-              </Button>
-              <Button size="sm" variant={destino === 'conta_pagar' ? 'default' : 'outline'} onClick={() => { setDestino('conta_pagar'); setTipo('DESPESA'); }} className="text-xs">
-                Conta a Pagar
-              </Button>
-              <Button size="sm" variant={destino === 'conta_receber' ? 'default' : 'outline'} onClick={() => { setDestino('conta_receber'); setTipo('RECEITA'); }} className="text-xs">
-                Conta a Receber
-              </Button>
-            </div>
+          {/* Destino — mesmas ações dos três botões de antes (conta a pagar/receber fixam o tipo). */}
+          <div className="space-y-1.5">
+            <span className="text-xs font-medium text-foreground">Tipo de Registro</span>
+            <SegmentedControl
+              ariaLabel="Tipo de Registro"
+              manualActivation
+              options={DESTINOS}
+              value={destino}
+              onChange={v => {
+                if (v === 'conta_pagar') { setDestino('conta_pagar'); setTipo('DESPESA'); }
+                else if (v === 'conta_receber') { setDestino('conta_receber'); setTipo('RECEITA'); }
+                else setDestino('lancamento');
+              }}
+              className="flex w-full"
+            />
           </div>
 
           {/* Tipo (only for lancamento) */}
           {destino === 'lancamento' && (
-            <div>
-              <Label className="text-xs">Tipo</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="criar-extrato-tipo" className="text-xs">Tipo</Label>
               <Select value={tipo} onValueChange={v => setTipo(v as 'RECEITA' | 'DESPESA')}>
-                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                <SelectTrigger id="criar-extrato-tipo" className="h-9"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="DESPESA">Despesa</SelectItem>
                   <SelectItem value="RECEITA">Receita</SelectItem>
@@ -411,44 +406,44 @@ export default function CriarLancamentoExtratoDialog({
           )}
 
           {/* Descrição + Valor */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label className="text-xs">Descrição</Label>
-              <Input value={descricao} onChange={e => setDescricao(e.target.value)} className="h-9" />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="criar-extrato-descricao" className="text-xs">Descrição</Label>
+              <Input id="criar-extrato-descricao" value={descricao} onChange={e => setDescricao(e.target.value)} className="h-9" />
             </div>
-            <div>
-              <Label className="text-xs">Valor (R$)</Label>
-              <BRLInput numericValue={valor} onNumericChange={setValor} showPrefix className="h-9" />
+            <div className="space-y-1.5">
+              <Label htmlFor="criar-extrato-valor" className="text-xs">Valor (R$)</Label>
+              <BRLInput id="criar-extrato-valor" numericValue={valor} onNumericChange={setValor} showPrefix className="h-9" />
             </div>
           </div>
 
           {/* Datas */}
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <Label className="text-xs">Data Competência</Label>
-              <DateInput value={dataCompetencia} onValueChange={setDataCompetencia} className="h-9" />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="criar-extrato-competencia" className="text-xs">Data Competência</Label>
+              <DateInput id="criar-extrato-competencia" value={dataCompetencia} onValueChange={setDataCompetencia} className="h-9" />
             </div>
-            <div>
-              <Label className="text-xs">Data Vencimento</Label>
-              <DateInput value={dataVencimento} onValueChange={setDataVencimento} className="h-9" />
+            <div className="space-y-1.5">
+              <Label htmlFor="criar-extrato-vencimento" className="text-xs">Data Vencimento</Label>
+              <DateInput id="criar-extrato-vencimento" value={dataVencimento} onValueChange={setDataVencimento} className="h-9" />
             </div>
-            <div>
-              <Label className="text-xs">Data {tipo === 'RECEITA' ? 'Recebimento' : 'Pagamento'}</Label>
-              <DateInput value={dataPagamento} onValueChange={setDataPagamento} className="h-9" />
+            <div className="space-y-1.5">
+              <Label htmlFor="criar-extrato-pagamento" className="text-xs">Data {tipo === 'RECEITA' ? 'Recebimento' : 'Pagamento'}</Label>
+              <DateInput id="criar-extrato-pagamento" value={dataPagamento} onValueChange={setDataPagamento} className="h-9" />
             </div>
           </div>
 
           {/* Categoria (single or rateio) */}
           <div>
-            <div className="flex items-center justify-between mb-1">
-              <Label className="text-xs">Categoria</Label>
-              <Button variant="ghost" size="sm" className="h-6 text-[10px] gap-1" onClick={() => {
+            <div className="mb-1 flex items-center justify-between">
+              <span className="text-xs font-medium text-foreground">Categoria</span>
+              <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={() => {
                 setUseRateio(!useRateio);
                 if (!useRateio && rateioLinhas.length === 0) {
                   setRateioLinhas([{ categoria_id: categoriaId || '', centro_custo_id: '', valor, percentual: 100, observacao: '' }]);
                 }
               }}>
-                <PieChart className="w-3 h-3" />
+                <PieChart aria-hidden="true" className="h-3.5 w-3.5" />
                 {useRateio ? 'Categoria Única' : 'Ratear'}
               </Button>
             </div>
@@ -462,42 +457,44 @@ export default function CriarLancamentoExtratoDialog({
                 className="h-9 text-sm"
               />
             ) : (
-              <div className="space-y-2 border border-border rounded-lg p-3">
-                {rateioLinhas.map((rl, idx) => (
-                  <div key={idx} className="grid grid-cols-12 gap-2 items-end">
-                    <div className="col-span-5">
-                      <Label className="text-[10px] text-muted-foreground">Categoria</Label>
-                      <CategoryCombobox
-                        value={rl.categoria_id}
-                        onValueChange={v => updateRateioLinha(idx, 'categoria_id', v)}
-                        options={filteredCategorias}
-                        placeholder="Pesquisar..."
-                        className="h-8 text-xs"
-                      />
-                    </div>
-                    <div className="col-span-3">
-                      <Label className="text-[10px] text-muted-foreground">Valor (R$)</Label>
-                      <BRLInput className="h-8 text-xs" numericValue={rl.valor} onNumericChange={value => updateRateioLinha(idx, 'valor', value)} showPrefix />
-                    </div>
-                    <div className="col-span-2">
-                      <Label className="text-[10px] text-muted-foreground">%</Label>
-                      <DecimalInput className="h-8 text-xs" value={String(rl.percentual || '')} onValueChange={(_, parsed) => updateRateioLinha(idx, 'percentual', parsed ?? 0)} maxDecimals={2} suffix="%" />
-                    </div>
-                    <div className="col-span-2 flex justify-end gap-1">
-                      {rateioLinhas.length > 1 && (
-                        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => removeRateioLinha(idx)}>
-                          <Trash2 className="w-3.5 h-3.5 text-destructive" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-                <div className="flex items-center justify-between">
+              <div className="space-y-2 rounded-lg border bg-muted p-3">
+                <ol className="space-y-2" aria-label="Linhas do rateio">
+                  {rateioLinhas.map((rl, idx) => (
+                    <li key={idx} className="grid grid-cols-2 items-end gap-2 sm:grid-cols-12">
+                      <div className="col-span-2 space-y-1 sm:col-span-5">
+                        <span className="text-xs font-medium text-muted-foreground">Categoria</span>
+                        <CategoryCombobox
+                          value={rl.categoria_id}
+                          onValueChange={v => updateRateioLinha(idx, 'categoria_id', v)}
+                          options={filteredCategorias}
+                          placeholder="Pesquisar..."
+                          className="h-8 bg-card text-xs"
+                        />
+                      </div>
+                      <div className="space-y-1 sm:col-span-3">
+                        <Label htmlFor={`criar-rateio-valor-${idx}`} className="text-xs text-muted-foreground">Valor (R$)</Label>
+                        <BRLInput id={`criar-rateio-valor-${idx}`} className="h-8 text-xs" numericValue={rl.valor} onNumericChange={value => updateRateioLinha(idx, 'valor', value)} showPrefix />
+                      </div>
+                      <div className="space-y-1 sm:col-span-2">
+                        <Label htmlFor={`criar-rateio-percentual-${idx}`} className="text-xs text-muted-foreground">%</Label>
+                        <DecimalInput id={`criar-rateio-percentual-${idx}`} className="h-8 text-xs" value={String(rl.percentual || '')} onValueChange={(_, parsed) => updateRateioLinha(idx, 'percentual', parsed ?? 0)} maxDecimals={2} suffix="%" />
+                      </div>
+                      <div className="col-span-2 flex justify-end gap-1 sm:col-span-2">
+                        {rateioLinhas.length > 1 && (
+                          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => removeRateioLinha(idx)} aria-label={`Remover a linha ${idx + 1} do rateio`}>
+                            <Trash2 aria-hidden="true" className="h-4 w-4 text-destructive" />
+                          </Button>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex gap-2">
-                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={addRateioLinha}><Plus className="w-3 h-3 mr-1" /> Linha</Button>
-                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={ratearIgual}>🧮 Igual</Button>
+                    <Button size="sm" variant="outline" className="h-8 text-xs" onClick={addRateioLinha}><Plus aria-hidden="true" className="mr-1 h-3.5 w-3.5" /> Linha</Button>
+                    <Button size="sm" variant="outline" className="h-8 text-xs" onClick={ratearIgual}><Calculator aria-hidden="true" className="mr-1 h-3.5 w-3.5" /> Igual</Button>
                   </div>
-                  <span className={`text-xs font-medium ${Math.abs(rateioDiff) < 0.01 ? 'text-success' : 'text-destructive'}`}>
+                  <span role="status" className={cn('text-xs font-medium tabular-nums', Math.abs(rateioDiff) < 0.01 ? 'text-success' : 'text-destructive')}>
                     {fmtBRL(rateioTotal)} / {fmtBRL(valor)}
                     {Math.abs(rateioDiff) >= 0.01 && ` (falta ${fmtBRL(rateioDiff)})`}
                   </span>
@@ -508,8 +505,8 @@ export default function CriarLancamentoExtratoDialog({
 
           {/* Fornecedor / Cliente */}
           {(destino === 'conta_pagar' || tipo === 'DESPESA') && (
-            <div>
-              <Label className="text-xs">Fornecedor</Label>
+            <div className="space-y-1.5">
+              <span className="text-xs font-medium text-foreground">Fornecedor</span>
               <SupplierCombobox
                 value={supplierId}
                 onValueChange={setSupplierId}
@@ -521,51 +518,41 @@ export default function CriarLancamentoExtratoDialog({
           )}
 
           {destino === 'conta_receber' && (
-            <div>
-              <Label className="text-xs">Cliente</Label>
-              <Input value={cliente} onChange={e => setCliente(e.target.value)} placeholder="Nome do cliente" className="h-9" />
+            <div className="space-y-1.5">
+              <Label htmlFor="criar-extrato-cliente" className="text-xs">Cliente</Label>
+              <Input id="criar-extrato-cliente" value={cliente} onChange={e => setCliente(e.target.value)} placeholder="Nome do cliente" className="h-9" />
             </div>
           )}
 
           {/* Observações */}
-          <div>
-            <Label className="text-xs">Observações</Label>
-            <Textarea value={observacoes} onChange={e => setObservacoes(e.target.value)} placeholder="Observações adicionais..." className="min-h-[60px]" />
+          <div className="space-y-1.5">
+            <Label htmlFor="criar-extrato-observacoes" className="text-xs">Observações</Label>
+            <Textarea id="criar-extrato-observacoes" value={observacoes} onChange={e => setObservacoes(e.target.value)} placeholder="Observações adicionais..." className="min-h-[60px]" />
           </div>
 
           {/* Info box */}
-          <div className="bg-muted/50 rounded-lg p-3 text-sm">
-            <p className="font-medium text-foreground mb-1">Ao salvar:</p>
-            <ul className="text-muted-foreground space-y-1 text-xs">
-              {destino === 'lancamento' && (
-                <>
-                  <li>✅ Lançamento criado no Livro Razão</li>
-                  <li>✅ Lançamento já nasce conciliado</li>
-                </>
-              )}
-              {destino === 'conta_pagar' && (
-                <>
-                  <li>✅ Conta a pagar criada com status PAGO</li>
-                  <li>✅ Lançamento correspondente no Livro Razão</li>
-                  <li>✅ Conciliado automaticamente com o extrato</li>
-                </>
-              )}
-              {destino === 'conta_receber' && (
-                <>
-                  <li>✅ Conta a receber criada com status RECEBIDO</li>
-                  <li>✅ Lançamento correspondente no Livro Razão</li>
-                  <li>✅ Conciliado automaticamente com o extrato</li>
-                </>
-              )}
-              {useRateio && <li>✅ Rateio por categoria aplicado</li>}
+          <div className="rounded-lg bg-muted p-3 text-sm">
+            <p className="mb-1 font-medium text-foreground">Ao salvar:</p>
+            <ul className="space-y-1 text-xs text-muted-foreground">
+              {[
+                ...(destino === 'lancamento' ? ['Lançamento criado no Livro Razão', 'Lançamento já nasce conciliado'] : []),
+                ...(destino === 'conta_pagar' ? ['Conta a pagar criada com status PAGO', 'Lançamento correspondente no Livro Razão', 'Conciliado automaticamente com o extrato'] : []),
+                ...(destino === 'conta_receber' ? ['Conta a receber criada com status RECEBIDO', 'Lançamento correspondente no Livro Razão', 'Conciliado automaticamente com o extrato'] : []),
+                ...(useRateio ? ['Rateio por categoria aplicado'] : []),
+              ].map(texto => (
+                <li key={texto} className="flex items-start gap-1.5">
+                  <CheckCircle2 aria-hidden="true" className="mt-px h-3.5 w-3.5 shrink-0 text-success" />
+                  <span>{texto}</span>
+                </li>
+              ))}
             </ul>
           </div>
         </div>
 
         <DialogFooter className="gap-2">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={handleSave} disabled={saving}>
-            {saving ? <RefreshCw className="w-4 h-4 mr-1 animate-spin" /> : <CheckCircle className="w-4 h-4 mr-1" />}
+          <Button onClick={handleSave} disabled={saving} aria-busy={saving}>
+            {saving ? <Loader2 aria-hidden="true" className="mr-1 h-4 w-4 animate-spin" /> : <CheckCircle aria-hidden="true" className="mr-1 h-4 w-4" />}
             Criar e Conciliar
           </Button>
         </DialogFooter>

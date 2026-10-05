@@ -36,6 +36,7 @@
     --surface-hover: 210 40% 97%;       /* #F5F8FB */
     --surface-active: 214 32% 94%;      /* #EBF0F6 */
     --surface-elevated: 0 0% 100%;      /* popovers/menus acima do card */
+    --segmented-active: 0 0% 100%;      /* pílula do item ativo do SegmentedControl, sobre --muted */
 
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
@@ -61,6 +62,19 @@
     --primary-soft: 214 100% 97%;       /* #EFF6FF */
     --primary-soft-foreground: 224 76% 45%;
     --primary-border: 213 94% 87%;      /* #BFDBFE */
+
+    /* ── Destaque (card azul de indicador principal — Redesign V2) ── */
+    /* Exceção nomeada à regra "sem gradiente decorativo": só o card de destaque
+       e o item ativo da sidebar. Branco mantém AA no ponto mais claro (--highlight-from),
+       inclusive sob os dois arcos sobrepostos. */
+    --highlight: 223 80% 50%;
+    --highlight-from: 223 80% 50%;
+    --highlight-to: 226 75% 43%;
+    --highlight-foreground: 0 0% 100%;
+    --highlight-muted: 214 100% 97%;            /* rótulo/apoio sobre o destaque */
+    --highlight-icon: hsl(0 0% 100% / 0.18);    /* quadrado translúcido do ícone */
+    --highlight-arc: hsl(0 0% 100% / 0.06);     /* arcos decorativos */
+    --highlight-divider: hsl(0 0% 100% / 0.24);
 
     --secondary: 214 32% 95%;           /* #EEF2F7 */
     --secondary-foreground: 215 25% 27%;
@@ -107,9 +121,10 @@
     --ring: 221 83% 53%;
 
     --radius: 0.75rem;                  /* 12px — cards/painéis */
+    --radius-summary: 1.125rem;         /* 18px — só a família de cards de resumo (KpiCard V2, ChartCard) */
 
     /* ── Sidebar ──────────────────────────────────────────────────── */
-    --sidebar-background: 0 0% 100%;
+    --sidebar-background: 220 100% 99%;        /* #FAFCFF — branco azulado do recorte aprovado */
     --sidebar-foreground: 215 25% 27%;
     --sidebar-primary: 221 83% 53%;
     --sidebar-primary-foreground: 0 0% 100%;
@@ -119,10 +134,14 @@
     --sidebar-ring: 221 83% 53%;
     --sidebar-hover: 214 32% 95%;              /* fundo do hover (cor cheia) */
     --sidebar-hover-foreground: 222 47% 11%;
-    --sidebar-active: 214 100% 97%;            /* fundo do item ativo (cor cheia) */
-    --sidebar-active-foreground: 224 76% 45%;  /* azul AA sobre o tint */
-    --sidebar-active-marker: 221 83% 53%;
+    /* Item ativo: azul cheio com o mesmo gradiente do card de destaque (D04/D18).
+       O fundo sólido é o fallback de `bg-gradient-highlight`. */
+    --sidebar-active: var(--highlight-from);
+    --sidebar-active-foreground: var(--highlight-foreground);
     --sidebar-section: 215 16% 47%;            /* rótulo de grupo */
+    --sidebar-card: 220 66% 96%;               /* #EEF3FC — cartão da loja */
+    --sidebar-card-hover: 220 60% 93%;
+    --sidebar-card-border: 220 50% 90%;
 
     /* ── Gráficos ─────────────────────────────────────────────────── */
     /* 8 séries com matizes distintos — nunca 5 tons do mesmo azul. */
@@ -156,10 +175,12 @@
     --shadow-card: var(--shadow-sm);
     --shadow-glow: 0 0 0 3px hsl(221 83% 53% / 0.12);
     --shadow-focus: 0 0 0 3px hsl(221 83% 53% / 0.22);
+    --shadow-highlight: 0 10px 24px -10px hsl(223 80% 50% / 0.55), 0 2px 6px -2px hsl(223 80% 50% / 0.25);
 
     /* ── Gradientes ───────────────────────────────────────────────── */
     --gradient-card: linear-gradient(145deg, hsl(0 0% 100%), hsl(210 40% 99%));
     --gradient-surface: linear-gradient(180deg, hsl(210 40% 98%), hsl(214 32% 96%));
+    --gradient-highlight: linear-gradient(135deg, hsl(var(--highlight-from)), hsl(var(--highlight-to)));
   }
 
   .dark {
@@ -176,6 +197,7 @@
     --surface-hover: 219 24% 14%;       /* #1A2130 */
     --surface-active: 218 23% 17%;      /* #212938 */
     --surface-elevated: 219 25% 13%;    /* #181E29 — popovers acima do card */
+    --segmented-active: 218 23% 20%;    /* mais clara que o trilho (--muted), como no tema claro */
 
     --popover: 219 25% 13%;
     --popover-foreground: 210 40% 98%;
@@ -197,6 +219,16 @@
     --primary-soft: 222 47% 16%;        /* #14203A — tint azul escuro */
     --primary-soft-foreground: 213 94% 78%;
     --primary-border: 220 45% 28%;
+
+    /* ── Destaque (card azul de indicador principal — Redesign V2) ── */
+    --highlight: 224 76% 48%;
+    --highlight-from: 224 76% 48%;
+    --highlight-to: 226 71% 40%;
+    --highlight-foreground: 0 0% 100%;
+    --highlight-muted: 214 100% 97%;
+    --highlight-icon: hsl(0 0% 100% / 0.16);
+    --highlight-arc: hsl(0 0% 100% / 0.05);
+    --highlight-divider: hsl(0 0% 100% / 0.22);
 
     --secondary: 219 24% 14%;
     --secondary-foreground: 213 27% 84%;
@@ -252,10 +284,12 @@
     --sidebar-ring: 217 91% 60%;
     --sidebar-hover: 219 24% 13%;
     --sidebar-hover-foreground: 210 40% 98%;
-    --sidebar-active: 222 47% 18%;
-    --sidebar-active-foreground: 213 94% 78%;
-    --sidebar-active-marker: 217 91% 60%;
+    --sidebar-active: var(--highlight-from);
+    --sidebar-active-foreground: var(--highlight-foreground);
     --sidebar-section: 215 20% 60%;
+    --sidebar-card: 222 32% 10%;
+    --sidebar-card-hover: 220 28% 14%;
+    --sidebar-card-border: 220 26% 18%;
 
     /* ── Gráficos ─────────────────────────────────────────────────── */
     --chart-1: 213 94% 68%;   /* azul     #60A5FA */
@@ -288,10 +322,12 @@
     --shadow-card: var(--shadow-sm);
     --shadow-glow: 0 0 0 3px hsl(217 91% 60% / 0.18);
     --shadow-focus: 0 0 0 3px hsl(217 91% 60% / 0.35);
+    --shadow-highlight: 0 10px 28px -10px hsl(0 0% 0% / 0.7), 0 0 0 1px hsl(223 80% 60% / 0.25);
 
     /* ── Gradientes ───────────────────────────────────────────────── */
     --gradient-card: linear-gradient(145deg, hsl(220 28% 11%), hsl(220 28% 9%));
     --gradient-surface: linear-gradient(180deg, hsl(222 33% 6%), hsl(224 33% 4%));
+    --gradient-highlight: linear-gradient(135deg, hsl(var(--highlight-from)), hsl(var(--highlight-to)));
   }
 }
 
