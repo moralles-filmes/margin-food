@@ -53,7 +53,9 @@ export default function TableActions({
 
   const handleDelete = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    
+    // A confirmação abre sem gatilho e o Radix deixaria o foco no corpo da página ao fechar.
+    const origem = e.currentTarget as HTMLButtonElement;
+
     if (hideConfirm) {
       if (onDelete) await onDelete();
       return;
@@ -65,10 +67,14 @@ export default function TableActions({
       confirmLabel: 'Excluir',
       variant: 'destructive',
     });
-    
+
     if (ok && onDelete) {
       await onDelete();
     }
+    // Volta ao botão se a linha ainda existe (cancelou ou a exclusão falhou).
+    requestAnimationFrame(() => {
+      if (origem.isConnected && !origem.disabled) origem.focus({ preventScroll: true });
+    });
   };
 
   const handleEdit = (e: React.MouseEvent) => {

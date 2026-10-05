@@ -36,6 +36,13 @@ describe('SegmentedControl', () => {
     expect(onChange).toHaveBeenCalledWith('periodo');
   });
 
+  it('sem opção escolhida, a primeira entra no Tab e nenhuma fica marcada', () => {
+    render(<SegmentedControl options={options} value="" onChange={vi.fn()} ariaLabel="Forma de venda" />);
+    expect(screen.getByRole('radio', { name: 'Dia' })).toHaveAttribute('tabindex', '0');
+    expect(screen.getByRole('radio', { name: 'Mês' })).toHaveAttribute('tabindex', '-1');
+    expect(screen.getAllByRole('radio').every(r => r.getAttribute('aria-checked') === 'false')).toBe(true);
+  });
+
   it('setas mudam a opção e só a ativa entra no Tab', () => {
     const onChange = vi.fn();
     render(<SegmentedControl options={options} value="mes" onChange={onChange} />);

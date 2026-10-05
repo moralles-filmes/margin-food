@@ -7,13 +7,14 @@ import { Button } from '@/components/ui/button';
 import { useCan, useModuleAccess } from '@/permissions';
 import { ModuleNav, type ModuleNavItem } from '@/components/ui/ModuleNav';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
+import { SubmoduleSwitcher, type SubmoduleItem } from '@/components/ui/SubmoduleSwitcher';
 import { isPresentationDetailTarget } from '@/lib/presentationDetailNavigation';
 import { Shield, Percent } from 'lucide-react';
 import {
   LayoutDashboard, FolderTree, Landmark, Receipt,
   DollarSign, TrendingUp, LayoutGrid, Settings,
   Building2, RefreshCw, CreditCard, ArrowDownToLine, Activity, BarChart3,
-  Target, Bell, ClipboardList
+  Target, Bell, ClipboardList, BookOpen
 } from 'lucide-react';
 import ContasPagarSection from '@/components/financeiro/ContasPagarSection';
 import ContasReceberSection from '@/components/financeiro/ContasReceberSection';
@@ -46,19 +47,29 @@ type FinSubTab = 'dashboard' | 'cadastros' | 'contas' | 'lancamentos' | 'pagar' 
 // DashboardFinanceiro extracted to src/components/financeiro/DashboardFinanceiroSection.tsx
 
 // ==================== CADASTROS BASE ====================
+type CadastroSubView = 'arvore' | 'plano' | 'centros';
+
+// Mesmo seletor de sub-módulo do Fechamento de Caixa (CLAUDE.md: substitui a fileira de botões).
+const CADASTROS_ITEMS: SubmoduleItem<CadastroSubView>[] = [
+  { id: 'arvore', label: 'Estrutura de Categorias', icon: FolderTree },
+  { id: 'plano', label: 'Plano de Contas', icon: BookOpen },
+  { id: 'centros', label: 'Centros de Custo', icon: Target },
+];
+
 function CadastrosBase() {
-  const [subView, setSubView] = useState<'arvore' | 'plano' | 'centros'>('arvore');
+  const [subView, setSubView] = useState<CadastroSubView>('arvore');
   const canCreate = useCan('financeiro:cadastros:create');
   const canEdit = useCan('financeiro:cadastros:edit');
   const canDelete = useCan('financeiro:cadastros:delete');
-  
+
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2 mb-4">
-        <Button variant={subView === 'arvore' ? 'default' : 'outline'} size="sm" onClick={() => setSubView('arvore')}>Estrutura de Categorias</Button>
-        <Button variant={subView === 'plano' ? 'default' : 'outline'} size="sm" onClick={() => setSubView('plano')}>Plano de Contas</Button>
-        <Button variant={subView === 'centros' ? 'default' : 'outline'} size="sm" onClick={() => setSubView('centros')}>Centros de Custo</Button>
-      </div>
+    <div className="space-y-6">
+      <SubmoduleSwitcher
+        items={CADASTROS_ITEMS}
+        value={subView}
+        onChange={value => setSubView(value as CadastroSubView)}
+        ariaLabel="Cadastro exibido"
+      />
       {subView === 'arvore' && <CadastroBaseTree />}
       {subView === 'plano' && <PlanoContasFinSection canCreate={canCreate} canEdit={canEdit} canDelete={canDelete} />}
       {subView === 'centros' && <CentrosCustoFinSection canCreate={canCreate} canEdit={canEdit} canDelete={canDelete} />}

@@ -23,6 +23,9 @@ interface SegmentedControlProps {
 
 export function SegmentedControl({ options, value, onChange, className, ariaLabel, manualActivation = false }: SegmentedControlProps) {
   const buttonRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  // Sem opção escolhida (ex.: forma de venda de uma marca nova), a primeira entra no Tab — senão
+  // o grupo inteiro ficava fora do teclado.
+  const temAtivo = options.some(option => option.value === value);
 
   function handleKeyDown(e: KeyboardEvent<HTMLButtonElement>, index: number) {
     let nextIndex: number | null = null;
@@ -53,7 +56,7 @@ export function SegmentedControl({ options, value, onChange, className, ariaLabe
             type="button"
             role="radio"
             aria-checked={isActive}
-            tabIndex={isActive ? 0 : -1}
+            tabIndex={isActive || (!temAtivo && index === 0) ? 0 : -1}
             onClick={() => onChange(option.value)}
             onKeyDown={e => handleKeyDown(e, index)}
             className={cn(
