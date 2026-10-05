@@ -1,3 +1,156 @@
+# Handoff 05B → 06A
+
+## Estado real
+
+- Repositório `moralles-filmes/margin-food`, branch `feat/redesign-v2-f05b`, criada de `feat/redesign-v2-f05a` em `149f4b5`. Commits da Fase 05B: `c102ddb` (código) e um commit de documentação, mais um commit de documentação registrando estes SHAs.
+- Sem push, PR ou merge; `main` intocada em `c6a9774`.
+- Fase 05B validada com ressalvas em 2026-10-05. Fase 06A pendente.
+
+## Contexto mínimo
+
+A V2 aplica ao sistema inteiro a identidade aprovada. As fases 01 e 02 criaram a base e a estrutura global. As fases seguintes levaram o padrão a estas telas:
+
+- 03: Dashboard Financeiro.
+- 04A: Contas Bancárias, Livro Razão, Fluxo e Projeção.
+- 04B: Conciliação.
+- 05A: Contas a Pagar/Receber, Códigos, Recorrências, Alertas e os diálogos de conta.
+- 05B: Fechamento de Caixa (com marcas), Cadastros Base (árvore de categorias, Plano de Contas, Centros de Custo) e Categorização.
+
+Nenhuma delas mudou RPC, parâmetro, payload, ordem de chamada, permissão nem condição de botão. A 06A começa as análises e relatórios financeiros: DRE/DFC, Orçamento, KPIs, Comparativo, Auditoria e Borderô. A Apresentação Sócios fica para a 06B.
+
+Não reverter estas decisões:
+
+- D15–D58.
+- D59–D68:
+  - Fechamento:
+    - Resumo somado na tela, com o período da última carga.
+    - Lista em tabela ⇄ cartões a 1000 px.
+    - Exportação desabilitada com leitura em erro.
+    - Aviso da PF-105 no diálogo.
+  - Marcas: `ErrorState` e forma de venda alcançável pelo teclado.
+  - Cadastros Base: sub-abas em `SubmoduleSwitcher` com `ariaLabel`.
+  - Árvore:
+    - Uma marcação, com ações sempre visíveis e nomeadas.
+    - A folha é decidida pela árvore inteira.
+    - Esqueleto só na primeira carga.
+    - Modelo Padrão só após leitura bem-sucedida.
+  - Plano/Centros: `ErrorState` e `AccessDenied`.
+  - Categorização: "Situação" com a contagem do servidor e prévia rotulada.
+  - `devolverFoco` e `TableActions` devolvem o foco.
+- D09 e D13.
+
+## Leitura obrigatória do próximo chat
+
+1. `CLAUDE.md`. Seções desta fase:
+   - Só a DRE é competência; o resto é caixa pelo Livro Razão.
+   - `DemonstrativoTree`: % sobre a receita do próprio demonstrativo.
+   - Rateio manda.
+   - Categorias não operacionais.
+   - Borderô.
+   - Apresentação Sócios — metas e projeção.
+   - Chave `financeiro:relatorio-socios:*`.
+2. `docs/redesign-margin-food-v2/PROMPT-MESTRE.md`
+3. `docs/redesign-margin-food-v2/PROGRESSO.md`
+4. `docs/redesign-margin-food-v2/DECISOES.md`
+5. `docs/redesign-margin-food-v2/fases/05B-RELATORIO.md`
+6. `docs/redesign-margin-food-v2/MATRIZ-DE-COBERTURA.md`: linhas FIN-B-011 a 038.
+7. `docs/redesign-margin-food-v2/prompts/06-analises-e-relatorios-financeiros.md`: itens 1 a 4, 6, 7 e 8. O item 5 vale só na parte do Borderô.
+
+Código a inspecionar:
+
+- Telas:
+  - `DRESection.tsx`
+  - `DFCSection.tsx`
+  - `DemonstrativoTree.tsx`
+  - `OrcamentoSection.tsx`
+  - `KPIsSection.tsx`
+  - `ComparativoSection.tsx`
+  - `AuditoriaFinSection.tsx`
+  - `BorderoSection.tsx`
+  - `bordero/BorderoPeriodFilter.tsx`
+  - `bordero/BorderoCategoryTable.tsx`
+  - o wrapper `DREDFCSection` em `src/components/FinanceiroView.tsx`
+- Exportadores, que não devem ser alterados:
+  - `src/lib/exportDemonstrativo.ts`
+  - `src/lib/borderoPdfExport.ts`
+- Exemplo do padrão: `FechamentoCaixaSection.tsx`, `ContasPagarSection.tsx`, `finV2Layout.tsx`, `kpiGrid.ts`, `useRetornoFoco.ts`, `useConteinerEstreito.ts`, `devolverFoco.ts`.
+
+## Já implementado e validado
+
+Conferido em navegador:
+
+- Ambiente: login "Administrador Principal" e unidade de teste Moralles.
+- Dados sintéticos injetados no cliente: fechamentos, marcas, 17 categorias, contas, centros e regras.
+- Toda escrita foi interceptada e nenhuma chegou ao servidor.
+
+Resultados:
+
+- Os valores ficaram idênticos antes e depois nas seis telas:
+  - os cinco cards;
+  - as linhas com marcas, quantidades, taxas, descontos e líquido;
+  - a soma das marcas na edição.
+- Diálogos abertos e fechados sem confirmar; o foco volta à origem, inclusive o Remover cancelado do `TableActions`, que antes ia para o `body`.
+- Estados exercitados: erro, atraso, vazio e um dia só.
+- Busca sem acento com a árvore recolhida.
+- Claro e escuro.
+- Larguras de 320/390 px (iframe), 768, 1024, 1366 e 1920 px sem rolagem horizontal, com a sidebar recolhida e também a 437 px.
+- Teclado.
+- Contraste ≥ 4,80 no claro (telas) e ≥ 5,11 no escuro.
+
+Executado em linha de comando:
+
+- Testes: 205 / 1.933.
+- Typecheck: 0.
+- Lint: 0 erros e 2.016 avisos.
+- Build ok: `FinanceiroView` 276,52 kB e CSS 123,52 kB.
+
+Auditoria de módulo (mapeador, identidade/acesso, processo de negócio, funcional):
+
+- Nenhum bloqueante.
+- Os achados da fase foram corrigidos.
+- Os preexistentes foram registrados em PF-105 a PF-110.
+
+Só em teste: sem permissão e o grupo achado só pelo nome na busca.
+
+Não executado: leitor de tela, movimento normal, confirmação "Data futura", Desativar categoria e Excluir selecionadas.
+
+## Trabalho seguinte
+
+Fase 06A — DRE/DFC, Orçamento, KPIs, Comparativo, Auditoria e Borderô, só apresentação. Os critérios estão no prompt 06 e na validação do prompt abaixo.
+
+## Bloqueios / riscos / cuidado com dados
+
+- **Escritas no Orçamento.** Estas ações gravam:
+  - Salvar (`_guarded_bulk_upsert_orcamento`);
+  - Copiar Mês (`copiar_orcamento_mes`);
+  - lixeira de orçamento de pai (`_guarded_delete_orcamento`).
+  Não acionar nenhuma delas.
+- **Telas só de leitura.** DRE, DFC, KPIs, Comparativo, Auditoria e Borderô só leem. `_guarded_list_fin_audit_logs` é leitura apesar do prefixo, e a fixture precisa respondê-la.
+- **Números das telas.** Os regimes têm de continuar assim:
+  - a DRE é competência;
+  - o DFC, o Orçamento, os KPIs, o Comparativo e o Borderô são caixa.
+  - O percentual usa a receita do próprio demonstrativo.
+  - O Borderô trabalha em centavos.
+  Nada disso muda. Os exportadores PDF/Excel precisam sair iguais.
+- **Sessão e unidade.** O proprietário precisa reautorizá-las a cada chat. O assistente não digita senha.
+- **D09.** Os valores das imagens de referência coincidem com os de uma unidade real. Nunca usá-los como fixture, no código ou nas docs.
+- **Capturas.** Mostram dados; ficam fora do repositório.
+- **Pendências.** Há 110 em `PENDENCIAS-FUNCIONAIS.md`, e nenhuma deve ser corrigida no redesign. Aguardam decisão do proprietário:
+  - PF-105 (impacto alto);
+  - PF-097;
+  - PF-108;
+  - PF-109;
+  - PF-088.
+- **Pendências destas telas:**
+  - PF-001: links da Auditoria.
+  - PF-002: o DFC exige `financeiro:fluxo:view` dentro da aba DRE.
+  - PF-007: carga de KPIs/Comparativo.
+
+## Prompt completo para colar no próximo chat
+
+O texto integral está em `docs/redesign-margin-food-v2/PROXIMO-CHAT.md` e reproduzido abaixo.
+
+```text
 Continue o Redesign Visual V2 do MARGIN FOOD (sistema EMPRESARIAL de gestão
 para restaurantes), repositório moralles-filmes/margin-food.
 Execute exclusivamente a FASE 06A — análises e relatórios financeiros,
@@ -324,3 +477,4 @@ ENTREGA AO FINAL
    se os gates passaram com navegador; validação/correção da 06A caso
    contrário.
 4. PARAR. Não iniciar a Fase 06B no mesmo chat.
+```
