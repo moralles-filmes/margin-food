@@ -25,6 +25,7 @@ import { ListaCarregando } from './ContasParts';
 import { useConteinerEstreito } from './useConteinerEstreito';
 import { useRetornoFoco } from './useRetornoFoco';
 import { CENTROS_LISTA_LIMITE_PX } from './fechamentoView';
+import { padronizarTexto } from '@/lib/padronizarTexto';
 
 import { useCan } from '@/permissions/hooks';
 interface CentroRow {
@@ -106,14 +107,14 @@ export default function CentrosCustoFinSection({
       if (editId) {
         const { error } = await (supabase.rpc as any)('_guarded_update_centro_custo', {
           p_id: editId,
-          p_nome: form.nome,
+          p_nome: padronizarTexto(form.nome),
           p_descricao: form.descricao || '',
           p_expected_updated_at: editUpdatedAt
         });
         if (error) { falhaAoSalvar(error); return; }
         toast.success('Centro de custo atualizado');
       } else {
-        const { error } = await supabase.from('fin_centros_custo').insert(withCompanyId(companyId, { ...form, created_by: user?.id }));
+        const { error } = await supabase.from('fin_centros_custo').insert(withCompanyId(companyId, { ...form, nome: padronizarTexto(form.nome), created_by: user?.id }));
         if (error) { falhaAoSalvar(error); return; }
         toast.success('Centro de custo criado');
       }

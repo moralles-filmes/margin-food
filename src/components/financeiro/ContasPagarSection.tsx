@@ -46,6 +46,7 @@ import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { getRecurrenceValidationMessage } from '@/domain/financeiro/recurrence';
 import { traduzirErroIdempotencia } from '@/domain/financeiro/idempotencia';
 import { useChavesPendentes } from '@/hooks/useChavesPendentes';
+import { padronizarTexto } from '@/lib/padronizarTexto';
 import { useTravaEnvio } from '@/hooks/useTravaEnvio';
 import { FinKpiGrid, FinNote, FinScreenHeader, FinSectionGroup } from './finV2Layout';
 import { useConteinerEstreito } from './useConteinerEstreito';
@@ -533,8 +534,10 @@ export default function ContasPagarSection({ initialStatus }: ContasPagarSection
       };
       // Só a criação leva chave: um reenvio não duplica o título nem as N parcelas.
       const payload = editingItem ? params : { ...params, p_idempotency_key: await chavesCriacao.chave(params) };
+      // A chave fica com o texto digitado; o banco recebe a descrição padronizada.
+      const enviado = { ...payload, p_descricao: padronizarTexto(params.p_descricao) };
 
-      const { data, error } = await (supabase.rpc as any)(editingItem ? '_guarded_update_conta_pagar' : '_guarded_create_conta_pagar', payload);
+      const { data, error } = await (supabase.rpc as any)(editingItem ? '_guarded_update_conta_pagar' : '_guarded_create_conta_pagar', enviado);
 
       if (error) {
         console.error('[ContasPagarSection.save]', { code: error.code });

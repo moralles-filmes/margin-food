@@ -22,6 +22,7 @@ import { buildCategoryOptions } from '@/lib/categoriaOptions';
 import SupplierCombobox from '@/components/financeiro/SupplierCombobox';
 import { Plus, Trash2, PieChart, CheckCircle, CheckCircle2, Loader2, FileText, Calculator } from 'lucide-react';
 import { traduzirErroIdempotencia } from '@/domain/financeiro/idempotencia';
+import { padronizarTexto } from '@/lib/padronizarTexto';
 
 import { useCan } from '@/permissions/hooks';
 interface ExtratoLinha {
@@ -306,7 +307,8 @@ export default function CriarLancamentoExtratoDialog({
         const { data: tituloData, error: tituloError } = await supabase.rpc('reconcile_create_titulo_from_extrato', {
           p_lancamento_id: lancResult.lancamento_id,
           p_destino: destino,
-          p_descricao: descricao,
+          // O título é cadastro (padronizado); o lançamento acima mantém o texto do banco.
+          p_descricao: padronizarTexto(descricao),
           p_data_vencimento: dataVencimento || dataCompetencia,
           p_data_competencia: dataCompetencia,
           p_data_baixa: dataPagamento || dataCompetencia,
