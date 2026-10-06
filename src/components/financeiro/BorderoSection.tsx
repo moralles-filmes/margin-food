@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { AlertTriangle, CheckCircle2, CircleCheckBig, FileDown, Landmark, Loader2, MinusCircle, RefreshCw, ShieldX, Sigma, Wallet, CalendarClock } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, CircleCheckBig, FileDown, Landmark, Loader2, MinusCircle, Sigma, CalendarClock } from 'lucide-react';
 import { useScopedToast } from '@/hooks/useScopedToast';
 import { useCan } from '@/permissions';
 import { useAuth } from '@/contexts/AuthContext';
@@ -9,8 +9,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import PageHeader from '@/components/ui/PageHeader';
 import KpiCard, { type KpiVariant } from '@/components/ui/KpiCard';
+import StatusBadge from '@/components/ui/StatusBadge';
+import ErrorState from '@/components/ui/ErrorState';
+import AccessDenied from '@/components/ui/AccessDenied';
+import { kpiGridClassFor, longestValueLength } from '@/components/ui/kpiGrid';
 import { todayBR, parseUTCToBR } from '@/lib/datetime';
 import { useBordero, isBorderoPermissionError } from '@/hooks/useBordero';
 import BorderoPeriodFilter from '@/components/financeiro/bordero/BorderoPeriodFilter';
@@ -20,11 +23,15 @@ import {
   borderoOverdueInPeriod,
   createInitialBorderoFilter,
   formatBorderoMoney,
+  formatBorderoPeriod,
   resolveBorderoPeriod,
   type BorderoFilterState,
   type BorderoFinalBalanceState,
   type BorderoReport,
 } from '@/domain/financeiro/bordero';
+import { FinKpiGrid, FinNote, FinScreenHeader, FinSectionGroup } from './finV2Layout';
+import { useRetornoFoco } from './useRetornoFoco';
+import { useConteinerEstreito } from './useConteinerEstreito';
 
 export const BORDERO_PAGE_SUBTITLE = 'Despesas do período — já pagas e a vencer — e disponibilidade de caixa.';
 
@@ -34,33 +41,36 @@ const FINAL_STATE_VIEW: Record<BorderoFinalBalanceState, { variant: KpiVariant; 
   negative: { variant: 'danger', icon: AlertTriangle, tag: 'Negativo' },
 };
 
-function NoAccess() {
-  return (
-    <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-2">
-      <ShieldX className="w-10 h-10" />
-      <p className="font-medium">Acesso restrito</p>
-      <p className="text-sm">Você não tem permissão para acessar o Borderô.</p>
-    </div>
-  );
-}
+/** Mesma grade dos cards carregados, para a página não saltar. */
+const GRADE_CARREGANDO = kpiGridClassFor(12, 3);
 
 function LoadingState() {
   return (
     <div className="space-y-4" role="status" aria-label="Carregando borderô">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
-        {Array.from({ length: 5 }).map((_, index) => <Skeleton key={index} className="h-[108px] w-full rounded-xl" />)}
-      </div>
+      <FinKpiGrid className={GRADE_CARREGANDO}>
+        {Array.from({ length: 5 }).map((_, index) => (
+          <div key={index} aria-hidden="true" className="space-y-3 rounded-summary border bg-card p-5">
+            <Skeleton className="h-3 w-24" />
+            <Skeleton className="h-7 w-32" />
+            <Skeleton className="h-3 w-40" />
+          </div>
+        ))}
+      </FinKpiGrid>
       <div className="space-y-2">
-        {Array.from({ length: 6 }).map((_, index) => <Skeleton key={index} className="h-9 w-full" />)}
+        {Array.from({ length: 6 }).map((_, index) => <Skeleton key={index} aria-hidden="true" className="h-9 w-full" />)}
       </div>
     </div>
   );
 }
 
 function AccountsDialog({ report, open, onOpenChange }: { report: BorderoReport; open: boolean; onOpenChange: (open: boolean) => void }) {
+  // Aberto pelo card (sem DialogTrigger): o foco volta ao card ao fechar (D49).
+  const retornoFoco = useRetornoFoco();
+  const [contasRef, estreito] = useConteinerEstreito(480);
+  const situacao = (available: boolean) => (available ? null : <StatusBadge status="warning" label="Saldo indisponível" />);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto" {...retornoFoco}>
         <DialogHeader>
           <DialogTitle>Composição do saldo das contas</DialogTitle>
           <DialogDescription>
@@ -68,37 +78,69 @@ function AccountsDialog({ report, open, onOpenChange }: { report: BorderoReport;
             (o mesmo de Contas Bancárias), posição de {parseUTCToBR(report.generatedAt)}.
           </DialogDescription>
         </DialogHeader>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Conta</TableHead>
-              <TableHead>Banco</TableHead>
-              <TableHead className="text-right">Saldo</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {report.accounts.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={3} className="text-center text-muted-foreground">Nenhuma conta bancária ativa.</TableCell>
-              </TableRow>
-            ) : report.accounts.map(account => (
-              <TableRow key={account.id}>
-                <TableCell className="font-medium">
-                  {account.name}
-                  {!account.balanceAvailable && <span className="ml-2 text-xs text-warning">(saldo indisponível)</span>}
-                </TableCell>
-                <TableCell className="text-muted-foreground">{account.bank ?? '—'}</TableCell>
-                <TableCell className="text-right font-mono tabular-nums">{formatBorderoMoney(account.balanceCents)}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-          <TableFooter>
-            <TableRow>
-              <TableCell colSpan={2} className="font-bold uppercase tracking-wide">Saldo das contas</TableCell>
-              <TableCell className="text-right font-mono font-bold tabular-nums">{formatBorderoMoney(report.totalAccountBalanceCents)}</TableCell>
-            </TableRow>
-          </TableFooter>
-        </Table>
+        <div ref={contasRef}>
+          {estreito ? (
+            <div className="space-y-2">
+              {report.accounts.length === 0 ? (
+                <p className="text-center text-sm text-muted-foreground">Nenhuma conta bancária ativa.</p>
+              ) : (
+                <ul aria-label="Contas" className="divide-y rounded-lg border">
+                  {report.accounts.map(account => (
+                    <li key={account.id} className="space-y-1 px-3 py-2.5">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="break-words text-sm font-medium text-foreground">{account.name}</p>
+                          <p className="text-xs text-muted-foreground">{account.bank ?? '—'}</p>
+                        </div>
+                        <p className="whitespace-nowrap text-sm font-medium tabular-nums text-foreground">{formatBorderoMoney(account.balanceCents)}</p>
+                      </div>
+                      {situacao(account.balanceAvailable)}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div className="flex items-center justify-between gap-3 rounded-lg bg-muted px-3 py-2.5">
+                <span className="text-sm font-bold uppercase tracking-wide text-foreground">Saldo das contas</span>
+                <span className="whitespace-nowrap font-bold tabular-nums text-foreground">{formatBorderoMoney(report.totalAccountBalanceCents)}</span>
+              </div>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Conta</TableHead>
+                  <TableHead>Banco</TableHead>
+                  <TableHead className="text-right">Saldo</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {report.accounts.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={3} className="text-center text-muted-foreground">Nenhuma conta bancária ativa.</TableCell>
+                  </TableRow>
+                ) : report.accounts.map(account => (
+                  <TableRow key={account.id}>
+                    <TableCell className="font-medium">
+                      <span className="mr-2">{account.name}</span>
+                      {situacao(account.balanceAvailable)}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{account.bank ?? '—'}</TableCell>
+                    <TableCell className="whitespace-nowrap text-right tabular-nums">{formatBorderoMoney(account.balanceCents)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+              <TableFooter>
+                <TableRow>
+                  <TableCell colSpan={2} className="font-bold uppercase tracking-wide">Saldo das contas</TableCell>
+                  <TableCell className="whitespace-nowrap text-right font-bold tabular-nums">{formatBorderoMoney(report.totalAccountBalanceCents)}</TableCell>
+                </TableRow>
+              </TableFooter>
+            </Table>
+          )}
+        </div>
+        {report.hasUnavailableBalances && (
+          <FinNote>Conta com saldo indisponível entra no total como R$0,00 até o saldo ser calculado.</FinNote>
+        )}
       </DialogContent>
     </Dialog>
   );
@@ -140,20 +182,32 @@ export default function BorderoSection() {
     }
   };
 
-  if (!canView) return <NoAccess />;
+  if (!canView) return <AccessDenied description="Você não tem permissão para acessar o Borderô." />;
 
   const finalView = report ? FINAL_STATE_VIEW[report.finalBalanceState] : null;
   const overdueInPeriod = report ? borderoOverdueInPeriod(report, todayISO) : { count: 0, amountCents: 0 };
   const showLoading = resolution.ok && (query.isPending || (query.isFetching && !report));
+  const valores = report ? [
+    formatBorderoMoney(report.totalPaidCents),
+    formatBorderoMoney(report.totalPayableCents),
+    formatBorderoMoney(report.totalExpenseCents),
+    formatBorderoMoney(report.totalAccountBalanceCents),
+    formatBorderoMoney(report.projectedFinalBalanceCents),
+  ] : [];
+  const resumoGrid = kpiGridClassFor(longestValueLength(valores), 3);
+  // O saldo final é a conclusão do borderô: destaque azul quando cobre as contas; negativo fica em
+  // card branco com cor de perigo, porque sobre o azul o vermelho não tem contraste (D16/D43).
+  const finalNegativo = report?.finalBalanceState === 'negative';
 
   return (
-    <div className="space-y-4">
-      <PageHeader
+    <div className="space-y-6">
+      <FinScreenHeader
         title="Borderô"
-        subtitle={BORDERO_PAGE_SUBTITLE}
+        description={BORDERO_PAGE_SUBTITLE}
         actions={canExport ? (
-          <Button type="button" variant="outline" size="sm" onClick={handleExport} disabled={!report || exporting || query.isFetching}>
-            {exporting ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <FileDown className="w-4 h-4 mr-1" />}
+          // Com a leitura em erro, o PDF sairia com a última carga boa enquanto a tela mostra o erro (D43/D59).
+          <Button type="button" variant="outline" size="sm" onClick={handleExport} disabled={!report || exporting || query.isFetching || query.isError}>
+            {exporting ? <Loader2 aria-hidden="true" className="w-4 h-4 mr-1 animate-spin" /> : <FileDown aria-hidden="true" className="w-4 h-4 mr-1" />}
             {exporting ? 'Gerando…' : 'Exportar PDF'}
           </Button>
         ) : undefined}
@@ -164,80 +218,83 @@ export default function BorderoSection() {
       {!resolution.ok ? null : showLoading ? (
         <LoadingState />
       ) : query.isError ? (
-        <Alert variant="destructive">
-          <AlertTriangle />
-          <AlertTitle>{isBorderoPermissionError(query.error) ? 'Acesso negado' : 'Não foi possível carregar o borderô'}</AlertTitle>
-          <AlertDescription className="space-y-3">
-            <p>
-              {isBorderoPermissionError(query.error)
-                ? 'Você não tem acesso aos dados financeiros desta unidade.'
-                : 'Os valores não foram exibidos para evitar números incorretos. Verifique a conexão e tente novamente.'}
-            </p>
-            {!isBorderoPermissionError(query.error) && (
-              <Button type="button" variant="outline" size="sm" onClick={() => void query.refetch()}>
-                <RefreshCw className="w-4 h-4 mr-1" /> Tentar novamente
-              </Button>
-            )}
-          </AlertDescription>
-        </Alert>
+        isBorderoPermissionError(query.error) ? (
+          <AccessDenied title="Acesso negado" description="Você não tem acesso aos dados financeiros desta unidade." />
+        ) : (
+          <ErrorState
+            title="Não foi possível carregar o borderô"
+            description="Os valores não foram exibidos para evitar números incorretos. Verifique a conexão e tente novamente."
+            onRetry={() => void query.refetch()}
+            retrying={query.isFetching}
+          />
+        )
       ) : report && finalView ? (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
-            <KpiCard
-              label="Contas já pagas"
-              value={formatBorderoMoney(report.totalPaidCents)}
-              sub={`${report.paidCount} despesa(s) paga(s) no período`}
-              icon={CircleCheckBig}
-              variant="success"
-            />
-            <KpiCard
-              label="Contas a vencer"
-              value={formatBorderoMoney(report.totalPayableCents)}
-              sub={overdueInPeriod.count > 0
-                ? `${report.payableCount} em aberto · ${overdueInPeriod.count} vencida(s)`
-                : `${report.payableCount} conta(s) em aberto no período`}
-              icon={CalendarClock}
-              variant="warning"
-            />
-            <KpiCard
-              label="Total de contas"
-              value={formatBorderoMoney(report.totalExpenseCents)}
-              sub="Já pagas + a vencer no período"
-              icon={Sigma}
-              variant="default"
-            />
-            <KpiCard
-              label="Saldo das contas"
-              value={formatBorderoMoney(report.totalAccountBalanceCents)}
-              sub={`Ver composição (${report.accounts.length} conta${report.accounts.length === 1 ? '' : 's'})`}
-              icon={Landmark}
-              variant="primary"
-              onClick={() => setAccountsOpen(true)}
-              ariaLabel="Saldo das contas — ver composição"
-            />
-            <KpiCard
-              label={`Saldo final provisionado · ${finalView.tag}`}
-              value={formatBorderoMoney(report.projectedFinalBalanceCents)}
-              sub={BORDERO_FINAL_BALANCE_MESSAGE[report.finalBalanceState]}
-              icon={finalView.icon}
-              variant={finalView.variant}
-            />
-          </div>
+          <FinSectionGroup
+            id="bordero-resumo"
+            title="Resumo do período"
+            caption={`${formatBorderoPeriod(report.period)}${query.isFetching ? ' · atualizando…' : ''}`}
+          >
+            <FinKpiGrid className={resumoGrid}>
+              <KpiCard
+                appearance="summary"
+                label="Contas já pagas"
+                value={valores[0]}
+                sub={`${report.paidCount} despesa(s) paga(s) no período`}
+                icon={CircleCheckBig}
+                variant="success"
+              />
+              <KpiCard
+                appearance="summary"
+                label="Contas a vencer"
+                value={valores[1]}
+                sub={overdueInPeriod.count > 0
+                  ? `${report.payableCount} em aberto · ${overdueInPeriod.count} vencida(s)`
+                  : `${report.payableCount} conta(s) em aberto no período`}
+                icon={CalendarClock}
+                variant="warning"
+              />
+              <KpiCard
+                appearance="summary"
+                label="Total de contas"
+                value={valores[2]}
+                sub="Já pagas + a vencer no período"
+                icon={Sigma}
+                variant="default"
+              />
+              <KpiCard
+                appearance="summary"
+                label="Saldo das contas"
+                value={valores[3]}
+                sub={`Ver composição (${report.accounts.length} conta${report.accounts.length === 1 ? '' : 's'})`}
+                icon={Landmark}
+                variant="primary"
+                onClick={() => setAccountsOpen(true)}
+                ariaLabel="Saldo das contas — ver composição"
+              />
+              <KpiCard
+                appearance={finalNegativo ? 'summary' : 'highlight'}
+                label={`Saldo final provisionado · ${finalView.tag}`}
+                value={valores[4]}
+                sub={BORDERO_FINAL_BALANCE_MESSAGE[report.finalBalanceState]}
+                icon={finalView.icon}
+                variant={finalView.variant}
+                valueTone={finalNegativo ? 'negative' : 'default'}
+              />
+            </FinKpiGrid>
 
-          <p className="text-xs text-muted-foreground flex items-start gap-1.5">
-            <Wallet className="w-3.5 h-3.5 mt-px shrink-0" />
-            <span>
+            <FinNote>
               Saldo final provisionado = saldo das contas − contas a vencer (o que já foi pago já saiu do saldo).
               Contas já pagas pela data do pagamento (boletos, conciliação e lançamentos manuais — igual ao Livro
               Razão); contas a vencer pela data de vencimento. A baixa de um boleto nunca é somada duas vezes.
-            </span>
-          </p>
+            </FinNote>
+          </FinSectionGroup>
 
           {report.overdueBeforePeriod.count > 0 && (
             <Alert variant="warning">
-              <AlertTriangle />
+              <AlertTriangle aria-hidden="true" />
               <AlertTitle>Contas vencidas antes do período</AlertTitle>
-              <AlertDescription>
+              <AlertDescription className="text-foreground">
                 {report.overdueBeforePeriod.count} conta(s) em aberto venceram antes de o período começar
                 ({formatBorderoMoney(report.overdueBeforePeriod.amountCents)}) e não compõem este borderô.
               </AlertDescription>
@@ -246,9 +303,9 @@ export default function BorderoSection() {
 
           {report.hasUnavailableBalances && (
             <Alert variant="warning">
-              <AlertTriangle />
+              <AlertTriangle aria-hidden="true" />
               <AlertTitle>Saldo indisponível em alguma conta</AlertTitle>
-              <AlertDescription>
+              <AlertDescription className="text-foreground">
                 Uma ou mais contas ativas ainda não têm saldo calculado e foram consideradas como R$0,00. Veja a composição do saldo.
               </AlertDescription>
             </Alert>

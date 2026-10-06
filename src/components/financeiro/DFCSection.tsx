@@ -1,37 +1,19 @@
 import { useSupabase } from '@/contexts/CompanyScopeContext';
-import { useState, useEffect, useCallback } from 'react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { formatInBR } from '@/lib/formatters';
-import { FileDown, FileSpreadsheet, ShieldAlert } from 'lucide-react';
+import { FileDown, FileSpreadsheet } from 'lucide-react';
 import { exportDemonstrativoPDF, exportDemonstrativoExcel } from '@/lib/exportDemonstrativo';
 import { useDataEvent } from '@/lib/dataEvents';
 import { useCan } from '@/permissions';
 import { useScopedToast } from '@/hooks/useScopedToast';
-import { Skeleton } from '@/components/ui/skeleton';
+import AccessDenied from '@/components/ui/AccessDenied';
+import ErrorState from '@/components/ui/ErrorState';
 import type { DfcSummary, DfcCategoria } from '@/types/financeiro';
 import DemonstrativoTree from './DemonstrativoTree';
-import MonthNavigator, { shiftMonth, monthBounds } from './MonthNavigator';
-
-function NoAccess() {
-  return (
-    <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-2">
-      <ShieldAlert className="w-10 h-10" />
-      <p className="font-medium">Acesso negado</p>
-      <p className="text-sm">Você não tem permissão para visualizar o DFC.</p>
-    </div>
-  );
-}
-
-function SkeletonTree() {
-  return (
-    <div className="space-y-2 p-4">
-      {Array.from({ length: 8 }).map((_, i) => (
-        <Skeleton key={i} className="h-8 w-full" />
-      ))}
-    </div>
-  );
-}
+import { shiftMonth, monthBounds } from './MonthNavigator';
+import { FinNote, FinScreenHeader, FinSectionGroup } from './finV2Layout';
+import { DemonstrativoFiltros } from './analisesParts';
 
 // Parse "yyyy-MM" como data LOCAL (não UTC) — ver nota em DRESection/MonthNavigator.
 function formatMonthLabelShort(value: string): string {
@@ -59,11 +41,16 @@ export default function DFCSection() {
   const [lancamentos, setLancamentos] = useState<{ id: string; categoria_id: string; valor: number; tipo: string; status: string }[]>([]);
   const [saldoInicial, setSaldoInicial] = useState(0);
   const [periodo, setPeriodo] = useState('');
+  // Estado só de apresentação: período dos valores exibidos (última carga bem-sucedida) e falha.
+  const [periodoCarregado, setPeriodoCarregado] = useState<string | null>(null);
+  const [erro, setErro] = useState(false);
+  const requisicao = useRef(0);
 
   const canView = useCan('financeiro:fluxo:view');
   const canExport = useCan('financeiro:fluxo:export');
 
   const load = useCallback(async () => {
+    const atual = ++requisicao.current;
     setLoading(true);
     const m = Number(meses);
     const mesInicio = shiftMonth(mesAncora, -(m - 1));
@@ -72,16 +59,20 @@ export default function DFCSection() {
 
     const startLabel = formatMonthLabelShort(mesInicio);
     const endLabel = formatMonthLabelShort(mesAncora);
-    setPeriodo(m === 1 ? endLabel : `${startLabel} — ${endLabel}`);
+    const label = m === 1 ? endLabel : `${startLabel} — ${endLabel}`;
+    setPeriodo(label);
 
     const { data, error } = await supabase.rpc('get_fin_dfc_summary', {
       p_inicio: inicio,
       p_fim: fim,
     });
+    // Só a resposta mais recente entra na tela (troca rápida de mês ou de quantidade de meses).
+    if (atual !== requisicao.current) return;
 
     if (error) {
       toast.error('Erro ao carregar DFC');
       console.error(error);
+      setErro(true);
       setLoading(false);
       return;
     }
@@ -90,6 +81,8 @@ export default function DFCSection() {
     setCategorias(result?.categorias || []);
     setLancamentos(valoresMapToLancamentos(result?.valores_por_categoria || {}));
     setSaldoInicial(Number(result?.saldo_inicial || 0));
+    setPeriodoCarregado(label);
+    setErro(false);
     setLoading(false);
   }, [mesAncora, meses, supabase, toast]);
 
@@ -99,7 +92,7 @@ export default function DFCSection() {
   useDataEvent('financeiro:contas_receber', load);
   useDataEvent('financeiro:contas', load);
 
-  if (!canView) return <NoAccess />;
+  if (!canView) return <AccessDenied description="Você não tem permissão para visualizar o DFC." />;
 
   const exportOpts = {
     categorias,
@@ -111,55 +104,57 @@ export default function DFCSection() {
     saldoInicial,
     showPctReceita: true,
   };
+  // Com a leitura em andamento ou em erro, o arquivo sairia com o período do filtro sobre outra carga (D43/D59).
+  const exportIndisponivel = loading || erro;
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div>
-          <h2 className="text-xl font-bold text-foreground">DFC — Demonstração de Fluxo de Caixa</h2>
-          <p className="text-sm text-muted-foreground">Apuração por caixa (data de pagamento) • {periodo}</p>
-        </div>
-        <div className="flex gap-2">
-          {canExport && (
-            <>
-              <Button variant="outline" size="sm" onClick={() => exportDemonstrativoPDF(exportOpts)} disabled={loading}>
-                <FileDown className="w-4 h-4 mr-1" /> PDF
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => exportDemonstrativoExcel(exportOpts)} disabled={loading}>
-                <FileSpreadsheet className="w-4 h-4 mr-1" /> Excel
-              </Button>
-            </>
-          )}
-          <Select value={meses} onValueChange={setMeses}>
-            <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="1">1 mês</SelectItem>
-              <SelectItem value="3">3 meses</SelectItem>
-              <SelectItem value="6">6 meses</SelectItem>
-              <SelectItem value="12">12 meses</SelectItem>
-            </SelectContent>
-          </Select>
-          <MonthNavigator value={mesAncora} onChange={setMesAncora} />
-        </div>
-      </div>
+    <div className="space-y-6">
+      <FinScreenHeader
+        title="DFC — Demonstração de Fluxo de Caixa"
+        description="Apuração por caixa (data de pagamento) · estrutura do Cadastro Base"
+        actions={canExport ? (
+          <>
+            <Button variant="outline" size="sm" onClick={() => exportDemonstrativoPDF(exportOpts)} disabled={exportIndisponivel}>
+              <FileDown aria-hidden="true" className="w-4 h-4 mr-1" /> PDF
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => exportDemonstrativoExcel(exportOpts)} disabled={exportIndisponivel}>
+              <FileSpreadsheet aria-hidden="true" className="w-4 h-4 mr-1" /> Excel
+            </Button>
+          </>
+        ) : undefined}
+      />
 
-      {loading ? (
-        <SkeletonTree />
-      ) : (
-        <DemonstrativoTree
-          categorias={categorias}
-          lancamentos={lancamentos}
-          rateios={[]}
-          loading={false}
-          isDFC
-          saldoInicial={saldoInicial}
-          showPctReceita
+      <DemonstrativoFiltros meses={meses} onMesesChange={setMeses} mes={mesAncora} onMesChange={setMesAncora} />
+
+      {erro ? (
+        <ErrorState
+          title="Não foi possível carregar o DFC"
+          description={`Nenhum valor foi exibido para ${periodo}. Tente novamente.`}
+          onRetry={() => { void load(); }}
+          retrying={loading}
         />
+      ) : (
+        <FinSectionGroup
+          id="dfc-demonstrativo"
+          title="Demonstrativo"
+          caption={periodoCarregado
+            ? `${periodoCarregado} · caixa${loading ? ' · atualizando…' : ''}`
+            : 'Carregando…'}
+        >
+          <DemonstrativoTree
+            categorias={categorias}
+            lancamentos={lancamentos}
+            rateios={[]}
+            loading={periodoCarregado === null}
+            isDFC
+            saldoInicial={saldoInicial}
+            showPctReceita
+          />
+          <FinNote>
+            Valores apurados pela data de pagamento efetivo (regime de caixa). Saldo inicial calculado a partir das contas financeiras cadastradas.
+          </FinNote>
+        </FinSectionGroup>
       )}
-
-      <p className="text-[10px] text-muted-foreground">
-        * Valores apurados pela data de pagamento efetivo (regime de caixa). Saldo inicial calculado a partir das contas financeiras cadastradas.
-      </p>
     </div>
   );
 }
