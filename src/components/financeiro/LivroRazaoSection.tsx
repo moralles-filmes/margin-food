@@ -26,7 +26,10 @@ import {
 import { useFormDirtyGuard } from '@/hooks/useFormDirtyGuard';
 import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
 import ContaDetailDialog, { type ContaDetailData, type ContaDetailRateio } from './ContaDetailDialog';
-import ContaFormDialog, { type ContaFormData, type RateioLine } from './ContaFormDialog';
+import ContaFormDialog, { type ContaFormCmv, type ContaFormData, type RateioLine } from './ContaFormDialog';
+import { fetchCmvConfig } from '@/hooks/useCmvFinanceiro';
+import { cmvDoCabecalho, rateiosComCmv } from '@/lib/cmvLancamentoPayload';
+import { useNavigationRecord } from '@/hooks/useNavigationRequest';
 import * as XLSX from '@/lib/safeXlsx';
 import { buildCategoryOptions } from '@/lib/categoriaOptions';
 import { mapFinanceiroDeleteError } from '@/lib/financeiroErrorMap';
@@ -73,6 +76,8 @@ interface Lancamento {
   saldo_apos: number | null;
 }
 
+/** Linha de `fin_lancamento_rateios` como a edição a lê (`cmv_incluir` só vem com o recurso no banco). */
+interface RateioRow { id: string; categoria_id: string; centro_custo_id: string | null; valor: number; percentual: number; cmv_incluir?: boolean | null }
 interface CategoriaRef { id: string; nome: string; tipo: string; parent_id: string | null; centro_custo_padrao_id: string | null; groupLabel?: string }
 interface CentroCustoRef { id: string; nome: string }
 interface ContaRef { id: string; nome: string }
@@ -198,6 +203,11 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
   const [editOrigem, setEditOrigem] = useState<string | null>(null);
   const [editClassificationOnly, setEditClassificationOnly] = useState(false);
   const [justificativa, setJustificativa] = useState('');
+  // CMV Financeiro: só com o recurso no banco (recursos.lancamentos). Nulo = formulário e payload como antes.
+  const [cmvForm, setCmvForm] = useState<ContaFormCmv | null>(null);
+  // A edição só envia a decisão se a leu ao abrir; senão o servidor preserva a que existe.
+  const cmvLidoNaEdicao = useRef(false);
+  const competenciaNaAbertura = useRef<string | null>(null);
   const [filtroTipo, setFiltroTipo] = useState(initialTipo || 'todos');
   const [filtroOrigem, setFiltroOrigem] = useState('todos');
   const [filtroConta, setFiltroConta] = useState(initialContaId || 'todos');
@@ -252,6 +262,10 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
   const [showDetail, setShowDetail] = useState(false);
   const [detailData, setDetailData] = useState<ContaDetailData | null>(null);
   const [detailRawItem, setDetailRawItem] = useState<Lancamento | null>(null);
+  // Vindo do CMV: o detalhe só abre depois de categorias/contas/centros carregados, que dão os nomes dele
+  // (a tela acabou de montar e o pedido de navegação chega antes dessas listas).
+  const [refsCarregadas, setRefsCarregadas] = useState(false);
+  const [lancamentoDoCmv, setLancamentoDoCmv] = useState<Lancamento | null>(null);
 
   const { confirm, ConfirmDialog } = useConfirmDialog();
 
@@ -325,17 +339,26 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
   const load = useCallback(async () => {
     setCursorDate(null);
     setCursorId(null);
-    const [_, catRes, ccRes, contRes] = await Promise.all([
+    const [_, catRes, ccRes, contRes, , , cmvConfig] = await Promise.all([
       loadPage(null, null),
       supabase.from('fin_categorias').select('id, nome, tipo, parent_id, centro_custo_padrao_id').eq('ativo', true).order('nome'),
       supabase.from('fin_centros_custo').select('id, nome').eq('ativo', true).order('nome'),
       supabase.from('fin_contas').select('id, nome').eq('ativo', true).order('nome'),
       loadTotais(),
       loadSaldoAtual(),
+      fetchCmvConfig(supabase),
     ]);
     setCategorias(buildCategoryOptions((catRes.data as CategoriaRef[]) || []));
     setCentros((ccRes.data as CentroCustoRef[]) || []);
     setContas((contRes.data as ContaRef[]) || []);
+    // Classificação desligada = sem sugestão: a despesa nova nasce pendente (a decisão já gravada continua à vista).
+    setCmvForm(cmvConfig?.recursos.lancamentos
+      ? {
+          ativo: cmvConfig.classificacaoAtiva,
+          padroes: cmvConfig.classificacaoAtiva ? new Map(cmvConfig.categorias.map(c => [c.id, c.cmvSugerir])) : new Map(),
+        }
+      : null);
+    setRefsCarregadas(true);
   }, [loadPage, supabase, loadTotais, loadSaldoAtual]);
 
   useEffect(() => { if (canView) load(); }, [load, canView]);
@@ -434,11 +457,33 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
     setEditOrigem(null);
     setEditClassificationOnly(false);
     setJustificativa('');
+    cmvLidoNaEdicao.current = false;
+    competenciaNaAbertura.current = null;
     setForm({ tipo: 'DESPESA', valor: 0, data_competencia: todayBR(), data_vencimento: '', data_pagamento: '', descricao: '', conta_id: '', conta_destino_id: '', forma_pagamento: 'pix', status: 'PREVISTO', recorrente: false, frequencia: 'mensal', parcelas: 0, observacoes: '', categoria_id: '', centro_custo_id: '' });
     setRateioLines([]);
     setShowForm(false);
   };
   const { showConfirm, guardedClose, confirmClose, cancelClose } = useFormDirtyGuard({ current: form, onClose: resetForm });
+
+  // Vindo do CMV (lista de origem): busca o lançamento pelo id, mesmo fora da página carregada.
+  useNavigationRecord('financeiro', ['lancamento'], async ({ id }) => {
+    if (!canView) return;
+    const { data, error } = await supabase.from('fin_lancamentos').select('*').eq('id', id).maybeSingle();
+    if (error || !data) {
+      if (error) console.error('[LivroRazaoSection.navegacao]', error);
+      toast.error('Lançamento não encontrado.');
+      return;
+    }
+    const row = data as unknown as Omit<Lancamento, 'data_ledger' | 'saldo_apos'>;
+    setLancamentoDoCmv({ ...row, data_ledger: row.data_pagamento || row.data_competencia, saldo_apos: null });
+  });
+  // ...e abre o detalhe quando os nomes (categoria, conta, centro) já estão carregados.
+  useEffect(() => {
+    if (!lancamentoDoCmv || !refsCarregadas) return;
+    setLancamentoDoCmv(null);
+    void openDetail(lancamentoDoCmv);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- openDetail é recriada a cada render e lê o estado desse render.
+  }, [lancamentoDoCmv, refsCarregadas]);
 
   if (!canView) return <NoAccess />;
 
@@ -463,22 +508,34 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
     setEditClassificationOnly(!!item.conciliado);
     setJustificativa('');
 
-    // Load rateios from database
-    const { data: rates, error: rateErr } = await supabase
-      .from('fin_lancamento_rateios')
-      .select('id, categoria_id, centro_custo_id, valor, percentual')
-      .eq('lancamento_id', item.id);
-    if (rateErr) {
-      toast.error('Erro ao carregar rateios: ' + rateErr.message);
+    // Rateios e, com o recurso no banco, a decisão do CMV (linhas e cabeçalho).
+    const comCmv = Boolean(cmvForm) && item.tipo === 'DESPESA';
+    const [ratesRes, cabecalhoRes] = await Promise.all([
+      supabase
+        .from('fin_lancamento_rateios')
+        .select(comCmv ? 'id, categoria_id, centro_custo_id, valor, percentual, cmv_incluir' : 'id, categoria_id, centro_custo_id, valor, percentual')
+        .eq('lancamento_id', item.id),
+      comCmv
+        ? supabase.from('fin_lancamentos').select('cmv_incluir').eq('id', item.id).maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+    ]);
+    if (ratesRes.error) {
+      toast.error('Erro ao carregar rateios: ' + ratesRes.error.message);
       return;
     }
+    // Sem as colunas do CMV na leitura, o salvamento não pode enviar a decisão (gravaria "pendente" por cima).
+    cmvLidoNaEdicao.current = comCmv && !cabecalhoRes.error;
+    competenciaNaAbertura.current = item.data_competencia;
+    const cmvCabecalho = (cabecalhoRes.data as unknown as { cmv_incluir?: boolean | null } | null)?.cmv_incluir ?? null;
 
-    const loadedRateios: RateioLine[] = (rates || []).map((r: any) => ({
+    const loadedRateios: RateioLine[] = ((ratesRes.data ?? []) as unknown as RateioRow[]).map(r => ({
       key: r.id,
+      id: r.id,
       categoria_id: r.categoria_id,
       centro_custo_id: r.centro_custo_id || '',
       valor: r.valor,
       percentual: r.percentual,
+      ...(cmvLidoNaEdicao.current ? { cmv_incluir: r.cmv_incluir ?? null } : {}),
     }));
     setRateioLines(loadedRateios);
 
@@ -499,6 +556,7 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
         observacoes: item.observacoes || '',
         categoria_id: item.categoria_id || '',
         centro_custo_id: item.centro_custo_id || '',
+        ...(cmvLidoNaEdicao.current ? { cmv_incluir: cmvCabecalho } : {}),
       });
     }
     setShowDetail(false);
@@ -530,22 +588,21 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
 
     setSaving(true);
     try {
-      const rateiosPayload = rateioLines.map(line => ({
-        categoria_id: line.categoria_id,
-        centro_custo_id: line.centro_custo_id || null,
-        valor: Number(line.valor),
-        percentual: line.percentual || null,
-        observacao: null,
-      }));
+      // Decisão e competência só com o recurso no banco; a decisão, só se foi lida ao abrir.
+      const enviaCmv = Boolean(cmvForm) && form.tipo === 'DESPESA' && cmvLidoNaEdicao.current;
+      const competenciaMudou = Boolean(cmvForm) && Boolean(form.data_competencia)
+        && form.data_competencia !== competenciaNaAbertura.current;
 
       const { error } = await callUntypedRpc('_guarded_update_reconciled_classification', {
         p_id: editId,
         p_categoria_id: rateioLines.length === 0 ? (form.categoria_id || null) : null,
         p_centro_custo_id: rateioLines.length === 0 ? (form.centro_custo_id || null) : null,
         p_observacoes: form.observacoes || null,
-        p_rateios: rateiosPayload,
+        p_rateios: rateiosComCmv(rateioLines, enviaCmv),
         p_expected_updated_at: editUpdatedAt,
         p_justificativa_edicao: justificativa.trim(),
+        ...cmvDoCabecalho(rateioLines.length > 0, form.cmv_incluir, enviaCmv),
+        ...(competenciaMudou ? { p_data_competencia: form.data_competencia } : {}),
       });
 
       if (error) {
@@ -695,15 +752,9 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
         }
       }
 
-      const rateiosPayload = rateioLines.length > 0
-        ? rateioLines.map(l => ({
-            categoria_id: l.categoria_id,
-            centro_custo_id: l.centro_custo_id || null,
-            valor: l.valor,
-            percentual: l.percentual || null,
-            observacao: null,
-          }))
-        : [];
+      // Decisão do CMV: só com o recurso, só despesa e, na edição, só se foi lida ao abrir.
+      const enviaCmv = Boolean(cmvForm) && form.tipo === 'DESPESA' && (!editId || cmvLidoNaEdicao.current);
+      const rateiosPayload = rateiosComCmv(rateioLines, enviaCmv);
 
       const rpcParams: Record<string, unknown> = {
         p_id: editId || null,
@@ -725,6 +776,7 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
         p_rateios: rateiosPayload,
         p_updated_at: editUpdatedAt || null,
         p_justificativa_edicao: justificativa.trim() || null,
+        ...cmvDoCabecalho(rateioLines.length > 0, form.cmv_incluir, enviaCmv),
       };
 
       // Só a criação leva chave; a edição já é protegida pelo optimistic lock.
@@ -1194,6 +1246,8 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
         justificativa={justificativa}
         onJustificativaChange={setJustificativa}
         classificationOnly={editClassificationOnly}
+        cmv={editId && !cmvLidoNaEdicao.current ? null : cmvForm}
+        competenciaNaReclassificacao={Boolean(cmvForm)}
       />
 
       <FormCloseConfirmDialog open={showConfirm} onConfirmLeave={confirmClose} onCancelLeave={cancelClose} />
