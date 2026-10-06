@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
-import { useSalmonStore } from '@/hooks/useSalmonStore';
+import { useTravaEnvio } from '@/hooks/useTravaEnvio';
+import type { SuppliersStore } from '@/hooks/useSuppliers';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { BRLInput } from '@/components/ui/brl-input';
@@ -9,24 +10,27 @@ import { Plus, Edit2, Trash2, Building2, Check, X } from 'lucide-react';
 import { useScopedToast } from '@/hooks/useScopedToast';
 import { Supplier } from '@/types/salmon';
 import { useCan } from '@/permissions/hooks';
+import { SUPPLIER_KEYS_COMPRAS, type SupplierPermissionKeys } from '@/domain/compras/fornecedores';
 
 interface SuppliersViewProps {
-  store: ReturnType<typeof useSalmonStore>;
+  store: Pick<SuppliersStore, 'suppliers' | 'addSupplier' | 'updateSupplier' | 'deleteSupplier'> & { loading?: boolean };
+  permissionKeys?: SupplierPermissionKeys;
 }
 
 const emptyForm = { name: '', cnpj: '', contact: '', notes: '', active: true, categoriasAtendidas: [] as string[], prazoEntregaPadrao: 0, formaPagamentoPadrao: '', pedidoMinimoValor: 0, pedidoMinimoQtd: 0, whatsappNumber: '' };
 
-export default function SuppliersView({ store }: SuppliersViewProps) {
+export default function SuppliersView({ store, permissionKeys = SUPPLIER_KEYS_COMPRAS }: SuppliersViewProps) {
   const toast = useScopedToast();
-  const { suppliers, addSupplier, updateSupplier, deleteSupplier } = store;
+  const { suppliers, addSupplier, updateSupplier, deleteSupplier, loading = false } = store;
   const { confirm, ConfirmDialog } = useConfirmDialog();
+  const { enviando, executar } = useTravaEnvio();
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
 
-  const canCreate = useCan('compras:fornecedores:create');
-  const canEdit = useCan('compras:fornecedores:edit');
-  const canDelete = useCan('compras:fornecedores:delete');
+  const canCreate = useCan(permissionKeys.create);
+  const canEdit = useCan(permissionKeys.edit);
+  const canDelete = useCan(permissionKeys.delete);
 
   const startEdit = (s: Supplier) => {
     if (!canEdit) { toast.error('Sem permissão para editar fornecedores'); return; }
@@ -39,37 +43,46 @@ export default function SuppliersView({ store }: SuppliersViewProps) {
     e.preventDefault();
     if (!form.name.trim()) { toast.error('Nome é obrigatório'); return; }
 
-    try {
-      if (editId) {
-        if (!canEdit) { toast.error('Sem permissão para editar fornecedores'); return; }
-        await updateSupplier(editId, form);
-        toast.success('Fornecedor atualizado!');
-        setEditId(null);
-      } else {
-        if (!canCreate) { toast.error('Sem permissão para criar fornecedores'); return; }
-        await addSupplier(form);
-        toast.success('Fornecedor cadastrado!');
+    await executar(async () => {
+      try {
+        if (editId) {
+          if (!canEdit) { toast.error('Sem permissão para editar fornecedores'); return; }
+          await updateSupplier(editId, form);
+          toast.success('Fornecedor atualizado!');
+          setEditId(null);
+        } else {
+          if (!canCreate) { toast.error('Sem permissão para criar fornecedores'); return; }
+          await addSupplier(form);
+          toast.success('Fornecedor cadastrado!');
+        }
+        setForm(emptyForm);
+        setShowForm(false);
+      } catch {
+        // o hook já avisou o erro traduzido; o formulário fica aberto para corrigir
       }
-      setForm(emptyForm);
-      setShowForm(false);
-    } catch {
-      // error toast already shown in store
-    }
+    });
   };
 
   const handleDelete = async (id: string, name: string) => {
     if (!canDelete) { toast.error('Sem permissão para excluir fornecedores'); return; }
     const ok = await confirm({ title: 'Excluir fornecedor', description: `Tem certeza que deseja excluir "${name}"?`, confirmLabel: 'Excluir', variant: 'destructive' });
-    if (ok) {
+    if (!ok) return;
+    try {
       await deleteSupplier(id);
       toast.success('Fornecedor excluído');
+    } catch {
+      // recusa (ex.: fornecedor já usado em contas) já avisada pelo hook
     }
   };
 
   const toggleActive = async (s: Supplier) => {
     if (!canEdit) { toast.error('Sem permissão para editar fornecedores'); return; }
-    await updateSupplier(s.id, { active: !s.active });
-    toast.info(s.active ? `${s.name} desativado` : `${s.name} ativado`);
+    try {
+      await updateSupplier(s.id, { active: !s.active });
+      toast.info(s.active ? `${s.name} desativado` : `${s.name} ativado`);
+    } catch {
+      // recusa já avisada pelo hook
+    }
   };
 
   return (
@@ -124,7 +137,7 @@ export default function SuppliersView({ store }: SuppliersViewProps) {
             </label>
             <div className="flex gap-2">
               <Button type="button" variant="ghost" size="sm" onClick={() => { setShowForm(false); setEditId(null); }}>Cancelar</Button>
-              <Button type="submit" size="sm" className="bg-primary-strong text-primary-foreground border-0">{editId ? 'Atualizar' : 'Salvar'}</Button>
+              <Button type="submit" size="sm" disabled={enviando} className="bg-primary-strong text-primary-foreground border-0">{editId ? 'Atualizar' : 'Salvar'}</Button>
             </div>
           </div>
         </form>
@@ -148,18 +161,18 @@ export default function SuppliersView({ store }: SuppliersViewProps) {
               </div>
               <div className="flex items-center gap-1">
                 {canEdit && (
-                  <button onClick={() => toggleActive(s)} className={`p-1.5 rounded-lg transition-colors ${s.active ? 'text-success hover:bg-success/10' : 'text-muted-foreground hover:bg-secondary'}`}>
-                    {s.active ? <Check className="w-3.5 h-3.5" /> : <X className="w-3.5 h-3.5" />}
+                  <button type="button" aria-label={`${s.active ? 'Desativar' : 'Ativar'} ${s.name}`} onClick={() => toggleActive(s)} className={`p-1.5 rounded-lg transition-colors ${s.active ? 'text-success hover:bg-success/10' : 'text-muted-foreground hover:bg-secondary'}`}>
+                    {s.active ? <Check aria-hidden="true" className="w-3.5 h-3.5" /> : <X aria-hidden="true" className="w-3.5 h-3.5" />}
                   </button>
                 )}
                 {canEdit && (
-                  <button onClick={() => startEdit(s)} className="p-1.5 rounded-lg text-muted-foreground hover:bg-secondary">
-                    <Edit2 className="w-3.5 h-3.5" />
+                  <button type="button" aria-label={`Editar ${s.name}`} onClick={() => startEdit(s)} className="p-1.5 rounded-lg text-muted-foreground hover:bg-secondary">
+                    <Edit2 aria-hidden="true" className="w-3.5 h-3.5" />
                   </button>
                 )}
                 {canDelete && (
-                  <button onClick={() => handleDelete(s.id, s.name)} className="p-1.5 rounded-lg text-destructive hover:bg-destructive/10">
-                    <Trash2 className="w-3.5 h-3.5" />
+                  <button type="button" aria-label={`Excluir ${s.name}`} onClick={() => handleDelete(s.id, s.name)} className="p-1.5 rounded-lg text-destructive hover:bg-destructive/10">
+                    <Trash2 aria-hidden="true" className="w-3.5 h-3.5" />
                   </button>
                 )}
               </div>
@@ -172,7 +185,10 @@ export default function SuppliersView({ store }: SuppliersViewProps) {
             </div>
           </div>
         ))}
-        {suppliers.length === 0 && (
+        {loading && suppliers.length === 0 && (
+          <p role="status" className="text-center py-8 text-sm text-muted-foreground">Carregando fornecedores…</p>
+        )}
+        {!loading && suppliers.length === 0 && (
           <div className="text-center py-8">
             <Building2 className="w-10 h-10 mx-auto text-muted-foreground/30 mb-2" />
             <p className="text-sm text-muted-foreground">Nenhum fornecedor cadastrado</p>

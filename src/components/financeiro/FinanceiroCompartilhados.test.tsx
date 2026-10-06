@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import DateRangePresets from './DateRangePresets';
 import MonthNavigator from './MonthNavigator';
 import CategoryCombobox from './CategoryCombobox';
@@ -44,6 +44,25 @@ describe('compartilhados do Financeiro — nome acessível sem mudar o comportam
     );
     expect(screen.getByRole('combobox', { name: 'Categoria do teste' })).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'Fornecedor do teste' })).toBeInTheDocument();
+  });
+});
+
+describe('SupplierCombobox — atalho de cadastro', () => {
+  const opcoes = [{ id: 's1', name: 'Fornecedor A' }];
+  // cmdk rola o item ativo para a vista; jsdom não implementa scrollIntoView.
+  beforeAll(() => { Element.prototype.scrollIntoView = vi.fn(); });
+
+  it('sem permissão informada pelo pai não oferece cadastrar', async () => {
+    render(<SupplierCombobox aria-label="Fornecedor" value="" onValueChange={() => {}} options={opcoes} />);
+    fireEvent.click(screen.getByRole('combobox', { name: 'Fornecedor' }));
+    expect(await screen.findByText('Fornecedor A')).toBeInTheDocument();
+    expect(screen.queryByText('Novo Fornecedor')).not.toBeInTheDocument();
+  });
+
+  it('com permissão oferece cadastrar', async () => {
+    render(<SupplierCombobox aria-label="Fornecedor" value="" onValueChange={() => {}} options={opcoes} enableQuickAdd />);
+    fireEvent.click(screen.getByRole('combobox', { name: 'Fornecedor' }));
+    expect(await screen.findByText('Novo Fornecedor')).toBeInTheDocument();
   });
 });
 
