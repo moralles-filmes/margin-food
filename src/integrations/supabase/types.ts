@@ -1822,12 +1822,10 @@ export type Database = {
           excluir_dos_totais: boolean
           grupo: string | null
           id: string
-          linha_dre: string | null
           nome_unaccent: string | null
           nome: string
           ordem: number | null
           parent_id: string | null
-          plano_contas_id: string | null
           regra_sugestao: string | null
           system_key: string | null
           tipo: string
@@ -1843,12 +1841,10 @@ export type Database = {
           excluir_dos_totais?: boolean
           grupo?: string | null
           id?: string
-          linha_dre?: string | null
           nome_unaccent?: never
           nome: string
           ordem?: number | null
           parent_id?: string | null
-          plano_contas_id?: string | null
           regra_sugestao?: string | null
           system_key?: string | null
           tipo?: string
@@ -1864,12 +1860,10 @@ export type Database = {
           excluir_dos_totais?: boolean
           grupo?: string | null
           id?: string
-          linha_dre?: string | null
           nome_unaccent?: never
           nome?: string
           ordem?: number | null
           parent_id?: string | null
-          plano_contas_id?: string | null
           regra_sugestao?: string | null
           system_key?: string | null
           tipo?: string
@@ -1895,13 +1889,6 @@ export type Database = {
             columns: ["parent_id"]
             isOneToOne: false
             referencedRelation: "fin_categorias"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fin_categorias_plano_contas_id_fkey"
-            columns: ["plano_contas_id"]
-            isOneToOne: false
-            referencedRelation: "fin_plano_contas"
             referencedColumns: ["id"]
           },
         ]
@@ -2189,7 +2176,6 @@ export type Database = {
           observacoes: string | null
           parcela_atual: number | null
           parcela_total: number | null
-          plano_contas_id: string | null
           recorrencia_config: Json | null
           recorrente: boolean
           referencia_id: string | null
@@ -2230,7 +2216,6 @@ export type Database = {
           observacoes?: string | null
           parcela_atual?: number | null
           parcela_total?: number | null
-          plano_contas_id?: string | null
           recorrencia_config?: Json | null
           recorrente?: boolean
           referencia_id?: string | null
@@ -2271,7 +2256,6 @@ export type Database = {
           observacoes?: string | null
           parcela_atual?: number | null
           parcela_total?: number | null
-          plano_contas_id?: string | null
           recorrencia_config?: Json | null
           recorrente?: boolean
           referencia_id?: string | null
@@ -2323,13 +2307,6 @@ export type Database = {
             columns: ["lancamento_pai_id"]
             isOneToOne: false
             referencedRelation: "fin_contas_pagar"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fin_contas_pagar_plano_contas_id_fkey"
-            columns: ["plano_contas_id"]
-            isOneToOne: false
-            referencedRelation: "fin_plano_contas"
             referencedColumns: ["id"]
           },
           {
@@ -2463,7 +2440,6 @@ export type Database = {
           observacoes: string | null
           parcela_atual: number | null
           parcela_total: number | null
-          plano_contas_id: string | null
           recorrencia_config: Json | null
           recorrente: boolean
           status: string
@@ -2494,7 +2470,6 @@ export type Database = {
           observacoes?: string | null
           parcela_atual?: number | null
           parcela_total?: number | null
-          plano_contas_id?: string | null
           recorrencia_config?: Json | null
           recorrente?: boolean
           status?: string
@@ -2525,7 +2500,6 @@ export type Database = {
           observacoes?: string | null
           parcela_atual?: number | null
           parcela_total?: number | null
-          plano_contas_id?: string | null
           recorrencia_config?: Json | null
           recorrente?: boolean
           status?: string
@@ -2575,13 +2549,6 @@ export type Database = {
             columns: ["lancamento_pai_id"]
             isOneToOne: false
             referencedRelation: "fin_contas_receber"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fin_contas_receber_plano_contas_id_fkey"
-            columns: ["plano_contas_id"]
-            isOneToOne: false
-            referencedRelation: "fin_plano_contas"
             referencedColumns: ["id"]
           },
           {
@@ -2710,62 +2677,6 @@ export type Database = {
           },
         ]
       }
-      fin_dre_linhas: {
-        Row: {
-          ativo: boolean
-          categorias_ids: string[] | null
-          codigo: string
-          company_id: string
-          created_at: string
-          formula: string | null
-          id: string
-          nivel: number
-          nome: string
-          ordem: number
-          sinal: number
-          tipo: string
-          updated_at: string
-        }
-        Insert: {
-          ativo?: boolean
-          categorias_ids?: string[] | null
-          codigo: string
-          company_id?: string
-          created_at?: string
-          formula?: string | null
-          id?: string
-          nivel?: number
-          nome: string
-          ordem?: number
-          sinal?: number
-          tipo?: string
-          updated_at?: string
-        }
-        Update: {
-          ativo?: boolean
-          categorias_ids?: string[] | null
-          codigo?: string
-          company_id?: string
-          created_at?: string
-          formula?: string | null
-          id?: string
-          nivel?: number
-          nome?: string
-          ordem?: number
-          sinal?: number
-          tipo?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fin_dre_linhas_company_fk"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       fin_lancamento_rateios: {
         Row: {
           categoria_id: string | null
@@ -2850,7 +2761,6 @@ export type Database = {
           origem: string
           parcela_atual: number | null
           parcela_total: number | null
-          plano_contas_id: string | null
           recorrencia_config: Json | null
           recorrente: boolean
           referencia_id: string | null
@@ -2886,7 +2796,6 @@ export type Database = {
           origem?: string
           parcela_atual?: number | null
           parcela_total?: number | null
-          plano_contas_id?: string | null
           recorrencia_config?: Json | null
           recorrente?: boolean
           referencia_id?: string | null
@@ -2922,7 +2831,6 @@ export type Database = {
           origem?: string
           parcela_atual?: number | null
           parcela_total?: number | null
-          plano_contas_id?: string | null
           recorrencia_config?: Json | null
           recorrente?: boolean
           referencia_id?: string | null
@@ -2974,13 +2882,6 @@ export type Database = {
             columns: ["lancamento_pai_id"]
             isOneToOne: false
             referencedRelation: "fin_lancamentos"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fin_lancamentos_plano_contas_id_fkey"
-            columns: ["plano_contas_id"]
-            isOneToOne: false
-            referencedRelation: "fin_plano_contas"
             referencedColumns: ["id"]
           },
         ]
@@ -3128,69 +3029,6 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      fin_plano_contas: {
-        Row: {
-          ativo: boolean
-          codigo: string
-          company_id: string
-          created_at: string
-          created_by: string | null
-          id: string
-          linha_dre: string | null
-          natureza: string
-          nivel: number
-          nome: string
-          pai_id: string | null
-          tipo: string
-          updated_at: string
-        }
-        Insert: {
-          ativo?: boolean
-          codigo: string
-          company_id?: string
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          linha_dre?: string | null
-          natureza?: string
-          nivel?: number
-          nome: string
-          pai_id?: string | null
-          tipo?: string
-          updated_at?: string
-        }
-        Update: {
-          ativo?: boolean
-          codigo?: string
-          company_id?: string
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          linha_dre?: string | null
-          natureza?: string
-          nivel?: number
-          nome?: string
-          pai_id?: string | null
-          tipo?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fin_plano_contas_company_fk"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fin_plano_contas_pai_id_fkey"
-            columns: ["pai_id"]
-            isOneToOne: false
-            referencedRelation: "fin_plano_contas"
             referencedColumns: ["id"]
           },
         ]
@@ -10119,7 +9957,6 @@ export type Database = {
         Args: { p_expected_updated_at: string; p_id: string }
         Returns: undefined
       }
-      _guarded_delete_plano_contas: { Args: { p_id: string }; Returns: Json }
       _guarded_estornar_conta_pagar: {
         Args: { p_id: string; p_justificativa?: string }
         Returns: Json
@@ -10212,18 +10049,6 @@ export type Database = {
         }
         Returns: Json
       }
-      _guarded_update_categoria: {
-        Args: {
-          p_centro_custo_padrao_id?: string
-          p_expected_updated_at?: string
-          p_grupo?: string
-          p_id: string
-          p_linha_dre?: string
-          p_nome: string
-          p_tipo: string
-        }
-        Returns: Json
-      }
       _guarded_update_centro_custo: {
         Args: {
           p_descricao?: string
@@ -10284,18 +10109,6 @@ export type Database = {
           p_recorrencia?: Json
           p_supplier_id?: string
           p_valor?: number
-        }
-        Returns: Json
-      }
-      _guarded_update_plano_contas: {
-        Args: {
-          p_codigo: string
-          p_expected_updated_at?: string
-          p_id: string
-          p_linha_dre?: string
-          p_natureza: string
-          p_nome: string
-          p_tipo: string
         }
         Returns: Json
       }
