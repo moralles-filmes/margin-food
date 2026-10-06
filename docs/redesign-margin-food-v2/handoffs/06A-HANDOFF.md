@@ -1,3 +1,52 @@
+# Handoff 06A → 06B
+
+## Estado real
+
+- Repositório `moralles-filmes/margin-food`, branch `feat/redesign-v2-f06a`, criada de `feat/redesign-v2-f05b` em `b4cf636`. Commits da Fase 06A: código e documentação (SHAs na seção "Commits" abaixo).
+- Sem push, PR ou merge; `main` intocada em `c6a9774`.
+- Fase 06A validada com ressalvas em 2026-10-05. Fase 06B pendente.
+
+## Contexto mínimo
+
+A V2 aplica ao sistema inteiro a identidade aprovada. Já estão no padrão: estrutura global (01–02), Dashboard Financeiro (03), Contas/Livro Razão/Fluxo/Projeção (04A), Conciliação (04B), Contas a Pagar/Receber, Códigos, Recorrências e Alertas (05A), Fechamento, Cadastros Base e Categorização (05B) e, nesta fase, DRE/DFC, Orçamento, KPIs, Comparativo, Auditoria e Borderô (06A). Nenhuma delas mudou RPC, parâmetro, payload, ordem de chamada, permissão nem exportador; as condições alteradas são restritivas (exportação/Copiar Mês bloqueados em leitura ou erro) ou só de exibição, todas registradas.
+
+Não reverter: D15–D68 e D69–D77 (alternador DRE/DFC com ativação manual; DRE/DFC com regime, filtros rotulados, legenda do período carregado e erro com nova tentativa; `DemonstrativoTree` com hierarquia por token, botões nomeados e lista no celular; Orçamento com resumo realizado × orçado, tabela ⇄ lista e esqueleto na troca de mês; KPIs com janela e base do contrato; Comparativo com A/B, % × p.p. e "Sem base"; Auditoria com o resumo do servidor rotulado e detalhe por botão; Borderô na família V2; `MonthNavigator` com 180 px). D09 e D13.
+
+## Leitura obrigatória do próximo chat
+
+Está no prompt abaixo (CLAUDE.md, mestre, progresso, decisões, este handoff, relatório 06A, matriz FIN-B-039 a 065, pendências da Apresentação, prompt 06).
+
+## Já implementado e validado (06A)
+
+- Navegador: Chrome "Browser 1", login "Administrador Principal", unidade de teste Moralles com dados sintéticos injetados no cliente; nenhuma escrita chegou ao servidor (registro de bloqueadas vazio).
+- Valores idênticos antes e depois nas seis telas (diferenças só de rótulo, registradas: `R$-0,00` → `R$0,00` na árvore; "-3,4pp" → "-3,4 p.p." e "0,00%" real no Comparativo).
+- Estados (erro, atraso, vazio, mês sem movimento, sem receita, base zerada), perfil reduzido simulado (DFC → "Acesso restrito"), diálogos abertos e fechados sem confirmar com retorno de foco, teclado, claro/escuro, 320/390/768/1024/1920 (iframe) e 1.333 px, sidebar recolhida e a 437 px sem rolagem, contraste ≥ 4,57 (claro) e ≥ 4,60 (escuro).
+- Linha de comando: testes 209 / 1.975; typecheck 0; lint 0 erros (662 avisos no repositório, iguais antes/depois); build ok.
+- Auditoria de módulo (mapeador, identidade, processo, funcional): nenhum bloqueante; sete achados da fase corrigidos; preexistentes em PF-111 a PF-116 (e PF-001 mantida).
+
+Não executado: leitor de tela, movimento normal, download de PDF/Excel (comparação pela entrada dos exportadores em teste), "sem permissão" em navegador nas telas além do DFC.
+
+## Trabalho seguinte
+
+Fase 06B — Apresentação Sócios (FIN-B-039 a 065), só apresentação. É grande (~10 mil linhas com canvas, governança e exportadores): o prompt autoriza dividir em 06B1/06B2 se não couber com QA real.
+
+## Bloqueios / riscos / cuidado com dados
+
+- **Escritas na Apresentação:** reuniões/sessões executivas, transições de ata, decisões e revisões gravam — abrir os diálogos e fechar sem confirmar, com escrita interceptada.
+- **Regras intocáveis:** escopo independente `presentationUnit`; metas/orçamento/projeção (ausência nunca vira zero; projeção só com 7 dias); só a DRE é competência; atas só referenciam decisões; idempotência por fingerprint do pedido original; exportadores `presentation*Export.ts` com paleta literal intencional.
+- **Ambiente:** outras sessões geram arquivos em `.claude/worktrees/`; o Vite do projeto recarrega a página a cada mudança ali (use a config da sessão com `server.watch.ignored`) e o ESLint inclui esses arquivos no total de avisos (compare só o repositório).
+- **Sessão e unidade:** o proprietário precisa reautorizar a cada chat; o assistente não digita senha. **D09:** nunca usar valores das imagens de referência. **Capturas** fora do repositório.
+- **Pendências:** PF-001 a PF-116; nenhuma corrigida no redesign. Da Apresentação: PF-006. Aguardam o proprietário: PF-105 (impacto alto), PF-097, PF-108, PF-109, PF-088, PF-111, PF-112, PF-114, PF-115.
+
+## Commits
+
+A preencher pelo commit de registro dos SHAs.
+
+## Prompt completo para colar no próximo chat
+
+O texto integral está em `docs/redesign-margin-food-v2/PROXIMO-CHAT.md` e reproduzido abaixo.
+
+```text
 Continue o Redesign Visual V2 do MARGIN FOOD (sistema EMPRESARIAL de gestão
 para restaurantes), repositório moralles-filmes/margin-food.
 Execute exclusivamente a FASE 06B — Apresentação Sócios (FIN-B-039 a
@@ -266,3 +315,4 @@ ENTREGA AO FINAL
    Fase 07 (CMV Financeiro) se os gates passaram com navegador;
    continuação/validação da 06B caso contrário.
 4. PARAR. Não iniciar a fase seguinte no mesmo chat.
+```
