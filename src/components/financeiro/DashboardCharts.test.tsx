@@ -11,6 +11,8 @@ const state = vi.hoisted(() => ({
   toast: { error: vi.fn(), success: vi.fn() },
   evolucao: [] as Array<Record<string, unknown>>,
   categorias: [] as Array<Record<string, unknown>>,
+  // Despesas por centro de custo do período do resumo; [] = nenhuma despesa com centro.
+  centros: [] as Array<Record<string, unknown>>,
   fail: false,
   // Cliente estável, como o do CompanyScopeProvider: o `load` depende dele.
   client: {} as { rpc: (...args: unknown[]) => unknown },
@@ -38,11 +40,12 @@ beforeEach(() => {
     { nome: 'Pessoal', valor: 300 },
     { nome: 'Energia', valor: 200 },
   ];
+  state.centros = [];
   state.rpc.mockReset();
   state.rpc.mockImplementation(async (_name: string, params: { p_start: string }) => {
     if (state.fail) return { data: null, error: { message: 'falha simulada' } };
     return params.p_start === '2026-03-01'
-      ? { data: { evolucao_mensal: [], despesas_por_categoria: state.categorias }, error: null }
+      ? { data: { evolucao_mensal: [], despesas_por_categoria: state.categorias, despesas_por_centro_custo: state.centros }, error: null }
       : { data: { evolucao_mensal: state.evolucao, despesas_por_categoria: [] }, error: null };
   });
 });
@@ -144,5 +147,42 @@ describe('DashboardCharts — Redesign V2', () => {
     const { container } = renderCharts();
     await waitFor(() => expect(state.rpc).toHaveBeenCalled());
     expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe('DashboardCharts — Despesas por Centro de Custo', () => {
+  it('sem despesa com centro de custo no período, o card não aparece', async () => {
+    renderCharts();
+    await screen.findByText('Soma das 3 categorias');
+    expect(screen.queryByText('Despesas por Centro de Custo')).not.toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: 'Despesas por centro de custo' })).not.toBeInTheDocument();
+  });
+
+  it('banco sem a chave nova também não mostra o card', async () => {
+    state.rpc.mockImplementation(async (_name: string, params: { p_start: string }) => (
+      params.p_start === '2026-03-01'
+        ? { data: { evolucao_mensal: [], despesas_por_categoria: state.categorias }, error: null }
+        : { data: { evolucao_mensal: state.evolucao, despesas_por_categoria: [] }, error: null }
+    ));
+    renderCharts();
+    await screen.findByText('Soma das 3 categorias');
+    expect(screen.queryByText('Despesas por Centro de Custo')).not.toBeInTheDocument();
+  });
+
+  it('com centro de custo: ranking pelo total, "Sem centro de custo" por último', async () => {
+    state.centros = [
+      { centro_custo_id: null, nome: 'Sem centro de custo', valor: 600 },
+      { centro_custo_id: 'cc-salao', nome: 'Salão', valor: 100 },
+      { centro_custo_id: 'cc-cozinha', nome: 'Cozinha', valor: 300 },
+    ];
+    renderCharts();
+    expect(await screen.findByText('Despesas por Centro de Custo')).toBeInTheDocument();
+    expect(screen.getByText('Total de despesas realizadas')).toBeInTheDocument();
+    const rows = within(screen.getByRole('list', { name: 'Despesas por centro de custo' })).getAllByRole('listitem');
+    expect(rows.map(r => r.querySelector('p')?.textContent)).toEqual(['Cozinha', 'Salão', 'Sem centro de custo']);
+    expect(within(rows[0]).getAllByText('30,0%').length).toBeGreaterThan(0);
+    expect(within(rows[2]).getAllByText('60,0%').length).toBeGreaterThan(0);
+    // O ranking de categorias continua igual ao lado.
+    expect(within(screen.getByRole('list', { name: 'Categorias de despesa' })).getAllByRole('listitem')).toHaveLength(3);
   });
 });

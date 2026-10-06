@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import { useId, type ReactNode } from 'react';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import MonthNavigator from './MonthNavigator';
@@ -9,11 +9,13 @@ import MonthNavigator from './MonthNavigator';
  */
 
 /** Painel de filtros comum ao DRE e ao DFC: quantidade de meses e mês final, com rótulos visíveis. */
-export function DemonstrativoFiltros({ meses, onMesesChange, mes, onMesChange }: {
+export function DemonstrativoFiltros({ meses, onMesesChange, mes, onMesChange, children }: {
   meses: string;
   onMesesChange: (value: string) => void;
   mes: string;
   onMesChange: (value: string) => void;
+  /** Campos extras no mesmo cartão (ex.: centro de custo do DRE/DFC). */
+  children?: ReactNode;
 }) {
   const mesesId = useId();
   const mesId = useId();
@@ -35,6 +37,7 @@ export function DemonstrativoFiltros({ meses, onMesesChange, mes, onMesChange }:
         <Label htmlFor={mesId} className="text-xs text-muted-foreground">Mês final</Label>
         <MonthNavigator id={mesId} value={mes} onChange={onMesChange} className="max-w-full" />
       </div>
+      {children}
     </div>
   );
 }

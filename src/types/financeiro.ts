@@ -23,6 +23,10 @@ export interface DfcSummary {
   categorias: DfcCategoria[];
   valores_por_categoria: Record<string, number>;
   saldo_inicial: number;
+  /** Centros com valor no período; vazio quando nenhum valor do período tem centro de custo. */
+  centros_custo?: unknown;
+  /** { <centro_id> | 'sem_centro': { <cat_id>: total } } — vazio junto com centros_custo. */
+  valores_por_centro_custo?: Record<string, Record<string, number>>;
 }
 
 export interface DfcCategoria {

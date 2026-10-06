@@ -1,5 +1,5 @@
 import { useSupabase } from '@/contexts/CompanyScopeContext';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { formatInBR } from '@/lib/formatters';
 import { FileDown, FileSpreadsheet } from 'lucide-react';
@@ -11,8 +11,11 @@ import AccessDenied from '@/components/ui/AccessDenied';
 import ErrorState from '@/components/ui/ErrorState';
 import DemonstrativoTree from './DemonstrativoTree';
 import { shiftMonth, monthBounds } from './MonthNavigator';
-import { FinScreenHeader, FinSectionGroup } from './finV2Layout';
+import { FinNote, FinScreenHeader, FinSectionGroup } from './finV2Layout';
 import { DemonstrativoFiltros } from './analisesParts';
+import CentroCustoFiltro from './CentroCustoFiltro';
+import { useCentroCustoRecorte } from './useCentroCustoRecorte';
+import { lerCentrosCusto, valoresDoCentroCusto, type ValoresPorCategoria, type ValoresPorCentroCusto } from '@/domain/financeiro/centroCusto';
 
 /** Convert RPC valores_por_categoria map into synthetic lancamentos for DemonstrativoTree */
 function valoresMapToLancamentos(valoresMap: Record<string, number>) {
@@ -36,7 +39,10 @@ export default function DRESection() {
   const toast = useScopedToast();
   const supabase = useSupabase();
   const [categorias, setCategorias] = useState<any[]>([]);
-  const [lancamentos, setLancamentos] = useState<any[]>([]);
+  const [valores, setValores] = useState<ValoresPorCategoria>({});
+  const [valoresPorCentro, setValoresPorCentro] = useState<ValoresPorCentroCusto>({});
+  const recorte = useCentroCustoRecorte();
+  const { registrarCentros } = recorte;
   const [loading, setLoading] = useState(true);
   const [mesAncora, setMesAncora] = useState(() => formatInBR(new Date(), 'yyyy-MM'));
   const [meses, setMeses] = useState('1');
@@ -74,13 +80,30 @@ export default function DRESection() {
       return;
     }
 
-    const result = data as { categorias?: typeof categorias; valores_por_categoria?: Record<string, number> } | null;
+    const result = data as {
+      categorias?: typeof categorias;
+      valores_por_categoria?: ValoresPorCategoria;
+      centros_custo?: unknown;
+      valores_por_centro_custo?: ValoresPorCentroCusto;
+    } | null;
     setCategorias(result?.categorias || []);
-    setLancamentos(valoresMapToLancamentos(result?.valores_por_categoria || {}));
+    setValores(result?.valores_por_categoria || {});
+    setValoresPorCentro(result?.valores_por_centro_custo || {});
+    registrarCentros(lerCentrosCusto(result?.centros_custo));
     setPeriodoCarregado(label);
     setErro(false);
     setLoading(false);
-  }, [mesAncora, meses, supabase, toast]);
+  }, [mesAncora, meses, supabase, toast, registrarCentros]);
+
+  const valoresRecorte = useMemo(
+    () => valoresDoCentroCusto(valores, valoresPorCentro, recorte.centros, recorte.selecao),
+    [valores, valoresPorCentro, recorte.centros, recorte.selecao],
+  );
+  const lancamentos = useMemo(() => valoresMapToLancamentos(valoresRecorte), [valoresRecorte]);
+  // % sobre a receita compara com o relatório inteiro; num recorte o denominador seria só a receita
+  // do centro (muitas vezes zero) — a coluna sai da tela e do export, como o saldo do DFC.
+  const mostrarPct = !recorte.filtrado;
+  const semMovimento = recorte.filtrado && Object.keys(valoresRecorte).length === 0;
 
   useEffect(() => { load(); }, [load]);
   useDataEvent('financeiro:lancamentos', load);
@@ -93,8 +116,8 @@ export default function DRESection() {
     lancamentos,
     rateios: [] as { categoria_id: string; valor: number }[],
     titulo: 'DRE — Demonstrativo de Resultado',
-    periodo,
-    showPctReceita: true,
+    periodo: recorte.filtrado ? `${periodo} · Centro de custo: ${recorte.rotulo}` : periodo,
+    showPctReceita: mostrarPct,
   };
   // Com a leitura em andamento ou em erro, o arquivo sairia com o período do filtro sobre outra carga (D43/D59).
   const exportIndisponivel = loading || erro;
@@ -116,7 +139,9 @@ export default function DRESection() {
         ) : undefined}
       />
 
-      <DemonstrativoFiltros meses={meses} onMesesChange={setMeses} mes={mesAncora} onMesChange={setMesAncora} />
+      <DemonstrativoFiltros meses={meses} onMesesChange={setMeses} mes={mesAncora} onMesChange={setMesAncora}>
+        <CentroCustoFiltro centros={recorte.centros} value={recorte.selecao} onChange={recorte.setSelecao} nomes={recorte.nomes} />
+      </DemonstrativoFiltros>
 
       {erro ? (
         <ErrorState
@@ -130,7 +155,7 @@ export default function DRESection() {
           id="dre-demonstrativo"
           title="Demonstrativo"
           caption={periodoCarregado
-            ? `${periodoCarregado} · competência${loading ? ' · atualizando…' : ''}`
+            ? `${periodoCarregado} · competência${recorte.filtrado ? ` · ${recorte.rotulo}` : ''}${loading ? ' · atualizando…' : ''}`
             : 'Carregando…'}
         >
           <DemonstrativoTree
@@ -138,8 +163,14 @@ export default function DRESection() {
             lancamentos={lancamentos}
             rateios={[]}
             loading={periodoCarregado === null}
-            showPctReceita
+            showPctReceita={mostrarPct}
           />
+          {recorte.filtrado && (
+            <FinNote>
+              {semMovimento && 'Este centro de custo não tem valores neste período. '}
+              Recorte por centro de custo: lançamento ou conta com rateio entra pelo centro de cada linha; sem rateio, pelo centro do próprio registro. A coluna de % sobre a receita não se aplica a um recorte e não aparece.
+            </FinNote>
+          )}
         </FinSectionGroup>
       )}
     </div>

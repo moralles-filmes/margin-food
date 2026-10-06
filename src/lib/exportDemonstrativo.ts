@@ -24,11 +24,13 @@ interface BuildOptions {
   rateios: any[];
   isDFC?: boolean;
   saldoInicial?: number;
+  /** DFC: false omite SALDO INICIAL e SALDO ACUMULADO (igual à tela, ver DemonstrativoTree). */
+  mostrarSaldo?: boolean;
   showPctReceita?: boolean;
 }
 
 function buildExportRows(opts: BuildOptions): { rows: ExportRow[]; receitaTotal: number } {
-  const { categorias, lancamentos, rateios, isDFC = false, saldoInicial = 0 } = opts;
+  const { categorias, lancamentos, rateios, isDFC = false, saldoInicial = 0, mostrarSaldo = true } = opts;
   const tree = buildTree(categorias);
   if (tree.length === 0) return { rows: [], receitaTotal: 0 };
 
@@ -68,7 +70,7 @@ function buildExportRows(opts: BuildOptions): { rows: ExportRow[]; receitaTotal:
   };
 
   // DFC: saldo inicial
-  if (isDFC) {
+  if (isDFC && mostrarSaldo) {
     rows.push({ codigo: '', nome: 'SALDO INICIAL', valor: saldoInicial, depth: 0, style: 'total' });
   }
 
@@ -84,7 +86,7 @@ function buildExportRows(opts: BuildOptions): { rows: ExportRow[]; receitaTotal:
   const resultadoLiquido = recTotal - despTotal;
   if (isDFC) {
     rows.push({ codigo: '', nome: 'RESULTADO LÍQUIDO DO PERÍODO', valor: resultadoLiquido, depth: 0, style: 'section' });
-    rows.push({ codigo: '', nome: 'SALDO ACUMULADO', valor: saldoInicial + resultadoLiquido, depth: 0, style: 'total' });
+    if (mostrarSaldo) rows.push({ codigo: '', nome: 'SALDO ACUMULADO', valor: saldoInicial + resultadoLiquido, depth: 0, style: 'total' });
   } else {
     rows.push({ codigo: '', nome: 'RESULTADO DO PERÍODO', valor: resultadoLiquido, depth: 0, style: 'total' });
   }
@@ -103,6 +105,11 @@ function buildExportRows(opts: BuildOptions): { rows: ExportRow[]; receitaTotal:
   }
 
   return { rows, receitaTotal: recTotal };
+}
+
+/** Período no nome do arquivo: o recorte (" · Centro de custo: X") traz ":" e "·", que não servem em nome de arquivo. */
+function periodoNoArquivo(periodo: string): string {
+  return periodo.replace(/[·:]/g, ' ').trim().replace(/\s+/g, '-');
 }
 
 // ── PDF Export ──
@@ -168,7 +175,7 @@ export async function exportDemonstrativoPDF(opts: BuildOptions & { titulo: stri
   doc.text(`Gerado por ${APP_NAME} em ${new Date().toLocaleString('pt-BR')}`, 14, doc.internal.pageSize.height - 8);
 
   const slug = opts.titulo.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-  doc.save(`${slug}-${opts.periodo.replace(/\s/g, '-')}.pdf`);
+  doc.save(`${slug}-${periodoNoArquivo(opts.periodo)}.pdf`);
 }
 
 // ── Excel Export ──
@@ -202,5 +209,5 @@ export async function exportDemonstrativoExcel(opts: BuildOptions & { titulo: st
   XLSX.utils.book_append_sheet(wb, ws, opts.titulo.substring(0, 31));
 
   const slug = opts.titulo.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-  XLSX.writeFile(wb, `${slug}-${opts.periodo.replace(/\s/g, '-')}.xlsx`);
+  XLSX.writeFile(wb, `${slug}-${periodoNoArquivo(opts.periodo)}.xlsx`);
 }

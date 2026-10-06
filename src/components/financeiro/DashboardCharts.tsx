@@ -21,7 +21,8 @@ import {
 import { ChartCard } from '@/components/ui/ChartCard';
 import { ChartTooltip } from '@/components/ui/ChartTooltip';
 import { ChartLegend } from '@/components/ui/ChartLegend';
-import { buildCategoryRanking, historyWindow } from '@/components/financeiro/dashboardFinanceiroView';
+import { buildCategoryRanking, historyWindow, type CategoryRanking } from '@/components/financeiro/dashboardFinanceiroView';
+import { ordenarDespesasPorCentro, type DespesaPorCentroCusto } from '@/domain/financeiro/centroCusto';
 
 import { useCan } from '@/permissions/hooks';
 // ── Types ──
@@ -42,6 +43,8 @@ interface CategoriaItem {
 interface ChartsData {
   evolucao_mensal: MonthlyItem[];
   despesas_por_categoria: CategoriaItem[];
+  /** Vazio quando nenhuma despesa do período tem centro de custo (o card nem aparece). */
+  despesas_por_centro_custo: DespesaPorCentroCusto[];
 }
 
 interface DashboardChartsProps {
@@ -81,6 +84,55 @@ function ResultadoDot({ cx, cy, value, index }: { cx?: number; cy?: number; valu
       fill="hsl(var(--background))"
       stroke={typeof value === 'number' && value < 0 ? SEMANTIC_CHART_COLORS.negative : LINE_COLOR}
     />
+  );
+}
+
+/** Ranking com soma, nº, nome, valor, participação e barra — mesmo layout para categoria e centro de custo. */
+function RankingList({ ranking, sumLabel, nameHeader, shareLabel, listLabel }: {
+  ranking: CategoryRanking;
+  sumLabel: string;
+  nameHeader: string;
+  shareLabel: string;
+  listLabel: string;
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 rounded-lg bg-muted px-4 py-3">
+        <span className="text-sm text-muted-foreground">{sumLabel}</span>
+        <span className="text-lg font-bold tabular-nums text-foreground">{fmtBRL(ranking.total)}</span>
+      </div>
+
+      <div className={`${RANKING_GRID} items-end text-[11px] font-medium uppercase leading-tight tracking-wider text-muted-foreground`}>
+        <span className="col-span-2">{nameHeader}</span>
+        <span className="text-right">
+          Valor<span className="block normal-case tracking-normal sm:hidden">{shareLabel.toLowerCase()}</span>
+        </span>
+        <span className="hidden text-right sm:block">{shareLabel}</span>
+      </div>
+
+      <ol aria-label={listLabel} className="m-0 list-none divide-y divide-border p-0">
+        {ranking.rows.map((row, i) => (
+          // Nome não é único (centro inativo homônimo): a chave leva a posição.
+          <li key={`${i}:${row.nome}`} className={`${RANKING_GRID} items-center gap-y-2 py-3`}>
+            <span className="row-span-2 self-center text-xs tabular-nums text-muted-foreground">{String(i + 1).padStart(2, '0')}</span>
+            <p className="col-start-2 min-w-0 break-words text-sm text-foreground">{row.nome}</p>
+            <span className="col-start-3 text-right text-sm font-semibold tabular-nums text-foreground">
+              {fmtBRL(row.valor)}
+              <span className="block text-xs font-normal text-muted-foreground sm:hidden">
+                {row.share == null ? '—' : formatPercentBR(row.share, 1)}
+              </span>
+            </span>
+            <span className="col-start-4 hidden text-right text-xs tabular-nums text-muted-foreground sm:block">
+              {row.share == null ? '—' : formatPercentBR(row.share, 1)}
+            </span>
+            {/* Barra na 2ª linha, sob nome + valor: o trilho tem o mesmo comprimento em todas as linhas. */}
+            <div aria-hidden="true" className="col-span-2 col-start-2 h-1.5 overflow-hidden rounded-full bg-muted">
+              <div className="h-full rounded-full bg-primary" style={{ width: `${row.barPercent}%` }} />
+            </div>
+          </li>
+        ))}
+      </ol>
+    </div>
   );
 }
 
@@ -149,6 +201,12 @@ export default function DashboardCharts({ periodStart, periodEndExclusive, perio
         nome: String(c.nome),
         valor: Number(c.valor) || 0,
       })),
+      // Chave ausente (banco anterior à migration) vira lista vazia: o card não aparece.
+      despesas_por_centro_custo: ((categoriaData?.despesas_por_centro_custo as Array<Record<string, unknown>>) || []).map((c) => ({
+        centro_custo_id: c.centro_custo_id == null ? null : String(c.centro_custo_id),
+        nome: String(c.nome),
+        valor: Number(c.valor) || 0,
+      })),
     });
     setLoading(false);
   }, [meses, periodEndExclusive, supabase, periodStart, toast]);
@@ -191,6 +249,9 @@ export default function DashboardCharts({ periodStart, periodEndExclusive, perio
         list: 'Categorias de despesa',
         footer: 'Percentuais sobre a soma das categorias listadas.',
       };
+  const rankingCentros = buildCategoryRanking(ordenarDespesasPorCentro(chartData?.despesas_por_centro_custo ?? []));
+  // Só com despesa com centro de custo no período: sem isso o card seria uma única linha "Sem centro".
+  const showCentros = !loading && !failed && rankingCentros.rows.length > 0;
   const showMissingMonths = !loading && !failed && evolucao.length > 0 && evolucao.length < meses;
   const chartState = {
     loading,
@@ -303,45 +364,34 @@ export default function DashboardCharts({ periodStart, periodEndExclusive, perio
               footer={rankingText.footer}
               {...chartState}
             >
-              <div className="space-y-4">
-                <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 rounded-lg bg-muted px-4 py-3">
-                  <span className="text-sm text-muted-foreground">{rankingText.sum}</span>
-                  <span className="text-lg font-bold tabular-nums text-foreground">{fmt(ranking.total)}</span>
-                </div>
-
-                <div className={`${RANKING_GRID} items-end text-[11px] font-medium uppercase leading-tight tracking-wider text-muted-foreground`}>
-                  <span className="col-span-2">Categoria</span>
-                  <span className="text-right">
-                    Valor<span className="block normal-case tracking-normal sm:hidden">{rankingText.share.toLowerCase()}</span>
-                  </span>
-                  <span className="hidden text-right sm:block">{rankingText.share}</span>
-                </div>
-
-                <ol aria-label={rankingText.list} className="m-0 list-none divide-y divide-border p-0">
-                  {ranking.rows.map((row, i) => (
-                    <li key={row.nome} className={`${RANKING_GRID} items-center gap-y-2 py-3`}>
-                      <span className="row-span-2 self-center text-xs tabular-nums text-muted-foreground">{String(i + 1).padStart(2, '0')}</span>
-                      <p className="col-start-2 min-w-0 break-words text-sm text-foreground">{row.nome}</p>
-                      <span className="col-start-3 text-right text-sm font-semibold tabular-nums text-foreground">
-                        {fmt(row.valor)}
-                        <span className="block text-xs font-normal text-muted-foreground sm:hidden">
-                          {row.share == null ? '—' : formatPercentBR(row.share, 1)}
-                        </span>
-                      </span>
-                      <span className="col-start-4 hidden text-right text-xs tabular-nums text-muted-foreground sm:block">
-                        {row.share == null ? '—' : formatPercentBR(row.share, 1)}
-                      </span>
-                      {/* Barra na 2ª linha, sob nome + valor: o trilho tem o mesmo comprimento em todas as linhas. */}
-                      <div aria-hidden="true" className="col-span-2 col-start-2 h-1.5 overflow-hidden rounded-full bg-muted">
-                        <div className="h-full rounded-full bg-primary" style={{ width: `${row.barPercent}%` }} />
-                      </div>
-                    </li>
-                  ))}
-                </ol>
-              </div>
+              <RankingList
+                ranking={ranking}
+                sumLabel={rankingText.sum}
+                nameHeader="Categoria"
+                shareLabel={rankingText.share}
+                listLabel={rankingText.list}
+              />
             </ChartCard>
 
             {expenseAside}
+
+            {showCentros && (
+              <ChartCard
+                title="Despesas por Centro de Custo"
+                subtitle="Despesas realizadas do período do resumo · regime de caixa"
+                height="h-auto"
+                className="min-w-0"
+                footer="Percentuais sobre o total de despesas realizadas do período. Lançamento com rateio entra pelo centro de cada linha."
+              >
+                <RankingList
+                  ranking={rankingCentros}
+                  sumLabel="Total de despesas realizadas"
+                  nameHeader="Centro de custo"
+                  shareLabel="Participação no total"
+                  listLabel="Despesas por centro de custo"
+                />
+              </ChartCard>
+            )}
           </div>
         </div>
       </section>
