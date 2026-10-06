@@ -631,7 +631,6 @@ CREATE POLICY "select_own_company" ON tabela
 | `admin_checkup_suite()` | Suite de verificação do sistema |
 | `admin_health_counts()` | Contagens de saúde |
 | `rpc_create_company(...)` | Criar empresa |
-| `rpc_set_user_company(...)` | Vincular usuário a empresa |
 | `sync_permissions_from_registry(...)` | Sincronizar permissões |
 | `rbac_permissions_diff(...)` | Diff de permissões |
 | `rbac_sql_lint_report(...)` | Lint de SQL do RBAC |

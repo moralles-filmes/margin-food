@@ -82,8 +82,10 @@ BEGIN
 
  INSERT INTO user_permissions(user_id,company_id,permission_key,effect)
  VALUES(target_id,company_a,'system:global:manage','ALLOW');
- PERFORM admin_upsert_company_membership(target_id,company_c,actor_id,'admin',ARRAY['system:global:manage','system:admin']);
- PERFORM pg_temp.assert_true('system:global:manage'=ANY(get_company_permissions(actor_id,company_c)), 'explicit global admin can still provision across companies');
+ -- Provisionar a partir de outra unidade só dá o 1º gestor, nunca a chave da
+ -- plataforma, e nunca ao próprio ator (20261006200000).
+ PERFORM pg_temp.denied(format('SELECT admin_upsert_company_membership(%L,%L,%L,''admin'',ARRAY[''system:global:manage'',''system:admin''])',
+   target_id,company_c,actor_id), 'cross-company provisioning never grants global management');
 END; $$;
 
 SET LOCAL ROLE authenticated;
