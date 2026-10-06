@@ -11689,10 +11689,6 @@ export type Database = {
         }
         Returns: Json
       }
-      rpc_set_user_company: {
-        Args: { p_company_id: string; p_user_id: string }
-        Returns: Json
-      }
       rpc_upsert_fechamento_caixa:
         | {
             Args: {

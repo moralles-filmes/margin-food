@@ -1,5 +1,5 @@
 import { withRequestCors } from '../_shared/request-cors.ts';
-import { addCompanyUser } from "../_shared/company-users.ts";
+import { addCompanyUser, CompanyUserInputError, describeMembershipError, normalizeIdentityEmail } from "../_shared/company-users.ts";
 import { companyHeaders } from "../_shared/company-scope.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -48,15 +48,22 @@ Deno.serve(withRequestCors(async (req) => {
     // ── ACTION: create-first-user ──
     // Creates the first admin user for a company that was created via the onboard_new_company RPC.
     // This is separate from admin-create-user because it needs to assign the user to a specific company.
+    // O banco só aceita para unidade sem gestor de usuários e nunca para o próprio ator:
+    // acesso do super admin a uma unidade é sempre concedido pela própria unidade.
     if (action === 'create-first-user') {
       const { company_id, email, password, nome } = body;
 
       if (!company_id) return json({ error: 'company_id é obrigatório' }, 400);
       if (!email || typeof email !== 'string') return json({ error: 'Email é obrigatório' }, 400);
+      const callerEmail = typeof claimsData.claims.email === 'string' ? claimsData.claims.email.toLowerCase() : null;
+      if (callerEmail && normalizeIdentityEmail(email) === callerEmail) {
+        return json({ error: describeMembershipError('SELF_PROVISIONING_DENIED') }, 403);
+      }
 
       // Verify company exists
-      const { data: company } = await adminClient.from('companies').select('id, nome').eq('id', company_id).single();
+      const { data: company } = await adminClient.from('companies').select('id, nome, ativo').eq('id', company_id).single();
       if (!company) return json({ error: 'Empresa não encontrada' }, 404);
+      if (!company.ativo) return json({ error: describeMembershipError('COMPANY_INACTIVE') }, 400);
 
       const result = await addCompanyUser(adminClient, {
         actorUserId: callerUserId, companyId: company_id, email, password, nome: nome || '', role: 'admin',
@@ -74,6 +81,10 @@ Deno.serve(withRequestCors(async (req) => {
     return json({ error: `Ação desconhecida: ${action}` }, 400);
   } catch (err) {
     console.error('admin-companies error:', err);
+    if (err instanceof CompanyUserInputError) return json({ error: err.message }, 400);
+    const message = err instanceof Error ? err.message : (err as { message?: string })?.message ?? '';
+    const denied = describeMembershipError(message);
+    if (denied) return json({ error: denied }, 403);
     return json({ error: 'Erro interno' }, 500);
   }
 }));

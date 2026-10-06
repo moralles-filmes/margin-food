@@ -35,6 +35,8 @@ interface UserRecord {
   created_at: string;
   disabled: boolean;
   permissions: { key: string; effect: string }[];
+  /** Detém system:global:manage nesta unidade: só quem também detém altera o acesso. */
+  protegido?: boolean;
 }
 
 interface JobRole {
@@ -61,6 +63,7 @@ export default function AdminUsersView() {
   const { user, rolesLoaded } = useAuth();
   const { confirm, ConfirmDialog } = useConfirmDialog();
   const canManageUsers = useCan('configuracoes:usuarios:manage');
+  const isGlobalManager = useCan('system:global:manage');
   const [users, setUsers] = useState<UserRecord[]>([]);
   const [jobRoles, setJobRoles] = useState<JobRole[]>([]);
   const [loading, setLoading] = useState(true);
@@ -294,6 +297,12 @@ export default function AdminUsersView() {
     if (!editingUser) return;
     setSaving(true);
     try {
+      // A chave da plataforma só sai pela tela de Super Admin (o banco recusa com
+      // GLOBAL_KEY_REMOVAL_DENIED): trocar perfil/template na matriz não a derruba.
+      const permissions = new Set(editPermissions);
+      if ((editingUser.permissions || []).some(p => p.key === 'system:global:manage' && p.effect === 'ALLOW')) {
+        permissions.add('system:global:manage');
+      }
       // Usa o helper invoke() (checa data.error, faz refresh de auth e lança em
       // falha) — o chamador antigo ignorava invokeError e mostrava sucesso sempre.
       const data = await invoke({
@@ -302,7 +311,7 @@ export default function AdminUsersView() {
         nome: editNome,
         email: editEmail,
         role: editRole,
-        permissions: Array.from(editPermissions),
+        permissions: Array.from(permissions),
       });
 
       if (data?.warning) toast.warning(data.warning);
@@ -438,11 +447,17 @@ export default function AdminUsersView() {
                 <TableBody>
                   {users.map(u => {
                     const roleInfo = ROLE_LABELS[u.role] || ROLE_LABELS.sem_role;
+                    const bloqueado = !!u.protegido && !isGlobalManager;
                     return (
                       <TableRow key={u.id} className={u.disabled ? 'opacity-60' : undefined}>
                         <TableCell>
                           <p className="text-sm font-semibold text-foreground truncate max-w-[220px]">{u.nome || '—'}</p>
                           <p className="text-xs text-muted-foreground truncate max-w-[220px]">{u.email}</p>
+                          {u.protegido && (
+                            <span className="mt-1 inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-primary-soft text-primary-ink border border-primary-border">
+                              <Shield className="w-3 h-3" /> Administração do sistema
+                            </span>
+                          )}
                         </TableCell>
                         <TableCell>
                           <span className={`inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full ${roleInfo.color}`}>
@@ -468,6 +483,11 @@ export default function AdminUsersView() {
                           <StatusBadge status={u.disabled ? 'inativo' : 'ativo'} size="xs" />
                         </TableCell>
                         <TableCell className="text-right">
+                          {bloqueado ? (
+                            <span className="text-xs text-muted-foreground" title="Este acesso só pode ser alterado pela administração do sistema.">
+                              Protegido
+                            </span>
+                          ) : (
                           <div className="flex items-center justify-end gap-1">
                             <Button variant="ghost" size="icon" title="Resetar senha"
                               className="h-7 w-7 text-muted-foreground hover:text-foreground"
@@ -485,6 +505,7 @@ export default function AdminUsersView() {
                               hideConfirm
                             />
                           </div>
+                          )}
                         </TableCell>
                       </TableRow>
                     );
