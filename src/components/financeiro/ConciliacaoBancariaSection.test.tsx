@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import ConciliacaoBancariaSection from '@/components/financeiro/ConciliacaoBancariaSection';
 import { fmtBRL } from '@/lib/formatters';
@@ -332,5 +332,82 @@ describe('Conciliação Bancária — visão Importar (rascunho restaurado)', ()
       p_external_id: 'F1', p_occurrence_index: 0,
     }));
     expect(escritas()).toEqual(['reconcile_import_lancamento']);
+  });
+
+  // Dentro do describe do rascunho restaurado: é ali que `restaurar` existe.
+  describe('CMV financeiro', () => {
+    const configCmv = (recursos: boolean) => ({
+      classificacao_ativa: true,
+      categorias: [{ id: 'cat1', nome: 'Peixes', cmv_sugerir: true }],
+      ...(recursos ? { recursos: { lancamentos: true } } : {}),
+    });
+    const comConfig = (config: unknown) => state.rpc.mockImplementation((nome: string) => {
+      if (nome === 'get_fin_cmv_config') return Promise.resolve({ data: config, error: null });
+      if (nome === 'reconcile_import_lancamento') return Promise.resolve({ data: { status: 'ok', lancamento_id: 'novo' }, error: null });
+      return Promise.resolve({ data: state.saldoSistema, error: null });
+    });
+    const importacao = () =>
+      state.rpc.mock.calls.find(([nome]) => nome === 'reconcile_import_lancamento')?.[1] as Record<string, unknown> | undefined;
+
+    it('linha nova leva a decisão no item do rateio e a competência ajustada; p_data segue a data do banco', async () => {
+      comConfig(configCmv(true));
+      restaurar([linha({ descricao: 'PIX ARROZ', valor: 55, categoriaId: 'cat1', cmvIncluir: true, competencia: '2026-09-01' })]);
+      render(<ConciliacaoBancariaSection />);
+      expect(await screen.findByRole('radiogroup', { name: 'Aparecer no CMV financeiro? — PIX ARROZ' })).toBeInTheDocument();
+      fireEvent.click(await screen.findByRole('button', { name: 'Processar' }));
+      await waitFor(() => expect(importacao()).toBeDefined());
+      expect(importacao()).toMatchObject({
+        p_data: '2026-09-05', p_data_competencia: '2026-09-01',
+        p_rateio_linhas: [expect.objectContaining({ categoria_id: 'cat1', cmv_incluir: true })],
+      });
+    });
+
+    it('linha salva antes do recurso segue pendente e sem competência própria', async () => {
+      comConfig(configCmv(true));
+      restaurar([linha({ descricao: 'PIX ANTIGO', categoriaId: 'cat1' })]);
+      render(<ConciliacaoBancariaSection />);
+      fireEvent.click(await screen.findByRole('button', { name: 'Processar' }));
+      await waitFor(() => expect(importacao()).toBeDefined());
+      expect(importacao()).not.toHaveProperty('p_data_competencia');
+      expect((importacao()!.p_rateio_linhas as Record<string, unknown>[])[0].cmv_incluir).toBeNull();
+    });
+
+    it('rateio: a linha abre com a resposta da linha e a resposta trocada no diálogo é a que vai ao banco', async () => {
+      comConfig(configCmv(true));
+      restaurar([linha({ descricao: 'PIX ARROZ', valor: 55, categoriaId: 'cat1', cmvIncluir: true })]);
+      render(<ConciliacaoBancariaSection />);
+      expect(await screen.findByRole('radiogroup', { name: 'Aparecer no CMV financeiro? — PIX ARROZ' })).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Ratear' }));
+      const dialogo = await screen.findByRole('dialog');
+      const grupo = within(dialogo).getByRole('radiogroup', { name: 'Aparecer no CMV financeiro? — linha 1 do rateio' });
+      expect(within(grupo).getByRole('radio', { name: 'Sim' })).toHaveAttribute('aria-checked', 'true');
+      fireEvent.click(within(grupo).getByRole('radio', { name: 'Não' }));
+      fireEvent.click(within(dialogo).getByRole('button', { name: /Salvar Rateio/ }));
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+      // Com rateio de uma linha, o Sim/Não da linha mostra a resposta do rateio.
+      const naLinha = await screen.findByRole('radiogroup', { name: 'Aparecer no CMV financeiro? — PIX ARROZ' });
+      expect(within(naLinha).getByRole('radio', { name: 'Não' })).toHaveAttribute('aria-checked', 'true');
+      fireEvent.click(await screen.findByRole('button', { name: 'Processar' }));
+      await waitFor(() => expect(importacao()).toBeDefined());
+      expect((importacao()!.p_rateio_linhas as Record<string, unknown>[])).toEqual([
+        expect.objectContaining({ categoria_id: 'cat1', cmv_incluir: false }),
+      ]);
+    });
+
+    it('banco sem o recurso: nada novo na tela nem no payload', async () => {
+      comConfig(configCmv(false));
+      restaurar([linha({ descricao: 'PIX SEM RECURSO', categoriaId: 'cat1', cmvIncluir: true, competencia: '2026-09-01' })]);
+      render(<ConciliacaoBancariaSection />);
+      expect(await screen.findByText('PIX SEM RECURSO')).toBeInTheDocument();
+      // A configuração já respondeu (sem `recursos`) antes de conferir que nada novo apareceu.
+      await waitFor(() => expect(state.rpc.mock.calls.some(([nome]) => nome === 'get_fin_cmv_config')).toBe(true));
+      await act(async () => { await Promise.resolve(); });
+      expect(screen.queryByRole('radiogroup', { name: /Aparecer no CMV financeiro/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /Alterar a competência/ })).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Processar' }));
+      await waitFor(() => expect(importacao()).toBeDefined());
+      expect(importacao()).not.toHaveProperty('p_data_competencia');
+      expect((importacao()!.p_rateio_linhas as Record<string, unknown>[])[0]).not.toHaveProperty('cmv_incluir');
+    });
   });
 });
