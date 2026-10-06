@@ -1,0 +1,355 @@
+\set ON_ERROR_STOP on
+
+-- CMV Financeiro com despesas de Lançamentos e da Conciliação: teste de integração
+-- em PostgreSQL real e DESCARTÁVEL. Aplica as migrations do CMV sobre um schema
+-- mínimo. São simulados apenas: auth.uid(), assert_tenant() (lê test.company_id),
+-- has_permission/has_any_permission (leem test.permissions), strip_html,
+-- immutable_unaccent (sem a extensão unaccent), fin_get_limite_aprovacao e
+-- fin_validate_recorrencia_config. Os gatilhos de soma do rateio e de edição de
+-- lançamento realizado têm o corpo de produção (2026-10-05).
+-- Uso: powershell -File supabase/tests/database/run_ephemeral.ps1 supabase/tests/database/cmv_lancamentos_ephemeral.sql
+
+DO $roles$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN CREATE ROLE anon NOLOGIN; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN CREATE ROLE authenticated NOLOGIN; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN CREATE ROLE service_role NOLOGIN BYPASSRLS; END IF;
+END;
+$roles$;
+
+CREATE SCHEMA auth;
+CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE
+AS $$ SELECT NULLIF(current_setting('test.user_id', true), '')::uuid $$;
+
+CREATE FUNCTION public.assert_tenant() RETURNS uuid LANGUAGE plpgsql STABLE AS $$
+DECLARE v uuid := NULLIF(current_setting('test.company_id', true), '')::uuid;
+BEGIN
+  IF v IS NULL THEN RAISE EXCEPTION 'COMPANY_ACCESS_DENIED'; END IF;
+  RETURN v;
+END; $$;
+
+CREATE FUNCTION public.has_any_permission(_user_id uuid, _permissions text[]) RETURNS boolean LANGUAGE sql STABLE
+AS $$ SELECT _user_id IS NOT NULL AND string_to_array(COALESCE(current_setting('test.permissions', true), ''), ',') && _permissions $$;
+CREATE FUNCTION public.has_permission(_permission text) RETURNS boolean LANGUAGE sql STABLE
+AS $$ SELECT public.has_any_permission(auth.uid(), ARRAY[_permission]) $$;
+CREATE FUNCTION public.strip_html(p text) RETURNS text LANGUAGE sql IMMUTABLE AS $$ SELECT p $$;
+CREATE FUNCTION public.immutable_unaccent(text) RETURNS text LANGUAGE sql IMMUTABLE STRICT AS $$ SELECT $1 $$;
+CREATE FUNCTION public.fin_get_limite_aprovacao(p_company_id uuid) RETURNS numeric LANGUAGE sql STABLE AS $$ SELECT 2500::numeric $$;
+CREATE FUNCTION public.fin_validate_recorrencia_config(p jsonb) RETURNS jsonb LANGUAGE sql IMMUTABLE AS $$ SELECT p $$;
+
+CREATE TABLE public.companies (id uuid PRIMARY KEY, nome text NOT NULL);
+CREATE TABLE public.permissions (key text PRIMARY KEY, description text, module text, submodule text, action text);
+CREATE TABLE public.role_permissions (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), role text NOT NULL, permission_key text NOT NULL);
+CREATE TABLE public.fin_config (
+  company_id uuid NOT NULL, key text NOT NULL, value text NOT NULL,
+  updated_at timestamptz NOT NULL DEFAULT now(), updated_by uuid, PRIMARY KEY (company_id, key)
+);
+CREATE TABLE public.fin_audit_logs (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), entidade text NOT NULL, entidade_id uuid, acao text NOT NULL,
+  antes jsonb, depois jsonb, justificativa text DEFAULT '', user_id uuid NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(), company_id uuid NOT NULL
+);
+CREATE TABLE public.fin_categorias (
+  id uuid PRIMARY KEY, nome text NOT NULL, tipo text NOT NULL DEFAULT 'despesa', grupo text DEFAULT '',
+  parent_id uuid, codigo text DEFAULT '', ordem integer DEFAULT 0, ativo boolean NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), company_id uuid NOT NULL
+);
+CREATE TABLE public.fin_contas (id uuid PRIMARY KEY, nome text NOT NULL, company_id uuid NOT NULL);
+CREATE TABLE public.fin_centros_custo (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), nome text NOT NULL, ativo boolean NOT NULL DEFAULT true, company_id uuid NOT NULL
+);
+CREATE TABLE public.fin_contas_pagar (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), descricao text NOT NULL DEFAULT '', valor numeric NOT NULL DEFAULT 0,
+  valor_pago numeric DEFAULT 0, fornecedor text DEFAULT '', supplier_id uuid,
+  data_vencimento date NOT NULL, data_competencia date, data_pagamento date,
+  categoria_id uuid, centro_custo_id uuid, conta_id uuid, forma_pagamento text DEFAULT 'boleto', observacoes text DEFAULT '',
+  status text NOT NULL DEFAULT 'RASCUNHO', created_by uuid, company_id uuid NOT NULL,
+  recorrente boolean NOT NULL DEFAULT false, recorrencia_config jsonb DEFAULT '{}'::jsonb,
+  parcela_atual integer, parcela_total integer, lancamento_pai_id uuid, lancamento_id uuid,
+  idempotency_key text, tipo_codigo_pagamento text, codigo_pagamento text,
+  created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX uq_fin_contas_pagar_idempotency ON public.fin_contas_pagar (company_id, idempotency_key) WHERE idempotency_key IS NOT NULL;
+CREATE TABLE public.fin_contas_receber (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), valor numeric NOT NULL DEFAULT 0, company_id uuid NOT NULL);
+-- Colunas de produção (information_schema, 2026-10-05), sem as que nenhuma função toca.
+CREATE TABLE public.fin_lancamentos (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tipo text NOT NULL DEFAULT 'DESPESA',
+  valor numeric NOT NULL DEFAULT 0 CHECK (valor > 0),
+  data_competencia date NOT NULL DEFAULT ((now() AT TIME ZONE 'America/Sao_Paulo'))::date,
+  data_pagamento date, data_vencimento date,
+  categoria_id uuid, centro_custo_id uuid, conta_id uuid, conta_destino_id uuid,
+  forma_pagamento text DEFAULT 'pix', status text NOT NULL DEFAULT 'PREVISTO',
+  descricao text DEFAULT '', observacoes text DEFAULT '', justificativa_edicao text DEFAULT '',
+  recorrente boolean NOT NULL DEFAULT false, recorrencia_config jsonb DEFAULT '{}'::jsonb,
+  parcela_atual integer, parcela_total integer, lancamento_pai_id uuid,
+  referencia_modulo text DEFAULT '', referencia_id text DEFAULT '',
+  conciliado boolean DEFAULT false, conciliado_em timestamptz, conciliado_por uuid,
+  origem text NOT NULL DEFAULT 'manual', idempotency_key text,
+  excluir_dos_relatorios boolean NOT NULL DEFAULT false,
+  created_by uuid, company_id uuid NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX idx_fin_lancamentos_company_idempotency ON public.fin_lancamentos (company_id, idempotency_key) WHERE idempotency_key IS NOT NULL;
+CREATE TABLE public.fin_lancamento_rateios (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), lancamento_id uuid NOT NULL, categoria_id uuid, centro_custo_id uuid,
+  valor numeric NOT NULL DEFAULT 0, percentual numeric, observacao text,
+  created_at timestamptz NOT NULL DEFAULT now(), company_id uuid NOT NULL
+);
+CREATE TABLE public.fin_conciliacao_vinculos (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), company_id uuid NOT NULL, conta_id uuid NOT NULL,
+  external_id text NOT NULL, tipo text NOT NULL, lancamento_id uuid NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(), created_by uuid
+);
+CREATE TABLE public.financeiro_fechamento_caixa (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), data date NOT NULL, faturamento_bruto numeric NOT NULL DEFAULT 0,
+  taxas numeric DEFAULT 0, descontos numeric DEFAULT 0, company_id uuid NOT NULL
+);
+CREATE UNIQUE INDEX idx_fechamento_caixa_company_data ON public.financeiro_fechamento_caixa (company_id, data);
+
+CREATE FUNCTION public.update_updated_at_column() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN NEW.updated_at = clock_timestamp(); RETURN NEW; END; $$;
+CREATE TRIGGER trg_updated_at_fin_contas_pagar BEFORE UPDATE ON public.fin_contas_pagar
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+CREATE TRIGGER trg_updated_at_fin_lancamentos BEFORE UPDATE ON public.fin_lancamentos
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+-- Corpo de produção (2026-10-05): edição de lançamento REALIZADO exige justificativa.
+CREATE FUNCTION public.trg_validate_fin_lancamento_update() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = 'public' AS $$
+BEGIN
+  IF OLD.status = 'REALIZADO' THEN
+    IF (
+      NEW.valor IS DISTINCT FROM OLD.valor
+      OR NEW.categoria_id IS DISTINCT FROM OLD.categoria_id
+      OR NEW.conta_id IS DISTINCT FROM OLD.conta_id
+      OR NEW.data_competencia IS DISTINCT FROM OLD.data_competencia
+      OR NEW.centro_custo_id IS DISTINCT FROM OLD.centro_custo_id
+    ) THEN
+      IF NEW.justificativa_edicao IS NULL OR TRIM(NEW.justificativa_edicao) = '' THEN
+        RAISE EXCEPTION 'Justificativa obrigatória ao editar lançamento realizado (campos: valor, categoria, conta, data, centro de custo)'
+          USING ERRCODE = 'P0003';
+      END IF;
+    END IF;
+  END IF;
+  RETURN NEW;
+END; $$;
+CREATE TRIGGER trg_validate_fin_lancamento_update BEFORE UPDATE ON public.fin_lancamentos
+  FOR EACH ROW EXECUTE FUNCTION public.trg_validate_fin_lancamento_update();
+
+-- Corpo de produção (2026-10-05): o pai do rateio pode ser lançamento, boleto ou conta a receber.
+CREATE FUNCTION public.trg_validate_rateio_sum() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = 'public' AS $$
+DECLARE v_lancamento_id uuid; v_company_id uuid; v_lancamento_valor numeric; v_soma_rateios numeric;
+BEGIN
+  IF TG_OP = 'DELETE' THEN v_lancamento_id := OLD.lancamento_id; v_company_id := OLD.company_id;
+  ELSE v_lancamento_id := NEW.lancamento_id; v_company_id := NEW.company_id; END IF;
+  SELECT ABS(valor) INTO v_lancamento_valor FROM fin_lancamentos WHERE id = v_lancamento_id AND company_id = v_company_id FOR UPDATE;
+  IF v_lancamento_valor IS NULL THEN
+    SELECT ABS(valor) INTO v_lancamento_valor FROM fin_contas_pagar WHERE id = v_lancamento_id AND company_id = v_company_id FOR UPDATE;
+  END IF;
+  IF v_lancamento_valor IS NULL THEN
+    SELECT ABS(valor) INTO v_lancamento_valor FROM fin_contas_receber WHERE id = v_lancamento_id AND company_id = v_company_id FOR UPDATE;
+  END IF;
+  IF v_lancamento_valor IS NULL THEN RAISE EXCEPTION 'Lançamento não encontrado: %', v_lancamento_id USING ERRCODE = 'P0002'; END IF;
+  IF TG_OP = 'DELETE' THEN
+    SELECT COALESCE(SUM(ABS(valor)), 0) INTO v_soma_rateios FROM fin_lancamento_rateios
+    WHERE lancamento_id = v_lancamento_id AND company_id = v_company_id AND id <> OLD.id;
+  ELSE
+    SELECT COALESCE(SUM(ABS(valor)), 0) INTO v_soma_rateios FROM fin_lancamento_rateios
+    WHERE lancamento_id = v_lancamento_id AND company_id = v_company_id AND id <> COALESCE(NEW.id, '00000000-0000-0000-0000-000000000000'::uuid);
+    v_soma_rateios := v_soma_rateios + ABS(NEW.valor);
+  END IF;
+  IF v_soma_rateios > v_lancamento_valor + 0.01 THEN
+    RAISE EXCEPTION 'Soma dos rateios (%) excede o valor do lançamento (%)', v_soma_rateios, v_lancamento_valor USING ERRCODE = 'P0001';
+  END IF;
+  IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
+  RETURN NEW;
+END; $$;
+CREATE TRIGGER trg_validate_rateio_sum BEFORE INSERT OR DELETE OR UPDATE ON public.fin_lancamento_rateios
+  FOR EACH ROW EXECUTE FUNCTION public.trg_validate_rateio_sum();
+
+-- Versões anteriores das RPCs (assinatura de produção), para as migrations dropparem e recriarem.
+CREATE FUNCTION public._guarded_create_conta_pagar(text,numeric,text,uuid,date,date,uuid,uuid,uuid,text,text,jsonb,jsonb,text,jsonb)
+RETURNS jsonb LANGUAGE sql AS $$ SELECT '{}'::jsonb $$;
+CREATE FUNCTION public._guarded_update_conta_pagar(uuid,text,numeric,text,uuid,date,date,uuid,uuid,uuid,text,text,jsonb,jsonb,timestamptz,jsonb)
+RETURNS jsonb LANGUAGE sql AS $$ SELECT '{}'::jsonb $$;
+CREATE FUNCTION public.reconcile_import_lancamento(date,text,numeric,text,uuid,uuid,jsonb,text,boolean,integer)
+RETURNS jsonb LANGUAGE sql AS $$ SELECT '{}'::jsonb $$;
+CREATE FUNCTION public._guarded_upsert_lancamento(uuid,text,text,numeric,uuid,uuid,uuid,date,date,date,text,text,text,text,boolean,jsonb,jsonb,timestamptz,text,text)
+RETURNS TABLE(id uuid, updated_at timestamptz, idempotente boolean) LANGUAGE sql AS $$ SELECT NULL::uuid, NULL::timestamptz, false $$;
+CREATE FUNCTION public._guarded_update_reconciled_classification(uuid,uuid,uuid,text,jsonb,timestamptz,text)
+RETURNS TABLE(id uuid, updated_at timestamptz) LANGUAGE sql AS $$ SELECT NULL::uuid, NULL::timestamptz $$;
+
+\ir ../../migrations/20261003140000_cmv_financeiro.sql
+\ir ../../migrations/20261003203219_cmv_financeiro_serie.sql
+\ir ../../migrations/20261005120000_cmv_financeiro_lancamentos.sql
+
+-- ─────────────────────────────────────────────────────────────────────────────
+
+CREATE FUNCTION public.cmv_assert(p_ok boolean, p_msg text) RETURNS void LANGUAGE plpgsql AS $$
+BEGIN IF p_ok IS NOT TRUE THEN RAISE EXCEPTION 'FALHOU: %', p_msg; END IF; END; $$;
+
+CREATE FUNCTION public.cmv_expect_error(p_sql text, p_like text, p_msg text) RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+  BEGIN
+    EXECUTE p_sql;
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM LIKE p_like THEN RETURN; END IF;
+    RAISE EXCEPTION 'FALHOU: % — erro inesperado: %', p_msg, SQLERRM;
+  END;
+  RAISE EXCEPTION 'FALHOU: % — era esperado erro %', p_msg, p_like;
+END; $$;
+
+-- Soma do CMV (centavos) do payload num intervalo.
+CREATE FUNCTION public.cmv_total(p jsonb, p_ini date, p_fim date) RETURNS bigint LANGUAGE sql AS $$
+  SELECT COALESCE(sum((x->>'centavos')::bigint), 0)::bigint FROM jsonb_array_elements(p->'cmv') x
+  WHERE (x->>'data')::date BETWEEN p_ini AND p_fim
+$$;
+
+CREATE FUNCTION public.run_cmv_lancamentos_ephemeral_tests() RETURNS text LANGUAGE plpgsql AS $$
+DECLARE
+  A constant uuid := '11111111-1111-4111-8111-111111111111';
+  B constant uuid := '22222222-2222-4222-8222-222222222222';
+  U constant uuid := 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
+  c_peixes constant uuid := 'c0000000-0000-4000-8000-000000000001'; -- padrão Sim
+  c_escr constant uuid := 'c0000000-0000-4000-8000-000000000002';   -- padrão Não
+  c_sem constant uuid := 'c0000000-0000-4000-8000-000000000003';    -- sem padrão
+  c_rec constant uuid := 'c0000000-0000-4000-8000-000000000004';    -- receita
+  c_b constant uuid := 'c0000000-0000-4000-8000-0000000000b1';      -- unidade B
+  k_a constant uuid := 'd0000000-0000-4000-8000-00000000000a';
+  k_b constant uuid := 'd0000000-0000-4000-8000-00000000000b';
+  TUDO constant text := 'financeiro:cmv:view,financeiro:cmv:manage,financeiro:pagar:create,financeiro:pagar:edit,financeiro:lancamentos:create,financeiro:lancamentos:edit,financeiro:conciliacao:reconcile';
+  r jsonb;
+  v_manual uuid; v_prev uuid; v_conc uuid; v_rat uuid; v_pend uuid; v_cancel uuid; v_desconc uuid;
+  v_espelho uuid; v_ajuste uuid; v_receita uuid; v_bol uuid;
+  v_imp uuid; v_rid uuid; v_lr uuid; v_lr2 uuid; v_lr3 uuid; v_sem_pag uuid;
+  v_p_peixes uuid; v_p_escr uuid; v_p_sem uuid; v_p_antigo uuid; v_p_decidido uuid; v_p_rat uuid; v_bol_pend uuid;
+  v_ids uuid[]; v_criados timestamptz[]; v_n bigint;
+BEGIN
+  INSERT INTO companies VALUES (A, 'Unidade A'), (B, 'Unidade B');
+  INSERT INTO fin_categorias (id, nome, tipo, company_id, cmv_sugerir) VALUES
+    (c_peixes, 'Peixes', 'despesa', A, true),
+    (c_escr, 'Escritório', 'despesa', A, false),
+    (c_sem, 'Sem padrão', 'despesa', A, NULL),
+    (c_rec, 'Vendas', 'receita', A, NULL),
+    (c_b, 'Peixes B', 'despesa', B, true);
+  INSERT INTO fin_contas (id, nome, company_id) VALUES (k_a, 'Banco A', A), (k_b, 'Banco B', B);
+  PERFORM set_config('test.user_id', U::text, false);
+  PERFORM set_config('test.company_id', A::text, false);
+  PERFORM set_config('test.permissions', TUDO, false);
+
+  -- 1. Helpers novos fechados para clientes; config aberta
+  PERFORM cmv_assert(NOT has_function_privilege('authenticated', 'public._fin_cmv_linhas_lancamentos(uuid)', 'EXECUTE'), 'helper de lançamentos fechado');
+  PERFORM cmv_assert(NOT has_function_privilege('authenticated', 'public._fin_cmv_linhas_fontes(uuid)', 'EXECUTE'), 'helper de fontes fechado');
+  PERFORM cmv_assert(NOT has_function_privilege('authenticated', 'public._fin_cmv_retrato_lancamento(uuid,uuid)', 'EXECUTE'), 'retrato de lançamento fechado');
+  PERFORM cmv_assert(has_function_privilege('authenticated', 'public.get_fin_cmv_config()', 'EXECUTE'), 'config aberta a authenticated');
+
+  -- 2. Regra de apuração (semana 07–13/09/2026)
+  INSERT INTO fin_lancamentos (tipo, valor, data_competencia, data_pagamento, status, origem, company_id, categoria_id, cmv_incluir, descricao, conta_id)
+  VALUES ('DESPESA', 100, '2026-09-08', '2026-09-08', 'REALIZADO', 'manual', A, c_peixes, true, 'PIX mercado', k_a) RETURNING id INTO v_manual;
+  INSERT INTO fin_lancamentos (tipo, valor, data_competencia, status, origem, company_id, categoria_id, cmv_incluir, descricao)
+  VALUES ('DESPESA', 20, '2026-09-09', 'PREVISTO', 'manual', A, c_peixes, true, 'Compra prevista') RETURNING id INTO v_prev;
+  INSERT INTO fin_lancamentos (tipo, valor, data_competencia, data_pagamento, data_vencimento, status, origem, conciliado, company_id, descricao, conta_id)
+  VALUES ('DESPESA', 40, '2026-09-10', '2026-09-10', '2026-09-10', 'REALIZADO', 'conciliacao', true, A, 'PIX conciliado', k_a) RETURNING id INTO v_conc;
+  INSERT INTO fin_lancamento_rateios (lancamento_id, categoria_id, valor, company_id, cmv_incluir)
+  VALUES (v_conc, c_peixes, 30, A, true), (v_conc, c_escr, 10, A, false);
+  -- fora: cancelado, desconciliado, espelho de baixa, encargo da baixa, receita
+  INSERT INTO fin_lancamentos (tipo, valor, data_competencia, data_pagamento, status, origem, company_id, categoria_id, cmv_incluir, descricao)
+  VALUES ('DESPESA', 1000, '2026-09-08', '2026-09-08', 'CANCELADO', 'manual', A, c_peixes, true, 'Cancelado') RETURNING id INTO v_cancel;
+  INSERT INTO fin_lancamentos (tipo, valor, data_competencia, data_pagamento, status, origem, conciliado, company_id, categoria_id, cmv_incluir, descricao)
+  VALUES ('DESPESA', 2000, '2026-09-08', '2026-09-08', 'REALIZADO', 'conciliacao', false, A, c_peixes, true, 'Desconciliado') RETURNING id INTO v_desconc;
+  INSERT INTO fin_lancamentos (tipo, valor, data_competencia, data_pagamento, status, origem, referencia_modulo, company_id, categoria_id, cmv_incluir, descricao)
+  VALUES ('DESPESA', 4000, '2026-09-08', '2026-09-08', 'REALIZADO', 'espelho_cp', 'contas_pagar', A, c_peixes, true, 'Espelho de baixa') RETURNING id INTO v_espelho;
+  INSERT INTO fin_lancamentos (tipo, valor, data_competencia, data_pagamento, status, origem, referencia_modulo, company_id, categoria_id, cmv_incluir, descricao)
+  VALUES ('DESPESA', 8000, '2026-09-08', '2026-09-08', 'REALIZADO', 'ajuste_pagamento', 'contas_pagar', A, c_peixes, true, 'Juros da baixa') RETURNING id INTO v_ajuste;
+  INSERT INTO fin_lancamentos (tipo, valor, data_competencia, data_pagamento, status, origem, company_id, categoria_id, cmv_incluir, descricao)
+  VALUES ('RECEITA', 16000, '2026-09-08', '2026-09-08', 'REALIZADO', 'manual', A, c_rec, true, 'Venda') RETURNING id INTO v_receita;
+  -- rateio manda: cabeçalho Sim, linhas 60 Sim + 40 Não
+  INSERT INTO fin_lancamentos (tipo, valor, data_competencia, data_pagamento, status, origem, company_id, categoria_id, cmv_incluir, descricao)
+  VALUES ('DESPESA', 100, '2026-09-11', '2026-09-11', 'REALIZADO', 'manual', A, c_peixes, true, 'Feira rateada') RETURNING id INTO v_rat;
+  INSERT INTO fin_lancamento_rateios (lancamento_id, categoria_id, valor, company_id, cmv_incluir)
+  VALUES (v_rat, c_peixes, 60, A, true), (v_rat, c_escr, 40, A, false);
+  INSERT INTO fin_lancamentos (tipo, valor, data_competencia, data_pagamento, status, origem, company_id, categoria_id, descricao)
+  VALUES ('DESPESA', 7, '2026-09-12', '2026-09-12', 'REALIZADO', 'manual', A, c_sem, 'Pendente') RETURNING id INTO v_pend;
+  -- o boleto continua contando como antes
+  r := _guarded_create_conta_pagar(p_descricao => 'Boleto peixe', p_valor => 50, p_data_vencimento => '2026-09-20',
+    p_data_competencia => '2026-09-09', p_categoria_id => c_peixes, p_cmv => '{"incluir": true}');
+  v_bol := (r->>'id')::uuid;
+
+  r := get_fin_cmv_financeiro('2026-09-07', '2026-09-13');
+  -- 100 (manual) + 20 (previsto) + 30 (conciliação, só a linha Sim) + 60 (rateio Sim) + 50 (boleto) = R$ 260,00
+  PERFORM cmv_assert(cmv_total(r, '2026-09-07', '2026-09-13') = 26000, 'CMV soma boletos e despesas de lançamentos pela regra');
+  PERFORM cmv_assert(r->>'contrato' = 'cmv-financeiro/v1', 'contrato continua v1');
+  PERFORM cmv_assert((SELECT sum((x->>'quantidade')::int) FROM jsonb_array_elements(r->'boletos') x) = 1, '"boletos" conta só boletos');
+  PERFORM cmv_assert((SELECT sum((x->>'quantidade')::int) FROM jsonb_array_elements(r->'lancamentos') x) = 4, 'lançamentos com linha Sim: manual, previsto, conciliação, rateado');
+  PERFORM cmv_assert((SELECT sum((x->>'centavos')::bigint) FROM jsonb_array_elements(r->'qualidade') x WHERE x->>'situacao' = 'fora') = 5000, 'linhas Não entram na qualidade (10 + 40)');
+  PERFORM cmv_assert((r->'pendentes_geral_por_fonte'->'lancamento'->>'titulos')::int = 1
+    AND (r->'pendentes_geral_por_fonte'->'lancamento'->>'centavos')::bigint = 700, 'pendência por fonte: lançamento');
+  PERFORM cmv_assert((r->'pendentes_geral_por_fonte'->'boleto'->>'titulos')::int = 0, 'nenhum boleto pendente');
+  PERFORM cmv_assert((r->'pendentes_geral'->>'titulos')::int = 1, 'pendentes gerais somam as fontes');
+
+  -- 3. Lista de origem
+  r := list_fin_cmv_linhas('2026-09-07', '2026-09-13', 'incluido');
+  PERFORM cmv_assert((r->>'total_titulos')::int = 5, 'lista: 1 boleto + 4 lançamentos');
+  PERFORM cmv_assert((r->>'total_centavos')::bigint = 26000, 'lista fecha com o CMV');
+  PERFORM cmv_assert(EXISTS (
+    SELECT 1 FROM jsonb_array_elements(r->'itens') x
+    WHERE x->>'fonte' = 'lancamento' AND x->>'lancamento_id' = v_conc::text AND x->>'documento_id' = v_conc::text
+      AND x->>'origem' = 'conciliacao' AND x->>'conta_nome' = 'Banco A' AND x->'conta_pagar_id' = 'null'::jsonb
+      AND (x->>'serie_boletos')::int = 1
+  ), 'item de lançamento identifica fonte, origem e conta');
+  -- Spec §8: fornecedor e vencimento não existem para lançamento (nulos, mesmo com vencimento gravado).
+  PERFORM cmv_assert(EXISTS (
+    SELECT 1 FROM jsonb_array_elements(r->'itens') x
+    WHERE x->>'fonte' = 'lancamento' AND x->>'lancamento_id' = v_conc::text
+      AND x->'fornecedor' = 'null'::jsonb AND x->'data_vencimento' = 'null'::jsonb
+  ), 'item de lançamento devolve fornecedor e data_vencimento nulos');
+  PERFORM cmv_assert(EXISTS (
+    SELECT 1 FROM jsonb_array_elements(r->'itens') x
+    WHERE x->>'fonte' = 'boleto' AND x->>'conta_pagar_id' = v_bol::text AND x->'lancamento_id' = 'null'::jsonb
+  ), 'item de boleto mantém conta_pagar_id');
+  PERFORM cmv_assert(EXISTS (
+    SELECT 1 FROM jsonb_array_elements(r->'itens') x
+    WHERE x->>'fonte' = 'boleto' AND x->>'conta_pagar_id' = v_bol::text
+      AND x->>'data_vencimento' = '2026-09-20'
+  ), 'item de boleto mantém data_vencimento');
+  r := list_fin_cmv_linhas(NULL, NULL, 'pendente');
+  PERFORM cmv_assert((r->>'total_titulos')::int = 1 AND (r->'itens'->0->>'lancamento_id')::uuid = v_pend, 'pendência de lançamento aparece na revisão');
+
+  -- 4. Isolamento entre unidades
+  PERFORM set_config('test.company_id', B::text, false);
+  r := get_fin_cmv_financeiro('2026-09-07', '2026-09-13');
+  PERFORM cmv_assert(cmv_total(r, '2026-09-07', '2026-09-13') = 0, 'B não vê despesas da A');
+  PERFORM cmv_assert((list_fin_cmv_linhas(NULL, NULL, 'todos')->>'total_linhas')::int = 0, 'lista de B vazia');
+  PERFORM set_config('test.company_id', A::text, false);
+
+  -- 5. Configuração informa o recurso a quem lança e a quem concilia
+  PERFORM set_config('test.permissions', 'financeiro:lancamentos:create', false);
+  PERFORM cmv_assert((get_fin_cmv_config()->'recursos'->>'lancamentos')::boolean, 'config para quem lança');
+  PERFORM set_config('test.permissions', 'financeiro:conciliacao:reconcile', false);
+  PERFORM cmv_assert((get_fin_cmv_config()->'recursos'->>'lancamentos')::boolean, 'config para quem concilia');
+  PERFORM set_config('test.permissions', TUDO, false);
+
+  -- 6. Escrita direta (PostgREST, papel authenticated) não altera a decisão do lançamento
+  GRANT USAGE ON SCHEMA public TO authenticated;
+  GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO authenticated;
+  SET LOCAL ROLE authenticated;
+  BEGIN
+    UPDATE public.fin_lancamentos SET cmv_incluir = false WHERE id = v_manual;
+    RAISE EXCEPTION 'CMV TEST FAILED: UPDATE direto da decisão do lançamento passou';
+  EXCEPTION WHEN insufficient_privilege THEN NULL;
+  END;
+  BEGIN
+    INSERT INTO public.fin_lancamentos (tipo, valor, data_competencia, status, company_id, cmv_incluir)
+    VALUES ('DESPESA', 1, '2026-09-08', 'PREVISTO', A, true);
+    RAISE EXCEPTION 'CMV TEST FAILED: INSERT direto com decisão passou';
+  EXCEPTION WHEN insufficient_privilege THEN NULL;
+  END;
+  -- Escrita que não toca a decisão continua permitida (as telas atuais fazem isso).
+  UPDATE public.fin_lancamentos SET observacoes = 'nota' WHERE id = v_manual;
+  RESET ROLE;
+  PERFORM cmv_assert((SELECT cmv_incluir AND observacoes = 'nota' FROM fin_lancamentos WHERE id = v_manual), 'escrita direta sem a decisão continua permitida');
+
+  RETURN 'cmv_lancamentos_ephemeral: OK';
+END;
+$$;
+
+SELECT public.run_cmv_lancamentos_ephemeral_tests();
