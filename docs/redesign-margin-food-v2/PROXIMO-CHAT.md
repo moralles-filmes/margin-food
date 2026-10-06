@@ -13,8 +13,9 @@ Financeiro (07) e não inicie a Fase 07.
 
 ESTADO REAL DEIXADO PELA FASE 06A (2026-10-05)
 - Branch feat/redesign-v2-f06a, criada de feat/redesign-v2-f05b em
-  b4cf636. Fase 06A commitada (código + documentação; SHAs no
-  handoffs/06A-HANDOFF.md). Sem push, PR ou merge. main intocada (c6a9774).
+  b4cf636. Fase 06A commitada em 9ffb6ab (código) e dd64f0a
+  (documentação), mais um commit de documentação com estes SHAs. Sem push,
+  PR ou merge. main intocada (c6a9774).
 - Fase 06A validada com ressalvas: bun run test = 209 arquivos / 1.975
   testes; tsc --noEmit -p tsconfig.app.json = 0 erros; bun run lint = 0
   erros (662 avisos dentro do repositório, iguais antes e depois arquivo a

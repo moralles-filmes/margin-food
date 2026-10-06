@@ -2,7 +2,7 @@
 
 ## Estado real
 
-- Repositório `moralles-filmes/margin-food`, branch `feat/redesign-v2-f06a`, criada de `feat/redesign-v2-f05b` em `b4cf636`. Commits da Fase 06A: código e documentação (SHAs na seção "Commits" abaixo).
+- Repositório `moralles-filmes/margin-food`, branch `feat/redesign-v2-f06a`, criada de `feat/redesign-v2-f05b` em `b4cf636`. Commits da Fase 06A: `9ffb6ab` (código) e `dd64f0a` (documentação), mais um commit de documentação registrando estes SHAs.
 - Sem push, PR ou merge; `main` intocada em `c6a9774`.
 - Fase 06A validada com ressalvas em 2026-10-05. Fase 06B pendente.
 
@@ -40,7 +40,9 @@ Fase 06B — Apresentação Sócios (FIN-B-039 a 065), só apresentação. É gr
 
 ## Commits
 
-A preencher pelo commit de registro dos SHAs.
+- `9ffb6ab` — feat(financeiro): telas da Fase 06A (código e testes).
+- `dd64f0a` — docs(redesign-v2): relatório, decisões, matriz, pendências, handoff e prompt.
+- Commit seguinte — registra estes SHAs.
 
 ## Prompt completo para colar no próximo chat
 
@@ -62,8 +64,9 @@ Financeiro (07) e não inicie a Fase 07.
 
 ESTADO REAL DEIXADO PELA FASE 06A (2026-10-05)
 - Branch feat/redesign-v2-f06a, criada de feat/redesign-v2-f05b em
-  b4cf636. Fase 06A commitada (código + documentação; SHAs no
-  handoffs/06A-HANDOFF.md). Sem push, PR ou merge. main intocada (c6a9774).
+  b4cf636. Fase 06A commitada em 9ffb6ab (código) e dd64f0a
+  (documentação), mais um commit de documentação com estes SHAs. Sem push,
+  PR ou merge. main intocada (c6a9774).
 - Fase 06A validada com ressalvas: bun run test = 209 arquivos / 1.975
   testes; tsc --noEmit -p tsconfig.app.json = 0 erros; bun run lint = 0
   erros (662 avisos dentro do repositório, iguais antes e depois arquivo a
