@@ -15,6 +15,7 @@ const state = vi.hoisted(() => ({
   contasErro: false,
   lancamentos: [] as Record<string, unknown>[],
   lancamentosErro: false,
+  categorias: [] as Record<string, unknown>[],
   pendentes: 0,
   conciliados: 0,
   saldoSistema: 0,
@@ -26,6 +27,7 @@ const state = vi.hoisted(() => ({
 
 function responder(table: string, ops: [string, unknown[]][]): Resposta {
   const op = (nome: string) => ops.find(([n]) => n === nome)?.[1];
+  if (table === 'fin_categorias') return { data: state.categorias, error: null };
   if (table === 'fin_contas') return state.contasErro ? { data: null, error: { message: 'falha' } } : { data: state.contas, error: null };
   if (table === 'fin_lancamentos') {
     const select = op('select');
@@ -105,6 +107,7 @@ beforeEach(() => {
   state.contasErro = false;
   state.lancamentos = [];
   state.lancamentosErro = false;
+  state.categorias = [];
   state.pendentes = 0;
   state.conciliados = 0;
   state.saldoSistema = 0;
@@ -391,6 +394,25 @@ describe('Conciliação Bancária — visão Importar (rascunho restaurado)', ()
       await waitFor(() => expect(importacao()).toBeDefined());
       expect((importacao()!.p_rateio_linhas as Record<string, unknown>[])).toEqual([
         expect.objectContaining({ categoria_id: 'cat1', cmv_incluir: false }),
+      ]);
+    });
+
+    it('rateio aberto só para responder Sim/Não: o centro de custo padrão da categoria não se perde', async () => {
+      comConfig(configCmv(true));
+      state.categorias = [{ id: 'cat1', nome: 'Peixes', tipo: 'despesa', parent_id: null, centro_custo_padrao_id: 'cc9', excluir_dos_totais: false }];
+      restaurar([linha({ descricao: 'PIX ARROZ', valor: 55, categoriaId: 'cat1' })]);
+      render(<ConciliacaoBancariaSection />);
+      expect(await screen.findByRole('radiogroup', { name: 'Aparecer no CMV financeiro? — PIX ARROZ' })).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Ratear' }));
+      const dialogo = await screen.findByRole('dialog');
+      const grupo = within(dialogo).getByRole('radiogroup', { name: 'Aparecer no CMV financeiro? — linha 1 do rateio' });
+      fireEvent.click(within(grupo).getByRole('radio', { name: 'Sim' }));
+      fireEvent.click(within(dialogo).getByRole('button', { name: /Salvar Rateio/ }));
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+      fireEvent.click(await screen.findByRole('button', { name: 'Processar' }));
+      await waitFor(() => expect(importacao()).toBeDefined());
+      expect((importacao()!.p_rateio_linhas as Record<string, unknown>[])).toEqual([
+        expect.objectContaining({ categoria_id: 'cat1', centro_custo_id: 'cc9', cmv_incluir: true }),
       ]);
     });
 

@@ -1654,8 +1654,10 @@ export default function ConciliacaoBancariaSection() {
     if (existing && existing.length > 0) {
       setRateioLinhas([...existing]);
     } else {
-      // A 1ª linha começa com a categoria e a resposta que a linha já tinha.
-      setRateioLinhas([{ categoria_id: linha.categoriaId || '', centro_custo_id: '', valor: linha.valor, percentual: 100, observacao: '', cmv_incluir: decisaoDaLinhaExtrato(linha) }]);
+      // A 1ª linha começa com a categoria, o centro de custo padrão dela e a resposta que a linha já tinha:
+      // abrir o rateio só para responder Sim/Não não pode mandar o item sem o centro de custo da categoria.
+      const centroPadrao = categorias.find(c => c.id === linha.categoriaId)?.centro_custo_padrao_id || '';
+      setRateioLinhas([{ categoria_id: linha.categoriaId || '', centro_custo_id: centroPadrao, valor: linha.valor, percentual: 100, observacao: '', cmv_incluir: decisaoDaLinhaExtrato(linha) }]);
     }
     setRateioDialog({ open: true, linhaIndex });
   };
