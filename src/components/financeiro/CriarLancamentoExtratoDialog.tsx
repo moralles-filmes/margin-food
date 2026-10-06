@@ -131,6 +131,13 @@ export default function CriarLancamentoExtratoDialog({
   };
   // Com o recurso, a data do banco é a chave que reconhece a linha no lançamento: não se edita.
   const dataBancoFixa = cmvRecurso && destino === 'lancamento';
+  // O efeito de pré-preenchimento lê o recurso por aqui: se a configuração chegar com o diálogo
+  // aberto, ele não roda de novo e não apaga o que o usuário já digitou. A herança vale só quando
+  // a configuração já estava carregada na abertura (a seção a carrega ao montar).
+  const cmvRecursoRef = useRef(cmvRecurso);
+  cmvRecursoRef.current = cmvRecurso;
+  // Competência que veio da linha do extrato (igual à data do banco quando não há ajuste).
+  const competenciaHerdadaRef = useRef('');
 
   // Load reference data
   useEffect(() => {
@@ -154,15 +161,22 @@ export default function CriarLancamentoExtratoDialog({
     // Sem o recurso a competência vai em p_data (a chave de idempotência), então o rascunho da
     // linha nunca entra: o diálogo abre exatamente como antes (data do banco, sem categoria, sem resposta).
     // Rateio de várias linhas não é levado para o diálogo: categoria e resposta ficam vazias, como antes.
-    const herda = cmvRecurso;
+    const herda = cmvRecursoRef.current;
     const rateioMultiplo = (linha.rateioLinhas?.length ?? 0) > 1;
+    // Rateio de uma linha: a categoria é a do rateio, a mesma de onde sai a resposta e a que o
+    // "Processar" envia (`salvarRateio` não atualiza `linha.categoriaId`, que pode estar velha ou vazia).
+    const categoriaHerdada = linha.rateioLinhas?.length === 1
+      ? linha.rateioLinhas[0].categoria_id || linha.categoriaId || ''
+      : linha.categoriaId || '';
+    // A competência própria só existe em despesa e só vale no destino lançamento (ver a troca de destino).
+    competenciaHerdadaRef.current = herda && linha.tipo === 'DESPESA' && linha.competencia ? linha.competencia : linha.data;
     setDescricao(linha.descricao);
     setValor(linha.valor);
     setTipo(linha.tipo);
-    setDataCompetencia(herda ? linha.competencia || linha.data : linha.data);
+    setDataCompetencia(competenciaHerdadaRef.current);
     setDataVencimento(linha.data);
     setDataPagamento(linha.data);
-    setCategoriaId(herda && !rateioMultiplo ? linha.categoriaId || '' : '');
+    setCategoriaId(herda && !rateioMultiplo ? categoriaHerdada : '');
     setSupplierId('');
     setCliente('');
     setObservacoes('');
@@ -171,7 +185,7 @@ export default function CriarLancamentoExtratoDialog({
     setCmvIncluir(herda && !rateioMultiplo ? decisaoDaLinhaExtrato(linha) : null);
     setCmvAviso(undefined);
     setDestino('lancamento');
-  }, [linha, open, cmvRecurso]);
+  }, [linha, open]);
 
   // Rateio helpers
   const addRateioLinha = () => {
@@ -238,7 +252,10 @@ export default function CriarLancamentoExtratoDialog({
     if (!dataCompetencia) { toast.error('Informe a data de competência'); return; }
     if (!useRateio && !categoriaId) { toast.error('Selecione uma categoria'); return; }
     // A categoria vinda da linha pode não estar (ainda) na lista: sem ela o payload sairia sem categoria.
-    if (!useRateio && !categorias.some(c => c.id === categoriaId)) { toast.error('Categoria indisponível. Selecione outra.'); return; }
+    if (!useRateio && !categorias.some(c => c.id === categoriaId)) {
+      toast.error(categorias.length === 0 ? 'Carregando categorias… tente de novo em instantes.' : 'Categoria indisponível. Selecione outra.');
+      return;
+    }
     if (useRateio && !rateioValido) { toast.error('Rateio inválido'); return; }
 
     salvandoRef.current = true;
@@ -445,6 +462,13 @@ export default function CriarLancamentoExtratoDialog({
               options={DESTINOS}
               value={destino}
               onChange={v => {
+                // A competência herdada da linha vale só no lançamento: no título, p_data (espelho do
+                // razão) e a baixa seguem a data do banco. Data que o usuário digitou nunca é trocada.
+                const herdada = competenciaHerdadaRef.current;
+                if (herdada !== linha.data) {
+                  if (v === 'lancamento') setDataCompetencia(atual => (atual === linha.data ? herdada : atual));
+                  else setDataCompetencia(atual => (atual === herdada ? linha.data : atual));
+                }
                 if (v === 'conta_pagar') { setDestino('conta_pagar'); setTipo('DESPESA'); }
                 else if (v === 'conta_receber') { setDestino('conta_receber'); setTipo('RECEITA'); }
                 else setDestino('lancamento');

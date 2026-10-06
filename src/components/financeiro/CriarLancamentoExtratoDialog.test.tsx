@@ -4,7 +4,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import CriarLancamentoExtratoDialog from './CriarLancamentoExtratoDialog';
 import type { CmvConfig } from '@/hooks/useCmvFinanceiro';
 
-const state = vi.hoisted(() => ({ rpc: vi.fn(), updates: [] as { table: string; payload: Record<string, unknown> }[] }));
+const state = vi.hoisted(() => ({
+  rpc: vi.fn(),
+  toastErro: vi.fn(),
+  updates: [] as { table: string; payload: Record<string, unknown> }[],
+}));
 
 function builder(table: string) {
   const b: Record<string, unknown> = {};
@@ -31,7 +35,7 @@ const supabase = {
 
 vi.mock('@/contexts/CompanyScopeContext', () => ({ useSupabase: () => supabase }));
 vi.mock('@/permissions/hooks', () => ({ useCan: () => true }));
-vi.mock('@/hooks/useScopedToast', () => ({ useScopedToast: () => ({ success: vi.fn(), error: vi.fn() }) }));
+vi.mock('@/hooks/useScopedToast', () => ({ useScopedToast: () => ({ success: vi.fn(), error: state.toastErro }) }));
 vi.mock('@/lib/dataEvents', () => ({ useEmitDataEvent: () => () => undefined }));
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ user: { id: 'u1' } }) }));
 vi.mock('@/components/financeiro/SupplierCombobox', () => ({ default: () => null }));
@@ -54,6 +58,7 @@ const config = (lancamentos: boolean): CmvConfig => ({
 
 beforeEach(() => {
   state.updates = [];
+  state.toastErro.mockReset();
   state.rpc.mockReset();
   state.rpc.mockImplementation((nome: string) => Promise.resolve(
     nome === 'reconcile_import_lancamento' ? { data: { status: 'ok', lancamento_id: 'l1' }, error: null } : { data: null, error: null },
@@ -214,12 +219,96 @@ describe('Criar a partir do extrato — CMV e datas', () => {
       expect((args.p_rateio_linhas as Record<string, unknown>[])[0]).not.toHaveProperty('cmv_incluir');
     });
 
+    it('configuração que chega com o diálogo aberto não refaz o formulário nem apaga o que foi digitado', async () => {
+      const props = { open: true, onOpenChange: () => {}, linha: ajustada, contaBancariaId: 'conta-1', onCreated: () => {} };
+      const { rerender } = render(<CriarLancamentoExtratoDialog {...props} cmvConfig={null} />);
+      await screen.findByRole('option', { name: 'Peixes' });
+      fireEvent.change(screen.getByLabelText('Descrição'), { target: { value: 'DESCRIÇÃO EDITADA' } });
+      rerender(<CriarLancamentoExtratoDialog {...props} cmvConfig={config(true)} />);
+      expect(screen.getByLabelText('Descrição')).toHaveValue('DESCRIÇÃO EDITADA');
+      // A herança só vale com a configuração já carregada na abertura.
+      expect(screen.getByLabelText('Data Competência')).toHaveValue('2026-09-10');
+      expect(screen.getByLabelText('Categoria')).toHaveValue('');
+    });
+
     it('categoria herdada que não está na lista: não grava sem categoria', async () => {
       abrir(config(true), { ...linha, categoriaId: 'catInexistente' });
       await screen.findByRole('option', { name: 'Peixes' });
       fireEvent.click(screen.getByRole('button', { name: /Criar e Conciliar/ }));
       await waitFor(() => expect(screen.getByRole('button', { name: /Criar e Conciliar/ })).toBeEnabled());
       expect(state.rpc).not.toHaveBeenCalledWith('reconcile_import_lancamento', expect.anything());
+      expect(state.toastErro).toHaveBeenCalledWith('Categoria indisponível. Selecione outra.');
+    });
+
+    it('categorias ainda carregando: pede para tentar de novo em vez de dizer que a categoria sumiu', async () => {
+      abrir(config(true), { ...linha, categoriaId: 'cat1' });
+      // Sem esperar a lista: a categoria da linha já está escolhida, mas as opções ainda não chegaram.
+      fireEvent.click(screen.getByRole('button', { name: /Criar e Conciliar/ }));
+      expect(state.toastErro).toHaveBeenCalledWith('Carregando categorias… tente de novo em instantes.');
+      expect(state.rpc).not.toHaveBeenCalledWith('reconcile_import_lancamento', expect.anything());
+      await screen.findByRole('option', { name: 'Peixes' });
+    });
+
+    it('rateio de uma linha salvo com outra categoria: categoria e resposta vêm do rateio, como no Processar', async () => {
+      const rateio = [{ categoria_id: 'cat1', centro_custo_id: '', valor: 55, percentual: 100, observacao: '', cmv_incluir: false }];
+      abrir(config(true), { ...linha, categoriaId: 'cat-velha', rateioLinhas: rateio });
+      await screen.findByRole('option', { name: 'Peixes' });
+      expect(screen.getByLabelText('Categoria')).toHaveValue('cat1');
+      const grupo = screen.getByRole('radiogroup', { name: 'Aparecer no CMV financeiro?' });
+      expect(within(grupo).getByRole('radio', { name: 'Não' })).toHaveAttribute('aria-checked', 'true');
+      fireEvent.click(screen.getByRole('button', { name: /Criar e Conciliar/ }));
+      await waitFor(() => expect(state.rpc).toHaveBeenCalledWith('reconcile_import_lancamento', expect.anything()));
+      expect(state.rpc.mock.calls.find(([n]) => n === 'reconcile_import_lancamento')![1]).toMatchObject({
+        p_rateio_linhas: [expect.objectContaining({ categoria_id: 'cat1', cmv_incluir: false })],
+      });
+    });
+
+    it('competência própria só vale em despesa: em receita, um valor solto do rascunho não entra', async () => {
+      abrir(config(true), { ...linhaReceita, competencia: '2026-09-03' });
+      await screen.findByRole('option', { name: 'Vendas' });
+      expect(screen.getByLabelText('Data Competência')).toHaveValue('2026-09-10');
+    });
+
+    describe('destino conta a pagar/receber', () => {
+      const comCompetencia: ExtratoLinha = { ...linha, competencia: '2026-09-03' };
+      const destino = (nome: string) => fireEvent.click(screen.getByRole('radio', { name: nome }));
+
+      it('a competência herdada fica só no lançamento: no título a data padrão é a do banco e o p_data também', async () => {
+        abrir(config(true), comCompetencia);
+        await screen.findByRole('option', { name: 'Peixes' });
+        expect(screen.getByLabelText('Data Competência')).toHaveValue('2026-09-03');
+
+        destino('Conta a Pagar');
+        expect(screen.getByLabelText('Data Competência')).toHaveValue('2026-09-10');
+        fireEvent.change(screen.getByLabelText('Categoria'), { target: { value: 'cat1' } });
+        fireEvent.click(screen.getByRole('button', { name: /Criar e Conciliar/ }));
+        await waitFor(() => expect(state.rpc).toHaveBeenCalledWith('reconcile_create_titulo_from_extrato', expect.anything()));
+        const lanc = state.rpc.mock.calls.find(([n]) => n === 'reconcile_import_lancamento')![1] as Record<string, unknown>;
+        expect(lanc).toMatchObject({ p_data: '2026-09-10', p_tipo: 'DESPESA' });
+        expect(lanc).not.toHaveProperty('p_data_competencia');
+        expect(state.rpc).toHaveBeenCalledWith('reconcile_create_titulo_from_extrato', expect.objectContaining({
+          p_data_competencia: '2026-09-10', p_data_baixa: '2026-09-10',
+        }));
+      });
+
+      it('voltar para lançamento sem mexer na data restaura a competência herdada', async () => {
+        abrir(config(true), comCompetencia);
+        await screen.findByRole('option', { name: 'Peixes' });
+        destino('Conta a Receber');
+        expect(screen.getByLabelText('Data Competência')).toHaveValue('2026-09-10');
+        destino('Lançamento');
+        expect(screen.getByLabelText('Data Competência')).toHaveValue('2026-09-03');
+      });
+
+      it('data digitada pelo usuário no diálogo é respeitada ao trocar de destino', async () => {
+        abrir(config(true), comCompetencia);
+        await screen.findByRole('option', { name: 'Peixes' });
+        fireEvent.change(screen.getByLabelText('Data Competência'), { target: { value: '2026-09-05' } });
+        destino('Conta a Pagar');
+        expect(screen.getByLabelText('Data Competência')).toHaveValue('2026-09-05');
+        destino('Lançamento');
+        expect(screen.getByLabelText('Data Competência')).toHaveValue('2026-09-05');
+      });
     });
   });
 
