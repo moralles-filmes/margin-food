@@ -116,10 +116,10 @@ export function CmvCardsSkeleton() {
 }
 
 export default function CmvCards({ report }: { report: CmvReport }) {
-  const { faturamento, cmv, percentual, boletos, atual, anterior } = report;
+  const { faturamento, cmv, percentual, documentos, atual, anterior } = report;
   const semAnterior = anterior.intervalo === null;
   const contexto = 'vs. período anterior';
-  const plural = (n: number | null) => (n === null ? '—' : `${n} ${n === 1 ? 'boleto' : 'boletos'}`);
+  const plural = (n: number | null) => (n === null ? '—' : `${n} ${n === 1 ? 'despesa' : 'despesas'}`);
 
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
@@ -177,15 +177,16 @@ export default function CmvCards({ report }: { report: CmvReport }) {
         )}
       />
       <CmvIndicadorCard
-        rotulo="Boletos vinculados ao CMV"
-        valor={boletos.atual === null ? '—' : String(boletos.atual)}
+        rotulo="Despesas vinculadas ao CMV"
+        valor={documentos.atual === null ? '—' : String(documentos.atual)}
         icone={FileText}
         estilo="info"
-        variacao={boletos.variacaoPercentual === null ? null : formatarVariacao(boletos.variacaoPercentual)}
-        direcao={direcaoDe(boletos.variacaoPercentual)}
+        variacao={documentos.variacaoPercentual === null ? null : formatarVariacao(documentos.variacaoPercentual)}
+        direcao={direcaoDe(documentos.variacaoPercentual)}
         tom="neutro"
         contexto={contexto}
-        rodape={semAnterior ? '—' : plural(anterior.boletos)}
+        rodape={semAnterior ? '—' : plural(anterior.documentos)}
+        observacao={`${atual.boletos} ${atual.boletos === 1 ? 'boleto' : 'boletos'} · ${atual.lancamentos} ${atual.lancamentos === 1 ? 'lançamento' : 'lançamentos'}`}
       />
     </div>
   );

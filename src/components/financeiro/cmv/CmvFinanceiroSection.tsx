@@ -47,11 +47,11 @@ const ATALHO_ATUAL: Record<Exclude<CmvModo, 'periodo'>, string> = {
 };
 
 const SITUACAO_TITULO: Record<CmvSituacao, string> = {
-  incluido: 'Boletos incluídos no CMV',
-  fora: 'Boletos fora do CMV',
-  pendente: 'Boletos pendentes de classificação',
+  incluido: 'Despesas incluídas no CMV',
+  fora: 'Despesas fora do CMV',
+  pendente: 'Despesas pendentes de classificação',
   sem_competencia: 'Boletos sem data de competência',
-  todos: 'Lançamentos e classificação no CMV',
+  todos: 'Despesas e classificação no CMV',
 };
 
 function NoAccess() {
@@ -85,6 +85,9 @@ export default function CmvFinanceiroSection() {
   const canManage = useCan('financeiro:cmv:manage');
   const canPagarView = useCan('financeiro:pagar:view');
   const canPagarEdit = useCan('financeiro:pagar:edit');
+  const canLancView = useCan('financeiro:lancamentos:view');
+  const canLancEdit = useCan('financeiro:lancamentos:edit');
+  const canConciliar = useCan('financeiro:conciliacao:reconcile');
   const scope = useCompanyScope();
   const { profile } = useAuth();
   const companyId = scope?.companyId ?? profile?.company_id;
@@ -112,8 +115,8 @@ export default function CmvFinanceiroSection() {
   const abrirCategoria = (linha: CmvCategoriaLinha) => {
     if (!faixaDoRelatorio) return;
     setAlvo({
-      titulo: `Boletos de origem — ${linha.nome}`,
-      descricao: `Linhas de rateio incluídas no CMV, com competência em ${formatarIntervalo(faixaDoRelatorio)}.`,
+      titulo: `Despesas de origem — ${linha.nome}`,
+      descricao: `Linhas incluídas no CMV (boletos, lançamentos e conciliação), com competência em ${formatarIntervalo(faixaDoRelatorio)}.`,
       inicio: faixaDoRelatorio.inicio,
       fim: faixaDoRelatorio.fim,
       situacao: 'incluido',
@@ -130,7 +133,7 @@ export default function CmvFinanceiroSection() {
       descricao: situacao === 'sem_competencia'
         ? 'Sem data de competência o boleto não entra em nenhum período. Informe a competência em Contas a Pagar.'
         : semPeriodo
-          ? 'Todos os boletos da unidade com esta situação, de qualquer competência.'
+          ? 'Todas as despesas da unidade com esta situação, de qualquer competência.'
           : `Competência em ${formatarIntervalo(faixaDoRelatorio!)}.`,
       inicio: semPeriodo ? null : faixaDoRelatorio!.inicio,
       fim: semPeriodo ? null : faixaDoRelatorio!.fim,
@@ -143,7 +146,7 @@ export default function CmvFinanceiroSection() {
     <div className="space-y-4">
       <PageHeader
         title="CMV Financeiro"
-        subtitle="Custo das mercadorias pelos boletos de Contas a Pagar (competência) sobre o faturamento do Fechamento de Caixa."
+        subtitle="Custo das mercadorias pelas despesas marcadas para o CMV (boletos, lançamentos e conciliação, por competência) sobre o faturamento do Fechamento de Caixa."
         actions={canExport ? (
           <Button type="button" variant="outline" onClick={() => setExportando(true)} disabled={!report || query.isFetching}>
             <Download className="mr-2 h-4 w-4" />Exportar
@@ -305,6 +308,7 @@ export default function CmvFinanceiroSection() {
                   canManage={canManage}
                   canRevisar={canManage}
                   pendentesGeral={report.pendentesGeral}
+                  pendentesGeralPorFonte={report.pendentesGeralPorFonte}
                   semCompetencia={report.semCompetencia}
                   onAbrirLista={abrirLista}
                 />
@@ -319,8 +323,10 @@ export default function CmvFinanceiroSection() {
         onClose={() => setAlvo(null)}
         companyId={companyId}
         canClassificar={canManage || canPagarEdit}
+        canClassificarLancamento={canManage || canLancEdit || canConciliar}
         canLote={canManage}
         canAbrirBoleto={canPagarView}
+        canAbrirLancamento={canLancView}
       />
       {report && canExport && <CmvExportSheet open={exportando} onOpenChange={setExportando} report={report} />}
     </div>

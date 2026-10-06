@@ -48,7 +48,7 @@ export function CmvTabelaResumo({ report, onAbrirCategoria }: {
                   <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: corCategoriaCss(grupo.cor) }} aria-hidden="true" />
                   {onAbrirCategoria ? (
                     <button
-                      type="button" onClick={() => onAbrirCategoria(grupo)} title={`Ver boletos de ${grupo.nome}`}
+                      type="button" onClick={() => onAbrirCategoria(grupo)} title={`Ver despesas de ${grupo.nome}`}
                       className="truncate rounded text-left hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       {grupo.nome}
@@ -101,7 +101,7 @@ export function CmvSobreOsDados({ report, onAbrirLista }: {
       <span>{rotulo}: <strong className="font-semibold text-foreground">{titulos}</strong> ({formatarCentavos(centavos)})</span>
       {titulos > 0 && (
         <Button type="button" variant="link" size="sm" className="h-auto p-0 text-primary-ink" onClick={() => onAbrirLista(situacao)}>
-          Ver boletos
+          Ver despesas
         </Button>
       )}
     </li>
@@ -110,7 +110,7 @@ export function CmvSobreOsDados({ report, onAbrirLista }: {
     <CmvPainel titulo={<span className="inline-flex items-center gap-2 text-primary-ink"><Info className="h-4 w-4" aria-hidden="true" />Sobre os dados</span>}>
       <div className="space-y-4">
         <ItemSobre icone={FileText} titulo="CMV Financeiro">
-          Soma das categorias marcadas para o CMV nos boletos de Contas a Pagar, pela <strong className="font-semibold text-foreground">data de competência</strong>. Pagamento e vencimento não mudam o período.
+          Soma das categorias marcadas para o CMV nas despesas — boletos de Contas a Pagar, lançamentos e conciliação —, pela <strong className="font-semibold text-foreground">data de competência</strong>. Pagamento e vencimento não mudam o período.
         </ItemSobre>
         <ItemSobre icone={BarChart3} titulo="Faturamento">
           Faturamento bruto registrado no <strong className="font-semibold text-foreground">Fechamento de Caixa</strong>
@@ -140,7 +140,7 @@ export function CmvSobreOsDados({ report, onAbrirLista }: {
         </div>
         <p className="flex gap-2 rounded-xl bg-primary-soft p-3 text-sm text-primary-ink">
           <Lightbulb className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-          <span>Mantenha os boletos com categoria, competência e a resposta do CMV preenchidas para um indicador mais preciso.</span>
+          <span>Mantenha as despesas com categoria, competência e a resposta do CMV preenchidas para um indicador mais preciso.</span>
         </p>
       </div>
     </CmvPainel>
@@ -174,7 +174,7 @@ export default function CmvVisaoGeral({ report, onAbrirCategoria, onAbrirLista }
           ) : <EmptyState title="Sem faturamento nem CMV no período selecionado" compact />}
         </CmvPainel>
         <CmvPainel className="xl:col-span-5" titulo="Composição do CMV por categoria">
-          {temCmv ? <CmvComposicao report={report} onAbrirGrupo={onAbrirCategoria} /> : <EmptyState title="Nenhum boleto incluído no CMV neste período" compact />}
+          {temCmv ? <CmvComposicao report={report} onAbrirGrupo={onAbrirCategoria} /> : <EmptyState title="Nenhuma despesa incluída no CMV neste período" compact />}
         </CmvPainel>
       </div>
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,3.3fr)_minmax(0,5.6fr)_minmax(0,3.1fr)]">

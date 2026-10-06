@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import CmvFinanceiroSection from './CmvFinanceiroSection';
@@ -20,6 +20,9 @@ const state = vi.hoisted(() => ({
   respostas: new Map<string, Partial<HookResult>>(),
   chamadas: [] as Array<{ companyId: unknown; filtro: CmvFiltro; enabled: boolean }>,
   listas: [] as Array<{ params: CmvListaParams; enabled: boolean }>,
+  lista: null as null | Record<string, unknown>,
+  classificar: vi.fn(),
+  navegar: vi.fn(),
   refetch: vi.fn(),
 }));
 
@@ -35,6 +38,10 @@ vi.mock('@/lib/datetime', async importOriginal => ({
   ...(await importOriginal<typeof import('@/lib/datetime')>()),
   todayBR: () => '2026-09-09',
 }));
+vi.mock('@/hooks/useNavigationRequest', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/hooks/useNavigationRequest')>()),
+  requestNavigation: (...args: unknown[]) => state.navegar(...args),
+}));
 vi.mock('@/hooks/useCmvFinanceiro', async importOriginal => ({
   ...(await importOriginal<typeof import('@/hooks/useCmvFinanceiro')>()),
   useCmvReport: (options: { companyId: unknown; filtro: CmvFiltro; enabled: boolean }) => {
@@ -44,16 +51,41 @@ vi.mock('@/hooks/useCmvFinanceiro', async importOriginal => ({
       ...state.respostas.get(`${options.filtro.inicio}|${options.filtro.fim}`),
     };
   },
-  useCmvConfig: () => ({ data: { classificacaoAtiva: false, categorias: [] }, isPending: false, isError: false, refetch: vi.fn() }),
+  useCmvConfig: () => ({ data: { classificacaoAtiva: false, categorias: [], recursos: { lancamentos: true } }, isPending: false, isError: false, refetch: vi.fn() }),
   useCmvLinhas: (options: { params: CmvListaParams; enabled: boolean }) => {
     state.listas.push(options);
-    return { data: { totalLinhas: 0, totalTitulos: 0, totalCentavos: 0, itens: [] }, isPending: false, isFetching: false, isError: false, error: null, refetch: vi.fn() };
+    return { data: state.lista ?? { totalLinhas: 0, totalTitulos: 0, totalCentavos: 0, itens: [] }, isPending: false, isFetching: false, isError: false, error: null, refetch: vi.fn() };
   },
+  classificarCmv: (...args: unknown[]) => state.classificar(...args),
 }));
 
 const SEMANA = '2026-09-07|2026-09-13';
 const pronto = (report: CmvReport): Partial<HookResult> => ({ data: report, isPending: false, isFetching: false });
 const relatorioSemana = () => buildCmvReport(parseCmvPayload(cmvPayloadCru()), CMV_FILTRO_SEMANA);
+
+// Lançamento: sem fornecedor nem vencimento (como vem do servidor); `serieBoletos` > 1 prova que a série é só de boleto.
+const LINHA_LANCAMENTO = {
+  fonte: 'lancamento', documentoId: 'l1', contaPagarId: null, rateioId: null, descricao: 'PIX ARROZ', fornecedor: null,
+  origem: 'conciliacao', contaNome: 'Banco A', dataCompetencia: '2026-09-08', dataVencimento: null, status: 'REALIZADO',
+  categoriaId: CAT.peixes, categoriaNome: 'Peixes', tituloCentavos: 5500, linhaCentavos: 5500, cmvIncluir: null,
+  updatedAt: 't1', serieBoletos: 2,
+};
+const LINHA_BOLETO = {
+  fonte: 'boleto', documentoId: 'b1', contaPagarId: 'b1', rateioId: 'r1', descricao: 'NF 123', fornecedor: 'Peixaria Azul',
+  origem: null, contaNome: null, dataCompetencia: '2026-09-09', dataVencimento: '2026-09-20', status: 'APROVADO',
+  categoriaId: CAT.peixes, categoriaNome: 'Peixes', tituloCentavos: 9000, linhaCentavos: 9000, cmvIncluir: true,
+  updatedAt: 'tb', serieBoletos: 3,
+};
+const listaMista = () => ({ totalLinhas: 2, totalTitulos: 2, totalCentavos: 14500, itens: [LINHA_BOLETO, LINHA_LANCAMENTO] });
+
+/** Abre a lista "Despesas pendentes de classificação" pelo aviso de qualidade da Visão Geral. */
+function abrirPendentes() {
+  state.respostas.set(SEMANA, pronto(relatorioSemana()));
+  renderizar();
+  const linha = screen.getByText(/Pendentes de classificação no período/).closest('li')!;
+  fireEvent.click(within(linha).getByRole('button', { name: 'Ver despesas' }));
+  return screen.getByRole('dialog', { name: 'Despesas pendentes de classificação' });
+}
 
 function renderizar() {
   return render(
@@ -70,6 +102,9 @@ beforeEach(() => {
   state.respostas.clear();
   state.chamadas.length = 0;
   state.listas.length = 0;
+  state.lista = null;
+  state.classificar.mockReset();
+  state.navegar.mockReset();
   state.refetch.mockReset();
 });
 afterEach(() => vi.clearAllMocks());
@@ -95,8 +130,8 @@ describe('CMV Financeiro — tela', () => {
     expect(within(card('% CMV')).getByText('31,00%')).toBeInTheDocument();
     expect(within(card('% CMV')).getByText('+6,00 p.p.')).toBeInTheDocument();
     expect(within(card('Variação do CMV em R$')).getByText('+R$ 1.100,00')).toBeInTheDocument();
-    expect(within(card('Boletos vinculados ao CMV')).getByText('5')).toBeInTheDocument();
-    expect(within(card('Boletos vinculados ao CMV')).getByText('2 boletos')).toBeInTheDocument();
+    expect(within(card('Despesas vinculadas ao CMV')).getByText('5')).toBeInTheDocument();
+    expect(within(card('Despesas vinculadas ao CMV')).getByText('2 despesas')).toBeInTheDocument();
 
     expect(screen.getByText('Faturamento × CMV × % CMV')).toBeInTheDocument();
     expect(screen.getByText('Composição do CMV por categoria')).toBeInTheDocument();
@@ -185,7 +220,7 @@ describe('CMV Financeiro — tela', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Análise por Categoria' }));
     const tabela = screen.getByRole('table', { name: /Demonstrativo de CMV por categoria/ });
     fireEvent.click(within(tabela).getByRole('button', { name: 'Peixes' }));
-    expect(screen.getByRole('dialog', { name: 'Boletos de origem — Peixes' })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Despesas de origem — Peixes' })).toBeInTheDocument();
     const consulta = state.listas.filter(l => l.enabled).pop()!;
     expect(consulta.params).toMatchObject({ inicio: '2026-09-07', fim: '2026-09-13', situacao: 'incluido', categoriaId: CAT.peixes, offset: 0 });
   });
@@ -194,8 +229,8 @@ describe('CMV Financeiro — tela', () => {
     state.respostas.set(SEMANA, pronto(relatorioSemana()));
     renderizar();
     const linha = screen.getByText(/Pendentes de classificação no período/).closest('li')!;
-    fireEvent.click(within(linha).getByRole('button', { name: 'Ver boletos' }));
-    expect(screen.getByRole('dialog', { name: 'Boletos pendentes de classificação' })).toBeInTheDocument();
+    fireEvent.click(within(linha).getByRole('button', { name: 'Ver despesas' }));
+    expect(screen.getByRole('dialog', { name: 'Despesas pendentes de classificação' })).toBeInTheDocument();
     expect(state.listas.filter(l => l.enabled).pop()!.params).toMatchObject({ situacao: 'pendente', inicio: '2026-09-07', fim: '2026-09-13', categoriaId: null });
   });
 
@@ -206,10 +241,124 @@ describe('CMV Financeiro — tela', () => {
     expect(screen.getByText('Demonstração — não são dados da empresa')).toBeInTheDocument();
     expect(screen.getByText('R$ 2.150,00')).toBeInTheDocument();
     expect(screen.getByText('R$ 1.800,00')).toBeInTheDocument();
-    expect(screen.getByText(/O padrão será sugerido em novos lançamentos\. Alterações não modificam boletos já cadastrados\./)).toBeInTheDocument();
+    expect(screen.getByText(/O padrão será sugerido em novos lançamentos\. Alterações não modificam despesas já cadastradas\./)).toBeInTheDocument();
     expect(screen.getByText('7')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Revisar pendências' }));
     expect(state.listas.filter(l => l.enabled).pop()!.params).toMatchObject({ situacao: 'pendente', inicio: null, fim: null });
+  });
+
+  it('lista de origem mostra a origem do lançamento, abre no Livro Razão e classifica pelo lançamento', async () => {
+    state.permissoes.add('financeiro:lancamentos:view');
+    state.permissoes.add('financeiro:lancamentos:edit');
+    state.lista = {
+      totalLinhas: 1, totalTitulos: 1, totalCentavos: 5500,
+      itens: [{
+        fonte: 'lancamento', documentoId: 'l1', contaPagarId: null, rateioId: null, descricao: 'PIX ARROZ', fornecedor: null,
+        origem: 'conciliacao', contaNome: 'Banco A', dataCompetencia: '2026-09-08', dataVencimento: null, status: 'REALIZADO',
+        categoriaId: CAT.peixes, categoriaNome: 'Peixes', tituloCentavos: 5500, linhaCentavos: 5500, cmvIncluir: null,
+        updatedAt: 't1', serieBoletos: 1,
+      }],
+    };
+    state.respostas.set(SEMANA, pronto(relatorioSemana()));
+    renderizar();
+    const linha = screen.getByText(/Pendentes de classificação no período/).closest('li')!;
+    fireEvent.click(within(linha).getByRole('button', { name: 'Ver despesas' }));
+    const dialogo = screen.getByRole('dialog', { name: 'Despesas pendentes de classificação' });
+    expect(within(dialogo).getByText('Conciliação · Banco A')).toBeInTheDocument();
+    expect(within(dialogo).getByRole('button', { name: 'Abrir PIX ARROZ em Lançamentos' })).toBeInTheDocument();
+    expect(within(dialogo).queryByRole('button', { name: /Série/ })).not.toBeInTheDocument();
+    fireEvent.click(within(within(dialogo).getByRole('radiogroup', { name: 'Aparecer no CMV financeiro? — PIX ARROZ' })).getByRole('radio', { name: 'Sim' }));
+    await waitFor(() => expect(state.classificar).toHaveBeenCalledWith(expect.anything(), [
+      { lancamentoId: 'l1', rateioId: null, incluir: true, expectedUpdatedAt: 't1' },
+    ]));
+  });
+
+  it('Regras de vínculo: pedir a resposta vale para as novas despesas e há "Aplicar padrões"', () => {
+    state.respostas.set(SEMANA, pronto(relatorioSemana()));
+    renderizar();
+    fireEvent.click(screen.getByRole('tab', { name: /Regras de vínculo/ }));
+    expect(screen.getByText('Pedir a resposta nas novas despesas')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Aplicar padrões às pendentes' })).toBeInTheDocument();
+  });
+
+  it('abrir leva cada linha ao módulo da sua fonte: lançamento no Livro Razão, boleto em Contas a Pagar', () => {
+    state.permissoes.add('financeiro:lancamentos:view');
+    state.lista = listaMista();
+    const dialogo = abrirPendentes();
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Abrir PIX ARROZ em Lançamentos' }));
+    expect(state.navegar).toHaveBeenCalledTimes(1);
+    expect(state.navegar).toHaveBeenLastCalledWith({ tab: 'financeiro', subtab: 'lancamentos', record: { type: 'lancamento', id: 'l1' } });
+
+    // o diálogo fechou; abre de novo e usa a linha do boleto
+    const linha = screen.getByText(/Pendentes de classificação no período/).closest('li')!;
+    fireEvent.click(within(linha).getByRole('button', { name: 'Ver despesas' }));
+    const reaberto = screen.getByRole('dialog', { name: 'Despesas pendentes de classificação' });
+    fireEvent.click(within(reaberto).getByRole('button', { name: 'Abrir NF 123 em Contas a Pagar' }));
+    expect(state.navegar).toHaveBeenCalledTimes(2);
+    expect(state.navegar).toHaveBeenLastCalledWith({ tab: 'financeiro', subtab: 'pagar', record: { type: 'conta_pagar', id: 'b1' } });
+    // o id do lançamento nunca chega ao Contas a Pagar
+    expect(state.navegar).not.toHaveBeenCalledWith(expect.objectContaining({ record: { type: 'conta_pagar', id: 'l1' } }));
+  });
+
+  it('o botão Abrir do lançamento some sem permissão do Livro Razão, mesmo com a de Contas a Pagar', () => {
+    state.lista = listaMista();
+    const dialogo = abrirPendentes();
+    expect(within(dialogo).getByRole('button', { name: 'Abrir NF 123 em Contas a Pagar' })).toBeInTheDocument();
+    expect(within(dialogo).queryByRole('button', { name: /Abrir PIX ARROZ/ })).not.toBeInTheDocument();
+  });
+
+  it('o botão Abrir do boleto some sem permissão de Contas a Pagar, mesmo com a do Livro Razão', () => {
+    state.permissoes.delete('financeiro:pagar:view');
+    state.permissoes.add('financeiro:lancamentos:view');
+    state.lista = listaMista();
+    const dialogo = abrirPendentes();
+    expect(within(dialogo).getByRole('button', { name: 'Abrir PIX ARROZ em Lançamentos' })).toBeInTheDocument();
+    expect(within(dialogo).queryByRole('button', { name: /Abrir NF 123/ })).not.toBeInTheDocument();
+  });
+
+  it('"Série" é só de boleto, mesmo que o lançamento traga contagem de série', () => {
+    state.lista = listaMista();
+    const dialogo = abrirPendentes();
+    expect(within(dialogo).getByRole('button', { name: /Aplicar a resposta de NF 123 às outras 2 parcelas da série/ })).toBeInTheDocument();
+    expect(within(dialogo).queryByRole('button', { name: /Aplicar a resposta de PIX ARROZ/ })).not.toBeInTheDocument();
+  });
+
+  it('lançamento sem fornecedor nem vencimento mostra a origem e nunca imprime "null"', () => {
+    state.lista = listaMista();
+    const dialogo = abrirPendentes();
+    expect(within(dialogo).getByText('Boleto · Peixaria Azul')).toBeInTheDocument();
+    expect(within(dialogo).getByText('Conciliação · Banco A')).toBeInTheDocument();
+    const linhaLancamento = within(dialogo).getByText('PIX ARROZ').closest('tr')!;
+    expect(within(linhaLancamento).getByText('—')).toBeInTheDocument();
+    expect(dialogo.textContent).not.toMatch(/null|undefined|NaN/);
+  });
+
+  it('quem só edita Contas a Pagar classifica o boleto, mas não o lançamento', () => {
+    state.permissoes = new Set(['financeiro:cmv:view', 'financeiro:pagar:view', 'financeiro:pagar:edit']);
+    state.lista = listaMista();
+    const dialogo = abrirPendentes();
+    expect(within(dialogo).getByRole('radiogroup', { name: 'Aparecer no CMV financeiro? — NF 123' })).toBeInTheDocument();
+    expect(within(dialogo).queryByRole('radiogroup', { name: /PIX ARROZ/ })).not.toBeInTheDocument();
+    expect(within(dialogo).getByText('Pendente de classificação')).toBeInTheDocument();
+  });
+
+  it.each(['financeiro:lancamentos:edit', 'financeiro:conciliacao:reconcile'])('%s habilita a classificação do lançamento, não a do boleto', permissao => {
+    state.permissoes = new Set(['financeiro:cmv:view', permissao]);
+    state.lista = listaMista();
+    const dialogo = abrirPendentes();
+    expect(within(dialogo).getByRole('radiogroup', { name: 'Aparecer no CMV financeiro? — PIX ARROZ' })).toBeInTheDocument();
+    expect(within(dialogo).queryByRole('radiogroup', { name: /NF 123/ })).not.toBeInTheDocument();
+  });
+
+  it('falha ao classificar uma linha registra no console antes do aviso', async () => {
+    const erro = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const falha = new Error('OPTIMISTIC_LOCK_CONFLICT');
+    state.classificar.mockRejectedValue(falha);
+    state.lista = listaMista();
+    const dialogo = abrirPendentes();
+    fireEvent.click(within(within(dialogo).getByRole('radiogroup', { name: 'Aparecer no CMV financeiro? — PIX ARROZ' })).getByRole('radio', { name: 'Sim' }));
+    await waitFor(() => expect(erro).toHaveBeenCalledWith('[CMV Financeiro] Falha ao classificar a linha:', falha));
+    erro.mockRestore();
   });
 
   it('sem permissão de leitura não consulta nem mostra dados', () => {
@@ -249,7 +398,7 @@ describe('CMV Financeiro — tela', () => {
     const card = screen.getByRole('heading', { level: 3, name: '% CMV' }).closest('article')!;
     expect(within(card).getAllByText('—').length).toBeGreaterThan(0);
     expect(within(card).getByText('Sem fechamento de caixa no período.')).toBeInTheDocument();
-    expect(screen.getByText('Nenhum boleto incluído no CMV neste período')).toBeInTheDocument();
+    expect(screen.getByText('Nenhuma despesa incluída no CMV neste período')).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/NaN|Infinity/);
   });
 });

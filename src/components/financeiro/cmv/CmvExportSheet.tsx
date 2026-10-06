@@ -126,7 +126,7 @@ export default function CmvExportSheet({ open, onOpenChange, report }: Props) {
         console.error('[CMV Financeiro] Falha ao preparar o PDF:', error);
         setPrevia(null);
         setErro(error instanceof BoletosDivergentesError
-          ? 'Os boletos mudaram depois que o relatório foi carregado. Feche o painel, atualize a tela e exporte de novo.'
+          ? 'As despesas mudaram depois que o relatório foi carregado. Feche o painel, atualize a tela e exporte de novo.'
           : 'Não foi possível preparar o PDF. Verifique a conexão e tente de novo.');
       } finally {
         if (!cancelado) setPreparando(false);
