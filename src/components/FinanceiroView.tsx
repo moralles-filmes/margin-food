@@ -37,7 +37,6 @@ import FechamentoCaixaSection from '@/components/financeiro/FechamentoCaixaSecti
 import CadastroBaseTree from '@/components/financeiro/CadastroBaseTree';
 import ContasBancariasSection from '@/components/financeiro/ContasBancariasSection';
 import LivroRazaoSection from '@/components/financeiro/LivroRazaoSection';
-import PlanoContasFinSection from '@/components/financeiro/PlanoContasFinSection';
 import CentrosCustoFinSection from '@/components/financeiro/CentrosCustoFinSection';
 
 type FinSubTab = 'dashboard' | 'cadastros' | 'contas' | 'lancamentos' | 'pagar' | 'codigos_pagamento' | 'receber' | 'fluxo' | 'dre' | 'orcamento' | 'conciliacao' | 'alertas' | 'recorrencias' | 'categorizacao' | 'bordero' | 'apresentacao_socios' | 'projecao' | 'kpis' | 'auditoria' | 'comparativo' | 'fechamento' | 'cmv';
@@ -46,7 +45,7 @@ type FinSubTab = 'dashboard' | 'cadastros' | 'contas' | 'lancamentos' | 'pagar' 
 
 // ==================== CADASTROS BASE ====================
 function CadastrosBase() {
-  const [subView, setSubView] = useState<'arvore' | 'plano' | 'centros'>('arvore');
+  const [subView, setSubView] = useState<'arvore' | 'centros'>('arvore');
   const canCreate = useCan('financeiro:cadastros:create');
   const canEdit = useCan('financeiro:cadastros:edit');
   const canDelete = useCan('financeiro:cadastros:delete');
@@ -55,11 +54,9 @@ function CadastrosBase() {
     <div className="space-y-4">
       <div className="flex items-center gap-2 mb-4">
         <Button variant={subView === 'arvore' ? 'default' : 'outline'} size="sm" onClick={() => setSubView('arvore')}>Estrutura de Categorias</Button>
-        <Button variant={subView === 'plano' ? 'default' : 'outline'} size="sm" onClick={() => setSubView('plano')}>Plano de Contas</Button>
         <Button variant={subView === 'centros' ? 'default' : 'outline'} size="sm" onClick={() => setSubView('centros')}>Centros de Custo</Button>
       </div>
       {subView === 'arvore' && <CadastroBaseTree />}
-      {subView === 'plano' && <PlanoContasFinSection canCreate={canCreate} canEdit={canEdit} canDelete={canDelete} />}
       {subView === 'centros' && <CentrosCustoFinSection canCreate={canCreate} canEdit={canEdit} canDelete={canDelete} />}
     </div>
   );

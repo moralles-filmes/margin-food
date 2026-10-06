@@ -1,6 +1,6 @@
 /**
- * Centros de Custo e Plano de Contas: o servidor recusa o cadastro duplicado
- * (índice único por nome/código entre ativos) e a tela traduz a recusa, em vez
+ * Centros de Custo: o servidor recusa o cadastro duplicado (índice único por
+ * nome entre ativos) e a tela traduz a recusa, em vez
  * de mostrar "duplicate key value violates unique constraint".
  */
 import { readFileSync } from 'node:fs';
@@ -82,10 +82,8 @@ describe('Centros de Custo — padronização do nome', () => {
 });
 
 describe('mensagemCadastroDuplicado', () => {
-  it('traduz a recusa dos dois índices', () => {
+  it('traduz a recusa do índice', () => {
     expect(mensagemCadastroDuplicado(DUPLICADO.message)).toMatch(/centro de custo ativo com este nome/);
-    expect(mensagemCadastroDuplicado('duplicate key value violates unique constraint "uq_fin_plano_contas_codigo_ativo"'))
-      .toMatch(/conta ativa com este código/);
   });
 
   it('devolve null para os demais erros', () => {
@@ -112,10 +110,4 @@ describe('migração: unicidade de Centros de Custo e Plano de Contas', () => {
     );
   });
 
-  it('plano de contas: código por empresa, só entre ativos', () => {
-    expect(migration).toContain(
-      'CREATE UNIQUE INDEX IF NOT EXISTS uq_fin_plano_contas_codigo_ativo ON public.fin_plano_contas '
-      + '(company_id, (lower(btrim(codigo)))) WHERE ativo;',
-    );
-  });
 });
