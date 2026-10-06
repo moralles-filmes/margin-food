@@ -257,6 +257,43 @@ describe('Lançamentos — "Aparecer no CMV financeiro?"', () => {
     expect(screen.getByText(/A cobrança e o pagamento do boleto não mudam\./)).toBeInTheDocument();
   });
 
+  it('sem competência a despesa não usa o vencimento: avisa que não entra em nenhum período', () => {
+    render(<Form variant="lancamento" initial={{ ...despesa, data_competencia: '', data_vencimento: '2026-09-18' }} />);
+    expect(screen.getByText(/Sem data de competência a despesa não entra em nenhum período do CMV/)).toBeInTheDocument();
+    expect(screen.queryByText(/vencimento, pois a competência não foi informada/)).not.toBeInTheDocument();
+    expect(screen.queryByText('18/09/2026')).not.toBeInTheDocument();
+  });
+
+  it('classificação desligada: trocar a categoria de despesa já respondida mostra o aviso e as opções, em vez de apagar em silêncio', () => {
+    render(<Form variant="lancamento" initial={{ ...despesa, categoria_id: 'peixes', cmv_incluir: true }} cmv={{ ativo: false, padroes: new Map() }} />);
+    expect(screen.getByRole('radiogroup', { name: 'Aparecer no CMV financeiro?' })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Categoria'), { target: { value: 'escritorio' } });
+    expect(formAtual()).toMatchObject({ categoria_id: 'escritorio', cmv_incluir: null, cmv_aviso: 'redefinido' });
+    expect(screen.getByText('Categoria trocada: decisão redefinida. Confira.')).toBeInTheDocument();
+    const grupo = screen.getByRole('radiogroup', { name: 'Aparecer no CMV financeiro?' });
+    expect(within(grupo).getByRole('radio', { name: 'Sim' })).toHaveAttribute('aria-checked', 'false');
+    expect(within(grupo).getByRole('radio', { name: 'Não' })).toHaveAttribute('aria-checked', 'false');
+    expect(salvar()).toBeEnabled();
+  });
+
+  it('classificação desligada e sem resposta nem aviso: a pergunta não aparece', () => {
+    render(<Form variant="lancamento" initial={despesa} cmv={{ ativo: false, padroes: new Map() }} />);
+    expect(screen.queryByText('Aparecer no CMV financeiro?')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Categoria'), { target: { value: 'peixes' } });
+    expect(formAtual().cmv_incluir).toBeNull();
+    expect(screen.queryByText('Aparecer no CMV financeiro?')).not.toBeInTheDocument();
+  });
+
+  it('classificação desligada: o aviso de uma linha do rateio também mantém a pergunta à vista', () => {
+    render(<Form variant="lancamento" isEditing initial={despesa} cmv={{ ativo: false, padroes: new Map() }}
+      linhas={[linha('a', 'peixes', 55, true)]} />);
+    const [primeira] = screen.getAllByLabelText('Categoria');
+    fireEvent.change(primeira, { target: { value: 'bebidas' } });
+    expect(JSON.parse(screen.getByTestId('rateio').textContent!)[0]).toMatchObject({ cmv_incluir: null, cmv_aviso: 'redefinido' });
+    expect(screen.getByText('Categoria trocada: decisão redefinida. Confira.')).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Aparecer no CMV financeiro?' })).toBeInTheDocument();
+  });
+
   it('despesa com rateio: o aviso de unificar fala da despesa e o salvar segue livre', () => {
     render(<Form variant="lancamento" isEditing initial={despesa} linhas={[linha('a', 'peixes', 30, true), linha('b', 'escritorio', 25, false)]} />);
     expect(resumo('Total da despesa')).toBe('R$ 55,00');

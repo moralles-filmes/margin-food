@@ -154,7 +154,10 @@ export default function ContaFormDialog({
   const cmvDoc = variant === 'pagar' ? 'boleto' : 'despesa';
   const cmvVariante = variant === 'pagar' || (variant === 'lancamento' && form.tipo === 'DESPESA');
   const cmvTemDecisao = (form.cmv_incluir ?? null) !== null || rateioLines.some(l => (l.cmv_incluir ?? null) !== null);
-  const mostrarCmv = cmvVariante && cmv !== null && (cmv.ativo || cmvTemDecisao);
+  // Aviso de categoria trocada mantém a pergunta à vista: sem isso, com a classificação
+  // desligada, a decisão seria apagada ao salvar sem ninguém ver o "Confira".
+  const cmvTemAviso = Boolean(form.cmv_aviso) || rateioLines.some(l => Boolean(l.cmv_aviso));
+  const mostrarCmv = cmvVariante && cmv !== null && (cmv.ativo || cmvTemDecisao || cmvTemAviso);
   const [rateioRef, rateioEstreito] = useConteinerEstreito(mostrarCmv ? RATEIO_LIMITE_CMV_PX : RATEIO_LIMITE_PX, RATEIO_HISTERESE_PX);
 
   /** Trocar a categoria reaplica o padrão dela — e avisa, para a decisão não mudar em silêncio. */
@@ -248,7 +251,8 @@ export default function ContaFormDialog({
     : (form.cmv_incluir ?? null) === null && (form.cmv_aviso === 'redefinido' || form.cmv_aviso === 'unificar');
   const cmvBloqueiaSalvar = variant === 'pagar' && mostrarCmv && Boolean(cmv?.ativo)
     && (isEditing ? cmvApagadaNaEdicao : cmvResumo.linhasPendentes > 0);
-  const cmvCompetencia = form.data_competencia || form.data_vencimento;
+  // O CMV do boleto cai na competência e, sem ela, no vencimento; o da despesa de lançamento só usa a competência.
+  const cmvCompetencia = variant === 'pagar' ? (form.data_competencia || form.data_vencimento) : form.data_competencia;
   const marcarTodasCmv = (valor: boolean) =>
     onRateioLinesChange(rateioLines.map(l => ({ ...l, cmv_incluir: valor, cmv_aviso: undefined })));
   const textoAvisoCmv = (aviso?: CmvAviso) =>
