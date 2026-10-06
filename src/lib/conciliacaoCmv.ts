@@ -103,8 +103,11 @@ export function trocarCategoriaDaLinha<T extends LinhaExtratoCmv>(
   padroes: ReadonlyMap<string, CmvDecisao> | null,
 ): T {
   const base: T = { ...l, categoriaId, rateioLinhas: undefined };
-  if (!padroes || l.tipo !== 'DESPESA') return base;
-  const { cmv_incluir, cmv_aviso } = decisaoAoTrocarCategoria(decisaoDaLinhaExtrato(l), categoriaId, padroes);
+  if (l.tipo !== 'DESPESA') return base;
+  // O rateio de uma linha sai daqui: a resposta que só vivia nele passa para a própria linha.
+  const atual = decisaoDaLinhaExtrato(l);
+  if (!padroes) return { ...base, cmvIncluir: atual };
+  const { cmv_incluir, cmv_aviso } = decisaoAoTrocarCategoria(atual, categoriaId, padroes);
   return { ...base, cmvIncluir: cmv_incluir, cmvAviso: cmv_aviso };
 }
 

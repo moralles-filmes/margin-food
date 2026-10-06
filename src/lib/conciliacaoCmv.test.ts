@@ -55,6 +55,34 @@ describe('conciliação — decisão do CMV e competência da linha do extrato',
     expect(trocarCategoriaDaLinha(linha({ tipo: 'RECEITA' }), 'peixes', padroes).cmvIncluir).toBeUndefined();
   });
 
+  it('trocar a categoria com a classificação desligada não perde a decisão que vive só no rateio de uma linha', () => {
+    const antes = linha({ categoriaId: 'peixes', rateioLinhas: [rateio('peixes', 55, true)] });
+    const depois = trocarCategoriaDaLinha(antes, 'outra', null);
+    expect(depois.rateioLinhas).toBeUndefined();
+    expect(depois).toMatchObject({ categoriaId: 'outra', cmvIncluir: true });
+    expect(decisaoDaLinhaExtrato(depois)).toBe(true);
+    // a linha sem resposta nenhuma segue pendente
+    expect(decisaoDaLinhaExtrato(trocarCategoriaDaLinha(linha({ rateioLinhas: [rateio('peixes', 55, null)] }), 'outra', null))).toBeNull();
+  });
+
+  it('não altera a linha recebida: devolve objetos novos mesmo com tudo congelado', () => {
+    const congelada = Object.freeze(linha({
+      categoriaId: 'peixes',
+      rateioLinhas: Object.freeze([Object.freeze(rateio('peixes', 55, null))]) as unknown as LinhaExtratoCmv['rateioLinhas'],
+    }));
+    const respondida = definirDecisaoDaLinha(congelada, true);
+    expect(respondida).not.toBe(congelada);
+    expect(respondida.rateioLinhas).not.toBe(congelada.rateioLinhas);
+    expect(decisaoDaLinhaExtrato(respondida)).toBe(true);
+    expect(decisaoDaLinhaExtrato(congelada)).toBeNull();
+
+    const trocada = trocarCategoriaDaLinha(congelada, 'escr', padroes);
+    expect(trocada).not.toBe(congelada);
+    expect(trocada).toMatchObject({ categoriaId: 'escr', cmvIncluir: false });
+    expect(congelada.categoriaId).toBe('peixes');
+    expect(congelada.rateioLinhas).toHaveLength(1);
+  });
+
   it('a decisão exibida e a gravada são a mesma: com rateio de uma linha, a da linha do rateio', () => {
     const umaLinha = linha({ rateioLinhas: [rateio('peixes', 55, null)] });
     const respondida = definirDecisaoDaLinha(umaLinha, true);
