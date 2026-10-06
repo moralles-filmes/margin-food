@@ -13,6 +13,7 @@ async function readPdfText(blob: Blob): Promise<string> {
 const emitidoEm = new Date('2026-09-20T18:45:00Z');
 const report = buildCmvReport(parseCmvPayload(cmvPayloadCru()), CMV_FILTRO_SEMANA);
 
+/** Sem `fonte`: linha antiga, tratada como boleto. */
 function boletos(n: number): CmvPdfBoleto[] {
   return Array.from({ length: n }, (_, i) => ({
     descricao: `Boleto teste ${String(i + 1).padStart(3, '0')}`,
@@ -117,11 +118,45 @@ describe('CMV Financeiro — exportação PDF', () => {
     expect(text).toContain(formatarCentavos(180 * 120000));
   });
 
+  it('textos falam de despesas (boletos, lançamentos e conciliação), não só de boletos', async () => {
+    const text = await readPdfText(createCmvPdfBlob(snapshot(CMV_TODOS_BLOCOS, { boletos: boletos(1) })).blob);
+    expect(text).toMatch(/Despesas vinculadas ao CMV/);
+    expect(text).not.toContain('Boletos vinculados ao CMV');
+    expect(text).toMatch(/Despesas de origem/);
+    // os parênteses são escapados no fluxo do PDF
+    expect(text).toMatch(/boletos de Contas a Pagar, lan.amentos e concilia..o\\\)/);
+    expect(text).toContain('Valor do documento');
+    expect(text).toContain('Origem / descri');
+    expect(text).toMatch(/CMV por compet.ncia das despesas/);
+  });
+
+  it('linha de lançamento mostra a origem e a conta; a de boleto continua com o fornecedor', async () => {
+    const base = boletos(1)[0];
+    const linhas: CmvPdfBoleto[] = [
+      { ...base, descricao: 'NF 123', fornecedor: 'Peixaria Azul' },
+      {
+        ...base, fonte: 'lancamento', origem: 'conciliacao', contaNome: 'Banco A', descricao: 'PIX ARROZ',
+        fornecedor: null, dataVencimento: null, status: 'REALIZADO',
+      },
+      {
+        ...base, fonte: 'lancamento', origem: 'manual', contaNome: null, descricao: 'COMPRA AVULSA',
+        fornecedor: null, dataVencimento: null, status: 'PREVISTO',
+      },
+    ];
+    const text = await readPdfText(createCmvPdfBlob(snapshot(['boletos'], { boletos: linhas })).blob);
+    expect(text).toMatch(/Peixaria Azul . NF 123/);
+    expect(text).toMatch(/Concilia..o . Banco A . PIX ARROZ/);
+    expect(text).toMatch(/Lan.amento . COMPRA AVULSA/);
+    expect(text).toContain('Realizado');
+    expect(text).toContain('Previsto');
+    expect(text).not.toMatch(/undefined|NaN|Infinity/);
+  });
+
   it('sem fechamento ou sem dados não imprime zero enganoso', async () => {
     const vazio = buildCmvReport(parseCmvPayload(cmvPayloadCru({ faturamento: [], cmv: [], boletos: [], qualidade: [], categorias: [] })), CMV_FILTRO_SEMANA);
     const text = await readPdfText(createCmvPdfBlob({ ...snapshot(CMV_TODOS_BLOCOS, { boletos: [] }), report: vazio }).blob);
     expect(text).toContain('Sem fechamento');
-    expect(text).toContain('Nenhum boleto inclu');
+    expect(text).toContain('Nenhuma despesa inclu');
     expect(text).not.toMatch(/NaN|Infinity|undefined/);
   });
 

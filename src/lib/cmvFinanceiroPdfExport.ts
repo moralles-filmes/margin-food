@@ -23,14 +23,14 @@ export type CmvBlocoPdf =
   | 'demonstrativo' | 'temporal' | 'boletos' | 'observacoes';
 
 export const CMV_BLOCOS_PDF: { id: CmvBlocoPdf; rotulo: string; descricao: string }[] = [
-  { id: 'cards', rotulo: 'Cards principais', descricao: 'Faturamento, CMV, % CMV, variação e boletos vinculados' },
+  { id: 'cards', rotulo: 'Cards principais', descricao: 'Faturamento, CMV, % CMV, variação e despesas vinculadas' },
   { id: 'evolucao', rotulo: 'Gráfico de evolução', descricao: 'Faturamento × CMV × % CMV por faixa do período' },
   { id: 'composicao', rotulo: 'Composição por categoria', descricao: 'Participação de cada categoria no CMV' },
   { id: 'comparativo', rotulo: 'Comparativo', descricao: 'Período atual × anterior, indicadores e categorias' },
   { id: 'ranking', rotulo: 'Ranking e leituras', descricao: 'Ranking das categorias e leituras do período' },
   { id: 'demonstrativo', rotulo: 'Demonstrativo por categoria', descricao: 'Categorias e subcategorias, em formato de demonstrativo' },
   { id: 'temporal', rotulo: 'Detalhamento temporal', descricao: 'Faturamento, CMV e % por faixa, atual e anterior' },
-  { id: 'boletos', rotulo: 'Boletos de origem', descricao: 'Todas as linhas de rateio incluídas no CMV do período' },
+  { id: 'boletos', rotulo: 'Despesas de origem', descricao: 'Todas as linhas incluídas no CMV do período (boletos, lançamentos e conciliação)' },
   { id: 'observacoes', rotulo: 'Observações', descricao: 'Anotações e considerações adicionais' },
 ];
 
@@ -45,6 +45,10 @@ export const CMV_ATALHOS_PDF: { id: string; rotulo: string; blocos: CmvBlocoPdf[
 
 export interface CmvPdfBoleto {
   descricao: string;
+  /** Ausente em linha antiga = boleto. */
+  fonte?: 'boleto' | 'lancamento';
+  origem?: string | null;
+  contaNome?: string | null;
   fornecedor: string | null;
   dataCompetencia: string | null;
   dataVencimento: string | null;
@@ -79,6 +83,8 @@ const STATUS_ROTULO: Record<string, string> = {
   AGUARDANDO_APROVACAO: 'Aguard. aprovação',
   APROVADO: 'Em aberto',
   PAGO: 'Pago',
+  REALIZADO: 'Realizado',
+  PREVISTO: 'Previsto',
 };
 
 const COR = {
@@ -205,7 +211,7 @@ function drawFirstPageHeader(ctx: Contexto): number {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.5);
   setText(doc, COR.muted);
-  doc.text(t('Custo das mercadorias pelos boletos de Contas a Pagar (competência) sobre o faturamento do Fechamento de Caixa.'), PAGE.margin, 29);
+  doc.text(t('Custo das mercadorias pelas despesas marcadas para o CMV (boletos, lançamentos e conciliação, por competência) sobre o faturamento do Fechamento de Caixa.'), PAGE.margin, 29);
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(7.5);
@@ -229,7 +235,7 @@ function drawFirstPageHeader(ctx: Contexto): number {
 function drawOrigem(ctx: Contexto, top: number): number {
   const { doc, snapshot: { report } } = ctx;
   const linhas: { texto: string; aviso: boolean }[] = [
-    { texto: 'CMV: linhas de rateio marcadas para o CMV nos boletos de Contas a Pagar, pela data de competência. Faturamento: bruto do Fechamento de Caixa. % CMV = CMV ÷ faturamento.', aviso: false },
+    { texto: 'CMV: linhas marcadas para o CMV nas despesas (boletos de Contas a Pagar, lançamentos e conciliação), pela data de competência. Faturamento: bruto do Fechamento de Caixa. % CMV = CMV ÷ faturamento.', aviso: false },
     { texto: comparacaoLabel(report), aviso: false },
     ...report.avisos.map(a => ({ texto: `Atenção: ${a.texto}`, aviso: true })),
   ];
@@ -255,7 +261,7 @@ function drawCards(ctx: Contexto, top: number): number {
   const { doc, snapshot: { report } } = ctx;
   const y0 = ensureSpace(doc, top, 30);
   const inicio = doc.getNumberOfPages();
-  const { faturamento, cmv, percentual, boletos, anterior } = report;
+  const { faturamento, cmv, percentual, documentos, anterior } = report;
   const semAnterior = anterior.intervalo === null;
   const base = (v: string | null) => (v === null ? 'Sem base de comparação' : `${v} vs. período anterior`);
   const cards = [
@@ -282,9 +288,9 @@ function drawCards(ctx: Contexto, top: number): number {
       rodape: semAnterior ? '-' : `${formatarCentavos(anterior.cmvCentavos)} > ${formatarCentavos(cmv.atual)}`,
     },
     {
-      rotulo: 'Boletos vinculados ao CMV', valor: boletos.atual === null ? '-' : String(boletos.atual),
-      variacao: base(boletos.variacaoPercentual === null ? null : formatarVariacao(boletos.variacaoPercentual)),
-      rodape: semAnterior ? '-' : `Anterior: ${anterior.boletos} ${anterior.boletos === 1 ? 'boleto' : 'boletos'}`,
+      rotulo: 'Despesas vinculadas ao CMV', valor: documentos.atual === null ? '-' : String(documentos.atual),
+      variacao: base(documentos.variacaoPercentual === null ? null : formatarVariacao(documentos.variacaoPercentual)),
+      rodape: semAnterior ? '-' : `Anterior: ${anterior.documentos} ${anterior.documentos === 1 ? 'despesa' : 'despesas'}`,
     },
   ];
   const gap = 3;
@@ -431,7 +437,7 @@ function drawComposicao(ctx: Contexto, top: number): number {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8.5);
     setText(doc, COR.muted);
-    doc.text(t('Nenhum boleto incluído no CMV neste período.'), PAGE.margin, y + 3);
+    doc.text(t('Nenhuma despesa incluída no CMV neste período.'), PAGE.margin, y + 3);
     marcar(ctx, 'composicao', inicio);
     return y + 9;
   }
@@ -505,7 +511,7 @@ const direita = { halign: 'right' as const };
 
 function drawComparativo(ctx: Contexto, top: number): number {
   const { doc, snapshot: { report } } = ctx;
-  const { atual, anterior, faturamento, cmv, percentual, boletos } = report;
+  const { atual, anterior, faturamento, cmv, percentual, documentos } = report;
   const y = sectionTitle(doc, 'Comparativo — período atual × anterior', top, 44);
   const inicio = doc.getNumberOfPages();
   const saldoAnterior = anterior.faturamentoCentavos === null ? null : anterior.faturamentoCentavos - anterior.cmvCentavos;
@@ -520,8 +526,8 @@ function drawComparativo(ctx: Contexto, top: number): number {
       ['% CMV (CMV ÷ faturamento)', formatarPercentual(percentual.atual), formatarPercentual(percentual.anterior), formatarPontos(percentual.pontos), '-'],
       ['Saldo após CMV, antes das demais despesas', formatarCentavos(report.saldoAposCmvCentavos), formatarCentavos(saldoAnterior),
         formatarCentavosComSinal(report.saldoAposCmvCentavos === null || saldoAnterior === null ? null : report.saldoAposCmvCentavos - saldoAnterior), '-'],
-      ['Boletos vinculados ao CMV', boletos.atual === null ? '-' : String(boletos.atual), boletos.anterior === null ? '-' : String(boletos.anterior),
-        boletos.diferenca === null ? '-' : `${boletos.diferenca > 0 ? '+' : ''}${boletos.diferenca}`, formatarVariacao(boletos.variacaoPercentual)],
+      ['Despesas vinculadas ao CMV', documentos.atual === null ? '-' : String(documentos.atual), documentos.anterior === null ? '-' : String(documentos.anterior),
+        documentos.diferenca === null ? '-' : `${documentos.diferenca > 0 ? '+' : ''}${documentos.diferenca}`, formatarVariacao(documentos.variacaoPercentual)],
       ['Dias no intervalo comparado', String(atual.dias), String(anterior.dias), '-', '-'],
       ['Dias com fechamento de caixa', `${atual.diasComFechamento} de ${atual.dias}`, `${anterior.diasComFechamento} de ${anterior.dias}`, '-', '-'],
     ].map(linha => linha.map(t)),
@@ -611,7 +617,7 @@ function drawDemonstrativo(ctx: Contexto, top: number): number {
     startY: y,
     head: [['Categoria / Subcategoria', 'Valor atual', 'Valor anterior', 'Diferença em R$', 'Variação %', 'Participação no CMV', '% do faturamento'].map(t)],
     body: linhas.length === 0
-      ? [[t('Nenhum boleto incluído no CMV neste período.'), '', '', '', '', '', '']]
+      ? [[t('Nenhuma despesa incluída no CMV neste período.'), '', '', '', '', '', '']]
       : linhas.map(l => [
         `${l.nome}${l.ativo ? '' : ' (inativa)'}`, formatarCentavos(l.atualCentavos), formatarCentavos(l.anteriorCentavos),
         formatarCentavosComSinal(l.diferencaCentavos), formatarVariacao(l.variacaoPercentual),
@@ -687,17 +693,19 @@ function drawTemporal(ctx: Contexto, top: number): number {
 function drawBoletos(ctx: Contexto, top: number): number {
   const { doc, snapshot: { boletos } } = ctx;
   const linhas = boletos ?? [];
-  const y = sectionTitle(doc, `Boletos de origem — linhas incluídas no CMV (${linhas.length})`, top, 30);
+  const y = sectionTitle(doc, `Despesas de origem — linhas incluídas no CMV (${linhas.length})`, top, 30);
   const inicio = doc.getNumberOfPages();
   const data = (iso: string | null) => (iso ? formatarData(iso) : '-');
   autoTable(doc, {
     ...TABLE_BASE,
     startY: y,
-    head: [['Fornecedor / boleto', 'Competência', 'Vencimento', 'Situação', 'Categoria', 'Valor do boleto', 'Valor incluído'].map(t)],
+    head: [['Origem / descrição', 'Competência', 'Vencimento', 'Situação', 'Categoria', 'Valor do documento', 'Valor incluído'].map(t)],
     body: linhas.length === 0
       ? [[t('Nenhuma linha incluída no CMV neste período.'), '', '', '', '', '', '']]
       : linhas.map(l => [
-        l.fornecedor ? `${l.fornecedor} · ${l.descricao}` : l.descricao,
+        l.fonte === 'lancamento'
+          ? `${l.origem === 'conciliacao' ? 'Conciliação' : 'Lançamento'}${l.contaNome ? ` · ${l.contaNome}` : ''} · ${l.descricao}`
+          : (l.fornecedor ? `${l.fornecedor} · ${l.descricao}` : l.descricao),
         data(l.dataCompetencia), data(l.dataVencimento), STATUS_ROTULO[l.status] ?? l.status,
         l.categoriaNome ?? 'Sem categoria', formatarCentavos(l.tituloCentavos), formatarCentavos(l.linhaCentavos),
       ].map(t)),
@@ -759,7 +767,7 @@ function drawFooters(ctx: Contexto): void {
     doc.setFontSize(7);
     setText(doc, COR.muted);
     doc.text(
-      t(`${APP_NAME} · CMV Financeiro · Emitido em ${formatDateTimeBR(emitidoEm)} · Dados de ${momento(report.geradoEm)} · CMV por competência dos boletos; faturamento do Fechamento de Caixa`),
+      t(`${APP_NAME} · CMV Financeiro · Emitido em ${formatDateTimeBR(emitidoEm)} · Dados de ${momento(report.geradoEm)} · CMV por competência das despesas; faturamento do Fechamento de Caixa`),
       PAGE.margin, PAGE.height - 6.5, { maxWidth: 230 },
     );
     doc.text(t(`Página ${page} de ${total}`), PAGE.width - PAGE.margin, PAGE.height - 6.5, { align: 'right' });
@@ -790,7 +798,7 @@ export function createCmvPdf(snapshot: CmvPdfSnapshot): CmvPdfResultado {
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
   doc.setProperties({
     title: t(`CMV Financeiro - ${report.empresa} - ${periodoLabel(report)}`),
-    subject: t(`CMV Financeiro por competência dos boletos sobre o faturamento do Fechamento de Caixa - ${periodoLabel(report)}`),
+    subject: t(`CMV Financeiro por competência das despesas sobre o faturamento do Fechamento de Caixa - ${periodoLabel(report)}`),
     creator: APP_NAME,
   });
   const ctx: Contexto = { doc, snapshot, blocosPorPagina: [] };
