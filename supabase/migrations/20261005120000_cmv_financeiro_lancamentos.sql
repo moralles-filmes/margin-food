@@ -432,7 +432,7 @@ REVOKE ALL ON FUNCTION public._fin_cmv_heranca(jsonb, uuid) FROM PUBLIC, anon, a
 -- chamadas antigas continuam valendo.
 DROP FUNCTION IF EXISTS public.reconcile_import_lancamento(date, text, numeric, text, uuid, uuid, jsonb, text, boolean, integer);
 
-CREATE FUNCTION public.reconcile_import_lancamento(
+CREATE OR REPLACE FUNCTION public.reconcile_import_lancamento(
   p_data date,
   p_descricao text,
   p_valor numeric,
@@ -669,11 +669,12 @@ $function$;
 -- Cliente sem p_cmv (versão antiga, edição pela tela de Conciliação): na criação
 -- a decisão nasce pendente; na edição herda a da MESMA categoria (se unânime).
 -- Nunca exige a resposta: CMV_DECISAO_OBRIGATORIA é só de boleto.
+-- `cmv_incluir` por linha de rateio só é considerado quando `p_cmv` não é nulo (`{}` basta).
 -- Corpo a partir de 20260929183200_idempotencia_financeiro.sql (= banco vivo em
 -- 2026-10-05, conferido por md5 do prosrc).
 DROP FUNCTION IF EXISTS public._guarded_upsert_lancamento(uuid, text, text, numeric, uuid, uuid, uuid, date, date, date, text, text, text, text, boolean, jsonb, jsonb, timestamptz, text, text);
 
-CREATE FUNCTION public._guarded_upsert_lancamento(
+CREATE OR REPLACE FUNCTION public._guarded_upsert_lancamento(
   p_id uuid DEFAULT NULL::uuid,
   p_tipo text DEFAULT 'DESPESA'::text,
   p_status text DEFAULT 'PREVISTO'::text,
@@ -974,11 +975,12 @@ $function$;
 -- data do banco (data_pagamento) nunca muda; se o lançamento não tem, a
 -- competência antiga vira data_pagamento antes da troca — o reconhecimento da
 -- linha já conciliada usa data_pagamento || data_competencia.
+-- `cmv_incluir` por linha de rateio só é considerado quando `p_cmv` não é nulo (`{}` basta).
 -- Corpo a partir de 20260825182354_allow_safe_reconciled_classification_edit.sql
 -- (= banco vivo em 2026-10-05, conferido por md5 do prosrc).
 DROP FUNCTION IF EXISTS public._guarded_update_reconciled_classification(uuid, uuid, uuid, text, jsonb, timestamptz, text);
 
-CREATE FUNCTION public._guarded_update_reconciled_classification(
+CREATE OR REPLACE FUNCTION public._guarded_update_reconciled_classification(
   p_id uuid,
   p_categoria_id uuid DEFAULT NULL::uuid,
   p_centro_custo_id uuid DEFAULT NULL::uuid,
@@ -1296,5 +1298,445 @@ REVOKE EXECUTE ON FUNCTION public._guarded_upsert_lancamento(uuid, text, text, n
 GRANT EXECUTE ON FUNCTION public._guarded_upsert_lancamento(uuid, text, text, numeric, uuid, uuid, uuid, date, date, date, text, text, text, text, boolean, jsonb, jsonb, timestamptz, text, text, jsonb) TO authenticated, service_role;
 REVOKE EXECUTE ON FUNCTION public._guarded_update_reconciled_classification(uuid, uuid, uuid, text, jsonb, timestamptz, text, jsonb, date) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public._guarded_update_reconciled_classification(uuid, uuid, uuid, text, jsonb, timestamptz, text, jsonb, date) TO authenticated, service_role;
+
+-- O DROP da assinatura antiga apagou o comentário que ela tinha.
+COMMENT ON FUNCTION public._guarded_update_reconciled_classification(uuid, uuid, uuid, text, jsonb, timestamptz, text, jsonb, date) IS
+  'Reclassifica um lançamento conciliado sem desfazer a conciliação: altera só categoria, centro de custo, rateios, observações, data de competência e a decisão do CMV, sempre com justificativa, e mantém o vínculo da conciliação (fin_conciliacao_vinculos). Valor, conta, tipo, status, descrição e data do banco exigem desconciliar.';
+
+-- ─── Classificação depois (revisão do CMV): boletos E lançamentos ────────────
+-- p_itens: [{ conta_pagar_id | lancamento_id, rateio_id | null, incluir, expected_updated_at }]
+-- Exatamente um documento por item. Só a decisão do CMV muda; tudo ou nada.
+-- Ordem de bloqueio: boletos por id, depois lançamentos por id — a mesma de
+-- fin_cmv_aplicar_padroes —, para dois lotes nunca se travarem.
+-- O caminho do boleto é o do banco vivo (20261003140000_cmv_financeiro.sql; o prosrc
+-- vivo em 2026-10-05 tem o mesmo md5, com fim de linha CRLF): mesmos gates, mesmo
+-- lock otimista e mesma auditoria. O que muda é só aceitar o lançamento ao lado.
+-- Lançamento: só o que a apuração conta (_fin_cmv_linhas_lancamentos) — despesa não
+-- cancelada, sem referência de título, conciliada se veio da conciliação e que não
+-- seja a baixa de um boleto (fin_contas_pagar.lancamento_id).
+CREATE OR REPLACE FUNCTION public.fin_cmv_classificar(
+  p_itens jsonb,
+  p_justificativa text DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_company_id uuid;
+  v_uid uuid;
+  v_total integer;
+  v_documentos integer;
+  v_lancamentos integer;
+  v_cp record;
+  v_lanc record;
+  v_item record;
+  v_antes jsonb;
+  v_depois jsonb;
+  v_tem_rateio boolean;
+  v_now timestamptz := now();
+  v_atualizados jsonb := '[]'::jsonb;
+BEGIN
+  v_company_id := public.assert_tenant();
+  v_uid := auth.uid();
+  IF v_uid IS NULL THEN RAISE EXCEPTION 'AUTH_REQUIRED'; END IF;
+
+  IF p_itens IS NULL OR jsonb_typeof(p_itens) <> 'array' THEN
+    RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'CMV_INVALIDO';
+  END IF;
+  v_total := jsonb_array_length(p_itens);
+  IF v_total < 1 OR v_total > 500 THEN
+    RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'CMV_LOTE_INVALIDO';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM jsonb_array_elements(p_itens) e
+    WHERE jsonb_typeof(e) <> 'object'
+      OR NOT (e ? 'incluir')
+      OR jsonb_typeof(e->'incluir') NOT IN ('boolean', 'null')
+      OR (jsonb_typeof(e->'conta_pagar_id') IS NOT DISTINCT FROM 'string')
+         = (jsonb_typeof(e->'lancamento_id') IS NOT DISTINCT FROM 'string')
+      OR jsonb_typeof(e->'expected_updated_at') IS DISTINCT FROM 'string'
+  ) THEN
+    RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'CMV_INVALIDO';
+  END IF;
+
+  SELECT count(DISTINCT COALESCE(e->>'conta_pagar_id', e->>'lancamento_id')),
+         count(DISTINCT e->>'lancamento_id')
+  INTO v_documentos, v_lancamentos
+  FROM jsonb_array_elements(p_itens) e;
+
+  -- Um documento: quem edita aquele cadastro também classifica. Lote (revisão
+  -- do histórico): só quem gerencia o CMV.
+  IF v_documentos > 1 THEN
+    IF NOT public.has_any_permission(v_uid, ARRAY['financeiro:cmv:manage', 'system:global:manage']) THEN
+      RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'PERMISSION_DENIED: financeiro:cmv:manage';
+    END IF;
+  ELSIF v_lancamentos = 1 THEN
+    IF NOT public.has_any_permission(v_uid, ARRAY[
+      'financeiro:cmv:manage', 'financeiro:lancamentos:edit', 'financeiro:conciliacao:reconcile',
+      'finance:manage', 'system:global:manage'
+    ]) THEN
+      RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'PERMISSION_DENIED: financeiro:lancamentos:edit';
+    END IF;
+  ELSIF NOT public.has_any_permission(v_uid, ARRAY[
+    'financeiro:cmv:manage', 'financeiro:pagar:edit', 'finance:manage', 'system:global:manage'
+  ]) THEN
+    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'PERMISSION_DENIED: financeiro:pagar:edit';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM jsonb_array_elements(p_itens) e
+    GROUP BY COALESCE(e->>'conta_pagar_id', e->>'lancamento_id'), e->>'rateio_id'
+    HAVING count(*) > 1
+  ) THEN
+    RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'CMV_ITEM_DUPLICADO';
+  END IF;
+
+  -- Boletos (mesma regra de antes).
+  FOR v_cp IN
+    SELECT cp.id, cp.status, cp.updated_at
+    FROM public.fin_contas_pagar cp
+    WHERE cp.company_id = v_company_id
+      AND cp.id IN (
+        SELECT (e->>'conta_pagar_id')::uuid FROM jsonb_array_elements(p_itens) e
+        WHERE jsonb_typeof(e->'conta_pagar_id') = 'string'
+      )
+    ORDER BY cp.id
+    FOR UPDATE
+  LOOP
+    IF v_cp.status = 'CANCELADO' THEN
+      RAISE EXCEPTION 'STATUS_INVALIDO: %', v_cp.status;
+    END IF;
+    IF EXISTS (
+      SELECT 1 FROM jsonb_array_elements(p_itens) e
+      WHERE (e->>'conta_pagar_id')::uuid = v_cp.id
+        AND (e->>'expected_updated_at')::timestamptz <> v_cp.updated_at
+    ) THEN
+      RAISE EXCEPTION 'OPTIMISTIC_LOCK_CONFLICT: %', v_cp.id;
+    END IF;
+
+    v_antes := public._fin_cmv_retrato(v_company_id, v_cp.id);
+    v_tem_rateio := EXISTS (
+      SELECT 1 FROM public.fin_lancamento_rateios r
+      WHERE r.lancamento_id = v_cp.id AND r.company_id = v_company_id
+    );
+
+    FOR v_item IN
+      SELECT NULLIF(e->>'rateio_id', '')::uuid AS rateio_id,
+        CASE WHEN jsonb_typeof(e->'incluir') = 'boolean' THEN (e->>'incluir')::boolean END AS incluir
+      FROM jsonb_array_elements(p_itens) e
+      WHERE (e->>'conta_pagar_id')::uuid = v_cp.id
+    LOOP
+      IF v_item.rateio_id IS NULL THEN
+        IF v_tem_rateio THEN
+          RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'CMV_ALVO_INVALIDO: boleto rateado classifica por linha';
+        END IF;
+        UPDATE public.fin_contas_pagar
+        SET cmv_incluir = v_item.incluir
+        WHERE id = v_cp.id AND company_id = v_company_id;
+      ELSE
+        UPDATE public.fin_lancamento_rateios
+        SET cmv_incluir = v_item.incluir
+        WHERE id = v_item.rateio_id AND lancamento_id = v_cp.id AND company_id = v_company_id;
+        IF NOT FOUND THEN
+          RAISE EXCEPTION 'NOT_FOUND: linha de rateio';
+        END IF;
+      END IF;
+    END LOOP;
+
+    -- A decisão faz parte da versão do boleto: quem estiver editando em outra
+    -- tela recebe conflito em vez de sobrescrever.
+    UPDATE public.fin_contas_pagar
+    SET updated_at = v_now
+    WHERE id = v_cp.id AND company_id = v_company_id;
+
+    v_depois := public._fin_cmv_retrato(v_company_id, v_cp.id);
+
+    INSERT INTO public.fin_audit_logs (entidade, entidade_id, acao, antes, depois, justificativa, user_id, company_id)
+    VALUES ('contas_pagar', v_cp.id, 'cmv_classificar', v_antes, v_depois,
+      COALESCE(public.strip_html(p_justificativa), ''), v_uid, v_company_id);
+
+    v_atualizados := v_atualizados || jsonb_build_object(
+      'conta_pagar_id', v_cp.id,
+      'updated_at', (SELECT cp.updated_at FROM public.fin_contas_pagar cp WHERE cp.id = v_cp.id AND cp.company_id = v_company_id)
+    );
+  END LOOP;
+
+  -- Lançamentos (Livro Razão e conciliação).
+  FOR v_lanc IN
+    SELECT l.id, l.status, l.tipo, l.origem, l.conciliado, l.referencia_modulo, l.updated_at
+    FROM public.fin_lancamentos l
+    WHERE l.company_id = v_company_id
+      AND l.id IN (
+        SELECT (e->>'lancamento_id')::uuid FROM jsonb_array_elements(p_itens) e
+        WHERE jsonb_typeof(e->'lancamento_id') = 'string'
+      )
+    ORDER BY l.id
+    FOR UPDATE
+  LOOP
+    IF v_lanc.status = 'CANCELADO' THEN
+      RAISE EXCEPTION 'STATUS_INVALIDO: %', v_lanc.status;
+    END IF;
+    -- Mesma regra da apuração (_fin_cmv_linhas_lancamentos): espelho de baixa,
+    -- encargo, receita e transferência não são despesas do CMV (o boleto de origem
+    -- é que se classifica); nem a linha da conciliação desconciliada; nem a baixa de
+    -- um boleto que perdeu o carimbo de referencia_modulo (o título aponta para ela).
+    IF v_lanc.tipo <> 'DESPESA'
+       OR NULLIF(v_lanc.referencia_modulo, '') IS NOT NULL
+       OR v_lanc.origem IN ('espelho_cp', 'espelho_cr', 'ajuste_pagamento')
+       OR (v_lanc.origem = 'conciliacao' AND v_lanc.conciliado IS NOT TRUE)
+       OR EXISTS (
+         SELECT 1 FROM public.fin_contas_pagar cp
+         WHERE cp.company_id = v_company_id AND cp.lancamento_id = v_lanc.id
+       ) THEN
+      RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'CMV_ALVO_INVALIDO: lançamento fora do CMV financeiro';
+    END IF;
+    IF EXISTS (
+      SELECT 1 FROM jsonb_array_elements(p_itens) e
+      WHERE (e->>'lancamento_id')::uuid = v_lanc.id
+        AND (e->>'expected_updated_at')::timestamptz <> v_lanc.updated_at
+    ) THEN
+      RAISE EXCEPTION 'OPTIMISTIC_LOCK_CONFLICT: %', v_lanc.id;
+    END IF;
+
+    v_antes := public._fin_cmv_retrato_lancamento(v_company_id, v_lanc.id);
+    v_tem_rateio := EXISTS (
+      SELECT 1 FROM public.fin_lancamento_rateios r
+      WHERE r.lancamento_id = v_lanc.id AND r.company_id = v_company_id
+    );
+
+    FOR v_item IN
+      SELECT NULLIF(e->>'rateio_id', '')::uuid AS rateio_id,
+        CASE WHEN jsonb_typeof(e->'incluir') = 'boolean' THEN (e->>'incluir')::boolean END AS incluir
+      FROM jsonb_array_elements(p_itens) e
+      WHERE (e->>'lancamento_id')::uuid = v_lanc.id
+    LOOP
+      IF v_item.rateio_id IS NULL THEN
+        IF v_tem_rateio THEN
+          RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'CMV_ALVO_INVALIDO: lançamento rateado classifica por linha';
+        END IF;
+        UPDATE public.fin_lancamentos
+        SET cmv_incluir = v_item.incluir
+        WHERE id = v_lanc.id AND company_id = v_company_id;
+      ELSE
+        UPDATE public.fin_lancamento_rateios
+        SET cmv_incluir = v_item.incluir
+        WHERE id = v_item.rateio_id AND lancamento_id = v_lanc.id AND company_id = v_company_id;
+        IF NOT FOUND THEN
+          RAISE EXCEPTION 'NOT_FOUND: linha de rateio';
+        END IF;
+      END IF;
+    END LOOP;
+
+    -- Só a versão muda: nenhum campo vigiado pelo gatilho de lançamento realizado.
+    UPDATE public.fin_lancamentos
+    SET updated_at = v_now
+    WHERE id = v_lanc.id AND company_id = v_company_id;
+
+    v_depois := public._fin_cmv_retrato_lancamento(v_company_id, v_lanc.id);
+
+    INSERT INTO public.fin_audit_logs (entidade, entidade_id, acao, antes, depois, justificativa, user_id, company_id)
+    VALUES ('lancamentos', v_lanc.id, 'cmv_classificar', v_antes, v_depois,
+      COALESCE(public.strip_html(p_justificativa), ''), v_uid, v_company_id);
+
+    v_atualizados := v_atualizados || jsonb_build_object(
+      'lancamento_id', v_lanc.id,
+      'updated_at', (SELECT l.updated_at FROM public.fin_lancamentos l WHERE l.id = v_lanc.id AND l.company_id = v_company_id)
+    );
+  END LOOP;
+
+  IF jsonb_array_length(v_atualizados) <> v_documentos THEN
+    RAISE EXCEPTION 'NOT_FOUND: documento';
+  END IF;
+
+  RETURN jsonb_build_object('titulos', v_documentos, 'itens', v_total, 'atualizados', v_atualizados);
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.fin_cmv_classificar(jsonb, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.fin_cmv_classificar(jsonb, text) TO authenticated, service_role;
+
+-- ─── Aplicar o padrão da categoria às linhas pendentes (histórico) ───────────
+-- Só linhas PENDENTES (cmv_incluir NULL) de categoria COM padrão, com competência
+-- a partir de p_desde, de boletos e de lançamentos. Decisão já tomada nunca é
+-- trocada e categoria sem padrão continua pendente. p_simular (padrão) só conta.
+-- A elegibilidade (o que é despesa do CMV) vem de _fin_cmv_linhas_fontes: não é
+-- repetida aqui, então a baixa legada de boleto e o espelho ficam de fora sozinhos.
+CREATE OR REPLACE FUNCTION public.fin_cmv_aplicar_padroes(
+  p_desde date,
+  p_simular boolean DEFAULT true,
+  p_justificativa text DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_company_id uuid;
+  v_uid uuid;
+  v_doc record;
+  v_antes jsonb;
+  v_depois jsonb;
+  v_n integer;
+  v_sim bigint;
+  v_nao bigint;
+  v_linhas_doc integer;
+  v_sim_doc bigint;
+  v_nao_doc bigint;
+  v_documentos integer := 0;
+  v_linhas integer := 0;
+  v_total_sim bigint := 0;
+  v_total_nao bigint := 0;
+  v_now timestamptz := now();
+BEGIN
+  v_company_id := public.assert_tenant();
+  v_uid := auth.uid();
+  IF v_uid IS NULL THEN RAISE EXCEPTION 'AUTH_REQUIRED'; END IF;
+  IF NOT public.has_any_permission(v_uid, ARRAY['financeiro:cmv:manage', 'system:global:manage']) THEN
+    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'PERMISSION_DENIED: financeiro:cmv:manage';
+  END IF;
+  IF p_desde IS NULL THEN
+    RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'CMV_PERIODO_OBRIGATORIO';
+  END IF;
+
+  IF COALESCE(p_simular, true) THEN
+    RETURN (
+      WITH alvo AS (
+        SELECT l.fonte, l.documento_id, round(l.valor * 100)::bigint AS centavos, c.cmv_sugerir
+        FROM public._fin_cmv_linhas_fontes(v_company_id) l
+        LEFT JOIN public.fin_categorias c ON c.id = l.categoria_id AND c.company_id = v_company_id
+        WHERE l.cmv_incluir IS NULL AND l.data_competencia >= p_desde
+      ),
+      por_fonte AS (
+        SELECT f.fonte, jsonb_build_object(
+          'documentos', count(DISTINCT a.documento_id) FILTER (WHERE a.cmv_sugerir IS NOT NULL),
+          'linhas_sim', count(a.documento_id) FILTER (WHERE a.cmv_sugerir IS TRUE),
+          'centavos_sim', COALESCE(sum(a.centavos) FILTER (WHERE a.cmv_sugerir IS TRUE), 0),
+          'linhas_nao', count(a.documento_id) FILTER (WHERE a.cmv_sugerir IS FALSE),
+          'centavos_nao', COALESCE(sum(a.centavos) FILTER (WHERE a.cmv_sugerir IS FALSE), 0),
+          'linhas_sem_padrao', count(a.documento_id) FILTER (WHERE a.cmv_sugerir IS NULL),
+          'centavos_sem_padrao', COALESCE(sum(a.centavos) FILTER (WHERE a.cmv_sugerir IS NULL), 0)
+        ) AS resumo
+        FROM (VALUES ('boleto'), ('lancamento')) AS f(fonte)
+        LEFT JOIN alvo a ON a.fonte = f.fonte
+        GROUP BY f.fonte
+      )
+      SELECT jsonb_build_object(
+        'simulado', true,
+        'desde', p_desde,
+        'boleto', (SELECT resumo FROM por_fonte WHERE fonte = 'boleto'),
+        'lancamento', (SELECT resumo FROM por_fonte WHERE fonte = 'lancamento')
+      )
+    );
+  END IF;
+
+  IF NULLIF(btrim(p_justificativa), '') IS NULL THEN
+    RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'JUSTIFICATIVA_OBRIGATORIA';
+  END IF;
+
+  -- Ordem fixa: boletos, depois lançamentos, por id — a mesma de fin_cmv_classificar.
+  FOR v_doc IN
+    SELECT DISTINCT l.fonte, l.documento_id
+    FROM public._fin_cmv_linhas_fontes(v_company_id) l
+    JOIN public.fin_categorias c ON c.id = l.categoria_id AND c.company_id = v_company_id
+    WHERE l.cmv_incluir IS NULL AND l.data_competencia >= p_desde AND c.cmv_sugerir IS NOT NULL
+    ORDER BY l.fonte, l.documento_id
+  LOOP
+    IF v_doc.fonte = 'boleto' THEN
+      PERFORM 1 FROM public.fin_contas_pagar cp
+      WHERE cp.id = v_doc.documento_id AND cp.company_id = v_company_id FOR UPDATE;
+      v_antes := public._fin_cmv_retrato(v_company_id, v_doc.documento_id);
+    ELSE
+      PERFORM 1 FROM public.fin_lancamentos l
+      WHERE l.id = v_doc.documento_id AND l.company_id = v_company_id FOR UPDATE;
+      v_antes := public._fin_cmv_retrato_lancamento(v_company_id, v_doc.documento_id);
+    END IF;
+
+    -- Linhas de rateio pendentes (boleto e lançamento usam a mesma tabela).
+    WITH alteradas AS (
+      UPDATE public.fin_lancamento_rateios r
+      SET cmv_incluir = c.cmv_sugerir
+      FROM public.fin_categorias c
+      WHERE r.lancamento_id = v_doc.documento_id AND r.company_id = v_company_id
+        AND r.cmv_incluir IS NULL
+        AND c.id = r.categoria_id AND c.company_id = v_company_id AND c.cmv_sugerir IS NOT NULL
+      RETURNING r.cmv_incluir, round(r.valor * 100)::bigint AS centavos
+    )
+    SELECT count(*), COALESCE(sum(centavos) FILTER (WHERE cmv_incluir), 0), COALESCE(sum(centavos) FILTER (WHERE NOT cmv_incluir), 0)
+    INTO v_linhas_doc, v_sim_doc, v_nao_doc
+    FROM alteradas;
+
+    -- Documento sem rateio: a decisão é do cabeçalho.
+    IF v_doc.fonte = 'boleto' THEN
+      WITH alterado AS (
+        UPDATE public.fin_contas_pagar cp
+        SET cmv_incluir = c.cmv_sugerir
+        FROM public.fin_categorias c
+        WHERE cp.id = v_doc.documento_id AND cp.company_id = v_company_id
+          AND cp.cmv_incluir IS NULL
+          AND c.id = cp.categoria_id AND c.company_id = v_company_id AND c.cmv_sugerir IS NOT NULL
+          AND NOT EXISTS (
+            SELECT 1 FROM public.fin_lancamento_rateios r
+            WHERE r.lancamento_id = cp.id AND r.company_id = cp.company_id
+          )
+        RETURNING cp.cmv_incluir, round(cp.valor * 100)::bigint AS centavos
+      )
+      SELECT count(*), COALESCE(sum(centavos) FILTER (WHERE cmv_incluir), 0), COALESCE(sum(centavos) FILTER (WHERE NOT cmv_incluir), 0)
+      INTO v_n, v_sim, v_nao
+      FROM alterado;
+    ELSE
+      WITH alterado AS (
+        UPDATE public.fin_lancamentos l
+        SET cmv_incluir = c.cmv_sugerir
+        FROM public.fin_categorias c
+        WHERE l.id = v_doc.documento_id AND l.company_id = v_company_id
+          AND l.cmv_incluir IS NULL
+          AND c.id = l.categoria_id AND c.company_id = v_company_id AND c.cmv_sugerir IS NOT NULL
+          AND NOT EXISTS (
+            SELECT 1 FROM public.fin_lancamento_rateios r
+            WHERE r.lancamento_id = l.id AND r.company_id = l.company_id
+          )
+        RETURNING l.cmv_incluir, round(l.valor * 100)::bigint AS centavos
+      )
+      SELECT count(*), COALESCE(sum(centavos) FILTER (WHERE cmv_incluir), 0), COALESCE(sum(centavos) FILTER (WHERE NOT cmv_incluir), 0)
+      INTO v_n, v_sim, v_nao
+      FROM alterado;
+    END IF;
+    v_linhas_doc := v_linhas_doc + v_n;
+    v_sim_doc := v_sim_doc + v_sim;
+    v_nao_doc := v_nao_doc + v_nao;
+
+    -- Alguém decidiu a linha entre a listagem e o bloqueio: nada mudou neste
+    -- documento, então nem a versão nem a auditoria se mexem.
+    IF v_linhas_doc = 0 THEN CONTINUE; END IF;
+
+    IF v_doc.fonte = 'boleto' THEN
+      UPDATE public.fin_contas_pagar SET updated_at = v_now
+      WHERE id = v_doc.documento_id AND company_id = v_company_id;
+      v_depois := public._fin_cmv_retrato(v_company_id, v_doc.documento_id);
+    ELSE
+      UPDATE public.fin_lancamentos SET updated_at = v_now
+      WHERE id = v_doc.documento_id AND company_id = v_company_id;
+      v_depois := public._fin_cmv_retrato_lancamento(v_company_id, v_doc.documento_id);
+    END IF;
+
+    INSERT INTO public.fin_audit_logs (entidade, entidade_id, acao, antes, depois, justificativa, user_id, company_id)
+    VALUES (CASE WHEN v_doc.fonte = 'boleto' THEN 'contas_pagar' ELSE 'lancamentos' END,
+      v_doc.documento_id, 'cmv_aplicar_padroes', v_antes, v_depois,
+      public.strip_html(btrim(p_justificativa)), v_uid, v_company_id);
+
+    v_documentos := v_documentos + 1;
+    v_linhas := v_linhas + v_linhas_doc;
+    v_total_sim := v_total_sim + v_sim_doc;
+    v_total_nao := v_total_nao + v_nao_doc;
+  END LOOP;
+
+  RETURN jsonb_build_object('simulado', false, 'desde', p_desde, 'documentos', v_documentos, 'linhas', v_linhas,
+    'centavos_sim', v_total_sim, 'centavos_nao', v_total_nao);
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.fin_cmv_aplicar_padroes(date, boolean, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.fin_cmv_aplicar_padroes(date, boolean, text) TO authenticated, service_role;
 
 NOTIFY pgrst, 'reload schema';

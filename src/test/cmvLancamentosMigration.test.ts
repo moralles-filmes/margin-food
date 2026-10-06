@@ -148,4 +148,101 @@ describe('migration CMV com lançamentos — escrita', () => {
     expect(sql).toContain('REVOKE ALL ON FUNCTION public._fin_cmv_heranca(jsonb, uuid) FROM PUBLIC, anon, authenticated;');
     expect(sql).toContain("NOTIFY pgrst, 'reload schema';");
   });
+
+  it('a migration inteira é re-executável: toda função nova é CREATE OR REPLACE e a assinatura antiga só sai com IF EXISTS', () => {
+    expect(semComentarios).not.toMatch(/CREATE FUNCTION/);
+    for (const nome of ['reconcile_import_lancamento', '_guarded_upsert_lancamento', '_guarded_update_reconciled_classification']) {
+      expect(sql).toContain(`CREATE OR REPLACE FUNCTION public.${nome}(`);
+    }
+    for (const drop of sql.match(/DROP FUNCTION[^;]*;/g) ?? []) expect(drop).toContain('IF EXISTS');
+    // o teste de banco real prova isso aplicando a migration duas vezes no mesmo banco
+    const ephemeral = readFileSync(resolve(process.cwd(), 'supabase/tests/database/cmv_lancamentos_ephemeral.sql'), 'utf8');
+    expect(ephemeral.split(`\\ir ../../migrations/${arquivo[0]}`).length - 1).toBe(2);
+  });
+
+  it('a reclassificação recupera o comentário que o DROP apagou, e as duas _guarded_ explicam o p_cmv', () => {
+    expect(plano(sql)).toMatch(
+      /COMMENT ON FUNCTION public\._guarded_update_reconciled_classification\(uuid, uuid, uuid, text, jsonb, timestamptz, text, jsonb, date\) IS '[^']*categoria[^']*centro de custo[^']*rateios[^']*observações[^']*competência[^']*decisão do CMV[^']*justificativa[^']*conciliação[^']*';/,
+    );
+    const frase = 'cmv_incluir` por linha de rateio só é considerado quando `p_cmv` não é nulo (`{}` basta)';
+    for (const nome of ['_guarded_upsert_lancamento', '_guarded_update_reconciled_classification']) {
+      const inicio = sql.search(new RegExp(`CREATE OR REPLACE FUNCTION public\\.${nome}\\(`));
+      const cabecalho = sql.slice(Math.max(0, inicio - 1800), inicio);
+      expect(cabecalho, `cabeçalho de ${nome}`).toContain(frase);
+    }
+  });
+});
+
+describe('migration CMV com lançamentos — classificação e padrões', () => {
+  it('classificar aceita boleto OU lançamento, com lock, ordem de bloqueio e auditoria', () => {
+    const c = corpo('fin_cmv_classificar');
+    expect(plano(c)).toContain("(jsonb_typeof(e->'conta_pagar_id') IS NOT DISTINCT FROM 'string') = (jsonb_typeof(e->'lancamento_id') IS NOT DISTINCT FROM 'string')");
+    const boletos = c.indexOf('FROM public.fin_contas_pagar cp');
+    const lancamentos = c.indexOf('FROM public.fin_lancamentos l');
+    expect(boletos).toBeGreaterThan(0);
+    expect(lancamentos).toBeGreaterThan(boletos);
+    expect(plano(c)).toContain('ORDER BY l.id FOR UPDATE');
+    expect(c).toContain("'CMV_ALVO_INVALIDO: lançamento fora do CMV financeiro'");
+    expect(plano(c)).toContain("VALUES ('lancamentos', v_lanc.id, 'cmv_classificar'");
+    expect(plano(c)).toContain("'financeiro:cmv:manage', 'financeiro:lancamentos:edit', 'financeiro:conciliacao:reconcile'");
+    expect(plano(c)).toContain("IF v_documentos > 1 THEN IF NOT public.has_any_permission(v_uid, ARRAY['financeiro:cmv:manage', 'system:global:manage'])");
+  });
+
+  it('classificar recusa o que a apuração não conta: mesma regra de _fin_cmv_linhas_lancamentos', () => {
+    const c = plano(corpo('fin_cmv_classificar'));
+    // a baixa de um boleto (título aponta para o lançamento), mesmo sem o carimbo de referencia_modulo
+    expect(c).toContain(
+      'OR EXISTS ( SELECT 1 FROM public.fin_contas_pagar cp WHERE cp.company_id = v_company_id AND cp.lancamento_id = v_lanc.id )',
+    );
+    // linha da conciliação desconciliada
+    expect(c).toContain("OR (v_lanc.origem = 'conciliacao' AND v_lanc.conciliado IS NOT TRUE)");
+    // as condições que já valiam
+    expect(c).toContain("IF v_lanc.tipo <> 'DESPESA' OR NULLIF(v_lanc.referencia_modulo, '') IS NOT NULL OR v_lanc.origem IN ('espelho_cp', 'espelho_cr', 'ajuste_pagamento')");
+    // a recusa vem antes de qualquer gravação do laço dos lançamentos
+    const corpoLancamentos = corpo('fin_cmv_classificar');
+    expect(corpoLancamentos.indexOf("'CMV_ALVO_INVALIDO: lançamento fora do CMV financeiro'")).toBeLessThan(
+      corpoLancamentos.indexOf('UPDATE public.fin_lancamentos'),
+    );
+  });
+
+  it('o caminho do boleto continua o do banco vivo: gates, lock, auditoria e ordem de bloqueio', () => {
+    const c = corpo('fin_cmv_classificar');
+    expect(plano(c)).toContain("ELSIF NOT public.has_any_permission(v_uid, ARRAY[ 'financeiro:cmv:manage', 'financeiro:pagar:edit', 'finance:manage', 'system:global:manage' ])");
+    expect(c).toContain("RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'PERMISSION_DENIED: financeiro:pagar:edit';");
+    expect(c).toContain('ORDER BY cp.id\n    FOR UPDATE');
+    expect(c).toContain("IF v_cp.status = 'CANCELADO' THEN");
+    expect(c).toContain("RAISE EXCEPTION 'OPTIMISTIC_LOCK_CONFLICT: %', v_cp.id;");
+    expect(c).toContain("VALUES ('contas_pagar', v_cp.id, 'cmv_classificar', v_antes, v_depois,");
+    expect(c).toContain('IF v_total < 1 OR v_total > 500 THEN');
+    expect(c).toContain("RAISE EXCEPTION 'NOT_FOUND: documento';");
+    // nenhum UPDATE do laço de boletos mexe em outra coisa que a decisão e a versão
+    const updates = c.match(/UPDATE public\.\w+\s+SET [^;]+;/g) ?? [];
+    expect(updates.length).toBeGreaterThan(0);
+    for (const update of updates) expect(update).toMatch(/SET (cmv_incluir = v_item\.incluir|updated_at = v_now)\s/);
+    expect(sql).toContain('REVOKE ALL ON FUNCTION public.fin_cmv_classificar(jsonb, text) FROM PUBLIC, anon;');
+    expect(sql).toContain('GRANT EXECUTE ON FUNCTION public.fin_cmv_classificar(jsonb, text) TO authenticated, service_role;');
+  });
+
+  it('aplicar padrões: só pendentes, prévia antes de qualquer escrita, justificativa e gerenciar o CMV', () => {
+    const c = corpo('fin_cmv_aplicar_padroes');
+    expect(plano(c)).toContain("ARRAY['financeiro:cmv:manage', 'system:global:manage']");
+    expect(c.indexOf('RETURN (')).toBeGreaterThan(0);
+    expect(c.indexOf('RETURN (')).toBeLessThan(c.indexOf('UPDATE public.'));
+    expect(c).toContain('AND r.cmv_incluir IS NULL');
+    expect(c).toContain('AND cp.cmv_incluir IS NULL');
+    expect(c).toContain('AND l.cmv_incluir IS NULL');
+    expect(c).toContain("'JUSTIFICATIVA_OBRIGATORIA'");
+    expect(sql).toContain('REVOKE ALL ON FUNCTION public.fin_cmv_aplicar_padroes(date, boolean, text) FROM PUBLIC, anon;');
+    expect(sql).toContain('GRANT EXECUTE ON FUNCTION public.fin_cmv_aplicar_padroes(date, boolean, text) TO authenticated, service_role;');
+  });
+
+  it('aplicar padrões herda a elegibilidade da apuração em vez de repeti-la', () => {
+    const c = corpo('fin_cmv_aplicar_padroes');
+    expect(c.split('FROM public._fin_cmv_linhas_fontes(v_company_id) l').length - 1).toBe(2);
+    expect(c).not.toContain('referencia_modulo');
+    expect(c).not.toContain("'espelho_cp'");
+    expect(c).not.toContain('fin_contas_pagar cp WHERE cp.company_id');
+    // ordem fixa de bloqueio, igual à de fin_cmv_classificar: boletos antes de lançamentos, por id
+    expect(plano(c)).toContain('ORDER BY l.fonte, l.documento_id');
+  });
 });

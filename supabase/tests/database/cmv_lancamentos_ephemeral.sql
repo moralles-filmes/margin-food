@@ -181,6 +181,9 @@ RETURNS TABLE(id uuid, updated_at timestamptz) LANGUAGE sql AS $$ SELECT NULL::u
 \ir ../../migrations/20261003140000_cmv_financeiro.sql
 \ir ../../migrations/20261003203219_cmv_financeiro_serie.sql
 \ir ../../migrations/20261005120000_cmv_financeiro_lancamentos.sql
+-- A migration é aplicada no SQL Editor e pode ser executada de novo: uma segunda aplicação, no mesmo
+-- banco, precisa passar sem erro e sem mudar nada (CREATE OR REPLACE, IF EXISTS, comentários e grants).
+\ir ../../migrations/20261005120000_cmv_financeiro_lancamentos.sql
 
 -- ─────────────────────────────────────────────────────────────────────────────
 
@@ -224,6 +227,7 @@ DECLARE
   v_p_peixes uuid; v_p_escr uuid; v_p_sem uuid; v_p_antigo uuid; v_p_decidido uuid; v_p_rat uuid; v_bol_pend uuid;
   v_ids uuid[]; v_criados timestamptz[]; v_n bigint;
   v_valido uuid; v_baixa_legada uuid; v_cp_legado uuid; v_so_origem uuid; v_so_referencia uuid;
+  v_bol2 uuid; v_bol_rat uuid; v_p_baixa uuid;
 BEGIN
   INSERT INTO companies VALUES (A, 'Unidade A'), (B, 'Unidade B');
   INSERT INTO fin_categorias (id, nome, tipo, company_id, cmv_sugerir) VALUES
@@ -511,6 +515,169 @@ BEGIN
     'auditoria da reclassificação guarda competência e decisão antes e depois');
   PERFORM cmv_assert((SELECT depois->>'data_competencia' = '2026-09-03' AND (depois->>'data')::date = '2026-09-10'
     FROM fin_audit_logs WHERE entidade_id = v_imp AND acao = 'reconcile_import'), 'auditoria da importação guarda a competência e a data do banco');
+
+  -- 11. Classificação depois (revisão do CMV): lançamentos
+  -- Fixtures do caminho do boleto (competência de 02/09, fora das semanas e das datas das seções seguintes).
+  r := _guarded_create_conta_pagar(p_descricao => 'Boleto da revisão', p_valor => 30, p_data_vencimento => '2026-09-30',
+    p_data_competencia => '2026-09-02', p_categoria_id => c_peixes);
+  v_bol2 := (r->>'id')::uuid;
+  UPDATE fin_contas_pagar SET status = 'PAGO' WHERE id = v_bol2;
+  r := _guarded_create_conta_pagar(p_descricao => 'Boleto rateado da revisão', p_valor => 40, p_data_vencimento => '2026-09-30',
+    p_data_competencia => '2026-09-02',
+    p_rateios => jsonb_build_array(jsonb_build_object('categoria_id', c_peixes, 'valor', 25), jsonb_build_object('categoria_id', c_escr, 'valor', 15)));
+  v_bol_rat := (r->>'id')::uuid;
+
+  PERFORM set_config('test.permissions', 'financeiro:lancamentos:edit', false);
+  r := fin_cmv_classificar(jsonb_build_array(jsonb_build_object('lancamento_id', v_pend, 'rateio_id', NULL, 'incluir', true,
+    'expected_updated_at', (SELECT updated_at FROM fin_lancamentos WHERE id = v_pend))));
+  PERFORM cmv_assert((SELECT cmv_incluir FROM fin_lancamentos WHERE id = v_pend), 'lançamento classificado por quem edita lançamentos');
+  PERFORM cmv_assert((r->'atualizados'->0->>'lancamento_id')::uuid = v_pend AND (r->>'titulos')::int = 1, 'retorno identifica o lançamento');
+  PERFORM cmv_assert(EXISTS (SELECT 1 FROM fin_audit_logs WHERE entidade = 'lancamentos' AND entidade_id = v_pend AND acao = 'cmv_classificar'), 'auditoria do lançamento');
+  -- conciliado e REALIZADO sem justificativa de edição: classificar não esbarra no gatilho de edição
+  PERFORM fin_cmv_classificar(jsonb_build_array(jsonb_build_object('lancamento_id', v_conc,
+    'rateio_id', (SELECT id FROM fin_lancamento_rateios WHERE lancamento_id = v_conc AND categoria_id = c_escr), 'incluir', true,
+    'expected_updated_at', (SELECT updated_at FROM fin_lancamentos WHERE id = v_conc))));
+  PERFORM cmv_assert((SELECT bool_and(cmv_incluir) FROM fin_lancamento_rateios WHERE lancamento_id = v_conc), 'linha de rateio da conciliação classificada');
+  PERFORM cmv_expect_error(format($q$SELECT public.fin_cmv_classificar('[{"lancamento_id":"%s","rateio_id":null,"incluir":true,"expected_updated_at":"%s"}]')$q$,
+    v_rat, (SELECT updated_at FROM fin_lancamentos WHERE id = v_rat)), 'CMV_ALVO_INVALIDO%', 'lançamento rateado classificado pelo cabeçalho');
+  PERFORM cmv_expect_error(format($q$SELECT public.fin_cmv_classificar('[{"lancamento_id":"%s","rateio_id":"%s","incluir":true,"expected_updated_at":"%s"}]')$q$,
+    v_conc, (SELECT id FROM fin_lancamento_rateios WHERE lancamento_id = v_rat LIMIT 1), (SELECT updated_at FROM fin_lancamentos WHERE id = v_conc)),
+    'NOT_FOUND: linha de rateio%', 'linha de rateio de outro lançamento');
+  PERFORM cmv_expect_error(format($q$SELECT public.fin_cmv_classificar('[{"lancamento_id":"%s","rateio_id":null,"incluir":true,"expected_updated_at":"%s"}]')$q$,
+    v_espelho, (SELECT updated_at FROM fin_lancamentos WHERE id = v_espelho)), 'CMV_ALVO_INVALIDO: lançamento fora%', 'espelho de baixa não é classificável');
+  PERFORM cmv_expect_error(format($q$SELECT public.fin_cmv_classificar('[{"lancamento_id":"%s","rateio_id":null,"incluir":true,"expected_updated_at":"%s"}]')$q$,
+    v_receita, (SELECT updated_at FROM fin_lancamentos WHERE id = v_receita)), 'CMV_ALVO_INVALIDO: lançamento fora%', 'receita não é classificável');
+  -- mesma regra da apuração: a baixa de um boleto (título aponta para o lançamento, sem carimbo de referência) e a
+  -- linha da conciliação desconciliada não são despesas do CMV
+  PERFORM cmv_expect_error(format($q$SELECT public.fin_cmv_classificar('[{"lancamento_id":"%s","rateio_id":null,"incluir":true,"expected_updated_at":"%s"}]')$q$,
+    v_baixa_legada, (SELECT updated_at FROM fin_lancamentos WHERE id = v_baixa_legada)), 'CMV_ALVO_INVALIDO: lançamento fora%', 'baixa legada de boleto (referenciada por fin_contas_pagar.lancamento_id)');
+  PERFORM cmv_expect_error(format($q$SELECT public.fin_cmv_classificar('[{"lancamento_id":"%s","rateio_id":null,"incluir":true,"expected_updated_at":"%s"}]')$q$,
+    v_desconc, (SELECT updated_at FROM fin_lancamentos WHERE id = v_desconc)), 'CMV_ALVO_INVALIDO: lançamento fora%', 'conciliação desconciliada');
+  PERFORM cmv_assert((SELECT cmv_incluir FROM fin_lancamentos WHERE id = v_baixa_legada), 'a baixa legada recusada ficou como estava');
+  PERFORM cmv_expect_error(format($q$SELECT public.fin_cmv_classificar('[{"lancamento_id":"%s","rateio_id":null,"incluir":true,"expected_updated_at":"%s"}]')$q$,
+    v_cancel, (SELECT updated_at FROM fin_lancamentos WHERE id = v_cancel)), 'STATUS_INVALIDO%', 'lançamento cancelado');
+  PERFORM cmv_expect_error(format($q$SELECT public.fin_cmv_classificar('[{"lancamento_id":"%s","conta_pagar_id":"%s","rateio_id":null,"incluir":true,"expected_updated_at":"2026-01-01T00:00:00Z"}]')$q$,
+    v_pend, v_bol), 'CMV_INVALIDO%', 'item com dois documentos');
+  PERFORM cmv_expect_error($q$SELECT public.fin_cmv_classificar('[{"rateio_id":null,"incluir":true,"expected_updated_at":"2026-01-01T00:00:00Z"}]')$q$,
+    'CMV_INVALIDO%', 'item sem documento');
+  PERFORM cmv_expect_error(format($q$SELECT public.fin_cmv_classificar('[{"lancamento_id":"%s","rateio_id":null,"incluir":false,"expected_updated_at":"2020-01-01T00:00:00Z"}]')$q$,
+    v_pend), 'OPTIMISTIC_LOCK_CONFLICT%', 'versão antiga do lançamento');
+  PERFORM cmv_expect_error(format($q$SELECT public.fin_cmv_classificar('[{"lancamento_id":"%s","rateio_id":null,"incluir":false,"expected_updated_at":"%s"},{"lancamento_id":"%s","rateio_id":null,"incluir":false,"expected_updated_at":"%s"}]')$q$,
+    v_pend, (SELECT updated_at FROM fin_lancamentos WHERE id = v_pend), v_pend, (SELECT updated_at FROM fin_lancamentos WHERE id = v_pend)),
+    'CMV_ITEM_DUPLICADO%', 'o mesmo lançamento duas vezes');
+  -- lote misturando boleto e lançamento exige gerenciar o CMV
+  PERFORM cmv_expect_error(format($q$SELECT public.fin_cmv_classificar('[{"conta_pagar_id":"%s","rateio_id":null,"incluir":false,"expected_updated_at":"%s"},{"lancamento_id":"%s","rateio_id":null,"incluir":false,"expected_updated_at":"%s"}]')$q$,
+    v_bol, (SELECT updated_at FROM fin_contas_pagar WHERE id = v_bol), v_pend, (SELECT updated_at FROM fin_lancamentos WHERE id = v_pend)),
+    'PERMISSION_DENIED: financeiro:cmv:manage%', 'lote sem cmv:manage');
+  -- cada fonte tem o seu gate de edição individual
+  PERFORM cmv_expect_error(format($q$SELECT public.fin_cmv_classificar('[{"conta_pagar_id":"%s","rateio_id":null,"incluir":true,"expected_updated_at":"%s"}]')$q$,
+    v_bol2, (SELECT updated_at FROM fin_contas_pagar WHERE id = v_bol2)), 'PERMISSION_DENIED: financeiro:pagar:edit%', 'quem só edita lançamentos não classifica boleto');
+  PERFORM set_config('test.permissions', 'financeiro:pagar:edit', false);
+  PERFORM cmv_expect_error(format($q$SELECT public.fin_cmv_classificar('[{"lancamento_id":"%s","rateio_id":null,"incluir":true,"expected_updated_at":"%s"}]')$q$,
+    v_pend, (SELECT updated_at FROM fin_lancamentos WHERE id = v_pend)), 'PERMISSION_DENIED: financeiro:lancamentos:edit%', 'quem só edita Contas a Pagar não classifica lançamento');
+  -- caminho do boleto como antes: PAGO (a edição comum recusa) muda só a decisão e a versão, com auditoria antes/depois
+  r := fin_cmv_classificar(jsonb_build_array(jsonb_build_object('conta_pagar_id', v_bol2, 'rateio_id', NULL, 'incluir', true,
+    'expected_updated_at', (SELECT updated_at FROM fin_contas_pagar WHERE id = v_bol2))));
+  PERFORM cmv_assert((SELECT cmv_incluir AND status = 'PAGO' AND valor = 30 FROM fin_contas_pagar WHERE id = v_bol2), 'boleto PAGO classificado só na decisão');
+  PERFORM cmv_assert((r->'atualizados'->0->>'conta_pagar_id')::uuid = v_bol2 AND NOT (r->'atualizados'->0 ? 'lancamento_id'), 'retorno do boleto continua só com conta_pagar_id');
+  PERFORM cmv_assert((SELECT (antes->>'pendentes')::int = 1 AND (depois->>'incluido')::numeric = 30
+    FROM fin_audit_logs WHERE entidade = 'contas_pagar' AND entidade_id = v_bol2 AND acao = 'cmv_classificar'), 'auditoria do boleto antes/depois');
+  PERFORM cmv_expect_error(format($q$SELECT public.fin_cmv_classificar('[{"conta_pagar_id":"%s","rateio_id":null,"incluir":true,"expected_updated_at":"%s"}]')$q$,
+    v_bol_rat, (SELECT updated_at FROM fin_contas_pagar WHERE id = v_bol_rat)), 'CMV_ALVO_INVALIDO: boleto rateado%', 'boleto rateado classificado pelo cabeçalho');
+  PERFORM fin_cmv_classificar(jsonb_build_array(jsonb_build_object('conta_pagar_id', v_bol_rat,
+    'rateio_id', (SELECT id FROM fin_lancamento_rateios WHERE lancamento_id = v_bol_rat AND categoria_id = c_peixes), 'incluir', true,
+    'expected_updated_at', (SELECT updated_at FROM fin_contas_pagar WHERE id = v_bol_rat))));
+  PERFORM cmv_assert((SELECT cmv_incluir FROM fin_lancamento_rateios WHERE lancamento_id = v_bol_rat AND categoria_id = c_peixes)
+    AND (SELECT cmv_incluir IS NULL FROM fin_lancamento_rateios WHERE lancamento_id = v_bol_rat AND categoria_id = c_escr), 'boleto rateado classifica só a linha pedida');
+  UPDATE fin_contas_pagar SET status = 'CANCELADO' WHERE id = v_bol_rat;
+  PERFORM cmv_expect_error(format($q$SELECT public.fin_cmv_classificar('[{"conta_pagar_id":"%s","rateio_id":null,"incluir":true,"expected_updated_at":"%s"}]')$q$,
+    v_bol_rat, (SELECT updated_at FROM fin_contas_pagar WHERE id = v_bol_rat)), 'STATUS_INVALIDO%', 'boleto cancelado');
+  PERFORM set_config('test.permissions', TUDO, false);
+  -- lote misto com um item desatualizado: tudo ou nada
+  PERFORM cmv_expect_error(format($q$SELECT public.fin_cmv_classificar('[{"conta_pagar_id":"%s","rateio_id":null,"incluir":false,"expected_updated_at":"%s"},{"lancamento_id":"%s","rateio_id":null,"incluir":false,"expected_updated_at":"2020-01-01T00:00:00Z"}]')$q$,
+    v_bol, (SELECT updated_at FROM fin_contas_pagar WHERE id = v_bol), v_pend), 'OPTIMISTIC_LOCK_CONFLICT%', 'lote misto com versão antiga');
+  PERFORM cmv_assert((SELECT cmv_incluir FROM fin_contas_pagar WHERE id = v_bol), 'o boleto do lote recusado ficou como estava');
+  r := fin_cmv_classificar(jsonb_build_array(
+    jsonb_build_object('conta_pagar_id', v_bol, 'rateio_id', NULL, 'incluir', false, 'expected_updated_at', (SELECT updated_at FROM fin_contas_pagar WHERE id = v_bol)),
+    jsonb_build_object('lancamento_id', v_pend, 'rateio_id', NULL, 'incluir', false, 'expected_updated_at', (SELECT updated_at FROM fin_lancamentos WHERE id = v_pend))));
+  PERFORM cmv_assert((r->>'titulos')::int = 2 AND (SELECT cmv_incluir IS FALSE FROM fin_contas_pagar WHERE id = v_bol)
+    AND (SELECT cmv_incluir IS FALSE FROM fin_lancamentos WHERE id = v_pend), 'lote com as duas fontes');
+  PERFORM cmv_assert(EXISTS (SELECT 1 FROM fin_audit_logs WHERE entidade = 'contas_pagar' AND entidade_id = v_bol AND acao = 'cmv_classificar')
+    AND (SELECT count(*) FROM fin_audit_logs WHERE entidade = 'lancamentos' AND entidade_id = v_pend AND acao = 'cmv_classificar') = 2, 'o lote audita cada documento na própria entidade');
+  PERFORM set_config('test.company_id', B::text, false);
+  PERFORM cmv_expect_error(format($q$SELECT public.fin_cmv_classificar('[{"lancamento_id":"%s","rateio_id":null,"incluir":true,"expected_updated_at":"%s"}]')$q$,
+    v_pend, (SELECT updated_at FROM fin_lancamentos WHERE id = v_pend)), 'NOT_FOUND%', 'B não classifica lançamento da A');
+  PERFORM cmv_expect_error(format($q$SELECT public.fin_cmv_classificar('[{"conta_pagar_id":"%s","rateio_id":null,"incluir":true,"expected_updated_at":"%s"}]')$q$,
+    v_bol, (SELECT updated_at FROM fin_contas_pagar WHERE id = v_bol)), 'NOT_FOUND%', 'B não classifica boleto da A');
+  PERFORM set_config('test.company_id', A::text, false);
+
+  -- 12. Aplicar padrões às pendentes (histórico)
+  INSERT INTO fin_lancamentos (tipo, valor, data_competencia, data_pagamento, status, origem, company_id, categoria_id, descricao)
+  VALUES ('DESPESA', 11, '2026-09-14', '2026-09-14', 'REALIZADO', 'manual', A, c_peixes, 'Pendente peixe') RETURNING id INTO v_p_peixes;
+  INSERT INTO fin_lancamentos (tipo, valor, data_competencia, data_pagamento, status, origem, company_id, categoria_id, descricao)
+  VALUES ('DESPESA', 12, '2026-09-14', '2026-09-14', 'REALIZADO', 'manual', A, c_escr, 'Pendente escritório') RETURNING id INTO v_p_escr;
+  INSERT INTO fin_lancamentos (tipo, valor, data_competencia, data_pagamento, status, origem, company_id, categoria_id, descricao)
+  VALUES ('DESPESA', 13, '2026-09-14', '2026-09-14', 'REALIZADO', 'manual', A, c_sem, 'Pendente sem padrão') RETURNING id INTO v_p_sem;
+  INSERT INTO fin_lancamentos (tipo, valor, data_competencia, data_pagamento, status, origem, company_id, categoria_id, descricao)
+  VALUES ('DESPESA', 14, '2026-08-01', '2026-08-01', 'REALIZADO', 'manual', A, c_peixes, 'Pendente antigo') RETURNING id INTO v_p_antigo;
+  INSERT INTO fin_lancamentos (tipo, valor, data_competencia, data_pagamento, status, origem, company_id, categoria_id, cmv_incluir, descricao)
+  VALUES ('DESPESA', 15, '2026-09-15', '2026-09-15', 'REALIZADO', 'manual', A, c_peixes, false, 'Já decidido') RETURNING id INTO v_p_decidido;
+  INSERT INTO fin_lancamentos (tipo, valor, data_competencia, data_pagamento, status, origem, company_id, descricao)
+  VALUES ('DESPESA', 15, '2026-09-16', '2026-09-16', 'REALIZADO', 'manual', A, 'Pendente rateado') RETURNING id INTO v_p_rat;
+  INSERT INTO fin_lancamento_rateios (lancamento_id, categoria_id, valor, company_id) VALUES (v_p_rat, c_peixes, 10, A), (v_p_rat, c_sem, 5, A);
+  -- baixa legada de boleto ainda pendente: fora da apuração, então nem a prévia nem a gravação a alcançam
+  INSERT INTO fin_lancamentos (tipo, valor, data_competencia, data_pagamento, status, origem, conciliado, company_id, categoria_id, descricao, conta_id)
+  VALUES ('DESPESA', 17, '2026-09-14', '2026-09-14', 'REALIZADO', 'conciliacao', true, A, c_peixes, 'Baixa legada pendente', k_a) RETURNING id INTO v_p_baixa;
+  INSERT INTO fin_contas_pagar (descricao, valor, valor_pago, data_vencimento, data_competencia, data_pagamento, status, company_id, categoria_id, cmv_incluir, lancamento_id)
+  VALUES ('Boleto da baixa legada pendente', 17, 17, '2026-09-14', '2026-09-14', '2026-09-14', 'PAGO', A, c_peixes, false, v_p_baixa);
+  r := _guarded_create_conta_pagar(p_descricao => 'Boleto pendente', p_valor => 16, p_data_vencimento => '2026-09-30',
+    p_data_competencia => '2026-09-15', p_categoria_id => c_peixes);
+  v_bol_pend := (r->>'id')::uuid;
+
+  PERFORM set_config('test.permissions', 'financeiro:cmv:view,financeiro:lancamentos:edit', false);
+  PERFORM cmv_expect_error($q$SELECT public.fin_cmv_aplicar_padroes('2026-09-14')$q$, 'PERMISSION_DENIED%', 'aplicar padrões exige gerenciar o CMV, até na prévia');
+  PERFORM set_config('test.permissions', TUDO, false);
+
+  v_n := (SELECT count(*) FROM fin_lancamentos WHERE cmv_incluir IS NULL);
+  r := fin_cmv_aplicar_padroes('2026-09-14', true);
+  PERFORM cmv_assert((r->>'simulado')::boolean, 'prévia marcada como simulação');
+  PERFORM cmv_assert((r->'lancamento'->>'documentos')::int = 3 AND (r->'lancamento'->>'linhas_sim')::int = 2
+    AND (r->'lancamento'->>'centavos_sim')::bigint = 2100 AND (r->'lancamento'->>'linhas_nao')::int = 1
+    AND (r->'lancamento'->>'linhas_sem_padrao')::int = 2 AND (r->'lancamento'->>'centavos_sem_padrao')::bigint = 1800,
+    'prévia por fonte: lançamentos');
+  PERFORM cmv_assert((r->'boleto'->>'documentos')::int = 1 AND (r->'boleto'->>'linhas_sim')::int = 1
+    AND (r->'boleto'->>'centavos_sim')::bigint = 1600, 'prévia por fonte: boletos');
+  PERFORM cmv_assert((SELECT count(*) FROM fin_lancamentos WHERE cmv_incluir IS NULL) = v_n, 'a prévia não grava nada');
+  PERFORM cmv_expect_error($q$SELECT public.fin_cmv_aplicar_padroes('2026-09-14', false)$q$, 'JUSTIFICATIVA_OBRIGATORIA%', 'gravar exige justificativa');
+  PERFORM cmv_expect_error($q$SELECT public.fin_cmv_aplicar_padroes(NULL, true)$q$, 'CMV_PERIODO_OBRIGATORIO%', 'data inicial obrigatória');
+
+  r := fin_cmv_aplicar_padroes('2026-09-14', false, 'aplicação inicial');
+  PERFORM cmv_assert((r->>'documentos')::int = 4 AND (r->>'linhas')::int = 4
+    AND (r->>'centavos_sim')::bigint = 3700 AND (r->>'centavos_nao')::bigint = 1200, 'três lançamentos e um boleto classificados');
+  PERFORM cmv_assert((SELECT cmv_incluir FROM fin_lancamentos WHERE id = v_p_peixes)
+    AND (SELECT cmv_incluir IS FALSE FROM fin_lancamentos WHERE id = v_p_escr)
+    AND (SELECT cmv_incluir IS NULL FROM fin_lancamentos WHERE id = v_p_sem)
+    AND (SELECT cmv_incluir IS NULL FROM fin_lancamentos WHERE id = v_p_antigo), 'só pendentes com padrão e a partir da data');
+  PERFORM cmv_assert((SELECT cmv_incluir IS FALSE FROM fin_lancamentos WHERE id = v_p_decidido), 'decisão já tomada não é trocada');
+  PERFORM cmv_assert((SELECT cmv_incluir FROM fin_lancamento_rateios WHERE lancamento_id = v_p_rat AND categoria_id = c_peixes)
+    AND (SELECT cmv_incluir IS NULL FROM fin_lancamento_rateios WHERE lancamento_id = v_p_rat AND categoria_id = c_sem)
+    AND (SELECT cmv_incluir IS NULL FROM fin_lancamentos WHERE id = v_p_rat), 'rateio: só a linha com padrão; cabeçalho intocado');
+  PERFORM cmv_assert((SELECT cmv_incluir FROM fin_contas_pagar WHERE id = v_bol_pend), 'boleto pendente recebe o padrão');
+  PERFORM cmv_assert((SELECT cmv_incluir IS NULL FROM fin_lancamentos WHERE id = v_p_baixa), 'a baixa legada de boleto herda a exclusão da apuração e continua intocada');
+  PERFORM cmv_assert((SELECT count(*) FROM fin_audit_logs WHERE acao = 'cmv_aplicar_padroes') = 4, 'auditoria por documento');
+  PERFORM cmv_assert((SELECT count(*) FROM fin_audit_logs WHERE acao = 'cmv_aplicar_padroes' AND entidade = 'lancamentos') = 3
+    AND (SELECT count(*) FROM fin_audit_logs WHERE acao = 'cmv_aplicar_padroes' AND entidade = 'contas_pagar' AND entidade_id = v_bol_pend) = 1
+    AND (SELECT bool_and(justificativa = 'aplicação inicial') FROM fin_audit_logs WHERE acao = 'cmv_aplicar_padroes'), 'auditoria na entidade de cada fonte, com a justificativa');
+  PERFORM cmv_assert((SELECT (antes->>'pendentes')::int = 1 AND (depois->>'incluido')::numeric = 11
+    FROM fin_audit_logs WHERE acao = 'cmv_aplicar_padroes' AND entidade = 'lancamentos' AND entidade_id = v_p_peixes), 'auditoria guarda o antes e o depois do lançamento');
+  -- repetir não troca nem recria nada: o que já foi decidido deixou de ser pendente
+  r := fin_cmv_aplicar_padroes('2026-09-14', false, 'repetição');
+  PERFORM cmv_assert((r->>'documentos')::int = 0 AND (r->>'linhas')::int = 0, 'aplicar de novo não altera nada');
+  PERFORM set_config('test.company_id', B::text, false);
+  PERFORM cmv_assert((fin_cmv_aplicar_padroes('2020-01-01', false, 'x')->>'documentos')::int = 0, 'B não alcança a A');
+  PERFORM set_config('test.company_id', A::text, false);
+  PERFORM cmv_assert(has_function_privilege('authenticated', 'public.fin_cmv_aplicar_padroes(date,boolean,text)', 'EXECUTE'), 'authenticated executa aplicar padrões');
+  PERFORM cmv_assert(NOT has_function_privilege('anon', 'public.fin_cmv_aplicar_padroes(date,boolean,text)', 'EXECUTE'), 'anon não aplica padrões');
 
   RETURN 'cmv_lancamentos_ephemeral: OK';
 END;
