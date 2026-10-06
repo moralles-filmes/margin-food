@@ -9849,6 +9849,17 @@ export type Database = {
         }
         Returns: Json
       }
+      _guarded_ajustar_saldo_inicial_conta: {
+        Args: {
+          p_ate: string
+          p_conta_id: string
+          p_contexto?: Json
+          p_expected_updated_at: string
+          p_periodo_fim: string
+          p_saldo_inicial: number
+        }
+        Returns: Json
+      }
       _guarded_aprovar_conta_pagar: {
         Args: { p_expected_updated_at: string; p_id: string }
         Returns: Json

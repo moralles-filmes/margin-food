@@ -726,7 +726,19 @@ export default function ContasBancariasSection({ onNavigateExtrato }: ContasBanc
             </div>
             <div>
               <Label htmlFor="conta-form-saldo-inicial">Saldo Inicial (R$)</Label>
-              <BRLInput id="conta-form-saldo-inicial" numericValue={form.saldo_inicial} onNumericChange={v => setForm({ ...form, saldo_inicial: v })} showPrefix />
+              <BRLInput
+                id="conta-form-saldo-inicial"
+                numericValue={form.saldo_inicial}
+                onNumericChange={v => setForm({ ...form, saldo_inicial: v })}
+                showPrefix
+                aria-describedby="conta-form-saldo-inicial-ajuda"
+              />
+              {/* Todo cálculo de saldo é saldo inicial + todos os lançamentos: o saldo de hoje
+                  somado a um extrato de dias anteriores conta esse movimento duas vezes. */}
+              <p id="conta-form-saldo-inicial-ajuda" className="mt-1 text-xs text-muted-foreground">
+                Saldo do banco no dia anterior ao primeiro lançamento que será registrado ou importado.
+                Se for conciliar extratos de dias anteriores, não use o saldo de hoje.
+              </p>
             </div>
             <Button onClick={save} className="w-full" disabled={saving}>
               {saving ? 'Salvando...' : editId ? 'Atualizar' : 'Salvar'}
