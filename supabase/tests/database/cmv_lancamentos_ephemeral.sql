@@ -387,6 +387,131 @@ BEGIN
   RESET ROLE;
   PERFORM cmv_assert((SELECT cmv_incluir AND observacoes = 'nota' FROM fin_lancamentos WHERE id = v_manual), 'escrita direta sem a decisão continua permitida');
 
+  -- 7. Conciliação: competência própria e decisão por linha
+  r := reconcile_import_lancamento(p_data => '2026-09-10', p_descricao => 'PIX ARROZ', p_valor => 55, p_tipo => 'DESPESA',
+    p_conta_id => k_a, p_user_id => U,
+    p_rateio_linhas => format('[{"categoria_id":"%s","valor":55,"percentual":100,"cmv_incluir":true}]', c_peixes)::jsonb,
+    p_data_competencia => '2026-09-03');
+  PERFORM cmv_assert(r->>'status' = 'ok', 'importação ok');
+  v_imp := (r->>'lancamento_id')::uuid;
+  PERFORM cmv_assert((SELECT data_pagamento = '2026-09-10' AND data_competencia = '2026-09-03' AND origem = 'conciliacao' AND conciliado
+    FROM fin_lancamentos WHERE id = v_imp), 'data do banco fica no pagamento; a competência, só na competência');
+  PERFORM cmv_assert((SELECT cmv_incluir FROM fin_lancamento_rateios WHERE lancamento_id = v_imp), 'decisão da linha gravada no rateio');
+  r := get_fin_cmv_financeiro('2026-08-31', '2026-09-06');
+  PERFORM cmv_assert(cmv_total(r, '2026-08-31', '2026-09-06') = 5500, 'o PIX entra na semana da competência');
+  -- reenviar a mesma linha (sem FITID) com outra competência: mesma chave (data do banco)
+  r := reconcile_import_lancamento(p_data => '2026-09-10', p_descricao => 'PIX ARROZ', p_valor => 55, p_tipo => 'DESPESA',
+    p_conta_id => k_a, p_user_id => U,
+    p_rateio_linhas => format('[{"categoria_id":"%s","valor":55,"percentual":100}]', c_peixes)::jsonb,
+    p_data_competencia => '2026-09-05');
+  PERFORM cmv_assert(r->>'status' = 'duplicate' AND (r->>'lancamento_id')::uuid = v_imp, 'reenvio reconhecido pela data do banco, não pela competência');
+  -- mesmo conteúdo com FITID novo e espaçamento diferente: a 2ª camada compara a data do banco
+  r := reconcile_import_lancamento(p_data => '2026-09-10', p_descricao => 'PIX  ARROZ', p_valor => 55, p_tipo => 'DESPESA',
+    p_conta_id => k_a, p_user_id => U,
+    p_rateio_linhas => format('[{"categoria_id":"%s","valor":55,"percentual":100}]', c_peixes)::jsonb,
+    p_external_id => 'FIT-NOVO', p_data_competencia => '2026-09-01');
+  PERFORM cmv_assert(r->>'status' = 'possible_duplicate', 'possível duplicata pela data do banco');
+  -- receita: a decisão enviada é ignorada
+  r := reconcile_import_lancamento(p_data => '2026-09-10', p_descricao => 'VENDA', p_valor => 80, p_tipo => 'RECEITA',
+    p_conta_id => k_a, p_user_id => U,
+    p_rateio_linhas => format('[{"categoria_id":"%s","valor":80,"percentual":100,"cmv_incluir":true}]', c_rec)::jsonb);
+  PERFORM cmv_assert((SELECT cmv_incluir IS NULL FROM fin_lancamento_rateios WHERE lancamento_id = (r->>'lancamento_id')::uuid), 'receita nunca recebe decisão do CMV');
+  -- cliente antigo (posicional, sem competência nem decisão)
+  r := reconcile_import_lancamento('2026-09-11', 'PIX ANTIGO', 12, 'DESPESA', k_a, U,
+    format('[{"categoria_id":"%s","valor":12,"percentual":100}]', c_peixes)::jsonb);
+  PERFORM cmv_assert((SELECT data_competencia = '2026-09-11' AND data_pagamento = '2026-09-11' FROM fin_lancamentos WHERE id = (r->>'lancamento_id')::uuid),
+    'sem competência informada vale a data do banco');
+  PERFORM cmv_assert((SELECT cmv_incluir IS NULL FROM fin_lancamento_rateios WHERE lancamento_id = (r->>'lancamento_id')::uuid), 'cliente antigo deixa pendente');
+  PERFORM cmv_expect_error(format($q$SELECT public.reconcile_import_lancamento(p_data => '2026-09-10', p_descricao => 'T', p_valor => 5, p_tipo => 'TRANSFERENCIA', p_conta_id => '%s', p_user_id => '%s', p_data_competencia => '2026-09-01')$q$, k_a, U),
+    'COMPETENCIA_INVALIDA%', 'transferência não aceita competência própria');
+  PERFORM cmv_assert((SELECT count(*) FROM pg_proc WHERE proname = 'reconcile_import_lancamento') = 1, 'uma única assinatura de reconcile_import_lancamento');
+
+  -- 8. Livro Razão: criação e edição com a decisão
+  SELECT u.id INTO v_lr FROM _guarded_upsert_lancamento(p_tipo => 'DESPESA', p_status => 'REALIZADO', p_valor => 90,
+    p_categoria_id => c_peixes, p_data_competencia => '2026-09-08', p_data_pagamento => '2026-09-08', p_descricao => 'Mercado',
+    p_cmv => '{"incluir": true}') u;
+  PERFORM cmv_assert((SELECT cmv_incluir FROM fin_lancamentos WHERE id = v_lr), 'despesa sem rateio guarda a decisão no lançamento');
+  SELECT u.id INTO v_lr2 FROM _guarded_upsert_lancamento(p_tipo => 'DESPESA', p_status => 'REALIZADO', p_valor => 100,
+    p_data_competencia => '2026-09-08', p_data_pagamento => '2026-09-08', p_descricao => 'Feira', p_cmv => '{}',
+    p_rateios => format('[{"categoria_id":"%s","valor":70,"cmv_incluir":true},{"categoria_id":"%s","valor":30,"cmv_incluir":false}]', c_peixes, c_escr)::jsonb) u;
+  PERFORM cmv_assert((SELECT count(*) FILTER (WHERE cmv_incluir) = 1 AND count(*) FILTER (WHERE NOT cmv_incluir) = 1
+    FROM fin_lancamento_rateios WHERE lancamento_id = v_lr2), 'decisão por linha de rateio');
+  PERFORM cmv_assert((SELECT cmv_incluir IS NULL FROM fin_lancamentos WHERE id = v_lr2), 'lançamento rateado não tem decisão própria');
+  -- receita: nem o cabeçalho nem as linhas recebem decisão (formulário que virou receita)
+  SELECT u.id INTO v_lr3 FROM _guarded_upsert_lancamento(p_tipo => 'RECEITA', p_valor => 10, p_descricao => 'Receita',
+    p_cmv => '{"incluir": true}',
+    p_rateios => format('[{"categoria_id":"%s","valor":10,"cmv_incluir":true}]', c_rec)::jsonb) u;
+  PERFORM cmv_assert((SELECT cmv_incluir IS NULL FROM fin_lancamentos WHERE id = v_lr3)
+    AND (SELECT bool_and(cmv_incluir IS NULL) FROM fin_lancamento_rateios WHERE lancamento_id = v_lr3), 'receita sem decisão');
+  PERFORM cmv_expect_error($q$SELECT * FROM public._guarded_upsert_lancamento(p_descricao => 'x', p_valor => 1, p_cmv => '"sim"')$q$,
+    'CMV_INVALIDO%', 'p_cmv malformado');
+  -- edição preservando id e created_at das linhas, com nova decisão
+  SELECT array_agg(id ORDER BY valor DESC), array_agg(created_at ORDER BY valor DESC) INTO v_ids, v_criados
+  FROM fin_lancamento_rateios WHERE lancamento_id = v_lr2;
+  PERFORM _guarded_upsert_lancamento(p_id => v_lr2, p_tipo => 'DESPESA', p_status => 'REALIZADO', p_valor => 100,
+    p_data_competencia => '2026-09-08', p_data_pagamento => '2026-09-08', p_descricao => 'Feira',
+    p_updated_at => (SELECT updated_at FROM fin_lancamentos WHERE id = v_lr2), p_cmv => '{}',
+    p_rateios => format('[{"id":"%s","categoria_id":"%s","valor":70,"cmv_incluir":false},{"id":"%s","categoria_id":"%s","valor":30,"cmv_incluir":false}]',
+      v_ids[1], c_peixes, v_ids[2], c_escr)::jsonb);
+  PERFORM cmv_assert((SELECT array_agg(id ORDER BY valor DESC) = v_ids AND array_agg(created_at ORDER BY valor DESC) = v_criados
+    AND bool_and(cmv_incluir IS FALSE) FROM fin_lancamento_rateios WHERE lancamento_id = v_lr2), 'edição preserva id/created_at e grava a nova decisão');
+  -- cliente antigo (sem p_cmv): mesma categoria herda; categoria trocada volta para pendente
+  PERFORM _guarded_upsert_lancamento(p_id => v_lr, p_tipo => 'DESPESA', p_status => 'REALIZADO', p_valor => 90,
+    p_categoria_id => c_peixes, p_data_competencia => '2026-09-08', p_data_pagamento => '2026-09-08', p_descricao => 'Mercado editado',
+    p_updated_at => (SELECT updated_at FROM fin_lancamentos WHERE id = v_lr));
+  PERFORM cmv_assert((SELECT cmv_incluir FROM fin_lancamentos WHERE id = v_lr), 'cliente antigo herda a decisão da mesma categoria');
+  PERFORM _guarded_upsert_lancamento(p_id => v_lr, p_tipo => 'DESPESA', p_status => 'REALIZADO', p_valor => 90,
+    p_categoria_id => c_escr, p_data_competencia => '2026-09-08', p_data_pagamento => '2026-09-08', p_descricao => 'Mercado editado',
+    p_updated_at => (SELECT updated_at FROM fin_lancamentos WHERE id = v_lr), p_justificativa_edicao => 'troca de categoria');
+  PERFORM cmv_assert((SELECT cmv_incluir IS NULL FROM fin_lancamentos WHERE id = v_lr), 'categoria trocada sem resposta volta para pendente');
+  PERFORM cmv_expect_error(format($q$SELECT * FROM public._guarded_upsert_lancamento(p_id => '%s', p_tipo => 'DESPESA', p_valor => 90, p_descricao => 'x', p_updated_at => '2020-01-01T00:00:00Z', p_cmv => '{}')$q$, v_lr),
+    'CONFLICT%', 'lock otimista da edição');
+  PERFORM cmv_assert((SELECT count(*) FROM pg_proc WHERE proname = '_guarded_upsert_lancamento') = 1, 'uma única assinatura do upsert');
+
+  -- 9. Reclassificação de lançamento conciliado: decisão e competência
+  v_rid := (SELECT id FROM fin_lancamento_rateios WHERE lancamento_id = v_imp);
+  PERFORM _guarded_update_reconciled_classification(p_id => v_imp,
+    p_rateios => format('[{"id":"%s","categoria_id":"%s","valor":55,"cmv_incluir":false}]', v_rid, c_peixes)::jsonb,
+    p_expected_updated_at => (SELECT updated_at FROM fin_lancamentos WHERE id = v_imp),
+    p_justificativa_edicao => 'compra da semana anterior', p_cmv => '{}', p_data_competencia => '2026-08-31');
+  PERFORM cmv_assert((SELECT data_competencia = '2026-08-31' AND data_pagamento = '2026-09-10' AND conciliado
+    FROM fin_lancamentos WHERE id = v_imp), 'reclassificação muda só a competência e mantém a conciliação');
+  PERFORM cmv_assert((SELECT id = v_rid AND cmv_incluir IS FALSE FROM fin_lancamento_rateios WHERE lancamento_id = v_imp), 'linha preservada com a nova decisão');
+  -- conciliado sem data_pagamento: a competência antiga vira a data do banco
+  INSERT INTO fin_lancamentos (tipo, valor, data_competencia, data_pagamento, status, origem, company_id, categoria_id, conciliado, descricao)
+  VALUES ('DESPESA', 33, '2026-09-05', NULL, 'REALIZADO', 'manual', A, c_peixes, true, 'Manual conciliado') RETURNING id INTO v_sem_pag;
+  PERFORM _guarded_update_reconciled_classification(p_id => v_sem_pag, p_categoria_id => c_peixes,
+    p_expected_updated_at => (SELECT updated_at FROM fin_lancamentos WHERE id = v_sem_pag),
+    p_justificativa_edicao => 'competência', p_cmv => '{"incluir": true}', p_data_competencia => '2026-09-01');
+  PERFORM cmv_assert((SELECT data_competencia = '2026-09-01' AND data_pagamento = '2026-09-05' AND cmv_incluir
+    FROM fin_lancamentos WHERE id = v_sem_pag), 'sem data do banco, a competência antiga vira data de pagamento');
+  -- cliente antigo (7 parâmetros) preserva decisão e competência
+  PERFORM _guarded_update_reconciled_classification(v_sem_pag, c_peixes, NULL, 'obs', '[]'::jsonb,
+    (SELECT updated_at FROM fin_lancamentos WHERE id = v_sem_pag), 'só observação');
+  PERFORM cmv_assert((SELECT cmv_incluir AND data_competencia = '2026-09-01' FROM fin_lancamentos WHERE id = v_sem_pag),
+    'cliente antigo preserva decisão e competência');
+  PERFORM cmv_expect_error(format($q$SELECT * FROM public._guarded_update_reconciled_classification(p_id => '%s', p_categoria_id => '%s', p_justificativa_edicao => ' ')$q$, v_sem_pag, c_peixes),
+    'JUSTIFICATIVA_OBRIGATORIA%', 'reclassificação exige justificativa');
+  PERFORM cmv_assert((SELECT count(*) FROM pg_proc WHERE proname = '_guarded_update_reconciled_classification') = 1, 'uma única assinatura da reclassificação');
+  PERFORM cmv_assert(NOT has_function_privilege('authenticated', 'public._fin_cmv_heranca(jsonb,uuid)', 'EXECUTE'), 'helper de herança fechado');
+
+  -- 10. O que o corpo anterior já fazia continua valendo; auditoria guarda o retrato do CMV
+  -- p_rateios que não é array era erro (jsonb_array_length) e não pode virar "sem rateio" e apagar as linhas.
+  BEGIN
+    PERFORM public._guarded_upsert_lancamento(p_descricao => 'x', p_valor => 1, p_rateios => '{}'::jsonb);
+    RAISE EXCEPTION 'FALHOU: p_rateios que não é array virou "sem rateio"';
+  EXCEPTION WHEN invalid_parameter_value THEN NULL;
+  END;
+  PERFORM cmv_assert((SELECT (antes->'cmv'->>'incluido')::numeric = 70 AND (depois->'cmv'->>'fora')::numeric = 100
+      AND (depois->'cmv'->>'incluido')::numeric = 0
+    FROM fin_audit_logs WHERE entidade_id = v_lr2 AND acao = 'editar'), 'auditoria do Livro Razão guarda o retrato do CMV antes e depois');
+  PERFORM cmv_assert((SELECT antes->>'data_competencia' = '2026-09-03' AND depois->>'data_competencia' = '2026-08-31'
+      AND depois->>'data_pagamento' = '2026-09-10' AND (antes->'cmv'->>'incluido')::numeric = 55 AND (depois->'cmv'->>'fora')::numeric = 55
+    FROM fin_audit_logs WHERE entidade_id = v_imp AND acao = 'editar_classificacao_conciliado'),
+    'auditoria da reclassificação guarda competência e decisão antes e depois');
+  PERFORM cmv_assert((SELECT depois->>'data_competencia' = '2026-09-03' AND (depois->>'data')::date = '2026-09-10'
+    FROM fin_audit_logs WHERE entidade_id = v_imp AND acao = 'reconcile_import'), 'auditoria da importação guarda a competência e a data do banco');
+
   RETURN 'cmv_lancamentos_ephemeral: OK';
 END;
 $$;

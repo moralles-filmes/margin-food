@@ -98,3 +98,54 @@ describe('migration CMV com lançamentos — leitura', () => {
     expect(c).toContain("'financeiro:conciliacao:reconcile'");
   });
 });
+
+describe('migration CMV com lançamentos — escrita', () => {
+  it('conciliação: a data do banco continua na chave e na 2ª camada; competência e decisão são opcionais', () => {
+    const c = corpo('reconcile_import_lancamento');
+    expect(sql).toContain('DROP FUNCTION IF EXISTS public.reconcile_import_lancamento(date, text, numeric, text, uuid, uuid, jsonb, text, boolean, integer);');
+    expect(c).toContain('p_occurrence_index integer DEFAULT 0,\n  p_data_competencia date DEFAULT NULL::date');
+    expect(c).toContain('v_legacy_idem_key := md5(v_company::text || p_data::text || p_descricao || p_valor::text || p_tipo || p_conta_id::text);');
+    expect(c.split('AND l.data_pagamento = p_data').length - 1).toBe(2);
+    expect(c).toContain('v_competencia := COALESCE(p_data_competencia, p_data);');
+    expect(plano(c)).toContain('p_tipo, p_valor, v_competencia, p_data, p_descricao, p_conta_id,');
+    expect(plano(c)).toContain("CASE WHEN p_tipo = 'DESPESA' AND jsonb_typeof(v_rateio_item->'cmv_incluir') = 'boolean'");
+    expect(plano(c)).toContain("'financeiro:conciliacao:reconcile', 'finance:manage', 'system:global:manage'");
+    expect(c).toContain("IF v_constraint IS DISTINCT FROM 'idx_fin_lancamentos_company_idempotency' THEN");
+  });
+
+  it('Livro Razão: p_cmv opcional, id da linha preservado, nunca exige a resposta', () => {
+    const c = corpo('_guarded_upsert_lancamento');
+    expect(sql).toContain('DROP FUNCTION IF EXISTS public._guarded_upsert_lancamento(uuid, text, text, numeric, uuid, uuid, uuid, date, date, date, text, text, text, text, boolean, jsonb, jsonb, timestamptz, text, text);');
+    expect(c).toContain('p_cmv jsonb DEFAULT NULL::jsonb');
+    expect(c).not.toContain('CMV_DECISAO_OBRIGATORIA');
+    expect(c).toContain('NOT (_r.id = ANY(_usados))');
+    expect(c).toContain('public._fin_cmv_heranca(_old_set, _r.categoria_id)');
+    expect(c).toContain("RAISE EXCEPTION 'REQUEST_ID_REUTILIZADO';");
+    expect(c).toContain("RAISE EXCEPTION 'Lançamento conciliado não pode ser editado. Desconcilie primeiro.';");
+    expect(plano(c)).toContain("'financeiro:lancamentos:create', 'finance:manage', 'system:global:manage'");
+  });
+
+  it('reclassificação: muda a competência e a decisão; a data do banco nunca', () => {
+    const c = corpo('_guarded_update_reconciled_classification');
+    expect(sql).toContain('DROP FUNCTION IF EXISTS public._guarded_update_reconciled_classification(uuid, uuid, uuid, text, jsonb, timestamptz, text);');
+    expect(c).toContain('p_cmv jsonb DEFAULT NULL::jsonb,\n  p_data_competencia date DEFAULT NULL::date');
+    expect(c).toContain('THEN COALESCE(v_lanc.data_pagamento, v_lanc.data_competencia)');
+    expect(c).toContain("RAISE EXCEPTION 'ORIGEM_INVALIDA: edite a conta a pagar/receber de origem';");
+    expect(c).toContain("RAISE EXCEPTION 'JUSTIFICATIVA_OBRIGATORIA';");
+    expect(c).not.toMatch(/\bvalor\s*=\s*p_/);
+    expect(c).not.toMatch(/\bconta_id\s*=/);
+  });
+
+  it('EXECUTE das assinaturas novas só para authenticated e service_role', () => {
+    for (const sig of [
+      'reconcile_import_lancamento(date, text, numeric, text, uuid, uuid, jsonb, text, boolean, integer, date)',
+      '_guarded_upsert_lancamento(uuid, text, text, numeric, uuid, uuid, uuid, date, date, date, text, text, text, text, boolean, jsonb, jsonb, timestamptz, text, text, jsonb)',
+      '_guarded_update_reconciled_classification(uuid, uuid, uuid, text, jsonb, timestamptz, text, jsonb, date)',
+    ]) {
+      expect(sql).toContain(`REVOKE EXECUTE ON FUNCTION public.${sig} FROM PUBLIC, anon;`);
+      expect(sql).toContain(`GRANT EXECUTE ON FUNCTION public.${sig} TO authenticated, service_role;`);
+    }
+    expect(sql).toContain('REVOKE ALL ON FUNCTION public._fin_cmv_heranca(jsonb, uuid) FROM PUBLIC, anon, authenticated;');
+    expect(sql).toContain("NOTIFY pgrst, 'reload schema';");
+  });
+});
