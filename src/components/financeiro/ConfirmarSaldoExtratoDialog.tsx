@@ -7,9 +7,12 @@ import { CurrencyInput } from '@/components/ui/brl-input';
 import { DateInput } from '@/components/ui/DateInput';
 import { diaAnterior } from '@/lib/extratoParser';
 import { getConsolidatedBankDelta, isAutomaticInvestmentLine } from '@/lib/conciliacaoInvestimentoAutomatico';
+import { diaSeguinte, sugerirSaldoInicial } from '@/lib/conciliacaoSaldoExtrato';
+import { useEmitDataEvent } from '@/lib/dataEvents';
 import { fmtBRL, formatDateBR, parseLocalDate } from '@/lib/formatters';
 import { normalizeBRLMoneyToNumber, formatNumberToBRL } from '@/lib/money';
 import { useScopedToast } from '@/hooks/useScopedToast';
+import { useTravaEnvio } from '@/hooks/useTravaEnvio';
 import { AlertTriangle, Info, Loader2 } from 'lucide-react';
 import { useCan } from '@/permissions/hooks';
 import { useRetornoFoco } from '@/components/financeiro/useRetornoFoco';
@@ -40,10 +43,53 @@ interface ConfirmarSaldoExtratoDialogProps {
   focoAoFechar?: () => HTMLElement | null;
 }
 
+interface ContaParaAjuste {
+  id: string;
+  saldo_inicial: number;
+  updated_at: string;
+}
+
+/** Divergência que só pode vir do saldo inicial: a conta não tem lançamento antes do período. */
+interface SugestaoSaldoInicial {
+  conta: ContaParaAjuste;
+  atual: number;
+  sugerido: number;
+  /** Véspera do período importado — a data em que o saldo sugerido vale. */
+  data: string;
+  /**
+   * A conta já tem lançamento depois do período: o saldo inicial atual pode ter
+   * sido conferido com eles, e mudá-lo desloca o saldo de todos. Só é correto se
+   * o usuário for importar todo o intervalo até eles — decisão que fica fora do
+   * ajuste de um clique.
+   */
+  temPosteriores: boolean;
+}
+
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** O servidor rechecou o histórico sob lock e encontrou lançamento novo: a sugestão envelheceu. */
+const HISTORICO_MUDOU_RE = /LANCAMENTO_(ANTERIOR|POSTERIOR)/;
+
+/** Texto fixo para os erros conhecidos de `_guarded_ajustar_saldo_inicial_conta`; o resto vai só para o console. */
+function mensagemErroAjuste(message: string, datas: { ate: string; periodoFim: string }): string {
+  if (/LANCAMENTO_ANTERIOR/.test(message)) {
+    return `A conta recebeu lançamentos até ${formatDateBR(parseLocalDate(datas.ate))} enquanto você conferia. Confira o saldo de novo.`;
+  }
+  if (/LANCAMENTO_POSTERIOR/.test(message)) {
+    return `A conta recebeu lançamentos depois de ${formatDateBR(parseLocalDate(datas.periodoFim))} enquanto você conferia. Confira o saldo de novo.`;
+  }
+  if (/OPTIMISTIC_LOCK_CONFLICT/.test(message)) return 'A conta foi alterada por outra pessoa. Cancele e importe o extrato de novo.';
+  if (/PERMISSION_DENIED/.test(message)) return 'Você não tem permissão para editar contas bancárias nesta unidade.';
+  if (/NOT_FOUND/.test(message)) return 'Conta não encontrada nesta unidade.';
+  return 'Não foi possível ajustar o saldo inicial. Tente de novo.';
+}
+
 interface Divergencia {
   informado: number;
   calculado: number;
   diferenca: number;
+  sugestaoSaldoInicial?: SugestaoSaldoInicial;
 }
 
 const TOLERANCIA = 0.01;
@@ -95,7 +141,171 @@ export default function ConfirmarSaldoExtratoDialog({
   const [loading, setLoading] = useState(false);
   const [divergencia, setDivergencia] = useState<Divergencia | null>(null);
   const canViewConciliacao = useCan('financeiro:conciliacao:view');
+  const canEditConta = useCan('financeiro:contas:edit');
+  // Sem leitura de lançamentos a RLS devolve lista vazia, que pareceria "conta sem histórico".
+  const canViewLancamentos = useCan('financeiro:lancamentos:view');
+  const emitDataEvent = useEmitDataEvent();
+  const { enviando: ajustando, executar } = useTravaEnvio();
   const retornoFoco = useRetornoFoco(focoAoFechar);
+
+  /**
+   * Existe lançamento da conta com data efetiva até `dataAnterior`? Filtro
+   * conservador (qualquer uma das datas basta), então pode responder "sim" para
+   * um lançamento cuja data efetiva é posterior — o lado seguro. `null` = erro.
+   */
+  const existeLancamentoAte = async (dataAnterior: string): Promise<boolean | null> => {
+    const { data, error } = await supabase
+      .from('fin_lancamentos')
+      .select('id')
+      .in('status', ['REALIZADO', 'CONCILIADO'])
+      .or(`conta_id.eq.${contaId},conta_destino_id.eq.${contaId}`)
+      .or(`data_competencia.lte.${dataAnterior},data_pagamento.lte.${dataAnterior},conciliado_em.lt.${periodoInicio}T00:00:00-03:00`)
+      .limit(1);
+    if (error) {
+      console.error('[ConfirmarSaldoExtratoDialog.lancamentosAnteriores]', error);
+      return null;
+    }
+    return (data || []).length > 0;
+  };
+
+  /**
+   * Existe lançamento com data efetiva depois do período? Mesma regra de data do
+   * saldo: COALESCE(data_pagamento, conciliado_em no fuso BR, data_competencia).
+   * `null` = erro.
+   */
+  const existeLancamentoDepois = async (): Promise<boolean | null> => {
+    const inicioDiaSeguinte = `${diaSeguinte(periodoFim)}T00:00:00-03:00`;
+    const { data, error } = await supabase
+      .from('fin_lancamentos')
+      .select('id')
+      .in('status', ['REALIZADO', 'CONCILIADO'])
+      .or(`conta_id.eq.${contaId},conta_destino_id.eq.${contaId}`)
+      .or(
+        `data_pagamento.gt.${periodoFim},`
+        + `and(data_pagamento.is.null,conciliado_em.gte.${inicioDiaSeguinte}),`
+        + `and(data_pagamento.is.null,conciliado_em.is.null,data_competencia.gt.${periodoFim})`,
+      )
+      .limit(1);
+    if (error) {
+      console.error('[ConfirmarSaldoExtratoDialog.lancamentosPosteriores]', error);
+      return null;
+    }
+    return (data || []).length > 0;
+  };
+
+  /**
+   * Só sugere ajustar o saldo inicial quando ele é a ÚNICA explicação possível:
+   * sem lançamento antes do período, o saldo do sistema na véspera é o próprio
+   * `saldo_inicial`. Com lançamento anterior, a diferença pode ser lançamento
+   * faltando ou duplicado — ajustar o saldo inicial esconderia exatamente o erro
+   * que esta conferência existe para mostrar. Qualquer falha de leitura cai na
+   * divergência genérica.
+   */
+  const buscarSugestaoSaldoInicial = async (
+    informado: number,
+    deltaAteData: number,
+    saldoBase: number,
+    dataAnterior: string,
+  ): Promise<SugestaoSaldoInicial | undefined> => {
+    if (!canViewLancamentos) return undefined;
+    // As datas vêm do arquivo do extrato e entram cruas no filtro do PostgREST.
+    if (![periodoInicio, periodoFim, dataAnterior].every(d => ISO_DATE_RE.test(d)) || !UUID_RE.test(contaId)) {
+      return undefined;
+    }
+    if (await existeLancamentoAte(dataAnterior) !== false) return undefined;
+
+    const { data: conta, error: erroConta } = await supabase
+      .from('fin_contas')
+      .select('id, saldo_inicial, updated_at')
+      .eq('id', contaId)
+      .maybeSingle();
+    if (erroConta || !conta) {
+      if (erroConta) console.error('[ConfirmarSaldoExtratoDialog.conta]', erroConta);
+      return undefined;
+    }
+
+    const atual = Number(conta.saldo_inicial) || 0;
+    // Saldo da véspera diferente do saldo inicial = há lançamento que o filtro
+    // acima não pegou; a premissa da sugestão não vale.
+    if (Math.abs(saldoBase - atual) >= TOLERANCIA) return undefined;
+
+    const posteriores = await existeLancamentoDepois();
+    if (posteriores === null) return undefined;
+
+    return {
+      conta: conta as ContaParaAjuste,
+      atual,
+      sugerido: sugerirSaldoInicial({ informado, deltaAteData }),
+      data: dataAnterior,
+      temPosteriores: posteriores,
+    };
+  };
+
+  const conferirSaldo = async (informado: number) => {
+    const dataAnterior = diaAnterior(periodoInicio);
+    const { data, error } = await supabase.rpc('get_fin_saldo_conta_em', {
+      p_conta_id: contaId,
+      p_data: dataAnterior,
+    });
+    if (error) {
+      toast.error('Erro ao calcular saldo: ' + error.message);
+      return;
+    }
+    const saldoBase = Number(data) || 0;
+    const deltaAteData = getConsolidatedBankDelta(
+      linhasExtrato.filter(linha => linha.data <= dataSaldo),
+    );
+    const calculado = saldoBase + deltaAteData;
+    const diferenca = informado - calculado;
+
+    if (Math.abs(diferenca) < TOLERANCIA) {
+      toast.success('Saldo confere!');
+      onConfirmed({ valor: informado, data: dataSaldo });
+      return;
+    }
+    const sugestaoSaldoInicial = await buscarSugestaoSaldoInicial(informado, deltaAteData, saldoBase, dataAnterior);
+    setDivergencia({ informado, calculado, diferenca, sugestaoSaldoInicial });
+  };
+
+  const reconferir = async (informado: number) => {
+    setDivergencia(null);
+    setLoading(true);
+    try {
+      await conferirSaldo(informado);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const ajustarSaldoInicial = () => executar(async () => {
+    const sugestaoAtual = divergencia?.sugestaoSaldoInicial;
+    if (!divergencia || !sugestaoAtual || sugestaoAtual.temPosteriores) return;
+    const { conta, sugerido, data: dataAnterior } = sugestaoAtual;
+
+    // A premissa (nenhum lançamento até a véspera nem depois do período) foi
+    // checada quando a tela abriu; outra aba pode ter importado extrato desde
+    // então, e o lock otimista da conta não percebe (lançamento não toca
+    // fin_contas). A RPC refaz as duas checagens sob lock antes de gravar.
+    const { error } = await supabase.rpc('_guarded_ajustar_saldo_inicial_conta', {
+      p_conta_id: conta.id,
+      p_saldo_inicial: sugerido,
+      p_ate: dataAnterior,
+      p_periodo_fim: periodoFim,
+      p_expected_updated_at: conta.updated_at,
+      p_contexto: { arquivo: nomeArquivo, saldo_informado: divergencia.informado, data_saldo: dataSaldo },
+    });
+    if (error) {
+      console.error('[ConfirmarSaldoExtratoDialog.ajustarSaldoInicial]', error);
+      toast.error(mensagemErroAjuste(error.message, { ate: dataAnterior, periodoFim }));
+      if (HISTORICO_MUDOU_RE.test(error.message)) await reconferir(divergencia.informado);
+      return;
+    }
+    // Até processar as linhas deste extrato o saldo da conta fica no da véspera,
+    // como em qualquer extrato ainda pendente.
+    toast.success(`Saldo inicial ajustado para ${fmtBRL(sugerido)}. O saldo da conta fecha com o banco depois de processar as linhas deste extrato.`);
+    emitDataEvent('financeiro:contas');
+    await reconferir(divergencia.informado);
+  });
 
   const handleConfirmarValor = async () => {
     if (!canViewConciliacao) {
@@ -124,32 +334,13 @@ export default function ConfirmarSaldoExtratoDialog({
 
     setLoading(true);
     try {
-      const dataAnterior = diaAnterior(periodoInicio);
-      const { data, error } = await supabase.rpc('get_fin_saldo_conta_em', {
-        p_conta_id: contaId,
-        p_data: dataAnterior,
-      });
-      if (error) {
-        toast.error('Erro ao calcular saldo: ' + error.message);
-        return;
-      }
-      const saldoBase = Number(data) || 0;
-      const deltaAteData = getConsolidatedBankDelta(
-        linhasExtrato.filter(linha => linha.data <= dataSaldo),
-      );
-      const calculado = saldoBase + deltaAteData;
-      const diferenca = informado - calculado;
-
-      if (Math.abs(diferenca) < TOLERANCIA) {
-        toast.success('Saldo confere!');
-        onConfirmed({ valor: informado, data: dataSaldo });
-      } else {
-        setDivergencia({ informado, calculado, diferenca });
-      }
+      await conferirSaldo(informado);
     } finally {
       setLoading(false);
     }
   };
+
+  const sugestao = divergencia?.sugestaoSaldoInicial;
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onCancel(); }}>
@@ -267,19 +458,64 @@ export default function ConfirmarSaldoExtratoDialog({
                   <dd className="whitespace-nowrap font-semibold tabular-nums text-destructive">{fmtBRL(divergencia.diferenca)}</dd>
                 </div>
               </dl>
-              <p className="text-xs text-muted-foreground">
-                Isso indica que pode haver lançamento(s) incorreto(s) ou faltando antes de {formatDateBR(parseLocalDate(periodoInicio))}.
-                Você pode continuar a conciliação mesmo assim e investigar depois, ou cancelar para corrigir antes.
-              </p>
+              {sugestao ? (
+                <div
+                  role="note"
+                  aria-labelledby="sugestao-saldo-inicial-titulo"
+                  className="space-y-1.5 rounded-lg border border-warning-border bg-warning-soft p-3 text-xs"
+                >
+                  <p id="sugestao-saldo-inicial-titulo" className="flex items-center gap-2 font-medium text-foreground">
+                    <Info aria-hidden="true" className="h-4 w-4 shrink-0 text-warning" />
+                    O saldo inicial da conta não bate com este extrato
+                  </p>
+                  <p className="text-muted-foreground">
+                    Esta conta não tem lançamentos antes de {formatDateBR(parseLocalDate(periodoInicio))}, então o saldo do
+                    sistema em {formatDateBR(parseLocalDate(sugestao.data))} é o próprio saldo inicial cadastrado:{' '}
+                    <strong className="whitespace-nowrap tabular-nums text-foreground">{fmtBRL(sugestao.atual)}</strong>.
+                  </p>
+                  <p className="text-muted-foreground">
+                    Pelo extrato, o saldo do banco em {formatDateBR(parseLocalDate(sugestao.data))} era{' '}
+                    <strong className="whitespace-nowrap tabular-nums text-foreground">{fmtBRL(sugestao.sugerido)}</strong>.
+                    O saldo inicial precisa ser o saldo do banco antes do primeiro lançamento importado, não o saldo de hoje.
+                  </p>
+                  {sugestao.temPosteriores ? (
+                    <p className="font-medium text-foreground">
+                      Esta conta já tem lançamentos depois de {formatDateBR(parseLocalDate(periodoFim))}. Mudar o saldo inicial
+                      desloca o saldo deles também, por isso o ajuste não é feito aqui: corrija em Contas Bancárias só se for
+                      importar todo o período até esses lançamentos.
+                    </p>
+                  ) : canEditConta ? (
+                    <p className="font-medium text-foreground">
+                      Confira no app do banco o saldo de {formatDateBR(parseLocalDate(sugestao.data))} antes de ajustar.
+                    </p>
+                  ) : (
+                    <p className="font-medium text-foreground">
+                      Peça a quem pode editar contas bancárias para ajustar o saldo inicial.
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Isso indica que pode haver lançamento(s) incorreto(s) ou faltando antes de {formatDateBR(parseLocalDate(periodoInicio))}.
+                  Você pode continuar a conciliação mesmo assim e investigar depois, ou cancelar para corrigir antes.
+                </p>
+              )}
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={onCancel}>Cancelar importação</Button>
+              <Button variant="outline" onClick={onCancel} disabled={ajustando}>Cancelar importação</Button>
               <Button
                 variant="destructive"
                 onClick={() => onConfirmed({ valor: divergencia.informado, data: dataSaldo })}
+                disabled={ajustando}
               >
                 Continuar mesmo assim
               </Button>
+              {sugestao && !sugestao.temPosteriores && canEditConta && (
+                <Button onClick={ajustarSaldoInicial} disabled={ajustando} aria-busy={ajustando}>
+                  {ajustando && <Loader2 aria-hidden="true" className="mr-1 h-4 w-4 animate-spin" />}
+                  {ajustando ? 'Ajustando...' : `Ajustar saldo inicial para ${fmtBRL(sugestao.sugerido)}`}
+                </Button>
+              )}
             </DialogFooter>
           </>
         )}

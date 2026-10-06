@@ -5,8 +5,35 @@ import {
   getBankBalanceAtDate,
   getPendingDeltaAtReference,
   loadSaldoExtrato,
+  diaSeguinte,
   saveSaldoExtrato,
+  sugerirSaldoInicial,
 } from './conciliacaoSaldoExtrato';
+
+describe('diaSeguinte', () => {
+  it('vira mês e ano sem passar por UTC', () => {
+    expect(diaSeguinte('2026-10-02')).toBe('2026-10-03');
+    expect(diaSeguinte('2026-09-30')).toBe('2026-10-01');
+    expect(diaSeguinte('2026-12-31')).toBe('2027-01-01');
+    expect(diaSeguinte('2028-02-28')).toBe('2028-02-29');
+  });
+});
+
+describe('sugerirSaldoInicial', () => {
+  it('reconstrói o saldo da véspera quando a conta foi cadastrada com o saldo de hoje (caso Stone)', () => {
+    expect(sugerirSaldoInicial({ informado: 299.47, deltaAteData: -65000 })).toBe(65299.47);
+  });
+
+  it('desconta as entradas do extrato', () => {
+    expect(sugerirSaldoInicial({ informado: 1000, deltaAteData: 250.3 })).toBe(749.7);
+  });
+
+  it('trabalha em centavos para não carregar erro de ponto flutuante', () => {
+    // 0.1 + 0.2 em float é 0.30000000000000004
+    expect(sugerirSaldoInicial({ informado: 0.3, deltaAteData: 0.1 + 0.2 })).toBe(0);
+    expect(sugerirSaldoInicial({ informado: -898.69, deltaAteData: -17901.99 - 7298.01 })).toBe(24301.31);
+  });
+});
 
 describe('statement balance storage', () => {
   beforeEach(() => sessionStorage.clear());
