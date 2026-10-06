@@ -1327,6 +1327,7 @@ DECLARE
   v_uid uuid;
   v_total integer;
   v_documentos integer;
+  v_boletos integer;
   v_lancamentos integer;
   v_cp record;
   v_lanc record;
@@ -1348,11 +1349,17 @@ BEGIN
   IF v_total < 1 OR v_total > 500 THEN
     RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'CMV_LOTE_INVALIDO';
   END IF;
+  -- Cada id presente é texto ou nulo: número, booleano, objeto ou lista nunca viram
+  -- documento. Sem isso, {"conta_pagar_id":"<boleto>","lancamento_id":0} contava como
+  -- lançamento (gate de lançamentos) e o laço dos boletos o processava do mesmo jeito.
   IF EXISTS (
     SELECT 1 FROM jsonb_array_elements(p_itens) e
     WHERE jsonb_typeof(e) <> 'object'
       OR NOT (e ? 'incluir')
       OR jsonb_typeof(e->'incluir') NOT IN ('boolean', 'null')
+      OR COALESCE(jsonb_typeof(e->'conta_pagar_id'), 'null') NOT IN ('string', 'null')
+      OR COALESCE(jsonb_typeof(e->'lancamento_id'), 'null') NOT IN ('string', 'null')
+      OR COALESCE(jsonb_typeof(e->'rateio_id'), 'null') NOT IN ('string', 'null')
       OR (jsonb_typeof(e->'conta_pagar_id') IS NOT DISTINCT FROM 'string')
          = (jsonb_typeof(e->'lancamento_id') IS NOT DISTINCT FROM 'string')
       OR jsonb_typeof(e->'expected_updated_at') IS DISTINCT FROM 'string'
@@ -1360,10 +1367,13 @@ BEGIN
     RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'CMV_INVALIDO';
   END IF;
 
-  SELECT count(DISTINCT COALESCE(e->>'conta_pagar_id', e->>'lancamento_id')),
-         count(DISTINCT e->>'lancamento_id')
-  INTO v_documentos, v_lancamentos
+  -- Contagens só dos ids que os laços de baixo realmente processam (texto): o gate e
+  -- os laços não discordam nem se a validação acima afrouxar um dia.
+  SELECT count(DISTINCT e->>'conta_pagar_id') FILTER (WHERE jsonb_typeof(e->'conta_pagar_id') = 'string'),
+         count(DISTINCT e->>'lancamento_id') FILTER (WHERE jsonb_typeof(e->'lancamento_id') = 'string')
+  INTO v_boletos, v_lancamentos
   FROM jsonb_array_elements(p_itens) e;
+  v_documentos := v_boletos + v_lancamentos;
 
   -- Um documento: quem edita aquele cadastro também classifica. Lote (revisão
   -- do histórico): só quem gerencia o CMV.
@@ -1386,7 +1396,8 @@ BEGIN
 
   IF EXISTS (
     SELECT 1 FROM jsonb_array_elements(p_itens) e
-    GROUP BY COALESCE(e->>'conta_pagar_id', e->>'lancamento_id'), e->>'rateio_id'
+    GROUP BY CASE WHEN jsonb_typeof(e->'conta_pagar_id') = 'string' THEN e->>'conta_pagar_id' ELSE e->>'lancamento_id' END,
+             e->>'rateio_id'
     HAVING count(*) > 1
   ) THEN
     RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'CMV_ITEM_DUPLICADO';
@@ -1515,8 +1526,10 @@ BEGIN
         IF v_tem_rateio THEN
           RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'CMV_ALVO_INVALIDO: lançamento rateado classifica por linha';
         END IF;
+        -- Decisão e versão no mesmo UPDATE: cada UPDATE de fin_lancamentos dispara o
+        -- refresh do cache de saldo da conta, então um só por documento.
         UPDATE public.fin_lancamentos
-        SET cmv_incluir = v_item.incluir
+        SET cmv_incluir = v_item.incluir, updated_at = v_now
         WHERE id = v_lanc.id AND company_id = v_company_id;
       ELSE
         UPDATE public.fin_lancamento_rateios
@@ -1528,10 +1541,14 @@ BEGIN
       END IF;
     END LOOP;
 
-    -- Só a versão muda: nenhum campo vigiado pelo gatilho de lançamento realizado.
-    UPDATE public.fin_lancamentos
-    SET updated_at = v_now
-    WHERE id = v_lanc.id AND company_id = v_company_id;
+    -- Lançamento rateado: a decisão está nas linhas, então só a versão muda aqui (nenhum
+    -- campo vigiado pelo gatilho de lançamento realizado). Sem rateio, o UPDATE do
+    -- cabeçalho acima já levou a versão.
+    IF v_tem_rateio THEN
+      UPDATE public.fin_lancamentos
+      SET updated_at = v_now
+      WHERE id = v_lanc.id AND company_id = v_company_id;
+    END IF;
 
     v_depois := public._fin_cmv_retrato_lancamento(v_company_id, v_lanc.id);
 
@@ -1580,6 +1597,8 @@ DECLARE
   v_n integer;
   v_sim bigint;
   v_nao bigint;
+  v_status text;
+  v_linhas_rateio integer;
   v_linhas_doc integer;
   v_sim_doc bigint;
   v_nao_doc bigint;
@@ -1642,13 +1661,20 @@ BEGIN
     WHERE l.cmv_incluir IS NULL AND l.data_competencia >= p_desde AND c.cmv_sugerir IS NOT NULL
     ORDER BY l.fonte, l.documento_id
   LOOP
+    -- O estado do documento é relido já com o bloqueio: o que foi cancelado entre a
+    -- listagem e aqui não recebe padrão.
     IF v_doc.fonte = 'boleto' THEN
-      PERFORM 1 FROM public.fin_contas_pagar cp
+      SELECT cp.status INTO v_status FROM public.fin_contas_pagar cp
       WHERE cp.id = v_doc.documento_id AND cp.company_id = v_company_id FOR UPDATE;
+    ELSE
+      SELECT l.status INTO v_status FROM public.fin_lancamentos l
+      WHERE l.id = v_doc.documento_id AND l.company_id = v_company_id FOR UPDATE;
+    END IF;
+    IF NOT FOUND OR v_status = 'CANCELADO' THEN CONTINUE; END IF;
+
+    IF v_doc.fonte = 'boleto' THEN
       v_antes := public._fin_cmv_retrato(v_company_id, v_doc.documento_id);
     ELSE
-      PERFORM 1 FROM public.fin_lancamentos l
-      WHERE l.id = v_doc.documento_id AND l.company_id = v_company_id FOR UPDATE;
       v_antes := public._fin_cmv_retrato_lancamento(v_company_id, v_doc.documento_id);
     END IF;
 
@@ -1663,8 +1689,9 @@ BEGIN
       RETURNING r.cmv_incluir, round(r.valor * 100)::bigint AS centavos
     )
     SELECT count(*), COALESCE(sum(centavos) FILTER (WHERE cmv_incluir), 0), COALESCE(sum(centavos) FILTER (WHERE NOT cmv_incluir), 0)
-    INTO v_linhas_doc, v_sim_doc, v_nao_doc
+    INTO v_linhas_rateio, v_sim_doc, v_nao_doc
     FROM alteradas;
+    v_linhas_doc := v_linhas_rateio;
 
     -- Documento sem rateio: a decisão é do cabeçalho.
     IF v_doc.fonte = 'boleto' THEN
@@ -1685,9 +1712,11 @@ BEGIN
       INTO v_n, v_sim, v_nao
       FROM alterado;
     ELSE
+      -- Decisão e versão no mesmo UPDATE: cada UPDATE de fin_lancamentos dispara o
+      -- refresh do cache de saldo da conta, então um só por documento.
       WITH alterado AS (
         UPDATE public.fin_lancamentos l
-        SET cmv_incluir = c.cmv_sugerir
+        SET cmv_incluir = c.cmv_sugerir, updated_at = v_now
         FROM public.fin_categorias c
         WHERE l.id = v_doc.documento_id AND l.company_id = v_company_id
           AND l.cmv_incluir IS NULL
@@ -1715,8 +1744,12 @@ BEGIN
       WHERE id = v_doc.documento_id AND company_id = v_company_id;
       v_depois := public._fin_cmv_retrato(v_company_id, v_doc.documento_id);
     ELSE
-      UPDATE public.fin_lancamentos SET updated_at = v_now
-      WHERE id = v_doc.documento_id AND company_id = v_company_id;
+      -- Sem rateio o UPDATE do cabeçalho acima já levou a versão; só o lançamento
+      -- rateado (decisão nas linhas) precisa dela aqui.
+      IF v_linhas_rateio > 0 THEN
+        UPDATE public.fin_lancamentos SET updated_at = v_now
+        WHERE id = v_doc.documento_id AND company_id = v_company_id;
+      END IF;
       v_depois := public._fin_cmv_retrato_lancamento(v_company_id, v_doc.documento_id);
     END IF;
 

@@ -166,6 +166,14 @@ END; $$;
 CREATE TRIGGER trg_validate_rateio_sum BEFORE INSERT OR DELETE OR UPDATE ON public.fin_lancamento_rateios
   FOR EACH ROW EXECUTE FUNCTION public.trg_validate_rateio_sum();
 
+-- Representa o trg_saldo_cache_lancamento de produção, que roda refresh_saldo_cache a CADA UPDATE de
+-- fin_lancamentos: aqui só registra o UPDATE, para provar quantos refreshes uma classificação custa.
+CREATE TABLE public.cmv_update_log (lancamento_id uuid NOT NULL);
+CREATE FUNCTION public.cmv_log_update() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN INSERT INTO public.cmv_update_log VALUES (NEW.id); RETURN NULL; END; $$;
+CREATE TRIGGER trg_cmv_log_update AFTER UPDATE ON public.fin_lancamentos
+  FOR EACH ROW EXECUTE FUNCTION public.cmv_log_update();
+
 -- Versões anteriores das RPCs (assinatura de produção), para as migrations dropparem e recriarem.
 CREATE FUNCTION public._guarded_create_conta_pagar(text,numeric,text,uuid,date,date,uuid,uuid,uuid,text,text,jsonb,jsonb,text,jsonb)
 RETURNS jsonb LANGUAGE sql AS $$ SELECT '{}'::jsonb $$;
@@ -228,6 +236,7 @@ DECLARE
   v_ids uuid[]; v_criados timestamptz[]; v_n bigint;
   v_valido uuid; v_baixa_legada uuid; v_cp_legado uuid; v_so_origem uuid; v_so_referencia uuid;
   v_bol2 uuid; v_bol_rat uuid; v_p_baixa uuid;
+  v_bad text;
 BEGIN
   INSERT INTO companies VALUES (A, 'Unidade A'), (B, 'Unidade B');
   INSERT INTO fin_categorias (id, nome, tipo, company_id, cmv_sugerir) VALUES
@@ -528,16 +537,22 @@ BEGIN
   v_bol_rat := (r->>'id')::uuid;
 
   PERFORM set_config('test.permissions', 'financeiro:lancamentos:edit', false);
+  DELETE FROM cmv_update_log;
   r := fin_cmv_classificar(jsonb_build_array(jsonb_build_object('lancamento_id', v_pend, 'rateio_id', NULL, 'incluir', true,
     'expected_updated_at', (SELECT updated_at FROM fin_lancamentos WHERE id = v_pend))));
   PERFORM cmv_assert((SELECT cmv_incluir FROM fin_lancamentos WHERE id = v_pend), 'lançamento classificado por quem edita lançamentos');
   PERFORM cmv_assert((r->'atualizados'->0->>'lancamento_id')::uuid = v_pend AND (r->>'titulos')::int = 1, 'retorno identifica o lançamento');
   PERFORM cmv_assert(EXISTS (SELECT 1 FROM fin_audit_logs WHERE entidade = 'lancamentos' AND entidade_id = v_pend AND acao = 'cmv_classificar'), 'auditoria do lançamento');
+  -- decisão e versão do lançamento sem rateio vão num UPDATE só: cada UPDATE custa um refresh do cache de saldo
+  PERFORM cmv_assert((SELECT count(*) FROM cmv_update_log WHERE lancamento_id = v_pend) = 1, 'lançamento sem rateio: um UPDATE só (um refresh de saldo)');
+  PERFORM cmv_assert((r->'atualizados'->0->>'updated_at')::timestamptz = (SELECT updated_at FROM fin_lancamentos WHERE id = v_pend), 'o retorno devolve a versão nova do lançamento');
   -- conciliado e REALIZADO sem justificativa de edição: classificar não esbarra no gatilho de edição
+  DELETE FROM cmv_update_log;
   PERFORM fin_cmv_classificar(jsonb_build_array(jsonb_build_object('lancamento_id', v_conc,
     'rateio_id', (SELECT id FROM fin_lancamento_rateios WHERE lancamento_id = v_conc AND categoria_id = c_escr), 'incluir', true,
     'expected_updated_at', (SELECT updated_at FROM fin_lancamentos WHERE id = v_conc))));
   PERFORM cmv_assert((SELECT bool_and(cmv_incluir) FROM fin_lancamento_rateios WHERE lancamento_id = v_conc), 'linha de rateio da conciliação classificada');
+  PERFORM cmv_assert((SELECT count(*) FROM cmv_update_log WHERE lancamento_id = v_conc) = 1, 'lançamento com rateio: um UPDATE só, o da versão');
   PERFORM cmv_expect_error(format($q$SELECT public.fin_cmv_classificar('[{"lancamento_id":"%s","rateio_id":null,"incluir":true,"expected_updated_at":"%s"}]')$q$,
     v_rat, (SELECT updated_at FROM fin_lancamentos WHERE id = v_rat)), 'CMV_ALVO_INVALIDO%', 'lançamento rateado classificado pelo cabeçalho');
   PERFORM cmv_expect_error(format($q$SELECT public.fin_cmv_classificar('[{"lancamento_id":"%s","rateio_id":"%s","incluir":true,"expected_updated_at":"%s"}]')$q$,
@@ -560,6 +575,20 @@ BEGIN
     v_pend, v_bol), 'CMV_INVALIDO%', 'item com dois documentos');
   PERFORM cmv_expect_error($q$SELECT public.fin_cmv_classificar('[{"rateio_id":null,"incluir":true,"expected_updated_at":"2026-01-01T00:00:00Z"}]')$q$,
     'CMV_INVALIDO%', 'item sem documento');
+  -- Id que não é texto nunca vale como documento. Sem isso, quem só edita lançamentos classificaria um BOLETO:
+  -- {"conta_pagar_id":"<boleto>","lancamento_id":0} passava na validação, contava 1 lançamento (e passava pelo gate
+  -- de lançamentos) e o laço dos boletos o processava mesmo assim. Aqui o usuário só tem financeiro:lancamentos:edit.
+  FOREACH v_bad IN ARRAY ARRAY['0', 'true', '{}', '[]', '1.5'] LOOP
+    PERFORM cmv_expect_error(format($q$SELECT public.fin_cmv_classificar('[{"conta_pagar_id":"%s","lancamento_id":%s,"rateio_id":null,"incluir":true,"expected_updated_at":"%s"}]')$q$,
+      v_bol2, v_bad, (SELECT updated_at FROM fin_contas_pagar WHERE id = v_bol2)), 'CMV_INVALIDO%', 'boleto com lancamento_id ' || v_bad);
+    PERFORM cmv_expect_error(format($q$SELECT public.fin_cmv_classificar('[{"conta_pagar_id":%s,"lancamento_id":"%s","rateio_id":null,"incluir":true,"expected_updated_at":"%s"}]')$q$,
+      v_bad, v_pend, (SELECT updated_at FROM fin_lancamentos WHERE id = v_pend)), 'CMV_INVALIDO%', 'lançamento com conta_pagar_id ' || v_bad);
+    PERFORM cmv_expect_error(format($q$SELECT public.fin_cmv_classificar('[{"lancamento_id":"%s","rateio_id":%s,"incluir":true,"expected_updated_at":"%s"}]')$q$,
+      v_conc, v_bad, (SELECT updated_at FROM fin_lancamentos WHERE id = v_conc)), 'CMV_INVALIDO%', 'rateio_id ' || v_bad);
+  END LOOP;
+  PERFORM cmv_assert((SELECT cmv_incluir IS NULL FROM fin_contas_pagar WHERE id = v_bol2), 'o boleto do payload forjado continua pendente');
+  -- a decisão do próprio lançamento não mudou com os payloads recusados
+  PERFORM cmv_assert((SELECT cmv_incluir FROM fin_lancamentos WHERE id = v_pend), 'o lançamento dos payloads recusados continua como estava');
   PERFORM cmv_expect_error(format($q$SELECT public.fin_cmv_classificar('[{"lancamento_id":"%s","rateio_id":null,"incluir":false,"expected_updated_at":"2020-01-01T00:00:00Z"}]')$q$,
     v_pend), 'OPTIMISTIC_LOCK_CONFLICT%', 'versão antiga do lançamento');
   PERFORM cmv_expect_error(format($q$SELECT public.fin_cmv_classificar('[{"lancamento_id":"%s","rateio_id":null,"incluir":false,"expected_updated_at":"%s"},{"lancamento_id":"%s","rateio_id":null,"incluir":false,"expected_updated_at":"%s"}]')$q$,
@@ -651,9 +680,17 @@ BEGIN
   PERFORM cmv_expect_error($q$SELECT public.fin_cmv_aplicar_padroes('2026-09-14', false)$q$, 'JUSTIFICATIVA_OBRIGATORIA%', 'gravar exige justificativa');
   PERFORM cmv_expect_error($q$SELECT public.fin_cmv_aplicar_padroes(NULL, true)$q$, 'CMV_PERIODO_OBRIGATORIO%', 'data inicial obrigatória');
 
+  DELETE FROM cmv_update_log;
   r := fin_cmv_aplicar_padroes('2026-09-14', false, 'aplicação inicial');
   PERFORM cmv_assert((r->>'documentos')::int = 4 AND (r->>'linhas')::int = 4
     AND (r->>'centavos_sim')::bigint = 3700 AND (r->>'centavos_nao')::bigint = 1200, 'três lançamentos e um boleto classificados');
+  -- um UPDATE por lançamento (cada um custa um refresh do cache de saldo): decisão e versão juntas no sem rateio,
+  -- só a versão no rateado; a baixa legada, o já decidido, o sem padrão e o antigo nem são tocados
+  PERFORM cmv_assert((SELECT count(*) FROM cmv_update_log WHERE lancamento_id = v_p_peixes) = 1
+    AND (SELECT count(*) FROM cmv_update_log WHERE lancamento_id = v_p_escr) = 1
+    AND (SELECT count(*) FROM cmv_update_log WHERE lancamento_id = v_p_rat) = 1
+    AND (SELECT count(*) FROM cmv_update_log WHERE lancamento_id IN (v_p_sem, v_p_antigo, v_p_decidido, v_p_baixa)) = 0,
+    'aplicar padrões: um UPDATE por lançamento alterado e nenhum nos demais');
   PERFORM cmv_assert((SELECT cmv_incluir FROM fin_lancamentos WHERE id = v_p_peixes)
     AND (SELECT cmv_incluir IS FALSE FROM fin_lancamentos WHERE id = v_p_escr)
     AND (SELECT cmv_incluir IS NULL FROM fin_lancamentos WHERE id = v_p_sem)

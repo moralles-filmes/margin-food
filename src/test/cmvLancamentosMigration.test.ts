@@ -218,9 +218,46 @@ describe('migration CMV com lançamentos — classificação e padrões', () => 
     // nenhum UPDATE do laço de boletos mexe em outra coisa que a decisão e a versão
     const updates = c.match(/UPDATE public\.\w+\s+SET [^;]+;/g) ?? [];
     expect(updates.length).toBeGreaterThan(0);
-    for (const update of updates) expect(update).toMatch(/SET (cmv_incluir = v_item\.incluir|updated_at = v_now)\s/);
+    for (const update of updates) expect(update).toMatch(/SET (cmv_incluir = v_item\.incluir|updated_at = v_now)[,\s]/);
     expect(sql).toContain('REVOKE ALL ON FUNCTION public.fin_cmv_classificar(jsonb, text) FROM PUBLIC, anon;');
     expect(sql).toContain('GRANT EXECUTE ON FUNCTION public.fin_cmv_classificar(jsonb, text) TO authenticated, service_role;');
+  });
+
+  it('classificar só aceita id em texto e conta o gate com os mesmos ids que os laços processam', () => {
+    const c = corpo('fin_cmv_classificar');
+    const p = plano(c);
+    // validação: id presente que não é texto nem nulo nunca vira documento
+    for (const campo of ['conta_pagar_id', 'lancamento_id', 'rateio_id']) {
+      expect(p).toContain(`OR COALESCE(jsonb_typeof(e->'${campo}'), 'null') NOT IN ('string', 'null')`);
+    }
+    // contagem/gate: só ids em texto, por tipo, e nenhuma derivação por COALESCE sobre o texto bruto
+    expect(p).toContain("count(DISTINCT e->>'conta_pagar_id') FILTER (WHERE jsonb_typeof(e->'conta_pagar_id') = 'string')");
+    expect(p).toContain("count(DISTINCT e->>'lancamento_id') FILTER (WHERE jsonb_typeof(e->'lancamento_id') = 'string')");
+    expect(p).toContain('v_documentos := v_boletos + v_lancamentos;');
+    expect(c).not.toContain("COALESCE(e->>'conta_pagar_id', e->>'lancamento_id')");
+    // o gate de lançamento só vale com um único documento, que é lançamento
+    expect(p).toContain('ELSIF v_lancamentos = 1 THEN');
+    expect(p).toContain("IF jsonb_array_length(v_atualizados) <> v_documentos THEN");
+  });
+
+  it('um UPDATE por lançamento: decisão e versão juntas no cabeçalho, só a versão no rateado', () => {
+    const c = corpo('fin_cmv_classificar');
+    expect(plano(c)).toContain('UPDATE public.fin_lancamentos SET cmv_incluir = v_item.incluir, updated_at = v_now WHERE id = v_lanc.id');
+    expect(plano(c)).toContain('IF v_tem_rateio THEN UPDATE public.fin_lancamentos SET updated_at = v_now WHERE id = v_lanc.id');
+    expect(c.split('UPDATE public.fin_lancamentos').length - 1).toBe(2);
+    const a = corpo('fin_cmv_aplicar_padroes');
+    expect(plano(a)).toContain('UPDATE public.fin_lancamentos l SET cmv_incluir = c.cmv_sugerir, updated_at = v_now FROM public.fin_categorias c');
+    expect(plano(a)).toContain('IF v_linhas_rateio > 0 THEN UPDATE public.fin_lancamentos SET updated_at = v_now');
+    expect(a.split('UPDATE public.fin_lancamentos').length - 1).toBe(2);
+    // o boleto não muda: continua decisão num UPDATE e versão em outro (caminho idêntico ao do banco vivo)
+    expect(c).toContain('UPDATE public.fin_contas_pagar\n    SET updated_at = v_now');
+  });
+
+  it('aplicar padrões relê o status já com o bloqueio e não toca em documento cancelado', () => {
+    const a = corpo('fin_cmv_aplicar_padroes');
+    expect(a).toContain("IF NOT FOUND OR v_status = 'CANCELADO' THEN CONTINUE; END IF;");
+    expect(a.indexOf('FOR UPDATE')).toBeLessThan(a.indexOf("v_status = 'CANCELADO'"));
+    expect(a.indexOf("v_status = 'CANCELADO'")).toBeLessThan(a.indexOf('UPDATE public.fin_lancamento_rateios'));
   });
 
   it('aplicar padrões: só pendentes, prévia antes de qualquer escrita, justificativa e gerenciar o CMV', () => {
