@@ -3828,6 +3828,7 @@ export default function ConciliacaoBancariaSection() {
         linha={criarDialog.linhaIndex >= 0 ? linhas[criarDialog.linhaIndex] || null : null}
         ocorrencia={ocorrenciaDaLinhaCriar()}
         contaBancariaId={contaSel}
+        cmvConfig={cmvConfig}
         onCreated={(result) => {
           const idx = criarDialog.linhaIndex;
           const linha = linhas[idx];

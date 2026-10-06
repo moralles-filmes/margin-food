@@ -1,5 +1,5 @@
 import { useSupabase } from '@/contexts/CompanyScopeContext';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,6 +23,10 @@ import SupplierCombobox from '@/components/financeiro/SupplierCombobox';
 import { Plus, Trash2, PieChart, CheckCircle, CheckCircle2, Loader2, FileText, Calculator } from 'lucide-react';
 import { traduzirErroIdempotencia } from '@/domain/financeiro/idempotencia';
 import { padronizarTexto } from '@/lib/padronizarTexto';
+import CmvDecisaoToggle from '@/components/financeiro/cmv/CmvDecisaoToggle';
+import { decisaoAoTrocarCategoria, type CmvDecisao } from '@/domain/financeiro/cmv';
+import type { CmvConfig } from '@/hooks/useCmvFinanceiro';
+import { datasDoLancamentoCriado } from '@/lib/conciliacaoCmv';
 
 import { useCan } from '@/permissions/hooks';
 interface ExtratoLinha {
@@ -39,6 +43,7 @@ interface RateioItem {
   valor: number;
   percentual: number;
   observacao: string;
+  cmv_incluir?: CmvDecisao;
 }
 
 interface Props {
@@ -50,6 +55,8 @@ interface Props {
   contaBancariaId: string;
   /** `ocorrencia` vem preenchido quando o lançamento foi gravado com o índice da linha. */
   onCreated: (result: { id: string; destino: string; ocorrencia?: number }) => void;
+  /** CMV Financeiro da unidade; nulo ou sem `recursos.lancamentos` = o diálogo funciona como antes. */
+  cmvConfig?: CmvConfig | null;
 }
 
 type Destino = 'lancamento' | 'conta_pagar' | 'conta_receber';
@@ -61,7 +68,7 @@ const DESTINOS: { value: Destino; label: string }[] = [
 ];
 
 export default function CriarLancamentoExtratoDialog({
- open, onOpenChange, linha, ocorrencia, contaBancariaId, onCreated }: Props) {
+ open, onOpenChange, linha, ocorrencia, contaBancariaId, onCreated, cmvConfig = null }: Props) {
   const emitDataEvent = useEmitDataEvent();
   const toast = useScopedToast();
   const supabase = useSupabase();
@@ -94,6 +101,26 @@ export default function CriarLancamentoExtratoDialog({
   // Trava síncrona: `saving` só desabilita o botão no próximo render.
   const salvandoRef = useRef(false);
 
+  // O tipo gerado da RPC ainda não tem p_data_competencia.
+  const callRpc = supabase.rpc.bind(supabase) as unknown as (
+    fn: string, args: Record<string, unknown>,
+  ) => Promise<{ data: unknown; error: { message: string } | null }>;
+
+  // CMV Financeiro: só com o recurso no banco, no destino "Lançamento" de despesa.
+  const [cmvIncluir, setCmvIncluir] = useState<CmvDecisao>(null);
+  const cmvRecurso = cmvConfig?.recursos.lancamentos === true;
+  const cmvPadroes = useMemo(
+    () => (cmvRecurso && cmvConfig?.classificacaoAtiva ? new Map(cmvConfig.categorias.map(c => [c.id, c.cmvSugerir])) : null),
+    [cmvConfig, cmvRecurso],
+  );
+  const enviaCmv = cmvRecurso && destino === 'lancamento' && tipo === 'DESPESA';
+  const mostrarCmv = enviaCmv
+    && (cmvConfig?.classificacaoAtiva === true || cmvIncluir !== null || rateioLinhas.some(r => (r.cmv_incluir ?? null) !== null));
+  const sugerirCmv = (anterior: CmvDecisao | undefined, categoria: string): CmvDecisao =>
+    cmvPadroes && tipo === 'DESPESA' ? decisaoAoTrocarCategoria(anterior, categoria, cmvPadroes).cmv_incluir : (anterior ?? null);
+  // Com o recurso, a data do banco é a chave que reconhece a linha no lançamento: não se edita.
+  const dataBancoFixa = cmvRecurso && destino === 'lancamento';
+
   // Load reference data
   useEffect(() => {
     if (!open) return;
@@ -123,12 +150,13 @@ export default function CriarLancamentoExtratoDialog({
     setObservacoes('');
     setUseRateio(false);
     setRateioLinhas([]);
+    setCmvIncluir(null);
     setDestino('lancamento');
   }, [linha, open]);
 
   // Rateio helpers
   const addRateioLinha = () => {
-    setRateioLinhas(prev => [...prev, { categoria_id: '', centro_custo_id: '', valor: 0, percentual: 0, observacao: '' }]);
+    setRateioLinhas(prev => [...prev, { categoria_id: '', centro_custo_id: '', valor: 0, percentual: 0, observacao: '', cmv_incluir: null }]);
   };
 
   const removeRateioLinha = (idx: number) => {
@@ -143,6 +171,7 @@ export default function CriarLancamentoExtratoDialog({
       if (field === 'categoria_id') {
         const cat = categorias.find(c => c.id === value);
         if (cat?.centro_custo_padrao_id) item.centro_custo_id = cat.centro_custo_padrao_id;
+        item.cmv_incluir = sugerirCmv(item.cmv_incluir, String(value));
       }
 
       if (field === 'valor' && valor > 0) {
@@ -201,6 +230,7 @@ export default function CriarLancamentoExtratoDialog({
             valor: r.valor,
             percentual: r.percentual || null,
             observacao: r.observacao || null,
+            ...(enviaCmv ? { cmv_incluir: r.cmv_incluir ?? null } : {}),
           }))
         : null;
 
@@ -214,6 +244,7 @@ export default function CriarLancamentoExtratoDialog({
             valor,
             percentual: 100,
             observacao: null,
+            ...(enviaCmv ? { cmv_incluir: cmvIncluir } : {}),
           }]
         : null;
       const effectivePayload = rateioPayload ?? singleRateioPayload;
@@ -221,16 +252,23 @@ export default function CriarLancamentoExtratoDialog({
       // O índice da linha só vale para o conteúdo dela: data, descrição, valor ou
       // tipo editados são outro lançamento, que segue o padrão (índice 0).
       const tipoEnviado = destino === 'lancamento' ? tipo : destino === 'conta_pagar' ? 'DESPESA' : 'RECEITA';
+      // Destino lançamento: a data do banco vai em p_data (chave e duplicata) e a competência à parte.
+      const datasLanc = datasDoLancamentoCriado({
+        dataBanco: linha?.data || dataPagamento || dataCompetencia,
+        dataCompetencia,
+        aceitaCompetencia: cmvRecurso,
+      });
+      const dataEnviada = destino === 'lancamento' ? datasLanc.p_data : dataCompetencia;
       const ocorrenciaEnviada = linha && ocorrencia != null
-        && dataCompetencia === linha.data && descricao === linha.descricao
+        && dataEnviada === linha.data && descricao === linha.descricao
         && valor === linha.valor && tipoEnviado === linha.tipo
         ? ocorrencia
         : undefined;
 
       if (destino === 'lancamento') {
         // Create via existing RPC (categoria já vai no payload → sem UPDATE de campo vigiado)
-        const { data, error } = await supabase.rpc('reconcile_import_lancamento', {
-          p_data: dataCompetencia,
+        const { data, error } = await callRpc('reconcile_import_lancamento', {
+          p_data: datasLanc.p_data,
           p_descricao: descricao,
           p_valor: valor,
           p_tipo: tipo,
@@ -239,6 +277,7 @@ export default function CriarLancamentoExtratoDialog({
           p_rateio_linhas: effectivePayload,
           p_external_id: linha?.fitId || null,
           p_occurrence_index: ocorrenciaEnviada ?? 0,
+          ...datasLanc.extra,
         });
         if (error) throw error;
         const importResult = data as { status?: string; lancamento_id?: string } | null;
@@ -261,10 +300,12 @@ export default function CriarLancamentoExtratoDialog({
 
         // Update the just-created lancamento with extra fields if needed.
         // NÃO incluir categoria_id aqui: é campo vigiado pelo trigger de lançamento REALIZADO.
-        if (importResult?.lancamento_id && (dataVencimento || dataPagamento || observacoes)) {
+        // Com o banco atualizado a data do banco já foi no p_data; só o fluxo antigo
+        // corrige data_pagamento aqui.
+        if (importResult?.lancamento_id && (dataVencimento || (datasLanc.atualizaPagamento && dataPagamento) || observacoes)) {
           const updatePayload: any = {};
           if (dataVencimento) updatePayload.data_vencimento = dataVencimento;
-          if (dataPagamento) updatePayload.data_pagamento = dataPagamento;
+          if (datasLanc.atualizaPagamento && dataPagamento) updatePayload.data_pagamento = dataPagamento;
           if (observacoes) updatePayload.observacoes = observacoes;
           if (Object.keys(updatePayload).length > 0) {
             await supabase.from('fin_lancamentos').update(updatePayload).eq('id', importResult.lancamento_id);
@@ -429,7 +470,17 @@ export default function CriarLancamentoExtratoDialog({
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="criar-extrato-pagamento" className="text-xs">Data {tipo === 'RECEITA' ? 'Recebimento' : 'Pagamento'}</Label>
-              <DateInput id="criar-extrato-pagamento" value={dataPagamento} onValueChange={setDataPagamento} className="h-9" />
+              <DateInput
+                id="criar-extrato-pagamento"
+                value={dataBancoFixa ? linha.data : dataPagamento}
+                onValueChange={setDataPagamento}
+                disabled={dataBancoFixa}
+                aria-describedby={dataBancoFixa ? 'criar-extrato-pagamento-ajuda' : undefined}
+                className="h-9"
+              />
+              {dataBancoFixa && (
+                <p id="criar-extrato-pagamento-ajuda" className="text-xs text-muted-foreground">Data do banco — não muda.</p>
+              )}
             </div>
           </div>
 
@@ -440,7 +491,9 @@ export default function CriarLancamentoExtratoDialog({
               <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={() => {
                 setUseRateio(!useRateio);
                 if (!useRateio && rateioLinhas.length === 0) {
-                  setRateioLinhas([{ categoria_id: categoriaId || '', centro_custo_id: '', valor, percentual: 100, observacao: '' }]);
+                  // A 1ª linha leva a categoria, o centro de custo padrão dela e a resposta que a tela já tinha.
+                  const centroPadrao = categorias.find(c => c.id === categoriaId)?.centro_custo_padrao_id || '';
+                  setRateioLinhas([{ categoria_id: categoriaId || '', centro_custo_id: centroPadrao, valor, percentual: 100, observacao: '', cmv_incluir: cmvIncluir }]);
                 }
               }}>
                 <PieChart aria-hidden="true" className="h-3.5 w-3.5" />
@@ -449,13 +502,21 @@ export default function CriarLancamentoExtratoDialog({
             </div>
 
             {!useRateio ? (
-              <CategoryCombobox
-                value={categoriaId}
-                onValueChange={setCategoriaId}
-                options={filteredCategorias}
-                placeholder="Pesquisar categoria..."
-                className="h-9 text-sm"
-              />
+              <>
+                <CategoryCombobox
+                  value={categoriaId}
+                  onValueChange={v => { setCategoriaId(v); setCmvIncluir(atual => sugerirCmv(atual, v)); }}
+                  options={filteredCategorias}
+                  placeholder="Pesquisar categoria..."
+                  className="h-9 text-sm"
+                />
+                {mostrarCmv && (
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-medium text-foreground">Aparecer no CMV financeiro?</span>
+                    <CmvDecisaoToggle size="sm" value={cmvIncluir} onChange={setCmvIncluir} label="Aparecer no CMV financeiro?" />
+                  </div>
+                )}
+              </>
             ) : (
               <div className="space-y-2 rounded-lg border bg-muted p-3">
                 <ol className="space-y-2" aria-label="Linhas do rateio">
@@ -486,6 +547,16 @@ export default function CriarLancamentoExtratoDialog({
                           </Button>
                         )}
                       </div>
+                      {mostrarCmv && (
+                        <div className="col-span-2 flex flex-wrap items-center gap-2 sm:col-span-12">
+                          <span className="text-xs text-muted-foreground">Aparecer no CMV financeiro?</span>
+                          <CmvDecisaoToggle
+                            size="sm" value={rl.cmv_incluir ?? null}
+                            onChange={v => setRateioLinhas(prev => prev.map((l, i) => (i === idx ? { ...l, cmv_incluir: v } : l)))}
+                            label={`Aparecer no CMV financeiro? — linha ${idx + 1} do rateio`}
+                          />
+                        </div>
+                      )}
                     </li>
                   ))}
                 </ol>
