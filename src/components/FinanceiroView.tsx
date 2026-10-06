@@ -34,6 +34,7 @@ const KPIsSection = lazy(() => import('@/components/financeiro/KPIsSection'));
 const AuditoriaFinSection = lazy(() => import('@/components/financeiro/AuditoriaFinSection'));
 const ComparativoSection = lazy(() => import('@/components/financeiro/ComparativoSection'));
 const CmvFinanceiroSection = lazy(() => import('@/components/financeiro/cmv/CmvFinanceiroSection'));
+const FornecedoresFinSection = lazy(() => import('@/components/financeiro/FornecedoresFinSection'));
 import FechamentoCaixaSection from '@/components/financeiro/FechamentoCaixaSection';
 import CadastroBaseTree from '@/components/financeiro/CadastroBaseTree';
 import ContasBancariasSection from '@/components/financeiro/ContasBancariasSection';
@@ -46,13 +47,15 @@ type FinSubTab = 'dashboard' | 'cadastros' | 'contas' | 'lancamentos' | 'pagar' 
 // DashboardFinanceiro extracted to src/components/financeiro/DashboardFinanceiroSection.tsx
 
 // ==================== CADASTROS BASE ====================
-type CadastroSubView = 'arvore' | 'plano' | 'centros';
+type CadastroSubView = 'arvore' | 'plano' | 'centros' | 'fornecedores';
 
 // Mesmo seletor de sub-módulo do Fechamento de Caixa (CLAUDE.md: substitui a fileira de botões).
 const CADASTROS_ITEMS: SubmoduleItem<CadastroSubView>[] = [
   { id: 'arvore', label: 'Estrutura de Categorias', icon: FolderTree },
   { id: 'plano', label: 'Plano de Contas', icon: BookOpen },
   { id: 'centros', label: 'Centros de Custo', icon: Target },
+  // Mesma tabela `suppliers` de Compras: o que se cadastra num módulo aparece no outro.
+  { id: 'fornecedores', label: 'Fornecedores', icon: Building2 },
 ];
 
 function CadastrosBase() {
@@ -72,6 +75,7 @@ function CadastrosBase() {
       {subView === 'arvore' && <CadastroBaseTree />}
       {subView === 'plano' && <PlanoContasFinSection canCreate={canCreate} canEdit={canEdit} canDelete={canDelete} />}
       {subView === 'centros' && <CentrosCustoFinSection canCreate={canCreate} canEdit={canEdit} canDelete={canDelete} />}
+      {subView === 'fornecedores' && <Suspense fallback={<FinSpinner />}><FornecedoresFinSection /></Suspense>}
     </div>
   );
 }

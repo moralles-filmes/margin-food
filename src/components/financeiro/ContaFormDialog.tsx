@@ -94,6 +94,8 @@ interface Props {
   centros: CentroRef[];
   contas: ContaRef[];
   suppliers?: SupplierRef[];
+  /** Mostra o atalho "Cadastrar fornecedor" (permissão de criar fornecedor em Compras ou no Financeiro). */
+  canQuickAddSupplier?: boolean;
   isEditing: boolean;
   saving: boolean;
   onSave: () => void;
@@ -121,7 +123,7 @@ const SECAO = 'space-y-4 rounded-xl border border-border bg-card p-4 sm:p-5';
 
 export default function ContaFormDialog({
   open, onOpenChange, variant, form, onFormChange, rateioLines, onRateioLinesChange,
-  categorias, centros, contas, suppliers,
+  categorias, centros, contas, suppliers, canQuickAddSupplier = false,
   isEditing, saving, onSave, onClose,
   editPrevStatus, justificativa, onJustificativaChange,
   classificationOnly = false,
@@ -375,6 +377,7 @@ export default function ContaFormDialog({
                     value={form.supplier_id || ''}
                     onValueChange={v => set({ supplier_id: v })}
                     options={suppliers || []}
+                    enableQuickAdd={canQuickAddSupplier}
                     className="mt-1"
                   />
                 </div>

@@ -25,6 +25,7 @@ import { traduzirErroIdempotencia } from '@/domain/financeiro/idempotencia';
 import { padronizarTexto } from '@/lib/padronizarTexto';
 
 import { useCan } from '@/permissions/hooks';
+import { usePodeCadastrarFornecedor } from '@/hooks/useSuppliers';
 interface ExtratoLinha {
   data: string;
   descricao: string;
@@ -66,6 +67,7 @@ export default function CriarLancamentoExtratoDialog({
   const toast = useScopedToast();
   const supabase = useSupabase();
   const canViewRbac = useCan('financeiro:conciliacao:reconcile');
+  const podeCadastrarFornecedor = usePodeCadastrarFornecedor();
   const { user } = useAuth();
   const retornoFoco = useRetornoFoco();
 
@@ -511,6 +513,7 @@ export default function CriarLancamentoExtratoDialog({
                 value={supplierId}
                 onValueChange={setSupplierId}
                 options={suppliers}
+                enableQuickAdd={podeCadastrarFornecedor}
                 placeholder="Pesquisar fornecedor..."
                 className="h-9"
               />

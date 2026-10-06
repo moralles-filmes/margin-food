@@ -63,6 +63,9 @@ vi.mock('@/components/financeiro/ContasBancariasSection', () => ({ default: () =
 vi.mock('@/components/financeiro/LivroRazaoSection', () => ({ default: () => null }));
 vi.mock('@/components/financeiro/PlanoContasFinSection', () => ({ default: () => null }));
 vi.mock('@/components/financeiro/CentrosCustoFinSection', () => ({ default: () => null }));
+vi.mock('@/components/financeiro/FornecedoresFinSection', () => ({
+  default: () => <div>Fornecedores do Financeiro</div>,
+}));
 
 function LocationProbe() {
   return <output aria-label="Rota atual">{useLocation().pathname}</output>;
@@ -117,5 +120,19 @@ describe('navegação do Financeiro para Borderô e Apresentação Sócios', () 
     expect(screen.queryByRole('button', { name: 'Borderô' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Apresentação Sócios' })).not.toBeInTheDocument();
     expect(screen.getByText('Acesso Negado')).toBeInTheDocument();
+  });
+});
+
+describe('Cadastros Base do Financeiro', () => {
+  it('oferece Fornecedores, com o mesmo cadastro de Compras', async () => {
+    permissionState.visibleSubtabs = ['cadastros'];
+    render(
+      <MemoryRouter>
+        <FinanceiroView />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Fornecedores' }));
+    expect(await screen.findByText('Fornecedores do Financeiro')).toBeInTheDocument();
   });
 });

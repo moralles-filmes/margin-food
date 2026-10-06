@@ -20,6 +20,7 @@ interface SupplierComboboxProps {
   disabled?: boolean;
   /** If true, the value is a text string (legacy), not a UUID */
   textMode?: boolean;
+  /** Atalho "Cadastrar fornecedor". Desligado por padrão: o pai liga com `usePodeCadastrarFornecedor()`. */
   enableQuickAdd?: boolean;
   /** Set to true when combobox is used inside a Dialog/Sheet */
   modal?: boolean;
@@ -37,7 +38,7 @@ export default function SupplierCombobox({
   className,
   disabled,
   textMode,
-  enableQuickAdd = true,
+  enableQuickAdd = false,
   modal = true,
   id,
   'aria-label': ariaLabel,
