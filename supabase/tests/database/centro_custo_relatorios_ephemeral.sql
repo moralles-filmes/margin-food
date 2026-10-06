@@ -225,6 +225,7 @@ $function$;
 
 -- Em produção as três RPCs já existem com o EXECUTE de PUBLIC revogado/concedido; aqui nascem da migration.
 \ir ../../migrations/20261006162551_fin_relatorios_centro_custo.sql
+\ir ../../migrations/20261006163434_fin_dre_nao_operacionais.sql
 
 GRANT USAGE ON SCHEMA public, auth TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION auth.uid() TO authenticated, service_role;
@@ -250,6 +251,10 @@ INSERT INTO public.fin_categorias (id, nome, codigo, tipo, ordem, company_id) VA
   ('ca000000-0000-0000-0000-0000000000a3', 'Aluguel', '3', 'despesa', 30, 'a0000000-0000-0000-0000-00000000000a'),
   ('ca000000-0000-0000-0000-0000000000b1', 'Despesa da B', '1', 'despesa', 10, 'b0000000-0000-0000-0000-00000000000b');
 
+-- Raiz não operacional (fora dos totais do DRE/DFC).
+INSERT INTO public.fin_categorias (id, nome, codigo, tipo, ordem, system_key, excluir_dos_totais, company_id) VALUES
+  ('ca000000-0000-0000-0000-0000000000a4', 'DESPESAS NÃO OPERACIONAIS', '9', 'despesa', 90, 'despesas_nao_operacionais', true, 'a0000000-0000-0000-0000-00000000000a');
+
 INSERT INTO public.fin_contas (id, saldo_inicial, company_id) VALUES
   ('c0000000-0000-0000-0000-0000000000a1', 1000, 'a0000000-0000-0000-0000-00000000000a');
 
@@ -272,7 +277,11 @@ INSERT INTO public.fin_lancamentos (id, tipo, valor, data_competencia, data_paga
   -- L8: agosto — fora do período (entra no saldo inicial do DFC)
   ('1a000000-0000-0000-0000-000000000008', 'DESPESA', 40, '2026-08-20', '2026-08-20', 'ca000000-0000-0000-0000-0000000000a2', 'cc000000-0000-0000-0000-0000000000c1', 'REALIZADO', 'manual', false, 'a0000000-0000-0000-0000-00000000000a'),
   -- L9: julho, sem centro — período sem nenhum centro de custo
-  ('1a000000-0000-0000-0000-000000000009', 'DESPESA', 25, '2026-07-15', '2026-07-15', 'ca000000-0000-0000-0000-0000000000a2', NULL, 'REALIZADO', 'manual', false, 'a0000000-0000-0000-0000-00000000000a');
+  ('1a000000-0000-0000-0000-000000000009', 'DESPESA', 25, '2026-07-15', '2026-07-15', 'ca000000-0000-0000-0000-0000000000a2', NULL, 'REALIZADO', 'manual', false, 'a0000000-0000-0000-0000-00000000000a'),
+  -- Junho: despesa não operacional e valores sem categoria (DRE não operacional / sem categoria)
+  ('1a000000-0000-0000-0000-000000000010', 'DESPESA', 400, '2026-06-10', '2026-06-10', 'ca000000-0000-0000-0000-0000000000a4', NULL, 'REALIZADO', 'manual', false, 'a0000000-0000-0000-0000-00000000000a'),
+  ('1a000000-0000-0000-0000-000000000011', 'DESPESA', 33, '2026-06-11', '2026-06-11', NULL, NULL, 'REALIZADO', 'manual', false, 'a0000000-0000-0000-0000-00000000000a'),
+  ('1a000000-0000-0000-0000-000000000012', 'RECEITA', 11, '2026-06-12', '2026-06-12', NULL, NULL, 'REALIZADO', 'manual', false, 'a0000000-0000-0000-0000-00000000000a');
 
 INSERT INTO public.fin_lancamento_rateios (id, lancamento_id, categoria_id, centro_custo_id, valor, company_id) VALUES
   -- L3: linha com centro (Cozinha) e linha SEM centro — não herda o Salão do cabeçalho
@@ -345,8 +354,8 @@ BEGIN
        'sem_centro', jsonb_build_object(alu, 430)) THEN
     RAISE EXCEPTION 'DFC: quebra por centro errada: %', dfc->'valores_por_centro_custo';
   END IF;
-  -- 1000 da conta − 40 (agosto) − 25 (julho).
-  IF (dfc->>'saldo_inicial')::numeric <> 935 THEN
+  -- 1000 da conta − 40 (agosto) − 25 (julho) − 400 − 33 + 11 (junho).
+  IF (dfc->>'saldo_inicial')::numeric <> 513 THEN
     RAISE EXCEPTION 'DFC: saldo inicial mudou: %', dfc->>'saldo_inicial';
   END IF;
   IF dfc::text LIKE '%Centro da B%' OR dfc::text LIKE '%linha_dre%' THEN
@@ -387,6 +396,33 @@ BEGIN
   vazio := public.get_fin_dashboard_charts('2026-07-01', '2026-07-31')::jsonb;
   IF vazio->'despesas_por_centro_custo' <> '[]'::jsonb THEN
     RAISE EXCEPTION 'Dashboard julho: esperava lista vazia: %', vazio;
+  END IF;
+
+  -- DRE: não operacional marcado (fica fora dos totais na árvore) e sem categoria em linha própria.
+  IF NOT EXISTS (
+    SELECT 1 FROM jsonb_array_elements(dre->'categorias') e
+    WHERE e->>'id' = 'ca000000-0000-0000-0000-0000000000a4'
+      AND (e->>'excluir_dos_totais')::boolean AND e->>'system_key' = 'despesas_nao_operacionais'
+  ) OR EXISTS (
+    SELECT 1 FROM jsonb_array_elements(dre->'categorias') e
+    WHERE e->>'id' = 'ca000000-0000-0000-0000-0000000000a2' AND (e->>'excluir_dos_totais')::boolean IS NOT FALSE
+  ) THEN
+    RAISE EXCEPTION 'DRE: categorias sem excluir_dos_totais/system_key: %', dre->'categorias';
+  END IF;
+  IF EXISTS (SELECT 1 FROM jsonb_array_elements(dre->'categorias') e WHERE e->>'codigo' IN ('S/C-R', 'S/C-D')) THEN
+    RAISE EXCEPTION 'DRE setembro: linha "Sem categoria" sem valor sem categoria: %', dre->'categorias';
+  END IF;
+  vazio := public.get_fin_dre_summary('2026-06-01', '2026-06-30');
+  IF vazio->'valores_por_categoria' <> jsonb_build_object(
+       'ca000000-0000-0000-0000-0000000000a4', 400,
+       '00000000-0000-0000-0000-000000000102', 33,
+       '00000000-0000-0000-0000-000000000101', 11) THEN
+    RAISE EXCEPTION 'DRE junho: sem categoria precisa ir para …101/…102: %', vazio->'valores_por_categoria';
+  END IF;
+  IF (SELECT count(*) FROM jsonb_array_elements(vazio->'categorias') e
+      WHERE (e->>'id', e->>'tipo', (e->>'excluir_dos_totais')::boolean) IN
+        (('00000000-0000-0000-0000-000000000101', 'receita', false), ('00000000-0000-0000-0000-000000000102', 'despesa', false))) <> 2 THEN
+    RAISE EXCEPTION 'DRE junho: faltam as linhas "Sem categoria": %', vazio->'categorias';
   END IF;
 
   -- Outra empresa pelo header: recusado antes de qualquer leitura.
