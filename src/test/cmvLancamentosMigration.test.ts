@@ -55,6 +55,14 @@ describe('migration CMV com lançamentos — leitura', () => {
     expect(c).toContain('WHERE NOT EXISTS');
   });
 
+  it('a baixa de um boleto (fin_contas_pagar.lancamento_id) não é despesa de lançamento', () => {
+    const c = plano(corpo('_fin_cmv_linhas_lancamentos'));
+    // por empresa e pela chave do título, para usar o índice de lancamento_id
+    expect(c).toContain(
+      'AND NOT EXISTS ( SELECT 1 FROM public.fin_contas_pagar cp WHERE cp.company_id = p_company_id AND cp.lancamento_id = l.id )',
+    );
+  });
+
   it('o relatório soma as duas fontes e mantém o contrato v1', () => {
     const p = plano(corpo('_fin_cmv_payload'));
     expect(p).toContain("'contrato', 'cmv-financeiro/v1'");

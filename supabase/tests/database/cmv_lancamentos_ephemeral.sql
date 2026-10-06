@@ -223,6 +223,7 @@ DECLARE
   v_imp uuid; v_rid uuid; v_lr uuid; v_lr2 uuid; v_lr3 uuid; v_sem_pag uuid;
   v_p_peixes uuid; v_p_escr uuid; v_p_sem uuid; v_p_antigo uuid; v_p_decidido uuid; v_p_rat uuid; v_bol_pend uuid;
   v_ids uuid[]; v_criados timestamptz[]; v_n bigint;
+  v_valido uuid; v_baixa_legada uuid; v_cp_legado uuid; v_so_origem uuid; v_so_referencia uuid;
 BEGIN
   INSERT INTO companies VALUES (A, 'Unidade A'), (B, 'Unidade B');
   INSERT INTO fin_categorias (id, nome, tipo, company_id, cmv_sugerir) VALUES
@@ -313,6 +314,44 @@ BEGIN
   ), 'item de boleto mantém data_vencimento');
   r := list_fin_cmv_linhas(NULL, NULL, 'pendente');
   PERFORM cmv_assert((r->>'total_titulos')::int = 1 AND (r->'itens'->0->>'lancamento_id')::uuid = v_pend, 'pendência de lançamento aparece na revisão');
+
+  -- 3b. A baixa de um boleto não é despesa à parte, e cada filtro de elegibilidade vale sozinho.
+  -- Semana 14–20/09/2026, separada da anterior para não mexer nos totais acima.
+  INSERT INTO fin_lancamentos (tipo, valor, data_competencia, data_pagamento, status, origem, company_id, categoria_id, cmv_incluir, descricao)
+  VALUES ('DESPESA', 10, '2026-09-15', '2026-09-15', 'REALIZADO', 'manual', A, c_peixes, true, 'Despesa válida da semana') RETURNING id INTO v_valido;
+  -- Fluxo antigo: o título ficou PAGO apontando para o lançamento da conciliação, mas o
+  -- carimbo (referencia_modulo/origem) se perdeu. O lançamento fica origem='conciliacao',
+  -- conciliado=true, referencia_modulo='' (default) e só o vínculo do título o denuncia.
+  INSERT INTO fin_lancamentos (tipo, valor, data_competencia, data_pagamento, status, origem, conciliado, company_id, categoria_id, cmv_incluir, descricao, conta_id)
+  VALUES ('DESPESA', 25, '2026-09-16', '2026-09-16', 'REALIZADO', 'conciliacao', true, A, c_peixes, true, 'Baixa de boleto sem carimbo', k_a) RETURNING id INTO v_baixa_legada;
+  INSERT INTO fin_contas_pagar (descricao, valor, valor_pago, data_vencimento, data_competencia, data_pagamento, status, company_id, categoria_id, cmv_incluir, lancamento_id)
+  VALUES ('Boleto pago do fluxo antigo', 25, 25, '2026-09-16', '2026-09-16', '2026-09-16', 'PAGO', A, c_peixes, true, v_baixa_legada) RETURNING id INTO v_cp_legado;
+  -- Cada filtro sozinho: origem de título com referencia_modulo vazio; referência a título com origem comum.
+  INSERT INTO fin_lancamentos (tipo, valor, data_competencia, data_pagamento, status, origem, referencia_modulo, company_id, categoria_id, cmv_incluir, descricao)
+  VALUES ('DESPESA', 400, '2026-09-17', '2026-09-17', 'REALIZADO', 'espelho_cp', '', A, c_peixes, true, 'Espelho sem referência') RETURNING id INTO v_so_origem;
+  INSERT INTO fin_lancamentos (tipo, valor, data_competencia, data_pagamento, status, origem, conciliado, referencia_modulo, company_id, categoria_id, cmv_incluir, descricao)
+  VALUES ('DESPESA', 800, '2026-09-17', '2026-09-17', 'REALIZADO', 'conciliacao', true, 'contas_pagar', A, c_peixes, true, 'Conciliado com referência de título') RETURNING id INTO v_so_referencia;
+
+  r := get_fin_cmv_financeiro('2026-09-14', '2026-09-20');
+  -- 10 (despesa válida) + 25 (o boleto, uma só vez) = R$ 35,00; a baixa do boleto, o espelho e o conciliado-com-referência ficam fora
+  PERFORM cmv_assert(cmv_total(r, '2026-09-14', '2026-09-20') = 3500, 'boleto e a própria baixa não contam em dobro; cada filtro de elegibilidade exclui sozinho');
+  PERFORM cmv_assert((SELECT sum((x->>'quantidade')::int) FROM jsonb_array_elements(r->'boletos') x) = 1, 'o boleto da baixa antiga continua contando como boleto');
+  PERFORM cmv_assert((SELECT sum((x->>'quantidade')::int) FROM jsonb_array_elements(r->'lancamentos') x) = 1, 'só a despesa válida conta como lançamento');
+  PERFORM cmv_assert(NOT EXISTS (
+    SELECT 1 FROM public._fin_cmv_linhas_lancamentos(A) l WHERE l.lancamento_id IN (v_baixa_legada, v_so_origem, v_so_referencia)
+  ), 'linhas de lançamento excluem a baixa de boleto, o espelho sem referência e o conciliado com referência');
+  PERFORM cmv_assert(EXISTS (SELECT 1 FROM public._fin_cmv_linhas_lancamentos(A) l WHERE l.lancamento_id = v_valido), 'controle: a despesa válida está nas linhas de lançamento');
+  PERFORM cmv_assert(EXISTS (SELECT 1 FROM public._fin_cmv_linhas(A) b WHERE b.conta_pagar_id = v_cp_legado), 'o boleto continua nas linhas de boleto');
+  r := list_fin_cmv_linhas('2026-09-14', '2026-09-20', 'todos');
+  PERFORM cmv_assert((r->>'total_titulos')::int = 2 AND (r->>'total_centavos')::bigint = 3500, 'lista da semana: despesa válida + boleto');
+  PERFORM cmv_assert(NOT EXISTS (
+    SELECT 1 FROM jsonb_array_elements(r->'itens') x
+    WHERE x->>'lancamento_id' IN (v_baixa_legada::text, v_so_origem::text, v_so_referencia::text)
+  ), 'lista não traz a baixa de boleto nem os lançamentos de título');
+  PERFORM cmv_assert(EXISTS (
+    SELECT 1 FROM jsonb_array_elements(r->'itens') x WHERE x->>'fonte' = 'boleto' AND x->>'conta_pagar_id' = v_cp_legado::text
+  ), 'lista traz o boleto da baixa antiga');
+  PERFORM cmv_assert((list_fin_cmv_linhas(NULL, NULL, 'pendente')->>'total_titulos')::int = 1, 'nada novo ficou pendente (continua só a pendência de lançamento da seção 2)');
 
   -- 4. Isolamento entre unidades
   PERFORM set_config('test.company_id', B::text, false);

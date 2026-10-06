@@ -7,7 +7,9 @@
 --   * não deriva de um título: referencia_modulo vazio. Espelho de baixa,
 --     encargo da baixa e título criado do extrato ficam fora — o boleto já conta
 --     pela própria competência, então nada é contado duas vezes;
---   * se veio da conciliação, está conciliada (mesma regra dos relatórios).
+--   * se veio da conciliação, está conciliada (mesma regra dos relatórios);
+--   * não é a baixa de um boleto: nenhum fin_contas_pagar aponta para ele em
+--     lancamento_id (mesmo que o carimbo de referencia_modulo tenha se perdido).
 -- Data = data_competencia. Decisão = linha de rateio; sem rateio, o próprio
 -- lançamento (fin_lancamentos.cmv_incluir). NULL = pendente, nunca "Sim".
 --
@@ -51,6 +53,13 @@ AS $$
       AND NULLIF(l.referencia_modulo, '') IS NULL
       AND l.origem NOT IN ('espelho_cp', 'espelho_cr', 'ajuste_pagamento')
       AND (l.origem <> 'conciliacao' OR l.conciliado IS TRUE)
+      -- Lançamento que é a baixa de um boleto (fin_contas_pagar.lancamento_id) não é
+      -- despesa à parte: o boleto já conta. Cobre o fluxo antigo que gravou o título
+      -- como PAGO mas perdeu o UPDATE que carimbava referencia_modulo/origem.
+      AND NOT EXISTS (
+        SELECT 1 FROM public.fin_contas_pagar cp
+        WHERE cp.company_id = p_company_id AND cp.lancamento_id = l.id
+      )
   )
   SELECT d.id, r.id, r.categoria_id, r.valor, r.cmv_incluir, d.data_competencia
   FROM despesas d
