@@ -16,7 +16,7 @@ import SupplierCombobox from './SupplierCombobox';
 import { Plus, Trash2, Repeat } from 'lucide-react';
 import { TIPOS_CODIGO_PAGAMENTO, MAX_CODIGO_PAGAMENTO } from '@/domain/financeiro/codigoPagamento';
 import { getRecurrenceLimit } from '@/domain/financeiro/recurrence';
-import { decisaoSugerida, formatarCentavos, formatarData, resumirBoleto, type CmvDecisao } from '@/domain/financeiro/cmv';
+import { decisaoAoTrocarCategoria, formatarCentavos, formatarData, resumirBoleto, type CmvDecisao } from '@/domain/financeiro/cmv';
 import CmvDecisaoToggle from './cmv/CmvDecisaoToggle';
 import { useRetornoFoco } from './useRetornoFoco';
 import { useConteinerEstreito } from './useConteinerEstreito';
@@ -104,6 +104,8 @@ interface Props {
   onJustificativaChange?: (v: string) => void;
   classificationOnly?: boolean;
   cmv?: ContaFormCmv | null;
+  /** Reclassificação de lançamento conciliado pode ajustar a competência (banco com o recurso). */
+  competenciaNaReclassificacao?: boolean;
   /** Elemento que recebe o foco ao fechar quando quem abriu o formulário saiu da tela. */
   focoReserva?: () => HTMLElement | null;
 }
@@ -126,6 +128,7 @@ export default function ContaFormDialog({
   editPrevStatus, justificativa, onJustificativaChange,
   classificationOnly = false,
   cmv = null,
+  competenciaNaReclassificacao = false,
   focoReserva,
 }: Props) {
   const [enableRateio, setEnableRateio] = useState(false);
@@ -146,18 +149,17 @@ export default function ContaFormDialog({
   const recurrenceLimit = getRecurrenceLimit(form.frequencia);
 
   // ─── CMV financeiro ───
+  // Boleto de Contas a Pagar e despesa do Livro Razão. Só o boleto exige a resposta;
+  // no lançamento ela é sugerida pelo padrão da categoria e a pendência fica na revisão.
+  const cmvDoc = variant === 'pagar' ? 'boleto' : 'despesa';
+  const cmvVariante = variant === 'pagar' || (variant === 'lancamento' && form.tipo === 'DESPESA');
   const cmvTemDecisao = (form.cmv_incluir ?? null) !== null || rateioLines.some(l => (l.cmv_incluir ?? null) !== null);
-  const mostrarCmv = variant === 'pagar' && cmv !== null && (cmv.ativo || cmvTemDecisao);
+  const mostrarCmv = cmvVariante && cmv !== null && (cmv.ativo || cmvTemDecisao);
   const [rateioRef, rateioEstreito] = useConteinerEstreito(mostrarCmv ? RATEIO_LIMITE_CMV_PX : RATEIO_LIMITE_PX, RATEIO_HISTERESE_PX);
 
   /** Trocar a categoria reaplica o padrão dela — e avisa, para a decisão não mudar em silêncio. */
-  const cmvAoTrocarCategoria = (anterior: CmvDecisao | undefined, categoriaId: string): { cmv_incluir: CmvDecisao; cmv_aviso?: CmvAviso } => {
-    if (!cmv) return { cmv_incluir: anterior ?? null };
-    const sugestao = decisaoSugerida(categoriaId, cmv.padroes);
-    const antes = anterior ?? null;
-    if (antes !== null && antes !== sugestao) return { cmv_incluir: sugestao, cmv_aviso: 'redefinido' };
-    return { cmv_incluir: sugestao, cmv_aviso: sugestao !== null ? 'sugerido' : undefined };
-  };
+  const cmvAoTrocarCategoria = (anterior: CmvDecisao | undefined, categoriaId: string): { cmv_incluir: CmvDecisao; cmv_aviso?: CmvAviso } =>
+    cmv ? decisaoAoTrocarCategoria(anterior, categoriaId, cmv.padroes) : { cmv_incluir: anterior ?? null };
 
   // ─── Rateio helpers ───
   const addRateioLine = () => {
@@ -244,13 +246,13 @@ export default function ContaFormDialog({
   const cmvApagadaNaEdicao = rateioAtivo
     ? rateioLines.some(l => (l.cmv_incluir ?? null) === null && l.cmv_aviso === 'redefinido')
     : (form.cmv_incluir ?? null) === null && (form.cmv_aviso === 'redefinido' || form.cmv_aviso === 'unificar');
-  const cmvBloqueiaSalvar = mostrarCmv && Boolean(cmv?.ativo)
+  const cmvBloqueiaSalvar = variant === 'pagar' && mostrarCmv && Boolean(cmv?.ativo)
     && (isEditing ? cmvApagadaNaEdicao : cmvResumo.linhasPendentes > 0);
   const cmvCompetencia = form.data_competencia || form.data_vencimento;
   const marcarTodasCmv = (valor: boolean) =>
     onRateioLinesChange(rateioLines.map(l => ({ ...l, cmv_incluir: valor, cmv_aviso: undefined })));
   const textoAvisoCmv = (aviso?: CmvAviso) =>
-    aviso === 'unificar' ? 'O rateio tinha respostas diferentes: informe a do boleto inteiro.'
+    aviso === 'unificar' ? `O rateio tinha respostas diferentes: informe a ${variant === 'pagar' ? 'do boleto inteiro' : 'da despesa inteira'}.`
       : aviso === 'redefinido' ? 'Categoria trocada: decisão redefinida. Confira.'
       : aviso === 'sugerido' ? 'Sugestão do padrão da categoria.'
         : null;
@@ -267,7 +269,7 @@ export default function ContaFormDialog({
     <div className="rounded-lg border border-border bg-muted p-3 space-y-2" aria-live="polite">
       <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs sm:grid-cols-4">
         <div>
-          <dt className="text-muted-foreground">Total do boleto</dt>
+          <dt className="text-muted-foreground">Total {cmvDoc === 'boleto' ? 'do boleto' : 'da despesa'}</dt>
           <dd className="font-semibold tabular-nums text-foreground">{formatarCentavos(cmvResumo.totalCentavos)}</dd>
         </div>
         <div>
@@ -288,8 +290,8 @@ export default function ContaFormDialog({
       <p className="text-[11px] text-muted-foreground">
         {cmvCompetencia
           ? <>Competência usada no CMV: <strong className="text-foreground">{formatarData(cmvCompetencia)}</strong>{!form.data_competencia && ' (vencimento, pois a competência não foi informada)'}.</>
-          : 'Sem data de competência o boleto não entra em nenhum período do CMV.'}
-        {' '}A cobrança e o pagamento do boleto não mudam.
+          : `Sem data de competência ${cmvDoc === 'boleto' ? 'o boleto' : 'a despesa'} não entra em nenhum período do CMV.`}
+        {' '}{cmvDoc === 'boleto' ? 'A cobrança e o pagamento do boleto não mudam.' : 'O pagamento e o saldo da conta não mudam.'}
       </p>
       {cmvBloqueiaSalvar && (
         <p className="text-xs font-medium text-warning">Responda Sim ou Não{rateioAtivo ? ' em todas as linhas' : ''} para salvar.</p>
@@ -317,7 +319,9 @@ export default function ContaFormDialog({
             <div className="rounded-lg border border-success-border bg-success-soft px-4 py-3 text-sm">
               <p className="font-medium text-foreground">A conciliação bancária será mantida.</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Somente categoria, centro de custo, rateio e observações podem ser alterados. Valor, data, conta, tipo e descrição bancária permanecem bloqueados.
+                {competenciaNaReclassificacao
+                  ? 'Somente categoria, centro de custo, rateio, competência, a resposta do CMV e observações podem ser alterados. Valor, data do banco, conta, tipo e descrição bancária permanecem bloqueados.'
+                  : 'Somente categoria, centro de custo, rateio e observações podem ser alterados. Valor, data, conta, tipo e descrição bancária permanecem bloqueados.'}
               </p>
             </div>
           )}
@@ -397,7 +401,7 @@ export default function ContaFormDialog({
                   id={id('competencia')}
                   value={form.data_competencia}
                   onValueChange={v => set({ data_competencia: v })}
-                  disabled={classificationOnly}
+                  disabled={classificationOnly && !competenciaNaReclassificacao}
                   className="mt-1"
                 />
               </div>
