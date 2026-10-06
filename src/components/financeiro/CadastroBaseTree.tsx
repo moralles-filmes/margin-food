@@ -24,6 +24,9 @@ import { useFormDirtyGuard } from '@/hooks/useFormDirtyGuard';
 import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
 import { cn, includesNormalized } from '@/lib/utils';
 import * as XLSX from '@/lib/safeXlsx';
+import {
+  grupoDeOutroTipo, grupoHerdado, grupoLabel, grupoObrigatorio, grupoOptionsForTipo,
+} from '@/domain/financeiro/categoriaGrupo';
 
 // ─── Types ───
 export interface CatNode {
@@ -35,7 +38,6 @@ export interface CatNode {
   ordem: number;
   centro_custo_padrao_id: string | null;
   grupo: string | null;
-  linha_dre: string | null;
   system_key: string | null;
   excluir_dos_totais: boolean;
   ativo: boolean;
@@ -332,18 +334,6 @@ function TreeRow({
   );
 }
 
-// ─── Grupo / Linha DRE options ───
-const GRUPO_OPTIONS = [
-  'receita_operacional', 'outras_receitas', 'receita_financeira',
-  'cmv', 'impostos', 'taxa', 'pessoal', 'ocupacao', 'utilidades',
-  'marketing', 'administrativa', 'manutencao', 'financeira',
-  'investimento', 'empréstimo', 'aporte', 'dividendos',
-];
-
-const LINHA_DRE_OPTIONS = [
-  'CMV', 'Deduções', 'Despesas Operacionais', 'Despesas Financeiras',
-];
-
 // ─── Projection fields ───
 const CATEGORY_FIELDS = `
   id,
@@ -354,7 +344,6 @@ const CATEGORY_FIELDS = `
   ordem,
   centro_custo_padrao_id,
   grupo,
-  linha_dre,
   system_key,
   excluir_dos_totais,
   ativo,
@@ -388,7 +377,7 @@ export default function CadastroBaseTree() {
   const [seeding, setSeeding] = useState(false);
   const [search, setSearch] = useState('');
   const [form, setForm] = useState({
-    nome: '', codigo: '', tipo: 'despesa', grupo: '', linha_dre: '',
+    nome: '', codigo: '', tipo: 'despesa', grupo: '',
     parent_id: '', centro_custo_padrao_id: '', ordem: 0,
   });
   const [centros, setCentros] = useState<CentroCusto[]>([]);
@@ -438,6 +427,19 @@ export default function CadastroBaseTree() {
   // Leaves currently visible/selectable — used to prune stale selection (search filter, background reload).
   const visibleLeafIds = new Set(collectLeafIds(filteredTree));
   const visibleSelectedCount = Array.from(selectedIds).filter(id => visibleLeafIds.has(id)).length;
+  // Sem grupo próprio, a categoria usa o da mãe na Apresentação Sócios — "Nenhum"
+  // fazia parecer que ela estava fora dos detalhamentos.
+  const grupoDaMae = grupoLabel(grupoHerdado(form.parent_id, items));
+  const categoriaEditada = editId ? items.find(i => i.id === editId) : undefined;
+  const maeDoForm = form.parent_id ? items.find(i => i.id === form.parent_id) : undefined;
+  const naoOperacional = Boolean(
+    categoriaEditada?.system_key || categoriaEditada?.excluir_dos_totais || maeDoForm?.excluir_dos_totais,
+  );
+  const exigeGrupo = grupoObrigatorio(form.parent_id, items, naoOperacional);
+  let ajudaGrupo = 'Em branco, a categoria usa o grupo da categoria acima.';
+  if (naoOperacional) ajudaGrupo = 'Categoria não operacional não entra nos detalhamentos.';
+  else if (exigeGrupo && form.parent_id) ajudaGrupo = 'Obrigatório aqui: nenhuma categoria acima tem grupo para herdar.';
+  else if (exigeGrupo) ajudaGrupo = 'Obrigatório na categoria principal: as categorias abaixo usam este grupo quando ficam em branco.';
 
   const toggleExpand = (id: string) => {
     setExpanded(prev => {
@@ -468,7 +470,7 @@ export default function CadastroBaseTree() {
     setEditId(null);
     setEditUpdatedAt(null);
     setForm({
-      nome: '', codigo: nextCodigo, tipo: parentTipo, grupo: '', linha_dre: '',
+      nome: '', codigo: nextCodigo, tipo: parentTipo, grupo: '',
       parent_id: parentId, centro_custo_padrao_id: '', ordem: nextNum * 10,
     });
     setShowForm(true);
@@ -479,7 +481,7 @@ export default function CadastroBaseTree() {
     setEditId(null);
     setEditUpdatedAt(null);
     setForm({
-      nome: '', codigo: String(rootCount + 1), tipo: 'despesa', grupo: '', linha_dre: '',
+      nome: '', codigo: String(rootCount + 1), tipo: 'despesa', grupo: '',
       parent_id: '', centro_custo_padrao_id: '', ordem: (rootCount + 1) * 10,
     });
     setShowForm(true);
@@ -493,7 +495,6 @@ export default function CadastroBaseTree() {
       codigo: node.codigo || '',
       tipo: node.tipo,
       grupo: node.grupo || '',
-      linha_dre: node.linha_dre || '',
       parent_id: node.parent_id || '',
       centro_custo_padrao_id: node.centro_custo_padrao_id || '',
       ordem: node.ordem || 0,
@@ -504,7 +505,7 @@ export default function CadastroBaseTree() {
   const resetForm = () => {
     setEditId(null);
     setEditUpdatedAt(null);
-    setForm({ nome: '', codigo: '', tipo: 'despesa', grupo: '', linha_dre: '', parent_id: '', centro_custo_padrao_id: '', ordem: 0 });
+    setForm({ nome: '', codigo: '', tipo: 'despesa', grupo: '', parent_id: '', centro_custo_padrao_id: '', ordem: 0 });
     setShowForm(false);
   };
   const { showConfirm, guardedClose, confirmClose, cancelClose } = useFormDirtyGuard({ current: form, onClose: resetForm });
@@ -515,6 +516,7 @@ export default function CadastroBaseTree() {
   const save = async () => {
     if (salvandoRef.current) return;
     if (!form.nome.trim()) { toast.error('Nome obrigatório'); return; }
+    if (exigeGrupo && !form.grupo) { toast.error('Selecione o grupo da categoria'); return; }
 
     // Cycle detection on edit
     if (editId && form.parent_id) {
@@ -532,7 +534,6 @@ export default function CadastroBaseTree() {
         codigo: form.codigo || '',
         tipo: form.tipo,
         grupo: form.grupo || null,
-        linha_dre: form.linha_dre || null,
         parent_id: form.parent_id || null,
         centro_custo_padrao_id: form.centro_custo_padrao_id || null,
         ordem: form.ordem || 0,
@@ -769,8 +770,7 @@ export default function CadastroBaseTree() {
           codigo: n.codigo,
           nome: n.nome,
           tipo: n.tipo,
-          grupo: n.grupo || '',
-          linha_dre: n.linha_dre || '',
+          grupo: grupoLabel(n.grupo) ?? '',
           centro_custo: cc?.nome || '',
           parent_id: n.parent_id || '',
           ordem: n.ordem,
@@ -901,7 +901,10 @@ export default function CadastroBaseTree() {
             </div>
             <div><Label>Nome</Label><Input value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} /></div>
             <div><Label>Tipo</Label>
-              <Select value={form.tipo} onValueChange={v => setForm({ ...form, tipo: v })}>
+              <Select
+                value={form.tipo}
+                onValueChange={v => setForm({ ...form, tipo: v, grupo: grupoDeOutroTipo(form.grupo, v) ? '' : form.grupo })}
+              >
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="receita">Receita</SelectItem>
@@ -909,26 +912,19 @@ export default function CadastroBaseTree() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div><Label>Grupo</Label>
-                <Select value={form.grupo || '_none'} onValueChange={v => setForm({ ...form, grupo: v === '_none' ? '' : v })}>
-                  <SelectTrigger><SelectValue placeholder="Nenhum" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="_none">Nenhum</SelectItem>
-                    {GRUPO_OPTIONS.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div><Label>Linha DRE</Label>
-                <Select value={form.linha_dre || '_none'} onValueChange={v => setForm({ ...form, linha_dre: v === '_none' ? '' : v })}>
-                  <SelectTrigger><SelectValue placeholder="Nenhuma" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="_none">Nenhuma</SelectItem>
-                    {LINHA_DRE_OPTIONS.map(l => <SelectItem key={l} value={l}>{l}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div><Label>Grupo{exigeGrupo ? ' *' : ''}</Label>
+              {/* Sem "Nenhum" quando não há grupo para herdar: em branco, a despesa sumiria dos detalhamentos. */}
+              <Select value={form.grupo || (exigeGrupo ? '' : '_none')} onValueChange={v => setForm({ ...form, grupo: v === '_none' ? '' : v })}>
+                <SelectTrigger><SelectValue placeholder="Selecione o grupo" /></SelectTrigger>
+                <SelectContent>
+                  {!exigeGrupo && <SelectItem value="_none">{grupoDaMae ? `Herdado: ${grupoDaMae}` : 'Nenhum'}</SelectItem>}
+                  {grupoOptionsForTipo(form.tipo, form.grupo).map(g => <SelectItem key={g.value} value={g.value}>{g.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
+            <p className="text-xs text-muted-foreground">
+              O grupo monta os detalhamentos da Apresentação Sócios (CMV, Pessoal, Operações, Financeiro e Investimentos). {ajudaGrupo}
+            </p>
             <div><Label>Centro de Custo Padrão</Label>
               <Select value={form.centro_custo_padrao_id || '_none'} onValueChange={v => setForm({ ...form, centro_custo_padrao_id: v === '_none' ? '' : v })}>
                 <SelectTrigger><SelectValue placeholder="Nenhum" /></SelectTrigger>

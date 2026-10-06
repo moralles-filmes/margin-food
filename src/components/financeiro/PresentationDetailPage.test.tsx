@@ -94,4 +94,22 @@ describe('estados do painel compartilhado de detalhe', () => {
     renderDetail();
     expect(screen.getByText('Erro ao carregar linhas')).toBeInTheDocument();
   });
+
+  it('avisa no CMV a despesa que nenhum detalhamento por grupo mostra', () => {
+    render(
+      <PresentationDetailPage
+        companyId="11111111-1111-4111-8111-111111111111"
+        target="cmv"
+        data={createPresentationSociosData()}
+        categoryMetadata={{ insumos: { group: 'cmv' } }}
+        rankingLimit={10}
+        unitName="Moralles"
+        onBack={() => {}}
+        onSelectCategory={() => {}}
+      />,
+    );
+
+    expect(screen.getByText(/50,00 de despesa fora dos detalhamentos/)).toBeInTheDocument();
+    expect(screen.getByText('(sem categoria)')).toBeInTheDocument();
+  });
 });

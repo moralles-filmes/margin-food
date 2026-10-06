@@ -18,7 +18,6 @@ function categoria(overrides: Partial<{
     ordem: 0,
     centro_custo_padrao_id: null,
     grupo: null,
-    linha_dre: null,
     system_key: null,
     excluir_dos_totais: false,
     ativo: true,
