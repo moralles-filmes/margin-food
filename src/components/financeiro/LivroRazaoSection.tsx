@@ -45,6 +45,7 @@ import {
   ledgerStatusBadge,
   ledgerTipoBadge,
 } from './livroRazaoView';
+import { padronizarTexto } from '@/lib/padronizarTexto';
 
 // ─── Types ───
 interface Lancamento {
@@ -194,6 +195,7 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
   const [editId, setEditId] = useState<string | null>(null);
   const [editUpdatedAt, setEditUpdatedAt] = useState<string | null>(null);
   const [editPrevStatus, setEditPrevStatus] = useState<string | null>(null);
+  const [editOrigem, setEditOrigem] = useState<string | null>(null);
   const [editClassificationOnly, setEditClassificationOnly] = useState(false);
   const [justificativa, setJustificativa] = useState('');
   const [filtroTipo, setFiltroTipo] = useState(initialTipo || 'todos');
@@ -429,6 +431,7 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
     setEditId(null);
     setEditUpdatedAt(null);
     setEditPrevStatus(null);
+    setEditOrigem(null);
     setEditClassificationOnly(false);
     setJustificativa('');
     setForm({ tipo: 'DESPESA', valor: 0, data_competencia: todayBR(), data_vencimento: '', data_pagamento: '', descricao: '', conta_id: '', conta_destino_id: '', forma_pagamento: 'pix', status: 'PREVISTO', recorrente: false, frequencia: 'mensal', parcelas: 0, observacoes: '', categoria_id: '', centro_custo_id: '' });
@@ -456,6 +459,7 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
     setEditId(item.id);
     setEditUpdatedAt(item.updated_at);
     setEditPrevStatus(item.status);
+    setEditOrigem(item.origem);
     setEditClassificationOnly(!!item.conciliado);
     setJustificativa('');
 
@@ -725,7 +729,9 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
 
       // Só a criação leva chave; a edição já é protegida pelo optimistic lock.
       const idempotencyKey = editId ? null : await chavesLancamento.chave(rpcParams);
-      const { data, error } = await supabase.rpc('_guarded_upsert_lancamento' as any, { ...rpcParams, p_idempotency_key: idempotencyKey } as any);
+      // A chave fica com o texto digitado. Lançamento vindo do extrato mantém o texto do banco.
+      const descricaoEnviada = editId && editOrigem !== 'manual' ? form.descricao : padronizarTexto(form.descricao);
+      const { data, error } = await supabase.rpc('_guarded_upsert_lancamento' as any, { ...rpcParams, p_descricao: descricaoEnviada, p_idempotency_key: idempotencyKey } as any);
       if (error) {
         console.error('[LivroRazaoSection.save]', error);
         if (error.message?.includes('CONFLICT')) {

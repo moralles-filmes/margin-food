@@ -72,6 +72,15 @@ describe('Centros de Custo — cadastro duplicado', () => {
   });
 });
 
+describe('Centros de Custo — padronização do nome', () => {
+  it('grava o nome digitado em caixa alta no padrão', async () => {
+    insert.mockResolvedValue({ data: null, error: null });
+    fireEvent.click(await abrirENomear('CENTRO DE CUSTO COZINHA'));
+    await waitFor(() => expect(insert).toHaveBeenCalledTimes(1));
+    expect(insert.mock.calls[0][0]).toMatchObject({ nome: 'Centro de Custo Cozinha' });
+  });
+});
+
 describe('mensagemCadastroDuplicado', () => {
   it('traduz a recusa dos dois índices', () => {
     expect(mensagemCadastroDuplicado(DUPLICADO.message)).toMatch(/centro de custo ativo com este nome/);
