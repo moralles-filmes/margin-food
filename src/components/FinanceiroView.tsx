@@ -3,9 +3,10 @@ import { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react
 import { useModuleBadges } from '@/contexts/ModuleBadgesContext';
 import { usePersistedTab } from '@/hooks/usePersistedTab';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
 import { useCan, useModuleAccess } from '@/permissions';
 import { ModuleNav, type ModuleNavItem } from '@/components/ui/ModuleNav';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
+import { SubmoduleSwitcher, type SubmoduleItem } from '@/components/ui/SubmoduleSwitcher';
 import { isPresentationDetailTarget } from '@/lib/presentationDetailNavigation';
 import { Shield, Percent } from 'lucide-react';
 import {
@@ -33,6 +34,7 @@ const KPIsSection = lazy(() => import('@/components/financeiro/KPIsSection'));
 const AuditoriaFinSection = lazy(() => import('@/components/financeiro/AuditoriaFinSection'));
 const ComparativoSection = lazy(() => import('@/components/financeiro/ComparativoSection'));
 const CmvFinanceiroSection = lazy(() => import('@/components/financeiro/cmv/CmvFinanceiroSection'));
+const FornecedoresFinSection = lazy(() => import('@/components/financeiro/FornecedoresFinSection'));
 import FechamentoCaixaSection from '@/components/financeiro/FechamentoCaixaSection';
 import CadastroBaseTree from '@/components/financeiro/CadastroBaseTree';
 import ContasBancariasSection from '@/components/financeiro/ContasBancariasSection';
@@ -44,20 +46,33 @@ type FinSubTab = 'dashboard' | 'cadastros' | 'contas' | 'lancamentos' | 'pagar' 
 // DashboardFinanceiro extracted to src/components/financeiro/DashboardFinanceiroSection.tsx
 
 // ==================== CADASTROS BASE ====================
+type CadastroSubView = 'arvore' | 'centros' | 'fornecedores';
+
+// Mesmo seletor de sub-módulo do Fechamento de Caixa (CLAUDE.md: substitui a fileira de botões).
+const CADASTROS_ITEMS: SubmoduleItem<CadastroSubView>[] = [
+  { id: 'arvore', label: 'Estrutura de Categorias', icon: FolderTree },
+  { id: 'centros', label: 'Centros de Custo', icon: Target },
+  // Mesma tabela `suppliers` de Compras: o que se cadastra num módulo aparece no outro.
+  { id: 'fornecedores', label: 'Fornecedores', icon: Building2 },
+];
+
 function CadastrosBase() {
-  const [subView, setSubView] = useState<'arvore' | 'centros'>('arvore');
+  const [subView, setSubView] = useState<CadastroSubView>('arvore');
   const canCreate = useCan('financeiro:cadastros:create');
   const canEdit = useCan('financeiro:cadastros:edit');
   const canDelete = useCan('financeiro:cadastros:delete');
-  
+
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2 mb-4">
-        <Button variant={subView === 'arvore' ? 'default' : 'outline'} size="sm" onClick={() => setSubView('arvore')}>Estrutura de Categorias</Button>
-        <Button variant={subView === 'centros' ? 'default' : 'outline'} size="sm" onClick={() => setSubView('centros')}>Centros de Custo</Button>
-      </div>
+    <div className="space-y-6">
+      <SubmoduleSwitcher
+        items={CADASTROS_ITEMS}
+        value={subView}
+        onChange={value => setSubView(value as CadastroSubView)}
+        ariaLabel="Cadastro exibido"
+      />
       {subView === 'arvore' && <CadastroBaseTree />}
       {subView === 'centros' && <CentrosCustoFinSection canCreate={canCreate} canEdit={canEdit} canDelete={canDelete} />}
+      {subView === 'fornecedores' && <Suspense fallback={<FinSpinner />}><FornecedoresFinSection /></Suspense>}
     </div>
   );
 }
@@ -65,13 +80,23 @@ function CadastrosBase() {
 // ContasBancarias extracted to src/components/financeiro/ContasBancariasSection.tsx
 
 // LancamentosSection wrapper - LivroRazaoSection extracted to src/components/financeiro/LivroRazaoSection.tsx
+const LANCAMENTOS_VIEWS = [
+  { value: 'razao', label: 'Livro Razão' },
+  { value: 'conciliacao', label: 'Conciliação Bancária' },
+];
+
 function LancamentosSection({ initialContaId, initialDateFrom, initialDateTo, initialTipo }: { initialContaId?: string; initialDateFrom?: string; initialDateTo?: string; initialTipo?: string }) {
   const [innerTab, setInnerTab] = useState<'razao' | 'conciliacao'>('razao');
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2 mb-2">
-        <Button variant={innerTab === 'razao' ? 'default' : 'outline'} size="sm" onClick={() => setInnerTab('razao')}>Livro Razão</Button>
-        <Button variant={innerTab === 'conciliacao' ? 'default' : 'outline'} size="sm" onClick={() => setInnerTab('conciliacao')}>Conciliação Bancária</Button>
+      <div className="max-w-full overflow-x-auto">
+        <SegmentedControl
+          ariaLabel="Visão de lançamentos"
+          manualActivation
+          options={LANCAMENTOS_VIEWS}
+          value={innerTab}
+          onChange={v => setInnerTab(v as 'razao' | 'conciliacao')}
+        />
       </div>
       {innerTab === 'razao' ? <LivroRazaoSection initialContaId={initialContaId} initialDateFrom={initialDateFrom} initialDateTo={initialDateTo} initialTipo={initialTipo} /> : <Suspense fallback={<FinSpinner />}><ConciliacaoBancariaSection /></Suspense>}
     </div>
@@ -79,13 +104,25 @@ function LancamentosSection({ initialContaId, initialDateFrom, initialDateTo, in
 }
 
 // ==================== DRE / DFC WRAPPER ====================
+// Trocar desmonta o demonstrativo e recarrega os dados: ativação manual, como em Lançamentos (D39).
+// Cada lado mantém a própria permissão (o DFC exige financeiro:fluxo:view — PF-002).
+const DEMONSTRATIVO_VIEWS = [
+  { value: 'dre', label: 'DRE' },
+  { value: 'dfc', label: 'DFC' },
+];
+
 function DREDFCSection() {
   const [innerTab, setInnerTab] = useState<'dre' | 'dfc'>('dre');
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2 mb-2">
-        <Button variant={innerTab === 'dre' ? 'default' : 'outline'} size="sm" onClick={() => setInnerTab('dre')}>DRE</Button>
-        <Button variant={innerTab === 'dfc' ? 'default' : 'outline'} size="sm" onClick={() => setInnerTab('dfc')}>DFC</Button>
+      <div className="max-w-full overflow-x-auto">
+        <SegmentedControl
+          ariaLabel="Demonstrativo exibido"
+          manualActivation
+          options={DEMONSTRATIVO_VIEWS}
+          value={innerTab}
+          onChange={v => setInnerTab(v as 'dre' | 'dfc')}
+        />
       </div>
       {innerTab === 'dre' ? <DRESection /> : <DFCSection />}
     </div>

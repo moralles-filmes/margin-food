@@ -1,27 +1,27 @@
 import { useSupabase } from '@/contexts/CompanyScopeContext';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
 import { useDataEvent } from '@/lib/dataEvents';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Skeleton } from '@/components/ui/skeleton';
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from 'recharts';
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { subMonths, startOfMonth, endOfMonth, subDays } from 'date-fns';
-import { formatDateISO, formatInBR } from '@/lib/datetime';
-import { fmtBRL, formatDecimalBR } from '@/lib/formatters';
+import { formatDateISO, formatInBR, todayBR } from '@/lib/datetime';
+import { fmtBRL, formatPercentBR } from '@/lib/formatters';
 import { useScopedToast } from '@/hooks/useScopedToast';
-import { AlertTriangle } from 'lucide-react';
+import { ReceiptText } from 'lucide-react';
 import {
   axisProps,
   gridProps,
   tooltipProps,
-  legendProps,
-  SERIES_COLORS,
+  chartMargin,
+  barProps,
   SEMANTIC_CHART_COLORS,
   chartValueFormatters,
   makeActiveDot,
 } from '@/lib/chartTheme';
+import { ChartCard } from '@/components/ui/ChartCard';
 import { ChartTooltip } from '@/components/ui/ChartTooltip';
 import { ChartLegend } from '@/components/ui/ChartLegend';
+import { buildCategoryRanking, historyWindow } from '@/components/financeiro/dashboardFinanceiroView';
 
 import { useCan } from '@/permissions/hooks';
 // ── Types ──
@@ -44,17 +44,59 @@ interface ChartsData {
   despesas_por_categoria: CategoriaItem[];
 }
 
-// Paleta categórica centralizada — ver src/lib/chartTheme.ts
-const PIE_COLORS = SERIES_COLORS;
-
 interface DashboardChartsProps {
   /** Início do período selecionado no filtro do Dashboard Financeiro (yyyy-MM-dd, inclusivo) */
   periodStart: string;
   /** Fim exclusivo do período selecionado no filtro (yyyy-MM-dd) — mesma semântica de get_fin_dashboard_summary */
   periodEndExclusive: string;
+  /** Rótulo do período do resumo (ex.: "Junho de 2026"), exibido em "Onde estão as despesas". */
+  periodLabel?: string;
+  /** Conteúdo ao lado do ranking de categorias (explicação de Despesas Provisionadas). */
+  expenseAside?: ReactNode;
 }
 
-export default function DashboardCharts({ periodStart, periodEndExclusive }: DashboardChartsProps) {
+const LINE_COLOR = 'hsl(var(--primary))';
+
+/** `despesas_por_categoria` de get_fin_dashboard_charts vem com `LIMIT 8`. */
+const CATEGORY_LIMIT = 8;
+
+/** Mesmas colunas no cabeçalho e nas linhas do ranking: nº, categoria, valor e (a partir de sm) participação. */
+const RANKING_GRID = 'grid grid-cols-[1.75rem_minmax(0,1fr)_auto] gap-x-3 sm:grid-cols-[1.75rem_minmax(0,1fr)_auto_6rem]';
+
+const EVOLUTION_LEGEND = [
+  { value: 'Receitas', color: SEMANTIC_CHART_COLORS.positive, type: 'square', dataKey: 'receitas' },
+  { value: 'Despesas', color: SEMANTIC_CHART_COLORS.negative, type: 'square', dataKey: 'despesas' },
+];
+
+/** Ponto do Resultado Mensal: mês negativo ganha contorno vermelho, além do sinal no tooltip e no eixo. */
+function ResultadoDot({ cx, cy, value, index }: { cx?: number; cy?: number; value?: number; index?: number }) {
+  if (cx == null || cy == null) return null;
+  return (
+    <circle
+      data-index={index}
+      cx={cx}
+      cy={cy}
+      r={4}
+      strokeWidth={2}
+      fill="hsl(var(--background))"
+      stroke={typeof value === 'number' && value < 0 ? SEMANTIC_CHART_COLORS.negative : LINE_COLOR}
+    />
+  );
+}
+
+function SectionHeader({ id, title, description, aside }: { id: string; title: string; description?: ReactNode; aside?: ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+      <div className="min-w-0 space-y-1">
+        <h3 id={id} className="text-lg font-semibold leading-tight text-foreground">{title}</h3>
+        {description && <p className="text-sm text-muted-foreground">{description}</p>}
+      </div>
+      {aside}
+    </div>
+  );
+}
+
+export default function DashboardCharts({ periodStart, periodEndExclusive, periodLabel, expenseAside }: DashboardChartsProps) {
   const toast = useScopedToast();
   const supabase = useSupabase();
   const canViewRbac = useCan('financeiro:dashboard:view');
@@ -118,122 +160,191 @@ export default function DashboardCharts({ periodStart, periodEndExclusive }: Das
   // Auto-refresh via data events
   useDataEvent('financeiro:*', useCallback(() => loadRef.current(), []));
 
-  const fmt = (v: number) => fmtBRL(v);
-
-  // ── Loading skeleton ──
-  if (loading) {
-    return (
-      <div className="space-y-4">
-        <div className="flex items-center justify-end">
-          <Skeleton className="h-9 w-36" />
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {[1, 2, 3].map(i => (
-            <Card key={i} className={i === 3 ? 'lg:col-span-2' : ''}>
-              <CardHeader className="pb-2"><Skeleton className="h-4 w-40" /></CardHeader>
-              <CardContent><Skeleton className="h-[260px] w-full" /></CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  // ── Error state ──
-  if (error || !chartData) {
-    return (
-      <Card>
-        <CardContent className="p-8 text-center text-muted-foreground">
-          <AlertTriangle className="w-8 h-8 mx-auto mb-2 opacity-40" />
-          <p className="text-sm">Não foi possível carregar os gráficos.</p>
-          <button onClick={load} className="text-xs text-primary underline mt-2">Tentar novamente</button>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  const { evolucao_mensal, despesas_por_categoria } = chartData;
-
-
   if (!canViewRbac) return null;
 
+  const fmt = (v: number) => fmtBRL(v);
+  const failed = !loading && (error || !chartData);
+  const janela = historyWindow(meses);
+  // O mês atual está em andamento: o rótulo do eixo e o título do tooltip avisam que o valor é parcial.
+  const currentMonth = todayBR().slice(0, 7);
+  const evolucao = (chartData?.evolucao_mensal ?? []).map(m => (
+    m.mes === currentMonth ? { ...m, mesLabel: `${m.mesLabel} · parcial` } : m
+  ));
+  const categorias = chartData?.despesas_por_categoria ?? [];
+  const ranking = buildCategoryRanking(categorias);
+  const topN = ranking.rows.length;
+  // A RPC devolve no máximo 8 categorias (LIMIT 8): só nesse caso a lista é um recorte (Top 8).
+  // Com menos, ela traz todas as categorias do período e os rótulos dizem isso.
+  const isTopCut = topN >= CATEGORY_LIMIT;
+  const rankingText = isTopCut
+    ? {
+        subtitle: `As maiores categorias do período do resumo (Top ${topN})`,
+        sum: `Soma do Top ${topN}`,
+        share: `Participação no Top ${topN}`,
+        list: `Top ${topN} categorias de despesa`,
+        footer: `Percentuais sobre a soma do Top ${topN}, não sobre toda a despesa realizada.`,
+      }
+    : {
+        subtitle: `Todas as categorias do período do resumo (${topN})`,
+        sum: topN === 1 ? 'Soma da categoria' : `Soma das ${topN} categorias`,
+        share: 'Participação na soma',
+        list: 'Categorias de despesa',
+        footer: 'Percentuais sobre a soma das categorias listadas.',
+      };
+  const showMissingMonths = !loading && !failed && evolucao.length > 0 && evolucao.length < meses;
+  const chartState = {
+    loading,
+    error: failed,
+    errorTitle: 'Não foi possível carregar os gráficos',
+    onRetry: load,
+  };
+
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-end">
-        <Select value={String(meses)} onValueChange={v => setMeses(Number(v))}>
-          <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="3">3 meses</SelectItem>
-            <SelectItem value="6">6 meses</SelectItem>
-            <SelectItem value="12">12 meses</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+    <div className="space-y-8">
+      <section aria-labelledby="dash-fin-evolucao" className="space-y-4">
+        <SectionHeader
+          id="dash-fin-evolucao"
+          title="Evolução financeira"
+          description={<>Janela do histórico: últimos {meses} meses até o mês atual ({janela.label}) — não segue o período do resumo.</>}
+          aside={(
+            <div className="flex items-center gap-2">
+              <span id="dash-fin-janela" className="text-sm text-muted-foreground">Janela do histórico</span>
+              <Select value={String(meses)} onValueChange={v => setMeses(Number(v))} disabled={loading}>
+                <SelectTrigger className="h-9 w-32" aria-labelledby="dash-fin-janela"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="3">3 meses</SelectItem>
+                  <SelectItem value="6">6 meses</SelectItem>
+                  <SelectItem value="12">12 meses</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Receitas vs Despesas</CardTitle></CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={evolucao_mensal}>
-                <CartesianGrid {...gridProps} />
-                <XAxis dataKey="mesLabel" {...axisProps} />
-                <YAxis {...axisProps} tickFormatter={chartValueFormatters.moneyCompact} />
-                <Tooltip {...tooltipProps} content={<ChartTooltip valueFormatter={v => fmt(Number(v))} />} />
-                <Legend {...legendProps} content={<ChartLegend />} />
-                <Bar dataKey="receitas" name="Receitas" fill={SEMANTIC_CHART_COLORS.positive} radius={[4, 4, 0, 0]} />
-                <Bar dataKey="despesas" name="Despesas" fill={SEMANTIC_CHART_COLORS.negative} radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        <div className="[container-type:inline-size]">
+          <div className="grid grid-cols-1 gap-4 [@container(min-width:56rem)]:grid-cols-[3fr_2fr]">
+            <ChartCard
+              title="Receitas vs Despesas"
+              subtitle="Realizadas por mês · regime de caixa"
+              legend={<ChartLegend justify="start" payload={EVOLUTION_LEGEND} />}
+              isEmpty={evolucao.length === 0}
+              emptyTitle="Sem lançamentos realizados na janela"
+              height="h-[280px]"
+              className="min-w-0"
+              {...chartState}
+            >
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={evolucao} margin={chartMargin}>
+                  <CartesianGrid {...gridProps} />
+                  <XAxis dataKey="mesLabel" {...axisProps} />
+                  <YAxis {...axisProps} tickFormatter={chartValueFormatters.moneyCompact} />
+                  <Tooltip {...tooltipProps} content={<ChartTooltip valueFormatter={v => fmt(Number(v))} />} />
+                  <Bar dataKey="receitas" name="Receitas" fill={SEMANTIC_CHART_COLORS.positive} {...barProps} />
+                  <Bar dataKey="despesas" name="Despesas" fill={SEMANTIC_CHART_COLORS.negative} {...barProps} />
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartCard>
 
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Resultado Mensal</CardTitle></CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={260}>
-              <LineChart data={evolucao_mensal}>
-                <CartesianGrid {...gridProps} />
-                <XAxis dataKey="mesLabel" {...axisProps} />
-                <YAxis {...axisProps} tickFormatter={chartValueFormatters.moneyCompact} />
-                <Tooltip {...tooltipProps} content={<ChartTooltip valueFormatter={v => fmt(Number(v))} />} />
-                <Line type="monotone" dataKey="resultado" name="Resultado" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 4 }} activeDot={makeActiveDot('hsl(var(--primary))')} />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+            <ChartCard
+              title="Resultado Mensal"
+              subtitle="Receitas − despesas realizadas · regime de caixa"
+              isEmpty={evolucao.length === 0}
+              emptyTitle="Sem lançamentos realizados na janela"
+              height="h-[280px]"
+              className="min-w-0"
+              {...chartState}
+            >
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={evolucao} margin={chartMargin}>
+                  <CartesianGrid {...gridProps} />
+                  <XAxis dataKey="mesLabel" {...axisProps} />
+                  <YAxis {...axisProps} tickFormatter={chartValueFormatters.moneyCompact} />
+                  <ReferenceLine y={0} stroke="hsl(var(--chart-axis))" />
+                  <Tooltip {...tooltipProps} content={<ChartTooltip valueFormatter={v => fmt(Number(v))} />} />
+                  <Line
+                    type="monotone"
+                    dataKey="resultado"
+                    name="Resultado"
+                    stroke={LINE_COLOR}
+                    strokeWidth={2}
+                    dot={(props: { cx?: number; cy?: number; value?: number; index?: number }) => <ResultadoDot key={`resultado-dot-${props.index}`} {...props} />}
+                    activeDot={makeActiveDot(LINE_COLOR)}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </ChartCard>
+          </div>
+        </div>
 
-        <Card className="lg:col-span-2">
-          <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Despesas por Categoria (Top 8)</CardTitle></CardHeader>
-          <CardContent>
-            {despesas_por_categoria.length === 0 ? (
-              <p className="text-center text-muted-foreground text-sm py-8">Sem despesas categorizadas no período</p>
-            ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <ResponsiveContainer width="100%" height={240}>
-                  <PieChart>
-                    <Pie data={despesas_por_categoria} dataKey="valor" nameKey="nome" cx="50%" cy="50%" outerRadius={90} label={(props) => { const { nome, percent } = props as unknown as { nome: string; percent: number }; return `${String(nome).slice(0, 15)} ${formatDecimalBR(percent * 100, 0)}%`; }} labelLine={false} fontSize={10}>
-                      {despesas_por_categoria.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-                    </Pie>
-                    <Tooltip content={<ChartTooltip valueFormatter={v => fmt(Number(v))} />} />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="space-y-1.5">
-                  {despesas_por_categoria.map((item, i) => (
-                    <div key={item.nome} className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
-                        <span className="truncate max-w-[160px]">{item.nome}</span>
-                      </div>
-                      <span className="font-medium">{fmt(item.valor)}</span>
-                    </div>
-                  ))}
+        {showMissingMonths && (
+          <p className="text-xs text-muted-foreground">
+            Meses sem lançamento realizado não aparecem no gráfico ({evolucao.length} de {meses} meses com dados).
+          </p>
+        )}
+      </section>
+
+      <section aria-labelledby="dash-fin-despesas" className="space-y-4">
+        <SectionHeader
+          id="dash-fin-despesas"
+          title="Onde estão as despesas"
+          aside={periodLabel ? <p className="text-sm text-muted-foreground">Período do resumo: {periodLabel}</p> : undefined}
+        />
+
+        <div className="[container-type:inline-size]">
+          <div className="grid grid-cols-1 items-start gap-4 [@container(min-width:56rem)]:grid-cols-[3fr_2fr]">
+            <ChartCard
+              title="Despesas por Categoria"
+              subtitle={topN > 0 && !loading && !failed ? rankingText.subtitle : 'Maiores categorias do período do resumo'}
+              isEmpty={categorias.length === 0}
+              emptyIcon={ReceiptText}
+              emptyTitle="Sem despesas categorizadas no período"
+              height={loading ? 'h-[280px]' : 'h-auto'}
+              className="min-w-0"
+              footer={rankingText.footer}
+              {...chartState}
+            >
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 rounded-lg bg-muted px-4 py-3">
+                  <span className="text-sm text-muted-foreground">{rankingText.sum}</span>
+                  <span className="text-lg font-bold tabular-nums text-foreground">{fmt(ranking.total)}</span>
                 </div>
+
+                <div className={`${RANKING_GRID} items-end text-[11px] font-medium uppercase leading-tight tracking-wider text-muted-foreground`}>
+                  <span className="col-span-2">Categoria</span>
+                  <span className="text-right">
+                    Valor<span className="block normal-case tracking-normal sm:hidden">{rankingText.share.toLowerCase()}</span>
+                  </span>
+                  <span className="hidden text-right sm:block">{rankingText.share}</span>
+                </div>
+
+                <ol aria-label={rankingText.list} className="m-0 list-none divide-y divide-border p-0">
+                  {ranking.rows.map((row, i) => (
+                    <li key={row.nome} className={`${RANKING_GRID} items-center gap-y-2 py-3`}>
+                      <span className="row-span-2 self-center text-xs tabular-nums text-muted-foreground">{String(i + 1).padStart(2, '0')}</span>
+                      <p className="col-start-2 min-w-0 break-words text-sm text-foreground">{row.nome}</p>
+                      <span className="col-start-3 text-right text-sm font-semibold tabular-nums text-foreground">
+                        {fmt(row.valor)}
+                        <span className="block text-xs font-normal text-muted-foreground sm:hidden">
+                          {row.share == null ? '—' : formatPercentBR(row.share, 1)}
+                        </span>
+                      </span>
+                      <span className="col-start-4 hidden text-right text-xs tabular-nums text-muted-foreground sm:block">
+                        {row.share == null ? '—' : formatPercentBR(row.share, 1)}
+                      </span>
+                      {/* Barra na 2ª linha, sob nome + valor: o trilho tem o mesmo comprimento em todas as linhas. */}
+                      <div aria-hidden="true" className="col-span-2 col-start-2 h-1.5 overflow-hidden rounded-full bg-muted">
+                        <div className="h-full rounded-full bg-primary" style={{ width: `${row.barPercent}%` }} />
+                      </div>
+                    </li>
+                  ))}
+                </ol>
               </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+            </ChartCard>
+
+            {expenseAside}
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

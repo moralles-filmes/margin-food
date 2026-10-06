@@ -1,20 +1,29 @@
 import { useSupabase } from '@/contexts/CompanyScopeContext';
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, useId } from 'react';
 import { fmtBRL, formatInBR, formatPercentBR } from '@/lib/formatters';
 import { BRLInput } from '@/components/ui/brl-input';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import StatusBadge from '@/components/ui/StatusBadge';
+import KpiCard from '@/components/ui/KpiCard';
+import EmptyState from '@/components/ui/EmptyState';
+import ErrorState from '@/components/ui/ErrorState';
+import AccessDenied from '@/components/ui/AccessDenied';
+import { kpiGridClassFor, longestValueLength } from '@/components/ui/kpiGrid';
 import { useScopedToast } from '@/hooks/useScopedToast';
 import { subMonths } from 'date-fns';
 import {
   Target, ChevronRight, ChevronDown, Trash2, FileDown, FileSpreadsheet,
-  Copy, Loader2, ShieldAlert, Lock, Save,
+  Copy, Loader2, Lock, Save, TrendingUp, TrendingDown, Scale,
 } from 'lucide-react';
+import { FinKpiGrid, FinNote, FinScreenHeader, FinSectionGroup } from './finV2Layout';
+import { ListaCarregando, ResumoCarregando } from './ContasParts';
+import { useConteinerEstreito } from './useConteinerEstreito';
+import { useRetornoFoco } from './useRetornoFoco';
+import { devolverFoco, elementoComFoco } from './devolverFoco';
 import { useDataEvent, useEmitDataEvent } from '@/lib/dataEvents';
 import { useCan } from '@/permissions/hooks';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
@@ -110,15 +119,12 @@ const STATUS_LABEL: Record<'receita' | 'despesa', Record<StatusExecucao, string>
 };
 const STATUS_VARIANT: Record<StatusExecucao, string> = { ok: 'ok', alerta: 'atencao', estourado: 'critico' };
 
-function NoAccess() {
-  return (
-    <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-2">
-      <ShieldAlert className="w-10 h-10" />
-      <p className="font-medium">Acesso negado</p>
-      <p className="text-sm">Você não tem permissão para acessar o Orçamento.</p>
-    </div>
-  );
-}
+/**
+ * Abaixo desta largura do contêiner a tabela vira lista (Redesign V2, Fase 06A). Uma só marcação no
+ * DOM (D45): cada folha tem um campo de orçado e a árvore abre e fecha — duas cópias duplicariam os
+ * campos e o estado de foco.
+ */
+const LIMITE_LISTA_PX = 860;
 
 // ─── Component ───
 
@@ -135,6 +141,14 @@ export default function OrcamentoSection() {
   const [mesAtual, setMesAtual] = useState(formatInBR(new Date(), 'yyyy-MM'));
   const [expanded, setExpanded] = useState<Set<string>>(new Set(['_receitas', '_despesas']));
   const [edits, setEdits] = useState<Record<string, number>>({});
+  // Estado só de apresentação: mês dos valores exibidos (última carga bem-sucedida) e falha de leitura.
+  const [mesCarregado, setMesCarregado] = useState<string | null>(null);
+  const [erro, setErro] = useState(false);
+  const requisicao = useRef(0);
+  const mesId = useId();
+  const copiarDeId = useId();
+  const retornoCopiar = useRetornoFoco();
+  const [listaRef, listaEstreita] = useConteinerEstreito(LIMITE_LISTA_PX);
 
   // Copy month dialog
   const [copyDialogOpen, setCopyDialogOpen] = useState(false);
@@ -162,10 +176,13 @@ export default function OrcamentoSection() {
 
   // ── Load data via RPC ──
   const load = useCallback(async () => {
+    const atual = ++requisicao.current;
     setLoading(true);
     setEdits({});
     try {
       const { data, error } = await supabase.rpc('get_fin_orcamento_arvore', { p_mes: mesAtual });
+      // Só a resposta mais recente entra na tela (troca rápida de mês).
+      if (atual !== requisicao.current) return;
       if (error) throw error;
       const result = data as {
         categorias?: Omit<CatNode, 'children'>[];
@@ -180,9 +197,12 @@ export default function OrcamentoSection() {
         receita: Number(result?.valores_sem_categoria?.receita) || 0,
         despesa: Number(result?.valores_sem_categoria?.despesa) || 0,
       });
+      setMesCarregado(mesAtual);
+      setErro(false);
     } catch (err) {
       console.error(err);
       toast.error('Erro ao carregar orçamento');
+      setErro(true);
     }
     setLoading(false);
   }, [mesAtual, supabase, toast]);
@@ -361,13 +381,15 @@ export default function OrcamentoSection() {
   // ── Delete legacy budget saved directly on a parent category ──
   const handleDeleteOwnBudget = async (row: FlatRow) => {
     if (!row.ownBudget) return;
+    // A confirmação abre sem gatilho: o foco volta à lixeira se nada for excluído (D68).
+    const origem = elementoComFoco();
     const ok = await confirm({
       title: 'Excluir Orçamento',
       description: `Deseja excluir o orçamento de "${row.nome}"? As sub-categorias poderão ser orçadas individualmente depois.`,
       confirmLabel: 'Excluir',
       variant: 'destructive',
     });
-    if (!ok) return;
+    if (!ok) { devolverFoco(origem); return; }
     try {
       const { error } = await supabase.rpc('_guarded_delete_orcamento', {
         p_id: row.ownBudget.id,
@@ -379,6 +401,7 @@ export default function OrcamentoSection() {
     } catch (err: unknown) {
       console.error('[OrcamentoSection.handleDeleteOwnBudget]', err);
       toast.error(mapFinanceiroDeleteError(err));
+      devolverFoco(origem);
     }
   };
 
@@ -479,188 +502,322 @@ export default function OrcamentoSection() {
   };
 
   // ── RBAC: block entire view ──
-  if (!canView) return <NoAccess />;
+  if (!canView) return <AccessDenied description="Você não tem permissão para acessar o Orçamento." />;
+
+  // ── Apresentação (Redesign V2, Fase 06A): mesmas linhas, somas e regras acima ──
+  const totalResultadoRow = rows.find(r => r.key === '_resultado');
+  // Esqueleto na primeira carga e na troca de mês: as linhas de outro mês não podem ficar visíveis
+  // (nem editáveis — o Salvar gravaria no mês novo). Recarga do mesmo mês mantém a tabela montada.
+  const primeiraCarga = loading && mesCarregado !== mesAtual;
+  const temBloqueadas = rows.some(r => r.locked);
+  const execucao = (row?: FlatRow) => (row && row.orcado > 0 ? `${formatPercentBR((row.realizado / row.orcado) * 100, 1)} executado` : null);
+  // Sem nenhuma meta na seção, o card diz que não há orçamento em vez de "Orçado: R$0,00".
+  const orcadoDoCard = (row?: FlatRow) => (row && row.orcado !== 0
+    ? `Orçado: ${fmt(row.orcado)}${execucao(row) ? ` · ${execucao(row)}` : ''}`
+    : 'Sem orçamento no mês');
+  const valoresResumo = [
+    fmt(totalReceitaRow?.realizado ?? 0),
+    fmt(totalDespesaRow?.realizado ?? 0),
+    fmt(totalResultadoRow?.realizado ?? 0),
+  ];
+  const resumoGrid = kpiGridClassFor(longestValueLength(valoresResumo), 3);
+
+  const linhaFundo = (row: FlatRow) => cn(
+    row.isTotalRow && 'bg-primary-soft border-t-2 border-primary-border',
+    row.isSectionHeader && 'bg-muted border-t-2 border-border',
+  );
+  const nomePeso = (row: FlatRow) => cn(
+    row.isSectionHeader && 'font-bold text-sm uppercase tracking-wider',
+    row.isTotalRow && 'font-bold text-base',
+    row.depth === 1 && !row.isSectionHeader && 'font-semibold text-xs uppercase tracking-wider',
+    row.depth > 1 && 'font-medium text-sm',
+  );
+  const valorPeso = (row: FlatRow) => cn(
+    (row.isTotalRow || row.isSectionHeader) && 'font-bold text-base',
+    row.depth === 1 && !row.isSectionHeader && 'font-semibold',
+  );
+
+  const abrirFechar = (row: FlatRow) => {
+    if (!row.hasChildren) return <span aria-hidden="true" className="w-7 shrink-0" />;
+    const aberto = expanded.has(row.key);
+    return (
+      <button
+        type="button"
+        onClick={() => toggleExpand(row.key)}
+        aria-expanded={aberto}
+        aria-label={`${aberto ? 'Recolher' : 'Expandir'} ${row.nome}`}
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-surface-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        {aberto ? <ChevronDown aria-hidden="true" className="h-4 w-4" /> : <ChevronRight aria-hidden="true" className="h-4 w-4" />}
+      </button>
+    );
+  };
+
+  const nomeDaLinha = (row: FlatRow) => (
+    <span className={cn('min-w-0 break-words', nomePeso(row))}>
+      {row.codigo && <span className="mr-1.5 font-mono text-xs font-normal normal-case tracking-normal text-muted-foreground">{row.codigo}</span>}
+      {row.nome}
+      {row.locked && (
+        <>
+          <Lock aria-hidden="true" className="ml-1.5 inline h-3 w-3 align-[-1px] text-muted-foreground" />
+          <span className="sr-only"> (orçamento definido em categoria superior)</span>
+        </>
+      )}
+    </span>
+  );
+
+  // Mesmas condições de antes: só folha não bloqueada recebe campo; orçamento legado de pai tem lixeira.
+  const orcadoDaLinha = (row: FlatRow, compacto: boolean) => {
+    const canEditThisLeaf = canEdit && row.isLeaf && !row.locked && !row.isSectionHeader && !row.isTotalRow;
+    const currentEditValue = row.categoriaId && row.categoriaId in edits
+      ? edits[row.categoriaId]
+      : row.orcado;
+    if (canEditThisLeaf) {
+      return (
+        <BRLInput
+          numericValue={currentEditValue}
+          onNumericChange={v => row.categoriaId && handleEditLeaf(row.categoriaId, v)}
+          showPrefix
+          aria-label={`Orçado de ${row.nome}`}
+          className={cn('h-8 text-right', compacto ? 'w-full max-w-[180px]' : 'ml-auto max-w-[160px]')}
+        />
+      );
+    }
+    if (row.ownBudget) {
+      return (
+        <div className={cn('flex items-center gap-1', !compacto && 'justify-end')}>
+          <span className="whitespace-nowrap font-semibold tabular-nums">{fmt(row.ownBudget.valor_orcado)}</span>
+          {canDelete && (
+            <Button
+              variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-destructive hover:bg-destructive-soft hover:text-destructive"
+              aria-label={`Excluir orçamento de ${row.nome}`}
+              title="Excluir orçamento deste nível"
+              onClick={() => handleDeleteOwnBudget(row)}
+            >
+              <Trash2 aria-hidden="true" className="w-4 h-4" />
+            </Button>
+          )}
+        </div>
+      );
+    }
+    return (
+      <span className={cn('whitespace-nowrap tabular-nums', valorPeso(row), row.locked && 'text-muted-foreground')}>
+        {row.locked || row.isUnassigned ? '—' : fmt(row.orcado)}
+        {row.locked && <span className="sr-only"> (orçado na categoria superior)</span>}
+        {row.isUnassigned && <span className="sr-only"> (sem categoria: não recebe orçamento)</span>}
+      </span>
+    );
+  };
+
+  const statusDaLinha = (row: FlatRow) => {
+    const status = computeStatus(row.tipo, row.orcado, row.realizado);
+    return status ? <StatusBadge status={STATUS_VARIANT[status]} label={STATUS_LABEL[row.tipo][status]} /> : null;
+  };
+  const pctDaLinha = (row: FlatRow) => (row.orcado > 0 ? formatPercentBR((row.realizado / row.orcado) * 100, 1) : '—');
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <ConfirmDialog />
 
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div>
-          <h2 className="text-xl font-bold text-foreground">Orçamento vs Realizado</h2>
-          <p className="text-sm text-muted-foreground">
-            Caixa (Livro Razão) • Receita {fmt(totalReceitaRow?.realizado ?? 0)} / {fmt(totalReceitaRow?.orcado ?? 0)} • Despesa {fmt(totalDespesaRow?.realizado ?? 0)} / {fmt(totalDespesaRow?.orcado ?? 0)} (realizado / orçado)
-          </p>
-        </div>
-        <div className="flex gap-2 flex-wrap">
+      <FinScreenHeader
+        title="Orçamento vs Realizado"
+        description="Caixa (Livro Razão) · categorias operacionais ativas · realizado comparado ao orçado do mês"
+        actions={(canEdit || canExport) ? (
+          <>
+            {canEdit && (
+              <>
+                <Button size="sm" onClick={handleSaveAll} disabled={saving || dirtyItems.length === 0}>
+                  {saving ? <Loader2 aria-hidden="true" className="w-4 h-4 mr-1 animate-spin" /> : <Save aria-hidden="true" className="w-4 h-4 mr-1" />}
+                  {saving ? 'Salvando...' : dirtyItems.length > 0 ? `Salvar (${dirtyItems.length})` : 'Salvar'}
+                </Button>
+                {/* Convite a gravar só depois de uma leitura bem-sucedida do mês (D65). A recarga do mesmo mês
+                    (ex.: depois de copiar) não desabilita, senão o foco não teria para onde voltar ao fechar o diálogo. */}
+                <Button variant="outline" size="sm" onClick={() => setCopyDialogOpen(true)} disabled={primeiraCarga || erro}>
+                  <Copy aria-hidden="true" className="w-4 h-4 mr-1" /> Copiar Mês
+                </Button>
+              </>
+            )}
+
+            {canExport && (
+              <>
+                <Button variant="outline" size="sm" onClick={gerarPDF} disabled={loading || erro}>
+                  <FileDown aria-hidden="true" className="w-4 h-4 mr-1" /> PDF
+                </Button>
+                <Button variant="outline" size="sm" onClick={gerarExcel} disabled={loading || erro}>
+                  <FileSpreadsheet aria-hidden="true" className="w-4 h-4 mr-1" /> Excel
+                </Button>
+              </>
+            )}
+          </>
+        ) : undefined}
+      />
+
+      <div className="flex flex-wrap items-end gap-3 rounded-summary border bg-card p-4 shadow-card">
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <Label htmlFor={mesId} className="text-xs text-muted-foreground">Mês</Label>
           <Select value={mesAtual} onValueChange={setMesAtual}>
-            <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
+            <SelectTrigger id={mesId} className="h-9 w-52 max-w-full"><SelectValue /></SelectTrigger>
             <SelectContent>{meses.map(m => <SelectItem key={m} value={m}>{formatMonthBR(m)}</SelectItem>)}</SelectContent>
           </Select>
-
-          {canEdit && (
-            <>
-              <Button size="sm" onClick={handleSaveAll} disabled={saving || dirtyItems.length === 0}>
-                {saving ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Save className="w-4 h-4 mr-1" />}
-                {saving ? 'Salvando...' : dirtyItems.length > 0 ? `Salvar (${dirtyItems.length})` : 'Salvar'}
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setCopyDialogOpen(true)}>
-                <Copy className="w-4 h-4 mr-1" /> Copiar Mês
-              </Button>
-            </>
-          )}
-
-          {canExport && (
-            <>
-              <Button variant="outline" size="sm" onClick={gerarPDF} disabled={loading}>
-                <FileDown className="w-4 h-4 mr-1" /> PDF
-              </Button>
-              <Button variant="outline" size="sm" onClick={gerarExcel} disabled={loading}>
-                <FileSpreadsheet className="w-4 h-4 mr-1" /> Excel
-              </Button>
-            </>
-          )}
         </div>
+        {dirtyItems.length > 0 && (
+          <p role="status" className="pb-2 text-xs font-medium text-warning">
+            {dirtyItems.length} alteração(ões) ainda não salva(s). Trocar de mês descarta o que foi digitado.
+          </p>
+        )}
       </div>
 
       {/* Content */}
-      {loading ? (
-        <Card><CardContent className="p-8 text-center text-muted-foreground flex items-center justify-center gap-2">
-          <Loader2 className="w-5 h-5 animate-spin" /> Carregando...
-        </CardContent></Card>
+      {erro ? (
+        <ErrorState
+          title="Não foi possível carregar o orçamento"
+          description={`Nenhum valor foi exibido para ${formatMonthBR(mesAtual)}. Tente novamente.`}
+          onRetry={() => { void load(); }}
+          retrying={loading}
+        />
+      ) : primeiraCarga ? (
+        <>
+          <FinSectionGroup id="orc-resumo" title="Resumo do mês" caption="Carregando…">
+            <ResumoCarregando cards={3} className={resumoGrid} />
+          </FinSectionGroup>
+          <FinSectionGroup id="orc-categorias" title="Categorias">
+            <div ref={listaRef}><ListaCarregando estreito={listaEstreita} texto="Carregando o orçamento…" /></div>
+          </FinSectionGroup>
+        </>
       ) : categorias.length === 0 ? (
-        <Card><CardContent className="p-8 text-center text-muted-foreground">
-          <Target className="w-10 h-10 mx-auto mb-3 opacity-30" />
-          <p className="font-medium">Nenhuma categoria operacional cadastrada.</p>
-          <p className="text-sm">Configure a estrutura em Cadastros Base primeiro.</p>
-        </CardContent></Card>
+        <EmptyState
+          icon={Target}
+          title="Nenhuma categoria operacional cadastrada."
+          description="Configure a estrutura em Cadastros Base primeiro."
+        />
       ) : (
-        <Card>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Categoria</TableHead>
-                  <TableHead className="text-right w-[180px]">Orçado (R$)</TableHead>
-                  <TableHead className="text-right w-[160px]">Realizado (R$)</TableHead>
-                  <TableHead className="text-right w-[100px]">% Exec.</TableHead>
-                  <TableHead className="w-[130px]">Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map(row => {
-                  const status = computeStatus(row.tipo, row.orcado, row.realizado);
-                  const pct = row.orcado > 0 ? formatPercentBR((row.realizado / row.orcado) * 100, 1) : '—';
-                  const canEditThisLeaf = canEdit && row.isLeaf && !row.locked && !row.isSectionHeader && !row.isTotalRow;
-                  const currentEditValue = row.categoriaId && row.categoriaId in edits
-                    ? edits[row.categoriaId]
-                    : row.orcado;
+        <>
+          <FinSectionGroup
+            id="orc-resumo"
+            title="Resumo do mês"
+            caption={`${mesCarregado ? formatMonthBR(mesCarregado) : ''} · realizado pelo regime de caixa${loading ? ' · atualizando…' : ''}`}
+          >
+            <FinKpiGrid className={resumoGrid}>
+              <KpiCard
+                appearance="summary"
+                icon={TrendingUp}
+                variant="success"
+                label="Receita realizada"
+                value={valoresResumo[0]}
+                sub={orcadoDoCard(totalReceitaRow)}
+              />
+              <KpiCard
+                appearance="summary"
+                icon={TrendingDown}
+                variant="danger"
+                label="Despesa realizada"
+                value={valoresResumo[1]}
+                sub={orcadoDoCard(totalDespesaRow)}
+              />
+              <KpiCard
+                appearance="summary"
+                icon={Scale}
+                label="Resultado realizado"
+                value={valoresResumo[2]}
+                valueTone={(totalResultadoRow?.realizado ?? 0) < 0 ? 'negative' : 'default'}
+                sub={`Resultado projetado (orçado): ${fmt(totalResultadoRow?.orcado ?? 0)}`}
+              />
+            </FinKpiGrid>
+            {dirtyItems.length > 0 && (
+              <FinNote>Os valores orçados incluem as alterações ainda não salvas.</FinNote>
+            )}
+          </FinSectionGroup>
 
-                  return (
-                    <TableRow
-                      key={row.key}
-                      className={cn(
-                        row.isTotalRow && 'bg-primary/5 font-bold border-t-2 border-primary/20',
-                        row.isSectionHeader && 'bg-muted/50 border-t border-border',
-                      )}
-                    >
-                      <TableCell
-                        className={cn(
-                          'flex items-center gap-1',
-                          row.isSectionHeader && 'font-bold text-sm uppercase tracking-wider',
-                          row.isTotalRow && 'font-bold text-base',
-                          row.depth === 1 && !row.isSectionHeader && 'font-semibold text-xs uppercase tracking-wider',
-                          row.depth > 1 && 'font-medium',
-                        )}
-                        style={{ paddingLeft: `${row.depth * 20 + 12}px` }}
-                      >
-                        {row.hasChildren ? (
-                          <button
-                            onClick={() => toggleExpand(row.key)}
-                            className="w-5 h-5 flex items-center justify-center rounded hover:bg-muted shrink-0"
-                          >
-                            {expanded.has(row.key) ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                          </button>
-                        ) : (
-                          <span className="w-5 shrink-0" />
-                        )}
-                        {row.codigo && <span className="font-mono text-xs text-muted-foreground mr-1">{row.codigo}</span>}
-                        <span className="truncate">{row.nome}</span>
-                        {row.locked && (
-                          <Lock className="w-3 h-3 text-muted-foreground shrink-0" aria-label="Orçamento definido em categoria superior" />
-                        )}
-                      </TableCell>
-
-                      <TableCell className="text-right">
-                        {canEditThisLeaf ? (
-                          <BRLInput
-                            numericValue={currentEditValue}
-                            onNumericChange={v => row.categoriaId && handleEditLeaf(row.categoriaId, v)}
-                            showPrefix
-                            className="h-8 text-right ml-auto max-w-[160px]"
-                          />
-                        ) : row.ownBudget ? (
-                          <div className="flex items-center justify-end gap-1">
-                            <span className="font-mono font-semibold">{fmt(row.ownBudget.valor_orcado)}</span>
-                            {canDelete && (
-                              <Button
-                                variant="ghost" size="icon" className="h-6 w-6 text-destructive"
-                                title="Excluir orçamento deste nível"
-                                onClick={() => handleDeleteOwnBudget(row)}
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </Button>
-                            )}
-                          </div>
-                        ) : (
-                          <span className={cn(
-                            'font-mono',
-                            (row.isTotalRow || row.isSectionHeader) && 'font-bold text-base',
-                            row.depth === 1 && !row.isSectionHeader && 'font-semibold',
-                            row.locked && 'text-muted-foreground',
-                          )}>
-                            {row.locked || row.isUnassigned ? '—' : fmt(row.orcado)}
-                          </span>
-                        )}
-                      </TableCell>
-
-                      <TableCell className={cn(
-                        'text-right font-mono',
-                        (row.isTotalRow || row.isSectionHeader) && 'font-bold text-base',
-                        row.depth === 1 && !row.isSectionHeader && 'font-semibold',
-                      )}>
-                        {fmt(row.realizado)}
-                      </TableCell>
-
-                      <TableCell className="text-right text-muted-foreground text-sm">{pct}</TableCell>
-
-                      <TableCell>
-                        {status && <StatusBadge status={STATUS_VARIANT[status]} label={STATUS_LABEL[row.tipo][status]} />}
-                      </TableCell>
+          <FinSectionGroup
+            id="orc-categorias"
+            title="Categorias"
+            caption="Orçado editável nas categorias sem subcategorias · status pela execução do orçado"
+          >
+            {temBloqueadas && (
+              <FinNote>
+                Categorias com cadeado têm o orçamento definido na categoria superior: o valor fica lá. Exclua o orçamento do nível de cima para orçar as subcategorias.
+              </FinNote>
+            )}
+            <div ref={listaRef} className="overflow-hidden rounded-summary border bg-card shadow-card">
+              {listaEstreita ? (
+                <ul aria-label="Orçamento por categoria">
+                  {rows.map(row => (
+                    <li key={row.key} className={cn('border-t px-3 py-2.5 first:border-t-0', linhaFundo(row))}>
+                      <div className="flex items-start gap-1" style={{ paddingLeft: `${row.depth * 12}px` }}>
+                        {abrirFechar(row)}
+                        <div className="min-w-0 flex-1 pt-1">{nomeDaLinha(row)}</div>
+                      </div>
+                      <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 text-xs" style={{ paddingLeft: `${row.depth * 12 + 32}px` }}>
+                        <div className="col-span-2 sm:col-span-1">
+                          <dt className="text-muted-foreground">Orçado</dt>
+                          <dd className="mt-0.5 text-sm">{orcadoDaLinha(row, true)}</dd>
+                        </div>
+                        <div className="col-span-2 sm:col-span-1">
+                          <dt className="text-muted-foreground">Realizado</dt>
+                          <dd className={cn('mt-0.5 whitespace-nowrap text-sm tabular-nums', valorPeso(row))}>{fmt(row.realizado)}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-muted-foreground">% Exec.</dt>
+                          <dd className="mt-0.5 tabular-nums text-foreground">{pctDaLinha(row)}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-muted-foreground">Status</dt>
+                          <dd className="mt-0.5">{statusDaLinha(row) ?? '—'}</dd>
+                        </div>
+                      </dl>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Categoria</TableHead>
+                      <TableHead className="text-right w-[180px]">Orçado (R$)</TableHead>
+                      <TableHead className="text-right w-[160px]">Realizado (R$)</TableHead>
+                      <TableHead className="text-right w-[100px]">% Exec.</TableHead>
+                      <TableHead className="w-[150px]">Status</TableHead>
                     </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {rows.map(row => (
+                      <TableRow key={row.key} className={linhaFundo(row)}>
+                        <TableCell className="py-2" style={{ paddingLeft: `${row.depth * 20 + 8}px` }}>
+                          <div className="flex items-center gap-1">
+                            {abrirFechar(row)}
+                            {nomeDaLinha(row)}
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-2 text-right">{orcadoDaLinha(row, false)}</TableCell>
+                        <TableCell className={cn('whitespace-nowrap py-2 text-right tabular-nums', valorPeso(row))}>
+                          {fmt(row.realizado)}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap py-2 text-right text-sm tabular-nums text-muted-foreground">{pctDaLinha(row)}</TableCell>
+                        <TableCell className="py-2">{statusDaLinha(row)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </div>
+          </FinSectionGroup>
+        </>
       )}
 
       {/* Copy Month Dialog */}
       <Dialog open={copyDialogOpen} onOpenChange={setCopyDialogOpen}>
-        <DialogContent>
+        <DialogContent {...retornoCopiar}>
           <DialogHeader>
             <DialogTitle>Copiar Orçamento de Outro Mês</DialogTitle>
+            <DialogDescription>
+              Copiar orçamentos para <strong className="text-foreground">{formatMonthBR(mesAtual)}</strong>. Categorias já existentes serão ignoradas.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              Copiar orçamentos para <strong>{formatMonthBR(mesAtual)}</strong>. Categorias já existentes serão ignoradas.
-            </p>
-            <div>
-              <Label>Copiar de</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor={copiarDeId}>Copiar de</Label>
               <Select value={copyFromMes} onValueChange={setCopyFromMes}>
-                <SelectTrigger><SelectValue placeholder="Selecione o mês de origem" /></SelectTrigger>
+                <SelectTrigger id={copiarDeId}><SelectValue placeholder="Selecione o mês de origem" /></SelectTrigger>
                 <SelectContent>
                   {meses.filter(m => m !== mesAtual).map(m => (
                     <SelectItem key={m} value={m}>{formatMonthBR(m)}</SelectItem>
@@ -669,7 +826,7 @@ export default function OrcamentoSection() {
               </Select>
             </div>
             <Button onClick={handleCopy} className="w-full" disabled={copying || !copyFromMes}>
-              {copying ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Copy className="w-4 h-4 mr-1" />}
+              {copying ? <Loader2 aria-hidden="true" className="w-4 h-4 mr-1 animate-spin" /> : <Copy aria-hidden="true" className="w-4 h-4 mr-1" />}
               {copying ? 'Copiando...' : 'Copiar'}
             </Button>
           </div>

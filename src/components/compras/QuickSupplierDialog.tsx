@@ -3,8 +3,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useSalmonStore } from '@/hooks/useSalmonStore';
+import { useSupabase } from '@/contexts/CompanyScopeContext';
+import { useCompanyId } from '@/hooks/useCompanyId';
+import { CANAL_FORNECEDORES, inserirFornecedor } from '@/hooks/useSuppliers';
 import { useScopedToast } from '@/hooks/useScopedToast';
+import { useEmitDataEvent } from '@/lib/dataEvents';
 import { Loader2 } from 'lucide-react';
 
 interface QuickSupplierDialogProps {
@@ -21,7 +24,10 @@ export default function QuickSupplierDialog({
   defaultName = '',
 }: QuickSupplierDialogProps) {
   const toast = useScopedToast();
-  const { addSupplier } = useSalmonStore();
+  // Só grava: o atalho fica montado em cada combobox e não precisa carregar a lista.
+  const supabase = useSupabase();
+  const { companyId } = useCompanyId();
+  const emitDataEvent = useEmitDataEvent();
   const [name, setName] = useState(defaultName);
   const [cnpj, setCnpj] = useState('');
   const [contact, setContact] = useState('');
@@ -43,7 +49,7 @@ export default function QuickSupplierDialog({
 
     setLoading(true);
     try {
-      const newSupplier = await addSupplier({
+      const newSupplier = await inserirFornecedor(supabase, companyId, {
         name: name.trim(),
         cnpj: cnpj.trim(),
         contact: contact.trim(),
@@ -55,6 +61,7 @@ export default function QuickSupplierDialog({
       });
 
       toast.success(`Fornecedor "${newSupplier.name}" cadastrado com sucesso!`);
+      emitDataEvent(CANAL_FORNECEDORES);
       onSuccess?.(newSupplier.name, newSupplier.id);
       onOpenChange(false);
       // Reset form
@@ -62,7 +69,7 @@ export default function QuickSupplierDialog({
       setCnpj('');
       setContact('');
     } catch (error) {
-      // Error is already handled by toast in useSalmonStore
+      toast.error(error instanceof Error ? error.message : 'Erro ao cadastrar fornecedor');
     } finally {
       setLoading(false);
     }

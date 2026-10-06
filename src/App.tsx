@@ -21,6 +21,8 @@ const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const AdminPanel = lazy(() => import("./pages/AdminPanel"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const FloatingCalculator = lazy(() => import("./components/FloatingCalculator"));
+// Catálogo de primitivas do redesign: só em desenvolvimento, fora do build de produção e de qualquer menu.
+const DesignCatalog = import.meta.env.DEV ? lazy(() => import("./pages/DesignCatalog")) : null;
 
 const AUTO_REFRESH_THROTTLE_MS = 2 * 60 * 1000; // 2 minutos
 
@@ -179,6 +181,7 @@ const App = () => {
                   <Route path="/financeiro/apresentacao-socios" element={<Index />} />
                   <Route path="/financeiro/apresentacao-socios/:detail" element={<Index />} />
                   <Route path="/admin" element={<AdminPanel />} />
+                  {DesignCatalog && <Route path="/__catalogo" element={<DesignCatalog />} />}
                   <Route path="*" element={<NotFound />} />
                 </Routes>
                 <FloatingCalculator />

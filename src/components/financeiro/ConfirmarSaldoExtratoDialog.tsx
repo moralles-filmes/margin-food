@@ -1,6 +1,6 @@
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { CurrencyInput } from '@/components/ui/brl-input';
@@ -10,8 +10,9 @@ import { getConsolidatedBankDelta, isAutomaticInvestmentLine } from '@/lib/conci
 import { fmtBRL, formatDateBR, parseLocalDate } from '@/lib/formatters';
 import { normalizeBRLMoneyToNumber, formatNumberToBRL } from '@/lib/money';
 import { useScopedToast } from '@/hooks/useScopedToast';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Info, Loader2 } from 'lucide-react';
 import { useCan } from '@/permissions/hooks';
+import { useRetornoFoco } from '@/components/financeiro/useRetornoFoco';
 
 interface ConfirmarSaldoExtratoDialogProps {
   open: boolean;
@@ -34,6 +35,9 @@ interface ConfirmarSaldoExtratoDialogProps {
   /** Recebe o saldo final confirmado pelo usuário — o pai o usa como referência
    *  da conferência pós-processamento (inclusive no "Continuar mesmo assim"). */
   onConfirmed: (saldoConfirmado: { valor: number; data: string }) => void;
+  /** Onde o foco volta ao fechar. O diálogo abre depois da leitura do arquivo e o campo de saldo
+   *  tem `autoFocus`, então não há um gatilho para onde o Radix possa devolver o foco. */
+  focoAoFechar?: () => HTMLElement | null;
 }
 
 interface Divergencia {
@@ -74,7 +78,7 @@ function getInitialReferenceDate(
 export default function ConfirmarSaldoExtratoDialog({
   open, nomeArquivo, periodoInicio, periodoFim, linhasExtrato, saldoSugerido,
   saldoContaCorrenteArquivo, internalMovementCount = 0, contaId,
-  onCancel, onConfirmed,
+  onCancel, onConfirmed, focoAoFechar,
 }: ConfirmarSaldoExtratoDialogProps) {
   const toast = useScopedToast();
   const supabase = useSupabase();
@@ -91,6 +95,7 @@ export default function ConfirmarSaldoExtratoDialog({
   const [loading, setLoading] = useState(false);
   const [divergencia, setDivergencia] = useState<Divergencia | null>(null);
   const canViewConciliacao = useCan('financeiro:conciliacao:view');
+  const retornoFoco = useRetornoFoco(focoAoFechar);
 
   const handleConfirmarValor = async () => {
     if (!canViewConciliacao) {
@@ -148,28 +153,35 @@ export default function ConfirmarSaldoExtratoDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onCancel(); }}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-h-[90vh] max-w-md overflow-y-auto" {...retornoFoco}>
         {!divergencia ? (
           <>
             <DialogHeader>
               <DialogTitle>Confirme o saldo do seu extrato</DialogTitle>
+              <DialogDescription>
+                O saldo informado vira a referência da conferência de saldo do extrato.
+              </DialogDescription>
             </DialogHeader>
-            <div className="space-y-3 text-sm">
-              <p className="text-muted-foreground">
-                Arquivo: <span className="font-medium text-foreground">{nomeArquivo}</span>
-              </p>
-              <p className="text-muted-foreground">
-                Período importado: <span className="font-medium text-foreground">
-                  {formatDateBR(parseLocalDate(periodoInicio))} a {formatDateBR(parseLocalDate(periodoFim))}
-                </span>
-              </p>
+            <div className="space-y-4 text-sm">
+              <dl className="grid gap-2 rounded-lg border bg-muted p-3 sm:grid-cols-2">
+                <div className="min-w-0">
+                  <dt className="text-xs text-muted-foreground">Arquivo</dt>
+                  <dd className="break-all font-medium text-foreground">{nomeArquivo}</dd>
+                </div>
+                <div className="min-w-0">
+                  <dt className="text-xs text-muted-foreground">Período importado</dt>
+                  <dd className="font-medium tabular-nums text-foreground">
+                    {formatDateBR(parseLocalDate(periodoInicio))} a {formatDateBR(parseLocalDate(periodoFim))}
+                  </dd>
+                </div>
+              </dl>
               {internalMovementCount > 0 && (
                 <div
                   role="alert"
-                  className="rounded-lg border border-warning/30 bg-warning/5 p-3 text-xs"
+                  className="rounded-lg border border-warning-border bg-warning-soft p-3 text-xs"
                 >
                   <p className="flex items-center gap-2 font-medium text-foreground">
-                    <AlertTriangle className="h-4 w-4 shrink-0 text-warning" />
+                    <AlertTriangle aria-hidden="true" className="h-4 w-4 shrink-0 text-warning" />
                     {internalMovementCount} movimentação(ões) interna(s) ContaMax detectada(s)
                   </p>
                   <p className="mt-1 text-muted-foreground">
@@ -197,7 +209,7 @@ export default function ConfirmarSaldoExtratoDialog({
                   max={periodoFim}
                   onValueChange={setDataSaldo}
                 />
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                   Linhas posteriores a essa data não entram na conferência.
                 </p>
               </div>
@@ -214,15 +226,17 @@ export default function ConfirmarSaldoExtratoDialog({
                   autoFocus
                 />
                 {saldoSugerido && (
-                  <p className="text-[11px] text-muted-foreground mt-1">
-                    ⚡ Valor sugerido pelo arquivo — confira antes de confirmar.
+                  <p className="mt-1 flex items-start gap-1.5 text-xs text-muted-foreground">
+                    <Info aria-hidden="true" className="mt-px h-3.5 w-3.5 shrink-0" />
+                    Valor sugerido pelo arquivo — confira antes de confirmar.
                   </p>
                 )}
               </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={onCancel} disabled={loading}>Cancelar</Button>
-              <Button onClick={handleConfirmarValor} disabled={loading}>
+              <Button onClick={handleConfirmarValor} disabled={loading} aria-busy={loading}>
+                {loading && <Loader2 aria-hidden="true" className="mr-1 h-4 w-4 animate-spin" />}
                 {loading ? 'Verificando...' : 'Confirmar valor'}
               </Button>
             </DialogFooter>
@@ -231,23 +245,29 @@ export default function ConfirmarSaldoExtratoDialog({
           <>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-destructive">
-                <AlertTriangle className="w-5 h-5 shrink-0" />
+                <AlertTriangle aria-hidden="true" className="h-5 w-5 shrink-0" />
                 Saldo não confere
               </DialogTitle>
+              <DialogDescription>
+                Saldo informado e saldo calculado em {formatDateBR(parseLocalDate(dataSaldo))}.
+              </DialogDescription>
             </DialogHeader>
             <div className="space-y-3 text-sm">
-              <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 space-y-1">
-                <p className="text-muted-foreground">
-                  Saldo informado: <span className="font-mono font-medium text-foreground">{fmtBRL(divergencia.informado)}</span>
-                </p>
-                <p className="text-muted-foreground">
-                  Saldo calculado pelo sistema: <span className="font-mono font-medium text-foreground">{fmtBRL(divergencia.calculado)}</span>
-                </p>
-                <p className="text-muted-foreground">
-                  Diferença: <span className="font-mono font-semibold text-destructive">{fmtBRL(divergencia.diferenca)}</span>
-                </p>
-              </div>
-              <p className="text-muted-foreground text-xs">
+              <dl className="space-y-1.5 rounded-lg border border-destructive-border bg-destructive-soft p-3">
+                <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+                  <dt className="text-muted-foreground">Saldo informado</dt>
+                  <dd className="whitespace-nowrap font-medium tabular-nums text-foreground">{fmtBRL(divergencia.informado)}</dd>
+                </div>
+                <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+                  <dt className="text-muted-foreground">Saldo calculado pelo sistema</dt>
+                  <dd className="whitespace-nowrap font-medium tabular-nums text-foreground">{fmtBRL(divergencia.calculado)}</dd>
+                </div>
+                <div className="flex flex-wrap items-baseline justify-between gap-x-3 border-t border-destructive-border pt-1.5">
+                  <dt className="font-medium text-foreground">Diferença</dt>
+                  <dd className="whitespace-nowrap font-semibold tabular-nums text-destructive">{fmtBRL(divergencia.diferenca)}</dd>
+                </div>
+              </dl>
+              <p className="text-xs text-muted-foreground">
                 Isso indica que pode haver lançamento(s) incorreto(s) ou faltando antes de {formatDateBR(parseLocalDate(periodoInicio))}.
                 Você pode continuar a conciliação mesmo assim e investigar depois, ou cancelar para corrigir antes.
               </p>

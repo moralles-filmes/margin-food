@@ -1,20 +1,28 @@
 import { useSupabase } from '@/contexts/CompanyScopeContext';
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useId, type ReactNode } from 'react';
 import { useEmitDataEvent, useDataEvent } from '@/lib/dataEvents';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { DateInput } from '@/components/ui/DateInput';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { CurrencyInput } from '@/components/ui/brl-input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { Skeleton } from '@/components/ui/skeleton';
 import { SubmoduleSwitcher, type SubmoduleItem } from '@/components/ui/SubmoduleSwitcher';
+import KpiCard from '@/components/ui/KpiCard';
+import StatusBadge from '@/components/ui/StatusBadge';
+import EmptyState from '@/components/ui/EmptyState';
+import ErrorState from '@/components/ui/ErrorState';
+import AccessDenied from '@/components/ui/AccessDenied';
+import { ChartCard } from '@/components/ui/ChartCard';
+import { kpiGridClassFor, longestValueLength } from '@/components/ui/kpiGrid';
 import { cacheInvalidate } from '@/components/cmv/cmvCache';
 import { useScopedToast } from '@/hooks/useScopedToast';
-import { Plus, Edit, Trash2, RefreshCw, DollarSign, Calendar, FileDown, FileSpreadsheet, AlertTriangle, Store } from 'lucide-react';
+import {
+  Plus, Edit, Trash2, RefreshCw, DollarSign, CalendarDays, FileDown, FileSpreadsheet, AlertTriangle, Store,
+  Wallet, TrendingUp, ShoppingBag, Users,
+} from 'lucide-react';
 import { useFormDirtyGuard } from '@/hooks/useFormDirtyGuard';
 import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
 import { startOfMonth, endOfMonth } from 'date-fns';
@@ -28,11 +36,18 @@ import * as XLSX from '@/lib/safeXlsx';
 import { mapFinanceiroDeleteError } from '@/lib/financeiroErrorMap';
 import DateRangePresets from './DateRangePresets';
 import FechamentoMarcasTab, { type FechamentoMarca } from './FechamentoMarcasTab';
+import { FinKpiGrid, FinNote, FinScreenHeader, FinSectionGroup } from './finV2Layout';
+import { ListaCarregando, ResumoCarregando } from './ContasParts';
+import { useConteinerEstreito } from './useConteinerEstreito';
+import { useRetornoFoco } from './useRetornoFoco';
+import { devolverFoco, elementoComFoco } from './devolverFoco';
+import { FECHAMENTO_LISTA_LIMITE_PX, diasFechamentoLabel, periodoFechamentoLabel } from './fechamentoView';
 import {
   buildFechamentoDias,
   buildFechamentoMarcaPayload,
   formatQuantidadeForma,
   resolveFormaVendaDoDia,
+  type FechamentoDia,
   type FormaVenda,
 } from '@/domain/financeiro/fechamentoMarcas';
 import {
@@ -50,8 +65,9 @@ import {
   Tooltip as RTooltip,
   CartesianGrid,
 } from 'recharts';
-import { axisProps, gridProps, tooltipProps, chartValueFormatters, makeActiveDot } from '@/lib/chartTheme';
+import { axisProps, chartMargin, gridProps, tooltipProps, chartValueFormatters, makeActiveDot } from '@/lib/chartTheme';
 import { ChartTooltip } from '@/components/ui/ChartTooltip';
+import { cn } from '@/lib/utils';
 
 // ── Types ──
 
@@ -89,14 +105,34 @@ function parseMoney(value: string) {
   return normalizeBRLMoneyToNumber(value) ?? 0;
 }
 
-// ── NoAccess fallback ──
-
-function NoAccess() {
+/** Aviso dentro do formulário (token de atenção, texto legível, sem opacidade). */
+function AvisoForm({ children }: { children: ReactNode }) {
   return (
-    <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-2">
-      <AlertTriangle className="w-8 h-8" />
-      <p className="text-sm">Você não tem permissão para acessar esta seção.</p>
+    <div className="flex items-start gap-2 rounded-lg border border-warning-border bg-warning-soft p-3 text-xs text-foreground">
+      <AlertTriangle aria-hidden="true" className="mt-px h-3.5 w-3.5 shrink-0 text-warning" />
+      <p>{children}</p>
     </div>
+  );
+}
+
+/** Lista "Por marca" de um dia — a mesma na tabela e nos cartões. */
+function MarcasDoDia({ dia, indisponivel }: { dia: FechamentoDia | undefined; indisponivel: boolean }) {
+  if (indisponivel) return <span className="text-muted-foreground">Indisponível</span>;
+  if (!dia || dia.marcas.length === 0) return <span className="text-muted-foreground">Não detalhado</span>;
+  return (
+    <ul className="space-y-1">
+      {dia.marcas.map(linha => (
+        <li key={linha.marcaId} className="flex flex-wrap items-baseline justify-between gap-x-3">
+          <span className="min-w-0 break-words text-foreground">{linha.nome}</span>
+          <span className="whitespace-nowrap text-muted-foreground">
+            <span className="font-medium tabular-nums text-foreground">{fmtBRL(linha.valor)}</span>
+            {linha.quantidade != null && linha.formaVenda && (
+              <> · {formatQuantidadeForma(linha.quantidade, linha.formaVenda)}</>
+            )}
+          </span>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -130,6 +166,20 @@ export default function FechamentoCaixaSection() {
   const [editUpdatedAt, setEditUpdatedAt] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<FechamentoTab>('diario');
 
+  // Só apresentação: qual leitura falhou (o toast continua) e de qual período são os números na tela.
+  const [cargaErro, setCargaErro] = useState<'fechamentos' | 'divisao' | null>(null);
+  const [marcasErro, setMarcasErro] = useState(false);
+  const [periodoCarregado, setPeriodoCarregado] = useState<{ inicio: string; fim: string } | null>(null);
+  const [listaRef, listaEstreita] = useConteinerEstreito(FECHAMENTO_LISTA_LIMITE_PX);
+  const retornoForm = useRetornoFoco();
+  const filtroDeId = useId();
+  const filtroAteId = useId();
+  const formDataId = useId();
+  const formBrutoId = useId();
+  const formTaxasId = useId();
+  const formDescontosId = useId();
+  const formObsId = useId();
+
   // Filters
   const [startDate, setStartDate] = useState(() => formatDateISO(startOfMonth(new Date())));
   const [endDate, setEndDate] = useState(() => formatDateISO(endOfMonth(new Date())));
@@ -151,6 +201,7 @@ export default function FechamentoCaixaSection() {
 
   const loadBrands = useCallback(async () => {
     setBrandsLoading(true);
+    setMarcasErro(false);
     const { data, error } = await supabase
       .from('financeiro_fechamento_marcas')
       .select('id, nome, ativo, ordem, categoria_id, forma_venda')
@@ -161,6 +212,7 @@ export default function FechamentoCaixaSection() {
     if (error) {
       console.error('[FechamentoCaixaSection.loadBrands]', error);
       toast.error('Erro ao carregar marcas do fechamento');
+      setMarcasErro(true);
     } else {
       setBrands((data || []) as FechamentoMarca[]);
     }
@@ -169,6 +221,7 @@ export default function FechamentoCaixaSection() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setCargaErro(null);
     let query = supabase
       .from('financeiro_fechamento_caixa')
       .select('id, data, faturamento_bruto, taxas, descontos, faturamento_liquido, observacao, created_at, updated_at');
@@ -180,9 +233,11 @@ export default function FechamentoCaixaSection() {
     if (error) {
       toast.error('Erro ao carregar fechamentos');
       console.error(error);
+      setCargaErro('fechamentos');
     } else {
       const loadedItems = (data || []) as FechamentoRow[];
       setItems(loadedItems);
+      setPeriodoCarregado({ inicio: startDate, fim: endDate });
 
       if (loadedItems.length === 0) {
         setBrandValues([]);
@@ -205,6 +260,7 @@ export default function FechamentoCaixaSection() {
           console.error('[FechamentoCaixaSection.loadBrandValues]', valuesError);
           setBrandValues([]);
           toast.error('Erro ao carregar a divisão por marcas');
+          setCargaErro('divisao');
         } else {
           setBrandValues(valuesData);
         }
@@ -358,13 +414,15 @@ export default function FechamentoCaixaSection() {
   // ── Delete ──
 
   const remove = async (id: string) => {
+    // Só foco: a confirmação abre sem gatilho e, ao fechar, o foco cairia no corpo da página.
+    const origemFoco = elementoComFoco();
     const ok = await confirm({
       title: 'Excluir fechamento de caixa',
       description: 'Esta ação removerá o fechamento do dia e pode impactar CMV, dashboards e relatórios. Deseja continuar?',
       variant: 'destructive',
       confirmLabel: 'Excluir',
     });
-    if (!ok) return;
+    if (!ok) { devolverFoco(origemFoco); return; }
 
     try {
       const { error } = await supabase.rpc('rpc_delete_fechamento_caixa', { p_id: id });
@@ -377,6 +435,7 @@ export default function FechamentoCaixaSection() {
       console.error('[FechamentoCaixaSection.remove]', err);
       toast.error(mapFinanceiroDeleteError(err));
     }
+    devolverFoco(origemFoco);
   };
 
   // ── Aggregates ──
@@ -397,8 +456,6 @@ export default function FechamentoCaixaSection() {
   );
   const diaById = useMemo(() => new Map(dias.map(dia => [dia.id, dia])), [dias]);
   const totaisPeriodo = useMemo(() => summarizeFechamentoPeriodo(dias), [dias]);
-
-  const tableColumnCount = canEdit || canDelete ? 8 : 7;
 
   // ── Trend chart data ──
 
@@ -452,370 +509,514 @@ export default function FechamentoCaixaSection() {
 
   // ── Guard ──
 
-  if (!canView) return <NoAccess />;
+  if (!canView) return <AccessDenied title="Acesso negado" description="Você não tem permissão para ver o fechamento de caixa." />;
+
+  // ── Apresentação ──
+
+  const periodoLabel = periodoCarregado ? periodoFechamentoLabel(periodoCarregado.inicio, periodoCarregado.fim) : null;
+  const divisaoIndisponivel = cargaErro === 'divisao';
+  const erroSemDados = cargaErro === 'fechamentos' && items.length === 0;
+  const temAcoes = canEdit || canDelete;
+  const valoresResumo = [
+    String(items.length),
+    fmtBRL(totalBruto),
+    fmtBRL(totalLiquido),
+    divisaoIndisponivel ? '—' : totaisPeriodo.pedidos.toLocaleString('pt-BR'),
+    divisaoIndisponivel ? '—' : totaisPeriodo.pessoas.toLocaleString('pt-BR'),
+  ];
+  const resumoGrid = kpiGridClassFor(longestValueLength(valoresResumo), 3);
+  const subDivisao = 'Indisponível: a divisão por marca não carregou';
+  const dataDoDia = (row: FechamentoRow) => formatDateBR(parseLocalDate(row.data));
+
+  const acoesDoDia = (row: FechamentoRow, comTexto = false) => (
+    <div className={cn('flex gap-1', comTexto ? 'flex-wrap' : 'justify-end')}>
+      {canEdit && (
+        <Button
+          size={comTexto ? 'sm' : 'icon'}
+          variant={comTexto ? 'outline' : 'ghost'}
+          className={comTexto ? 'h-9' : 'h-8 w-8'}
+          onClick={() => openEdit(row)}
+          aria-label={`Editar fechamento de ${dataDoDia(row)}`}
+          title={comTexto ? undefined : `Editar fechamento de ${dataDoDia(row)}`}
+        >
+          <Edit aria-hidden="true" className={cn('h-4 w-4', comTexto && 'mr-1')} />
+          {comTexto && 'Editar'}
+        </Button>
+      )}
+      {canDelete && (
+        <Button
+          size={comTexto ? 'sm' : 'icon'}
+          variant={comTexto ? 'outline' : 'ghost'}
+          className={cn(comTexto ? 'h-9' : 'h-8 w-8', 'text-destructive hover:text-destructive')}
+          onClick={() => remove(row.id)}
+          aria-label={`Excluir fechamento de ${dataDoDia(row)}`}
+          title={comTexto ? undefined : `Excluir fechamento de ${dataDoDia(row)}`}
+        >
+          <Trash2 aria-hidden="true" className={cn('h-4 w-4', comTexto && 'mr-1')} />
+          {comTexto && 'Excluir'}
+        </Button>
+      )}
+    </div>
+  );
+
+  const observacao = (row: FechamentoRow) => row.observacao && (
+    <p className="mt-2 break-words text-xs text-muted-foreground">
+      <span className="font-medium text-foreground">Obs.:</span> {row.observacao}
+    </p>
+  );
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <ConfirmDialog />
 
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div>
-          <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
-            <DollarSign className="w-5 h-5 text-primary" /> Fechamento de Caixa
-          </h2>
-          <p className="text-sm text-muted-foreground">Faturamento diário — fonte canônica para CMV e relatórios</p>
-        </div>
-        {activeTab === 'diario' && <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-1">
-            <DateInput value={startDate} onValueChange={setStartDate} className="w-36 h-9 text-xs" />
-            <span className="text-muted-foreground text-xs">—</span>
-            <DateInput value={endDate} onValueChange={setEndDate} className="w-36 h-9 text-xs" />
-          </div>
-          <Button variant="outline" size="sm" onClick={load} disabled={loading}>
-            <RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} /> Atualizar
-          </Button>
-
-          {canExport && (
-            <>
-              <Button variant="outline" size="sm" onClick={exportPdf} disabled={exportingPdf || loading || items.length === 0}>
-                <FileDown className="w-4 h-4 mr-1" /> PDF
+      <FinScreenHeader
+        title="Fechamento de Caixa"
+        description="Faturamento diário — fonte canônica para CMV e relatórios"
+        actions={activeTab === 'diario' ? (
+          <>
+            {canExport && (
+              <>
+                {/* Com leitura em erro o arquivo sairia com o período do filtro sobre dados de outra carga, sem a
+                    divisão por marca ou com "Marca removida" no lugar dos nomes: exportar só depois de uma carga completa (D43). */}
+                <Button variant="outline" size="sm" onClick={exportPdf} disabled={exportingPdf || loading || items.length === 0 || cargaErro !== null || marcasErro}>
+                  <FileDown aria-hidden="true" className="w-4 h-4 mr-1" /> PDF
+                </Button>
+                <Button variant="outline" size="sm" onClick={exportExcel} disabled={exportingExcel || loading || items.length === 0 || cargaErro !== null || marcasErro}>
+                  <FileSpreadsheet aria-hidden="true" className="w-4 h-4 mr-1" /> Excel
+                </Button>
+              </>
+            )}
+            {canCreate && (
+              <Button size="sm" onClick={openNew} disabled={brandsLoading}>
+                <Plus aria-hidden="true" className="w-4 h-4 mr-1" /> Novo Dia
               </Button>
-              <Button variant="outline" size="sm" onClick={exportExcel} disabled={exportingExcel || loading || items.length === 0}>
-                <FileSpreadsheet className="w-4 h-4 mr-1" /> Excel
-              </Button>
-            </>
-          )}
-
-          {(canCreate || canEdit) && (
-            <Dialog open={showForm} onOpenChange={open => { if (!open) guardedClose(); else openNew(); }}>
-              {canCreate && (
-                <DialogTrigger asChild>
-                  <Button size="sm" disabled={brandsLoading}>
-                    <Plus className="w-4 h-4 mr-1" /> Novo Dia
-                  </Button>
-                </DialogTrigger>
-              )}
-              <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>{editId ? 'Editar Fechamento' : 'Novo Fechamento'}</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-3">
-                  <div>
-                    <Label>Data</Label>
-                    <DateInput value={formData} onValueChange={setFormData} />
-                  </div>
-                  {brandsForForm.length > 0 ? (
-                    <div className="space-y-3">
-                      <div>
-                        <Label>Faturamento por marca</Label>
-                        <p className="text-xs text-muted-foreground">
-                          Informe quanto cada operação vendeu no dia. A soma será o faturamento bruto.
-                        </p>
-                      </div>
-                      {!formUsesBrands && editId && (
-                        <div className="rounded-lg border border-warning-border bg-warning-soft p-3 text-xs text-warning">
-                          Este fechamento antigo ainda não foi dividido. O total atual é {fmtBRL(parseMoney(formBruto))};
-                          ao preencher uma marca, a nova soma substituirá esse total.
-                        </div>
-                      )}
-                      {brandsForFormSemCategoria.length > 0 && (
-                        <div className="rounded-lg border border-warning-border bg-warning-soft p-3 text-xs text-warning">
-                          Sem categoria vinculada: {brandsForFormSemCategoria.map(b => b.nome).join(', ')}. O faturamento
-                          líquido dessa(s) loja(s) não aparece na Apresentação Sócios até vincular em “Marcas e dark
-                          kitchens”.
-                        </div>
-                      )}
-                      <div className="space-y-2">
-                        {brandsForForm.map(brand => {
-                          const semQuantidade = brandBreakdownPayload.missingQuantidade.includes(brand.id);
-                          return (
-                            <div key={brand.id} className="rounded-lg border p-3">
-                              <div className="mb-2 flex items-center justify-between gap-2">
-                                <p className="text-sm font-medium text-foreground">{brand.nome}</p>
-                                {!brand.ativo && <span className="text-[10px] text-muted-foreground">Inativa</span>}
-                              </div>
-                              <div className="grid gap-3 sm:grid-cols-2">
-                                <div className="space-y-1.5">
-                                  <Label htmlFor={`marca-${brand.id}`} className="text-xs text-muted-foreground">
-                                    Faturamento
-                                  </Label>
-                                  <CurrencyInput
-                                    id={`marca-${brand.id}`}
-                                    value={formBrandValues[brand.id] || ''}
-                                    onValueChange={raw => {
-                                      setFormBrandValues(current => ({ ...current, [brand.id]: raw }));
-                                      setFormUsesBrands(true);
-                                    }}
-                                    showPrefix
-                                    placeholder="0,00"
-                                  />
-                                </div>
-                                {brand.forma_venda ? (
-                                  <div className="space-y-1.5">
-                                    <Label htmlFor={`marca-qtd-${brand.id}`} className="text-xs text-muted-foreground">
-                                      {brand.forma_venda === 'PEDIDOS' ? 'Qtd. de pedidos' : 'Qtd. de pessoas'}
-                                    </Label>
-                                    <Input
-                                      id={`marca-qtd-${brand.id}`}
-                                      inputMode="numeric"
-                                      value={formBrandQuantities[brand.id] || ''}
-                                      onChange={event => {
-                                        const digits = event.target.value.replace(/\D/g, '').slice(0, 9);
-                                        setFormBrandQuantities(current => ({ ...current, [brand.id]: digits }));
-                                        setFormUsesBrands(true);
-                                      }}
-                                      placeholder="0"
-                                      aria-invalid={semQuantidade}
-                                      className={semQuantidade ? 'border-warning' : undefined}
-                                    />
-                                  </div>
-                                ) : (
-                                  <p className="self-end pb-2 text-xs text-muted-foreground">
-                                    Defina a forma de venda desta marca em “Marcas e dark kitchens” para informar
-                                    a quantidade.
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                      <div className="grid gap-3 rounded-lg border bg-muted/40 p-3 sm:grid-cols-3">
-                        <div>
-                          <p className="text-xs text-muted-foreground">Faturamento bruto — soma das marcas</p>
-                          <p className="text-lg font-bold text-success">
-                            {fmtBRL(formUsesBrands ? brandGrossTotal : parseMoney(formBruto))}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">Total de pedidos</p>
-                          <p className="text-lg font-bold text-foreground">
-                            {brandBreakdownPayload.totalPedidos.toLocaleString('pt-BR')}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">Total de pessoas</p>
-                          <p className="text-lg font-bold text-foreground">
-                            {brandBreakdownPayload.totalPessoas.toLocaleString('pt-BR')}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div>
-                      <Label>Faturamento Bruto (R$)</Label>
-                      <CurrencyInput
-                        value={formBruto}
-                        onValueChange={(raw) => setFormBruto(raw)}
-                        showPrefix
-                        placeholder="0,00"
-                      />
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Cadastre marcas na aba “Marcas e dark kitchens” para dividir este valor.
-                      </p>
-                    </div>
-                  )}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <Label>Taxas (R$)</Label>
-                      <CurrencyInput
-                        value={formTaxas}
-                        onValueChange={(raw) => setFormTaxas(raw)}
-                        showPrefix
-                        placeholder="0,00"
-                      />
-                    </div>
-                    <div>
-                      <Label>Descontos (R$)</Label>
-                      <CurrencyInput
-                        value={formDescontos}
-                        onValueChange={(raw) => setFormDescontos(raw)}
-                        showPrefix
-                        placeholder="0,00"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <Label>Observação</Label>
-                    <Textarea value={formObs} onChange={e => setFormObs(e.target.value)} placeholder="Opcional" rows={2} />
-                  </div>
-                  <div className="bg-muted/50 rounded-lg p-3">
-                    <p className="text-xs text-muted-foreground">Líquido estimado:</p>
-                    <p className="text-lg font-bold text-foreground">{fmtBRL(liquidoEstimado)}</p>
-                  </div>
-                  <Button onClick={save} className="w-full" disabled={saving}>
-                    {saving ? 'Salvando...' : editId ? 'Atualizar' : 'Registrar'}
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
-          )}
-        </div>}
-      </div>
+            )}
+          </>
+        ) : undefined}
+      />
 
       <SubmoduleSwitcher
         items={FECHAMENTO_TABS}
         value={activeTab}
         onChange={value => setActiveTab(value as FechamentoTab)}
+        ariaLabel="Seção do fechamento"
       />
 
       {activeTab === 'diario' ? (
-        <div className="space-y-4">
-      <DateRangePresets
-        from={startDate}
-        to={endDate}
-        onChange={(s, e) => { setStartDate(s); setEndDate(e); }}
-      />
+        <div className="space-y-6">
+          <div className="space-y-3 rounded-summary border bg-card p-4 shadow-card">
+            <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:items-end">
+              <div className="flex min-w-0 flex-col gap-1.5">
+                <Label htmlFor={filtroDeId} className="text-xs text-muted-foreground">De</Label>
+                <DateInput id={filtroDeId} value={startDate} onValueChange={setStartDate} className="h-9 w-full text-xs sm:w-36" />
+              </div>
+              <div className="flex min-w-0 flex-col gap-1.5">
+                <Label htmlFor={filtroAteId} className="text-xs text-muted-foreground">Até</Label>
+                <DateInput id={filtroAteId} value={endDate} onValueChange={setEndDate} className="h-9 w-full text-xs sm:w-36" />
+              </div>
+              <Button variant="outline" size="sm" className="col-span-2 h-9 sm:col-span-1" onClick={load} disabled={loading}>
+                <RefreshCw aria-hidden="true" className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} /> Atualizar
+              </Button>
+            </div>
+            <div className="border-t pt-3">
+              <DateRangePresets
+                from={startDate}
+                to={endDate}
+                onChange={(s, e) => { setStartDate(s); setEndDate(e); }}
+              />
+            </div>
+          </div>
 
-      {/* Summary cards */}
-      {loading ? (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          {[1, 2, 3, 4, 5].map(i => (
-            <Card key={i}><CardContent className="p-4 space-y-2">
-              <Skeleton className="h-3 w-24" />
-              <Skeleton className="h-8 w-32" />
-            </CardContent></Card>
-          ))}
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          <Card>
-            <CardContent className="p-4">
-              <p className="text-xs text-muted-foreground">Dias registrados</p>
-              <p className="text-2xl font-bold text-foreground">{items.length}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <p className="text-xs text-muted-foreground">Total Bruto</p>
-              <p className="text-2xl font-bold text-success">{fmtBRL(totalBruto)}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <p className="text-xs text-muted-foreground">Total Líquido</p>
-              <p className="text-2xl font-bold text-primary">{fmtBRL(totalLiquido)}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <p className="text-xs text-muted-foreground">Total de pedidos</p>
-              <p className="text-2xl font-bold text-foreground">{totaisPeriodo.pedidos.toLocaleString('pt-BR')}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <p className="text-xs text-muted-foreground">Total de pessoas</p>
-              <p className="text-2xl font-bold text-foreground">{totaisPeriodo.pessoas.toLocaleString('pt-BR')}</p>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+          {marcasErro && (
+            <ErrorState
+              compact
+              title="Não foi possível carregar as marcas"
+              description="Os nomes do detalhamento por marca e o formulário do dia podem ficar incompletos."
+              onRetry={() => { void loadBrands(); }}
+              retrying={brandsLoading}
+            />
+          )}
 
-      {/* Trend chart */}
-      {!loading && chartData.length >= 2 && (
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground mb-2">Tendência — Faturamento Líquido Diário</p>
-            <ResponsiveContainer width="100%" height={180}>
-              <AreaChart data={chartData}>
-                <CartesianGrid {...gridProps} />
-                <XAxis dataKey="data" {...axisProps} />
-                <YAxis {...axisProps} tickFormatter={chartValueFormatters.moneyCompact} />
-                <RTooltip {...tooltipProps} content={<ChartTooltip valueFormatter={v => fmtBRL(Number(v))} />} />
-                <Area type="monotone" dataKey="liquido" name="Líquido" className="fill-primary/20 stroke-primary" strokeWidth={2} activeDot={makeActiveDot('hsl(var(--primary))')} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Table */}
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Data</TableHead>
-            <TableHead className="text-right">Bruto</TableHead>
-            <TableHead>Por marca</TableHead>
-            <TableHead className="text-right">Taxas</TableHead>
-            <TableHead className="text-right">Descontos</TableHead>
-            <TableHead className="text-right">Líquido</TableHead>
-            <TableHead>Obs</TableHead>
-            {(canEdit || canDelete) && <TableHead className="w-20">Ações</TableHead>}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
           {loading ? (
-            Array.from({ length: 5 }).map((_, i) => (
-              <TableRow key={i}>
-                {Array.from({ length: tableColumnCount }).map((_, j) => (
-                  <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
-                ))}
-              </TableRow>
-            ))
-          ) : items.length === 0 ? (
-            <TableRow><TableCell colSpan={tableColumnCount} className="text-center text-muted-foreground py-8">
-              <Calendar className="w-8 h-8 mx-auto mb-2 opacity-30" />
-              Nenhum fechamento no período
-            </TableCell></TableRow>
-          ) : items.map(row => (
-            <TableRow key={row.id} className="align-top">
-              <TableCell className="font-mono text-sm">{formatDateBR(parseLocalDate(row.data))}</TableCell>
-              <TableCell className="text-right font-medium text-success">{fmtBRL(Number(row.faturamento_bruto))}</TableCell>
-              <TableCell className="min-w-[260px] text-xs">
-                {(diaById.get(row.id)?.marcas.length ?? 0) === 0 ? (
-                  <span className="text-muted-foreground">Não detalhado</span>
-                ) : (
-                  <ul className="space-y-1">
-                    {diaById.get(row.id)!.marcas.map(linha => (
-                      <li key={linha.marcaId} className="flex items-baseline justify-between gap-3">
-                        <span className="text-foreground">{linha.nome}</span>
-                        <span className="whitespace-nowrap text-muted-foreground">
-                          <span className="font-medium text-foreground">{fmtBRL(linha.valor)}</span>
-                          {linha.quantidade != null && linha.formaVenda && (
-                            <> · {formatQuantidadeForma(linha.quantidade, linha.formaVenda)}</>
-                          )}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </TableCell>
-              <TableCell className="text-right text-muted-foreground">{fmtBRL(Number(row.taxas))}</TableCell>
-              <TableCell className="text-right text-muted-foreground">{fmtBRL(Number(row.descontos))}</TableCell>
-              <TableCell className="text-right font-bold">{fmtBRL(Number(row.faturamento_liquido))}</TableCell>
-              <TableCell className="text-muted-foreground text-xs max-w-[150px] truncate">{row.observacao || '—'}</TableCell>
-              {(canEdit || canDelete) && (
-                <TableCell>
-                  <div className="flex gap-1">
-                    {canEdit && (
-                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(row)}>
-                        <Edit className="w-3.5 h-3.5" />
-                      </Button>
-                    )}
-                    {canDelete && (
-                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => remove(row.id)}>
-                        <Trash2 className="w-3.5 h-3.5 text-destructive" />
-                      </Button>
-                    )}
-                  </div>
-                </TableCell>
+            <>
+              <FinSectionGroup id="fech-resumo" title="Resumo do período" caption="Carregando…">
+                <ResumoCarregando cards={5} className={resumoGrid} />
+              </FinSectionGroup>
+              <FinSectionGroup id="fech-dias" title="Fechamentos por dia">
+                <div ref={listaRef}>
+                  <ListaCarregando estreito={listaEstreita} texto="Carregando fechamentos…" />
+                </div>
+              </FinSectionGroup>
+            </>
+          ) : erroSemDados ? (
+            <ErrorState
+              title="Não foi possível carregar os fechamentos"
+              description="Nenhum valor foi carregado para o período. Tente novamente."
+              onRetry={() => { void load(); }}
+              retrying={loading}
+            />
+          ) : (
+            <>
+              {cargaErro === 'fechamentos' && (
+                <ErrorState
+                  compact
+                  title="Não foi possível atualizar os fechamentos"
+                  description={`Os valores abaixo são da última carga${periodoLabel ? ` (${periodoLabel})` : ''}.`}
+                  onRetry={() => { void load(); }}
+                />
               )}
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+              {divisaoIndisponivel && (
+                <ErrorState
+                  compact
+                  title="Não foi possível carregar a divisão por marca"
+                  description="Bruto, taxas, descontos e líquido estão completos; o detalhamento por marca, pedidos e pessoas ficam indisponíveis."
+                  onRetry={() => { void load(); }}
+                />
+              )}
+
+              <FinSectionGroup
+                id="fech-resumo"
+                title="Resumo do período"
+                caption={periodoLabel ? `${periodoLabel} · somado na tela a partir dos fechamentos carregados` : undefined}
+              >
+                <FinKpiGrid className={resumoGrid}>
+                  <KpiCard
+                    appearance="highlight"
+                    icon={Wallet}
+                    label="Total bruto"
+                    value={valoresResumo[1]}
+                    sub="Soma do faturamento bruto dos dias"
+                  />
+                  <KpiCard
+                    appearance="summary"
+                    icon={TrendingUp}
+                    label="Total líquido"
+                    value={valoresResumo[2]}
+                    sub="Bruto − taxas − descontos de cada dia"
+                  />
+                  <KpiCard
+                    appearance="summary"
+                    icon={CalendarDays}
+                    label="Dias registrados"
+                    value={valoresResumo[0]}
+                    sub="Dias com fechamento no período"
+                  />
+                  <KpiCard
+                    appearance="summary"
+                    icon={ShoppingBag}
+                    label="Total de pedidos"
+                    value={valoresResumo[3]}
+                    sub={divisaoIndisponivel ? subDivisao : 'Marcas vendidas por pedido, com quantidade informada'}
+                  />
+                  <KpiCard
+                    appearance="summary"
+                    icon={Users}
+                    label="Total de pessoas"
+                    value={valoresResumo[4]}
+                    sub={divisaoIndisponivel ? subDivisao : 'Marcas vendidas por pessoa, com quantidade informada'}
+                  />
+                </FinKpiGrid>
+                <FinNote>
+                  Pedidos e pessoas são contagens separadas e nunca se somam. Marca sem quantidade informada no dia não entra nessas contagens.
+                </FinNote>
+              </FinSectionGroup>
+
+              {items.length > 0 && (
+                <ChartCard
+                  title="Faturamento líquido por dia"
+                  subtitle={periodoLabel ? `${periodoLabel} · R$` : 'R$'}
+                  height="h-[220px]"
+                  isEmpty={chartData.length < 2}
+                  emptyIcon={TrendingUp}
+                  emptyTitle="Tendência a partir de dois dias"
+                  emptyDescription="Há só um dia com fechamento no período; o valor está na lista abaixo."
+                >
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={chartData} margin={chartMargin}>
+                      <CartesianGrid {...gridProps} />
+                      <XAxis dataKey="data" {...axisProps} tickFormatter={v => String(v).slice(0, 5)} />
+                      <YAxis {...axisProps} tickFormatter={chartValueFormatters.moneyCompact} />
+                      <RTooltip {...tooltipProps} content={<ChartTooltip valueFormatter={v => fmtBRL(Number(v))} />} />
+                      <Area type="monotone" dataKey="liquido" name="Líquido" stroke="hsl(var(--primary))" fill="hsl(var(--primary-soft))" fillOpacity={1} strokeWidth={2} activeDot={makeActiveDot('hsl(var(--primary))')} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </ChartCard>
+              )}
+
+              <FinSectionGroup
+                id="fech-dias"
+                title="Fechamentos por dia"
+                caption={items.length > 0 ? diasFechamentoLabel(items.length) : undefined}
+              >
+                <div ref={listaRef}>
+                  {items.length === 0 ? (
+                    <EmptyState
+                      icon={CalendarDays}
+                      title="Nenhum fechamento no período"
+                      description={canCreate ? 'Use Novo Dia para registrar o faturamento de um dia.' : 'Escolha outro período nos filtros acima.'}
+                    />
+                  ) : listaEstreita ? (
+                    <ul className="space-y-2">
+                      {items.map(row => (
+                        <li key={row.id} className="space-y-3 rounded-lg border bg-card p-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <p className="text-sm font-semibold text-foreground">{dataDoDia(row)}</p>
+                            <p className="text-right">
+                              <span className="block text-xs text-muted-foreground">Líquido</span>
+                              <span className="whitespace-nowrap text-sm font-bold tabular-nums text-foreground">{fmtBRL(Number(row.faturamento_liquido))}</span>
+                            </p>
+                          </div>
+                          <dl className="flex flex-wrap gap-x-5 gap-y-1 text-xs">
+                            <div>
+                              <dt className="text-muted-foreground">Bruto</dt>
+                              <dd className="whitespace-nowrap font-medium tabular-nums text-success">{fmtBRL(Number(row.faturamento_bruto))}</dd>
+                            </div>
+                            <div>
+                              <dt className="text-muted-foreground">Taxas</dt>
+                              <dd className="whitespace-nowrap tabular-nums text-foreground">{fmtBRL(Number(row.taxas))}</dd>
+                            </div>
+                            <div>
+                              <dt className="text-muted-foreground">Descontos</dt>
+                              <dd className="whitespace-nowrap tabular-nums text-foreground">{fmtBRL(Number(row.descontos))}</dd>
+                            </div>
+                          </dl>
+                          <div className="text-xs">
+                            <p className="mb-1 font-medium text-muted-foreground">Por marca</p>
+                            <MarcasDoDia dia={diaById.get(row.id)} indisponivel={divisaoIndisponivel} />
+                            {observacao(row)}
+                          </div>
+                          {temAcoes && <div className="border-t pt-2">{acoesDoDia(row, true)}</div>}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Data</TableHead>
+                          <TableHead className="text-right">Bruto</TableHead>
+                          <TableHead>Por marca</TableHead>
+                          <TableHead className="text-right">Taxas</TableHead>
+                          <TableHead className="text-right">Descontos</TableHead>
+                          <TableHead className="text-right">Líquido</TableHead>
+                          {temAcoes && <TableHead className="text-right">Ações</TableHead>}
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {items.map(row => (
+                          <TableRow key={row.id} className="align-top">
+                            <TableCell className="whitespace-nowrap text-sm font-medium tabular-nums">{dataDoDia(row)}</TableCell>
+                            <TableCell className="whitespace-nowrap text-right font-medium tabular-nums text-success">{fmtBRL(Number(row.faturamento_bruto))}</TableCell>
+                            <TableCell className="min-w-[240px] text-xs">
+                              <MarcasDoDia dia={diaById.get(row.id)} indisponivel={divisaoIndisponivel} />
+                              {observacao(row)}
+                            </TableCell>
+                            <TableCell className="whitespace-nowrap text-right tabular-nums text-muted-foreground">{fmtBRL(Number(row.taxas))}</TableCell>
+                            <TableCell className="whitespace-nowrap text-right tabular-nums text-muted-foreground">{fmtBRL(Number(row.descontos))}</TableCell>
+                            <TableCell className="whitespace-nowrap text-right font-bold tabular-nums">{fmtBRL(Number(row.faturamento_liquido))}</TableCell>
+                            {temAcoes && <TableCell>{acoesDoDia(row)}</TableCell>}
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </div>
+              </FinSectionGroup>
+            </>
+          )}
         </div>
       ) : (
-        <div className="pt-2">
-          <FechamentoMarcasTab
-            items={brands}
-            loading={brandsLoading}
-            canCreate={canCreate}
-            canEdit={canEdit}
-          />
-        </div>
+        <FechamentoMarcasTab
+          items={brands}
+          loading={brandsLoading}
+          canCreate={canCreate}
+          canEdit={canEdit}
+          erro={marcasErro}
+          onRetry={() => { void loadBrands(); }}
+        />
+      )}
+
+      {(canCreate || canEdit) && (
+        <Dialog open={showForm} onOpenChange={open => { if (!open) guardedClose(); else openNew(); }}>
+          <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl" {...retornoForm}>
+            <DialogHeader>
+              <DialogTitle>{editId ? 'Editar Fechamento' : 'Novo Fechamento'}</DialogTitle>
+              <DialogDescription>
+                {editId
+                  ? 'Altere o faturamento, as taxas e os descontos do dia.'
+                  : 'Registre o faturamento de um dia, com taxas e descontos.'}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor={formDataId}>Data</Label>
+                <DateInput id={formDataId} value={formData} onValueChange={setFormData} />
+              </div>
+              {marcasErro && (
+                <AvisoForm>
+                  As marcas não carregaram: o faturamento por marca pode não aparecer. Feche, use “Tentar novamente”
+                  no aviso das marcas e abra o dia de novo.
+                </AvisoForm>
+              )}
+              {divisaoIndisponivel && editId && (
+                <AvisoForm>
+                  A divisão por marca deste período não carregou, então este dia pode aparecer sem marcas. Salvar assim
+                  regrava o dia sem o detalhamento: feche e atualize antes de alterar.
+                </AvisoForm>
+              )}
+              {brandsForForm.length > 0 ? (
+                <section aria-labelledby={`${formDataId}-marcas`} className="space-y-3">
+                  <div>
+                    <h3 id={`${formDataId}-marcas`} className="text-sm font-medium text-foreground">Faturamento por marca</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Informe quanto cada operação vendeu no dia. A soma será o faturamento bruto.
+                    </p>
+                  </div>
+                  {/* Com a divisão indisponível não se sabe se o dia é antigo: o aviso acima já explica. */}
+                  {!formUsesBrands && editId && !divisaoIndisponivel && (
+                    <AvisoForm>
+                      Este fechamento antigo ainda não foi dividido. O total atual é {fmtBRL(parseMoney(formBruto))};
+                      ao preencher uma marca, a nova soma substituirá esse total.
+                    </AvisoForm>
+                  )}
+                  {brandsForFormSemCategoria.length > 0 && (
+                    <AvisoForm>
+                      Sem categoria vinculada: {brandsForFormSemCategoria.map(b => b.nome).join(', ')}. O faturamento
+                      líquido dessa(s) loja(s) não aparece na Apresentação Sócios até vincular em “Marcas e dark
+                      kitchens”.
+                    </AvisoForm>
+                  )}
+                  <div className="space-y-2">
+                    {brandsForForm.map(brand => {
+                      const semQuantidade = brandBreakdownPayload.missingQuantidade.includes(brand.id);
+                      return (
+                        <div key={brand.id} className="rounded-lg border p-3">
+                          <div className="mb-2 flex items-center justify-between gap-2">
+                            <p className="min-w-0 break-words text-sm font-medium text-foreground">{brand.nome}</p>
+                            {!brand.ativo && <StatusBadge status="neutral" label="Inativa" />}
+                          </div>
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <div className="space-y-1.5">
+                              <Label htmlFor={`marca-${brand.id}`} className="text-xs text-muted-foreground">
+                                Faturamento
+                              </Label>
+                              <CurrencyInput
+                                id={`marca-${brand.id}`}
+                                value={formBrandValues[brand.id] || ''}
+                                onValueChange={raw => {
+                                  setFormBrandValues(current => ({ ...current, [brand.id]: raw }));
+                                  setFormUsesBrands(true);
+                                }}
+                                showPrefix
+                                placeholder="0,00"
+                                aria-label={`Faturamento — ${brand.nome}`}
+                              />
+                            </div>
+                            {brand.forma_venda ? (
+                              <div className="space-y-1.5">
+                                <Label htmlFor={`marca-qtd-${brand.id}`} className="text-xs text-muted-foreground">
+                                  {brand.forma_venda === 'PEDIDOS' ? 'Qtd. de pedidos' : 'Qtd. de pessoas'}
+                                </Label>
+                                <Input
+                                  id={`marca-qtd-${brand.id}`}
+                                  inputMode="numeric"
+                                  value={formBrandQuantities[brand.id] || ''}
+                                  onChange={event => {
+                                    const digits = event.target.value.replace(/\D/g, '').slice(0, 9);
+                                    setFormBrandQuantities(current => ({ ...current, [brand.id]: digits }));
+                                    setFormUsesBrands(true);
+                                  }}
+                                  placeholder="0"
+                                  aria-invalid={semQuantidade}
+                                  aria-label={`${brand.forma_venda === 'PEDIDOS' ? 'Qtd. de pedidos' : 'Qtd. de pessoas'} — ${brand.nome}`}
+                                  className={semQuantidade ? 'border-warning' : undefined}
+                                />
+                              </div>
+                            ) : (
+                              <p className="self-end pb-2 text-xs text-muted-foreground">
+                                Defina a forma de venda desta marca em “Marcas e dark kitchens” para informar
+                                a quantidade.
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <dl className="grid gap-3 rounded-lg border bg-muted p-3 sm:grid-cols-3">
+                    <div>
+                      <dt className="text-xs text-muted-foreground">Faturamento bruto — soma das marcas</dt>
+                      <dd className="text-lg font-bold tabular-nums text-success">
+                        {fmtBRL(formUsesBrands ? brandGrossTotal : parseMoney(formBruto))}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-muted-foreground">Total de pedidos</dt>
+                      <dd className="text-lg font-bold tabular-nums text-foreground">
+                        {brandBreakdownPayload.totalPedidos.toLocaleString('pt-BR')}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-muted-foreground">Total de pessoas</dt>
+                      <dd className="text-lg font-bold tabular-nums text-foreground">
+                        {brandBreakdownPayload.totalPessoas.toLocaleString('pt-BR')}
+                      </dd>
+                    </div>
+                  </dl>
+                </section>
+              ) : (
+                <div className="space-y-1.5">
+                  <Label htmlFor={formBrutoId}>Faturamento Bruto (R$)</Label>
+                  <CurrencyInput
+                    id={formBrutoId}
+                    value={formBruto}
+                    onValueChange={(raw) => setFormBruto(raw)}
+                    showPrefix
+                    placeholder="0,00"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {marcasErro
+                      ? 'As marcas não carregaram: este valor seria gravado sem divisão por marca.'
+                      : 'Cadastre marcas na aba “Marcas e dark kitchens” para dividir este valor.'}
+                  </p>
+                </div>
+              )}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor={formTaxasId}>Taxas (R$)</Label>
+                  <CurrencyInput
+                    id={formTaxasId}
+                    value={formTaxas}
+                    onValueChange={(raw) => setFormTaxas(raw)}
+                    showPrefix
+                    placeholder="0,00"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor={formDescontosId}>Descontos (R$)</Label>
+                  <CurrencyInput
+                    id={formDescontosId}
+                    value={formDescontos}
+                    onValueChange={(raw) => setFormDescontos(raw)}
+                    showPrefix
+                    placeholder="0,00"
+                  />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor={formObsId}>Observação</Label>
+                <Textarea id={formObsId} value={formObs} onChange={e => setFormObs(e.target.value)} placeholder="Opcional" rows={2} />
+              </div>
+              <div className="rounded-lg border bg-muted p-3">
+                <p className="text-xs text-muted-foreground">Líquido estimado:</p>
+                <p className="text-lg font-bold tabular-nums text-foreground">{fmtBRL(liquidoEstimado)}</p>
+              </div>
+              <Button onClick={save} className="w-full" disabled={saving}>
+                {saving ? 'Salvando...' : editId ? 'Atualizar' : 'Registrar'}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
       <FormCloseConfirmDialog open={showConfirm} onConfirmLeave={confirmClose} onCancelLeave={cancelClose} />
     </div>

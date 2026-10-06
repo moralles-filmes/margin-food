@@ -20,9 +20,14 @@ interface SupplierComboboxProps {
   disabled?: boolean;
   /** If true, the value is a text string (legacy), not a UUID */
   textMode?: boolean;
+  /** Atalho "Cadastrar fornecedor". Desligado por padrão: o pai liga com `usePodeCadastrarFornecedor()`. */
   enableQuickAdd?: boolean;
   /** Set to true when combobox is used inside a Dialog/Sheet */
   modal?: boolean;
+  /** Id do botão, para um `<Label htmlFor>` externo nomear o combobox. */
+  id?: string;
+  'aria-label'?: string;
+  'aria-labelledby'?: string;
 }
 
 export default function SupplierCombobox({
@@ -33,8 +38,11 @@ export default function SupplierCombobox({
   className,
   disabled,
   textMode,
-  enableQuickAdd = true,
+  enableQuickAdd = false,
   modal = true,
+  id,
+  'aria-label': ariaLabel,
+  'aria-labelledby': ariaLabelledBy,
 }: SupplierComboboxProps) {
   const [open, setOpen] = useState(false);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
@@ -53,14 +61,17 @@ export default function SupplierCombobox({
       <Popover open={open} onOpenChange={setOpen} modal={modal}>
         <PopoverTrigger asChild>
           <Button
+            id={id}
             variant="outline"
             role="combobox"
             aria-expanded={open}
+            aria-label={ariaLabel}
+            aria-labelledby={ariaLabelledBy}
             disabled={disabled}
             className={cn('w-full justify-between font-normal', !value && 'text-muted-foreground', className)}
           >
             <span className="truncate">{selected?.name || value || placeholder}</span>
-            <ChevronsUpDown className="ml-1 h-4 w-4 shrink-0 opacity-50" />
+            <ChevronsUpDown aria-hidden="true" className="ml-1 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-[280px] p-0" align="start">

@@ -1,5 +1,5 @@
 import { useSupabase } from '@/contexts/CompanyScopeContext';
-import { Fragment, useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { Fragment, useState, useEffect, useCallback, useMemo, useRef, type KeyboardEvent } from 'react';
 import { useCan } from '@/permissions';
 import { useEmitDataEvent, useDataEvent } from '@/lib/dataEvents';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
@@ -9,11 +9,20 @@ import { formatDateISO, formatInBR } from '@/lib/datetime';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
 import { DateInput } from '@/components/ui/DateInput';
-import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { TrendingUp, TrendingDown, ArrowUpRight, RefreshCw, Repeat, ShieldAlert, Download, Edit, Trash2 } from 'lucide-react';
+import KpiCard from '@/components/ui/KpiCard';
+import StatusBadge from '@/components/ui/StatusBadge';
+import EmptyState from '@/components/ui/EmptyState';
+import ErrorState from '@/components/ui/ErrorState';
+import { kpiGridClassFor, longestValueLength } from '@/components/ui/kpiGrid';
+import { cn } from '@/lib/utils';
+import {
+  TrendingUp, TrendingDown, ArrowUpRight, ArrowLeftRight, RefreshCw, Repeat, ShieldAlert, Download, Edit, Trash2,
+  Wallet, Scale, Receipt, CheckCircle2, type LucideIcon,
+} from 'lucide-react';
 import { useFormDirtyGuard } from '@/hooks/useFormDirtyGuard';
 import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
 import ContaDetailDialog, { type ContaDetailData, type ContaDetailRateio } from './ContaDetailDialog';
@@ -27,6 +36,15 @@ import SearchableSelect from '@/components/ui/SearchableSelect';
 import { buildCategoriaFilterOptions, categoriaFiltroToParams, CATEGORIA_FILTRO_TODOS } from './categoriaFiltro';
 import { traduzirErroIdempotencia } from '@/domain/financeiro/idempotencia';
 import { useChavesPendentes } from '@/hooks/useChavesPendentes';
+import { FinKpiGrid, FinNote, FinScreenHeader, FinSectionGroup } from './finV2Layout';
+import {
+  daySaldoLabel,
+  formatLedgerPeriodLabel,
+  ledgerOrigem,
+  ledgerSaldoLabel,
+  ledgerStatusBadge,
+  ledgerTipoBadge,
+} from './livroRazaoView';
 import { padronizarTexto } from '@/lib/padronizarTexto';
 
 // ─── Types ───
@@ -67,7 +85,7 @@ function NoAccess() {
     <div className="bg-card border border-border rounded-xl p-8 text-center">
       <ShieldAlert className="w-10 h-10 mx-auto mb-3 opacity-30" />
       <p className="font-medium text-foreground">Acesso negado</p>
-      <p className="text-sm text-muted-foreground">Voce nao tem permissao para visualizar lancamentos.</p>
+      <p className="text-sm text-muted-foreground">Você não tem permissão para visualizar lançamentos.</p>
     </div>
   );
 }
@@ -86,20 +104,53 @@ function SkeletonTableRows() {
   );
 }
 
-const ORIGEM_LABEL: Record<string, { text: string; cls: string; tooltip: string }> = {
-  manual: { text: 'Manual', cls: 'bg-muted text-muted-foreground border-border', tooltip: 'Lancamento criado manualmente no Livro Razao' },
-  conciliacao: { text: 'Conciliacao', cls: 'bg-primary/10 text-primary border-primary/20', tooltip: 'Lancamento criado a partir da conciliacao bancaria' },
-  espelho_cp: { text: 'Espelho CP', cls: 'bg-warning/10 text-warning-foreground border-warning/20', tooltip: 'Lancamento gerado pela baixa de uma Conta a Pagar' },
-  espelho_cr: { text: 'Espelho CR', cls: 'bg-success/10 text-success border-success/20', tooltip: 'Lancamento gerado pelo recebimento de uma Conta a Receber' },
-  transferencia: { text: 'Transferencia', cls: 'bg-accent text-accent-foreground border-border', tooltip: 'Movimentacao entre contas financeiras' },
-  ajuste_pagamento: { text: 'Ajuste', cls: 'bg-info/10 text-info border-info/20', tooltip: 'Diferenca entre o valor do boleto e o valor debitado no extrato (juros, tarifa ou desconto)' },
-};
+function SkeletonStackedRows() {
+  return (
+    <div className="space-y-2" aria-hidden="true">
+      {[...Array(4)].map((_, i) => (
+        <div key={i} className="rounded-lg border bg-card p-3 space-y-2">
+          <Skeleton className="h-4 w-3/4" />
+          <Skeleton className="h-3 w-1/2" />
+        </div>
+      ))}
+    </div>
+  );
+}
 
-const STATUS_COLOR: Record<string, string> = {
-  PREVISTO: 'bg-warning/10 text-warning-foreground border-warning/20',
-  REALIZADO: 'bg-success/10 text-success border-success/20',
-  CANCELADO: 'bg-muted text-muted-foreground border-muted',
-};
+/** Estado de um carregamento de apresentação — erro nunca é exibido como zero. */
+type LoadStatus = 'loading' | 'ready' | 'error';
+
+/** Cabeçalho de cada dia da lista: data à esquerda, saldo rotulado à direita. */
+function DayHeader({ date, saldo, saldoLabel }: { date: string; saldo: number | null | undefined; saldoLabel: string }) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-lg bg-muted px-4 py-2.5">
+      <span className="text-sm font-semibold text-foreground">
+        {capitalizeFirst(formatDayHeaderLabel(parseLocalDate(date)))}
+      </span>
+      <span className="text-xs text-muted-foreground">
+        {saldoLabel}{' '}
+        <span className={cn('text-sm font-bold tabular-nums', saldo != null && saldo < 0 ? 'text-destructive' : 'text-foreground')}>
+          {saldo != null ? fmtBRL(saldo) : '—'}
+        </span>
+      </span>
+    </div>
+  );
+}
+
+/** Chip de origem; a explicação fica no tooltip ao passar o mouse (o texto do chip já nomeia a origem). */
+function OrigemChip({ origem, tipo }: { origem: string | null | undefined; tipo: string }) {
+  const orig = ledgerOrigem(origem, tipo);
+  return (
+    <TooltipProvider delayDuration={200}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className={cn('inline-flex whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium cursor-help', orig.className)}>{orig.text}</span>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-[220px] text-xs">{orig.tooltip}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
 
 interface LivroRazaoProps {
   initialContaId?: string;
@@ -173,6 +224,19 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
 
   const [totais, setTotais] = useState({ total_receita: 0, total_despesa: 0, total_transferencia: 0, resultado: 0 });
   const [saldoAtual, setSaldoAtual] = useState(0);
+  // 'refresh' = falhou a 1ª página (a lista na tela é da carga anterior); 'more' = falhou "carregar mais".
+  const [listError, setListError] = useState<null | 'refresh' | 'more'>(null);
+  const [totaisStatus, setTotaisStatus] = useState<LoadStatus>('loading');
+  const [saldoStatus, setSaldoStatus] = useState<LoadStatus>('loading');
+  // Filtros do pedido que trouxe os totais/saldo exibidos: a legenda e os rótulos descrevem os
+  // números na tela, não o filtro recém-trocado cuja resposta ainda não chegou.
+  const [totaisRef, setTotaisRef] = useState<{ de: string; ate: string; tipo: string; conta: string } | null>(null);
+  const [saldoRef, setSaldoRef] = useState<{ ate: string; conta: string } | null>(null);
+  // Só a resposta do pedido mais recente entra na tela: trocar o mês rápido não deixa a
+  // resposta (ou o erro) de um filtro antigo sobrescrever a do filtro atual.
+  const pageSeq = useRef(0);
+  const totaisSeq = useRef(0);
+  const saldoSeq = useRef(0);
 
   const [form, setForm] = useState<ContaFormData>({
     tipo: 'DESPESA', valor: 0, data_competencia: todayBR(),
@@ -193,6 +257,7 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
 
   // ─── Pagination ───
   const loadPage = useCallback(async (cDate: string | null, cId: string | null) => {
+    const seq = ++pageSeq.current;
     setLoading(true);
     const { data, error } = await supabase.rpc('list_fin_lancamentos_cursor', {
       p_start: filtroDataDe || null,
@@ -205,7 +270,9 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
       p_cursor_id: cId,
       ...categoriaFiltroToParams(filtroCategoria),
     } as any);
-    if (error) { console.error(error); setLoading(false); return; }
+    if (seq !== pageSeq.current) return;
+    if (error) { console.error(error); setListError(cDate ? 'more' : 'refresh'); setLoading(false); return; }
+    setListError(null);
     const result = data as unknown as { items: Lancamento[]; has_more: boolean } | null;
     const newItems = result?.items || [];
     setHasMore(result?.has_more || false);
@@ -220,6 +287,7 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
   }, [supabase, filtroDataDe, filtroDataAte, filtroTipo, filtroConta, filtroOrigem, filtroCategoria]);
 
   const loadTotais = useCallback(async () => {
+    const seq = ++totaisSeq.current;
     const { data, error } = await supabase.rpc('get_fin_lancamentos_totais', {
       p_start: filtroDataDe || null,
       p_end: filtroDataAte || null,
@@ -228,7 +296,8 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
       p_origem: filtroOrigem !== 'todos' ? filtroOrigem : null,
       ...categoriaFiltroToParams(filtroCategoria),
     } as any);
-    if (error) { console.error('[LivroRazaoSection.loadTotais]', error); return; }
+    if (seq !== totaisSeq.current) return;
+    if (error) { console.error('[LivroRazaoSection.loadTotais]', error); setTotaisStatus('error'); return; }
     const result = data as unknown as { total_receita: number; total_despesa: number; total_transferencia: number; resultado: number } | null;
     setTotais({
       total_receita: Number(result?.total_receita) || 0,
@@ -236,15 +305,21 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
       total_transferencia: Number(result?.total_transferencia) || 0,
       resultado: Number(result?.resultado) || 0,
     });
+    setTotaisRef({ de: filtroDataDe, ate: filtroDataAte, tipo: filtroTipo, conta: filtroConta });
+    setTotaisStatus('ready');
   }, [supabase, filtroDataDe, filtroDataAte, filtroTipo, filtroConta, filtroOrigem, filtroCategoria]);
 
   const loadSaldoAtual = useCallback(async () => {
+    const seq = ++saldoSeq.current;
     const { data, error } = await supabase.rpc('get_fin_saldo_atual', {
       p_conta_id: filtroConta !== 'todos' ? filtroConta : null,
       p_data: filtroDataAte || null,
     });
-    if (error) { console.error('[LivroRazaoSection.loadSaldoAtual]', error); return; }
+    if (seq !== saldoSeq.current) return;
+    if (error) { console.error('[LivroRazaoSection.loadSaldoAtual]', error); setSaldoStatus('error'); return; }
     setSaldoAtual(Number(data) || 0);
+    setSaldoRef({ ate: filtroDataAte, conta: filtroConta });
+    setSaldoStatus('ready');
   }, [filtroConta, filtroDataAte, supabase]);
 
   const load = useCallback(async () => {
@@ -369,15 +444,15 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
 
   const openEdit = async (item: Lancamento) => {
     if (item.origem === 'espelho_cp') {
-      toast.error('Este lancamento foi gerado por uma Conta a Pagar. Edite diretamente em Contas a Pagar.');
+      toast.error('Este lançamento foi gerado por uma Conta a Pagar. Edite diretamente em Contas a Pagar.');
       return;
     }
     if (item.origem === 'espelho_cr') {
-      toast.error('Este lancamento foi gerado por uma Conta a Receber. Edite diretamente em Contas a Receber.');
+      toast.error('Este lançamento foi gerado por uma Conta a Receber. Edite diretamente em Contas a Receber.');
       return;
     }
     if (item.conciliado && item.tipo === 'TRANSFERENCIA') {
-      toast.error('Transferencias conciliadas nao possuem classificacao contabil editavel.');
+      toast.error('Transferências conciliadas não possuem classificação contábil editável.');
       return;
     }
 
@@ -449,7 +524,7 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
       return;
     }
     if (!justificativa.trim()) {
-      toast.error('Justificativa obrigatoria para reclassificar um lancamento conciliado.');
+      toast.error('Justificativa obrigatória para reclassificar um lançamento conciliado.');
       return;
     }
 
@@ -476,14 +551,14 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
       if (error) {
         console.error('[LivroRazaoSection.saveReconciledClassification]', error);
         if (error.message?.includes('OPTIMISTIC_LOCK_CONFLICT')) {
-          toast.error('Este registro foi alterado por outro usuario. Recarregue a pagina.');
+          toast.error('Este registro foi alterado por outro usuário. Recarregue a página.');
         } else {
           toast.error(error.message);
         }
         return;
       }
 
-      toast.success('Classificacao atualizada sem desfazer a conciliacao.');
+      toast.success('Classificação atualizada sem desfazer a conciliação.');
       resetForm();
       load();
       emitDataEvent('financeiro:lancamentos');
@@ -494,21 +569,21 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
   };
 
   const deleteLancamento = async (item: Lancamento) => {
-    const ok = await confirm({ title: 'Excluir lancamento', description: 'Tem certeza que deseja excluir este lancamento? Esta acao nao pode ser desfeita.', confirmLabel: 'Excluir', variant: 'destructive' });
+    const ok = await confirm({ title: 'Excluir lançamento', description: 'Tem certeza que deseja excluir este lançamento? Esta ação não pode ser desfeita.', confirmLabel: 'Excluir', variant: 'destructive' });
     if (!ok) return;
     setSaving(true);
     try {
       if (item.tipo === 'TRANSFERENCIA') {
         const { error } = await supabase.rpc('delete_transfer', { p_lancamento_id: item.id });
         if (error) throw error;
-        toast.success('Transferencia excluida');
+        toast.success('Transferência excluída');
       } else {
         const { error } = await (supabase.rpc as any)('_guarded_delete_lancamento', {
           p_id: item.id,
           p_expected_updated_at: item.updated_at,
         });
         if (error) throw error;
-        toast.success('Lancamento excluido');
+        toast.success('Lançamento excluído');
       }
       load();
       emitDataEvent('financeiro:lancamentos');
@@ -522,13 +597,13 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
 
   const save = async () => {
     if (saving || salvandoRef.current) return;
-    if (!form.descricao.trim()) { toast.error('Descricao obrigatoria'); return; }
+    if (!form.descricao.trim()) { toast.error('Descrição obrigatória'); return; }
 
     // === TRANSFER FLOW ===
     if (form.tipo === 'TRANSFERENCIA') {
       if (!form.conta_id || !form.conta_destino_id) { toast.error('Selecione conta origem e destino'); return; }
       if (form.conta_id === form.conta_destino_id) { toast.error('Contas devem ser diferentes'); return; }
-      if (!form.valor || form.valor <= 0) { toast.error('Valor obrigatorio'); return; }
+      if (!form.valor || form.valor <= 0) { toast.error('Valor obrigatório'); return; }
 
       salvandoRef.current = true;
       setSaving(true);
@@ -543,7 +618,7 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
             p_conta_destino_id: form.conta_destino_id,
           });
           if (error) { toast.error(error.message); return; }
-          toast.success('Transferencia atualizada (ambos os lados)');
+          toast.success('Transferência atualizada (ambos os lados)');
         } else {
           const transferParams = {
             p_conta_origem: form.conta_id,
@@ -563,7 +638,7 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
           }
           chavesTransferencia.confirmar(transferParams);
           const jaRegistrada = (data as { idempotente?: boolean } | null)?.idempotente === true;
-          toast.success(jaRegistrada ? 'Esta transferencia ja estava registrada.' : 'Transferencia registrada com sucesso!');
+          toast.success(jaRegistrada ? 'Esta transferência já estava registrada.' : 'Transferência registrada com sucesso!');
         }
         resetForm();
         load();
@@ -580,12 +655,12 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
     const diffRateio = (form.valor || 0) - totalRateio;
     const rateioValido = rateioLines.length === 0 || Math.abs(diffRateio) < 0.01;
     const valorFinal = rateioLines.length > 0 ? totalRateio : form.valor;
-    if (!valorFinal || valorFinal <= 0) { toast.error('Valor obrigatorio'); return; }
+    if (!valorFinal || valorFinal <= 0) { toast.error('Valor obrigatório'); return; }
     if (rateioLines.length > 0 && !rateioValido) { toast.error(`Rateio incompleto. Ajuste os valores para totalizar ${fmt(form.valor)}.`); return; }
     if (rateioLines.length > 0 && rateioLines.some(l => !l.categoria_id)) { toast.error('Todas as linhas de rateio precisam de categoria'); return; }
 
     if (editId && editPrevStatus === 'REALIZADO' && !justificativa.trim()) {
-      toast.error('Justificativa obrigatoria para edicao de lancamento REALIZADO.');
+      toast.error('Justificativa obrigatória para edição de lançamento REALIZADO.');
       return;
     }
 
@@ -611,8 +686,8 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
             `- ${d.descricao} — ${fmt(d.valor)} (venc: ${formatDateValueBR(d.data_vencimento)})`
           ).join('\n');
           const proceed = await confirm({
-            title: 'Possivel duplicidade detectada',
-            description: `Encontramos ${form.tipo === 'DESPESA' ? 'Conta(s) a Pagar' : 'Conta(s) a Receber'} com valor semelhante:\n\n${dupDescriptions}\n\nDeseja criar o lancamento mesmo assim?`,
+            title: 'Possível duplicidade detectada',
+            description: `Encontramos ${form.tipo === 'DESPESA' ? 'Conta(s) a Pagar' : 'Conta(s) a Receber'} com valor semelhante:\n\n${dupDescriptions}\n\nDeseja criar o lançamento mesmo assim?`,
             confirmLabel: 'Criar mesmo assim',
             variant: 'destructive',
           });
@@ -660,7 +735,7 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
       if (error) {
         console.error('[LivroRazaoSection.save]', error);
         if (error.message?.includes('CONFLICT')) {
-          toast.error('Este registro foi alterado por outro usuario. Recarregue a pagina.');
+          toast.error('Este registro foi alterado por outro usuário. Recarregue a página.');
         } else {
           toast.error(traduzirErroIdempotencia(error.message) ?? error.message);
         }
@@ -670,10 +745,10 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
       if (!editId) chavesLancamento.confirmar(rpcParams);
       const jaRegistrado = !editId && (data as { idempotente?: boolean }[] | null)?.[0]?.idempotente === true;
       toast.success(editId
-        ? 'Lancamento atualizado'
+        ? 'Lançamento atualizado'
         : jaRegistrado
-          ? 'Este lancamento ja estava registrado.'
-          : (form.recorrente ? 'Lancamento recorrente criado!' : 'Lancamento criado'));
+          ? 'Este lançamento já estava registrado.'
+          : (form.recorrente ? 'Lançamento recorrente criado!' : 'Lançamento criado'));
       resetForm();
       load();
       emitDataEvent('financeiro:lancamentos');
@@ -702,226 +777,390 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
     toast.success('Exportacao concluida');
   };
 
+  // ─── Presentation ───
+  // Transferência numa conta filtrada tem direção definida: entrada (crédito) na conta destino,
+  // saída (débito) na conta origem. Sem filtro de conta, a transferência zera no consolidado
+  // da empresa, então não há sinal correto único — mantém neutro.
+  const valorDisplay = (item: Lancamento) => {
+    const isTransferInto = item.tipo === 'TRANSFERENCIA' && filtroConta !== 'todos' && item.conta_destino_id === filtroConta;
+    const isTransferOutOf = item.tipo === 'TRANSFERENCIA' && filtroConta !== 'todos' && item.conta_id === filtroConta;
+    const isCredit = item.tipo === 'RECEITA' || isTransferInto;
+    const isDebit = item.tipo === 'DESPESA' || isTransferOutOf;
+    const cls = isCredit ? 'text-success' : isDebit ? 'text-destructive' : 'text-foreground';
+    const sign = isCredit ? '+' : isDebit ? '-' : '';
+    return { cls, text: sign ? `${sign} ${fmt(item.valor)}` : fmt(item.valor) };
+  };
+
+  const hasRowFilter = filtroTipo !== 'todos' || filtroOrigem !== 'todos' || filtroCategoria !== CATEGORIA_FILTRO_TODOS;
+  const saldoDoDiaLabel = daySaldoLabel(hasRowFilter);
+  const totaisTipo = totaisRef?.tipo ?? filtroTipo;
+  const totaisPeriodoLabel = formatLedgerPeriodLabel(totaisRef?.de ?? filtroDataDe, totaisRef?.ate ?? filtroDataAte);
+  const saldoAte = saldoRef?.ate ?? filtroDataAte;
+  const saldoConta = saldoRef?.conta ?? filtroConta;
+  const contaSelecionada = saldoConta === 'todos'
+    ? 'Contas ativas'
+    : contas.find(c => c.id === saldoConta)?.nome ?? 'Conta selecionada';
+  // get_fin_lancamentos_totais soma realizados e previstos; get_fin_saldo_atual só realizados.
+  const TOTAIS_SUB = 'Realizados e previstos';
+  // Com filtro de conta, a RPC de totais só soma as transferências que saem da conta.
+  const transferenciasDaConta = (totaisRef?.conta ?? filtroConta) !== 'todos';
+
+  type TotalCard = { key: string; label: string; value: number; icon: LucideIcon; tone: 'default' | 'positive' | 'negative'; sub: string };
+  const totalCards: TotalCard[] = totaisTipo === 'todos'
+    ? [
+        { key: 'entradas', label: 'Entradas', value: totais.total_receita, icon: TrendingUp, tone: 'positive', sub: TOTAIS_SUB },
+        { key: 'saidas', label: 'Saídas', value: totais.total_despesa, icon: TrendingDown, tone: 'negative', sub: TOTAIS_SUB },
+        { key: 'resultado', label: 'Resultado', value: totais.resultado, icon: Scale, tone: totais.resultado >= 0 ? 'positive' : 'negative', sub: TOTAIS_SUB },
+      ]
+    : totaisTipo === 'RECEITA'
+      ? [{ key: 'entradas', label: 'Total de entradas', value: totais.total_receita, icon: TrendingUp, tone: 'positive', sub: TOTAIS_SUB }]
+      : totaisTipo === 'DESPESA'
+        ? [{ key: 'saidas', label: 'Total de saídas', value: totais.total_despesa, icon: TrendingDown, tone: 'negative', sub: TOTAIS_SUB }]
+        : [transferenciasDaConta
+            ? { key: 'transferencias', label: 'Transferências enviadas pela conta', value: totais.total_transferencia, icon: ArrowLeftRight, tone: 'default', sub: 'As recebidas não entram neste total' }
+            : { key: 'transferencias', label: 'Total de transferências', value: totais.total_transferencia, icon: ArrowLeftRight, tone: 'default', sub: TOTAIS_SUB }];
+  const cardCount = totalCards.length + 1;
+  const totaisGrid = kpiGridClassFor(
+    longestValueLength([...totalCards.map(c => fmt(c.value)), fmt(saldoAtual)]),
+    cardCount === 4 ? 4 : 2,
+  );
+  const retryTotais = () => {
+    setTotaisStatus('loading');
+    setSaldoStatus('loading');
+    loadTotais();
+    loadSaldoAtual();
+  };
+
+  const openNew = (tipo: 'DESPESA' | 'RECEITA' | 'TRANSFERENCIA') => {
+    resetForm();
+    setForm(f => ({ ...f, tipo }));
+    setShowForm(true);
+  };
+
+  // Sem editar nem excluir, a coluna "Ações" não aparece (antes ficava vazia).
+  const hasRowActions = canEdit || canDelete;
+  const tableColumns = hasRowActions ? 7 : 6;
+
+  const rowActions = (item: Lancamento, vertical = false) => (
+    <div className={cn('flex justify-end gap-1', vertical && 'flex-col')} onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
+      {canEdit && (
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-8 w-8"
+          onClick={() => openEdit(item)}
+          disabled={saving}
+          title={item.conciliado ? 'Editar classificação' : 'Editar'}
+          aria-label={item.conciliado ? `Editar classificação de ${item.descricao}` : `Editar lançamento ${item.descricao}`}
+        >
+          <Edit aria-hidden="true" className="w-3.5 h-3.5" />
+        </Button>
+      )}
+      {canDelete && (
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-8 w-8"
+          onClick={() => deleteLancamento(item)}
+          disabled={saving}
+          title="Excluir"
+          aria-label={`Excluir lançamento ${item.descricao}`}
+        >
+          <Trash2 aria-hidden="true" className="w-3.5 h-3.5 text-destructive" />
+        </Button>
+      )}
+    </div>
+  );
+
+  const descricaoBlock = (item: Lancamento) => (
+    <>
+      {item.recorrente && <Repeat role="img" aria-label="Recorrente" className="w-3 h-3 inline mr-1 text-muted-foreground" />}
+      <span className="whitespace-normal break-words">{item.descricao}</span>
+      {item.tipo === 'TRANSFERENCIA' && item.conta_id && item.conta_destino_id && (
+        <span className="text-[11px] text-muted-foreground flex items-center gap-1 mt-0.5 font-normal">
+          <ArrowUpRight aria-hidden="true" className="w-3 h-3" />
+          {contaNome(item.conta_id)} → {contaNome(item.conta_destino_id)}
+        </span>
+      )}
+      {item.conciliado && (
+        <span className="ml-1 inline-flex items-center gap-0.5 text-[11px] font-normal text-success">
+          <CheckCircle2 aria-hidden="true" className="h-3 w-3" /> Conciliado
+        </span>
+      )}
+    </>
+  );
+
+  const onRowKeyDown = (e: KeyboardEvent, item: Lancamento) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetail(item); }
+  };
+
   // ─── Render ───
   return (
     <>
-      <div className="space-y-4">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <div>
-            <h2 className="text-xl font-bold text-foreground">Livro Razao</h2>
-            <p className="text-sm text-muted-foreground">Ledger central — registra todas as movimentacoes financeiras realizadas</p>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <DateInput value={filtroDataDe} onValueChange={setFiltroDataDe} className="w-36 h-9 text-xs" />
-            <span className="text-muted-foreground text-xs">ate</span>
-            <DateInput value={filtroDataAte} onValueChange={setFiltroDataAte} className="w-36 h-9 text-xs" />
-            <Select value={filtroTipo} onValueChange={setFiltroTipo}>
-              <SelectTrigger className="w-36 h-9"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos</SelectItem>
-                <SelectItem value="RECEITA">Receitas</SelectItem>
-                <SelectItem value="DESPESA">Despesas</SelectItem>
-                <SelectItem value="TRANSFERENCIA">Transferencias</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={filtroOrigem} onValueChange={setFiltroOrigem}>
-              <SelectTrigger className="w-36 h-9"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todas origens</SelectItem>
-                <SelectItem value="manual">Manual</SelectItem>
-                <SelectItem value="conciliacao">Conciliacao</SelectItem>
-                <SelectItem value="espelho_cp">Espelho CP</SelectItem>
-                <SelectItem value="espelho_cr">Espelho CR</SelectItem>
-                <SelectItem value="transferencia">Transferencia</SelectItem>
-                <SelectItem value="ajuste_pagamento">Ajuste de baixa</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={filtroConta} onValueChange={setFiltroConta}>
-              <SelectTrigger className="w-36 h-9"><SelectValue placeholder="Conta" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todas contas</SelectItem>
-                {contas.map(c => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            <SearchableSelect
-              value={filtroCategoria}
-              onValueChange={v => setFiltroCategoria(v || CATEGORIA_FILTRO_TODOS)}
-              options={categoriaFilterOptions}
-              placeholder="Categoria"
-              searchPlaceholder="Buscar categoria..."
-              className="w-44 h-9"
-              allowClear={false}
-            />
-            {canExport && (
-              <Button size="sm" variant="outline" onClick={exportExcel}>
-                <Download className="w-4 h-4 mr-1" /> Excel
-              </Button>
-            )}
-            {canCreate && (
-              <>
-                <Button size="sm" variant="outline" onClick={() => { resetForm(); setForm(f => ({ ...f, tipo: 'DESPESA' })); setShowForm(true); }} disabled={saving}>
-                  <TrendingDown className="w-4 h-4 mr-1 text-destructive" /> Nova Despesa
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => { resetForm(); setForm(f => ({ ...f, tipo: 'RECEITA' })); setShowForm(true); }} disabled={saving}>
-                  <TrendingUp className="w-4 h-4 mr-1 text-success" /> Nova Receita
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => { resetForm(); setForm(f => ({ ...f, tipo: 'TRANSFERENCIA' })); setShowForm(true); }} disabled={saving}>
-                  <ArrowUpRight className="w-4 h-4 mr-1" /> Nova Transferencia
-                </Button>
-              </>
-            )}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 flex-wrap">
-          <MonthNavigator value={mesFiltro} onChange={handleMesChange} />
-          <DateRangePresets
-            from={filtroDataDe}
-            to={filtroDataAte}
-            onChange={(de, ate) => { setFiltroDataDe(de); setFiltroDataAte(ate); }}
-            hideLastNDays
-          />
-        </div>
-
-        <div className="flex items-center gap-4 flex-wrap text-sm bg-card border border-border rounded-lg px-4 py-2.5">
-          {filtroTipo === 'todos' ? (
+      <div className="space-y-6">
+        <FinScreenHeader
+          title="Livro Razão"
+          description="Lançamentos realizados e previstos, agrupados por dia."
+          actions={(
             <>
-              <span className="text-muted-foreground">Entradas: <strong className="text-success">{fmt(totais.total_receita)}</strong></span>
-              <span className="text-muted-foreground">Saidas: <strong className="text-destructive">{fmt(totais.total_despesa)}</strong></span>
-              <span className="text-muted-foreground">Resultado: <strong className={totais.resultado >= 0 ? 'text-success' : 'text-destructive'}>{fmt(totais.resultado)}</strong></span>
+              {canExport && (
+                <Button size="sm" variant="outline" onClick={exportExcel}>
+                  <Download className="w-4 h-4 mr-1" /> Excel
+                </Button>
+              )}
+              {canCreate && (
+                <>
+                  <Button size="sm" variant="outline" onClick={() => openNew('DESPESA')} disabled={saving}>
+                    <TrendingDown className="w-4 h-4 mr-1 text-destructive" /> Nova Despesa
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => openNew('RECEITA')} disabled={saving}>
+                    <TrendingUp className="w-4 h-4 mr-1 text-success" /> Nova Receita
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => openNew('TRANSFERENCIA')} disabled={saving}>
+                    <ArrowUpRight className="w-4 h-4 mr-1" /> Nova Transferência
+                  </Button>
+                </>
+              )}
             </>
-          ) : filtroTipo === 'RECEITA' ? (
-            <span className="text-muted-foreground">Total de entradas: <strong className="text-success">{fmt(totais.total_receita)}</strong></span>
-          ) : filtroTipo === 'DESPESA' ? (
-            <span className="text-muted-foreground">Total de saidas: <strong className="text-destructive">{fmt(totais.total_despesa)}</strong></span>
-          ) : (
-            <span className="text-muted-foreground">Total de transferencias: <strong className="text-foreground">{fmt(totais.total_transferencia)}</strong></span>
           )}
-          <span className="text-muted-foreground ml-auto">Saldo atual: <strong className={saldoAtual >= 0 ? 'text-foreground' : 'text-destructive'}>{fmt(saldoAtual)}</strong></span>
-          {filtroCategoria !== CATEGORIA_FILTRO_TODOS && (
-            <span className="w-full text-xs text-muted-foreground">
-              Com filtro de categoria, os totais somam só a parte rateada na categoria e nas subcategorias (mesmo valor do DFC); a coluna Valor mostra o lançamento inteiro.
-            </span>
-          )}
+        />
+
+        <div className="rounded-summary border bg-card p-4 shadow-card space-y-3">
+          <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:items-end">
+            <div className="flex min-w-0 flex-col gap-1.5">
+              <Label htmlFor="razao-data-de" className="text-xs text-muted-foreground">De</Label>
+              <DateInput id="razao-data-de" value={filtroDataDe} onValueChange={setFiltroDataDe} className="h-9 w-full text-xs sm:w-36" />
+            </div>
+            <div className="flex min-w-0 flex-col gap-1.5">
+              <Label htmlFor="razao-data-ate" className="text-xs text-muted-foreground">Até</Label>
+              <DateInput id="razao-data-ate" value={filtroDataAte} onValueChange={setFiltroDataAte} className="h-9 w-full text-xs sm:w-36" />
+            </div>
+            <div className="flex min-w-0 flex-col gap-1.5">
+              <Label htmlFor="razao-tipo" className="text-xs text-muted-foreground">Tipo</Label>
+              <Select value={filtroTipo} onValueChange={setFiltroTipo}>
+                <SelectTrigger id="razao-tipo" className="h-9 w-full sm:w-36"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  <SelectItem value="RECEITA">Receitas</SelectItem>
+                  <SelectItem value="DESPESA">Despesas</SelectItem>
+                  <SelectItem value="TRANSFERENCIA">Transferências</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex min-w-0 flex-col gap-1.5">
+              <Label htmlFor="razao-origem" className="text-xs text-muted-foreground">Origem</Label>
+              <Select value={filtroOrigem} onValueChange={setFiltroOrigem}>
+                <SelectTrigger id="razao-origem" className="h-9 w-full sm:w-40"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todas origens</SelectItem>
+                  <SelectItem value="manual">Manual</SelectItem>
+                  <SelectItem value="conciliacao">Conciliação</SelectItem>
+                  <SelectItem value="espelho_cp">Espelho CP</SelectItem>
+                  <SelectItem value="espelho_cr">Espelho CR</SelectItem>
+                  <SelectItem value="transferencia">Transferência</SelectItem>
+                  <SelectItem value="ajuste_pagamento">Ajuste de baixa</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex min-w-0 flex-col gap-1.5">
+              <Label htmlFor="razao-conta" className="text-xs text-muted-foreground">Conta</Label>
+              <Select value={filtroConta} onValueChange={setFiltroConta}>
+                <SelectTrigger id="razao-conta" className="h-9 w-full sm:w-44"><SelectValue placeholder="Conta" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todas contas</SelectItem>
+                  {contas.map(c => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex min-w-0 flex-col gap-1.5">
+              <span className="text-xs font-medium leading-none text-muted-foreground">Categoria</span>
+              <SearchableSelect
+                value={filtroCategoria}
+                onValueChange={v => setFiltroCategoria(v || CATEGORIA_FILTRO_TODOS)}
+                options={categoriaFilterOptions}
+                placeholder="Categoria"
+                searchPlaceholder="Buscar categoria..."
+                ariaLabel="Categoria"
+                className="h-9 w-full sm:w-48"
+                allowClear={false}
+              />
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 border-t pt-3">
+            <MonthNavigator value={mesFiltro} onChange={handleMesChange} />
+            <DateRangePresets
+              from={filtroDataDe}
+              to={filtroDataAte}
+              onChange={(de, ate) => { setFiltroDataDe(de); setFiltroDataAte(ate); }}
+              hideLastNDays
+            />
+          </div>
         </div>
 
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Data</TableHead>
-              <TableHead>Descricao</TableHead>
-              <TableHead>Tipo</TableHead>
-              <TableHead>Origem</TableHead>
-              <TableHead>Valor</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="w-20">Acoes</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading && items.length === 0 ? (
-              <SkeletonTableRows />
-            ) : items.length === 0 ? (
-              <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">Nenhum lancamento encontrado</TableCell></TableRow>
-            ) : items.map((item, idx) => {
-              const orig = ORIGEM_LABEL[item.origem || (item.tipo === 'TRANSFERENCIA' ? 'transferencia' : 'manual')] || ORIGEM_LABEL.manual;
-              const isNewDay = idx === 0 || items[idx - 1].data_ledger !== item.data_ledger;
-              const diaSaldo = dayCloseSaldo.get(item.data_ledger);
-              return (
-                <Fragment key={item.id}>
-                  {isNewDay && (
-                    <TableRow className="hover:bg-transparent border-0">
-                      <TableCell colSpan={7} className="p-0">
-                        <div className="flex items-center justify-between px-4 py-3 my-1.5 rounded-lg bg-muted/60">
-                          <span className="text-sm font-semibold text-foreground">
-                            {capitalizeFirst(formatDayHeaderLabel(parseLocalDate(item.data_ledger)))}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            saldo total{' '}
-                            <span className={`text-base font-bold ${diaSaldo != null && diaSaldo < 0 ? 'text-destructive' : 'text-foreground'}`}>
-                              {diaSaldo != null ? fmt(diaSaldo) : '—'}
-                            </span>
-                          </span>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                  <TableRow
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => openDetail(item)}
-                  >
-                  <TableCell className="font-mono text-sm">{formatDateBR(parseLocalDate(item.data_ledger))}</TableCell>
-                  <TableCell className="font-medium max-w-xs">
-                    {item.recorrente && <Repeat className="w-3 h-3 inline mr-1 text-muted-foreground" />}
-                    <span className="whitespace-normal break-words">{item.descricao}</span>
-                    {item.tipo === 'TRANSFERENCIA' && item.conta_id && item.conta_destino_id && (
-                      <span className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
-                        <ArrowUpRight className="w-3 h-3" />
-                        {contaNome(item.conta_id)} → {contaNome(item.conta_destino_id)}
-                      </span>
-                    )}
-                    {item.conciliado && <span className="text-[10px] text-success ml-1">Conciliado</span>}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={item.tipo === 'RECEITA' ? 'default' : item.tipo === 'DESPESA' ? 'destructive' : 'outline'}>
-                      {item.tipo === 'TRANSFERENCIA' ? 'Transf.' : item.tipo}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <TooltipProvider delayDuration={200}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full border cursor-help ${orig.cls}`}>{orig.text}</span>
-                        </TooltipTrigger>
-                        <TooltipContent side="top" className="max-w-[220px] text-xs">{orig.tooltip}</TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </TableCell>
-                  {(() => {
-                    // Transferencia numa conta filtrada tem direcao definida: entrada (credito) na conta destino,
-                    // saida (debito) na conta origem. Sem filtro de conta, a transferencia zera no consolidado
-                    // da empresa, entao nao ha sinal correto unico — mantem neutro.
-                    const isTransferInto = item.tipo === 'TRANSFERENCIA' && filtroConta !== 'todos' && item.conta_destino_id === filtroConta;
-                    const isTransferOutOf = item.tipo === 'TRANSFERENCIA' && filtroConta !== 'todos' && item.conta_id === filtroConta;
-                    const isCredit = item.tipo === 'RECEITA' || isTransferInto;
-                    const isDebit = item.tipo === 'DESPESA' || isTransferOutOf;
-                    const cls = isCredit ? 'text-success' : isDebit ? 'text-destructive' : 'text-foreground';
-                    const sign = isCredit ? '+' : isDebit ? '-' : '';
-                    return (
-                      <TableCell className={`font-bold ${cls}`}>
-                        {sign} {fmt(item.valor)}
-                      </TableCell>
-                    );
-                  })()}
-                  <TableCell><span className={`text-xs px-2 py-0.5 rounded-full border ${STATUS_COLOR[item.status] || ''}`}>{item.status}</span></TableCell>
-                  <TableCell>
-                    <div className="flex gap-1" onClick={e => e.stopPropagation()}>
-                      {canEdit && (
-                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(item)} disabled={saving} title={item.conciliado ? 'Editar classificacao' : 'Editar'}>
-                          <Edit className="w-3.5 h-3.5" />
-                        </Button>
-                      )}
-                      {canDelete && (
-                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => deleteLancamento(item)} disabled={saving} title="Excluir">
-                          <Trash2 className="w-3.5 h-3.5 text-destructive" />
-                        </Button>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-                </Fragment>
-              );
-            })}
-          </TableBody>
-        </Table>
+        <FinSectionGroup id="razao-totais" title="Totais do período" caption={totaisPeriodoLabel}>
+          {totaisStatus === 'error' || saldoStatus === 'error' ? (
+            <ErrorState compact title="Não foi possível carregar os totais" onRetry={retryTotais} />
+          ) : totaisStatus === 'loading' || saldoStatus === 'loading' ? (
+            <FinKpiGrid className={totaisGrid}>
+              {Array.from({ length: cardCount }).map((_, i) => (
+                <div key={i} aria-hidden="true" className="rounded-summary border bg-card p-5 space-y-3">
+                  <Skeleton className="h-3 w-24" />
+                  <Skeleton className="h-7 w-32" />
+                  <Skeleton className="h-3 w-40" />
+                </div>
+              ))}
+            </FinKpiGrid>
+          ) : (
+            <FinKpiGrid className={totaisGrid}>
+              {totalCards.map(card => (
+                <KpiCard
+                  key={card.key}
+                  appearance="summary"
+                  icon={card.icon}
+                  label={card.label}
+                  value={fmt(card.value)}
+                  sub={card.sub}
+                  valueTone={card.tone}
+                />
+              ))}
+              <KpiCard
+                appearance="summary"
+                icon={Wallet}
+                label={ledgerSaldoLabel(saldoAte)}
+                value={fmt(saldoAtual)}
+                sub={saldoAte ? `${contaSelecionada} · realizados até o fim do dia` : `${contaSelecionada} · só realizados`}
+                valueTone={saldoAtual < 0 ? 'negative' : 'default'}
+              />
+            </FinKpiGrid>
+          )}
+          {filtroCategoria !== CATEGORIA_FILTRO_TODOS && (
+            <FinNote>
+              Com filtro de categoria, os totais somam só a parte rateada na categoria e nas subcategorias; a coluna Valor mostra o lançamento inteiro. Diferente do DFC, os totais incluem os previstos.
+            </FinNote>
+          )}
+        </FinSectionGroup>
 
-        {hasMore && items.length > 0 && (
-          <div className="flex justify-center">
-            <Button variant="outline" size="sm" onClick={() => loadPage(cursorDate, cursorId)} disabled={loading}>
-              {loading ? <RefreshCw className="w-4 h-4 mr-1 animate-spin" /> : null}
-              Carregar mais
-            </Button>
-          </div>
-        )}
+        <FinSectionGroup id="razao-lancamentos" title="Lançamentos" caption={items.length > 0 ? `${items.length}${hasMore ? '+' : ''} ${items.length === 1 ? 'lançamento' : 'lançamentos'}` : undefined}>
+          {listError && items.length === 0 ? (
+            <ErrorState title="Não foi possível carregar os lançamentos" onRetry={load} retrying={loading} />
+          ) : !loading && items.length === 0 ? (
+            <EmptyState icon={Receipt} title="Nenhum lançamento encontrado" description="Ajuste o período ou os filtros." />
+          ) : (
+            <div className="[container-type:inline-size]">
+              {/* Larguras médias e grandes: tabela. */}
+              <div className="hidden [@container(min-width:48rem)]:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Data</TableHead>
+                      <TableHead>Descrição</TableHead>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead>Origem</TableHead>
+                      <TableHead className="text-right">Valor</TableHead>
+                      <TableHead>Status</TableHead>
+                      {hasRowActions && <TableHead className="w-20 text-right">Ações</TableHead>}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {loading && items.length === 0 ? (
+                      <SkeletonTableRows />
+                    ) : items.map((item, idx) => {
+                      const isNewDay = idx === 0 || items[idx - 1].data_ledger !== item.data_ledger;
+                      const valor = valorDisplay(item);
+                      const tipoBadge = ledgerTipoBadge(item.tipo);
+                      const statusBadge = ledgerStatusBadge(item.status);
+                      return (
+                        <Fragment key={item.id}>
+                          {isNewDay && (
+                            <TableRow className="hover:bg-transparent border-0">
+                              <TableCell colSpan={tableColumns} className="p-0 pt-2">
+                                <DayHeader date={item.data_ledger} saldo={dayCloseSaldo.get(item.data_ledger)} saldoLabel={saldoDoDiaLabel} />
+                              </TableCell>
+                            </TableRow>
+                          )}
+                          <TableRow
+                            className="cursor-pointer hover:bg-card-hover focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+                            tabIndex={0}
+                            onClick={() => openDetail(item)}
+                            onKeyDown={e => onRowKeyDown(e, item)}
+                          >
+                            <TableCell className="whitespace-nowrap text-sm tabular-nums">{formatDateBR(parseLocalDate(item.data_ledger))}</TableCell>
+                            <TableCell className="font-medium max-w-xs">{descricaoBlock(item)}</TableCell>
+                            <TableCell><StatusBadge status={tipoBadge.status} label={tipoBadge.label} /></TableCell>
+                            <TableCell><OrigemChip origem={item.origem} tipo={item.tipo} /></TableCell>
+                            <TableCell className={cn('text-right font-semibold tabular-nums whitespace-nowrap', valor.cls)}>{valor.text}</TableCell>
+                            <TableCell><StatusBadge status={statusBadge.status} label={statusBadge.label} /></TableCell>
+                            {hasRowActions && <TableCell>{rowActions(item)}</TableCell>}
+                          </TableRow>
+                        </Fragment>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Larguras estreitas: lista empilhada, sem rolagem horizontal. */}
+              <div className="[@container(min-width:48rem)]:hidden">
+                {loading && items.length === 0 ? (
+                  <SkeletonStackedRows />
+                ) : (
+                  <ul className="space-y-2">
+                    {items.map((item, idx) => {
+                      const isNewDay = idx === 0 || items[idx - 1].data_ledger !== item.data_ledger;
+                      const valor = valorDisplay(item);
+                      const tipoBadge = ledgerTipoBadge(item.tipo);
+                      const statusBadge = ledgerStatusBadge(item.status);
+                      return (
+                        <Fragment key={item.id}>
+                          {isNewDay && (
+                            <li className="pt-2 first:pt-0">
+                              <DayHeader date={item.data_ledger} saldo={dayCloseSaldo.get(item.data_ledger)} saldoLabel={saldoDoDiaLabel} />
+                            </li>
+                          )}
+                          <li className="flex items-start gap-1 rounded-lg border bg-card">
+                            <button
+                              type="button"
+                              className="min-w-0 flex-1 rounded-lg p-3 text-left hover:bg-card-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              onClick={() => openDetail(item)}
+                            >
+                              <span className="flex items-start justify-between gap-3">
+                                <span className="min-w-0 text-sm font-medium text-foreground">{descricaoBlock(item)}</span>
+                                <span className={cn('shrink-0 text-sm font-semibold tabular-nums whitespace-nowrap', valor.cls)}>{valor.text}</span>
+                              </span>
+                              <span className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                                <span className="tabular-nums">{formatDateBR(parseLocalDate(item.data_ledger))}</span>
+                                <StatusBadge status={tipoBadge.status} label={tipoBadge.label} />
+                                <OrigemChip origem={item.origem} tipo={item.tipo} />
+                                <StatusBadge status={statusBadge.status} label={statusBadge.label} />
+                              </span>
+                            </button>
+                            {hasRowActions && <div className="py-2 pr-1">{rowActions(item, true)}</div>}
+                          </li>
+                        </Fragment>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            </div>
+          )}
+
+          {listError === 'more' && items.length > 0 && (
+            <ErrorState compact title="Não foi possível carregar mais lançamentos" onRetry={() => loadPage(cursorDate, cursorId)} retrying={loading} />
+          )}
+          {listError === 'refresh' && items.length > 0 && (
+            <ErrorState compact title="Não foi possível atualizar os lançamentos" description="A lista abaixo é da última carga." onRetry={load} retrying={loading} />
+          )}
+
+          {hasMore && items.length > 0 && !listError && (
+            <div className="flex justify-center">
+              <Button variant="outline" size="sm" onClick={() => loadPage(cursorDate, cursorId)} disabled={loading}>
+                {loading ? <RefreshCw className="w-4 h-4 mr-1 animate-spin" /> : null}
+                Carregar mais
+              </Button>
+            </div>
+          )}
+        </FinSectionGroup>
       </div>
 
       {/* Detail Dialog */}

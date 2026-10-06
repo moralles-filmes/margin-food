@@ -1,21 +1,24 @@
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useEmitDataEvent, useDataEvent } from '@/lib/dataEvents';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
+import StatusBadge, { type StatusType } from '@/components/ui/StatusBadge';
+import ErrorState from '@/components/ui/ErrorState';
+import AccessDenied from '@/components/ui/AccessDenied';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { useCan } from '@/permissions/hooks';
 import { useScopedToast } from '@/hooks/useScopedToast';
-import { RefreshCw, Repeat, Play, ExternalLink, ShieldX, Download } from 'lucide-react';
+import { RefreshCw, Repeat, Play, ExternalLink, Download } from 'lucide-react';
 import { fmtBRL, todayBR } from '@/lib/formatters';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import * as XLSX from '@/lib/safeXlsx';
 import { traduzirErroIdempotencia } from '@/domain/financeiro/idempotencia';
+import { FinScreenHeader, FinSectionGroup } from './finV2Layout';
 
 // ─── Types ───
 type OrigemType = 'lancamento' | 'conta_pagar' | 'conta_receber';
@@ -48,10 +51,10 @@ const ORIGEM_LABELS: Record<OrigemType, string> = {
   conta_receber: 'Contas a Receber',
 };
 
-const ORIGEM_BADGE_VARIANT: Record<OrigemType, 'default' | 'destructive' | 'secondary'> = {
-  lancamento: 'default',
-  conta_pagar: 'destructive',
-  conta_receber: 'secondary',
+/** Tipo com cor semântica (como no Livro Razão); valor desconhecido aparece cru, em neutro. */
+const TIPO_BADGE: Record<string, { label: string; status: StatusType }> = {
+  RECEITA: { label: 'Receita', status: 'success' },
+  DESPESA: { label: 'Despesa', status: 'danger' },
 };
 
 const ORIGEM_TAB: Record<OrigemType, string> = {
@@ -70,32 +73,6 @@ const FREQ_LABELS: Record<string, string> = {
 
 interface Props {
   onNavigate?: (tab: string) => void;
-}
-
-// ─── NoAccess ───
-function NoAccess() {
-  return (
-    <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-2">
-      <ShieldX className="w-10 h-10 opacity-40" />
-      <p className="font-medium">Acesso restrito</p>
-      <p className="text-sm">Você não tem permissão para visualizar as recorrências financeiras.</p>
-    </div>
-  );
-}
-
-// ─── Skeleton rows ───
-function SkeletonRows() {
-  return (
-    <>
-      {Array.from({ length: 5 }).map((_, i) => (
-        <TableRow key={i}>
-          {Array.from({ length: 8 }).map((_, j) => (
-            <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
-          ))}
-        </TableRow>
-      ))}
-    </>
-  );
 }
 
 export default function RecorrenciasSection({ onNavigate }: Props) {
@@ -288,160 +265,207 @@ export default function RecorrenciasSection({ onNavigate }: Props) {
   };
 
   // ─── RBAC gate ───
-  if (!canView) return <NoAccess />;
+  if (!canView) return <AccessDenied description="Você não tem permissão para visualizar as recorrências financeiras." />;
+
+  // Contagens só das recorrências carregadas (a lista é paginada): a legenda diz isso.
+  const pendentesCarregadas = items.filter(item => !item.gerado_mes).length;
+  const legenda = items.length > 0
+    ? `${items.length} ${items.length === 1 ? 'carregada' : 'carregadas'}${hasMore ? ' (há mais)' : ''} · ${pendentesCarregadas} ${pendentesCarregadas === 1 ? 'pendente' : 'pendentes'} no mês entre as carregadas`
+    : undefined;
+
+  const tipoBadge = (tipo: string) => TIPO_BADGE[tipo] ?? { label: tipo, status: 'neutral' as StatusType };
+
+  const origemChip = (item: RecorrenciaConsolidada) => (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span tabIndex={0} className="inline-flex cursor-help items-center whitespace-nowrap rounded-full border border-neutral-border bg-neutral-soft px-2 py-0.5 text-[10px] font-semibold leading-tight text-neutral focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          {ORIGEM_LABELS[item.origem]}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>
+        Recorrência criada em {ORIGEM_LABELS[item.origem]}
+      </TooltipContent>
+    </Tooltip>
+  );
+
+  const statusMes = (item: RecorrenciaConsolidada) => (item.gerado_mes
+    ? <StatusBadge status="success" label={`${item.filhos_mes} lançada(s)`} />
+    : <StatusBadge status="warning" label="Pendente" />);
+
+  const acoes = (item: RecorrenciaConsolidada) => {
+    const isGerando = gerandoById[item.chave_unica] ?? false;
+    const maxReached = item.parcelas_max > 0 && item.parcelas_geradas >= item.parcelas_max;
+    return (
+      <div className="flex items-center justify-end gap-1">
+        {item.origem === 'lancamento' && canCreate && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8"
+            onClick={() => gerarParcela(item)}
+            disabled={isGerando || maxReached}
+            aria-label={`Gerar parcela de ${item.descricao}`}
+          >
+            {isGerando ? (
+              <RefreshCw aria-hidden="true" className="w-3 h-3 mr-1 animate-spin" />
+            ) : (
+              <Play aria-hidden="true" className="w-3 h-3 mr-1" />
+            )}
+            Gerar
+          </Button>
+        )}
+        {onNavigate && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => handleOpenOrigem(item)} aria-label={`Abrir ${ORIGEM_LABELS[item.origem]}`}>
+                <ExternalLink aria-hidden="true" className="w-3.5 h-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Abrir {ORIGEM_LABELS[item.origem]}</TooltipContent>
+          </Tooltip>
+        )}
+      </div>
+    );
+  };
+
+  const parcelas = (item: RecorrenciaConsolidada) => `${item.parcelas_geradas}/${item.parcelas_max > 0 ? item.parcelas_max : '∞'}`;
 
   return (
     <TooltipProvider>
-      <div className="space-y-4">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <div>
-            <h2 className="text-xl font-bold text-foreground">Recorrências do Mês</h2>
-            <p className="text-sm text-muted-foreground">Visão consolidada de todas as recorrências financeiras</p>
-          </div>
-          <div className="flex items-center gap-2">
-            {canExport && items.length > 0 && (
-              <Button variant="outline" size="sm" onClick={handleExportExcel}>
-                <Download className="w-4 h-4 mr-1" /> Excel
+      <div className="space-y-6">
+        <FinScreenHeader
+          title="Recorrências do Mês"
+          description="Visão consolidada de todas as recorrências financeiras"
+          actions={(
+            <>
+              {canExport && items.length > 0 && (
+                <Button variant="outline" size="sm" onClick={handleExportExcel}>
+                  <Download aria-hidden="true" className="w-4 h-4 mr-1" /> Excel
+                </Button>
+              )}
+              <Button variant="outline" size="sm" onClick={() => loadPage(null, null, true)} disabled={loading}>
+                <RefreshCw aria-hidden="true" className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} /> Atualizar
               </Button>
-            )}
+            </>
+          )}
+        />
+
+        <div className="flex flex-wrap items-end gap-3 rounded-summary border bg-card p-4 shadow-card">
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <Label htmlFor="recorrencias-mes" className="text-xs text-muted-foreground">Mês</Label>
             <Select value={mesAno} onValueChange={setMesAno}>
-              <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
+              <SelectTrigger id="recorrencias-mes" className="h-9 w-[200px] max-w-full"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {monthOptions.map(opt => (
                   <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            <Button variant="outline" size="sm" onClick={() => loadPage(null, null, true)} disabled={loading}>
-              <RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} /> Atualizar
-            </Button>
           </div>
+          <p className="pb-2 text-xs text-muted-foreground">“Pendente” = nenhuma parcela lançada neste mês.</p>
         </div>
 
-        {errorState && !loading ? (
-          <Card><CardContent className="p-8 text-center text-destructive">
-            <p className="font-medium">Erro ao carregar recorrências</p>
-            <p className="text-sm text-muted-foreground mt-1">Tente novamente ou contate o administrador.</p>
-            <Button variant="outline" size="sm" className="mt-3" onClick={() => loadPage(null, null, true)}>
-              <RefreshCw className="w-4 h-4 mr-1" /> Tentar novamente
-            </Button>
-          </CardContent></Card>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Descrição</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Origem</TableHead>
-                <TableHead>Frequência</TableHead>
-                <TableHead className="text-right">Valor</TableHead>
-                <TableHead>Parcelas</TableHead>
-                <TableHead>Status no Mês</TableHead>
-                <TableHead>Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <SkeletonRows />
-              ) : items.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center py-12">
-                    <Repeat className="w-10 h-10 mx-auto mb-3 opacity-30 text-muted-foreground" />
-                    <p className="font-medium text-muted-foreground">Nenhuma recorrência cadastrada</p>
-                    <p className="text-sm text-muted-foreground">Para criar, vá em <strong>Lançamentos</strong>, <strong>Contas a Pagar</strong> ou <strong>Contas a Receber</strong> e ative a opção "Recorrente".</p>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                items.map(item => {
-                  const isGerando = gerandoById[item.chave_unica] ?? false;
-                  const maxReached = item.parcelas_max > 0 && item.parcelas_geradas >= item.parcelas_max;
-                  return (
-                    <TableRow key={item.chave_unica}>
-                      <TableCell className="font-medium max-w-xs whitespace-normal break-words">{item.descricao}</TableCell>
-                      <TableCell>
-                        <Badge variant={item.tipo === 'RECEITA' ? 'default' : 'destructive'}>{item.tipo}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Badge variant={ORIGEM_BADGE_VARIANT[item.origem]} className="cursor-help">
-                              {ORIGEM_LABELS[item.origem]}
-                            </Badge>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            Recorrência criada em {ORIGEM_LABELS[item.origem]}
-                          </TooltipContent>
-                        </Tooltip>
-                      </TableCell>
-                      <TableCell className="text-sm">{FREQ_LABELS[item.frequencia] || item.frequencia || '—'}</TableCell>
-                      <TableCell className="text-right font-bold">{fmtBRL(item.valor)}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {item.parcelas_geradas}/{item.parcelas_max > 0 ? item.parcelas_max : '∞'}
-                      </TableCell>
-                      <TableCell>
-                        {item.gerado_mes ? (
-                          <Badge variant="outline" className="bg-success/10 text-success border-success/20">
-                            {item.filhos_mes} lançada(s)
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="bg-warning/10 text-warning border-warning/20">
-                            Pendente
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          {item.origem === 'lancamento' && canCreate && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => gerarParcela(item)}
-                              disabled={isGerando || maxReached}
-                            >
-                              {isGerando ? (
-                                <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
-                              ) : (
-                                <Play className="w-3 h-3 mr-1" />
-                              )}
-                              Gerar
-                            </Button>
-                          )}
-                          {onNavigate && (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button size="sm" variant="ghost" onClick={() => handleOpenOrigem(item)}>
-                                  <ExternalLink className="w-3.5 h-3.5" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Abrir {ORIGEM_LABELS[item.origem]}</TooltipContent>
-                            </Tooltip>
-                          )}
-                        </div>
-                      </TableCell>
+        <FinSectionGroup id="recorrencias-lista" title="Recorrências" caption={!errorState ? legenda : undefined}>
+          {errorState && !loading ? (
+            <ErrorState
+              title="Erro ao carregar recorrências"
+              description="Tente novamente ou contate o administrador."
+              onRetry={() => loadPage(null, null, true)}
+            />
+          ) : loading ? (
+            <div role="status" className="space-y-2">
+              <span className="sr-only">Carregando recorrências…</span>
+              {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} aria-hidden="true" className="h-11 w-full rounded-md" />)}
+            </div>
+          ) : items.length === 0 ? (
+            <div className="space-y-3 rounded-xl border border-dashed border-border bg-card p-8 text-center">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-muted">
+                <Repeat aria-hidden="true" className="h-7 w-7 text-muted-foreground" />
+              </div>
+              <p className="font-medium text-foreground">Nenhuma recorrência cadastrada</p>
+              <p className="mx-auto max-w-md text-sm text-muted-foreground">Para criar, vá em <strong className="text-foreground">Lançamentos</strong>, <strong className="text-foreground">Contas a Pagar</strong> ou <strong className="text-foreground">Contas a Receber</strong> e ative a opção "Recorrente".</p>
+            </div>
+          ) : (
+            <div className="[container-type:inline-size]">
+              {/* Contêiner largo: tabela. */}
+              <div className="hidden [@container(min-width:48rem)]:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Descrição</TableHead>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead>Origem</TableHead>
+                      <TableHead>Frequência</TableHead>
+                      <TableHead className="text-right">Valor</TableHead>
+                      <TableHead>Parcelas</TableHead>
+                      <TableHead>Status no Mês</TableHead>
+                      <TableHead className="text-right">Ações</TableHead>
                     </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {items.map(item => {
+                      const tipo = tipoBadge(item.tipo);
+                      return (
+                        <TableRow key={item.chave_unica}>
+                          <TableCell className="max-w-xs whitespace-normal break-words font-medium">{item.descricao}</TableCell>
+                          <TableCell><StatusBadge status={tipo.status} label={tipo.label} /></TableCell>
+                          <TableCell>{origemChip(item)}</TableCell>
+                          <TableCell className="text-sm">{FREQ_LABELS[item.frequencia] || item.frequencia || '—'}</TableCell>
+                          <TableCell className="whitespace-nowrap text-right font-semibold tabular-nums">{fmtBRL(item.valor)}</TableCell>
+                          <TableCell className="text-sm tabular-nums text-muted-foreground">{parcelas(item)}</TableCell>
+                          <TableCell>{statusMes(item)}</TableCell>
+                          <TableCell>{acoes(item)}</TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+              {/* Contêiner estreito: lista empilhada, sem rolagem horizontal. */}
+              <ul className="space-y-2 [@container(min-width:48rem)]:hidden">
+                {items.map(item => {
+                  const tipo = tipoBadge(item.tipo);
+                  return (
+                    <li key={item.chave_unica} className="space-y-2 rounded-lg border bg-card p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="min-w-0 break-words text-sm font-medium text-foreground">{item.descricao}</p>
+                        <p className="shrink-0 whitespace-nowrap text-sm font-semibold tabular-nums text-foreground">{fmtBRL(item.valor)}</p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                        <StatusBadge status={tipo.status} label={tipo.label} />
+                        {origemChip(item)}
+                        <span>{FREQ_LABELS[item.frequencia] || item.frequencia || '—'}</span>
+                        <span aria-hidden="true">·</span>
+                        <span className="tabular-nums">Parcelas {parcelas(item)}</span>
+                      </div>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        {statusMes(item)}
+                        {acoes(item)}
+                      </div>
+                    </li>
                   );
-                })
-              )}
-            </TableBody>
-          </Table>
-        )}
+                })}
+              </ul>
+            </div>
+          )}
 
-        {/* Load more */}
-        {hasMore && !loading && (
-          <div className="flex justify-center pt-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => loadPage(cursorData, cursorId, false)}
-              disabled={loadingMore}
-            >
-              {loadingMore ? (
-                <RefreshCw className="w-4 h-4 mr-1 animate-spin" />
-              ) : null}
-              Carregar mais
-            </Button>
-          </div>
-        )}
+          {/* Load more */}
+          {hasMore && !loading && (
+            <div className="flex justify-center pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => loadPage(cursorData, cursorId, false)}
+                disabled={loadingMore}
+              >
+                {loadingMore ? (
+                  <RefreshCw aria-hidden="true" className="w-4 h-4 mr-1 animate-spin" />
+                ) : null}
+                Carregar mais
+              </Button>
+            </div>
+          )}
+        </FinSectionGroup>
       </div>
     </TooltipProvider>
   );

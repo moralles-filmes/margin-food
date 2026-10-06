@@ -1,7 +1,7 @@
 import { useCompanyId } from '@/hooks/useCompanyId';
 import { withCompanyId } from '@/lib/companyPayload';
 import { useSupabase } from '@/contexts/CompanyScopeContext';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useId } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCan } from '@/permissions';
 import { useEmitDataEvent, useDataEvent } from '@/lib/dataEvents';
@@ -10,15 +10,17 @@ import { useScopedToast } from '@/hooks/useScopedToast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
+import StatusBadge from '@/components/ui/StatusBadge';
+import EmptyState from '@/components/ui/EmptyState';
+import ErrorState from '@/components/ui/ErrorState';
+import AccessDenied from '@/components/ui/AccessDenied';
 import {
   ChevronRight, ChevronDown, Plus, Edit, Trash2, FolderTree,
-  FileText, Wand2, Search, Download, ShieldAlert, ArrowUp, ArrowDown, GripVertical
+  FileText, Wand2, Search, Download, ArrowUp, ArrowDown, GripVertical, ChevronsDown, ChevronsUp,
 } from 'lucide-react';
 import { useFormDirtyGuard } from '@/hooks/useFormDirtyGuard';
 import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
@@ -27,6 +29,10 @@ import * as XLSX from '@/lib/safeXlsx';
 import {
   grupoDeOutroTipo, grupoHerdado, grupoLabel, grupoObrigatorio, grupoOptionsForTipo,
 } from '@/domain/financeiro/categoriaGrupo';
+import { FinScreenHeader, FinSectionGroup } from './finV2Layout';
+import { useRetornoFoco } from './useRetornoFoco';
+import { devolverFoco, elementoComFoco } from './devolverFoco';
+import { categoriaTipoBadge } from './fechamentoView';
 
 // ─── Types ───
 export interface CatNode {
@@ -117,31 +123,17 @@ function collectLeafIds(nodes: CatNode[], depth = 0): string[] {
 // ─── Skeleton loading ───
 function SkeletonTree() {
   return (
-    <Card>
-      <CardContent className="p-3 space-y-2">
-        {[...Array(6)].map((_, i) => (
-          <div key={i} className="flex items-center gap-2 py-1.5 px-2" style={{ paddingLeft: `${(i % 3) * 20 + 8}px` }}>
-            <Skeleton className="h-4 w-4 rounded" />
-            <Skeleton className="h-4 w-12" />
-            <Skeleton className="h-4 flex-1" />
-            <Skeleton className="h-5 w-16 rounded-full" />
-          </div>
-        ))}
-      </CardContent>
-    </Card>
-  );
-}
-
-// ─── NoAccess ───
-function NoAccess() {
-  return (
-    <Card>
-      <CardContent className="p-8 text-center text-muted-foreground">
-        <ShieldAlert className="w-10 h-10 mx-auto mb-3 opacity-30" />
-        <p className="font-medium">Acesso negado</p>
-        <p className="text-sm mt-1">Você não tem permissão para visualizar os cadastros base.</p>
-      </CardContent>
-    </Card>
+    <div role="status" className="space-y-2 rounded-summary border bg-card p-3">
+      <span className="sr-only">Carregando categorias…</span>
+      {[...Array(6)].map((_, i) => (
+        <div key={i} aria-hidden="true" className="flex items-center gap-2 py-1.5 px-2" style={{ paddingLeft: `${(i % 3) * 20 + 8}px` }}>
+          <Skeleton className="h-4 w-4 rounded" />
+          <Skeleton className="h-4 w-12" />
+          <Skeleton className="h-4 flex-1" />
+          <Skeleton className="h-5 w-16 rounded-full" />
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -158,6 +150,10 @@ interface TreeRowProps {
   node: CatNode;
   depth: number;
   expanded: Set<string>;
+  /** Durante a busca os grupos com resultado ficam abertos (só exibição; `expanded` não muda). */
+  abertoPelaBusca: boolean;
+  /** Ids com sub-itens ativos na árvore inteira: a busca poda os filhos, mas um grupo não vira folha por isso. */
+  paisReais: Set<string>;
   toggleExpand: (id: string) => void;
   onEdit: (node: CatNode) => void;
   onAdd: (parentId: string, parentCodigo: string, parentTipo: string) => void;
@@ -178,16 +174,18 @@ interface TreeRowProps {
   onToggleSelect: (id: string) => void;
 }
 
+const acaoLinha = 'h-8 w-8 text-muted-foreground hover:text-foreground';
+
 function TreeRow({
-  node, depth, expanded, toggleExpand, onEdit, onAdd, onDelete, onMove,
+  node, depth, expanded, abertoPelaBusca, paisReais, toggleExpand, onEdit, onAdd, onDelete, onMove,
   canEdit, canCreate, canDelete, saving, isFirst, isLast,
   dragCtx, onDragStart, onDragOver, onDragEnd, onDrop,
   selectedIds, onToggleSelect,
 }: TreeRowProps) {
-  const isExpanded = expanded.has(node.id);
   const hasChildren = node.children.length > 0;
+  const isExpanded = hasChildren && (abertoPelaBusca || expanded.has(node.id));
   const isTopLevel = depth === 0;
-  const isLeaf = !hasChildren && depth > 0;
+  const isLeaf = !hasChildren && !paisReais.has(node.id) && depth > 0;
   const isDragging = dragCtx.dragId === node.id;
   const isDropTarget = dragCtx.dropTargetId === node.id && dragCtx.dragId !== node.id;
   const isSystemCategory = node.system_key !== null;
@@ -196,17 +194,18 @@ function TreeRow({
     && dragCtx.dragTipo === node.tipo
     && dragCtx.dragParentId === (node.parent_id ?? null)
     && !isSystemCategory;
+  const tipo = categoriaTipoBadge(node.tipo);
 
   return (
-    <>
+    <li>
       <div
         className={cn(
-          'group flex items-center gap-1 py-1.5 px-2 rounded-md transition-colors hover:bg-muted/50',
-          isTopLevel && 'bg-muted/30 mt-2 first:mt-0',
-          isDragging && 'opacity-40',
-          isDropTarget && canDrop && 'ring-2 ring-primary/50 bg-primary/5',
+          'flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md py-1 pr-2 transition-colors hover:bg-card-hover [@container(min-width:40rem)]:flex-nowrap',
+          isTopLevel && 'bg-muted',
+          isDragging && 'outline-dashed outline-1 outline-border',
+          isDropTarget && canDrop && 'bg-primary-soft ring-2 ring-primary',
         )}
-        style={{ paddingLeft: `${depth * 20 + 8}px` }}
+        style={{ paddingLeft: `${depth * 20 + 4}px` }}
         onDragOver={(e) => {
           if (canDrop) {
             e.preventDefault();
@@ -220,117 +219,138 @@ function TreeRow({
           }
         }}
       >
-        {/* Drag handle */}
-        {canEdit && !isSystemCategory && (
-          <span
-            draggable
-            onDragStart={(e) => {
-              e.dataTransfer.effectAllowed = 'move';
-              onDragStart(node.id, node.tipo, node.parent_id);
-            }}
-            onDragEnd={onDragEnd}
-            className="cursor-grab active:cursor-grabbing w-5 h-5 flex items-center justify-center shrink-0 text-muted-foreground/40 hover:text-muted-foreground"
-            title="Arrastar para reordenar"
-          >
-            <GripVertical className="w-3.5 h-3.5" />
-          </span>
-        )}
-
-        <button
-          onClick={() => hasChildren && toggleExpand(node.id)}
-          className={cn('w-5 h-5 flex items-center justify-center rounded', hasChildren ? 'hover:bg-muted cursor-pointer' : 'cursor-default')}
-          tabIndex={hasChildren ? 0 : -1}
-          aria-label={hasChildren ? (isExpanded ? 'Recolher' : 'Expandir') : undefined}
-        >
-          {hasChildren ? (
-            isExpanded ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
-          ) : (
-            <FileText className="w-3 h-3 text-muted-foreground/50" />
-          )}
-        </button>
-
-        {canDelete && isLeaf && !isSystemCategory && (
-          <Checkbox
-            checked={selectedIds.has(node.id)}
-            onCheckedChange={() => onToggleSelect(node.id)}
-            disabled={saving}
-            className="shrink-0"
-            aria-label={`Selecionar ${node.nome}`}
-          />
-        )}
-
-        <span className="font-mono text-xs text-muted-foreground w-12 shrink-0">{node.codigo}</span>
-
-        <span className={cn('flex-1 text-sm truncate', isTopLevel ? 'font-bold text-foreground uppercase tracking-wide text-xs' : 'font-medium text-foreground')}>
-          {node.nome}
-        </span>
-
-        <Badge variant={node.tipo === 'receita' ? 'default' : 'secondary'} className="text-[10px] h-5">
-          {node.tipo}
-        </Badge>
-
-        {node.excluir_dos_totais && (
-          <Badge variant="outline" className="text-[10px] h-5 whitespace-nowrap">
-            Fora dos totais
-          </Badge>
-        )}
-
-        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-          {canEdit && !isSystemCategory && !isFirst && (
-            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => onMove(node.id, 'up')} title="Subir" disabled={saving}>
-              <ArrowUp className="w-3 h-3" />
-            </Button>
-          )}
-          {canEdit && !isSystemCategory && !isLast && (
-            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => onMove(node.id, 'down')} title="Descer" disabled={saving}>
-              <ArrowDown className="w-3 h-3" />
-            </Button>
-          )}
-          {canCreate && (
-            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => onAdd(node.id, node.codigo, node.tipo)} title="Adicionar sub-item" disabled={saving}>
-              <Plus className="w-3 h-3" />
-            </Button>
-          )}
+        <div className="flex min-w-0 flex-1 basis-60 items-center gap-1">
+          {/* Arrastar só com mouse; pelo teclado, "Subir"/"Descer" fazem a mesma reordenação. */}
           {canEdit && !isSystemCategory && (
-            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => onEdit(node)} title="Editar" disabled={saving}>
-              <Edit className="w-3 h-3" />
-            </Button>
+            <span
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.effectAllowed = 'move';
+                onDragStart(node.id, node.tipo, node.parent_id);
+              }}
+              onDragEnd={onDragEnd}
+              aria-hidden="true"
+              className="flex h-8 w-5 shrink-0 cursor-grab items-center justify-center text-muted-foreground hover:text-foreground active:cursor-grabbing"
+              title="Arrastar para reordenar"
+            >
+              <GripVertical className="h-3.5 w-3.5" />
+            </span>
           )}
+
+          {hasChildren ? (
+            <button
+              type="button"
+              onClick={() => toggleExpand(node.id)}
+              disabled={abertoPelaBusca}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-secondary hover:text-foreground disabled:cursor-default disabled:hover:bg-transparent"
+              aria-expanded={isExpanded}
+              aria-label={`${isExpanded ? 'Recolher' : 'Expandir'} ${node.nome}`}
+              title={abertoPelaBusca ? 'Aberta durante a busca' : undefined}
+            >
+              {isExpanded ? <ChevronDown aria-hidden="true" className="h-4 w-4" /> : <ChevronRight aria-hidden="true" className="h-4 w-4" />}
+            </button>
+          ) : (
+            <span aria-hidden="true" className="flex h-8 w-8 shrink-0 items-center justify-center text-muted-foreground">
+              <FileText className="h-3.5 w-3.5" />
+            </span>
+          )}
+
           {canDelete && isLeaf && !isSystemCategory && (
-            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => onDelete(node)} title="Desativar" disabled={saving}>
-              <Trash2 className="w-3 h-3 text-destructive" />
-            </Button>
+            <Checkbox
+              checked={selectedIds.has(node.id)}
+              onCheckedChange={() => onToggleSelect(node.id)}
+              disabled={saving}
+              className="mr-1 shrink-0"
+              aria-label={`Selecionar ${node.nome}`}
+            />
           )}
+
+          <span className="min-w-[3.5rem] shrink-0 font-mono text-xs text-muted-foreground">{node.codigo}</span>
+
+          <span className={cn(
+            'min-w-0 break-words',
+            isTopLevel ? 'text-xs font-bold uppercase tracking-wide text-foreground' : 'text-sm font-medium text-foreground',
+          )}>
+            {node.nome}
+          </span>
+        </div>
+
+        <div className="flex w-full flex-wrap items-center justify-between gap-1.5 [@container(min-width:40rem)]:ml-auto [@container(min-width:40rem)]:w-auto [@container(min-width:40rem)]:justify-end">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <StatusBadge status={tipo.status} label={tipo.label} />
+            {node.excluir_dos_totais && <StatusBadge status="neutral" label="Fora dos totais" />}
+            {isSystemCategory && (
+              <span title="Categoria de sistema: não é editada, desativada nem reordenada aqui">
+                <StatusBadge status="info" label="Sistema" />
+              </span>
+            )}
+          </div>
+
+          {/* Mesmas ações e condições de antes; a ação que não se aplica à linha deixa o espaço vazio
+              (só quando o perfil tem a permissão), para as ações ficarem alinhadas em coluna. */}
+          <div className="flex items-center">
+            {canEdit && (!isSystemCategory && !isFirst ? (
+              <Button size="icon" variant="ghost" className={acaoLinha} onClick={() => onMove(node.id, 'up')} title={`Subir ${node.nome}`} aria-label={`Subir ${node.nome}`} disabled={saving}>
+                <ArrowUp aria-hidden="true" className="h-3.5 w-3.5" />
+              </Button>
+            ) : <span aria-hidden="true" className="h-8 w-8" />)}
+            {canEdit && (!isSystemCategory && !isLast ? (
+              <Button size="icon" variant="ghost" className={acaoLinha} onClick={() => onMove(node.id, 'down')} title={`Descer ${node.nome}`} aria-label={`Descer ${node.nome}`} disabled={saving}>
+                <ArrowDown aria-hidden="true" className="h-3.5 w-3.5" />
+              </Button>
+            ) : <span aria-hidden="true" className="h-8 w-8" />)}
+            {canCreate && (
+              <Button size="icon" variant="ghost" className={acaoLinha} onClick={() => onAdd(node.id, node.codigo, node.tipo)} title={`Adicionar sub-item em ${node.nome}`} aria-label={`Adicionar sub-item em ${node.nome}`} disabled={saving}>
+                <Plus aria-hidden="true" className="h-3.5 w-3.5" />
+              </Button>
+            )}
+            {canEdit && (!isSystemCategory ? (
+              <Button size="icon" variant="ghost" className={acaoLinha} onClick={() => onEdit(node)} title={`Editar ${node.nome}`} aria-label={`Editar ${node.nome}`} disabled={saving}>
+                <Edit aria-hidden="true" className="h-3.5 w-3.5" />
+              </Button>
+            ) : <span aria-hidden="true" className="h-8 w-8" />)}
+            {canDelete && (isLeaf && !isSystemCategory ? (
+              <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => onDelete(node)} title={`Desativar ${node.nome}`} aria-label={`Desativar ${node.nome}`} disabled={saving}>
+                <Trash2 aria-hidden="true" className="h-3.5 w-3.5" />
+              </Button>
+            ) : <span aria-hidden="true" className="h-8 w-8" />)}
+          </div>
         </div>
       </div>
 
-      {isExpanded && node.children.map((child, idx) => (
-        <TreeRow
-          key={child.id}
-          node={child}
-          depth={depth + 1}
-          expanded={expanded}
-          toggleExpand={toggleExpand}
-          onEdit={onEdit}
-          onAdd={onAdd}
-          onDelete={onDelete}
-          onMove={onMove}
-          canEdit={canEdit}
-          canCreate={canCreate}
-          canDelete={canDelete}
-          saving={saving}
-          isFirst={idx === 0}
-          isLast={idx === node.children.length - 1}
-          dragCtx={dragCtx}
-          onDragStart={onDragStart}
-          onDragOver={onDragOver}
-          onDragEnd={onDragEnd}
-          onDrop={onDrop}
-          selectedIds={selectedIds}
-          onToggleSelect={onToggleSelect}
-        />
-      ))}
-    </>
+      {isExpanded && (
+        <ul className="space-y-0.5">
+          {node.children.map((child, idx) => (
+            <TreeRow
+              key={child.id}
+              node={child}
+              depth={depth + 1}
+              expanded={expanded}
+              abertoPelaBusca={abertoPelaBusca}
+              paisReais={paisReais}
+              toggleExpand={toggleExpand}
+              onEdit={onEdit}
+              onAdd={onAdd}
+              onDelete={onDelete}
+              onMove={onMove}
+              canEdit={canEdit}
+              canCreate={canCreate}
+              canDelete={canDelete}
+              saving={saving}
+              isFirst={idx === 0}
+              isLast={idx === node.children.length - 1}
+              dragCtx={dragCtx}
+              onDragStart={onDragStart}
+              onDragOver={onDragOver}
+              onDragEnd={onDragEnd}
+              onDrop={onDrop}
+              selectedIds={selectedIds}
+              onToggleSelect={onToggleSelect}
+            />
+          ))}
+        </ul>
+      )}
+    </li>
   );
 }
 
@@ -385,6 +405,12 @@ export default function CadastroBaseTree() {
     dragId: null, dragTipo: null, dragParentId: null, dropTargetId: null,
   });
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  // Só apresentação: leitura que falhou não é "nenhuma categoria" (a lista vazia viraria convite ao Modelo Padrão).
+  const [erro, setErro] = useState(false);
+  const [centrosErro, setCentrosErro] = useState(false);
+  const retornoForm = useRetornoFoco();
+  const buscaId = useId();
+  const campoId = useId();
 
   const { confirm, ConfirmDialog } = useConfirmDialog();
 
@@ -396,6 +422,10 @@ export default function CadastroBaseTree() {
       supabase.from('fin_categorias').select(CATEGORY_FIELDS).eq('ativo', true).order('ordem').order('codigo'),
       supabase.from('fin_centros_custo').select('id, nome').eq('ativo', true).order('nome'),
     ]);
+    if (catRes.error) console.error('[CadastroBaseTree.load] categorias', catRes.error);
+    if (ccRes.error) console.error('[CadastroBaseTree.load] centros', ccRes.error);
+    setErro(Boolean(catRes.error));
+    setCentrosErro(Boolean(ccRes.error));
     setItems((catRes.data as CatRow[] | null) || []);
     setCentros((ccRes.data as CentroCusto[] | null) || []);
     setLoading(false);
@@ -424,8 +454,12 @@ export default function CadastroBaseTree() {
   }
   const hasRegularCategories = items.some(item => item.system_key === null && !systemSubtreeIds.has(item.id));
   const filteredTree = filterTree(tree, search);
+  // A busca poda os filhos: um grupo que casa só pelo nome voltaria como "folha" (com seleção e Desativar).
+  // Folha é decidida pela árvore inteira — com a busca abrindo os grupos (D64) isso ficava ao alcance de um clique.
+  const paisReais = new Set(items.map(i => i.parent_id).filter((id): id is string => !!id));
+  const folhasVisiveis = collectLeafIds(filteredTree).filter(id => !paisReais.has(id));
   // Leaves currently visible/selectable — used to prune stale selection (search filter, background reload).
-  const visibleLeafIds = new Set(collectLeafIds(filteredTree));
+  const visibleLeafIds = new Set(folhasVisiveis);
   const visibleSelectedCount = Array.from(selectedIds).filter(id => visibleLeafIds.has(id)).length;
   // Sem grupo próprio, a categoria usa o da mãe na Apresentação Sócios — "Nenhum"
   // fazia parecer que ela estava fora dos detalhamentos.
@@ -459,7 +493,7 @@ export default function CadastroBaseTree() {
       return next;
     });
   };
-  const selectAllLeaves = () => setSelectedIds(new Set(collectLeafIds(filteredTree)));
+  const selectAllLeaves = () => setSelectedIds(new Set(folhasVisiveis));
   const deselectAll = () => setSelectedIds(new Set());
 
   // ─── Form handlers ───
@@ -511,7 +545,7 @@ export default function CadastroBaseTree() {
   const { showConfirm, guardedClose, confirmClose, cancelClose } = useFormDirtyGuard({ current: form, onClose: resetForm });
 
   // ─── Early return if no permission ───
-  if (!canView) return <NoAccess />;
+  if (!canView) return <AccessDenied title="Acesso negado" description="Você não tem permissão para visualizar os cadastros base." />;
 
   const save = async () => {
     if (salvandoRef.current) return;
@@ -569,7 +603,9 @@ export default function CadastroBaseTree() {
 
   // ─── Delete with confirmation + link check ───
   const handleDelete = async (node: CatNode) => {
-    if (node.children.length > 0) {
+    // Só foco: a confirmação abre sem gatilho; ao cancelar, o foco volta ao botão da linha.
+    const origemFoco = elementoComFoco();
+    if (node.children.length > 0 || paisReais.has(node.id)) {
       toast.error('Remova os sub-itens primeiro');
       return;
     }
@@ -591,7 +627,7 @@ export default function CadastroBaseTree() {
       variant: 'destructive',
       confirmLabel: 'Desativar',
     });
-    if (!ok) return;
+    if (!ok) { devolverFoco(origemFoco); return; }
 
     setSaving(true);
     try {
@@ -602,6 +638,7 @@ export default function CadastroBaseTree() {
       emitDataEvent('financeiro:cadastros');
     } finally {
       setSaving(false);
+      devolverFoco(origemFoco);
     }
   };
 
@@ -612,6 +649,7 @@ export default function CadastroBaseTree() {
     // point at a category the user can no longer see and no longer intends to delete.
     const ids = Array.from(selectedIds).filter(id => visibleLeafIds.has(id));
     if (ids.length === 0) return;
+    const origemFoco = elementoComFoco();
 
     const ok = await confirm({
       title: 'Excluir categorias selecionadas',
@@ -619,7 +657,7 @@ export default function CadastroBaseTree() {
       variant: 'destructive',
       confirmLabel: 'Excluir',
     });
-    if (!ok) return;
+    if (!ok) { devolverFoco(origemFoco); return; }
 
     setSaving(true);
     try {
@@ -660,6 +698,7 @@ export default function CadastroBaseTree() {
       emitDataEvent('financeiro:cadastros');
     } finally {
       setSaving(false);
+      devolverFoco(origemFoco);
     }
   };
 
@@ -789,150 +828,208 @@ export default function CadastroBaseTree() {
     toast.success('Exportação concluída');
   };
 
+  // ─── Apresentação ───
+  const leafCount = folhasVisiveis.length;
+  // Só depois de uma leitura que deu certo: lista vazia por falha ou carregamento não é "sem categorias".
+  const podeModeloPadrao = canCreate && !hasRegularCategories && !loading && !erro;
+  const parentNome = form.parent_id ? items.find(i => i.id === form.parent_id)?.nome : undefined;
+  const legenda = loading && items.length > 0
+    ? 'Atualizando…'
+    : loading || erro
+    ? undefined
+    : search
+      ? 'Busca: categorias encontradas e os grupos acima delas'
+      : `${items.length === 1 ? '1 categoria ativa' : `${items.length} categorias ativas`}`;
+  const ids = {
+    codigo: `${campoId}-codigo`,
+    ordem: `${campoId}-ordem`,
+    nome: `${campoId}-nome`,
+    tipo: `${campoId}-tipo`,
+    grupo: `${campoId}-grupo`,
+    grupoAjuda: `${campoId}-grupo-ajuda`,
+    centro: `${campoId}-centro`,
+  };
+
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div>
-          <h2 className="text-xl font-bold text-foreground">Estrutura de Categorias</h2>
-          <p className="text-sm text-muted-foreground">
-            Árvore hierárquica de receitas e despesas — base para DRE e DFC
-          </p>
+    <div className="space-y-6">
+      <FinScreenHeader
+        title="Estrutura de Categorias"
+        description="Árvore hierárquica de receitas e despesas — base para DRE e DFC"
+        actions={(
+          <>
+            {canExport && (
+              <Button variant="outline" size="sm" onClick={exportExcel} disabled={loading || erro || centrosErro}>
+                <Download aria-hidden="true" className="w-4 h-4 mr-1" /> Excel
+              </Button>
+            )}
+            {podeModeloPadrao && (
+              <Button variant="outline" size="sm" onClick={seedDefaults} disabled={seeding}>
+                <Wand2 aria-hidden="true" className={cn('w-4 h-4 mr-1', seeding && 'animate-spin')} /> Modelo Padrão
+              </Button>
+            )}
+            {canCreate && (
+              <Button size="sm" onClick={openAddRoot} disabled={saving}>
+                <Plus aria-hidden="true" className="w-4 h-4 mr-1" /> Nova Raiz
+              </Button>
+            )}
+          </>
+        )}
+      />
+
+      <div className="space-y-3 rounded-summary border bg-card p-4 shadow-card">
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor={buscaId} className="text-xs text-muted-foreground">Buscar categoria</Label>
+          <div className="relative">
+            <Search aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              id={buscaId}
+              type="search"
+              placeholder="Nome ou código..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="h-9 pl-9"
+            />
+          </div>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <Button variant="outline" size="sm" onClick={expandAll}>Expandir Tudo</Button>
-          <Button variant="outline" size="sm" onClick={collapseAll}>Recolher</Button>
-          {canDelete && collectLeafIds(filteredTree).length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 border-t pt-3">
+          <Button variant="outline" size="sm" onClick={expandAll} disabled={!!search}>
+            <ChevronsDown aria-hidden="true" className="w-4 h-4 mr-1" /> Expandir tudo
+          </Button>
+          <Button variant="outline" size="sm" onClick={collapseAll} disabled={!!search}>
+            <ChevronsUp aria-hidden="true" className="w-4 h-4 mr-1" /> Recolher tudo
+          </Button>
+          {canDelete && leafCount > 0 && (
             <>
-              <Button variant="outline" size="sm" onClick={selectAllLeaves}>Selecionar Todas</Button>
+              <span aria-hidden="true" className="mx-1 hidden h-5 w-px bg-border sm:block" />
+              <Button variant="outline" size="sm" onClick={selectAllLeaves}>Selecionar todas</Button>
               <Button variant="outline" size="sm" onClick={deselectAll}>Desmarcar</Button>
             </>
           )}
           {visibleSelectedCount > 0 && (
-            <Button variant="destructive" size="sm" onClick={handleBulkDelete} disabled={saving}>
-              <Trash2 className="w-4 h-4 mr-1" /> Excluir Selecionadas ({visibleSelectedCount})
-            </Button>
-          )}
-          {canExport && (
-            <Button variant="outline" size="sm" onClick={exportExcel}>
-              <Download className="w-4 h-4 mr-1" /> Excel
-            </Button>
-          )}
-          {canCreate && !hasRegularCategories && (
-            <Button variant="outline" size="sm" onClick={seedDefaults} disabled={seeding}>
-              <Wand2 className={cn('w-4 h-4 mr-1', seeding && 'animate-spin')} /> Modelo Padrão
-            </Button>
-          )}
-          {canCreate && (
-            <Button size="sm" onClick={openAddRoot} disabled={saving}>
-              <Plus className="w-4 h-4 mr-1" /> Nova Raiz
+            <Button variant="destructive" size="sm" onClick={handleBulkDelete} disabled={saving} className="sm:ml-auto">
+              <Trash2 aria-hidden="true" className="w-4 h-4 mr-1" /> Excluir selecionadas ({visibleSelectedCount})
             </Button>
           )}
         </div>
+        {search && (
+          <p className="text-xs text-muted-foreground">Durante a busca, os grupos acima das categorias encontradas ficam abertos.</p>
+        )}
       </div>
 
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input
-          placeholder="Buscar categoria..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="pl-9"
-        />
-      </div>
-
-      {loading ? (
-        <SkeletonTree />
-      ) : filteredTree.length === 0 && !search ? (
-        <Card><CardContent className="p-8 text-center text-muted-foreground">
-          <FolderTree className="w-10 h-10 mx-auto mb-3 opacity-30" />
-          <p className="font-medium">Nenhuma categoria cadastrada</p>
-          <p className="text-sm mt-1">Clique em "Modelo Padrão" para carregar a estrutura inicial.</p>
-        </CardContent></Card>
-      ) : filteredTree.length === 0 && search ? (
-        <Card><CardContent className="p-8 text-center text-muted-foreground">
-          <Search className="w-10 h-10 mx-auto mb-3 opacity-30" />
-          <p className="font-medium">Nenhuma categoria encontrada</p>
-          <p className="text-sm mt-1">Tente outro termo de busca.</p>
-        </CardContent></Card>
-      ) : (
-        <Card>
-          <CardContent className="p-3">
-            {filteredTree.map((node, idx) => (
-              <TreeRow
-                key={node.id}
-                node={node}
-                depth={0}
-                expanded={expanded}
-                toggleExpand={toggleExpand}
-                onEdit={openEdit}
-                onAdd={openAdd}
-                onDelete={handleDelete}
-                onMove={handleMove}
-                canEdit={canEdit}
-                canCreate={canCreate}
-                canDelete={canDelete}
-                saving={saving}
-                isFirst={idx === 0 || (idx > 0 && filteredTree[idx - 1].tipo !== node.tipo)}
-                isLast={idx === filteredTree.length - 1 || (idx < filteredTree.length - 1 && filteredTree[idx + 1].tipo !== node.tipo)}
-                dragCtx={dragCtx}
-                onDragStart={handleDragStart}
-                onDragOver={handleDragOver}
-                onDragEnd={handleDragEnd}
-                onDrop={handleDrop}
-                selectedIds={selectedIds}
-                onToggleSelect={toggleSelect}
-              />
-            ))}
-          </CardContent>
-        </Card>
-      )}
+      <FinSectionGroup id="cad-categorias" title="Categorias" caption={legenda}>
+        {/* Esqueleto só na primeira carga: numa recarga (depois de Subir/Descer, salvar, desativar) a árvore
+            continua montada, e o foco fica no botão em vez de voltar ao topo da página. */}
+        {loading && items.length === 0 ? (
+          <SkeletonTree />
+        ) : erro ? (
+          <ErrorState title="Não foi possível carregar as categorias" onRetry={() => { void load(); }} retrying={loading} />
+        ) : filteredTree.length === 0 && !search ? (
+          <EmptyState
+            icon={FolderTree}
+            title="Nenhuma categoria cadastrada"
+            description={canCreate
+              ? 'Clique em "Modelo Padrão" para carregar a estrutura inicial.'
+              : 'Ainda não há categorias ativas nesta unidade.'}
+          />
+        ) : filteredTree.length === 0 && search ? (
+          <EmptyState
+            icon={Search}
+            title="Nenhuma categoria encontrada"
+            description="Tente outro termo de busca."
+            actionLabel="Limpar busca"
+            onAction={() => setSearch('')}
+          />
+        ) : (
+          <div className="rounded-summary border bg-card p-2 shadow-card [container-type:inline-size]">
+            <ul className="space-y-0.5">
+              {filteredTree.map((node, idx) => (
+                <TreeRow
+                  key={node.id}
+                  node={node}
+                  depth={0}
+                  expanded={expanded}
+                  abertoPelaBusca={!!search}
+                  paisReais={paisReais}
+                  toggleExpand={toggleExpand}
+                  onEdit={openEdit}
+                  onAdd={openAdd}
+                  onDelete={handleDelete}
+                  onMove={handleMove}
+                  canEdit={canEdit}
+                  canCreate={canCreate}
+                  canDelete={canDelete}
+                  saving={saving}
+                  isFirst={idx === 0 || (idx > 0 && filteredTree[idx - 1].tipo !== node.tipo)}
+                  isLast={idx === filteredTree.length - 1 || (idx < filteredTree.length - 1 && filteredTree[idx + 1].tipo !== node.tipo)}
+                  dragCtx={dragCtx}
+                  onDragStart={handleDragStart}
+                  onDragOver={handleDragOver}
+                  onDragEnd={handleDragEnd}
+                  onDrop={handleDrop}
+                  selectedIds={selectedIds}
+                  onToggleSelect={toggleSelect}
+                />
+              ))}
+            </ul>
+          </div>
+        )}
+      </FinSectionGroup>
 
       {/* Form Dialog */}
       <Dialog open={showForm} onOpenChange={(open) => { if (!open) guardedClose(); }}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto" {...retornoForm}>
           <DialogHeader>
             <DialogTitle>{editId ? 'Editar Categoria' : 'Nova Categoria'}</DialogTitle>
+            <DialogDescription>
+              {editId
+                ? 'Altere os dados da categoria.'
+                : parentNome ? `Sub-item de ${parentNome}.` : 'Categoria raiz da árvore.'}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div><Label>Código</Label><Input value={form.codigo} onChange={e => setForm({ ...form, codigo: e.target.value })} placeholder="Ex: 3.01.01" /></div>
-              <div><Label>Ordem</Label><Input type="number" step="1" min="0" value={form.ordem} onChange={e => setForm({ ...form, ordem: parseInt(e.target.value) || 0 })} /></div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5"><Label htmlFor={ids.codigo}>Código</Label><Input id={ids.codigo} value={form.codigo} onChange={e => setForm({ ...form, codigo: e.target.value })} placeholder="Ex: 3.01.01" /></div>
+              <div className="space-y-1.5"><Label htmlFor={ids.ordem}>Ordem</Label><Input id={ids.ordem} type="number" step="1" min="0" value={form.ordem} onChange={e => setForm({ ...form, ordem: parseInt(e.target.value) || 0 })} /></div>
             </div>
-            <div><Label>Nome</Label><Input value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} /></div>
-            <div><Label>Tipo</Label>
+            <div className="space-y-1.5"><Label htmlFor={ids.nome}>Nome</Label><Input id={ids.nome} value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} /></div>
+            <div className="space-y-1.5"><Label htmlFor={ids.tipo}>Tipo</Label>
               <Select
                 value={form.tipo}
                 onValueChange={v => setForm({ ...form, tipo: v, grupo: grupoDeOutroTipo(form.grupo, v) ? '' : form.grupo })}
               >
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger id={ids.tipo}><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="receita">Receita</SelectItem>
                   <SelectItem value="despesa">Despesa</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <div><Label>Grupo{exigeGrupo ? ' *' : ''}</Label>
+            <div className="space-y-1.5"><Label htmlFor={ids.grupo}>Grupo{exigeGrupo && <span aria-hidden="true"> *</span>}</Label>
               {/* Sem "Nenhum" quando não há grupo para herdar: em branco, a despesa sumiria dos detalhamentos. */}
               <Select value={form.grupo || (exigeGrupo ? '' : '_none')} onValueChange={v => setForm({ ...form, grupo: v === '_none' ? '' : v })}>
-                <SelectTrigger><SelectValue placeholder="Selecione o grupo" /></SelectTrigger>
+                <SelectTrigger id={ids.grupo} aria-describedby={ids.grupoAjuda} aria-required={exigeGrupo}><SelectValue placeholder="Selecione o grupo" /></SelectTrigger>
                 <SelectContent>
                   {!exigeGrupo && <SelectItem value="_none">{grupoDaMae ? `Herdado: ${grupoDaMae}` : 'Nenhum'}</SelectItem>}
                   {grupoOptionsForTipo(form.tipo, form.grupo).map(g => <SelectItem key={g.value} value={g.value}>{g.label}</SelectItem>)}
                 </SelectContent>
               </Select>
+              <p id={ids.grupoAjuda} className="text-xs text-muted-foreground">
+                O grupo monta os detalhamentos da Apresentação Sócios (CMV, Pessoal, Operações, Financeiro e Investimentos). {ajudaGrupo}
+              </p>
             </div>
-            <p className="text-xs text-muted-foreground">
-              O grupo monta os detalhamentos da Apresentação Sócios (CMV, Pessoal, Operações, Financeiro e Investimentos). {ajudaGrupo}
-            </p>
-            <div><Label>Centro de Custo Padrão</Label>
+            <div className="space-y-1.5"><Label htmlFor={ids.centro}>Centro de Custo Padrão</Label>
               <Select value={form.centro_custo_padrao_id || '_none'} onValueChange={v => setForm({ ...form, centro_custo_padrao_id: v === '_none' ? '' : v })}>
-                <SelectTrigger><SelectValue placeholder="Nenhum" /></SelectTrigger>
+                <SelectTrigger id={ids.centro}><SelectValue placeholder="Nenhum" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="_none">Nenhum</SelectItem>
                   {centros.map(c => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
                 </SelectContent>
               </Select>
+              {centrosErro && (
+                <p role="alert" className="text-xs text-destructive">
+                  Os centros de custo não carregaram; a lista acima pode estar vazia.
+                </p>
+              )}
             </div>
             <Button onClick={save} className="w-full" disabled={saving}>
               {saving ? 'Salvando...' : editId ? 'Atualizar' : 'Criar'}

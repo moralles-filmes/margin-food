@@ -1,18 +1,29 @@
 import { useSupabase } from '@/contexts/CompanyScopeContext';
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, type KeyboardEvent } from 'react';
 import type { CursorListResponse, FinStatusCounts } from '@/types/financeiro';
 import { useEmitDataEvent, useDataEvent } from '@/lib/dataEvents';
 import { fmtBRL, formatDateBR, parseLocalDate } from '@/lib/formatters';
+import { cn } from '@/lib/utils';
 import { useCan } from '@/permissions/hooks';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { DateInput } from '@/components/ui/DateInput';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Skeleton } from '@/components/ui/skeleton';
+import KpiCard from '@/components/ui/KpiCard';
+import StatusBadge from '@/components/ui/StatusBadge';
+import EmptyState from '@/components/ui/EmptyState';
+import ErrorState from '@/components/ui/ErrorState';
+import AccessDenied from '@/components/ui/AccessDenied';
+import { kpiGridClassFor, longestValueLength } from '@/components/ui/kpiGrid';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useScopedToast } from '@/hooks/useScopedToast';
-import { Plus, FileDown, RefreshCw, Ban, Undo2, Search, X } from 'lucide-react';
+import { Plus, FileDown, RefreshCw, Undo2, Search, X, AlertTriangle, Wallet, Filter, Receipt } from 'lucide-react';
 import { useFormDirtyGuard } from '@/hooks/useFormDirtyGuard';
 import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
 import { gerarPDFContasReceber } from '@/lib/pdfFinanceiro';
@@ -31,6 +42,12 @@ import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { getRecurrenceValidationMessage } from '@/domain/financeiro/recurrence';
 import { traduzirErroIdempotencia } from '@/domain/financeiro/idempotencia';
 import { useChavesPendentes } from '@/hooks/useChavesPendentes';
+import { useTravaEnvio } from '@/hooks/useTravaEnvio';
+import { FinKpiGrid, FinScreenHeader, FinSectionGroup } from './finV2Layout';
+import { useConteinerEstreito } from './useConteinerEstreito';
+import { useRetornoFoco } from './useRetornoFoco';
+import { CONTAS_LISTA_LIMITE_PX, colunasDoResumo, contaStatusBadge, contaVencida, contasCaption, totalFiltradoSub } from './contasView';
+import { ListaCarregando, ResumoCarregando } from './ContasParts';
 import { padronizarTexto } from '@/lib/padronizarTexto';
 
 /* ─── Types ─── */
@@ -50,6 +67,7 @@ interface Centro { id: string; nome: string; }
 interface Conta { id: string; nome: string; }
 interface SaveContaReceberResult { lancamentos_criados?: number; idempotente?: boolean; }
 
+// Rótulos do Excel (mantidos como antes da V2 para o arquivo não mudar); os selos da tela vêm de `contasView`.
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   RASCUNHO: { label: 'Rascunho', color: 'bg-muted text-muted-foreground' },
   A_RECEBER: { label: 'A Receber', color: 'bg-primary/10 text-primary border-primary/20' },
@@ -59,24 +77,6 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
 };
 
 const PAGE_SIZE = 50;
-
-function SkeletonRows() {
-  return (<>{Array.from({ length: 5 }).map((_, i) => (
-    <TableRow key={i}>
-      {Array.from({ length: 6 }).map((_, j) => (
-        <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
-      ))}
-    </TableRow>
-  ))}</>);
-}
-
-function NoAccess() {
-  return (
-    <div className="flex items-center justify-center py-16 text-muted-foreground">
-      <Ban className="w-5 h-5 mr-2" /> Acesso negado
-    </div>
-  );
-}
 
 interface ContasReceberSectionProps {
   initialStatus?: string;
@@ -90,6 +90,7 @@ export default function ContasReceberSection({ initialStatus }: ContasReceberSec
   const canCreate = useCan('financeiro:receber:create');
   const canEdit = useCan('financeiro:receber:edit');
   const canExport = useCan('financeiro:receber:export');
+  const canDelete = useCan('financeiro:receber:delete');
 
   const [items, setItems] = useState<ContaReceber[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
@@ -115,6 +116,10 @@ export default function ContasReceberSection({ initialStatus }: ContasReceberSec
   const [cursorId, setCursorId] = useState<string | null>(null);
   const [serverTotals, setServerTotals] = useState({ totalPendente: 0, vencidas: 0 });
   const [filteredSummary, setFilteredSummary] = useState({ total: 0, count: 0 });
+  // Só apresentação: erro de carga nunca vira lista vazia nem R$ 0,00.
+  const [totaisStatus, setTotaisStatus] = useState<'loading' | 'ok' | 'error'>('loading');
+  const [listaErro, setListaErro] = useState<null | 'list' | 'more'>(null);
+  const [listaRef, listaEstreita] = useConteinerEstreito(CONTAS_LISTA_LIMITE_PX);
 
   const [form, setForm] = useState<ContaFormData>({
     descricao: '', valor: 0, data_vencimento: todayBR(), data_competencia: '',
@@ -135,6 +140,14 @@ export default function ContasReceberSection({ initialStatus }: ContasReceberSec
   const [recTarget, setRecTarget] = useState<ContaReceber | null>(null);
   const [recDate, setRecDate] = useState<string>(todayBR());
 
+  // Estorno: confirmação em AlertDialog (antes `window.confirm`), com o mesmo texto e a mesma ordem.
+  const [estornoAlvo, setEstornoAlvo] = useState<ContaReceber | null>(null);
+  const { executar: travaEstorno } = useTravaEnvio();
+
+  // Diálogos abertos por estado devolvem o foco a quem os abriu (D49).
+  const retornoRecebimento = useRetornoFoco();
+  const retornoEstorno = useRetornoFoco();
+
   const categoriaFilterOptions = useMemo(
     () => buildCategoriaFilterOptions(categorias.filter(c => c.tipo === 'receita')),
     [categorias]
@@ -142,6 +155,7 @@ export default function ContasReceberSection({ initialStatus }: ContasReceberSec
 
   const loadPage = useCallback(async (cDate: string | null, cId: string | null) => {
     setLoading(true);
+    setListaErro(null);
     const { data, error } = await supabase.rpc('list_fin_contas_receber_cursor', {
       p_status: filtroStatus !== 'todos' ? filtroStatus : null,
       p_limit: PAGE_SIZE, p_cursor_date: cDate, p_cursor_id: cId,
@@ -150,7 +164,7 @@ export default function ContasReceberSection({ initialStatus }: ContasReceberSec
       p_search: buscaAplicada || null,
       ...categoriaFiltroToParams(filtroCategoria),
     } as any);
-    if (error) { console.error(error); setLoading(false); return; }
+    if (error) { console.error(error); setListaErro(cDate ? 'more' : 'list'); setLoading(false); return; }
     const result = (data as unknown) as CursorListResponse<ContaReceber> | null;
     const newItems: ContaReceber[] = result?.items || [];
     setHasMore(result?.has_more || false);
@@ -182,8 +196,10 @@ export default function ContasReceberSection({ initialStatus }: ContasReceberSec
   };
 
   const loadTotals = useCallback(async () => {
-    const { data } = await supabase.rpc('get_fin_counts_by_status');
-    if (data) { const d = (data as unknown) as FinStatusCounts; setServerTotals({ totalPendente: Number(d.total_receber_pendente) || 0, vencidas: Number(d.vencidas_receber) || 0 }); }
+    setTotaisStatus(atual => (atual === 'ok' ? 'ok' : 'loading'));
+    const { data, error } = await supabase.rpc('get_fin_counts_by_status');
+    if (data) { const d = (data as unknown) as FinStatusCounts; setServerTotals({ totalPendente: Number(d.total_receber_pendente) || 0, vencidas: Number(d.vencidas_receber) || 0 }); setTotaisStatus('ok'); }
+    else { if (error) console.error('[ContasReceberSection.loadTotals]', error); setTotaisStatus('error'); }
   }, [supabase]);
 
   const loadAux = useCallback(async () => {
@@ -274,7 +290,7 @@ export default function ContasReceberSection({ initialStatus }: ContasReceberSec
   };
   const { showConfirm, guardedClose, confirmClose, cancelClose } = useFormDirtyGuard({ current: form, onClose: handleCloseForm });
 
-  if (!canView) return <NoAccess />;
+  if (!canView) return <AccessDenied title="Acesso negado" description="Você não tem permissão para ver as contas a receber." />;
 
   const handleEdit = async (item: ContaReceber) => {
     setLoading(true);
@@ -345,7 +361,7 @@ export default function ContasReceberSection({ initialStatus }: ContasReceberSec
   /* ─── Save via RPC ─── */
   const save = async () => {
     if (saving || salvandoRef.current) return;
-    if (!form.descricao.trim() || form.valor <= 0) { toast.error('Descricao e valor obrigatorios'); return; }
+    if (!form.descricao.trim() || form.valor <= 0) { toast.error('Descrição e valor obrigatórios'); return; }
     const recurrenceError = form.recorrente
       ? getRecurrenceValidationMessage(form.frequencia, form.parcelas)
       : null;
@@ -404,7 +420,7 @@ export default function ContasReceberSection({ initialStatus }: ContasReceberSec
       toast.success(editingItem
         ? 'Conta atualizada'
         : result?.idempotente
-          ? 'Esta conta a receber ja estava registrada.'
+          ? 'Esta conta a receber já estava registrada.'
           : `${createdCount} conta${createdCount > 1 ? 's' : ''} a receber criada${createdCount > 1 ? 's' : ''}`);
       handleCloseForm();
       emitDataEvent('financeiro:receber');
@@ -435,7 +451,7 @@ export default function ContasReceberSection({ initialStatus }: ContasReceberSec
         p_data_recebimento: recDate,
       });
       if (error) { toast.error(error.message); void loadPage(null, null); return; }
-      toast.success('Recebimento registrado + lancamento gerado');
+      toast.success('Recebimento registrado + lançamento gerado');
       setRecOpen(false);
       setShowDetail(false);
       emitDataEvent('financeiro:receber');
@@ -446,21 +462,31 @@ export default function ContasReceberSection({ initialStatus }: ContasReceberSec
   };
 
   /* ─── Estornar ─── */
-  const estornar = async (item?: ContaReceber) => {
+  // Abre a confirmação; nada é gravado antes do clique em "Estornar" no AlertDialog.
+  const estornar = (item?: ContaReceber) => {
     const target = item || detailRawItem;
     if (saving || !target) return;
-    if (!confirm('Deseja estornar este recebimento? O lancamento espelho sera cancelado e a conta voltara ao status A Receber.')) return;
-    setSaving(true);
-    try {
-      const { error } = await supabase.rpc('_guarded_estornar_conta_receber', { p_id: target.id } as any);
-      if (error) { toast.error(error.message); void loadPage(null, null); return; }
-      toast.success('Recebimento estornado');
-      setShowDetail(false);
-      emitDataEvent('financeiro:receber');
-      emitDataEvent('financeiro:lancamentos');
-    } finally {
-      setSaving(false);
-    }
+    setEstornoAlvo(target);
+  };
+
+  const confirmarEstorno = async () => {
+    const target = estornoAlvo;
+    if (!target) return;
+    await travaEstorno(async () => {
+      if (saving) return;
+      setSaving(true);
+      try {
+        const { error } = await supabase.rpc('_guarded_estornar_conta_receber', { p_id: target.id } as any);
+        if (error) { toast.error(error.message); void loadPage(null, null); return; }
+        toast.success('Recebimento estornado');
+        setShowDetail(false);
+        emitDataEvent('financeiro:receber');
+        emitDataEvent('financeiro:lancamentos');
+      } finally {
+        setSaving(false);
+        setEstornoAlvo(null);
+      }
+    });
   };
 
   /* ─── Export ─── */
@@ -486,174 +512,304 @@ export default function ContasReceberSection({ initialStatus }: ContasReceberSec
     || filtroCategoria !== CATEGORIA_FILTRO_TODOS
     || buscaAplicada.length > 0;
 
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div>
-          <h2 className="text-xl font-bold text-foreground">Contas a Receber</h2>
-          <p className="text-sm text-muted-foreground">
-            {serverTotals.vencidas > 0 && <span className="text-destructive font-medium">{serverTotals.vencidas} vencida(s) • </span>}
-            Total pendente: {fmt(serverTotals.totalPendente)}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {canExport && (
-            <>
-              <Button variant="outline" size="sm" onClick={() => gerarPDFContasReceber({ items })} disabled={items.length === 0}>
-                <FileDown className="w-4 h-4 mr-1" /> PDF
-              </Button>
-              <Button variant="outline" size="sm" onClick={exportExcel} disabled={items.length === 0}>
-                <FileDown className="w-4 h-4 mr-1" /> Excel
-              </Button>
-            </>
-          )}
-          {canCreate && (
-            <Button size="sm" onClick={() => { handleCloseForm(); setShowForm(true); }}>
-              <Plus className="w-4 h-4 mr-1" /> Nova Conta
-            </Button>
-          )}
-        </div>
-      </div>
+  // ─── Resumo (mesmas fontes: get_fin_counts_by_status e filtered_* da lista) ───
+  const filtradoCalculando = loading && items.length === 0;
+  // Lista que não carregou não tem total: o card mostra "—", nunca R$ 0,00.
+  const filtradoIndisponivel = listaErro === 'list' && items.length === 0;
+  const valoresResumo = [
+    String(serverTotals.vencidas),
+    fmt(serverTotals.totalPendente),
+    ...(hasActiveFilters && !filtradoCalculando && !filtradoIndisponivel ? [fmt(filteredSummary.total)] : []),
+  ];
+  const cardsResumo = 2 + (hasActiveFilters ? 1 : 0);
+  const resumoGrid = kpiGridClassFor(longestValueLength(valoresResumo), colunasDoResumo(cardsResumo));
 
-      <div className="flex items-center gap-2 flex-wrap">
-        <DateInput value={filtroDataDe} onValueChange={setFiltroDataDe} className="w-36 h-9 text-xs" />
-        <span className="text-muted-foreground text-xs">até</span>
-        <DateInput value={filtroDataAte} onValueChange={setFiltroDataAte} className="w-36 h-9 text-xs" />
-        <Select value={filtroStatus} onValueChange={setFiltroStatus}>
-          <SelectTrigger className="w-44 h-9"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todos">Todos os status</SelectItem>
-            <SelectItem value="A_RECEBER">A Receber</SelectItem>
-            <SelectItem value="RECEBIDO">Recebido</SelectItem>
-            <SelectItem value="VENCIDO">Vencido</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={filtroConta} onValueChange={setFiltroConta}>
-          <SelectTrigger className="w-48 h-9"><SelectValue placeholder="Conta de pagamento" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todos">Todas as contas</SelectItem>
-            {contas.map(c => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <SearchableSelect
-          value={filtroCategoria}
-          onValueChange={v => setFiltroCategoria(v || CATEGORIA_FILTRO_TODOS)}
-          options={categoriaFilterOptions}
-          placeholder="Categoria"
-          searchPlaceholder="Buscar categoria..."
-          className="w-52 h-9"
-          allowClear={false}
+  const temAcoes = (item: ContaReceber) =>
+    (['A_RECEBER', 'VENCIDO'].includes(item.status) && canEdit)
+    || item.status === 'RECEBIDO'
+    || (['A_RECEBER', 'VENCIDO', 'RASCUNHO'].includes(item.status) && (canEdit || canDelete));
+
+  // Mesmos botões e mesmas condições de antes; só ganharam nome acessível com a descrição.
+  const acoesDaLinha = (item: ContaReceber, emLista = false) => (
+    <div className={cn('flex items-center justify-end gap-1', emLista ? 'flex-wrap' : 'flex-nowrap whitespace-nowrap')}>
+      {['A_RECEBER', 'VENCIDO'].includes(item.status) && canEdit && (
+        <Button size="sm" variant="default" onClick={() => abrirRecebimento(item)} disabled={saving} className="h-8 text-xs" aria-label={`Receber ${item.descricao}`}>Receber</Button>
+      )}
+      {item.status === 'RECEBIDO' && (
+        <Button size="sm" variant="outline" onClick={() => estornar(item)} disabled={saving} className="h-8 border-warning-border text-xs text-warning hover:bg-warning-soft" aria-label={`Estornar recebimento de ${item.descricao}`}>
+          <Undo2 aria-hidden="true" className="w-3 h-3 mr-1" />Estornar
+        </Button>
+      )}
+      {(item.status === 'A_RECEBER' || item.status === 'VENCIDO' || item.status === 'RASCUNHO') && (
+        <TableActions
+          onEdit={() => handleEdit(item)}
+          onDelete={() => handleDelete(item)}
+          editPermission="financeiro:receber:edit"
+          deletePermission="financeiro:receber:delete"
+          isDeleting={isDeletingId === item.id}
+          editLabel={`Editar ${item.descricao}`}
+          deleteLabel={`Excluir ${item.descricao}`}
         />
-        <div className="relative flex-1 min-w-[220px] max-w-sm">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-          <Input
-            type="search"
-            value={busca}
-            onChange={event => setBusca(event.target.value)}
-            placeholder="Buscar pela descrição..."
-            aria-label="Buscar conta a receber pela descrição"
-            className="h-9 pl-9"
-          />
-        </div>
-        {hasActiveFilters && (
+      )}
+    </div>
+  );
+
+  const onRowKeyDown = (e: KeyboardEvent, item: ContaReceber) => {
+    if (e.target !== e.currentTarget) return;
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); void openDetail(item); }
+  };
+
+  const vencimentoTexto = (item: ContaReceber, vencida: boolean, prefixo = '') => (
+    <span className={cn('inline-flex items-center gap-1 whitespace-nowrap tabular-nums', vencida ? 'font-semibold text-destructive' : '')}>
+      {vencida && <AlertTriangle aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />}
+      {prefixo}{formatDateBR(parseLocalDate(item.data_vencimento))}
+    </span>
+  );
+
+  return (
+    <div className="space-y-6">
+      <FinScreenHeader
+        title="Contas a Receber"
+        description="Recebimentos previstos: baixa e estorno."
+        actions={(
           <>
-            <div className="flex h-9 items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3" aria-live="polite">
-              <span className="text-xs text-muted-foreground">Total filtrado</span>
-              <strong className="whitespace-nowrap text-sm text-foreground">
-                {loading && items.length === 0 ? 'Calculando...' : fmt(filteredSummary.total)}
-              </strong>
-              {!loading || items.length > 0 ? (
-                <span className="whitespace-nowrap text-xs text-muted-foreground">• {filteredSummary.count} lançamento(s)</span>
-              ) : null}
+            {canExport && (
+              <>
+                <Button variant="outline" size="sm" onClick={() => gerarPDFContasReceber({ items })} disabled={items.length === 0}>
+                  <FileDown aria-hidden="true" className="w-4 h-4 mr-1" /> PDF
+                </Button>
+                <Button variant="outline" size="sm" onClick={exportExcel} disabled={items.length === 0}>
+                  <FileDown aria-hidden="true" className="w-4 h-4 mr-1" /> Excel
+                </Button>
+              </>
+            )}
+            {canCreate && (
+              <Button size="sm" onClick={() => { handleCloseForm(); setShowForm(true); }}>
+                <Plus aria-hidden="true" className="w-4 h-4 mr-1" /> Nova Conta
+              </Button>
+            )}
+          </>
+        )}
+      />
+
+      <FinSectionGroup
+        id="cr-resumo"
+        title="Resumo"
+        caption={hasActiveFilters ? 'Vencidas e pendente: toda a unidade · Total filtrado: filtros aplicados' : 'Toda a unidade, sem filtros'}
+      >
+        {totaisStatus === 'error' ? (
+          <ErrorState compact title="Não foi possível carregar o resumo" onRetry={() => { void loadTotals(); }} />
+        ) : totaisStatus === 'loading' ? (
+          <ResumoCarregando cards={cardsResumo} className={resumoGrid} />
+        ) : (
+          <FinKpiGrid className={resumoGrid}>
+            <KpiCard
+              appearance="summary"
+              icon={AlertTriangle}
+              label="Vencidas"
+              value={String(serverTotals.vencidas)}
+              sub="Em aberto com vencimento antes de hoje"
+              variant={serverTotals.vencidas > 0 ? 'danger' : 'default'}
+              valueTone={serverTotals.vencidas > 0 ? 'negative' : 'default'}
+            />
+            <KpiCard
+              appearance="summary"
+              icon={Wallet}
+              label="Total pendente"
+              value={fmt(serverTotals.totalPendente)}
+              sub="Em aberto (não recebidas nem canceladas)"
+            />
+            {hasActiveFilters && (
+              <KpiCard
+                appearance="summary"
+                icon={Filter}
+                label="Total filtrado"
+                value={filtradoCalculando ? 'Calculando…' : filtradoIndisponivel ? '—' : fmt(filteredSummary.total)}
+                sub={filtradoCalculando ? 'Somando as contas dos filtros aplicados' : filtradoIndisponivel ? 'Indisponível: a lista não carregou' : totalFiltradoSub(filteredSummary.count)}
+              />
+            )}
+          </FinKpiGrid>
+        )}
+      </FinSectionGroup>
+
+      <div className="space-y-3 rounded-summary border bg-card p-4 shadow-card">
+        <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:items-end">
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <Label htmlFor="cr-data-de" className="text-xs text-muted-foreground">De</Label>
+            <DateInput id="cr-data-de" value={filtroDataDe} onValueChange={setFiltroDataDe} className="h-9 w-full text-xs sm:w-36" />
+          </div>
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <Label htmlFor="cr-data-ate" className="text-xs text-muted-foreground">Até</Label>
+            <DateInput id="cr-data-ate" value={filtroDataAte} onValueChange={setFiltroDataAte} className="h-9 w-full text-xs sm:w-36" />
+          </div>
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <Label htmlFor="cr-status" className="text-xs text-muted-foreground">Status</Label>
+            <Select value={filtroStatus} onValueChange={setFiltroStatus}>
+              <SelectTrigger id="cr-status" className="h-9 w-full sm:w-44"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos os status</SelectItem>
+                <SelectItem value="A_RECEBER">A Receber</SelectItem>
+                <SelectItem value="RECEBIDO">Recebido</SelectItem>
+                <SelectItem value="VENCIDO">Vencido</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <Label htmlFor="cr-conta" className="text-xs text-muted-foreground">Conta</Label>
+            <Select value={filtroConta} onValueChange={setFiltroConta}>
+              <SelectTrigger id="cr-conta" className="h-9 w-full sm:w-48"><SelectValue placeholder="Conta de pagamento" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todas as contas</SelectItem>
+                {contas.map(c => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="col-span-2 flex min-w-0 flex-col gap-1.5 sm:col-span-1">
+            <span className="text-xs font-medium leading-none text-muted-foreground">Categoria</span>
+            <SearchableSelect
+              value={filtroCategoria}
+              onValueChange={v => setFiltroCategoria(v || CATEGORIA_FILTRO_TODOS)}
+              options={categoriaFilterOptions}
+              placeholder="Categoria"
+              searchPlaceholder="Buscar categoria..."
+              ariaLabel="Categoria"
+              className="h-9 w-full sm:w-52"
+              allowClear={false}
+            />
+          </div>
+          <div className="col-span-2 flex min-w-0 flex-col gap-1.5 sm:min-w-[220px] sm:max-w-sm sm:flex-1">
+            <Label htmlFor="cr-busca" className="text-xs text-muted-foreground">Buscar</Label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+              <Input
+                id="cr-busca"
+                type="search"
+                value={busca}
+                onChange={event => setBusca(event.target.value)}
+                placeholder="Buscar pela descrição..."
+                aria-label="Buscar conta a receber pela descrição"
+                className="h-9 pl-9"
+              />
             </div>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 border-t pt-3">
+          <MonthNavigator value={mesFiltro} onChange={handleMesChange} />
+          <DateRangePresets
+            from={filtroDataDe}
+            to={filtroDataAte}
+            onChange={(de, ate) => { setFiltroDataDe(de); setFiltroDataAte(ate); }}
+          />
+          {hasActiveFilters && (
             <Button
               variant="ghost"
               size="sm"
               onClick={limparFiltros}
-              className="h-9 px-2 text-muted-foreground hover:text-foreground"
+              className="h-8 px-2 text-muted-foreground hover:text-foreground sm:ml-auto"
               aria-label="Limpar todos os filtros"
               title="Limpar todos os filtros"
             >
-              <X className="w-4 h-4 mr-1" /> Limpar filtros
+              <X aria-hidden="true" className="w-4 h-4 mr-1" /> Limpar filtros
             </Button>
-          </>
-        )}
-      </div>
-
-      <div className="flex items-center gap-2 flex-wrap">
-        <MonthNavigator value={mesFiltro} onChange={handleMesChange} />
-        <DateRangePresets
-          from={filtroDataDe}
-          to={filtroDataAte}
-          onChange={(de, ate) => { setFiltroDataDe(de); setFiltroDataAte(ate); }}
-        />
-      </div>
-
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Vencimento</TableHead>
-            <TableHead>Descricao</TableHead>
-            <TableHead>Cliente</TableHead>
-            <TableHead>Valor</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Acoes</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {loading && items.length === 0 ? (
-            <SkeletonRows />
-          ) : items.length === 0 ? (
-            <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Nenhuma conta a receber</TableCell></TableRow>
-          ) : items.map(item => {
-            const isVencida = item.data_vencimento < today && !['RECEBIDO', 'CANCELADO'].includes(item.status);
-            const sc = isVencida ? STATUS_CONFIG.VENCIDO : (STATUS_CONFIG[item.status] || STATUS_CONFIG.RASCUNHO);
-            return (
-              <TableRow
-                key={item.id}
-                className={`cursor-pointer hover:bg-muted/50 ${isVencida ? 'bg-destructive/5' : ''}`}
-                onClick={() => openDetail(item)}
-              >
-                <TableCell className={`font-mono text-sm ${isVencida ? 'text-destructive font-bold' : ''}`}>{formatDateBR(parseLocalDate(item.data_vencimento))}</TableCell>
-                <TableCell className="font-medium max-w-xs whitespace-normal break-words">{item.descricao}</TableCell>
-                <TableCell className="text-muted-foreground">{item.cliente || '-'}</TableCell>
-                <TableCell className="font-bold text-success">{fmt(item.valor)}</TableCell>
-                <TableCell><span className={`text-xs px-2 py-0.5 rounded-full border ${sc.color}`}>{sc.label}</span></TableCell>
-                <TableCell>
-                  <div className="flex gap-1 items-center justify-end" onClick={e => e.stopPropagation()}>
-                    {['A_RECEBER', 'VENCIDO'].includes(item.status) && canEdit && (
-                      <Button size="sm" variant="default" onClick={() => abrirRecebimento(item)} disabled={saving} className="text-xs h-7">Receber</Button>
-                    )}
-                    {item.status === 'RECEBIDO' && (
-                      <Button size="sm" variant="outline" onClick={() => estornar(item)} disabled={saving} className="text-xs h-7 text-warning border-warning/30 hover:bg-warning/10">
-                        <Undo2 className="w-3 h-3 mr-1" />Estornar
-                      </Button>
-                    )}
-                    {(item.status === 'A_RECEBER' || item.status === 'VENCIDO' || item.status === 'RASCUNHO') && (
-                      <TableActions
-                        onEdit={() => handleEdit(item)}
-                        onDelete={() => handleDelete(item)}
-                        editPermission="financeiro:receber:edit"
-                        deletePermission="financeiro:receber:delete"
-                        isDeleting={isDeletingId === item.id}
-                      />
-                    )}
-                  </div>
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
-
-      {hasMore && items.length > 0 && (
-        <div className="flex justify-center">
-          <Button variant="outline" size="sm" onClick={() => loadPage(cursorDate, cursorId)} disabled={loading}>
-            {loading ? <RefreshCw className="w-4 h-4 mr-1 animate-spin" /> : null}
-            Carregar mais
-          </Button>
+          )}
         </div>
-      )}
+      </div>
+
+      <FinSectionGroup id="cr-lista" title="Contas" caption={contasCaption(items.length, filteredSummary.count) || undefined}>
+        <div ref={listaRef} className="space-y-3">
+          {listaErro === 'list' && items.length === 0 ? (
+            <ErrorState title="Não foi possível carregar as contas a receber" onRetry={() => { void loadPage(null, null); }} retrying={loading} />
+          ) : loading && items.length === 0 ? (
+            <ListaCarregando estreito={listaEstreita} texto="Carregando contas a receber…" />
+          ) : items.length === 0 ? (
+            <EmptyState
+              icon={Receipt}
+              title="Nenhuma conta a receber"
+              description={hasActiveFilters ? 'Nenhuma conta corresponde aos filtros aplicados.' : 'Use Nova Conta para cadastrar.'}
+              actionLabel={hasActiveFilters ? 'Limpar filtros' : undefined}
+              onAction={hasActiveFilters ? limparFiltros : undefined}
+            />
+          ) : listaEstreita ? (
+            <ul className="space-y-2">
+              {items.map(item => {
+                const vencida = contaVencida('receber', item.status, item.data_vencimento, today);
+                const badge = contaStatusBadge('receber', item.status, vencida);
+                return (
+                  <li key={item.id} className={cn('rounded-lg border bg-card', vencida && 'border-destructive-border')}>
+                    <button
+                      type="button"
+                      className="w-full rounded-lg p-3 text-left hover:bg-card-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      onClick={() => { void openDetail(item); }}
+                    >
+                      <span className="flex items-start justify-between gap-3">
+                        <span className="min-w-0 break-words text-sm font-medium text-foreground">{item.descricao}</span>
+                        <span className="shrink-0 whitespace-nowrap text-sm font-semibold tabular-nums text-success">{fmt(item.valor)}</span>
+                      </span>
+                      {item.cliente && <span className="mt-1 block break-words text-xs text-muted-foreground">{item.cliente}</span>}
+                      <span className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                        {vencimentoTexto(item, vencida, 'Vence ')}
+                        <StatusBadge status={badge.status} label={badge.label} />
+                      </span>
+                    </button>
+                    {temAcoes(item) && <div className="border-t px-3 py-2">{acoesDaLinha(item, true)}</div>}
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Vencimento</TableHead>
+                  <TableHead>Descrição</TableHead>
+                  <TableHead>Cliente</TableHead>
+                  <TableHead className="text-right">Valor</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {items.map(item => {
+                  const vencida = contaVencida('receber', item.status, item.data_vencimento, today);
+                  const badge = contaStatusBadge('receber', item.status, vencida);
+                  return (
+                    <TableRow
+                      key={item.id}
+                      tabIndex={0}
+                      className="cursor-pointer hover:bg-card-hover focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+                      onClick={() => { void openDetail(item); }}
+                      onKeyDown={e => onRowKeyDown(e, item)}
+                    >
+                      <TableCell className="text-sm">{vencimentoTexto(item, vencida)}</TableCell>
+                      <TableCell className="max-w-xs whitespace-normal break-words font-medium">{item.descricao}</TableCell>
+                      <TableCell className="text-muted-foreground">{item.cliente || '-'}</TableCell>
+                      <TableCell className="whitespace-nowrap text-right font-semibold tabular-nums text-success">{fmt(item.valor)}</TableCell>
+                      <TableCell><StatusBadge status={badge.status} label={badge.label} /></TableCell>
+                      <TableCell onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>{acoesDaLinha(item)}</TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          )}
+
+          {listaErro === 'list' && items.length > 0 && (
+            <ErrorState compact title="Não foi possível atualizar a lista" description="A lista abaixo é da última carga." onRetry={() => { void loadPage(null, null); }} retrying={loading} />
+          )}
+          {listaErro === 'more' && items.length > 0 && (
+            <ErrorState compact title="Não foi possível carregar mais contas" onRetry={() => { void loadPage(cursorDate, cursorId); }} retrying={loading} />
+          )}
+
+          {hasMore && items.length > 0 && !listaErro && (
+            <div className="flex justify-center">
+              <Button variant="outline" size="sm" onClick={() => loadPage(cursorDate, cursorId)} disabled={loading}>
+                {loading ? <RefreshCw aria-hidden="true" className="w-4 h-4 mr-1 animate-spin" /> : null}
+                Carregar mais
+              </Button>
+            </div>
+          )}
+        </div>
+      </FinSectionGroup>
 
       {/* Detail Dialog */}
       <ContaDetailDialog
@@ -670,7 +826,7 @@ export default function ContasReceberSection({ initialStatus }: ContasReceberSec
 
       {/* Receive Date Dialog */}
       <Dialog open={recOpen} onOpenChange={o => { if (!o) setRecOpen(false); }}>
-        <DialogContent className="sm:max-w-sm">
+        <DialogContent className="sm:max-w-sm" {...retornoRecebimento}>
           <DialogHeader>
             <DialogTitle>Registrar recebimento</DialogTitle>
             <DialogDescription>
@@ -678,16 +834,16 @@ export default function ContasReceberSection({ initialStatus }: ContasReceberSec
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
-            <label className="text-sm font-medium">Data do recebimento</label>
-            <DateInput value={recDate} max={todayBR()} onValueChange={setRecDate} />
-            <p className="text-xs text-muted-foreground">
+            <Label htmlFor="cr-recebimento-data">Data do recebimento</Label>
+            <DateInput id="cr-recebimento-data" value={recDate} max={todayBR()} onValueChange={setRecDate} aria-describedby="cr-recebimento-data-ajuda" />
+            <p id="cr-recebimento-data-ajuda" className="text-xs text-muted-foreground">
               A competência da conta é preservada no DRE; o fluxo de caixa (DFC) usa esta data.
             </p>
           </div>
-          <DialogFooter>
+          <DialogFooter className="gap-2 sm:gap-0">
             <Button variant="outline" onClick={() => setRecOpen(false)} disabled={saving}>Cancelar</Button>
             <Button onClick={confirmarRecebimento} disabled={saving || !recDate}>
-              {saving ? <RefreshCw className="w-4 h-4 mr-1 animate-spin" /> : null}
+              {saving ? <RefreshCw aria-hidden="true" className="w-4 h-4 mr-1 animate-spin" /> : null}
               Confirmar recebimento
             </Button>
           </DialogFooter>
@@ -711,6 +867,31 @@ export default function ContasReceberSection({ initialStatus }: ContasReceberSec
         onSave={save}
         onClose={guardedClose}
       />
+
+      {/* Estorno */}
+      <AlertDialog open={estornoAlvo !== null} onOpenChange={o => { if (!o && !saving) setEstornoAlvo(null); }}>
+        <AlertDialogContent {...retornoEstorno}>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Estornar recebimento?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Deseja estornar este recebimento? O lançamento espelho será cancelado e a conta voltará ao status A Receber.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {estornoAlvo && (
+            <p className="rounded-lg border border-border bg-muted px-3 py-2 text-sm">
+              <span className="font-medium text-foreground">{estornoAlvo.descricao}</span>
+              <span className="text-muted-foreground"> — </span>
+              <span className="font-semibold tabular-nums text-foreground">{fmt(estornoAlvo.valor)}</span>
+            </p>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={saving}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction disabled={saving} onClick={e => { e.preventDefault(); void confirmarEstorno(); }}>
+              {saving ? 'Estornando…' : 'Estornar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <FormCloseConfirmDialog open={showConfirm} onConfirmLeave={confirmClose} onCancelLeave={cancelClose} />
     </div>

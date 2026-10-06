@@ -4,7 +4,6 @@ import { useScopeActivity } from '@/hooks/useScopeActivity';
 import { bankDraftScope } from '@/lib/bankDraftScope';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useEmitDataEvent } from '@/lib/dataEvents';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DateInput } from '@/components/ui/DateInput';
@@ -12,7 +11,13 @@ import { BRLInput } from '@/components/ui/brl-input';
 import { DecimalInput } from '@/components/ui/decimal-input';
 import { fmtBRL, formatDateBR, parseLocalDate, todayBR } from '@/lib/formatters';
 import { Label } from '@/components/ui/label';
-import { Badge, badgeVariants } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import StatusBadge from '@/components/ui/StatusBadge';
+import EmptyState from '@/components/ui/EmptyState';
+import ErrorState from '@/components/ui/ErrorState';
+import KpiCard from '@/components/ui/KpiCard';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
+import { kpiGridClassFor, longestValueLength } from '@/components/ui/kpiGrid';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -21,7 +26,7 @@ import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, A
 import { parseExtrato, verifyContaExtrato, decodeExtratoBuffer, type ExtratoConta } from '@/lib/extratoParser';
 import { useAuth } from '@/contexts/AuthContext';
 import { useScopedToast } from '@/hooks/useScopedToast';
-import { Upload, CheckCircle, Save, RefreshCw, ArrowRight, Receipt, Plus, Trash2, PieChart, ArrowRightLeft, Search, CreditCard, FileText, EyeOff, X, AlertTriangle, Edit, RotateCcw } from 'lucide-react';
+import { Upload, CheckCircle, CheckCircle2, Check, Save, RefreshCw, ArrowRight, Receipt, Plus, Trash2, PieChart, ArrowRightLeft, Search, CreditCard, FileText, EyeOff, X, AlertTriangle, Edit, RotateCcw, Loader2, Landmark, Calculator, Clock, FileUp } from 'lucide-react';
 import CriarLancamentoExtratoDialog from '@/components/financeiro/CriarLancamentoExtratoDialog';
 import CategoryCombobox from '@/components/financeiro/CategoryCombobox';
 import ContaFormDialog, { type ContaFormData, type RateioLine } from '@/components/financeiro/ContaFormDialog';
@@ -50,6 +55,24 @@ import {
 import type { ContaBancariaRef, CategoriaFinRef, CentroCustoRef, LancamentoConciliacao, LancamentoCandidate, ContaPagarCandidate, ContaReceberCandidate, ContaPagarAberta } from '@/types/financeiro';
 import { mapPagamentoError } from '@/lib/financeiroErrorMap';
 import DateRangePresets from './DateRangePresets';
+import { FinKpiGrid, FinNote, FinScreenHeader, FinSectionGroup } from './finV2Layout';
+import { AvisoConciliacao, ConferenciaSaldoCarregando, ConferenciaSaldoErro, ConferenciaSaldoPainel, ExtratoLinhaResumo } from './ConciliacaoParts';
+import {
+  CHIP_TOM,
+  MATCH_ORIGEM,
+  extratoLinhaFundo,
+  extratoLinhaResolvida,
+  extratoLinhaStatus,
+  extratoLinhasCaption,
+  extratoTipoBadge,
+  lancamentoConciliacaoBadge,
+  sugestoesLabel,
+  type ChipTom,
+  type ExtratoLinhaEstado,
+} from './conciliacaoView';
+import { ledgerTipoBadge } from './livroRazaoView';
+import { useConteinerEstreito } from './useConteinerEstreito';
+import { useRetornoFoco } from './useRetornoFoco';
 import { subDays } from 'date-fns';
 import { formatInBR } from '@/lib/datetime';
 
@@ -228,6 +251,11 @@ function fitidsDasLinhas(linhas: Pick<LinhaExtrato, 'tipo' | 'fitId'>[]): Set<st
   return set;
 }
 
+const CONCILIACAO_VISOES = [
+  { value: 'importar', label: 'Importar Extrato' },
+  { value: 'conciliar', label: 'Lançamentos' },
+];
+
 export default function ConciliacaoBancariaSection() {
   const emitDataEvent = useEmitDataEvent();
   const toast = useScopedToast();
@@ -238,6 +266,9 @@ export default function ConciliacaoBancariaSection() {
   const { companyId } = useCompanyId();
   const isScopeActive = useScopeActivity();
   const [contas, setContas] = useState<ContaBancariaRef[]>([]);
+  // Apresentação: distingue "contas ainda carregando", "falhou" e "nenhuma conta ativa".
+  const [contasStatus, setContasStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [contasTentativa, setContasTentativa] = useState(0);
   const [contaSel, setContaSel] = useState('');
   const draftKey = bankDraftScope(user?.id, companyId, contaSel);
   const currentAccount = useRef(contaSel);
@@ -264,6 +295,15 @@ export default function ConciliacaoBancariaSection() {
   /** Dia em que a diferença acima começou a existir — best-effort, calculado por busca
    *  binária (ver `localizarDiaDivergencia`), só quando o card de conferência está vermelho. */
   const [diaDivergencia, setDiaDivergencia] = useState<{ status: 'found' | 'before_period'; data: string } | null>(null);
+  // Apresentação da conferência: recalculando (o veredito exibido ainda é o anterior) e falha
+  // na leitura do saldo do sistema (antes o banner sumia ou ficava com o veredito velho).
+  const [conferenciaAtualizando, setConferenciaAtualizando] = useState(false);
+  const [conferenciaErro, setConferenciaErro] = useState(false);
+  const [conferenciaTentativa, setConferenciaTentativa] = useState(0);
+  // Saldo do extrato e linhas com que o veredito exibido foi calculado. Comparar no render diz se
+  // ele ficou velho sem um setState a mais (marcar "atualizando" no efeito renderizava a lista
+  // inteira de novo a cada clique).
+  const [conferenciaBase, setConferenciaBase] = useState<{ saldo: SaldoExtratoRef; linhas: LinhaExtrato[] } | null>(null);
 
   const [lancamentos, setLancamentos] = useState<LancamentoConciliacao[]>([]);
   const [lancamentoRateioCategoryIds, setLancamentoRateioCategoryIds] = useState<Record<string, string[]>>({});
@@ -274,6 +314,10 @@ export default function ConciliacaoBancariaSection() {
   // Totais da conta inteira (independentes do filtro/paginação da lista) — usados só no resumo do cabeçalho.
   const [totalPendentesConta, setTotalPendentesConta] = useState(0);
   const [totalConciliadosConta, setTotalConciliadosConta] = useState(0);
+  // Apresentação: contagem ainda não lida ou que falhou nunca aparece como zero.
+  const [contagemStatus, setContagemStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  // Apresentação: falha na lista não aparece como "Nenhum lançamento encontrado".
+  const [lancamentosErro, setLancamentosErro] = useState(false);
   const [selectedLancamentoIds, setSelectedLancamentoIds] = useState<Set<string>>(new Set());
 
   const [processando, setProcessando] = useState(false);
@@ -382,7 +426,9 @@ export default function ConciliacaoBancariaSection() {
   );
   useEffect(() => {
     supabase.from('fin_contas').select('id, nome, numero_conta, agencia, banco').eq('ativo', true).order('nome')
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (error) console.error('[ConciliacaoBancariaSection.contas]', error);
+        setContasStatus(error ? 'error' : 'ready');
         setContas(data || []);
         if (data && data.length > 0 && !contaSel) setContaSel(data[0].id);
       });
@@ -393,7 +439,7 @@ export default function ConciliacaoBancariaSection() {
       setCategorias(buildCategoryOptions(catRes.data || []));
       setCentrosCusto(ccRes.data || []);
     });
-  }, [contaSel, supabase]);
+  }, [contaSel, supabase, contasTentativa]);
 
   useEffect(() => {
     setLinhasAntigasAusentes([]);
@@ -403,6 +449,7 @@ export default function ConciliacaoBancariaSection() {
   useEffect(() => {
     setImportFilter('todos');
     setConferenciaSaldo(null);
+    setConferenciaErro(false);
     if (!contaSel) {
       setLinhasState([]);
       setSaldoExtrato(null);
@@ -427,19 +474,29 @@ export default function ConciliacaoBancariaSection() {
     if (!contaSel || !saldoExtrato) {
       setConferenciaSaldo(null);
       setDiaDivergencia(null);
+      setConferenciaErro(false);
+      setConferenciaAtualizando(false);
       return;
     }
     let active = true;
     const t = setTimeout(async () => {
+      // Só depois do debounce: marcar no corpo do efeito renderizava a lista inteira de novo a cada
+      // clique numa linha (medido: o dobro do tempo de resposta com 250 linhas).
+      setConferenciaAtualizando(true);
       const { data, error } = await supabase.rpc('get_fin_saldo_conta_em', {
         p_conta_id: contaSel,
         p_data: saldoExtrato.data,
       });
-      if (!active || !isScopeActive()) return;
+      if (!active) return;
+      // Antes da checagem de escopo: senão o "Atualizando…" ficava preso se o escopo saísse no meio.
+      setConferenciaAtualizando(false);
+      if (!isScopeActive()) return;
       if (error) {
         console.error('[ConciliacaoBancariaSection.conferenciaSaldo]', error);
+        setConferenciaErro(true);
         return;
       }
+      setConferenciaErro(false);
       const sistema = Number(data) || 0;
       // Linhas ainda não resolvidas entram como projeção: quando tudo for
       // processado, projetado === sistema e a comparação vira definitiva.
@@ -447,6 +504,7 @@ export default function ConciliacaoBancariaSection() {
       const projetado = sistema + pendentesDelta;
       const diferenca = saldoExtrato.valor - projetado;
       setConferenciaSaldo({ sistema, projetado, pendentesDelta, diferenca });
+      setConferenciaBase({ saldo: saldoExtrato, linhas });
 
       if (Math.abs(diferenca) < 0.01) {
         setDiaDivergencia(null);
@@ -461,7 +519,7 @@ export default function ConciliacaoBancariaSection() {
       }
     }, 600);
     return () => { active = false; clearTimeout(t); };
-  }, [contaSel, saldoExtrato, linhas, supabase, isScopeActive]);
+  }, [contaSel, saldoExtrato, linhas, supabase, isScopeActive, conferenciaTentativa]);
 
   useEffect(() => {
     if (contaSel && view === 'conciliar') loadLancamentos();
@@ -470,6 +528,8 @@ export default function ConciliacaoBancariaSection() {
     setSelectedLancamentoIds(new Set());
   }, [contaSel, filtro, filtroDataDe, filtroDataAte, view]);
   useEffect(() => { if (contaSel && view === 'conciliar') loadLancamentosCounts(); }, [contaSel, view]);
+  // Apresentação: ao trocar de conta, a contagem da conta anterior não fica na tela como se fosse a nova.
+  useEffect(() => { setContagemStatus('loading'); }, [contaSel]);
 
   /** Totais reais da conta (pendente/conciliado), independentes do filtro e da paginação da lista. */
   const loadLancamentosCounts = async () => {
@@ -479,6 +539,8 @@ export default function ConciliacaoBancariaSection() {
       supabase.from('fin_lancamentos').select('id', { count: 'exact', head: true })
         .eq('conta_id', contaSel).eq('status', 'REALIZADO').eq('conciliado', true),
     ]);
+    if (pendRes.error || concRes.error) console.error('[ConciliacaoBancariaSection.loadLancamentosCounts]', pendRes.error || concRes.error);
+    setContagemStatus(pendRes.error || concRes.error ? 'error' : 'ready');
     setTotalPendentesConta(pendRes.count || 0);
     setTotalConciliadosConta(concRes.count || 0);
   };
@@ -539,8 +601,10 @@ export default function ConciliacaoBancariaSection() {
 
       setLancamentoRateioCategoryIds(rateioCategoryIds);
       setLancamentos(allRows);
+      setLancamentosErro(false);
     } catch (error) {
       console.error('Error loading lancamentos:', error);
+      setLancamentosErro(true);
       toast.error('Erro ao carregar lançamentos');
       setLancamentoRateioCategoryIds({});
       setLancamentos([]);
@@ -2168,22 +2232,26 @@ export default function ConciliacaoBancariaSection() {
     .map((linha, index) => ({ linha, index }))
     .filter(({ linha }) => matchesImportFilter(linha, importFilter));
 
-  const importFilterChip = (filter: ImportFilter, label: string, className = '') => (
-    <button
-      type="button"
-      onClick={() => setImportFilter(filter)}
-      aria-pressed={importFilter === filter}
-      className={cn(
-        badgeVariants({ variant: 'outline' }),
-        'cursor-pointer transition-colors hover:bg-accent',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-        importFilter === filter && 'ring-2 ring-primary ring-offset-1',
-        className,
-      )}
-    >
-      {label}
-    </button>
-  );
+  const importFilterChip = (filter: ImportFilter, count: number, label: string, tom: ChipTom = 'default') => {
+    const ativo = importFilter === filter;
+    return (
+      <button
+        type="button"
+        onClick={() => setImportFilter(filter)}
+        aria-pressed={ativo}
+        className={cn(
+          'inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition-colors',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+          CHIP_TOM[tom],
+          // Ativo: anel azul + marca de seleção + peso maior — não depende só da cor.
+          ativo && 'font-semibold ring-2 ring-primary ring-offset-1 ring-offset-background',
+        )}
+      >
+        {ativo && <Check aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />}
+        <span className="font-semibold tabular-nums">{count}</span> {label}
+      </button>
+    );
+  };
 
   const rateioValorTotal = linhas[rateioDialog.linhaIndex]?.valor || 0;
   const rateioLinhaTipo = linhas[rateioDialog.linhaIndex]?.tipo;
@@ -2226,10 +2294,13 @@ export default function ConciliacaoBancariaSection() {
     setLinhas(prev => prev.map((l, j) => j === i ? { ...l, categoriaId } : l));
 
   const getOriginBadge = (origin?: MatchSuggestion['origin']) => {
-    if (origin === 'lancamento') return <Badge className="bg-success/10 text-success border-success/20 text-[10px]">Lançamento</Badge>;
-    if (origin === 'conta_pagar') return <Badge className="bg-primary/10 text-primary border-primary/20 text-[10px]">Conta a Pagar</Badge>;
-    if (origin === 'conta_receber') return <Badge className="bg-warning/10 text-warning border-warning/20 text-[10px]">Conta a Receber</Badge>;
-    return null;
+    if (!origin) return null;
+    const o = MATCH_ORIGEM[origin];
+    return (
+      <span className={cn('inline-flex items-center whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-semibold leading-tight', o.className)}>
+        {o.label}
+      </span>
+    );
   };
 
   // === Transfer creation from OFX line ===
@@ -2267,637 +2338,840 @@ export default function ConciliacaoBancariaSection() {
   };
 
 
+  // ─── Apresentação (Redesign V2, Fase 04B) ───
+  // Tabela ⇄ lista com uma só marcação (ver `useConteinerEstreito`). Os limites são a largura em que
+  // as colunas cabem sem rolagem: extrato com 7 colunas e até 7 ações; lançamentos com 9 colunas.
+  const [setExtratoConteiner, extratoEstreito] = useConteinerEstreito(1040);
+  const [setLancamentosConteiner, lancamentosEstreito] = useConteinerEstreito(832);
+  // Foco de volta ao botão que abriu cada diálogo (ver `useRetornoFoco`).
+  const focoSugestoes = useRetornoFoco();
+  const focoBaixa = useRetornoFoco();
+  const focoBoleto = useRetornoFoco();
+  const focoJaNoRazao = useRetornoFoco();
+  const focoDuplicata = useRetornoFoco();
+  const focoRateio = useRetornoFoco();
+  const focoTransferencia = useRetornoFoco();
+  const focoContaDiverge = useRetornoFoco(() => fileRef.current);
+  const focoSubstituir = useRetornoFoco(() => fileRef.current);
+
   if (!canViewRbac) return null;
 
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div>
-          <h2 className="text-xl font-bold text-foreground">Conciliação Bancária</h2>
-          <p className="text-sm text-muted-foreground">Importe extratos e concilie com lançamentos, contas a pagar e a receber</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Select value={contaSel} onValueChange={setContaSel}>
-            <SelectTrigger className="w-44"><SelectValue placeholder="Conta" /></SelectTrigger>
-            <SelectContent>{contas.map(c => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}</SelectContent>
-          </Select>
-          <div className="flex items-center rounded-lg border border-border overflow-hidden h-9">
-            <button onClick={() => setView('importar')}
-              className={`px-3 h-full text-xs font-medium transition-colors ${view === 'importar' ? 'bg-primary text-primary-foreground' : 'bg-muted/50 text-muted-foreground hover:text-foreground'}`}
-            >Importar Extrato</button>
-            <button onClick={() => setView('conciliar')}
-              className={`px-3 h-full text-xs font-medium transition-colors ${view === 'conciliar' ? 'bg-primary text-primary-foreground' : 'bg-muted/50 text-muted-foreground hover:text-foreground'}`}
-            >Lançamentos</button>
-          </div>
-        </div>
+  const contaAtual = contas.find(c => c.id === contaSel);
+  const dataBR = (iso: string) => formatDateBR(parseLocalDate(iso));
+
+  /** Mesmos sinais que o render derivava linha a linha (precedência inalterada). */
+  const estadoLinha = (linha: LinhaExtrato) => {
+    const isDone = !!linha.matchId?.endsWith('-done');
+    const isAutomatic = isAutomaticInvestmentLine(linha);
+    const isInternal = !!linha.movimentacaoInterna;
+    const estado: ExtratoLinhaEstado = {
+      isDone,
+      isInternal,
+      isAutomaticPending: isAutomatic && !isInternal,
+      isJaConciliada: !!linha.jaConciliada,
+      isIgnorada: !!linha.ignorada,
+      hasMatch: !!linha.matchId && !isDone,
+      hasSuggestions: !linha.matchId && !!linha.suggestions && linha.suggestions.length > 0,
+    };
+    return { ...estado, isAutomatic, isInactive: estado.isJaConciliada || estado.isIgnorada || isAutomatic };
+  };
+  type EstadoLinha = ReturnType<typeof estadoLinha>;
+
+  /** Linha sem tom próprio e desmarcada (não entra no Processar): texto secundário, sem opacidade. */
+  const descricaoSecundaria = (linha: LinhaExtrato, e: EstadoLinha) =>
+    extratoLinhaResolvida(e) || (!extratoLinhaFundo(e) && !linha.selecionada);
+
+  const leadLinha = (linha: LinhaExtrato, i: number, e: EstadoLinha) => {
+    if (e.isDone || e.isJaConciliada) return <CheckCircle aria-hidden="true" className="h-4 w-4 text-success" />;
+    if (e.isInternal) return <ArrowRightLeft aria-hidden="true" className="h-4 w-4 text-info" />;
+    if (e.isAutomaticPending) return <AlertTriangle aria-hidden="true" className="h-4 w-4 text-warning" />;
+    if (e.isIgnorada) return <EyeOff aria-hidden="true" className="h-4 w-4 text-muted-foreground" />;
+    if (e.hasMatch) return <CheckCircle aria-hidden="true" className="h-4 w-4 text-success" />;
+    return (
+      <Checkbox
+        checked={linha.selecionada}
+        onCheckedChange={(v) => setLinhas(prev => prev.map((l, j) => j === i ? { ...l, selecionada: !!v } : l))}
+        aria-label={`Incluir no processamento: ${linha.descricao}`}
+      />
+    );
+  };
+
+  const notasLinha = (linha: LinhaExtrato, e: EstadoLinha) => (
+    <>
+      {e.hasMatch && (
+        <span className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-success">
+          <ArrowRight aria-hidden="true" className="h-3 w-3 shrink-0" />
+          <span className="min-w-0 break-words">{linha.matchDescricao}</span>
+          {linha.matchOrigin && getOriginBadge(linha.matchOrigin)}
+        </span>
+      )}
+      {e.hasMatch && linha.matchJaNoRazao && (
+        <span className="mt-1 flex items-start gap-1.5 text-xs text-warning">
+          <AlertTriangle aria-hidden="true" className="mt-px h-3.5 w-3.5 shrink-0" />
+          <span>
+            Já está no Livro Razão — veio da baixa em Contas a Pagar/Receber.
+            Ao processar, esta linha será <strong>vinculada</strong> a esse lançamento,
+            sem criar outro.
+          </span>
+        </span>
+      )}
+      {e.isJaConciliada && (
+        linha.transferReconhecida ? (
+          <span className="mt-1 flex items-start gap-1.5 text-xs text-muted-foreground">
+            <ArrowRightLeft aria-hidden="true" className="mt-px h-3.5 w-3.5 shrink-0" />
+            <span>
+              Transferência já lançada pelo extrato da outra conta em{' '}
+              {dataBR(linha.transferReconhecida.data)} ({getContaNome(linha.transferReconhecida.conta_id)} → {getContaNome(linha.transferReconhecida.conta_destino_id)}).
+              Não precisa lançar de novo.
+            </span>
+          </span>
+        ) : (
+          <span className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+            <CheckCircle aria-hidden="true" className="h-3.5 w-3.5 shrink-0" /> Já conciliada anteriormente
+          </span>
+        )
+      )}
+      {!e.isInactive && linha.transferAlertas && linha.transferAlertas.length > 0 && (
+        <span className="mt-1 flex items-start gap-1.5 text-xs text-warning">
+          <AlertTriangle aria-hidden="true" className="mt-px h-3.5 w-3.5 shrink-0" />
+          <span>
+            Confira antes de conciliar: já existe transferência de mesmo valor
+            {linha.transferAlertas.map(t => (
+              <span key={t.id} className="block">
+                • {dataBR(t.data)} — {getContaNome(t.conta_id)} → {getContaNome(t.conta_destino_id)}
+                {t.direcaoInvertida ? ' (direção invertida)' : ''}
+              </span>
+            ))}
+          </span>
+        </span>
+      )}
+      {e.isIgnorada && (
+        e.isInternal ? (
+          <span className="mt-1 flex items-start gap-1.5 text-xs text-info">
+            <ArrowRightLeft aria-hidden="true" className="mt-px h-3.5 w-3.5 shrink-0" />
+            <span>Movimento interno ContaMax — registrado sem efeito financeiro</span>
+          </span>
+        ) : (
+          <span className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+            <EyeOff aria-hidden="true" className="h-3.5 w-3.5 shrink-0" /> Marcada como ignorada
+          </span>
+        )
+      )}
+      {e.isAutomaticPending && (
+        <span className="mt-1 flex items-start gap-1.5 text-xs text-warning">
+          <AlertTriangle aria-hidden="true" className="mt-px h-3.5 w-3.5 shrink-0" />
+          <span>Bloqueada para tratamento interno — nenhum lançamento financeiro será criado</span>
+        </span>
+      )}
+      {e.hasSuggestions && !e.isInactive && (
+        <span className="mt-1 flex items-center gap-1.5 text-xs text-warning">
+          <Search aria-hidden="true" className="h-3.5 w-3.5 shrink-0" /> {linha.suggestions!.length} sugestão(ões) disponível(is)
+        </span>
+      )}
+    </>
+  );
+
+  const categoriaLinha = (linha: LinhaExtrato, i: number, e: EstadoLinha) => (
+    !e.isAutomatic && !e.hasMatch && !e.isDone && !e.isInactive && !(linha.rateioLinhas && linha.rateioLinhas.length > 1) ? (
+      <div className="mt-2 w-full max-w-[16rem]">
+        <CategoryCombobox
+          value={linha.categoriaId || ''}
+          onValueChange={(v) => setLinhaCategoria(i, v)}
+          options={categoriasForTipo(linha.tipo)}
+          placeholder="Categoria obrigatória..."
+          className="h-8 text-xs"
+          modal={false}
+        />
       </div>
+    ) : null
+  );
 
-      {/* ========== IMPORT VIEW ========== */}
-      {view === 'importar' && (
+  const valorLinha = (linha: LinhaExtrato, e: EstadoLinha) => (
+    <>
+      <span className={cn(
+        'whitespace-nowrap font-semibold tabular-nums',
+        e.isAutomatic ? 'text-muted-foreground' : linha.tipo === 'RECEITA' ? 'text-success' : 'text-destructive',
+      )}>
+        {linha.tipo === 'RECEITA' ? '+' : '-'} {fmt(linha.valor)}
+      </span>
+      {e.isAutomatic && <span className="block text-[11px] font-normal text-muted-foreground">efeito no saldo: R$ 0,00</span>}
+    </>
+  );
+
+  const acoesLinha = (linha: LinhaExtrato, i: number, e: EstadoLinha) => {
+    if (e.isInternal) return null;
+    if (e.isAutomaticPending) {
+      return (
+        <Button size="sm" variant="outline" className="h-8 text-xs" disabled={processando} onClick={processAutomaticInvestmentLines}>
+          {processando
+            ? <Loader2 aria-hidden="true" className="mr-1 h-3.5 w-3.5 animate-spin" />
+            : <RefreshCw aria-hidden="true" className="mr-1 h-3.5 w-3.5" />}
+          {processando ? 'Tratando...' : 'Tentar novamente'}
+        </Button>
+      );
+    }
+    if (e.isIgnorada) {
+      return (
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-8 text-xs"
+          title="Voltar esta entrada para análise"
+          disabled={!linha.ignoradaId || reconsiderandoId !== null}
+          onClick={() => reconsiderarLinha(i)}
+        >
+          <RotateCcw aria-hidden="true" className="mr-1 h-3.5 w-3.5" />
+          {reconsiderandoId === linha.ignoradaId ? 'Reconsiderando...' : 'Reconsiderar'}
+        </Button>
+      );
+    }
+    if (e.isJaConciliada) return null;
+    return (
+      <div className="flex flex-wrap gap-1.5">
+        {!e.isDone && linha.suggestions && linha.suggestions.length > 0 && (
+          <Button size="sm" variant={e.hasMatch ? 'default' : 'outline'} className="h-8 text-xs"
+            onClick={() => setSuggestionsDialog({ open: true, linhaIndex: i })}>
+            <Search aria-hidden="true" className="mr-1 h-3.5 w-3.5" />
+            {e.hasMatch ? 'Alterar' : sugestoesLabel(linha.suggestions.length)}
+          </Button>
+        )}
+        {e.hasMatch && (
+          <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive" onClick={() => clearMatch(i)}
+            title="Remover vínculo" aria-label={`Remover vínculo com ${linha.matchDescricao || linha.descricao}`}>
+            <X aria-hidden="true" className="h-4 w-4" />
+          </Button>
+        )}
+        {e.hasMatch && (linha.matchOrigin === 'conta_pagar' || linha.matchOrigin === 'conta_receber') && (
+          <Button size="sm" variant="outline" className="h-8 text-xs"
+            onClick={() => abrirRevisaoBaixa([i], 'individual')}>
+            <CreditCard aria-hidden="true" className="mr-1 h-3.5 w-3.5" /> Baixar
+          </Button>
+        )}
+        {!e.hasMatch && !e.isDone && linha.tipo === 'DESPESA' && (
+          <Button size="sm" variant="outline" className="h-8 text-xs"
+            title="Vincular esta saída a um boleto em aberto e dar baixa nele"
+            onClick={() => abrirBoletoDialog(i)}>
+            <Receipt aria-hidden="true" className="mr-1 h-3.5 w-3.5" /> Boleto
+          </Button>
+        )}
+        {!e.hasMatch && !e.isDone && (
+          <>
+            <Button size="sm" variant={linha.rateioLinhas && linha.rateioLinhas.length > 1 ? 'default' : 'outline'} className="h-8 text-xs" onClick={() => openRateio(i)}>
+              <PieChart aria-hidden="true" className="mr-1 h-3.5 w-3.5" />
+              {linha.rateioLinhas && linha.rateioLinhas.length > 1 ? `${linha.rateioLinhas.length} cat.` : 'Ratear'}
+            </Button>
+            <Button size="sm" variant="outline" className="h-8 text-xs" title="Marcar como transferência entre contas"
+              onClick={() => { setTransferDialog({ open: true, linhaIndex: i }); setTransferContaDestino(''); }}>
+              <ArrowRightLeft aria-hidden="true" className="mr-1 h-3.5 w-3.5" /> Transf.
+            </Button>
+            <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setCriarDialog({ open: true, linhaIndex: i })}>
+              <FileText aria-hidden="true" className="mr-1 h-3.5 w-3.5" /> Criar
+            </Button>
+          </>
+        )}
+        {!e.isDone && (
+          <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+            title="Ignorar esta entrada — não criará lançamento" aria-label={`Ignorar esta entrada: ${linha.descricao}`}
+            onClick={() => ignorarLinha(i)}>
+            <EyeOff aria-hidden="true" className="h-4 w-4" />
+          </Button>
+        )}
+      </div>
+    );
+  };
+
+  const categoriaLancamento = (item: LancamentoConciliacao) => {
+    const categoriaNome = categorias.find(c => c.id === item.categoria_id)?.nome;
+    const rateioCategoryIds = lancamentoRateioCategoryIds[item.id] || [];
+    const rateioCategoryNames = rateioCategoryIds
+      .map(categoryId => categorias.find(c => c.id === categoryId)?.nome)
+      .filter((name): name is string => Boolean(name));
+    const categoryLabel = categoriaNome
+      || (rateioCategoryIds.length > 1
+        ? `${rateioCategoryIds.length} categorias`
+        : rateioCategoryNames[0]);
+    if (categoryLabel) {
+      return (
+        <span className="text-xs text-foreground" title={rateioCategoryNames.join(' • ') || categoriaNome}>
+          {categoryLabel}
+        </span>
+      );
+    }
+    // Transferência não exige categoria (mesma isenção de findLancamentosSemCategoria)
+    if (item.tipo === 'TRANSFERENCIA') return <span className="text-xs text-muted-foreground">—</span>;
+    return (
+      <span className="inline-flex items-center gap-1 text-xs text-warning">
+        <AlertTriangle aria-hidden="true" className="h-3.5 w-3.5" /> Sem categoria
+      </span>
+    );
+  };
+
+  const valorLancamento = (item: LancamentoConciliacao) => (
+    <span className={cn('whitespace-nowrap font-semibold tabular-nums', item.tipo === 'RECEITA' ? 'text-success' : 'text-destructive')}>
+      {item.tipo === 'RECEITA' ? '+' : '-'} {fmt(item.valor)}
+    </span>
+  );
+
+  const selecionarLancamento = (item: LancamentoConciliacao) => (
+    <Checkbox
+      checked={selectedLancamentoIds.has(item.id)}
+      onCheckedChange={(v) => setSelectedLancamentoIds(prev => {
+        const next = new Set(prev);
+        if (v) next.add(item.id); else next.delete(item.id);
+        return next;
+      })}
+      aria-label={`Selecionar ${item.descricao}`}
+    />
+  );
+
+  const conciliadoLancamento = (item: LancamentoConciliacao) => (
+    <Checkbox
+      checked={!!item.conciliado}
+      onCheckedChange={(v) => conciliar(item.id, !!v)}
+      aria-label={item.conciliado ? `Desconciliar ${item.descricao}` : `Conciliar ${item.descricao}`}
+    />
+  );
+
+  const acoesLancamento = (item: LancamentoConciliacao) => (
+    <div className="flex items-center justify-end gap-1">
+      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEditLancamento(item)} disabled={editSaving}
+        title="Editar" aria-label={`Editar lançamento ${item.descricao}`}>
+        <Edit aria-hidden="true" className="h-4 w-4" />
+      </Button>
+      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => deleteLancamentoConciliacao(item)} disabled={editSaving}
+        title="Excluir" aria-label={`Excluir lançamento ${item.descricao}`}>
+        <Trash2 aria-hidden="true" className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+
+  const contagemValores = contagemStatus === 'ready'
+    ? [totalPendentesConta.toLocaleString('pt-BR'), totalConciliadosConta.toLocaleString('pt-BR')]
+    : [];
+
+  return (
+    <div className="space-y-6">
+      <FinScreenHeader
+        title="Conciliação Bancária"
+        description="Importe extratos e concilie com lançamentos, contas a pagar e a receber."
+        actions={(
+          <div className="flex w-full flex-wrap items-end gap-3 sm:w-auto">
+            <div className="flex min-w-0 flex-1 flex-col gap-1.5 sm:flex-none">
+              <Label htmlFor="conciliacao-conta" className="text-xs text-muted-foreground">Conta bancária</Label>
+              <Select value={contaSel} onValueChange={setContaSel}>
+                <SelectTrigger id="conciliacao-conta" className="h-9 w-full sm:w-64"><SelectValue placeholder="Selecione a conta" /></SelectTrigger>
+                <SelectContent>{contas.map(c => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <SegmentedControl
+              ariaLabel="Visão da conciliação"
+              manualActivation
+              options={CONCILIACAO_VISOES}
+              value={view}
+              onChange={v => setView(v as 'importar' | 'conciliar')}
+              className="w-full sm:w-auto"
+            />
+          </div>
+        )}
+      />
+
+      {contas.length === 0 && contasStatus === 'loading' ? (
+        <div role="status" className="space-y-3 rounded-summary border bg-card p-5 shadow-card">
+          <span className="sr-only">Carregando contas bancárias…</span>
+          <Skeleton className="h-4 w-48" />
+          <Skeleton className="h-9 w-full" />
+          <Skeleton className="h-9 w-2/3" />
+        </div>
+      ) : contas.length === 0 && contasStatus === 'error' ? (
+        <ErrorState
+          title="Não foi possível carregar as contas bancárias"
+          onRetry={() => { setContasStatus('loading'); setContasTentativa(n => n + 1); }}
+        />
+      ) : contas.length === 0 ? (
+        <EmptyState
+          icon={Landmark}
+          title="Nenhuma conta bancária ativa"
+          description="Cadastre ou reative uma conta em Contas Bancárias para importar extratos e conciliar."
+        />
+      ) : (
         <>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-end gap-3 flex-wrap">
-                <div>
-                  <Label>Arquivo (CSV / OFX / QFX / OFC)</Label>
-                  <label className={`flex items-center gap-2 cursor-pointer${loading ? ' opacity-50 pointer-events-none' : ''}`}>
-                    <input
-                      ref={fileRef}
-                      type="file"
-                      accept=".csv,.ofx,.qfx,.ofc,.txt"
-                      onChange={handleFile}
-                      disabled={loading}
-                      className="hidden"
-                    />
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-input bg-background text-sm font-medium text-primary hover:bg-accent hover:text-accent-foreground transition-colors">
-                      <Upload className="w-3.5 h-3.5" />
-                      Escolher arquivo
-                    </span>
-                    <span className="text-sm text-muted-foreground truncate max-w-[200px]">
-                      {nomeArquivo || 'Nenhum arquivo selecionado'}
-                    </span>
-                  </label>
-                </div>
-                {linhas.length > 0 && (
-                  <Button variant="ghost" size="sm" className="text-destructive h-9" onClick={limparExtrato}>
-                    <X className="w-4 h-4 mr-1" /> Limpar Extrato
-                  </Button>
-                )}
-              </div>
-              <p className="text-[11px] text-muted-foreground mt-2">
-                O sistema cruza automaticamente com lançamentos, <strong>contas a pagar</strong> e <strong>contas a receber</strong> pendentes. Use <EyeOff className="w-3 h-3 inline" /> para ignorar entradas que não devem gerar lançamento.
-              </p>
-            </CardContent>
-          </Card>
-
-          {/* Conferência de saldo contra o banco: rede final contra linha engolida/
-              ignorada indevidamente. Fica fora do bloco `linhas.length > 0` de
-              propósito — o veredito importa justamente DEPOIS de tudo processado. */}
-          {saldoExtrato && conferenciaSaldo && (
-            Math.abs(conferenciaSaldo.diferenca) < 0.01 ? (
-              <Card className="border-success/30 bg-success/5">
-                <CardContent className="p-3 flex items-center gap-2 text-sm">
-                  <CheckCircle className="w-4 h-4 text-success shrink-0" />
-                  <span>
-                    Saldo confere com o extrato do banco:{' '}
-                    <span className="font-mono font-medium">{fmtBRL(saldoExtrato.valor)}</span>{' '}
-                    em {formatDateBR(parseLocalDate(saldoExtrato.data))}
-                    {Math.abs(conferenciaSaldo.pendentesDelta) >= 0.01 && (
-                      <span className="text-muted-foreground"> (projetado com as linhas ainda pendentes)</span>
-                    )}
-                  </span>
-                </CardContent>
-              </Card>
-            ) : (
-              <Card className="border-destructive/30 bg-destructive/5">
-                <CardContent className="p-3 space-y-1 text-sm">
-                  <div className="flex items-center gap-2 font-medium text-destructive">
-                    <AlertTriangle className="w-4 h-4 shrink-0" />
-                    Saldo NÃO confere com o extrato do banco — diferença de{' '}
-                    <span className="font-mono">{fmtBRL(conferenciaSaldo.diferenca)}</span>
+          {/* ========== IMPORT VIEW ========== */}
+          {view === 'importar' && (
+            <div className="space-y-6">
+              <section aria-labelledby="conciliacao-arquivo-titulo" aria-busy={loading} className="rounded-summary border bg-card p-4 shadow-card sm:p-5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <div aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary-ink">
+                      <FileUp className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <h3 id="conciliacao-arquivo-titulo" className="text-sm font-semibold text-foreground">Arquivo do extrato</h3>
+                      <p className="text-xs text-muted-foreground">
+                        CSV, OFX, QFX ou OFC{contaAtual ? <> — as linhas entram em <span className="font-medium text-foreground">{contaAtual.nome}</span></> : null}
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-muted-foreground">
-                    Banco em {formatDateBR(parseLocalDate(saldoExtrato.data))}:{' '}
-                    <span className="font-mono text-foreground">{fmtBRL(saldoExtrato.valor)}</span>
-                    {' · '}Sistema{Math.abs(conferenciaSaldo.pendentesDelta) >= 0.01 ? ' (com linhas pendentes)' : ''}:{' '}
-                    <span className="font-mono text-foreground">{fmtBRL(conferenciaSaldo.projetado)}</span>
-                  </p>
-                  {diaDivergencia && (
-                    <p className="text-muted-foreground">
-                      {diaDivergencia.status === 'found' ? (
-                        <>A diferença começou em{' '}
-                          <span className="font-mono text-foreground">{formatDateBR(parseLocalDate(diaDivergencia.data))}</span>
-                          {' '}— revise as linhas dessa data.</>
-                      ) : (
-                        <>A diferença já existia antes de{' '}
-                          <span className="font-mono text-foreground">{formatDateBR(parseLocalDate(diaDivergencia.data))}</span>
-                          {' '}(fora do período deste extrato).</>
-                      )}
-                    </p>
+                  {linhas.length > 0 && (
+                    <Button variant="ghost" size="sm" className="h-9 text-destructive" onClick={limparExtrato}>
+                      <X aria-hidden="true" className="mr-1 h-4 w-4" /> Limpar Extrato
+                    </Button>
                   )}
-                  <p className="text-[11px] text-muted-foreground">
-                    Pode haver linha marcada como duplicata/ignorada que na verdade é uma transação real,
-                    ou lançamento incorreto no período. Revise antes de confiar no saldo.
-                  </p>
-                </CardContent>
-              </Card>
-            )
-          )}
+                </div>
+                <label className={cn('mt-4 flex flex-wrap items-center gap-x-3 gap-y-2', loading && 'pointer-events-none')}>
+                  {/* sr-only (e não `hidden`): o campo continua alcançável pelo teclado. */}
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept=".csv,.ofx,.qfx,.ofc,.txt"
+                    onChange={handleFile}
+                    disabled={loading}
+                    className="peer sr-only"
+                  />
+                  <span className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm font-medium text-primary-ink transition-colors hover:bg-accent hover:text-accent-foreground peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-background peer-disabled:cursor-not-allowed peer-disabled:opacity-50">
+                    {loading
+                      ? <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
+                      : <Upload aria-hidden="true" className="h-4 w-4" />}
+                    Escolher arquivo
+                  </span>
+                  <span className="min-w-0 break-all text-sm text-muted-foreground">
+                    {nomeArquivo || 'Nenhum arquivo selecionado'}
+                  </span>
+                </label>
+                <FinNote className="mt-3">
+                  O sistema cruza automaticamente com lançamentos, <strong>contas a pagar</strong> e <strong>contas a receber</strong> pendentes.
+                  Use <EyeOff aria-hidden="true" className="inline h-3 w-3" /><span className="sr-only">o botão Ignorar</span> para ignorar entradas que não devem gerar lançamento.
+                </FinNote>
+              </section>
 
-          {linhasAntigasAusentes.length > 0 && (
-            <Card className="border-warning/30 bg-warning/5">
-              <CardContent className="p-3 space-y-2 text-sm">
-                <div className="flex items-center gap-2 font-medium text-warning">
-                  <AlertTriangle className="w-4 h-4 shrink-0" />
-                  {linhasAntigasAusentes.length} lançamento(ões) de um extrato anterior não existem no arquivo atual
-                </div>
-                <p className="text-muted-foreground">
-                  O banco alterou o conteúdo do extrato entre downloads. Esses lançamentos continuam afetando o saldo
-                  e precisam ser revisados — o FITID sozinho não detecta esta mudança.
-                </p>
-                <div className="space-y-1 text-xs text-muted-foreground">
-                  {linhasAntigasAusentes.slice(0, 3).map(row => (
-                    <p key={row.id}>
-                      {formatDateBR(parseLocalDate(row.data_pagamento || row.data_competencia))}
-                      {' · '}{row.descricao || 'Sem descrição'}{' · '}{fmtBRL(Number(row.valor))}
-                    </p>
-                  ))}
-                  {linhasAntigasAusentes.length > 3 && <p>+ {linhasAntigasAusentes.length - 3} outro(s)</p>}
-                </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    const dates = linhasAntigasAusentes.map(row => row.data_pagamento || row.data_competencia).sort();
-                    setFiltroDataDe(dates[0]);
-                    setFiltroDataAte(dates[dates.length - 1]);
-                    setFiltro('conciliados');
-                    setView('conciliar');
-                  }}
+              {/* Conferência de saldo contra o banco: rede final contra linha engolida/
+                  ignorada indevidamente. Fica fora do bloco `linhas.length > 0` de
+                  propósito — o veredito importa justamente DEPOIS de tudo processado. */}
+              {saldoExtrato && (
+                conferenciaErro ? (
+                  <ConferenciaSaldoErro
+                    data={saldoExtrato.data}
+                    onRetry={() => setConferenciaTentativa(n => n + 1)}
+                    retrying={conferenciaAtualizando}
+                  />
+                ) : conferenciaSaldo && conferenciaBase?.saldo === saldoExtrato ? (
+                  // Veredito de outro saldo de extrato (arquivo novo na mesma conta) nunca aparece ao
+                  // lado do banco novo: até o recálculo, fica o "Conferindo…".
+                  <ConferenciaSaldoPainel
+                    saldoExtrato={saldoExtrato}
+                    conferencia={conferenciaSaldo}
+                    confere={Math.abs(conferenciaSaldo.diferenca) < 0.01}
+                    diaDivergencia={diaDivergencia}
+                    atualizando={conferenciaAtualizando || conferenciaBase.linhas !== linhas}
+                  />
+                ) : (
+                  <ConferenciaSaldoCarregando data={saldoExtrato.data} />
+                )
+              )}
+
+              {linhasAntigasAusentes.length > 0 && (
+                <AvisoConciliacao
+                  tom="warning"
+                  icon={AlertTriangle}
+                  titulo={`${linhasAntigasAusentes.length} lançamento(ões) de um extrato anterior não existem no arquivo atual`}
+                  acao={(
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        const dates = linhasAntigasAusentes.map(row => row.data_pagamento || row.data_competencia).sort();
+                        setFiltroDataDe(dates[0]);
+                        setFiltroDataAte(dates[dates.length - 1]);
+                        setFiltro('conciliados');
+                        setView('conciliar');
+                      }}
+                    >
+                      Revisar lançamentos antigos
+                    </Button>
+                  )}
                 >
-                  Revisar lançamentos antigos
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-
-          {automaticInvestmentLines.length > 0 && (
-            <Card className="border-info-border bg-info-soft">
-              <CardContent className="p-3 flex items-center justify-between gap-3 flex-wrap text-sm">
-                <div>
-                  <p className="font-medium text-foreground">
-                    {automaticInvestmentLines.length} movimentação(ões) ContaMax aguardando tratamento
+                  <p>
+                    O banco alterou o conteúdo do extrato entre downloads. Esses lançamentos continuam afetando o saldo
+                    e precisam ser revisados — o FITID sozinho não detecta esta mudança.
                   </p>
-                  <p className="text-xs text-muted-foreground">
+                  <ul className="space-y-1 text-xs">
+                    {linhasAntigasAusentes.slice(0, 3).map(row => (
+                      <li key={row.id} className="flex flex-wrap gap-x-1.5">
+                        <span className="tabular-nums">{dataBR(row.data_pagamento || row.data_competencia)}</span>
+                        <span aria-hidden="true">·</span>
+                        <span className="min-w-0 break-words">{row.descricao || 'Sem descrição'}</span>
+                        <span aria-hidden="true">·</span>
+                        <span className="whitespace-nowrap font-medium tabular-nums text-foreground">{fmtBRL(Number(row.valor))}</span>
+                      </li>
+                    ))}
+                    {linhasAntigasAusentes.length > 3 && <li>+ {linhasAntigasAusentes.length - 3} outro(s)</li>}
+                  </ul>
+                </AvisoConciliacao>
+              )}
+
+              {automaticInvestmentLines.length > 0 && (
+                <AvisoConciliacao
+                  tom="info"
+                  icon={ArrowRightLeft}
+                  titulo={`${automaticInvestmentLines.length} movimentação(ões) ContaMax aguardando tratamento`}
+                  acao={(
+                    <Button size="sm" variant="outline" onClick={processAutomaticInvestmentLines} disabled={processando}>
+                      {processando
+                        ? <Loader2 aria-hidden="true" className="mr-1 h-3.5 w-3.5 animate-spin" />
+                        : <RefreshCw aria-hidden="true" className="mr-1 h-3.5 w-3.5" />}
+                      {processando ? 'Tratando...' : 'Tentar novamente'}
+                    </Button>
+                  )}
+                >
+                  <p className="text-xs">
                     Aplicações e resgates são movimentos internos do saldo Santander consolidado. O sistema os registra sem efeito financeiro e sem criar uma conta técnica.
                   </p>
-                </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={processAutomaticInvestmentLines}
-                  disabled={processando}
-                >
-                  <RefreshCw className="w-3.5 h-3.5 mr-1" />
-                  {processando ? 'Tratando...' : 'Tentar novamente'}
-                </Button>
-              </CardContent>
-            </Card>
+                </AvisoConciliacao>
+              )}
+
+              {linhas.length > 0 && (
+                <FinSectionGroup id="conciliacao-linhas" title="Linhas do extrato" caption={extratoLinhasCaption(linhasFiltradas.length, linhas.length)}>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div role="group" aria-label="Filtrar linhas do extrato" className="flex flex-wrap gap-1.5">
+                      {importFilterChip('conciliar', matchedTotal, 'p/ conciliar', 'success')}
+                      {withSuggestions > 0 && importFilterChip('sugestoes', withSuggestions, 'com sugestões', 'warning')}
+                      {importFilterChip('criar', selecionadas.length, 'p/ criar')}
+                      {jaConciliadas > 0 && importFilterChip('conciliados', jaConciliadas, 'já conciliada(s)', 'neutral')}
+                      {movimentacoesInternas > 0 && importFilterChip('internos', movimentacoesInternas, 'mov. interna(s)', 'info')}
+                      {ignoradas > 0 && importFilterChip('ignorados', ignoradas, 'ignorada(s)', 'neutral')}
+                      {importFilterChip('todos', linhas.length, 'total')}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button variant="outline" size="sm" onClick={() => toggleAll(true)}>Selecionar Novas</Button>
+                      <Button variant="outline" size="sm" onClick={() => toggleAll(false)}>Desmarcar</Button>
+                      {/* Arrow function obrigatória: onClick={importarEConciliar} passaria o
+                          evento como `jaConfirmouVinculos` e pularia a confirmação. */}
+                      <Button size="sm" onClick={() => importarEConciliar()} disabled={importando} aria-busy={importando}>
+                        {importando
+                          ? <Loader2 aria-hidden="true" className="mr-1 h-4 w-4 animate-spin" />
+                          : <Save aria-hidden="true" className="mr-1 h-4 w-4" />}
+                        Processar
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div ref={setExtratoConteiner}>
+                    {linhasFiltradas.length === 0 ? (
+                      <EmptyState
+                        compact
+                        icon={Search}
+                        title="Nenhuma linha neste filtro."
+                        actionLabel="Ver todas as linhas"
+                        onAction={() => setImportFilter('todos')}
+                      />
+                    ) : extratoEstreito ? (
+                      <ul className="space-y-2" aria-label="Linhas do extrato">
+                        {linhasFiltradas.map(({ linha, index: i }) => {
+                          const e = estadoLinha(linha);
+                          const tipo = extratoTipoBadge(linha.tipo, e.isAutomatic);
+                          const status = extratoLinhaStatus(e, linha.selecionada);
+                          const acoes = acoesLinha(linha, i, e);
+                          return (
+                            <li key={i} className={cn('rounded-lg border p-3', extratoLinhaFundo(e) || 'bg-card')}>
+                              <div className="flex items-start gap-3">
+                                <div className="flex h-5 shrink-0 items-center">{leadLinha(linha, i, e)}</div>
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-start justify-between gap-3">
+                                    <p className={cn('min-w-0 break-words text-sm font-medium', descricaoSecundaria(linha, e) ? 'text-muted-foreground' : 'text-foreground')}>
+                                      {linha.descricao}
+                                    </p>
+                                    <div className="shrink-0 text-right text-sm">{valorLinha(linha, e)}</div>
+                                  </div>
+                                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                                    <span className="tabular-nums">{dataBR(linha.data)}</span>
+                                    <StatusBadge status={tipo.status} label={tipo.label} />
+                                    <StatusBadge status={status.status} label={status.label} />
+                                  </div>
+                                  {notasLinha(linha, e)}
+                                  {categoriaLinha(linha, i, e)}
+                                  {acoes && <div className="mt-2">{acoes}</div>}
+                                </div>
+                              </div>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    ) : (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-10"><span aria-hidden="true">✓</span><span className="sr-only">Seleção</span></TableHead>
+                            <TableHead className="w-28">Data</TableHead>
+                            <TableHead>Descrição (extrato)</TableHead>
+                            <TableHead className="w-24">Tipo</TableHead>
+                            <TableHead className="w-40 text-right">Valor</TableHead>
+                            <TableHead className="w-40">Status</TableHead>
+                            <TableHead className="min-w-[17rem] text-right">Ações</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {linhasFiltradas.map(({ linha, index: i }) => {
+                            const e = estadoLinha(linha);
+                            const tipo = extratoTipoBadge(linha.tipo, e.isAutomatic);
+                            const status = extratoLinhaStatus(e, linha.selecionada);
+                            return (
+                              <TableRow key={i} className={extratoLinhaFundo(e)}>
+                                <TableCell>{leadLinha(linha, i, e)}</TableCell>
+                                <TableCell className="whitespace-nowrap text-sm tabular-nums">{dataBR(linha.data)}</TableCell>
+                                <TableCell className="min-w-[16rem] max-w-md">
+                                  <p className={cn('whitespace-normal break-words font-medium', descricaoSecundaria(linha, e) ? 'text-muted-foreground' : 'text-foreground')}>
+                                    {linha.descricao}
+                                  </p>
+                                  {notasLinha(linha, e)}
+                                  {categoriaLinha(linha, i, e)}
+                                </TableCell>
+                                <TableCell><StatusBadge status={tipo.status} label={tipo.label} /></TableCell>
+                                <TableCell className="text-right">{valorLinha(linha, e)}</TableCell>
+                                <TableCell><StatusBadge status={status.status} label={status.label} /></TableCell>
+                                <TableCell className="min-w-[17rem]"><div className="flex justify-end [&>div]:justify-end">{acoesLinha(linha, i, e)}</div></TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    )}
+                  </div>
+                </FinSectionGroup>
+              )}
+
+              {linhas.length === 0 && (
+                <EmptyState
+                  icon={Upload}
+                  title="Selecione um arquivo CSV, OFX, QFX ou OFC para importar"
+                  description="CSV: data;descrição;valor (separado por ; ou ,). OFX/QFX/OFC: formatos bancários suportados."
+                />
+              )}
+            </div>
           )}
 
-          {linhas.length > 0 && (
-            <>
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <div className="text-sm text-muted-foreground flex flex-wrap gap-1">
-                  {importFilterChip('conciliar', `${matchedTotal} p/ conciliar`, 'bg-success/10 text-success border-success/20')}
-                  {withSuggestions > 0 && importFilterChip('sugestoes', `${withSuggestions} com sugestões`, 'bg-warning/10 text-warning border-warning/20')}
-                  {importFilterChip('criar', `${selecionadas.length} p/ criar`)}
-                  {jaConciliadas > 0 && importFilterChip('conciliados', `${jaConciliadas} já conciliada(s)`, 'bg-muted text-muted-foreground')}
-                  {movimentacoesInternas > 0 && importFilterChip('internos', `${movimentacoesInternas} mov. interna(s)`, 'bg-info-soft text-info border-info-border')}
-                  {ignoradas > 0 && importFilterChip('ignorados', `${ignoradas} ignorada(s)`, 'bg-muted text-muted-foreground')}
-                  {importFilterChip('todos', `${linhas.length} total`)}
-                </div>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={() => toggleAll(true)}>Selecionar Novas</Button>
-                  <Button variant="outline" size="sm" onClick={() => toggleAll(false)}>Desmarcar</Button>
-                  {/* Arrow function obrigatória: onClick={importarEConciliar} passaria o
-                      evento como `jaConfirmouVinculos` e pularia a confirmação. */}
-                  <Button size="sm" onClick={() => importarEConciliar()} disabled={importando}>
-                    <Save className={`w-4 h-4 mr-1 ${importando ? 'animate-spin' : ''}`} />
-                    Processar
+          {/* ========== CONCILIATION VIEW ========== */}
+          {view === 'conciliar' && (
+            <div className="space-y-6">
+              {contaSel && (
+                <FinSectionGroup
+                  id="conciliacao-situacao"
+                  title="Situação da conta"
+                  caption={`${contaAtual?.nome ?? 'Conta selecionada'} · lançamentos realizados de todo o período`}
+                >
+                  {contagemStatus === 'error' ? (
+                    <ErrorState compact title="Não foi possível carregar a contagem da conta" onRetry={loadLancamentosCounts} />
+                  ) : contagemStatus === 'loading' ? (
+                    <div role="status">
+                      <span className="sr-only">Carregando a contagem da conta…</span>
+                      <FinKpiGrid className={kpiGridClassFor(12, 2)}>
+                        {[0, 1].map(k => (
+                          <div key={k} aria-hidden="true" className="space-y-3 rounded-summary border bg-card p-5">
+                            <Skeleton className="h-3 w-32" />
+                            <Skeleton className="h-7 w-16" />
+                            <Skeleton className="h-3 w-48" />
+                          </div>
+                        ))}
+                      </FinKpiGrid>
+                    </div>
+                  ) : (
+                    <FinKpiGrid className={kpiGridClassFor(longestValueLength(contagemValores), 2)}>
+                      <KpiCard
+                        appearance="summary"
+                        icon={Clock}
+                        label="Pendentes de conciliação"
+                        value={contagemValores[0]}
+                        sub="Realizados na conta e ainda não conciliados"
+                        variant={totalPendentesConta > 0 ? 'warning' : 'default'}
+                      />
+                      <KpiCard
+                        appearance="summary"
+                        icon={CheckCircle2}
+                        label="Conciliados"
+                        value={contagemValores[1]}
+                        sub="Realizados na conta e já conciliados"
+                        variant="success"
+                      />
+                    </FinKpiGrid>
+                  )}
+                </FinSectionGroup>
+              )}
+
+              <div className="space-y-3 rounded-summary border bg-card p-4 shadow-card">
+                <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:items-end">
+                  <div className="flex min-w-0 flex-col gap-1.5">
+                    <Label htmlFor="conciliacao-data-de" className="text-xs text-muted-foreground">De</Label>
+                    <DateInput
+                      id="conciliacao-data-de"
+                      value={filtroDataDe}
+                      max={filtroDataAte || undefined}
+                      onValueChange={setFiltroDataDe}
+                      className="h-9 w-full text-xs sm:w-36"
+                    />
+                  </div>
+                  <div className="flex min-w-0 flex-col gap-1.5">
+                    <Label htmlFor="conciliacao-data-ate" className="text-xs text-muted-foreground">Até</Label>
+                    <DateInput
+                      id="conciliacao-data-ate"
+                      value={filtroDataAte}
+                      min={filtroDataDe || undefined}
+                      onValueChange={setFiltroDataAte}
+                      className="h-9 w-full text-xs sm:w-36"
+                    />
+                  </div>
+                  <div className="flex min-w-0 flex-col gap-1.5">
+                    <Label htmlFor="conciliacao-situacao-filtro" className="text-xs text-muted-foreground">Situação</Label>
+                    <Select value={filtro} onValueChange={v => setFiltro(v as 'pendentes' | 'conciliados' | 'todos')}>
+                      <SelectTrigger id="conciliacao-situacao-filtro" className="h-9 w-full sm:w-40"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pendentes">Pendentes</SelectItem>
+                        <SelectItem value="conciliados">Conciliados</SelectItem>
+                        <SelectItem value="todos">Todos</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button variant="outline" size="sm" className="h-9 self-end" onClick={loadLancamentos} aria-busy={loading}>
+                    <RefreshCw aria-hidden="true" className={cn('mr-1 h-4 w-4', loading && 'animate-spin')} /> Atualizar
                   </Button>
+                </div>
+                <div className="border-t pt-3">
+                  <DateRangePresets
+                    from={filtroDataDe}
+                    to={filtroDataAte}
+                    onChange={(de, ate) => { setFiltroDataDe(de); setFiltroDataAte(ate); }}
+                  />
                 </div>
               </div>
 
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-10">✓</TableHead>
-                    <TableHead>Data</TableHead>
-                    <TableHead>Descrição (Extrato)</TableHead>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead className="text-right">Valor</TableHead>
-                    <TableHead>Ações</TableHead>
-                    <TableHead className="w-[150px]">Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {linhasFiltradas.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
-                        Nenhuma linha neste filtro.
-                      </TableCell>
-                    </TableRow>
-                  ) : linhasFiltradas.map(({ linha, index: i }) => {
-                    const isDone = linha.matchId?.endsWith('-done');
-                    const hasMatch = !!linha.matchId && !isDone;
-                    const hasSuggestions = !linha.matchId && linha.suggestions && linha.suggestions.length > 0;
-                    const isJaConciliada = !!linha.jaConciliada;
-                    const isIgnorada = !!linha.ignorada;
-                    const isInternal = !!linha.movimentacaoInterna;
-                    const isAutomatic = isAutomaticInvestmentLine(linha);
-                    const isAutomaticPending = isAutomatic && !isInternal;
-                    const isInactive = isJaConciliada || isIgnorada || isAutomatic;
-
-                    return (
-                      <TableRow key={i} className={
-                        isDone ? 'bg-success/5 opacity-70' :
-                        isInternal ? 'bg-info-soft' :
-                        isAutomaticPending ? 'bg-warning/5' :
-                        isJaConciliada ? 'bg-muted/30 opacity-60' :
-                        isIgnorada ? 'bg-muted/30 opacity-50' :
-                        hasMatch ? 'bg-success/5' :
-                        hasSuggestions ? 'bg-warning/5' :
-                        !linha.selecionada ? 'opacity-70' : ''
-                      }>
-                        <TableCell>
-                          {isDone || isJaConciliada ? (
-                            <CheckCircle className="w-4 h-4 text-success" />
-                          ) : isInternal ? (
-                            <ArrowRightLeft className="w-4 h-4 text-primary" />
-                          ) : isAutomaticPending ? (
-                            <AlertTriangle className="w-4 h-4 text-warning" />
-                          ) : isIgnorada ? (
-                            <EyeOff className="w-4 h-4 text-muted-foreground" />
-                          ) : hasMatch ? (
-                            <CheckCircle className="w-4 h-4 text-success" />
-                          ) : (
-                            <Checkbox
-                              checked={linha.selecionada}
-                              onCheckedChange={(v) => setLinhas(prev => prev.map((l, j) => j === i ? { ...l, selecionada: !!v } : l))}
-                            />
-                          )}
-                        </TableCell>
-                        <TableCell className="font-mono text-sm">{formatDateBR(parseLocalDate(linha.data))}</TableCell>
-                        <TableCell className="max-w-xs">
-                          <span className="font-medium whitespace-normal break-words">{linha.descricao}</span>
-                          {hasMatch && (
-                            <span className="text-[10px] text-success flex items-center gap-1 mt-0.5">
-                              <ArrowRight className="w-3 h-3" /> {linha.matchDescricao}
-                              {linha.matchOrigin && <span className="ml-1">{getOriginBadge(linha.matchOrigin)}</span>}
-                            </span>
-                          )}
-                          {hasMatch && linha.matchJaNoRazao && (
-                            <span className="text-[10px] text-warning flex items-start gap-1 mt-0.5">
-                              <AlertTriangle className="w-3 h-3 shrink-0 mt-px" />
-                              <span>
-                                Já está no Livro Razão — veio da baixa em Contas a Pagar/Receber.
-                                Ao processar, esta linha será <strong>vinculada</strong> a esse lançamento,
-                                sem criar outro.
-                              </span>
-                            </span>
-                          )}
-                          {isJaConciliada && (
-                            linha.transferReconhecida ? (
-                              <span className="text-[10px] text-muted-foreground flex items-start gap-1 mt-0.5">
-                                <ArrowRightLeft className="w-3 h-3 shrink-0 mt-px" />
-                                <span>
-                                  Transferência já lançada pelo extrato da outra conta em{' '}
-                                  {formatDateBR(parseLocalDate(linha.transferReconhecida.data))} (
-                                  {getContaNome(linha.transferReconhecida.conta_id)} → {getContaNome(linha.transferReconhecida.conta_destino_id)}
-                                  ). Não precisa lançar de novo.
-                                </span>
-                              </span>
-                            ) : (
-                              <span className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
-                                <CheckCircle className="w-3 h-3" /> Já conciliada anteriormente
-                              </span>
-                            )
-                          )}
-                          {!isInactive && linha.transferAlertas && linha.transferAlertas.length > 0 && (
-                            <span className="text-[10px] text-warning flex items-start gap-1 mt-0.5">
-                              <AlertTriangle className="w-3 h-3 shrink-0 mt-px" />
-                              <span>
-                                Confira antes de conciliar: já existe transferência de mesmo valor
-                                {linha.transferAlertas.map(t => (
-                                  <span key={t.id} className="block">
-                                    • {formatDateBR(parseLocalDate(t.data))} — {getContaNome(t.conta_id)} → {getContaNome(t.conta_destino_id)}
-                                    {t.direcaoInvertida ? ' (direção invertida)' : ''}
-                                  </span>
-                                ))}
-                              </span>
-                            </span>
-                          )}
-                          {isIgnorada && (
-                            isInternal ? (
-                              <span className="text-[10px] text-primary flex items-center gap-1 mt-0.5">
-                                <ArrowRightLeft className="w-3 h-3" /> Movimento interno ContaMax — registrado sem efeito financeiro
-                              </span>
-                            ) : (
-                              <span className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
-                                <EyeOff className="w-3 h-3" /> Marcada como ignorada
-                              </span>
-                            )
-                          )}
-                          {isAutomaticPending && (
-                            <span className="text-[10px] text-warning flex items-center gap-1 mt-0.5">
-                              <AlertTriangle className="w-3 h-3" /> Bloqueada para tratamento interno — nenhum lançamento financeiro será criado
-                            </span>
-                          )}
-                          {hasSuggestions && !isInactive && (
-                            <span className="text-[10px] text-warning flex items-center gap-1 mt-0.5">
-                              <Search className="w-3 h-3" /> {linha.suggestions!.length} sugestão(ões) disponível(is)
-                            </span>
-                          )}
-                          {!isAutomatic && !hasMatch && !isDone && !isInactive && !(linha.rateioLinhas && linha.rateioLinhas.length > 1) && (
-                            <div className="mt-1 max-w-[220px]">
-                              <CategoryCombobox
-                                value={linha.categoriaId || ''}
-                                onValueChange={(v) => setLinhaCategoria(i, v)}
-                                options={categoriasForTipo(linha.tipo)}
-                                placeholder="Categoria obrigatória..."
-                                className="h-7 text-xs"
-                                modal={false}
-                              />
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {isAutomatic ? (
-                            <Badge variant="outline">INTERNA</Badge>
-                          ) : (
-                            <Badge variant={linha.tipo === 'RECEITA' ? 'default' : 'destructive'}>{linha.tipo}</Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className={cn(
-                          'text-right font-bold',
-                          isAutomatic ? 'text-muted-foreground' : linha.tipo === 'RECEITA' ? 'text-success' : 'text-destructive',
-                        )}>
-                          {linha.tipo === 'RECEITA' ? '+' : '-'} {fmt(linha.valor)}
-                          {isAutomatic && <span className="block text-[10px] font-normal">efeito no saldo: R$ 0,00</span>}
-                        </TableCell>
-                        <TableCell>
-                          {isInternal ? null : isAutomaticPending ? (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-7 text-xs"
-                              disabled={processando}
-                              onClick={processAutomaticInvestmentLines}
-                            >
-                              <RefreshCw className="w-3 h-3 mr-1" />
-                              {processando ? 'Tratando...' : 'Tentar novamente'}
-                            </Button>
-                          ) : isIgnorada ? (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-7 text-xs"
-                              title="Voltar esta entrada para análise"
-                              disabled={!linha.ignoradaId || reconsiderandoId !== null}
-                              onClick={() => reconsiderarLinha(i)}
-                            >
-                              <RotateCcw className="w-3 h-3 mr-1" />
-                              {reconsiderandoId === linha.ignoradaId ? 'Reconsiderando...' : 'Reconsiderar'}
-                            </Button>
-                          ) : isJaConciliada ? null : (
-                            <div className="flex gap-1">
-                              {!isDone && linha.suggestions && linha.suggestions.length > 0 && (
-                                <Button size="sm" variant={hasMatch ? 'default' : 'outline'} className="h-7 text-xs"
-                                  onClick={() => setSuggestionsDialog({ open: true, linhaIndex: i })}>
-                                  <Search className="w-3 h-3 mr-1" />
-                                  {hasMatch ? 'Alterar' : `${linha.suggestions.length} sugestão`}
-                                </Button>
-                              )}
-                              {hasMatch && (
-                                <Button size="sm" variant="ghost" className="h-7 text-xs text-destructive" onClick={() => clearMatch(i)}>✕</Button>
-                              )}
-                              {hasMatch && (linha.matchOrigin === 'conta_pagar' || linha.matchOrigin === 'conta_receber') && (
-                                <Button size="sm" variant="outline" className="h-7 text-xs"
-                                  onClick={() => abrirRevisaoBaixa([i], 'individual')}>
-                                  <CreditCard className="w-3 h-3 mr-1" /> Baixar
-                                </Button>
-                              )}
-                              {!hasMatch && !isDone && linha.tipo === 'DESPESA' && (
-                                <Button size="sm" variant="outline" className="h-7 text-xs"
-                                  title="Vincular esta saída a um boleto em aberto e dar baixa nele"
-                                  onClick={() => abrirBoletoDialog(i)}>
-                                  <Receipt className="w-3 h-3 mr-1" /> Boleto
-                                </Button>
-                              )}
-                              {!hasMatch && !isDone && (
-                                <>
-                                  <Button size="sm" variant={linha.rateioLinhas && linha.rateioLinhas.length > 1 ? 'default' : 'outline'} className="h-7 text-xs" onClick={() => openRateio(i)}>
-                                    <PieChart className="w-3 h-3 mr-1" />
-                                    {linha.rateioLinhas && linha.rateioLinhas.length > 1 ? `${linha.rateioLinhas.length} cat.` : 'Ratear'}
-                                  </Button>
-                                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { setTransferDialog({ open: true, linhaIndex: i }); setTransferContaDestino(''); }}>
-                                    <ArrowRightLeft className="w-3 h-3 mr-1" /> Transf.
-                                  </Button>
-                                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setCriarDialog({ open: true, linhaIndex: i })}>
-                                    <FileText className="w-3 h-3 mr-1" /> Criar
-                                  </Button>
-                                </>
-                              )}
-                              {!isDone && (
-                                <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground hover:text-destructive" title="Ignorar esta entrada — não criará lançamento" onClick={() => ignorarLinha(i)}>
-                                  <EyeOff className="w-3 h-3" />
-                                </Button>
-                              )}
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {isDone ? (
-                            <Badge className="bg-success/10 text-success border-success/20 text-[10px]">Concluído</Badge>
-                          ) : isInternal ? (
-                            <Badge className="bg-info-soft text-info border-info-border text-[10px]">Mov. interna</Badge>
-                          ) : isAutomaticPending ? (
-                            <Badge className="bg-warning/10 text-warning border-warning/20 text-[10px]">Tratamento pendente</Badge>
-                          ) : isJaConciliada ? (
-                            <Badge variant="outline" className="text-[10px] text-muted-foreground">Já Conciliado</Badge>
-                          ) : isIgnorada ? (
-                            <Badge variant="outline" className="text-[10px] text-muted-foreground">Ignorado</Badge>
-                          ) : hasMatch ? (
-                            <Badge className="bg-success/10 text-success border-success/20 text-[10px]">Conciliar c/ existente</Badge>
-                          ) : hasSuggestions ? (
-                            <Badge className="bg-warning/10 text-warning border-warning/20 text-[10px]">Sugestão p/ conciliar</Badge>
-                          ) : (
-                            <Badge variant="outline" className="text-[10px]">Criar novo</Badge>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </>
-          )}
-
-          {linhas.length === 0 && (
-            <Card><CardContent className="p-8 text-center text-muted-foreground">
-              <Upload className="w-10 h-10 mx-auto mb-3 opacity-30" />
-              <p className="font-medium">Selecione um arquivo CSV, OFX, QFX ou OFC para importar</p>
-              <p className="text-xs mt-2">
-                <strong>CSV:</strong> data;descrição;valor (separado por ; ou ,)<br />
-                <strong>OFX/QFX/OFC:</strong> formatos bancários suportados
-              </p>
-            </CardContent></Card>
-          )}
-        </>
-      )}
-
-      {/* ========== CONCILIATION VIEW ========== */}
-      {view === 'conciliar' && (
-        <>
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <p className="text-sm text-muted-foreground">
-              {totalPendentesConta} pendente(s) • {totalConciliadosConta} conciliado(s)
-            </p>
-            <div className="flex items-center gap-2 flex-wrap">
-              <DateInput
-                value={filtroDataDe}
-                max={filtroDataAte || undefined}
-                onValueChange={setFiltroDataDe}
-                className="w-36 h-9 text-xs"
-                aria-label="Data inicial"
-              />
-              <span className="text-muted-foreground text-xs">até</span>
-              <DateInput
-                value={filtroDataAte}
-                min={filtroDataDe || undefined}
-                onValueChange={setFiltroDataAte}
-                className="w-36 h-9 text-xs"
-                aria-label="Data final"
-              />
-              <Select value={filtro} onValueChange={v => setFiltro(v as 'pendentes' | 'conciliados' | 'todos')}>
-                <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pendentes">Pendentes</SelectItem>
-                  <SelectItem value="conciliados">Conciliados</SelectItem>
-                  <SelectItem value="todos">Todos</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button variant="outline" size="sm" onClick={loadLancamentos}>
-                <RefreshCw className="w-4 h-4 mr-1" /> Atualizar
-              </Button>
-              {filtro === 'pendentes' && pendentes > 0 && (
-                <Button size="sm" onClick={conciliarTodos}>
-                  <CheckCircle className="w-4 h-4 mr-1" /> Conciliar Todos
-                </Button>
-              )}
-              {lancamentosFiltrados.length > 0 && (
-                <>
-                  <Button variant="outline" size="sm" onClick={() => toggleAllLancamentos(true)}>Selecionar Todos</Button>
-                  <Button variant="outline" size="sm" onClick={() => toggleAllLancamentos(false)}>Desmarcar</Button>
-                </>
-              )}
-              {selectedLancamentoIds.size > 0 && (
-                <Button variant="destructive" size="sm" onClick={bulkDeleteLancamentos} disabled={editSaving}>
-                  <Trash2 className="w-4 h-4 mr-1" /> Excluir Selecionados ({selectedLancamentoIds.size})
-                </Button>
-              )}
-            </div>
-          </div>
-
-          <DateRangePresets
-            from={filtroDataDe}
-            to={filtroDataAte}
-            onChange={(de, ate) => { setFiltroDataDe(de); setFiltroDataAte(ate); }}
-          />
-
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-10"></TableHead>
-                <TableHead className="w-10">✓</TableHead>
-                <TableHead>Data</TableHead>
-                <TableHead>Descrição</TableHead>
-                <TableHead>Categoria</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead className="text-right">Valor</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="w-20">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">Carregando...</TableCell></TableRow>
-              ) : lancamentos.length === 0 ? (
-                <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">
-                  {contaSel ? 'Nenhum lançamento encontrado' : 'Selecione uma conta bancária'}
-                </TableCell></TableRow>
-              ) : lancamentosFiltrados.map(item => {
-                const categoriaNome = categorias.find(c => c.id === item.categoria_id)?.nome;
-                const rateioCategoryIds = lancamentoRateioCategoryIds[item.id] || [];
-                const rateioCategoryNames = rateioCategoryIds
-                  .map(categoryId => categorias.find(c => c.id === categoryId)?.nome)
-                  .filter((name): name is string => Boolean(name));
-                const categoryLabel = categoriaNome
-                  || (rateioCategoryIds.length > 1
-                    ? `${rateioCategoryIds.length} categorias`
-                    : rateioCategoryNames[0]);
-                return (
-                <TableRow key={item.id} className={item.conciliado ? 'opacity-80' : ''}>
-                  <TableCell>
-                    <Checkbox
-                      checked={selectedLancamentoIds.has(item.id)}
-                      onCheckedChange={(v) => setSelectedLancamentoIds(prev => {
-                        const next = new Set(prev);
-                        if (v) next.add(item.id); else next.delete(item.id);
-                        return next;
-                      })}
-                      aria-label={`Selecionar ${item.descricao}`}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Checkbox
-                      checked={!!item.conciliado}
-                      onCheckedChange={(v) => conciliar(item.id, !!v)}
-                      aria-label={item.conciliado ? `Desconciliar ${item.descricao}` : `Conciliar ${item.descricao}`}
-                    />
-                  </TableCell>
-                  <TableCell className="font-mono text-sm">{formatDateBR(parseLocalDate(item.data_competencia))}</TableCell>
-                  <TableCell className="font-medium max-w-xs whitespace-normal break-words">{item.descricao}</TableCell>
-                  <TableCell>
-                    {categoryLabel ? (
-                      <span className="text-xs" title={rateioCategoryNames.join(' • ') || categoriaNome}>
-                        {categoryLabel}
-                      </span>
-                    ) : item.tipo === 'TRANSFERENCIA' ? (
-                      // Transferência não exige categoria (mesma isenção de findLancamentosSemCategoria)
-                      <span className="text-xs text-muted-foreground">—</span>
-                    ) : (
-                      <span className="text-xs text-warning flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Sem categoria</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={item.tipo === 'RECEITA' ? 'default' : 'destructive'}>{item.tipo}</Badge>
-                  </TableCell>
-                  <TableCell className={`text-right font-bold ${item.tipo === 'RECEITA' ? 'text-success' : 'text-destructive'}`}>
-                    {item.tipo === 'RECEITA' ? '+' : '-'} {fmt(item.valor)}
-                  </TableCell>
-                  <TableCell>
-                    {item.conciliado ? (
-                      <span className="text-xs text-success flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Conciliado</span>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">Pendente</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEditLancamento(item)} disabled={editSaving} title="Editar">
-                        <Edit className="w-3.5 h-3.5" />
+              <FinSectionGroup
+                id="conciliacao-lancamentos"
+                title="Lançamentos da conta"
+                caption={!loading && !lancamentosErro && lancamentos.length > 0
+                  ? `${lancamentosFiltrados.length} ${lancamentosFiltrados.length === 1 ? 'lançamento' : 'lançamentos'} no período`
+                  : undefined}
+              >
+                {(filtro === 'pendentes' && pendentes > 0) || lancamentosFiltrados.length > 0 || selectedLancamentoIds.size > 0 ? (
+                  <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                    {filtro === 'pendentes' && pendentes > 0 && (
+                      <Button size="sm" onClick={conciliarTodos}>
+                        <CheckCircle aria-hidden="true" className="mr-1 h-4 w-4" /> Conciliar Todos ({pendentes})
                       </Button>
-                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => deleteLancamentoConciliacao(item)} disabled={editSaving} title="Excluir">
-                        <Trash2 className="w-3.5 h-3.5" />
+                    )}
+                    {lancamentosFiltrados.length > 0 && (
+                      <>
+                        <Button variant="outline" size="sm" onClick={() => toggleAllLancamentos(true)}>Selecionar Todos</Button>
+                        <Button variant="outline" size="sm" onClick={() => toggleAllLancamentos(false)}>Desmarcar</Button>
+                      </>
+                    )}
+                    {selectedLancamentoIds.size > 0 && (
+                      <Button variant="destructive" size="sm" onClick={bulkDeleteLancamentos} disabled={editSaving}>
+                        <Trash2 aria-hidden="true" className="mr-1 h-4 w-4" /> Excluir Selecionados ({selectedLancamentoIds.size})
                       </Button>
+                    )}
+                  </div>
+                ) : null}
+
+                <div ref={setLancamentosConteiner}>
+                  {!contaSel ? (
+                    <EmptyState icon={Landmark} title="Selecione uma conta bancária" description="Escolha a conta no seletor acima." />
+                  ) : loading ? (
+                    <div role="status" className="space-y-2">
+                      <span className="sr-only">Carregando lançamentos…</span>
+                      {Array.from({ length: 5 }).map((_, k) => (
+                        <div key={k} className="flex items-center gap-4 rounded-lg border bg-card p-3">
+                          <Skeleton className="h-4 w-4" />
+                          <Skeleton className="h-4 w-20" />
+                          <Skeleton className="h-4 flex-1" />
+                          <Skeleton className="h-4 w-24" />
+                        </div>
+                      ))}
                     </div>
-                  </TableCell>
-                </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+                  ) : lancamentosErro ? (
+                    <ErrorState title="Não foi possível carregar os lançamentos" onRetry={loadLancamentos} />
+                  ) : lancamentosFiltrados.length === 0 ? (
+                    // Também quando a última pendente é conciliada pelo checkbox com "Pendentes" ativo:
+                    // antes ficava só o cabeçalho da tabela, sem mensagem.
+                    <EmptyState icon={Receipt} title="Nenhum lançamento encontrado" description="Ajuste o período ou a situação." />
+                  ) : lancamentosEstreito ? (
+                    <ul className="space-y-2" aria-label="Lançamentos da conta">
+                      {lancamentosFiltrados.map(item => {
+                        const tipo = ledgerTipoBadge(item.tipo);
+                        const situacao = lancamentoConciliacaoBadge(item.conciliado);
+                        return (
+                          <li key={item.id} className="rounded-lg border bg-card p-3">
+                            <div className="flex items-start gap-3">
+                              <div className="flex h-5 shrink-0 items-center">{selecionarLancamento(item)}</div>
+                              <div className="min-w-0 flex-1 space-y-1.5">
+                                <div className="flex items-start justify-between gap-3">
+                                  <p className="min-w-0 break-words text-sm font-medium text-foreground">{item.descricao}</p>
+                                  <div className="shrink-0 text-right text-sm">{valorLancamento(item)}</div>
+                                </div>
+                                <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                                  <span className="tabular-nums">{dataBR(item.data_competencia)}</span>
+                                  <StatusBadge status={tipo.status} label={tipo.label} />
+                                  <StatusBadge status={situacao.status} label={situacao.label} />
+                                </div>
+                                <div>{categoriaLancamento(item)}</div>
+                                <div className="flex items-center justify-between gap-2 border-t pt-2">
+                                  <div className="flex items-center gap-2 text-sm text-foreground">
+                                    {conciliadoLancamento(item)}
+                                    <span aria-hidden="true">Conciliado</span>
+                                  </div>
+                                  {acoesLancamento(item)}
+                                </div>
+                              </div>
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-10"><span className="sr-only">Selecionar</span></TableHead>
+                          <TableHead className="w-24">Conciliado</TableHead>
+                          <TableHead className="w-28">Data</TableHead>
+                          <TableHead>Descrição</TableHead>
+                          <TableHead>Categoria</TableHead>
+                          <TableHead className="w-32">Tipo</TableHead>
+                          <TableHead className="w-40 text-right">Valor</TableHead>
+                          <TableHead className="w-28">Status</TableHead>
+                          <TableHead className="w-24 text-right">Ações</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {lancamentosFiltrados.map(item => {
+                          const tipo = ledgerTipoBadge(item.tipo);
+                          const situacao = lancamentoConciliacaoBadge(item.conciliado);
+                          return (
+                            <TableRow key={item.id}>
+                              <TableCell>{selecionarLancamento(item)}</TableCell>
+                              <TableCell>{conciliadoLancamento(item)}</TableCell>
+                              <TableCell className="whitespace-nowrap text-sm tabular-nums">{dataBR(item.data_competencia)}</TableCell>
+                              <TableCell className="max-w-xs whitespace-normal break-words font-medium">{item.descricao}</TableCell>
+                              <TableCell>{categoriaLancamento(item)}</TableCell>
+                              <TableCell><StatusBadge status={tipo.status} label={tipo.label} /></TableCell>
+                              <TableCell className="text-right">{valorLancamento(item)}</TableCell>
+                              <TableCell><StatusBadge status={situacao.status} label={situacao.label} /></TableCell>
+                              <TableCell>{acoesLancamento(item)}</TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  )}
+                </div>
+              </FinSectionGroup>
+            </div>
+          )}
         </>
       )}
 
       {/* ========== SUGGESTIONS DIALOG ========== */}
       <Dialog open={suggestionsDialog.open} onOpenChange={(open) => !open && setSuggestionsDialog({ open: false, linhaIndex: -1 })}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto" {...focoSugestoes}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Search className="w-5 h-5 text-primary" /> Sugestões de Conciliação
+              <Search aria-hidden="true" className="h-5 w-5 text-primary" /> Sugestões de Conciliação
             </DialogTitle>
           </DialogHeader>
 
@@ -2906,51 +3180,57 @@ export default function ConciliacaoBancariaSection() {
             const suggestions = linha.suggestions || [];
             return (
               <div className="space-y-4">
-                <Card className="border-primary/20">
-                  <CardContent className="p-3">
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <p className="text-[10px] text-muted-foreground font-medium uppercase">Linha do Extrato</p>
-                        <p className="text-sm font-medium">{linha.descricao}</p>
-                        <p className="text-xs text-muted-foreground">{formatDateBR(parseLocalDate(linha.data))}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-lg font-bold">{fmt(linha.valor)}</p>
-                        <Badge variant={linha.tipo === 'RECEITA' ? 'default' : 'destructive'}>{linha.tipo}</Badge>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                <ExtratoLinhaResumo descricao={linha.descricao} data={linha.data} valor={linha.valor} tipo={linha.tipo} />
 
-                <div className="space-y-2">
+                <ul className="space-y-2" aria-label="Sugestões">
                   {suggestions.length === 0 ? (
-                    <p className="text-center text-muted-foreground py-4">Nenhuma sugestão encontrada</p>
-                  ) : suggestions.map((s, idx) => (
-                    <Card key={`${s.origin}-${s.id}`} className={`cursor-pointer transition-colors hover:border-primary/40 ${linha.matchId === s.id ? 'border-primary bg-primary/5' : ''}`}
-                      onClick={() => selectSuggestion(suggestionsDialog.linhaIndex, s)}>
-                      <CardContent className="p-3">
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-0.5">
-                              {getOriginBadge(s.origin)}
-                              <Badge variant="outline" className="text-[10px]">Score: {s.score}</Badge>
-                              {idx === 0 && <Badge className="bg-primary/10 text-primary border-primary/20 text-[10px]">Melhor match</Badge>}
-                            </div>
-                            <p className="text-sm font-medium break-words">{s.descricao}</p>
-                            <div className="flex items-center gap-3 text-[11px] text-muted-foreground mt-0.5">
-                              <span>Data: {formatDateBR(parseLocalDate(s.data))}</span>
-                              {s.extra && <span>• {s.extra}</span>}
-                            </div>
-                          </div>
-                          <div className="text-right shrink-0">
-                            <p className={`text-sm font-bold ${linha.tipo === 'RECEITA' ? 'text-success' : 'text-destructive'}`}>{fmt(s.valor)}</p>
-                            {linha.matchId === s.id && <CheckCircle className="w-4 h-4 text-success ml-auto mt-1" />}
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+                    <li className="py-4 text-center text-sm text-muted-foreground">Nenhuma sugestão encontrada</li>
+                  ) : suggestions.map((s, idx) => {
+                    const escolhida = linha.matchId === s.id;
+                    return (
+                      <li key={`${s.origin}-${s.id}`}>
+                        {/* Botão (e não card clicável): a escolha também funciona pelo teclado. */}
+                        <button
+                          type="button"
+                          aria-pressed={escolhida}
+                          onClick={() => selectSuggestion(suggestionsDialog.linhaIndex, s)}
+                          className={cn(
+                            'w-full rounded-lg border bg-card p-3 text-left transition-colors hover:border-primary-border hover:bg-card-hover',
+                            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+                            escolhida && 'border-primary bg-primary-soft hover:bg-primary-soft',
+                          )}
+                        >
+                          <span className="flex items-start justify-between gap-3">
+                            <span className="min-w-0 flex-1">
+                              <span className="mb-1 flex flex-wrap items-center gap-1.5">
+                                {getOriginBadge(s.origin)}
+                                <StatusBadge status="neutral" label={`Score: ${s.score}`} />
+                                {idx === 0 && (
+                                  <span className="inline-flex items-center rounded-full border border-primary-border bg-primary-soft px-2 py-0.5 text-[11px] font-semibold leading-tight text-primary-ink">
+                                    Melhor match
+                                  </span>
+                                )}
+                              </span>
+                              <span className="block break-words text-sm font-medium text-foreground">{s.descricao}</span>
+                              <span className="mt-0.5 flex flex-wrap items-center gap-x-3 text-xs text-muted-foreground">
+                                <span className="tabular-nums">Data: {formatDateBR(parseLocalDate(s.data))}</span>
+                                {s.extra && <span>• {s.extra}</span>}
+                              </span>
+                            </span>
+                            <span className="shrink-0 text-right">
+                              <span className={cn('block whitespace-nowrap text-sm font-semibold tabular-nums', linha.tipo === 'RECEITA' ? 'text-success' : 'text-destructive')}>{fmt(s.valor)}</span>
+                              {escolhida && (
+                                <span className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-success">
+                                  <CheckCircle2 aria-hidden="true" className="h-4 w-4" /> Escolhida
+                                </span>
+                              )}
+                            </span>
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
 
                 <DialogFooter className="gap-2">
                   <Button variant="outline" onClick={() => setSuggestionsDialog({ open: false, linhaIndex: -1 })}>Fechar</Button>
@@ -2968,10 +3248,10 @@ export default function ConciliacaoBancariaSection() {
 
       {/* ========== REVISÃO ANTES DA BAIXA ========== */}
       <Dialog open={baixaDialog.open} onOpenChange={(open) => !open && setBaixaDialog({ open: false, indices: [], escopo: 'lote' })}>
-        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto" {...focoBaixa}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <CreditCard className="w-5 h-5 text-primary" />
+              <CreditCard aria-hidden="true" className="h-5 w-5 text-primary" />
               {baixaDialog.indices.length === 1
                 ? 'Confirmar baixa'
                 : `Confirmar ${baixaDialog.indices.length} baixas`}
@@ -3002,44 +3282,43 @@ export default function ConciliacaoBancariaSection() {
                   : (diff > 0 ? categoriasForTipo('DESPESA') : categoriasDesconto);
 
                 return (
-                  <Card key={i} className={diverge ? 'border-warning/40' : ''}>
-                    <CardContent className="p-3 space-y-3">
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <p className="text-[10px] text-muted-foreground font-medium uppercase">Linha do extrato</p>
-                          <p className="text-sm font-medium break-words">{linha.descricao}</p>
-                          <p className="text-xs text-muted-foreground">{formatDateBR(parseLocalDate(linha.data))}</p>
-                          <p className="text-base font-bold mt-1">{fmt(linha.valor)}</p>
+                  <div key={i} className={cn('space-y-3 rounded-lg border bg-card p-3', diverge && 'border-warning-border')}>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div className="rounded-md bg-muted p-2.5">
+                          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Linha do extrato</p>
+                          <p className="break-words text-sm font-medium text-foreground">{linha.descricao}</p>
+                          <p className="text-xs tabular-nums text-muted-foreground">{formatDateBR(parseLocalDate(linha.data))}</p>
+                          <p className="mt-1 whitespace-nowrap text-base font-bold tabular-nums text-foreground">{fmt(linha.valor)}</p>
                         </div>
-                        <div>
-                          <p className="text-[10px] text-muted-foreground font-medium uppercase">
+                        <div className="rounded-md bg-muted p-2.5">
+                          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                             {linha.matchOrigin === 'conta_pagar' ? 'Boleto' : 'Título a receber'}
                           </p>
-                          <p className="text-sm font-medium break-words">{linha.matchDescricao}</p>
-                          <p className="text-base font-bold mt-1">{fmt(valorTitulo)}</p>
+                          <p className="break-words text-sm font-medium text-foreground">{linha.matchDescricao}</p>
+                          <p className="mt-1 whitespace-nowrap text-base font-bold tabular-nums text-foreground">{fmt(valorTitulo)}</p>
                         </div>
                       </div>
 
                       {diverge ? (
-                        <div className="rounded-md border border-warning/40 bg-warning/5 p-2.5 space-y-2">
-                          <p className="text-xs text-warning flex items-center gap-1.5">
-                            <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                        <div className="space-y-2 rounded-md border border-warning-border bg-warning-soft p-2.5">
+                          <p className="flex items-center gap-1.5 text-xs text-warning">
+                            <AlertTriangle aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
                             <span>
-                              O banco {isRecebimento ? 'creditou' : 'debitou'} <strong>{fmt(Math.abs(diff))}</strong>
+                              O banco {isRecebimento ? 'creditou' : 'debitou'} <strong className="tabular-nums">{fmt(Math.abs(diff))}</strong>
                               {diff > 0 ? ' a mais' : ' a menos'} que o título.
                             </span>
                           </p>
 
-                          <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <Label className="text-[10px] text-muted-foreground">Lançar a diferença como</Label>
+                          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                            <div className="space-y-1">
+                              <Label htmlFor={`baixa-ajuste-tipo-${i}`} className="text-xs text-muted-foreground">Lançar a diferença como</Label>
                               <Select
                                 value={ajuste.tipo}
                                 onValueChange={v => setAjustesBaixa(prev => ({
                                   ...prev, [i]: { tipo: v as AjusteTipo, categoriaId: prev[i]?.categoriaId || '' },
                                 }))}
                               >
-                                <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecione" /></SelectTrigger>
+                                <SelectTrigger id={`baixa-ajuste-tipo-${i}`} className="h-8 bg-card text-xs"><SelectValue placeholder="Selecione" /></SelectTrigger>
                                 <SelectContent>
                                   {diff > 0 ? (
                                     <>
@@ -3052,8 +3331,8 @@ export default function ConciliacaoBancariaSection() {
                                 </SelectContent>
                               </Select>
                             </div>
-                            <div>
-                              <Label className="text-[10px] text-muted-foreground">Categoria da diferença</Label>
+                            <div className="space-y-1">
+                              <span className="text-xs font-medium text-muted-foreground">Categoria da diferença</span>
                               <CategoryCombobox
                                 value={ajuste.categoriaId}
                                 onValueChange={v => setAjustesBaixa(prev => ({
@@ -3061,26 +3340,26 @@ export default function ConciliacaoBancariaSection() {
                                 }))}
                                 options={categoriasAjuste}
                                 placeholder="Selecione"
-                                className="h-8 text-xs"
+                                className="h-8 bg-card text-xs"
                                 modal={false}
                               />
                             </div>
                           </div>
 
-                          <p className="text-[11px] text-muted-foreground">
+                          <p className="text-xs text-muted-foreground">
                             O título entra no razão por {fmt(valorTitulo)} na categoria dele, e a diferença
                             vira um lançamento separado. A soma bate com o extrato.
                             {diff < 0 && ` O desconto ${isRecebimento ? 'concedido' : 'obtido'} fica em categoria não operacional: entra no saldo da conta, mas fora do resultado no DRE, do DFC e dos relatórios.`}
                           </p>
                         </div>
                       ) : (
-                        <p className="text-xs text-success flex items-center gap-1.5">
-                          <CheckCircle className="w-3.5 h-3.5" /> Valores conferem.
+                        <p className="flex items-center gap-1.5 text-xs text-success">
+                          <CheckCircle2 aria-hidden="true" className="h-3.5 w-3.5" /> Valores conferem.
                         </p>
                       )}
 
                       <div className="flex justify-end">
-                        <Button size="sm" variant="ghost" className="h-7 text-xs text-destructive"
+                        <Button size="sm" variant="ghost" className="h-8 text-xs text-destructive"
                           onClick={() => {
                             clearMatch(i);
                             setBaixaDialog(prev => ({ ...prev, indices: prev.indices.filter(idx => idx !== i) }));
@@ -3088,8 +3367,7 @@ export default function ConciliacaoBancariaSection() {
                           Não dar baixa nesta
                         </Button>
                       </div>
-                    </CardContent>
-                  </Card>
+                  </div>
                 );
               })}
 
@@ -3114,27 +3392,22 @@ export default function ConciliacaoBancariaSection() {
 
       {/* ========== BOLETO EM ABERTO (vínculo manual) ========== */}
       <Dialog open={boletoDialog.open} onOpenChange={(open) => !open && setBoletoDialog({ open: false, linhaIndex: -1 })}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto" {...focoBoleto}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Receipt className="w-5 h-5 text-primary" /> Vincular a um boleto em aberto
+              <Receipt aria-hidden="true" className="h-5 w-5 text-primary" /> Vincular a um boleto em aberto
             </DialogTitle>
           </DialogHeader>
 
           {boletoDialog.linhaIndex >= 0 && linhas[boletoDialog.linhaIndex] && (
             <div className="space-y-4">
-              <Card className="border-primary/20">
-                <CardContent className="p-3 flex justify-between items-center">
-                  <div>
-                    <p className="text-[10px] text-muted-foreground font-medium uppercase">Linha do Extrato</p>
-                    <p className="text-sm font-medium">{linhas[boletoDialog.linhaIndex].descricao}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatDateBR(parseLocalDate(linhas[boletoDialog.linhaIndex].data))}
-                    </p>
-                  </div>
-                  <p className="text-lg font-bold text-destructive">{fmt(linhas[boletoDialog.linhaIndex].valor)}</p>
-                </CardContent>
-              </Card>
+              <ExtratoLinhaResumo
+                descricao={linhas[boletoDialog.linhaIndex].descricao}
+                data={linhas[boletoDialog.linhaIndex].data}
+                valor={linhas[boletoDialog.linhaIndex].valor}
+                tipo={linhas[boletoDialog.linhaIndex].tipo}
+                valorClassName="text-destructive"
+              />
 
               <div className="flex gap-2">
                 <Input
@@ -3142,47 +3415,55 @@ export default function ConciliacaoBancariaSection() {
                   onChange={e => setBoletoBusca(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') buscarBoletos(boletoBusca); }}
                   placeholder="Buscar por descrição ou fornecedor..."
+                  aria-label="Buscar boleto por descrição ou fornecedor"
                   className="h-9"
                 />
-                <Button size="sm" variant="outline" className="h-9" onClick={() => buscarBoletos(boletoBusca)} disabled={boletoLoading}>
-                  <Search className={`w-4 h-4 ${boletoLoading ? 'animate-spin' : ''}`} />
+                <Button size="sm" variant="outline" className="h-9" onClick={() => buscarBoletos(boletoBusca)} disabled={boletoLoading} aria-label="Buscar boletos">
+                  {boletoLoading
+                    ? <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
+                    : <Search aria-hidden="true" className="h-4 w-4" />}
                 </Button>
               </div>
 
-              <div className="space-y-2">
+              <ul className="space-y-2" aria-label="Boletos em aberto" aria-busy={boletoLoading}>
                 {boletoLoading ? (
-                  <p className="text-center text-muted-foreground py-4">Buscando...</p>
+                  <li className="flex items-center justify-center gap-2 py-4 text-sm text-muted-foreground">
+                    <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" /> Buscando...
+                  </li>
                 ) : boletoOpcoes.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-4">Nenhum boleto em aberto encontrado</p>
+                  <li className="py-4 text-center text-sm text-muted-foreground">Nenhum boleto em aberto encontrado</li>
                 ) : boletoOpcoes.map(b => {
                   const mesmoValor = Math.abs(Number(b.valor) - linhas[boletoDialog.linhaIndex].valor) < 0.01;
                   return (
-                    <Card key={b.id}
-                      className={`cursor-pointer transition-colors hover:border-primary/40 ${mesmoValor ? 'border-success/40' : ''}`}
-                      onClick={() => selecionarBoleto(b)}>
-                      <CardContent className="p-3 flex items-center justify-between gap-3">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-                            <Badge variant="outline" className="text-[10px]">
-                              {b.status === 'AGUARDANDO_APROVACAO' ? 'Aguard. Aprovacao' : b.status}
-                            </Badge>
-                            {mesmoValor && <Badge className="bg-success/10 text-success border-success/20 text-[10px]">Mesmo valor</Badge>}
-                            {!b.tem_categoria && (
-                              <Badge className="bg-warning/10 text-warning border-warning/20 text-[10px]">Sem categoria</Badge>
-                            )}
-                          </div>
-                          <p className="text-sm font-medium break-words">{b.descricao}</p>
-                          <div className="flex items-center gap-3 text-[11px] text-muted-foreground mt-0.5 flex-wrap">
-                            <span>Vence: {formatDateBR(parseLocalDate(b.data_vencimento))}</span>
+                    <li key={b.id}>
+                      {/* Botão (e não card clicável): a escolha também funciona pelo teclado. */}
+                      <button
+                        type="button"
+                        onClick={() => selecionarBoleto(b)}
+                        className={cn(
+                          'flex w-full items-start justify-between gap-3 rounded-lg border bg-card p-3 text-left transition-colors hover:border-primary-border hover:bg-card-hover',
+                          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+                          mesmoValor && 'border-success-border',
+                        )}
+                      >
+                        <span className="min-w-0 flex-1">
+                          <span className="mb-1 flex flex-wrap items-center gap-1.5">
+                            <StatusBadge status="neutral" label={b.status === 'AGUARDANDO_APROVACAO' ? 'Aguard. Aprovação' : b.status} />
+                            {mesmoValor && <StatusBadge status="success" label="Mesmo valor" />}
+                            {!b.tem_categoria && <StatusBadge status="warning" label="Sem categoria" />}
+                          </span>
+                          <span className="block break-words text-sm font-medium text-foreground">{b.descricao}</span>
+                          <span className="mt-0.5 flex flex-wrap items-center gap-x-3 text-xs text-muted-foreground">
+                            <span className="tabular-nums">Vence: {formatDateBR(parseLocalDate(b.data_vencimento))}</span>
                             {b.fornecedor && <span>• {b.fornecedor}</span>}
-                          </div>
-                        </div>
-                        <p className="text-sm font-bold text-destructive shrink-0">{fmt(Number(b.valor))}</p>
-                      </CardContent>
-                    </Card>
+                          </span>
+                        </span>
+                        <span className="shrink-0 whitespace-nowrap text-sm font-semibold tabular-nums text-destructive">{fmt(Number(b.valor))}</span>
+                      </button>
+                    </li>
                   );
                 })}
-              </div>
+              </ul>
 
               <DialogFooter>
                 <Button variant="outline" onClick={() => setBoletoDialog({ open: false, linhaIndex: -1 })}>Fechar</Button>
@@ -3194,10 +3475,10 @@ export default function ConciliacaoBancariaSection() {
 
       {/* ========== CONFIRMAÇÃO: BAIXA JÁ NO LIVRO RAZÃO ========== */}
       <AlertDialog open={jaNoRazaoDialog.open} onOpenChange={(open) => !open && setJaNoRazaoDialog({ open: false, indices: [] })}>
-        <AlertDialogContent className="max-w-2xl">
+        <AlertDialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto" {...focoJaNoRazao}>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-warning" />
+              <AlertTriangle aria-hidden="true" className="h-5 w-5 shrink-0 text-warning" />
               {jaNoRazaoDialog.indices.length === 1
                 ? 'Este pagamento já está no Livro Razão'
                 : `${jaNoRazaoDialog.indices.length} pagamentos já estão no Livro Razão`}
@@ -3212,22 +3493,21 @@ export default function ConciliacaoBancariaSection() {
               diferente, escolha “Lançar como novo”.
             </p>
 
-            <div className="space-y-2 max-h-[40vh] overflow-y-auto">
+            <div className="max-h-[40vh] space-y-2 overflow-y-auto">
               {jaNoRazaoDialog.indices.map(i => {
                 const linha = linhas[i];
                 if (!linha) return null;
                 return (
-                  <Card key={i} className="border-warning/30">
-                    <CardContent className="p-3 flex items-center justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium break-words">{linha.descricao}</p>
-                        <p className="text-[11px] text-muted-foreground">
-                          {formatDateBR(parseLocalDate(linha.data))} • no razão como “{linha.matchDescricao}”
+                  <div key={i} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-warning-border bg-card p-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="break-words text-sm font-medium text-foreground">{linha.descricao}</p>
+                        <p className="text-xs text-muted-foreground">
+                          <span className="tabular-nums">{formatDateBR(parseLocalDate(linha.data))}</span> • no razão como “{linha.matchDescricao}”
                         </p>
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-sm font-bold text-destructive">{fmt(linha.valor)}</span>
-                        <Button size="sm" variant="ghost" className="h-7 text-xs text-destructive"
+                      <div className="flex shrink-0 items-center gap-2">
+                        <span className={cn('whitespace-nowrap text-sm font-semibold tabular-nums', linha.tipo === 'RECEITA' ? 'text-success' : 'text-destructive')}>{fmt(linha.valor)}</span>
+                        <Button size="sm" variant="ghost" className="h-8 text-xs text-destructive"
                           onClick={() => {
                             clearMatch(i);
                             setJaNoRazaoDialog(prev => ({
@@ -3238,8 +3518,7 @@ export default function ConciliacaoBancariaSection() {
                           Lançar como novo
                         </Button>
                       </div>
-                    </CardContent>
-                  </Card>
+                  </div>
                 );
               })}
               {jaNoRazaoDialog.indices.length === 0 && (
@@ -3264,10 +3543,10 @@ export default function ConciliacaoBancariaSection() {
 
       {/* ========== POSSÍVEL DUPLICATA (mesma conta/valor/data/descrição já conciliados) ========== */}
       <AlertDialog open={duplicataDialog.open} onOpenChange={(open) => !open && setDuplicataDialog({ open: false, itens: [] })}>
-        <AlertDialogContent className="max-w-2xl">
+        <AlertDialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto" {...focoDuplicata}>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-warning" />
+              <AlertTriangle aria-hidden="true" className="h-5 w-5 shrink-0 text-warning" />
               {duplicataDialog.itens.length === 1
                 ? '1 linha parece duplicada'
                 : `${duplicataDialog.itens.length} linhas parecem duplicadas`}
@@ -3283,30 +3562,28 @@ export default function ConciliacaoBancariaSection() {
               "Importar mesmo assim"; senão, marque como ignorada.
             </p>
 
-            <div className="space-y-2 max-h-[40vh] overflow-y-auto">
+            <div className="max-h-[40vh] space-y-2 overflow-y-auto">
               {duplicataDialog.itens.map((item) => (
-                <Card key={`${item.linha.data}-${item.linha.valor}-${item.linha.descricao}-${item.linha.fitId ?? ''}`} className="border-warning/30">
-                  <CardContent className="p-3 flex items-center justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium break-words">{item.linha.descricao}</p>
-                      <p className="text-[11px] text-muted-foreground">
-                        {formatDateBR(parseLocalDate(item.linha.data))}
+                <div key={`${item.linha.data}-${item.linha.valor}-${item.linha.descricao}-${item.linha.fitId ?? ''}`} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-warning-border bg-card p-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="break-words text-sm font-medium text-foreground">{item.linha.descricao}</p>
+                      <p className="text-xs text-muted-foreground">
+                        <span className="tabular-nums">{formatDateBR(parseLocalDate(item.linha.data))}</span>
                         {item.criadoEm && ` • já conciliado em ${formatInBR(new Date(item.criadoEm), "dd/MM/yyyy 'às' HH:mm")}`}
                       </p>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-sm font-bold text-destructive">{fmt(item.linha.valor)}</span>
-                      <Button size="sm" variant="ghost" className="h-7 text-xs"
+                    <div className="flex shrink-0 flex-wrap items-center gap-2">
+                      <span className={cn('whitespace-nowrap text-sm font-semibold tabular-nums', item.linha.tipo === 'RECEITA' ? 'text-success' : 'text-destructive')}>{fmt(item.linha.valor)}</span>
+                      <Button size="sm" variant="ghost" className="h-8 text-xs"
                         onClick={() => ignorarDuplicata(item)}>
                         Ignorar
                       </Button>
-                      <Button size="sm" variant="outline" className="h-7 text-xs"
+                      <Button size="sm" variant="outline" className="h-8 text-xs"
                         onClick={() => forcarImportarDuplicata(item)}>
                         Importar mesmo assim
                       </Button>
                     </div>
-                  </CardContent>
-                </Card>
+                </div>
               ))}
               {duplicataDialog.itens.length === 0 && (
                 <p className="text-sm text-muted-foreground text-center py-3">
@@ -3324,37 +3601,27 @@ export default function ConciliacaoBancariaSection() {
 
       {/* ========== RATEIO DIALOG ========== */}
       <Dialog open={rateioDialog.open} onOpenChange={(open) => !open && setRateioDialog({ open: false, linhaIndex: -1 })}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto" {...focoRateio}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <PieChart className="w-5 h-5 text-primary" /> Rateio por Categoria
+              <PieChart aria-hidden="true" className="h-5 w-5 text-primary" /> Rateio por Categoria
             </DialogTitle>
           </DialogHeader>
 
           {rateioDialog.linhaIndex >= 0 && linhas[rateioDialog.linhaIndex] && (
             <div className="space-y-4">
-              <Card className="border-primary/20">
-                <CardContent className="p-3">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <p className="text-sm font-medium">{linhas[rateioDialog.linhaIndex].descricao}</p>
-                      <p className="text-xs text-muted-foreground">{formatDateBR(parseLocalDate(linhas[rateioDialog.linhaIndex].data))}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-lg font-bold">{fmt(rateioValorTotal)}</p>
-                      <Badge variant={linhas[rateioDialog.linhaIndex].tipo === 'RECEITA' ? 'default' : 'destructive'}>
-                        {linhas[rateioDialog.linhaIndex].tipo}
-                      </Badge>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              <ExtratoLinhaResumo
+                descricao={linhas[rateioDialog.linhaIndex].descricao}
+                data={linhas[rateioDialog.linhaIndex].data}
+                valor={rateioValorTotal}
+                tipo={linhas[rateioDialog.linhaIndex].tipo}
+              />
 
-              <div className="space-y-2">
+              <ol className="space-y-2" aria-label="Linhas do rateio">
                 {rateioLinhas.map((rl, idx) => (
-                  <div key={idx} className="grid grid-cols-12 gap-2 items-end border border-border rounded-lg p-2">
-                    <div className="col-span-4">
-                      <Label className="text-[10px] text-muted-foreground">Categoria</Label>
+                  <li key={idx} className="grid grid-cols-2 items-end gap-2 rounded-lg border bg-card p-2.5 sm:grid-cols-12">
+                    <div className="col-span-2 space-y-1 sm:col-span-4">
+                      <span className="text-xs font-medium text-muted-foreground">Categoria</span>
                       <CategoryCombobox
                         value={rl.categoria_id}
                         onValueChange={v => updateRateioLinha(idx, 'categoria_id', v)}
@@ -3363,47 +3630,47 @@ export default function ConciliacaoBancariaSection() {
                         className="h-8 text-xs"
                       />
                     </div>
-                    <div className="col-span-3">
-                      <Label className="text-[10px] text-muted-foreground">Centro de Custo</Label>
+                    <div className="col-span-2 space-y-1 sm:col-span-2">
+                      <Label htmlFor={`rateio-centro-${idx}`} className="text-xs text-muted-foreground">Centro de Custo</Label>
                       <Select value={rl.centro_custo_id} onValueChange={v => updateRateioLinha(idx, 'centro_custo_id', v)}>
-                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Auto" /></SelectTrigger>
+                        <SelectTrigger id={`rateio-centro-${idx}`} className="h-8 text-xs"><SelectValue placeholder="Auto" /></SelectTrigger>
                         <SelectContent>{centrosCusto.map(c => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}</SelectContent>
                       </Select>
                     </div>
-                    <div className="col-span-2">
-                      <Label className="text-[10px] text-muted-foreground">Valor (R$)</Label>
-                      <BRLInput className="h-8 text-xs" numericValue={rl.valor} onNumericChange={value => updateRateioLinha(idx, 'valor', value)} showPrefix />
+                    <div className="space-y-1 sm:col-span-3">
+                      <Label htmlFor={`rateio-valor-${idx}`} className="text-xs text-muted-foreground">Valor (R$)</Label>
+                      <BRLInput id={`rateio-valor-${idx}`} className="h-8 text-xs" numericValue={rl.valor} onNumericChange={value => updateRateioLinha(idx, 'valor', value)} showPrefix />
                     </div>
-                    <div className="col-span-2">
-                      <Label className="text-[10px] text-muted-foreground">%</Label>
-                      <DecimalInput className="h-8 text-xs" value={String(rl.percentual || '')} onValueChange={(_, parsed) => updateRateioLinha(idx, 'percentual', parsed ?? 0)} maxDecimals={2} suffix="%" />
+                    <div className="space-y-1 sm:col-span-2">
+                      <Label htmlFor={`rateio-percentual-${idx}`} className="text-xs text-muted-foreground">%</Label>
+                      <DecimalInput id={`rateio-percentual-${idx}`} className="h-8 text-xs" value={String(rl.percentual || '')} onValueChange={(_, parsed) => updateRateioLinha(idx, 'percentual', parsed ?? 0)} maxDecimals={2} suffix="%" />
                     </div>
-                    <div className="col-span-1 flex justify-center">
+                    <div className="col-span-2 flex justify-end sm:col-span-1 sm:justify-center">
                       {rateioLinhas.length > 1 && (
-                        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => removeRateioLinha(idx)}>
-                          <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => removeRateioLinha(idx)} aria-label={`Remover a linha ${idx + 1} do rateio`}>
+                          <Trash2 aria-hidden="true" className="h-4 w-4 text-destructive" />
                         </Button>
                       )}
                     </div>
-                  </div>
+                  </li>
                 ))}
-              </div>
+              </ol>
 
-              <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex gap-2">
-                  <Button size="sm" variant="outline" onClick={addRateioLinha}><Plus className="w-3.5 h-3.5 mr-1" /> Linha</Button>
-                  <Button size="sm" variant="outline" onClick={ratearIgual}>🧮 Ratear Igual</Button>
+                  <Button size="sm" variant="outline" onClick={addRateioLinha}><Plus aria-hidden="true" className="mr-1 h-3.5 w-3.5" /> Linha</Button>
+                  <Button size="sm" variant="outline" onClick={ratearIgual}><Calculator aria-hidden="true" className="mr-1 h-3.5 w-3.5" /> Ratear Igual</Button>
                 </div>
-                <div className="text-right text-sm">
+                <div className="text-right text-sm" role="status">
                   <span className="text-muted-foreground">Rateado: </span>
-                  <span className={`font-bold ${rateioValido ? 'text-success' : 'text-destructive'}`}>{fmt(rateioTotalAtual)}</span>
-                  {!rateioValido && <span className="text-destructive text-xs ml-2">(Diferença: {fmt(rateioDiff)})</span>}
+                  <span className={cn('font-bold tabular-nums', rateioValido ? 'text-success' : 'text-destructive')}>{fmt(rateioTotalAtual)}</span>
+                  {!rateioValido && <span className="ml-2 text-xs tabular-nums text-destructive">(Diferença: {fmt(rateioDiff)})</span>}
                 </div>
               </div>
 
               <DialogFooter className="gap-2">
                 <Button variant="outline" onClick={() => setRateioDialog({ open: false, linhaIndex: -1 })}>Cancelar</Button>
-                <Button onClick={salvarRateio} disabled={!rateioValido}><CheckCircle className="w-4 h-4 mr-1" /> Salvar Rateio</Button>
+                <Button onClick={salvarRateio} disabled={!rateioValido}><CheckCircle aria-hidden="true" className="mr-1 h-4 w-4" /> Salvar Rateio</Button>
               </DialogFooter>
             </div>
           )}
@@ -3413,10 +3680,10 @@ export default function ConciliacaoBancariaSection() {
 
       {/* ========== TRANSFER DIALOG ========== */}
       <Dialog open={transferDialog.open} onOpenChange={(open) => { if (!open) { setTransferDialog({ open: false, linhaIndex: -1 }); setTransferContaDestino(''); } }}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto" {...focoTransferencia}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <ArrowRightLeft className="w-5 h-5 text-primary" /> Marcar como Transferência
+              <ArrowRightLeft aria-hidden="true" className="h-5 w-5 text-primary" /> Marcar como Transferência
             </DialogTitle>
           </DialogHeader>
           {transferDialog.linhaIndex >= 0 && linhas[transferDialog.linhaIndex] && (() => {
@@ -3425,30 +3692,23 @@ export default function ConciliacaoBancariaSection() {
             const nomeOutraConta = transferContaDestino ? getContaNome(transferContaDestino) : 'conta a selecionar';
             return (
               <div className="space-y-4">
-                <Card className="border-primary/20">
-                  <CardContent className="p-3">
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <p className="text-sm font-medium">{linha.descricao}</p>
-                         <p className="text-xs text-muted-foreground">{formatDateBR(parseLocalDate(linha.data))}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-lg font-bold">{fmt(linha.valor)}</p>
-                        <Badge variant={isOutgoing ? 'destructive' : 'default'}>{isOutgoing ? 'Saída' : 'Entrada'}</Badge>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                <ExtratoLinhaResumo
+                  descricao={linha.descricao}
+                  data={linha.data}
+                  valor={linha.valor}
+                  tipo={linha.tipo}
+                  badge={isOutgoing ? { label: 'Saída', status: 'danger' } : { label: 'Entrada', status: 'success' }}
+                />
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label className="text-xs text-muted-foreground">{isOutgoing ? 'Conta Origem (esta)' : 'Conta Destino (esta)'}</Label>
-                    <Input value={getContaNome(contaSel)} disabled className="h-9" />
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="transferencia-esta-conta" className="text-xs text-muted-foreground">{isOutgoing ? 'Conta Origem (esta)' : 'Conta Destino (esta)'}</Label>
+                    <Input id="transferencia-esta-conta" value={getContaNome(contaSel)} disabled className="h-9" />
                   </div>
-                  <div>
-                    <Label className="text-xs">{isOutgoing ? 'Conta Destino' : 'Conta Origem'}</Label>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="transferencia-outra-conta" className="text-xs">{isOutgoing ? 'Conta Destino' : 'Conta Origem'}</Label>
                     <Select value={transferContaDestino} onValueChange={setTransferContaDestino}>
-                      <SelectTrigger className="h-9"><SelectValue placeholder="Selecione a conta" /></SelectTrigger>
+                      <SelectTrigger id="transferencia-outra-conta" className="h-9"><SelectValue placeholder="Selecione a conta" /></SelectTrigger>
                       <SelectContent>
                         {contas.filter(c => c.id !== contaSel).map(c => (
                           <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
@@ -3459,11 +3719,11 @@ export default function ConciliacaoBancariaSection() {
                 </div>
 
                 {linha.transferAlertas && linha.transferAlertas.length > 0 && (
-                  <div className="rounded-lg border border-warning/30 bg-warning/10 p-3 text-xs">
-                    <p className="font-medium text-warning flex items-center gap-1.5 mb-1">
-                      <AlertTriangle className="w-3.5 h-3.5" /> Já existe transferência de mesmo valor
+                  <div role="alert" className="rounded-lg border border-warning-border bg-warning-soft p-3 text-xs">
+                    <p className="mb-1 flex items-center gap-1.5 font-semibold text-foreground">
+                      <AlertTriangle aria-hidden="true" className="h-3.5 w-3.5 text-warning" /> Já existe transferência de mesmo valor
                     </p>
-                    <ul className="text-muted-foreground space-y-0.5">
+                    <ul className="space-y-0.5 text-muted-foreground">
                       {linha.transferAlertas.map(t => (
                         <li key={t.id}>
                           • {formatDateBR(parseLocalDate(t.data))} — {getContaNome(t.conta_id)} → {getContaNome(t.conta_destino_id)}
@@ -3478,20 +3738,27 @@ export default function ConciliacaoBancariaSection() {
                   </div>
                 )}
 
-                <div className="bg-muted/50 rounded-lg p-3 text-sm">
-                  <p className="font-medium text-foreground mb-1">Ao confirmar:</p>
-                  <ul className="text-muted-foreground space-y-1 text-xs">
-                    <li>✅ Um lançamento de transferência: saída em <strong>{isOutgoing ? getContaNome(contaSel) : nomeOutraConta}</strong> e entrada em <strong>{isOutgoing ? nomeOutraConta : getContaNome(contaSel)}</strong></li>
-                    <li>✅ Tipo = TRANSFERÊNCIA (não afeta receitas/despesas)</li>
-                    <li>✅ Linha do extrato será conciliada automaticamente</li>
-                    <li>✅ Ao importar o extrato da outra conta, a linha correspondente é reconhecida sozinha — sem duplicar</li>
+                <div className="rounded-lg bg-muted p-3 text-sm">
+                  <p className="mb-1 font-medium text-foreground">Ao confirmar:</p>
+                  <ul className="space-y-1 text-xs text-muted-foreground">
+                    {[
+                      <>Um lançamento de transferência: saída em <strong className="text-foreground">{isOutgoing ? getContaNome(contaSel) : nomeOutraConta}</strong> e entrada em <strong className="text-foreground">{isOutgoing ? nomeOutraConta : getContaNome(contaSel)}</strong></>,
+                      <>Tipo = TRANSFERÊNCIA (não afeta receitas/despesas)</>,
+                      <>Linha do extrato será conciliada automaticamente</>,
+                      <>Ao importar o extrato da outra conta, a linha correspondente é reconhecida sozinha — sem duplicar</>,
+                    ].map((texto, k) => (
+                      <li key={k} className="flex items-start gap-1.5">
+                        <CheckCircle2 aria-hidden="true" className="mt-px h-3.5 w-3.5 shrink-0 text-success" />
+                        <span>{texto}</span>
+                      </li>
+                    ))}
                   </ul>
                 </div>
 
                 <DialogFooter className="gap-2">
                   <Button variant="outline" onClick={() => { setTransferDialog({ open: false, linhaIndex: -1 }); setTransferContaDestino(''); }}>Cancelar</Button>
                   <Button onClick={criarTransferenciaFromOFX} disabled={processando || !transferContaDestino}>
-                    {processando ? <RefreshCw className="w-4 h-4 mr-1 animate-spin" /> : <ArrowRightLeft className="w-4 h-4 mr-1" />}
+                    {processando ? <Loader2 aria-hidden="true" className="mr-1 h-4 w-4 animate-spin" /> : <ArrowRightLeft aria-hidden="true" className="mr-1 h-4 w-4" />}
                     Criar Transferência
                   </Button>
                 </DialogFooter>
@@ -3523,16 +3790,16 @@ export default function ConciliacaoBancariaSection() {
       {/* ========== CONTA MISMATCH ALERT ========== */}
       {contaMismatch && (
         <AlertDialog open={contaMismatch.open}>
-          <AlertDialogContent>
+          <AlertDialogContent className="max-h-[90vh] overflow-y-auto" {...focoContaDiverge}>
             <AlertDialogHeader>
               <AlertDialogTitle className="flex items-center gap-2 text-destructive">
-                <AlertTriangle className="w-5 h-5 shrink-0" />
+                <AlertTriangle aria-hidden="true" className="h-5 w-5 shrink-0" />
                 Conta do extrato diverge da selecionada
               </AlertDialogTitle>
             </AlertDialogHeader>
 
             <div className="space-y-3 text-sm">
-              <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 space-y-1">
+              <div className="space-y-1 rounded-lg border border-destructive-border bg-destructive-soft p-3">
                 <p className="font-semibold text-foreground">Identificação no arquivo:</p>
                 {contaMismatch.extratoInfo.numeroConta && (
                   <p className="text-muted-foreground">
@@ -3554,7 +3821,7 @@ export default function ConciliacaoBancariaSection() {
               {(() => {
                 const cad = contas.find(c => c.id === contaSel);
                 return cad ? (
-                  <div className="rounded-lg border bg-muted/40 p-3 space-y-1">
+                  <div className="space-y-1 rounded-lg border bg-muted p-3">
                     <p className="font-semibold text-foreground">Conta selecionada: {cad.nome}</p>
                     {(cad.numero_conta || cad.agencia) ? (
                       <>
@@ -3605,10 +3872,10 @@ export default function ConciliacaoBancariaSection() {
       {/* ========== SUBSTITUIR EXTRATO COM LINHAS PENDENTES ========== */}
       {substituirExtratoDialog && (
         <AlertDialog open={substituirExtratoDialog.open}>
-          <AlertDialogContent>
+          <AlertDialogContent className="max-h-[90vh] overflow-y-auto" {...focoSubstituir}>
             <AlertDialogHeader>
               <AlertDialogTitle className="flex items-center gap-2 text-warning">
-                <AlertTriangle className="w-5 h-5 shrink-0" />
+                <AlertTriangle aria-hidden="true" className="h-5 w-5 shrink-0" />
                 {substituirExtratoDialog.pendentes === 1
                   ? 'Ainda há 1 linha não processada'
                   : `Ainda há ${substituirExtratoDialog.pendentes} linhas não processadas`}
@@ -3649,6 +3916,7 @@ export default function ConciliacaoBancariaSection() {
           saldoContaCorrenteArquivo={confirmSaldoDialog.saldoContaCorrenteArquivo}
           internalMovementCount={confirmSaldoDialog.parsed.filter(isAutomaticInvestmentLine).length}
           contaId={contaSel}
+          focoAoFechar={() => fileRef.current}
           onCancel={() => setConfirmSaldoDialog(null)}
           onConfirmed={async (saldoConfirmado) => {
             const pending = confirmSaldoDialog.parsed;

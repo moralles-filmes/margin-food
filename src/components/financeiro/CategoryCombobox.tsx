@@ -23,6 +23,10 @@ interface CategoryComboboxProps {
   disabled?: boolean;
   /** Set to true when combobox is used inside a Dialog/Sheet */
   modal?: boolean;
+  /** Id do botão, para um `<Label htmlFor>` externo nomear o combobox. */
+  id?: string;
+  'aria-label'?: string;
+  'aria-labelledby'?: string;
 }
 
 export default function CategoryCombobox({
@@ -33,6 +37,9 @@ export default function CategoryCombobox({
   className,
   disabled,
   modal = true,
+  id,
+  'aria-label': ariaLabel,
+  'aria-labelledby': ariaLabelledBy,
 }: CategoryComboboxProps) {
   const [open, setOpen] = useState(false);
 
@@ -52,14 +59,17 @@ export default function CategoryCombobox({
     <Popover open={open} onOpenChange={setOpen} modal={modal}>
       <PopoverTrigger asChild>
         <Button
+          id={id}
           variant="outline"
           role="combobox"
           aria-expanded={open}
+          aria-label={ariaLabel}
+          aria-labelledby={ariaLabelledBy}
           disabled={disabled}
           className={cn('w-full justify-between font-normal h-8 text-xs', !value && 'text-muted-foreground', className)}
         >
           <span className="truncate">{selected ? (selected.codigo ? `${selected.codigo} — ${selected.nome}` : selected.nome) : placeholder}</span>
-          <ChevronsUpDown className="ml-1 h-3 w-3 shrink-0 opacity-50" />
+          <ChevronsUpDown aria-hidden="true" className="ml-1 h-3 w-3 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[320px] max-w-[92vw] p-0" align="start">

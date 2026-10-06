@@ -48,6 +48,15 @@ export default {
           "soft-foreground": "hsl(var(--primary-soft-foreground))",
           border: "hsl(var(--primary-border))",
         },
+        /** Card de destaque (Redesign V2) — `icon`/`arc`/`divider` já são cores completas com alfa. */
+        highlight: {
+          DEFAULT: "hsl(var(--highlight))",
+          foreground: "hsl(var(--highlight-foreground))",
+          muted: "hsl(var(--highlight-muted))",
+          icon: "var(--highlight-icon)",
+          arc: "var(--highlight-arc)",
+          divider: "var(--highlight-divider)",
+        },
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
           foreground: "hsl(var(--secondary-foreground))",
@@ -84,6 +93,9 @@ export default {
           hover: "hsl(var(--surface-hover))",
           active: "hsl(var(--surface-active))",
           elevated: "hsl(var(--surface-elevated))",
+        },
+        segmented: {
+          active: "hsl(var(--segmented-active))",
         },
         success: {
           DEFAULT: "hsl(var(--success))",
@@ -128,8 +140,10 @@ export default {
           "hover-foreground": "hsl(var(--sidebar-hover-foreground))",
           active: "hsl(var(--sidebar-active))",
           "active-foreground": "hsl(var(--sidebar-active-foreground))",
-          "active-marker": "hsl(var(--sidebar-active-marker))",
           section: "hsl(var(--sidebar-section))",
+          card: "hsl(var(--sidebar-card))",
+          "card-hover": "hsl(var(--sidebar-card-hover))",
+          "card-border": "hsl(var(--sidebar-card-border))",
         },
         chart: {
           1: "hsl(var(--chart-1))",
@@ -158,6 +172,10 @@ export default {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+        summary: "var(--radius-summary)",
+      },
+      backgroundImage: {
+        "gradient-highlight": "var(--gradient-highlight)",
       },
       boxShadow: {
         xs: "var(--shadow-xs)",
@@ -167,6 +185,7 @@ export default {
         card: "var(--shadow-card)",
         glow: "var(--shadow-glow)",
         focus: "var(--shadow-focus)",
+        highlight: "var(--shadow-highlight)",
       },
       transitionDuration: {
         fast: "150ms",

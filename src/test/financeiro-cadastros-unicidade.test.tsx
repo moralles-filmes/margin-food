@@ -92,7 +92,7 @@ describe('mensagemCadastroDuplicado', () => {
   });
 });
 
-describe('migração: unicidade de Centros de Custo e Plano de Contas', () => {
+describe('migração: unicidade de Centros de Custo', () => {
   const migration = readFileSync(
     resolve(process.cwd(), 'supabase/migrations/20260930130020_financeiro_cadastros_unicidade.sql'),
     'utf8',

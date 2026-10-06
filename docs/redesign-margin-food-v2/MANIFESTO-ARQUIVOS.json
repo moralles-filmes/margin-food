@@ -1,0 +1,240 @@
+{
+  "description": "Pacote de prompts, sem implementação no repositório",
+  "files": [
+    {
+      "path": "FONTES-E-LIMITES.md",
+      "bytes": 2818,
+      "sha256": "f265ae77edb13d40835bb7d7e48e7e1153187d71dbfb242e5c07c3b3ed781582"
+    },
+    {
+      "path": "PLANO-DE-FASES.md",
+      "bytes": 3104,
+      "sha256": "8b1a4e6d148008aaf1c9e262873dc26b9ea3aa2969942df6da87ac9b10b53431"
+    },
+    {
+      "path": "PROMPT-INICIAL.txt",
+      "bytes": 3608,
+      "sha256": "c5fd901af8e98c5653c818d08508b68c6ab4f65b1f53b28b0ffa602fc7c20950"
+    },
+    {
+      "path": "PROMPT-MESTRE.md",
+      "bytes": 22073,
+      "sha256": "8dfe8e86540b9c1f989b624cf13f020282b81b6a96f5e9ad23274e78c3d4d629"
+    },
+    {
+      "path": "PROMPT-RETOMADA.txt",
+      "bytes": 1160,
+      "sha256": "7f3d01c63d0032d6d66c0b0b11483ce46cf549a9448134dac5c6c0529dff0acf"
+    },
+    {
+      "path": "README.md",
+      "bytes": 2472,
+      "sha256": "e0cda8ce502bfcccb721fa7e77f41a8aa37a1ef2d4daa62679acf3b31dce9abe"
+    },
+    {
+      "path": "TODOS-OS-PROMPTS.md",
+      "bytes": 116187,
+      "sha256": "290bc01a918f053dc55c8babd30e119e871b9d542d1186a6eff8ffa76bc1949b"
+    },
+    {
+      "path": "TODOS-OS-PROMPTS.txt",
+      "bytes": 116187,
+      "sha256": "290bc01a918f053dc55c8babd30e119e871b9d542d1186a6eff8ffa76bc1949b"
+    },
+    {
+      "path": "prompts/00-auditoria-e-inventario.md",
+      "bytes": 5348,
+      "sha256": "6c0d7e79f7af4b65b3dcf718457f9ce609365eeb8d7f71e978681f01de0d5d6a"
+    },
+    {
+      "path": "prompts/01-fundacao-cards-e-graficos.md",
+      "bytes": 4931,
+      "sha256": "f2eb8a90c34744975aa7a6eaa61710b0f9546f495e54b655f64755e6614cba9b"
+    },
+    {
+      "path": "prompts/02-sidebar-e-seletor-de-loja.md",
+      "bytes": 4908,
+      "sha256": "ad14c9b87d0adfced818b2c4ba3c866de694fca1b8d94331a66eb1016326d717"
+    },
+    {
+      "path": "prompts/03-dashboard-financeiro.md",
+      "bytes": 6022,
+      "sha256": "8caa60473d6bbec6feea6bb395aff1f1f870f46954ee832985f2b72806ac2ecd"
+    },
+    {
+      "path": "prompts/04-contas-bancarias-e-movimentacao-financeira.md",
+      "bytes": 4584,
+      "sha256": "915d11d4455ee5d324ccfeabe21a781b9627cee4a64a0d8b7a4684cd24040da8"
+    },
+    {
+      "path": "prompts/05-operacoes-e-cadastros-financeiros.md",
+      "bytes": 4967,
+      "sha256": "af88afe188b1b0e7c6a3d903192f58082898e6df7edef196107e7390a2dfe728"
+    },
+    {
+      "path": "prompts/06-analises-e-relatorios-financeiros.md",
+      "bytes": 4904,
+      "sha256": "9b904c753f3f580b0d9ddb32ec7d24c87a6374c0496ef32a52f2afed2c71ebd0"
+    },
+    {
+      "path": "prompts/07-cmv-financeiro.md",
+      "bytes": 4848,
+      "sha256": "c8149e45aa7294cd42b76d138210591a84a6b681b841bfc9f1d8486c7ab25adb"
+    },
+    {
+      "path": "prompts/08-controle-de-estoque.md",
+      "bytes": 4470,
+      "sha256": "00d0c45c41e533549a047ee4059be4cc9dc8e5e0c13a7493437b068e1b9f8cd1"
+    },
+    {
+      "path": "prompts/09-movimentacao-e-inventario.md",
+      "bytes": 4558,
+      "sha256": "3fb4d7cec29760b41c637668483343323c1a0f5e687274d22ebb12b1b8b97cad"
+    },
+    {
+      "path": "prompts/10-salmao.md",
+      "bytes": 4296,
+      "sha256": "9bd59f2336ab2ef8548a025014ad1c176b4878f17490c332a1054723fe4702ac"
+    },
+    {
+      "path": "prompts/11-compras-e-fornecedores.md",
+      "bytes": 4410,
+      "sha256": "476c43efbb0a097c878ed0045feb3fda0af6b8b23be26c1543e2dc4b8d967135"
+    },
+    {
+      "path": "prompts/12-centro-cmv-e-ficha-tecnica.md",
+      "bytes": 4408,
+      "sha256": "0c68d1adf2f3dc2219d0aaac1e9691d949cc8f91ab8ba400dd496b39712ed761"
+    },
+    {
+      "path": "prompts/13-planejamento-e-relatorios-gerais.md",
+      "bytes": 4557,
+      "sha256": "6ac621e20023118f45447c29526ab308a0a17d386d10aa3acd65e8d3dcc3f35e"
+    },
+    {
+      "path": "prompts/14-rh-pessoas.md",
+      "bytes": 4518,
+      "sha256": "3990fb711f76dc1e41ca33da33ee65876bd7a603fca3d96abdd0a51666e9448e"
+    },
+    {
+      "path": "prompts/15-central-ia.md",
+      "bytes": 4438,
+      "sha256": "a5ab9e5814279a8f0515d8a3ed9140a17dc722669b36407d887c9721703ef998"
+    },
+    {
+      "path": "prompts/16-administracao-e-telas-auxiliares.md",
+      "bytes": 4532,
+      "sha256": "28055bd1b265c6d9ea514c8b4aee980df3e1aa250f2e1d801274e87a284b9b09"
+    },
+    {
+      "path": "prompts/17-qa-integrado-e-fechamento.md",
+      "bytes": 5208,
+      "sha256": "f76aeeb7fffae700ac722562704a09462fb612b426c1a83b5e9bc3ae4a30271d"
+    },
+    {
+      "path": "referencias/00-card-azul-aprovado.png",
+      "bytes": 14239,
+      "sha256": "9ac8dae9433c4f65cf9e1c89a5ec4ce44ea748e0911b01396eb9463836f9d179"
+    },
+    {
+      "path": "referencias/00-sidebar-aprovada.png",
+      "bytes": 54904,
+      "sha256": "7882c16ce1a3a82a90d63acda0caf231bbead2dcbaff56f28f071ef600346c72"
+    },
+    {
+      "path": "referencias/01-dashboard-financeiro.png",
+      "bytes": 788037,
+      "sha256": "bc93d9d4ac10236b1d39baddf12d1affe25978799812e891ed7e6421a4a0eb90"
+    },
+    {
+      "path": "referencias/01b-dashboard-detalhamento.png",
+      "bytes": 607702,
+      "sha256": "28c9cfdf88fda47bcca16ea40826be33a4f163319e94cc61e3e765826b3b92af"
+    },
+    {
+      "path": "referencias/01c-dashboard-mobile.png",
+      "bytes": 464487,
+      "sha256": "47789c6099c87aef5958226a72ddefb9e68d4298a840e1cb6bf78f0cee16c705"
+    },
+    {
+      "path": "referencias/02-contas-bancarias.png",
+      "bytes": 509329,
+      "sha256": "959dc63baf50afcd0746dee128e936ebe9db624cf4ff77f65d75f440f8a7ffb5"
+    },
+    {
+      "path": "referencias/03-controle-de-estoque.png",
+      "bytes": 465500,
+      "sha256": "43fc566396ede48031c2d75228c8772c21bd8542c851d698f1a64b0b5da27274"
+    },
+    {
+      "path": "referencias/04-cmv-financeiro.png",
+      "bytes": 458537,
+      "sha256": "1eb1173b7ebe7bda82375b5995a2274f700c8ba0a5713333ccb23a789a67bc3f"
+    },
+    {
+      "path": "referencias/05-planejamento.png",
+      "bytes": 453418,
+      "sha256": "34c75a92e3688ac9a0516daae88a84ddfeda79102dc1838b7f7fa92c7189dfab"
+    },
+    {
+      "path": "referencias/06-rh-pessoas.png",
+      "bytes": 449317,
+      "sha256": "ddb32ce72c329bb74adb79649e2df26406e32ec39a4d151e7000a3c9d60ff72c"
+    },
+    {
+      "path": "referencias/07-sidebar-e-componentes.png",
+      "bytes": 509037,
+      "sha256": "dc14e052ff384490ec8ccd94c3630d48a7319d10919e085c16d08df5616c0ee0"
+    },
+    {
+      "path": "referencias/08-estoque-mobile.png",
+      "bytes": 266359,
+      "sha256": "788d0573c8fdbe099a781b581998718fcf46443378b2b09317103fe18378be53"
+    },
+    {
+      "path": "referencias/09-visao-geral-referencias.png",
+      "bytes": 1563329,
+      "sha256": "fb6e06188d8a0c4c54bbb603c3158042c240463c3e5a5bdfed737ae36d52251f"
+    },
+    {
+      "path": "referencias/90-colagem-inspiracao.png",
+      "bytes": 1436194,
+      "sha256": "cb43c90d44f17ee8aef1722ec96e0734e763dc1a30b46f45ee91e40d862f862f"
+    },
+    {
+      "path": "referencias/MANIFESTO.md",
+      "bytes": 2775,
+      "sha256": "a3b5d1fdb8b74e38ec978564f27e304dceb35dea796c1c212d1cce228afffac2"
+    },
+    {
+      "path": "templates/DECISOES.md",
+      "bytes": 498,
+      "sha256": "2b741eda2ed047de45a82cf3c5890df3166ac2b8cec6f97e8536ade2e3b17606"
+    },
+    {
+      "path": "templates/HANDOFF.md",
+      "bytes": 1348,
+      "sha256": "e92b76bb3d258cd94f13700ffe0d6713bba5314a4a1f9257283a17cea326d9f5"
+    },
+    {
+      "path": "templates/MATRIZ-DE-COBERTURA.md",
+      "bytes": 871,
+      "sha256": "1e9a4c818962e2737f9c2aabecade24ea90b9db96da8d6f864b7f7e4952b23ea"
+    },
+    {
+      "path": "templates/PENDENCIAS-FUNCIONAIS.md",
+      "bytes": 653,
+      "sha256": "3a35c9a629de681f037ffd778933962d198640911d00206b788a255e5757879c"
+    },
+    {
+      "path": "templates/PROGRESSO.md",
+      "bytes": 608,
+      "sha256": "f7e0e9e2cd855e2ed9b8ab700af450c17fb5926782d06d9aca6c6caa646ea969"
+    },
+    {
+      "path": "templates/RELATORIO-DA-FASE.md",
+      "bytes": 1090,
+      "sha256": "b7bc3e76345d94467117581c5b2cf19523a0a94b9f770150b6fcd4634ef16963"
+    }
+  ]
+}
