@@ -71,7 +71,7 @@ describe('CMV Financeiro — exportação PDF', () => {
     expect(blocosPorPagina).toEqual([['cards']]);
     expect(text).toContain('Fechamento de Caixa');
     expect(text).toContain('pela data de compet');
-    expect(text).toContain('2 boletos do per');
+    expect(text).toContain('2 despesas do per');
     expect(text).toContain('Emitido em');
     expect(text).toContain('Dados consultados em');
     // bloco não selecionado não entra de carona

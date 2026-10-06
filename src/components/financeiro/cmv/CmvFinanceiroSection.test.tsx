@@ -108,7 +108,7 @@ describe('CMV Financeiro — tela', () => {
     state.respostas.set(SEMANA, pronto(relatorioSemana()));
     renderizar();
     // o primeiro aviso fica sempre à vista; os demais abrem sob demanda
-    expect(screen.getByText(/Apuração possivelmente incompleta: 2 boletos do período/)).toBeInTheDocument();
+    expect(screen.getByText(/Apuração possivelmente incompleta: 2 despesas do período/)).toBeInTheDocument();
     expect(screen.queryByText(/1 boleto sem data de competência/)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /^Ver os \d avisos$/ }));
     expect(screen.getByText(/1 boleto sem data de competência/)).toBeInTheDocument();

@@ -259,8 +259,33 @@ describe('CMV Financeiro — insights', () => {
     expect(textos).toContain('Peixes teve o maior aumento em reais: +R$ 1.000,00 (+100,0%) sobre o período anterior.');
     expect(textos).toContain('Bebidas teve a maior redução em reais: -R$ 400,00 (-40,0%) sobre o período anterior.');
     expect(textos).toContain('O % CMV subiu 6,00 p.p.: de 25,00% para 31,00%.');
-    expect(textos.some(t => t.startsWith('2 boletos do período (R$ 123,45) aguardam classificação'))).toBe(true);
+    expect(textos.some(t => t.startsWith('2 despesas do período (R$ 123,45) aguardam classificação'))).toBe(true);
     expect(textos.join(' ')).not.toMatch(/NaN|Infinity|undefined|eficiência|oportunidade/);
+  });
+
+  it('lançamentos entram na contagem de despesas, separados dos boletos', () => {
+    const r = buildCmvReport(parseCmvPayload(cmvPayloadCru({
+      lancamentos: [{ data: '2026-09-08', quantidade: 2 }, { data: '2026-09-02', quantidade: 1 }],
+    })), CMV_FILTRO_SEMANA);
+    expect(r.boletos.atual).toBe(5);
+    expect(r.lancamentos.atual).toBe(2);
+    expect(r.documentos.atual).toBe(7);
+    // semana anterior: 2 boletos + 1 lançamento
+    expect(r.documentos.anterior).toBe(3);
+  });
+
+  it('banco sem o recurso (payload antigo) não quebra: sem lançamentos e sem pendência por fonte', () => {
+    const r = buildCmvReport(parseCmvPayload(cmvPayloadCru()), CMV_FILTRO_SEMANA);
+    expect(r.lancamentos.atual).toBe(0);
+    expect(r.documentos.atual).toBe(r.boletos.atual);
+    expect(r.pendentesGeralPorFonte).toBeNull();
+  });
+
+  it('pendência por fonte vem do servidor', () => {
+    const r = buildCmvReport(parseCmvPayload(cmvPayloadCru({
+      pendentes_geral_por_fonte: { boleto: { titulos: 3, centavos: 100 }, lancamento: { titulos: 4, centavos: 200 } },
+    })), CMV_FILTRO_SEMANA);
+    expect(r.pendentesGeralPorFonte).toEqual({ boleto: { titulos: 3, centavos: 100 }, lancamento: { titulos: 4, centavos: 200 } });
   });
 
   it('sem dados não gera frase fixa', () => {

@@ -43,15 +43,18 @@ export function isCmvIndisponivel(error: unknown): boolean {
 }
 
 const MENSAGENS: [RegExp, string][] = [
-  [/OPTIMISTIC_LOCK_CONFLICT/, 'Este boleto foi alterado por outra pessoa. Recarregue e tente de novo.'],
+  [/OPTIMISTIC_LOCK_CONFLICT/, 'Este registro foi alterado por outra pessoa. Recarregue e tente de novo.'],
   [/CMV_DECISAO_OBRIGATORIA/, 'Informe se o boleto aparece no CMV financeiro.'],
   [/Could not find the function|PGRST202/, 'Recurso ainda não disponível neste ambiente. Tente de novo em alguns minutos.'],
   [/RATEIO_NAO_FECHA/, 'A soma do rateio precisa fechar com o valor do boleto.'],
-  [/CMV_ALVO_INVALIDO/, 'Este boleto tem rateio: classifique cada linha.'],
+  [/CMV_ALVO_INVALIDO: lançamento fora/, 'Este lançamento não entra no CMV financeiro (baixa de boleto, receita ou transferência).'],
+  [/CMV_ALVO_INVALIDO/, 'Este documento tem rateio: classifique cada linha.'],
   [/CMV_LOTE_INVALIDO/, 'Selecione de 1 a 500 linhas por vez.'],
   [/CMV_PERIODO_LONGO/, 'O período máximo é de 12 meses.'],
   [/CMV_PERIODO_/, 'Período inválido.'],
-  [/STATUS_INVALIDO/, 'Boleto cancelado não pode ser classificado.'],
+  [/JUSTIFICATIVA_OBRIGATORIA/, 'Informe a justificativa.'],
+  [/COMPETENCIA_INVALIDA/, 'Transferência não aceita competência própria.'],
+  [/STATUS_INVALIDO/, 'Registro cancelado não pode ser classificado.'],
   [/PERMISSION_DENIED/, 'Você não tem permissão para esta ação.'],
   [/NOT_FOUND/, 'Registro não encontrado. Recarregue a tela.'],
 ];
@@ -129,6 +132,8 @@ export interface CmvCategoriaConfig {
 export interface CmvConfig {
   classificacaoAtiva: boolean;
   categorias: CmvCategoriaConfig[];
+  /** O banco já aceita a decisão em Lançamentos e na Conciliação (migration de lançamentos). */
+  recursos: { lancamentos: boolean };
 }
 
 export function parseCmvConfig(raw: unknown): CmvConfig {
@@ -136,6 +141,10 @@ export function parseCmvConfig(raw: unknown): CmvConfig {
   const categorias = Array.isArray(o.categorias) ? o.categorias : [];
   return {
     classificacaoAtiva: o.classificacao_ativa === true,
+    recursos: {
+      lancamentos: typeof o.recursos === 'object' && o.recursos !== null
+        && (o.recursos as Record<string, unknown>).lancamentos === true,
+    },
     categorias: categorias.flatMap(item => {
       const c = item as Record<string, unknown>;
       if (typeof c?.id !== 'string') return [];
@@ -186,11 +195,21 @@ export function useCmvConfig({ companyId, enabled }: { companyId: string | null 
 
 export type CmvSituacao = 'incluido' | 'fora' | 'pendente' | 'sem_competencia' | 'todos';
 
+export type CmvFonte = 'boleto' | 'lancamento';
+
 export interface CmvLinhaDetalhe {
-  contaPagarId: string;
+  fonte: CmvFonte;
+  /** Id do boleto (fonte boleto) ou do lançamento (fonte lançamento). */
+  documentoId: string;
+  /** Só boleto; `null` em lançamento. */
+  contaPagarId: string | null;
   rateioId: string | null;
   descricao: string;
   fornecedor: string | null;
+  /** Lançamento: 'manual' (Livro Razão) ou 'conciliacao'. `null` em boleto. */
+  origem: string | null;
+  /** Conta bancária do lançamento. */
+  contaNome: string | null;
   dataCompetencia: string | null;
   dataVencimento: string | null;
   status: string;
@@ -200,7 +219,7 @@ export interface CmvLinhaDetalhe {
   linhaCentavos: number;
   cmvIncluir: CmvDecisao;
   updatedAt: string;
-  /** Boletos da mesma série de recorrência, contando este (1 = avulso). */
+  /** Boletos da mesma série de recorrência, contando este (1 = avulso ou lançamento). */
   serieBoletos: number;
 }
 
@@ -232,12 +251,18 @@ export function parseCmvLista(raw: unknown): CmvListaDetalhe {
     totalCentavos: Number(o.total_centavos) || 0,
     itens: itens.flatMap(item => {
       const l = item as Record<string, unknown>;
-      if (typeof l?.conta_pagar_id !== 'string') return [];
+      const fonte: CmvFonte = l.fonte === 'lancamento' ? 'lancamento' : 'boleto';
+      const documentoId = texto(l.documento_id) ?? texto(fonte === 'lancamento' ? l.lancamento_id : l.conta_pagar_id);
+      if (!documentoId) return [];
       return [{
-        contaPagarId: l.conta_pagar_id,
+        fonte,
+        documentoId,
+        contaPagarId: fonte === 'boleto' ? documentoId : null,
         rateioId: texto(l.rateio_id),
         descricao: texto(l.descricao) ?? '(sem descrição)',
         fornecedor: texto(l.fornecedor),
+        origem: texto(l.origem),
+        contaNome: texto(l.conta_nome),
         dataCompetencia: texto(l.data_competencia),
         dataVencimento: texto(l.data_vencimento),
         status: texto(l.status) ?? '',
@@ -305,17 +330,24 @@ export function useCmvLinhas({ companyId, params, enabled }: {
 
 // ─── Escritas ────────────────────────────────────────────────────────────────
 
-export interface CmvItemClassificacao {
-  contaPagarId: string;
+/** Um item da classificação: exatamente um documento (boleto OU lançamento). */
+export type CmvItemClassificacao = {
   rateioId: string | null;
   incluir: CmvDecisao;
   expectedUpdatedAt: string;
+} & ({ contaPagarId: string; lancamentoId?: never } | { lancamentoId: string; contaPagarId?: never });
+
+/** Item de classificação a partir de uma linha da lista do CMV. */
+export function itemDaLinha(linha: CmvLinhaDetalhe, incluir: CmvDecisao): CmvItemClassificacao {
+  return linha.fonte === 'lancamento'
+    ? { lancamentoId: linha.documentoId, rateioId: linha.rateioId, incluir, expectedUpdatedAt: linha.updatedAt }
+    : { contaPagarId: linha.documentoId, rateioId: linha.rateioId, incluir, expectedUpdatedAt: linha.updatedAt };
 }
 
 export async function classificarCmv(supabase: Supabase, itens: CmvItemClassificacao[], justificativa?: string) {
   const { data, error } = await rpc(supabase)('fin_cmv_classificar', {
     p_itens: itens.map(i => ({
-      conta_pagar_id: i.contaPagarId,
+      ...(i.lancamentoId ? { lancamento_id: i.lancamentoId } : { conta_pagar_id: i.contaPagarId }),
       rateio_id: i.rateioId,
       incluir: i.incluir,
       expected_updated_at: i.expectedUpdatedAt,
@@ -363,6 +395,65 @@ export async function aplicarCmvSerie(
     linhasAlteradas: Number(o.linhas_alteradas) || 0,
     referenciaUpdatedAt: typeof o.referencia_updated_at === 'string' ? o.referencia_updated_at : null,
   };
+}
+
+export interface CmvPreviaFonte {
+  documentos: number;
+  linhasSim: number;
+  centavosSim: number;
+  linhasNao: number;
+  centavosNao: number;
+  linhasSemPadrao: number;
+  centavosSemPadrao: number;
+}
+
+export interface CmvPreviaPadroes {
+  desde: string;
+  boleto: CmvPreviaFonte;
+  lancamento: CmvPreviaFonte;
+}
+
+export interface CmvPadroesAplicados {
+  documentos: number;
+  linhas: number;
+  centavosSim: number;
+  centavosNao: number;
+}
+
+const numero = (v: unknown) => Number(v) || 0;
+
+function previaFonte(raw: unknown): CmvPreviaFonte {
+  const o = (typeof raw === 'object' && raw !== null ? raw : {}) as Record<string, unknown>;
+  return {
+    documentos: numero(o.documentos),
+    linhasSim: numero(o.linhas_sim),
+    centavosSim: numero(o.centavos_sim),
+    linhasNao: numero(o.linhas_nao),
+    centavosNao: numero(o.centavos_nao),
+    linhasSemPadrao: numero(o.linhas_sem_padrao),
+    centavosSemPadrao: numero(o.centavos_sem_padrao),
+  };
+}
+
+/** Prévia de "Aplicar padrões": quantas linhas pendentes viram Sim/Não a partir de `desde`. Não grava. */
+export async function simularPadroesCmv(supabase: Supabase, desde: string): Promise<CmvPreviaPadroes> {
+  const { data, error } = await rpc(supabase)('fin_cmv_aplicar_padroes', { p_desde: desde, p_simular: true, p_justificativa: null });
+  if (error) throw error;
+  const o = (typeof data === 'object' && data !== null ? data : {}) as Record<string, unknown>;
+  return { desde, boleto: previaFonte(o.boleto), lancamento: previaFonte(o.lancamento) };
+}
+
+/** Grava o padrão da categoria nas linhas pendentes a partir de `desde` (com auditoria por documento). */
+export async function aplicarPadroesCmv(supabase: Supabase, desde: string, justificativa: string): Promise<CmvPadroesAplicados> {
+  const { data, error } = await rpc(supabase)('fin_cmv_aplicar_padroes', {
+    p_desde: desde, p_simular: false, p_justificativa: justificativa.trim(),
+  });
+  if (error) {
+    console.error('[CMV Financeiro] Falha em fin_cmv_aplicar_padroes:', error);
+    throw error;
+  }
+  const o = (typeof data === 'object' && data !== null ? data : {}) as Record<string, unknown>;
+  return { documentos: numero(o.documentos), linhas: numero(o.linhas), centavosSim: numero(o.centavos_sim), centavosNao: numero(o.centavos_nao) };
 }
 
 export async function definirPadraoCategoria(supabase: Supabase, categoriaId: string, sugerir: CmvDecisao, expectedUpdatedAt: string) {

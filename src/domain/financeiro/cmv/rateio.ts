@@ -66,6 +66,24 @@ export function decisaoSugerida(
   return padroes.get(categoriaId) ?? null;
 }
 
+/** Por que a decisão mudou ao escolher a categoria (o formulário mostra o aviso). */
+export type CmvAvisoDecisao = 'sugerido' | 'redefinido';
+
+/**
+ * Decisão ao escolher/trocar a categoria de uma linha: o padrão da nova categoria.
+ * Se havia uma resposta diferente, ela é trocada COM aviso — nunca em silêncio.
+ */
+export function decisaoAoTrocarCategoria(
+  anterior: CmvDecisao | undefined,
+  categoriaId: string | null | undefined,
+  padroes: ReadonlyMap<string, CmvDecisao>,
+): { cmv_incluir: CmvDecisao; cmv_aviso?: CmvAvisoDecisao } {
+  const sugestao = decisaoSugerida(categoriaId, padroes);
+  const antes = anterior ?? null;
+  if (antes !== null && antes !== sugestao) return { cmv_incluir: sugestao, cmv_aviso: 'redefinido' };
+  return { cmv_incluir: sugestao, cmv_aviso: sugestao !== null ? 'sugerido' : undefined };
+}
+
 /**
  * Distribui `totalCentavos` em N partes iguais; os centavos que sobram vão um a
  * um para as primeiras linhas, então a soma fecha sempre e o resultado é o mesmo

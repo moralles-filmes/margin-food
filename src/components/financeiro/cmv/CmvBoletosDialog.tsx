@@ -20,7 +20,7 @@ import { useTravaEnvio } from '@/hooks/useTravaEnvio';
 import { requestNavigation } from '@/hooks/useNavigationRequest';
 import { formatarCentavos, formatarData, type CmvDecisao } from '@/domain/financeiro/cmv';
 import {
-  CMV_QUERY_ROOT, aplicarCmvSerie, classificarCmv, mensagemErroCmv, useCmvLinhas,
+  CMV_QUERY_ROOT, aplicarCmvSerie, classificarCmv, itemDaLinha, mensagemErroCmv, useCmvLinhas,
   type CmvLinhaDetalhe, type CmvSituacao,
 } from '@/hooks/useCmvFinanceiro';
 import CmvDecisaoToggle from './CmvDecisaoToggle';
@@ -48,7 +48,7 @@ interface Props {
 }
 
 const PAGINA = 50;
-const chaveLinha = (l: Pick<CmvLinhaDetalhe, 'contaPagarId' | 'rateioId'>) => `${l.contaPagarId}:${l.rateioId ?? ''}`;
+const chaveLinha = (l: Pick<CmvLinhaDetalhe, 'fonte' | 'documentoId' | 'rateioId'>) => `${l.fonte}:${l.documentoId}:${l.rateioId ?? ''}`;
 
 const SITUACAO_TEXTO: Record<'sim' | 'nao' | 'pendente', string> = {
   sim: 'Sim (entra no CMV)',
@@ -127,13 +127,11 @@ export default function CmvBoletosDialog({ alvo, onClose, companyId, canClassifi
     await trava(async () => {
       setSalvando(chaveLinha(linha));
       try {
-        await classificarCmv(supabase, [{
-          contaPagarId: linha.contaPagarId, rateioId: linha.rateioId, incluir, expectedUpdatedAt: linha.updatedAt,
-        }]);
+        await classificarCmv(supabase, [itemDaLinha(linha, incluir)]);
         toast.success(incluir ? 'Linha incluída no CMV financeiro.' : 'Linha retirada do CMV financeiro.');
         // O boleto mudou de versão: as linhas dele saem da seleção do lote.
         setSelecionadas(atual => {
-          const proximo = new Map([...atual].filter(([, l]) => l.contaPagarId !== linha.contaPagarId));
+          const proximo = new Map([...atual].filter(([, l]) => l.documentoId !== linha.documentoId));
           return proximo.size === atual.size ? atual : proximo;
         });
         await aposGravar();
@@ -168,7 +166,7 @@ export default function CmvBoletosDialog({ alvo, onClose, companyId, canClassifi
     const linhas = [...selecionadas.values()];
     return {
       linhas,
-      titulos: new Set(linhas.map(l => l.contaPagarId)).size,
+      titulos: new Set(linhas.map(l => l.documentoId)).size,
       centavos: linhas.reduce((s, l) => s + l.linhaCentavos, 0),
     };
   }, [selecionadas]);
@@ -181,7 +179,7 @@ export default function CmvBoletosDialog({ alvo, onClose, companyId, canClassifi
       try {
         const resultado = await classificarCmv(
           supabase,
-          previa.linhas.map(l => ({ contaPagarId: l.contaPagarId, rateioId: l.rateioId, incluir, expectedUpdatedAt: l.updatedAt })),
+          previa.linhas.map(l => itemDaLinha(l, incluir)),
           justificativa,
         );
         toast.success(`${resultado.itens} ${resultado.itens === 1 ? 'linha classificada' : 'linhas classificadas'} em ${resultado.titulos} ${resultado.titulos === 1 ? 'boleto' : 'boletos'}.`);
@@ -207,7 +205,7 @@ export default function CmvBoletosDialog({ alvo, onClose, companyId, canClassifi
     await trava(async () => {
       setSalvando('serie');
       try {
-        const resultado = await aplicarCmvSerie(supabase, referencia.contaPagarId, { expectedUpdatedAt: referencia.updatedAt });
+        const resultado = await aplicarCmvSerie(supabase, referencia.documentoId, { expectedUpdatedAt: referencia.updatedAt });
         toast.success(resultado.titulosAlterados === 0
           ? 'As outras parcelas da série já estavam com esta resposta.'
           : `${resultado.titulosAlterados} ${resultado.titulosAlterados === 1 ? 'parcela da série atualizada' : 'parcelas da série atualizadas'}.`);
@@ -349,7 +347,7 @@ export default function CmvBoletosDialog({ alvo, onClose, companyId, canClassifi
                           </td>
                           {canAbrirBoleto && (
                             <td className="px-3 py-2">
-                              <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => abrirBoleto(linha.contaPagarId)} aria-label={`Abrir ${linha.descricao} em Contas a Pagar`}>
+                              <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => abrirBoleto(linha.documentoId)} aria-label={`Abrir ${linha.descricao} em Contas a Pagar`}>
                                 <ExternalLink className="h-4 w-4" />
                               </Button>
                             </td>
