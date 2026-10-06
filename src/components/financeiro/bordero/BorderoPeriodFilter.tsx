@@ -37,9 +37,12 @@ export default function BorderoPeriodFilter({ filter, resolution, todayISO, onCh
   const isCurrentMonth = filter.mode === 'month' && filter.month === monthOfISO(todayISO);
 
   return (
-    <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+    <div className="space-y-3 rounded-summary border bg-card p-4 shadow-card">
       <div className="flex flex-wrap items-center gap-3">
+        {/* Trocar o tipo recarrega o borderô: ativação manual, as setas só movem o foco (D39). */}
         <SegmentedControl
+          ariaLabel="Tipo de período"
+          manualActivation
           options={MODE_OPTIONS}
           value={filter.mode}
           onChange={value => onChange({ ...filter, mode: value as BorderoPeriodMode })}
@@ -49,7 +52,7 @@ export default function BorderoPeriodFilter({ filter, resolution, todayISO, onCh
         {filter.mode === 'week' && (
           <div className="flex flex-wrap items-center gap-2">
             <Button type="button" variant="outline" size="sm" onClick={() => onChange(shiftBorderoFilter(filter, -1))}>
-              <ChevronLeft className="w-4 h-4" /> Semana anterior
+              <ChevronLeft aria-hidden="true" className="w-4 h-4" /> Semana anterior
             </Button>
             <Button
               type="button"
@@ -61,7 +64,7 @@ export default function BorderoPeriodFilter({ filter, resolution, todayISO, onCh
               Semana atual
             </Button>
             <Button type="button" variant="outline" size="sm" onClick={() => onChange(shiftBorderoFilter(filter, 1))}>
-              Próxima semana <ChevronRight className="w-4 h-4" />
+              Próxima semana <ChevronRight aria-hidden="true" className="w-4 h-4" />
             </Button>
             <DatePicker
               date={parseLocalDate(filter.weekAnchor)}
@@ -76,7 +79,7 @@ export default function BorderoPeriodFilter({ filter, resolution, todayISO, onCh
 
         {filter.mode === 'month' && (
           <div className="flex flex-wrap items-center gap-2">
-            <MonthNavigator value={filter.month} onChange={month => onChange({ ...filter, month })} monthsBack={24} monthsForward={12} />
+            <MonthNavigator value={filter.month} onChange={month => onChange({ ...filter, month })} monthsBack={24} monthsForward={12} ariaLabel="Mês do borderô" />
             <Button
               type="button"
               variant="outline"
@@ -114,7 +117,7 @@ export default function BorderoPeriodFilter({ filter, resolution, todayISO, onCh
       </div>
 
       <div className="flex items-center gap-2 text-sm" aria-live="polite">
-        <CalendarRange className="w-4 h-4 text-muted-foreground shrink-0" />
+        <CalendarRange aria-hidden="true" className="w-4 h-4 text-muted-foreground shrink-0" />
         {resolution.ok ? (
           <p className="text-foreground">
             <span className="font-semibold uppercase tracking-wide text-muted-foreground text-xs mr-1.5">Período:</span>

@@ -3,7 +3,6 @@ import { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react
 import { useModuleBadges } from '@/contexts/ModuleBadgesContext';
 import { usePersistedTab } from '@/hooks/usePersistedTab';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
 import { useCan, useModuleAccess } from '@/permissions';
 import { ModuleNav, type ModuleNavItem } from '@/components/ui/ModuleNav';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
@@ -104,13 +103,25 @@ function LancamentosSection({ initialContaId, initialDateFrom, initialDateTo, in
 }
 
 // ==================== DRE / DFC WRAPPER ====================
+// Trocar desmonta o demonstrativo e recarrega os dados: ativação manual, como em Lançamentos (D39).
+// Cada lado mantém a própria permissão (o DFC exige financeiro:fluxo:view — PF-002).
+const DEMONSTRATIVO_VIEWS = [
+  { value: 'dre', label: 'DRE' },
+  { value: 'dfc', label: 'DFC' },
+];
+
 function DREDFCSection() {
   const [innerTab, setInnerTab] = useState<'dre' | 'dfc'>('dre');
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2 mb-2">
-        <Button variant={innerTab === 'dre' ? 'default' : 'outline'} size="sm" onClick={() => setInnerTab('dre')}>DRE</Button>
-        <Button variant={innerTab === 'dfc' ? 'default' : 'outline'} size="sm" onClick={() => setInnerTab('dfc')}>DFC</Button>
+      <div className="max-w-full overflow-x-auto">
+        <SegmentedControl
+          ariaLabel="Demonstrativo exibido"
+          manualActivation
+          options={DEMONSTRATIVO_VIEWS}
+          value={innerTab}
+          onChange={v => setInnerTab(v as 'dre' | 'dfc')}
+        />
       </div>
       {innerTab === 'dre' ? <DRESection /> : <DFCSection />}
     </div>

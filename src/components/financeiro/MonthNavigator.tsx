@@ -61,7 +61,9 @@ export default function MonthNavigator({ value, onChange, monthsBack = 12, month
         <SelectTrigger
           id={id}
           aria-label={id ? ariaLabel : (ariaLabel ?? 'Mês')}
-          className="h-9 w-[168px] border-0 border-x border-border rounded-none justify-center gap-1.5 bg-transparent shadow-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset font-medium"
+          // 180 px: "Novembro de 2026" (o rótulo mais longo) cabe inteiro; com 168 px setembro, novembro,
+          // dezembro e fevereiro eram cortados com reticências (medido na Fase 06A).
+          className="h-9 w-[180px] border-0 border-x border-border rounded-none justify-center gap-1.5 bg-transparent shadow-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset font-medium"
         >
           <SelectValue />
         </SelectTrigger>
