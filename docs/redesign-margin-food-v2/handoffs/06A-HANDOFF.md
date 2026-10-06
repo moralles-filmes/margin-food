@@ -2,8 +2,8 @@
 
 ## Estado real
 
-- Repositório `moralles-filmes/margin-food`, branch `feat/redesign-v2-f06a`, criada de `feat/redesign-v2-f05b` em `b4cf636`. Commits da Fase 06A: `9ffb6ab` (código) e `dd64f0a` (documentação), mais um commit de documentação registrando estes SHAs.
-- Sem push, PR ou merge; `main` intocada em `c6a9774`.
+- Repositório `moralles-filmes/margin-food`, branch `feat/redesign-v2-f06a`, criada de `feat/redesign-v2-f05b` em `b4cf636`. Commits da Fase 06A: `9ffb6ab` (código), `dd64f0a` (documentação) e `5548766` (SHAs). Depois da validação, a pedido do proprietário, merge de `origin/main` em `6f19117` (PR #144 e padronização de texto #142/#143, sem conflito).
+- Publicada na `main` pelo PR #145 (deploy automático da Vercel). As fases 01–05B entraram pelo PR #144.
 - Fase 06A validada com ressalvas em 2026-10-05. Fase 06B pendente.
 
 ## Contexto mínimo
@@ -21,7 +21,7 @@ Está no prompt abaixo (CLAUDE.md, mestre, progresso, decisões, este handoff, r
 - Navegador: Chrome "Browser 1", login "Administrador Principal", unidade de teste Moralles com dados sintéticos injetados no cliente; nenhuma escrita chegou ao servidor (registro de bloqueadas vazio).
 - Valores idênticos antes e depois nas seis telas (diferenças só de rótulo, registradas: `R$-0,00` → `R$0,00` na árvore; "-3,4pp" → "-3,4 p.p." e "0,00%" real no Comparativo).
 - Estados (erro, atraso, vazio, mês sem movimento, sem receita, base zerada), perfil reduzido simulado (DFC → "Acesso restrito"), diálogos abertos e fechados sem confirmar com retorno de foco, teclado, claro/escuro, 320/390/768/1024/1920 (iframe) e 1.333 px, sidebar recolhida e a 437 px sem rolagem, contraste ≥ 4,57 (claro) e ≥ 4,60 (escuro).
-- Linha de comando: testes 209 / 1.975; typecheck 0; lint 0 erros (662 avisos no repositório, iguais antes/depois); build ok.
+- Linha de comando: testes 209 / 1.975; typecheck 0; lint 0 erros (662 avisos no repositório, iguais antes/depois); build ok. Depois do merge da `main`: testes 211 / 2.239; typecheck 0; lint 0 erros e 661 avisos no código rastreado, os mesmos do PR #144 (sem `.claude/` a contagem dá 662 porque inclui `dev-cmv-preview/`, pasta local excluída do git); build ok (`FinanceiroView` 278,99 kB).
 - Auditoria de módulo (mapeador, identidade, processo, funcional): nenhum bloqueante; sete achados da fase corrigidos; preexistentes em PF-111 a PF-116 (e PF-001 mantida).
 
 Não executado: leitor de tela, movimento normal, download de PDF/Excel (comparação pela entrada dos exportadores em teste), "sem permissão" em navegador nas telas além do DFC.
@@ -63,22 +63,28 @@ Orçamento, KPIs, Comparativo, Auditoria, Borderô), não toque no CMV
 Financeiro (07) e não inicie a Fase 07.
 
 ESTADO REAL DEIXADO PELA FASE 06A (2026-10-05)
-- Branch feat/redesign-v2-f06a, criada de feat/redesign-v2-f05b em
-  b4cf636. Fase 06A commitada em 9ffb6ab (código) e dd64f0a
-  (documentação), mais um commit de documentação com estes SHAs. Sem push,
-  PR ou merge. main intocada (c6a9774).
-- Fase 06A validada com ressalvas: bun run test = 209 arquivos / 1.975
-  testes; tsc --noEmit -p tsconfig.app.json = 0 erros; bun run lint = 0
-  erros (662 avisos dentro do repositório, iguais antes e depois arquivo a
-  arquivo — o TOTAL impresso pelo comando inclui .claude/worktrees/* de
-  outras sessões e muda enquanto elas trabalham: compare só o repositório,
-  ou arquivo a arquivo com `git show HEAD:<arquivo> | eslint --stdin
-  --stdin-filename <arquivo> -f json`); bun run build ok (FinanceiroView
-  278,69 kB; Orçamento 20,13; KPIs 13,51; Comparativo 12,85; Auditoria
-  18,60; Borderô 24,43; Index 41,40; index 204,76; CSS 124,12;
-  vendor-charts 555,44). Os chunks da Apresentação Sócios não foram
-  anotados: rode um build ANTES de editar e registre os tamanhos de partida
-  (ApresentacaoSociosSection e os chunks de exportação presentation*).
+- Fases 01–05B na main pelo PR #144. Fase 06A na branch
+  feat/redesign-v2-f06a (criada de feat/redesign-v2-f05b em b4cf636;
+  9ffb6ab código, dd64f0a documentação, 5548766 SHAs), atualizada com
+  merge de origin/main em 6f19117 (#144 e padronização de texto #142/#143,
+  sem conflito) e publicada na main pelo PR #145. A 06B parte de
+  origin/main atualizada (git fetch antes).
+- Fase 06A validada com ressalvas. Gates depois do merge da main:
+  bun run test = 211 arquivos / 2.239 testes; tsc --noEmit -p
+  tsconfig.app.json = 0 erros; bun run lint = 0 erros e 661 avisos no
+  código rastreado (o TOTAL impresso pelo comando inclui .claude/worktrees/*
+  de outras sessões e pastas locais excluídas do git, como
+  dev-cmv-preview/, e muda enquanto elas trabalham: compare só o
+  repositório, ou arquivo a arquivo com `git show HEAD:<arquivo> | eslint
+  --stdin --stdin-filename <arquivo> -f json`); bun run build ok
+  (FinanceiroView 278,99 kB; Orçamento 20,13; KPIs 13,51; Comparativo
+  12,85; Auditoria 18,60; Borderô 24,43; Index 41,46; index 204,80; CSS
+  124,12; vendor-charts 555,44). Chunks da Apresentação Sócios no mesmo
+  build (ponto de partida da 06B; confirme com um build antes de editar):
+  ApresentacaoSociosSection 260,24 kB; presentationPdfExport 36,93;
+  presentationPptxExport 48,35; presentationMinutesPdfExport 2,75;
+  presentationMinutesPptxExport 4,79; presentationSlides 19,48;
+  presentationMinutesPages 8,04; presentationInsightsFormatting 3,56.
 - Entregue na 06A (D69–D77): alternador DRE/DFC em SegmentedControl com
   ativação manual; DRE/DFC com regime no cabeçalho, filtros rotulados
   (DemonstrativoFiltros), legenda do período carregado, ErrorState,
@@ -112,10 +118,10 @@ ESTADO REAL DEIXADO PELA FASE 06A (2026-10-05)
 
 ANTES DE EDITAR
 1. Confirme diretório, branch, SHA e git status. PERGUNTE ao proprietário se
-   a 06B segue em nova branch a partir da atual (ex.: feat/redesign-v2-f06b)
-   ou na mesma, com commit separado por fase, e se haverá commit ao final.
-   Não reverta nem sobrescreva o que existir. Sem push, merge ou deploy sem
-   pedido dele.
+   a 06B segue em nova branch a partir de origin/main atualizada (ex.:
+   feat/redesign-v2-f06b), com commit separado por fase, e se haverá
+   commit ao final. Não reverta nem sobrescreva o que existir. Sem push,
+   merge ou deploy sem pedido dele.
 2. Leia, nesta ordem:
    - CLAUDE.md (AGENTS.md é idêntico). Para esta fase: Apresentação Sócios
      usa escopo independente no parâmetro presentationUnit (queries,
