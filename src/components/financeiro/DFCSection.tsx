@@ -1,5 +1,5 @@
 import { useSupabase } from '@/contexts/CompanyScopeContext';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { formatInBR } from '@/lib/formatters';
 import { FileDown, FileSpreadsheet } from 'lucide-react';
@@ -14,6 +14,9 @@ import DemonstrativoTree from './DemonstrativoTree';
 import { shiftMonth, monthBounds } from './MonthNavigator';
 import { FinNote, FinScreenHeader, FinSectionGroup } from './finV2Layout';
 import { DemonstrativoFiltros } from './analisesParts';
+import CentroCustoFiltro from './CentroCustoFiltro';
+import { useCentroCustoRecorte } from './useCentroCustoRecorte';
+import { lerCentrosCusto, valoresDoCentroCusto, type ValoresPorCategoria, type ValoresPorCentroCusto } from '@/domain/financeiro/centroCusto';
 
 // Parse "yyyy-MM" como data LOCAL (não UTC) — ver nota em DRESection/MonthNavigator.
 function formatMonthLabelShort(value: string): string {
@@ -38,7 +41,10 @@ export default function DFCSection() {
   const [meses, setMeses] = useState('1');
   const [loading, setLoading] = useState(true);
   const [categorias, setCategorias] = useState<DfcCategoria[]>([]);
-  const [lancamentos, setLancamentos] = useState<{ id: string; categoria_id: string; valor: number; tipo: string; status: string }[]>([]);
+  const [valores, setValores] = useState<ValoresPorCategoria>({});
+  const [valoresPorCentro, setValoresPorCentro] = useState<ValoresPorCentroCusto>({});
+  const recorte = useCentroCustoRecorte();
+  const { registrarCentros } = recorte;
   const [saldoInicial, setSaldoInicial] = useState(0);
   const [periodo, setPeriodo] = useState('');
   // Estado só de apresentação: período dos valores exibidos (última carga bem-sucedida) e falha.
@@ -79,12 +85,26 @@ export default function DFCSection() {
 
     const result = (data as unknown) as DfcSummary | null;
     setCategorias(result?.categorias || []);
-    setLancamentos(valoresMapToLancamentos(result?.valores_por_categoria || {}));
+    setValores(result?.valores_por_categoria || {});
+    setValoresPorCentro(result?.valores_por_centro_custo || {});
+    registrarCentros(lerCentrosCusto(result?.centros_custo));
     setSaldoInicial(Number(result?.saldo_inicial || 0));
     setPeriodoCarregado(label);
     setErro(false);
     setLoading(false);
-  }, [mesAncora, meses, supabase, toast]);
+  }, [mesAncora, meses, supabase, toast, registrarCentros]);
+
+  const valoresRecorte = useMemo(
+    () => valoresDoCentroCusto(valores, valoresPorCentro, recorte.centros, recorte.selecao),
+    [valores, valoresPorCentro, recorte.centros, recorte.selecao],
+  );
+  const lancamentos = useMemo(() => valoresMapToLancamentos(valoresRecorte), [valoresRecorte]);
+  // % sobre a receita compara com o relatório inteiro; num recorte o denominador seria só a receita
+  // do centro (muitas vezes zero) — a coluna sai da tela e do export, como o saldo do DFC.
+  const mostrarPct = !recorte.filtrado;
+  const semMovimento = recorte.filtrado && Object.keys(valoresRecorte).length === 0;
+  // O saldo das contas é da empresa inteira: num recorte por centro de custo ele não se aplica.
+  const mostrarSaldo = !recorte.filtrado;
 
   useEffect(() => { load(); }, [load]);
   useDataEvent('financeiro:lancamentos', load);
@@ -99,10 +119,11 @@ export default function DFCSection() {
     lancamentos,
     rateios: [] as { id: string; categoria_id: string; valor: number }[],
     titulo: 'DFC — Demonstração de Fluxo de Caixa',
-    periodo,
+    periodo: recorte.filtrado ? `${periodo} · Centro de custo: ${recorte.rotulo}` : periodo,
     isDFC: true,
     saldoInicial,
-    showPctReceita: true,
+    mostrarSaldo,
+    showPctReceita: mostrarPct,
   };
   // Com a leitura em andamento ou em erro, o arquivo sairia com o período do filtro sobre outra carga (D43/D59).
   const exportIndisponivel = loading || erro;
@@ -124,7 +145,9 @@ export default function DFCSection() {
         ) : undefined}
       />
 
-      <DemonstrativoFiltros meses={meses} onMesesChange={setMeses} mes={mesAncora} onMesChange={setMesAncora} />
+      <DemonstrativoFiltros meses={meses} onMesesChange={setMeses} mes={mesAncora} onMesChange={setMesAncora}>
+        <CentroCustoFiltro centros={recorte.centros} value={recorte.selecao} onChange={recorte.setSelecao} nomes={recorte.nomes} />
+      </DemonstrativoFiltros>
 
       {erro ? (
         <ErrorState
@@ -138,7 +161,7 @@ export default function DFCSection() {
           id="dfc-demonstrativo"
           title="Demonstrativo"
           caption={periodoCarregado
-            ? `${periodoCarregado} · caixa${loading ? ' · atualizando…' : ''}`
+            ? `${periodoCarregado} · caixa${recorte.filtrado ? ` · ${recorte.rotulo}` : ''}${loading ? ' · atualizando…' : ''}`
             : 'Carregando…'}
         >
           <DemonstrativoTree
@@ -148,11 +171,19 @@ export default function DFCSection() {
             loading={periodoCarregado === null}
             isDFC
             saldoInicial={saldoInicial}
-            showPctReceita
+            mostrarSaldo={mostrarSaldo}
+            showPctReceita={mostrarPct}
           />
-          <FinNote>
-            Valores apurados pela data de pagamento efetivo (regime de caixa). Saldo inicial calculado a partir das contas financeiras cadastradas.
-          </FinNote>
+          {mostrarSaldo ? (
+            <FinNote>
+              Valores apurados pela data de pagamento efetivo (regime de caixa). Saldo inicial calculado a partir das contas financeiras cadastradas.
+            </FinNote>
+          ) : (
+            <FinNote>
+              {semMovimento && 'Este centro de custo não tem valores neste período. '}
+              Recorte por centro de custo: lançamento com rateio entra pelo centro de cada linha; sem rateio, pelo centro do próprio lançamento. Saldo inicial, saldo acumulado e a coluna de % sobre os recebimentos são da empresa inteira e não aparecem neste recorte.
+            </FinNote>
+          )}
         </FinSectionGroup>
       )}
     </div>

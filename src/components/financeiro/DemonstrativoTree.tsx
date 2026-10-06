@@ -25,6 +25,8 @@ interface DemonstrativoTreeProps {
   /** DFC mode: show saldo inicial / acumulado */
   saldoInicial?: number;
   isDFC?: boolean;
+  /** DFC: false omite SALDO INICIAL e SALDO ACUMULADO (o saldo é da empresa, não de um recorte). */
+  mostrarSaldo?: boolean;
 }
 
 interface RowData {
@@ -49,6 +51,7 @@ export default function DemonstrativoTree({
   showPctReceita = false,
   saldoInicial = 0,
   isDFC = false,
+  mostrarSaldo = true,
 }: DemonstrativoTreeProps) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set(['_receitas', '_despesas']));
 
@@ -121,7 +124,7 @@ export default function DemonstrativoTree({
     };
 
     // — SALDO INICIAL (DFC only) —
-    if (isDFC) {
+    if (isDFC && mostrarSaldo) {
       result.push({
         id: '_saldo_inicial',
         codigo: '',
@@ -178,16 +181,18 @@ export default function DemonstrativoTree({
         isSectionHeader: true,
         isTotalRow: false,
       });
-      result.push({
-        id: '_resultado',
-        codigo: '',
-        nome: 'SALDO ACUMULADO',
-        valor: saldoInicial + resultadoLiquido,
-        depth: 0,
-        hasChildren: false,
-        tipo: 'total',
-        isTotalRow: true,
-      });
+      if (mostrarSaldo) {
+        result.push({
+          id: '_resultado',
+          codigo: '',
+          nome: 'SALDO ACUMULADO',
+          valor: saldoInicial + resultadoLiquido,
+          depth: 0,
+          hasChildren: false,
+          tipo: 'total',
+          isTotalRow: true,
+        });
+      }
     } else {
       result.push({
         id: '_resultado',
@@ -219,7 +224,7 @@ export default function DemonstrativoTree({
     }
 
     return { rows: result, receitaTotal: recTotal };
-  }, [categorias, lancamentos, rateios, expanded, isDFC, saldoInicial]);
+  }, [categorias, lancamentos, rateios, expanded, isDFC, saldoInicial, mostrarSaldo]);
 
   const toggleExpand = (id: string) => {
     setExpanded(prev => {

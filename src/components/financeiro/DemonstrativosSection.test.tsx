@@ -44,6 +44,9 @@ const CATEGORIAS = [
 const VALORES = { r1: 98765.43, d1: 1234567.89, n: 30000 };
 const ok = (data: unknown) => ({ data, error: null });
 
+// cmdk (filtro de centro de custo) rola o item ativo para a vista; jsdom não implementa scrollIntoView.
+Element.prototype.scrollIntoView = vi.fn();
+
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(new Date('2026-10-05T15:00:00Z'));
@@ -134,5 +137,113 @@ describe('DFC (V2)', () => {
     state.perms = new Set(['financeiro:dre:view']);
     render(<DFCSection />);
     expect(screen.getByText('Você não tem permissão para visualizar o DFC.')).toBeInTheDocument();
+  });
+});
+
+describe('Recorte por centro de custo (DRE/DFC)', () => {
+  const CENTROS = [{ id: 'cc-cozinha', nome: 'Cozinha' }, { id: 'cc-salao', nome: 'Salão' }];
+  // Contrato do servidor: para cada categoria, a soma dos centros é o valor da categoria.
+  const POR_CENTRO = {
+    'cc-cozinha': { d1: 1000000 },
+    'cc-salao': { r1: 98765.43, d1: 200000 },
+    sem_centro: { d1: 34567.89, n: 30000 },
+  };
+
+  const escolherCentro = async (nome: string) => {
+    fireEvent.click(screen.getByRole('combobox', { name: 'Centro de custo' }));
+    fireEvent.click(await screen.findByRole('option', { name: nome }));
+  };
+
+  it('sem nenhum valor com centro de custo no período, o filtro não aparece', async () => {
+    state.respostas.push(ok({ categorias: CATEGORIAS, valores_por_categoria: VALORES, centros_custo: [], valores_por_centro_custo: {} }));
+    render(<DRESection />);
+    await screen.findByText('out/26 · competência');
+    expect(screen.queryByRole('combobox', { name: 'Centro de custo' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Recorte por centro de custo/)).not.toBeInTheDocument();
+  });
+
+  it('banco sem as chaves novas também não mostra o filtro', async () => {
+    state.respostas.push(ok({ categorias: CATEGORIAS, valores_por_categoria: VALORES }));
+    render(<DRESection />);
+    await screen.findByText('out/26 · competência');
+    expect(screen.queryByRole('combobox', { name: 'Centro de custo' })).not.toBeInTheDocument();
+  });
+
+  it('DRE: filtrar por centro mostra só os valores dele e leva o recorte ao export', async () => {
+    state.respostas.push(ok({ categorias: CATEGORIAS, valores_por_categoria: VALORES, centros_custo: CENTROS, valores_por_centro_custo: POR_CENTRO }));
+    render(<DRESection />);
+    await screen.findByText('out/26 · competência');
+    expect(screen.getByRole('combobox', { name: 'Centro de custo' })).toHaveTextContent('Todos os centros de custo');
+    expect(screen.getByText('RESULTADO DO PERÍODO').closest('tr')).toHaveTextContent('R$-1.135.802,46');
+
+    await escolherCentro('Cozinha');
+    expect(await screen.findByText('out/26 · competência · Cozinha')).toBeInTheDocument();
+    expect(screen.getByText('RESULTADO DO PERÍODO').closest('tr')).toHaveTextContent('R$-1.000.000,00');
+    expect(screen.getByText(/Recorte por centro de custo/)).toBeInTheDocument();
+    // % sobre a receita não se aplica a um recorte (o denominador seria só a receita do centro).
+    expect(screen.queryByRole('columnheader', { name: '% Receita Líq.' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Sem receita no período/)).not.toBeInTheDocument();
+    // A troca de recorte é feita no cliente: nenhuma leitura nova.
+    expect(state.rpcCalls).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole('button', { name: /PDF/ }));
+    expect(state.pdf).toHaveBeenCalledWith(expect.objectContaining({
+      periodo: 'out/26 · Centro de custo: Cozinha',
+      showPctReceita: false,
+      lancamentos: [{ id: 'd1', categoria_id: 'd1', valor: 1000000, tipo: 'VIRTUAL', status: 'REALIZADO' }],
+    }));
+  });
+
+  it('DRE: "Sem centro de custo" mostra o que não tem centro', async () => {
+    state.respostas.push(ok({ categorias: CATEGORIAS, valores_por_categoria: VALORES, centros_custo: CENTROS, valores_por_centro_custo: POR_CENTRO }));
+    render(<DRESection />);
+    await screen.findByText('out/26 · competência');
+    await escolherCentro('Sem centro de custo');
+    expect(await screen.findByText('out/26 · competência · Sem centro de custo')).toBeInTheDocument();
+    expect(screen.getByText('RESULTADO DO PERÍODO').closest('tr')).toHaveTextContent('R$-34.567,89');
+  });
+
+  it('DRE: o filtro continua visível com um centro escolhido num mês sem centro de custo', async () => {
+    state.respostas.push(ok({ categorias: CATEGORIAS, valores_por_categoria: VALORES, centros_custo: CENTROS, valores_por_centro_custo: POR_CENTRO }));
+    state.respostas.push(ok({ categorias: CATEGORIAS, valores_por_categoria: { r1: 10, d1: 4 }, centros_custo: [], valores_por_centro_custo: {} }));
+    render(<DRESection />);
+    await screen.findByText('out/26 · competência');
+    await escolherCentro('Cozinha');
+    fireEvent.click(screen.getByRole('button', { name: 'Mês anterior' }));
+    expect(await screen.findByText('set/26 · competência · Cozinha')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Centro de custo' })).toHaveTextContent('Cozinha');
+    expect(screen.getByText('RESULTADO DO PERÍODO').closest('tr')).toHaveTextContent('R$0,00');
+    expect(screen.getByText(/Este centro de custo não tem valores neste período/)).toBeInTheDocument();
+  });
+
+  it('DFC: com centro escolhido, saldo inicial e acumulado da empresa saem da tela e do export', async () => {
+    state.respostas.push(ok({ categorias: CATEGORIAS, valores_por_categoria: VALORES, saldo_inicial: 250000, centros_custo: CENTROS, valores_por_centro_custo: POR_CENTRO }));
+    render(<DFCSection />);
+    await screen.findByText('out/26 · caixa');
+    expect(screen.getByText('SALDO INICIAL')).toBeInTheDocument();
+
+    await escolherCentro('Salão');
+    expect(await screen.findByText('out/26 · caixa · Salão')).toBeInTheDocument();
+    expect(screen.queryByText('SALDO INICIAL')).not.toBeInTheDocument();
+    expect(screen.queryByText('SALDO ACUMULADO')).not.toBeInTheDocument();
+    expect(screen.getByText('RESULTADO LÍQUIDO DO PERÍODO').closest('tr')).toHaveTextContent('R$-101.234,57');
+    expect(screen.getByText(/Saldo inicial, saldo acumulado e a coluna de % sobre os recebimentos são da empresa inteira/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /PDF/ }));
+    expect(screen.queryByRole('columnheader', { name: '% Recebimentos' })).not.toBeInTheDocument();
+    expect(state.pdf).toHaveBeenCalledWith(expect.objectContaining({ periodo: 'out/26 · Centro de custo: Salão', mostrarSaldo: false, showPctReceita: false }));
+  });
+
+  it('voltar para "Todos" restaura % e a tela de antes', async () => {
+    state.respostas.push(ok({ categorias: CATEGORIAS, valores_por_categoria: VALORES, centros_custo: CENTROS, valores_por_centro_custo: POR_CENTRO }));
+    render(<DRESection />);
+    await screen.findByText('out/26 · competência');
+    await escolherCentro('Cozinha');
+    await screen.findByText('out/26 · competência · Cozinha');
+    await escolherCentro('Todos os centros de custo');
+    expect(await screen.findByText('out/26 · competência')).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: '% Receita Líq.' })).toBeInTheDocument();
+    expect(screen.getByText('RESULTADO DO PERÍODO').closest('tr')).toHaveTextContent('R$-1.135.802,46');
+    expect(screen.queryByText(/Recorte por centro de custo/)).not.toBeInTheDocument();
   });
 });
