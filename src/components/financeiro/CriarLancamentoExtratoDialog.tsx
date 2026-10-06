@@ -24,16 +24,17 @@ import { Plus, Trash2, PieChart, CheckCircle, CheckCircle2, Loader2, FileText, C
 import { traduzirErroIdempotencia } from '@/domain/financeiro/idempotencia';
 import { padronizarTexto } from '@/lib/padronizarTexto';
 import CmvDecisaoToggle from '@/components/financeiro/cmv/CmvDecisaoToggle';
-import { decisaoAoTrocarCategoria, type CmvDecisao } from '@/domain/financeiro/cmv';
+import { decisaoAoTrocarCategoria, type CmvAvisoDecisao, type CmvDecisao } from '@/domain/financeiro/cmv';
 import type { CmvConfig } from '@/hooks/useCmvFinanceiro';
-import { datasDoLancamentoCriado } from '@/lib/conciliacaoCmv';
+import { datasDoLancamentoCriado, decisaoDaLinhaExtrato, type LinhaExtratoCmv } from '@/lib/conciliacaoCmv';
 
 import { useCan } from '@/permissions/hooks';
-interface ExtratoLinha {
-  data: string;
+/**
+ * Linha do extrato como a conciliação a entrega: além dos dados do banco, o que o usuário já
+ * ajustou nela (`competencia`, `categoriaId`, resposta do CMV), que o diálogo herda com o recurso.
+ */
+interface ExtratoLinha extends LinhaExtratoCmv {
   descricao: string;
-  valor: number;
-  tipo: 'RECEITA' | 'DESPESA';
   fitId?: string;
 }
 
@@ -108,6 +109,8 @@ export default function CriarLancamentoExtratoDialog({
 
   // CMV Financeiro: só com o recurso no banco, no destino "Lançamento" de despesa.
   const [cmvIncluir, setCmvIncluir] = useState<CmvDecisao>(null);
+  // Só "redefinido" interessa aqui: a decisão dada foi trocada pelo padrão de outra categoria.
+  const [cmvAviso, setCmvAviso] = useState<CmvAvisoDecisao | undefined>(undefined);
   const cmvRecurso = cmvConfig?.recursos.lancamentos === true;
   const cmvPadroes = useMemo(
     () => (cmvRecurso && cmvConfig?.classificacaoAtiva ? new Map(cmvConfig.categorias.map(c => [c.id, c.cmvSugerir])) : null),
@@ -118,6 +121,14 @@ export default function CriarLancamentoExtratoDialog({
     && (cmvConfig?.classificacaoAtiva === true || cmvIncluir !== null || rateioLinhas.some(r => (r.cmv_incluir ?? null) !== null));
   const sugerirCmv = (anterior: CmvDecisao | undefined, categoria: string): CmvDecisao =>
     cmvPadroes && tipo === 'DESPESA' ? decisaoAoTrocarCategoria(anterior, categoria, cmvPadroes).cmv_incluir : (anterior ?? null);
+  // Categoria única: a decisão acompanha o padrão da nova categoria e, se havia resposta diferente, avisa.
+  const trocarCategoriaUnica = (categoria: string) => {
+    setCategoriaId(categoria);
+    if (!cmvPadroes || tipo !== 'DESPESA') return;
+    const trocada = decisaoAoTrocarCategoria(cmvIncluir, categoria, cmvPadroes);
+    setCmvIncluir(trocada.cmv_incluir);
+    setCmvAviso(trocada.cmv_aviso === 'redefinido' ? 'redefinido' : undefined);
+  };
   // Com o recurso, a data do banco é a chave que reconhece a linha no lançamento: não se edita.
   const dataBancoFixa = cmvRecurso && destino === 'lancamento';
 
@@ -138,21 +149,29 @@ export default function CriarLancamentoExtratoDialog({
   // Pre-fill from extrato line
   useEffect(() => {
     if (!linha || !open) return;
+    // Com o recurso no banco, o que o usuário ajustou na própria linha do extrato (competência,
+    // categoria e resposta do CMV) vem junto: "Processar" já respeita isso e "Criar" não pode perdê-lo.
+    // Sem o recurso a competência vai em p_data (a chave de idempotência), então o rascunho da
+    // linha nunca entra: o diálogo abre exatamente como antes (data do banco, sem categoria, sem resposta).
+    // Rateio de várias linhas não é levado para o diálogo: categoria e resposta ficam vazias, como antes.
+    const herda = cmvRecurso;
+    const rateioMultiplo = (linha.rateioLinhas?.length ?? 0) > 1;
     setDescricao(linha.descricao);
     setValor(linha.valor);
     setTipo(linha.tipo);
-    setDataCompetencia(linha.data);
+    setDataCompetencia(herda ? linha.competencia || linha.data : linha.data);
     setDataVencimento(linha.data);
     setDataPagamento(linha.data);
-    setCategoriaId('');
+    setCategoriaId(herda && !rateioMultiplo ? linha.categoriaId || '' : '');
     setSupplierId('');
     setCliente('');
     setObservacoes('');
     setUseRateio(false);
     setRateioLinhas([]);
-    setCmvIncluir(null);
+    setCmvIncluir(herda && !rateioMultiplo ? decisaoDaLinhaExtrato(linha) : null);
+    setCmvAviso(undefined);
     setDestino('lancamento');
-  }, [linha, open]);
+  }, [linha, open, cmvRecurso]);
 
   // Rateio helpers
   const addRateioLinha = () => {
@@ -218,6 +237,8 @@ export default function CriarLancamentoExtratoDialog({
     if (valor <= 0) { toast.error('Valor deve ser maior que zero'); return; }
     if (!dataCompetencia) { toast.error('Informe a data de competência'); return; }
     if (!useRateio && !categoriaId) { toast.error('Selecione uma categoria'); return; }
+    // A categoria vinda da linha pode não estar (ainda) na lista: sem ela o payload sairia sem categoria.
+    if (!useRateio && !categorias.some(c => c.id === categoriaId)) { toast.error('Categoria indisponível. Selecione outra.'); return; }
     if (useRateio && !rateioValido) { toast.error('Rateio inválido'); return; }
 
     salvandoRef.current = true;
@@ -505,7 +526,7 @@ export default function CriarLancamentoExtratoDialog({
               <>
                 <CategoryCombobox
                   value={categoriaId}
-                  onValueChange={v => { setCategoriaId(v); setCmvIncluir(atual => sugerirCmv(atual, v)); }}
+                  onValueChange={trocarCategoriaUnica}
                   options={filteredCategorias}
                   placeholder="Pesquisar categoria..."
                   className="h-9 text-sm"
@@ -513,7 +534,11 @@ export default function CriarLancamentoExtratoDialog({
                 {mostrarCmv && (
                   <div className="mt-2 flex flex-wrap items-center gap-2">
                     <span className="text-xs font-medium text-foreground">Aparecer no CMV financeiro?</span>
-                    <CmvDecisaoToggle size="sm" value={cmvIncluir} onChange={setCmvIncluir} label="Aparecer no CMV financeiro?" />
+                    <CmvDecisaoToggle
+                      size="sm" value={cmvIncluir} label="Aparecer no CMV financeiro?"
+                      onChange={v => { setCmvIncluir(v); setCmvAviso(undefined); }}
+                    />
+                    {cmvAviso === 'redefinido' && <span className="text-xs text-warning">Categoria trocada: confira.</span>}
                   </div>
                 )}
               </>
