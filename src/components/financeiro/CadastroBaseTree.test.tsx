@@ -9,6 +9,7 @@ import CadastroBaseTree from './CadastroBaseTree';
 const state = vi.hoisted(() => ({
   rpcCalls: [] as string[],
   tableWrites: [] as string[],
+  inserts: [] as Record<string, unknown>[],
   dados: {} as Record<string, unknown[]>,
   erro: {} as Record<string, boolean>,
   perms: new Set<string>(),
@@ -20,7 +21,7 @@ function builder(table: string) {
   const self = () => b;
   Object.assign(b, {
     select: self, order: self, eq: self, limit: self, in: self,
-    insert: () => { state.tableWrites.push(`insert:${table}`); return b; },
+    insert: (payload: Record<string, unknown>) => { state.tableWrites.push(`insert:${table}`); state.inserts.push(payload); return b; },
     update: () => { state.tableWrites.push(`update:${table}`); return b; },
     upsert: () => { state.tableWrites.push(`upsert:${table}`); return b; },
     delete: () => { state.tableWrites.push(`delete:${table}`); return b; },
@@ -50,7 +51,7 @@ const TODAS = ['view', 'create', 'edit', 'delete', 'export'].map(a => `financeir
 const escritas = () => [...state.rpcCalls, ...state.tableWrites];
 
 const cat = (id: string, nome: string, codigo: string, tipo: string, parent_id: string | null, ordem: number, extra: Record<string, unknown> = {}) => ({
-  id, nome, codigo, tipo, parent_id, ordem, centro_custo_padrao_id: null, grupo: null, linha_dre: null,
+  id, nome, codigo, tipo, parent_id, ordem, centro_custo_padrao_id: null, grupo: null,
   system_key: null, excluir_dos_totais: false, ativo: true, updated_at: '2026-01-01T00:00:00Z', ...extra,
 });
 const CATEGORIAS = [
@@ -67,6 +68,7 @@ const CATEGORIAS = [
 beforeEach(() => {
   state.rpcCalls = [];
   state.tableWrites = [];
+  state.inserts = [];
   state.erro = {};
   state.perms = new Set(TODAS);
   state.dados = { fin_categorias: CATEGORIAS, fin_centros_custo: [{ id: 'cc', nome: 'Cozinha' }], fin_lancamentos: [], fin_lancamento_rateios: [] };
@@ -165,9 +167,11 @@ describe('Estrutura de Categorias (V2)', () => {
     await screen.findByText('RECEITAS');
     fireEvent.click(screen.getByRole('button', { name: /Nova Raiz/ }));
     const dialogo = await screen.findByRole('dialog', { name: 'Nova Categoria' });
-    for (const rotulo of ['Código', 'Ordem', 'Nome', 'Tipo', 'Grupo', 'Linha DRE', 'Centro de Custo Padrão']) {
+    for (const rotulo of ['Código', 'Ordem', 'Nome', 'Tipo', /^Grupo/, 'Centro de Custo Padrão']) {
       expect(within(dialogo).getByLabelText(rotulo)).toBeInTheDocument();
     }
+    // Linha DRE saiu: nenhum relatório a lia.
+    expect(within(dialogo).queryByText('Linha DRE')).not.toBeInTheDocument();
     expect(within(dialogo).getByText('Categoria raiz da árvore.')).toBeInTheDocument();
     fireEvent.keyDown(dialogo, { key: 'Escape' });
     const guard = await screen.findByRole('alertdialog');
@@ -181,5 +185,62 @@ describe('Estrutura de Categorias (V2)', () => {
     render(<CadastroBaseTree />);
     expect(screen.getByText('Acesso negado')).toBeInTheDocument();
     expect(screen.getByText('Você não tem permissão para visualizar os cadastros base.')).toBeInTheDocument();
+  });
+});
+
+/**
+ * Grupo obrigatório quando não há o que herdar: sem grupo próprio nem herdado, a despesa some
+ * dos detalhamentos da Apresentação Sócios (caso real: R$ 111 mil de CMV do Ren Sushi fora do CMV).
+ */
+describe('Estrutura de Categorias — grupo da categoria', () => {
+  async function abrirSubItem(nome: string) {
+    render(<CadastroBaseTree />);
+    await screen.findByText('RECEITAS');
+    fireEvent.click(screen.getByRole('button', { name: `Adicionar sub-item em ${nome}` }));
+    return screen.findByRole('dialog', { name: 'Nova Categoria' });
+  }
+
+  function nomearECriar(dialogo: HTMLElement, nome: string) {
+    fireEvent.change(within(dialogo).getByLabelText('Nome'), { target: { value: nome } });
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Criar' }));
+  }
+
+  it('não cria categoria principal sem grupo', async () => {
+    render(<CadastroBaseTree />);
+    await screen.findByText('RECEITAS');
+    fireEvent.click(screen.getByRole('button', { name: /Nova Raiz/ }));
+    const dialogo = await screen.findByRole('dialog', { name: 'Nova Categoria' });
+    nomearECriar(dialogo, 'Delivery');
+
+    expect(within(dialogo).getByText(/Obrigatório na categoria principal/)).toBeInTheDocument();
+    expect(state.toast.error).toHaveBeenCalledWith('Selecione o grupo da categoria');
+    expect(escritas()).toEqual([]);
+  });
+
+  it('sub-item herda o grupo da mãe e pode ficar em branco', async () => {
+    state.dados.fin_categorias = CATEGORIAS.map(c => (c.id === 'd' ? { ...c, grupo: 'administrativa' } : c));
+    const dialogo = await abrirSubItem('DESPESAS');
+    expect(within(dialogo).getByText(/Em branco, a categoria usa o grupo da categoria acima/)).toBeInTheDocument();
+    nomearECriar(dialogo, 'Limpeza');
+
+    await waitFor(() => expect(state.inserts).toHaveLength(1));
+    expect(state.inserts[0]).toMatchObject({ parent_id: 'd', grupo: null });
+  });
+
+  it('exige grupo no sub-item de categoria antiga sem grupo', async () => {
+    const dialogo = await abrirSubItem('DESPESAS');
+    nomearECriar(dialogo, 'Frete');
+
+    expect(within(dialogo).getByText(/nenhuma categoria acima tem grupo/)).toBeInTheDocument();
+    expect(state.toast.error).toHaveBeenCalledWith('Selecione o grupo da categoria');
+    expect(escritas()).toEqual([]);
+  });
+
+  it('não exige grupo em categoria não operacional', async () => {
+    const dialogo = await abrirSubItem('RECEITAS NÃO OPERACIONAIS');
+    nomearECriar(dialogo, 'Multa recebida');
+
+    await waitFor(() => expect(state.inserts).toHaveLength(1));
+    expect(state.inserts[0]).toMatchObject({ parent_id: 'nor', grupo: null });
   });
 });

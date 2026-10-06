@@ -8,16 +8,16 @@ vi.mock('@/integrations/supabase/client', () => ({
 describe('metadados semânticos da Apresentação Sócios', () => {
   it('aceita grupos configurados e categorias sem classificação', () => {
     expect(parsePresentationCategoryMetadata({
-      a: { group: 'cmv', dreLine: 'CMV' },
-      b: { group: null, dreLine: null },
+      a: { group: 'cmv' },
+      b: { group: null },
     })).toEqual({
-      a: { group: 'cmv', dreLine: 'CMV' },
-      b: { group: null, dreLine: null },
+      a: { group: 'cmv' },
+      b: { group: null },
     });
   });
 
   it('rejeita payload incompatível em vez de classificar silenciosamente', () => {
-    expect(() => parsePresentationCategoryMetadata({ a: { group: 42, dreLine: null } }))
+    expect(() => parsePresentationCategoryMetadata({ a: { group: 42 } }))
       .toThrow(/a\.group/);
   });
 });

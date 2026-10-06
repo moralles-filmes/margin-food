@@ -12,6 +12,7 @@ import { useEmitDataEvent } from '@/lib/dataEvents';
 import { useScopedToast } from '@/hooks/useScopedToast';
 import { useTravaEnvio } from '@/hooks/useTravaEnvio';
 import { includesNormalized } from '@/lib/utils';
+import { grupoLabel } from '@/domain/financeiro/categoriaGrupo';
 import {
   formatarCentavos, formatarPercentual, razaoPercentual, resumirBoleto,
   type CmvContagem, type CmvDecisao,
@@ -219,7 +220,7 @@ export default function CmvRegrasVinculo({ companyId, canManage, canRevisar, pen
                       {categoria.nome}
                       {!categoria.ativo && <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">inativa</span>}
                     </th>
-                    <td className="px-3 py-2 text-muted-foreground">{categoria.pai ?? categoria.grupo ?? '—'}</td>
+                    <td className="px-3 py-2 text-muted-foreground">{categoria.pai ?? grupoLabel(categoria.grupo) ?? '—'}</td>
                     <td className="px-3 py-2">
                       {canManage ? (
                         <span className="inline-flex flex-wrap items-center gap-2">

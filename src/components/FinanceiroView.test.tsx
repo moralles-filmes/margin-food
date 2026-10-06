@@ -61,7 +61,6 @@ vi.mock('@/components/financeiro/FechamentoCaixaSection', () => ({ default: () =
 vi.mock('@/components/financeiro/CadastroBaseTree', () => ({ default: () => null }));
 vi.mock('@/components/financeiro/ContasBancariasSection', () => ({ default: () => null }));
 vi.mock('@/components/financeiro/LivroRazaoSection', () => ({ default: () => null }));
-vi.mock('@/components/financeiro/PlanoContasFinSection', () => ({ default: () => null }));
 vi.mock('@/components/financeiro/CentrosCustoFinSection', () => ({ default: () => null }));
 vi.mock('@/components/financeiro/FornecedoresFinSection', () => ({
   default: () => <div>Fornecedores do Financeiro</div>,

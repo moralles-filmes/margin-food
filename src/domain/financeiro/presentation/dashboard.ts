@@ -2,10 +2,25 @@ import type {
   CategoryCompositionNode,
   PresentationPeriodSnapshot,
 } from './contracts';
+import { normalizarGrupo } from '../categoriaGrupo';
+
+/**
+ * Grupos (`fin_categorias.grupo`, já herdados) que cada detalhamento da
+ * Apresentação Sócios lê. Despesa cujo grupo efetivo não está aqui — inclusive
+ * sem grupo — não aparece em nenhum deles, só no total.
+ */
+export const PRESENTATION_ANALYSIS_GROUPS = {
+  cmv: ['cmv'],
+  personnel: ['pessoal'],
+  operations: ['ocupacao', 'utilidades', 'marketing', 'administrativa', 'manutencao'],
+  financial: ['financeira', 'taxa'],
+  investments: ['investimento'],
+} as const satisfies Record<string, readonly string[]>;
+
+export const PRESENTATION_DETAILED_GROUPS: readonly string[] = Object.values(PRESENTATION_ANALYSIS_GROUPS).flat();
 
 export interface PresentationCategoryMetadata {
   group: string | null;
-  dreLine: string | null;
 }
 
 export type PresentationCategoryMetadataMap = Readonly<Record<string, PresentationCategoryMetadata>>;
@@ -23,9 +38,22 @@ export interface PresentationDashboardInsight {
   target: 'overview' | 'revenue' | 'expense' | 'cmv' | 'payables' | 'receivables';
 }
 
-function normalizedGroup(value: string | null | undefined): string | null {
-  const normalized = value?.trim().toLocaleLowerCase('pt-BR');
-  return normalized ? normalized : null;
+export interface PresentationExpenseOutsideGroupsItem {
+  categoryId: string | null;
+  /** Nomes da raiz até a categoria. */
+  path: readonly string[];
+  /** Grupo efetivo (próprio ou herdado); `null` = sem grupo. */
+  group: string | null;
+  amount: number;
+}
+
+export interface PresentationExpenseOutsideGroups {
+  amount: number;
+  categories: readonly PresentationExpenseOutsideGroupsItem[];
+}
+
+function roundToCents(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
 function categoryGroup(
@@ -34,7 +62,7 @@ function categoryGroup(
   inheritedGroup: string | null,
 ): string | null {
   if (node.categoryId === null) return inheritedGroup;
-  return normalizedGroup(metadata[node.categoryId]?.group) ?? inheritedGroup;
+  return normalizarGrupo(metadata[node.categoryId]?.group) ?? inheritedGroup;
 }
 
 function sumDirectAmountForGroup(
@@ -44,7 +72,7 @@ function sumDirectAmountForGroup(
   inheritedGroup: string | null = null,
 ): number {
   let total = 0;
-  const normalizedTarget = normalizedGroup(targetGroup);
+  const normalizedTarget = normalizarGrupo(targetGroup);
 
   for (const node of nodes) {
     const effectiveGroup = categoryGroup(node, metadata, inheritedGroup);
@@ -52,7 +80,44 @@ function sumDirectAmountForGroup(
     total += sumDirectAmountForGroup(node.children, metadata, targetGroup, effectiveGroup);
   }
 
-  return Math.round((total + Number.EPSILON) * 100) / 100;
+  return roundToCents(total);
+}
+
+/**
+ * Despesa que nenhum detalhamento por grupo mostra: grupo efetivo vazio ou fora
+ * de `coveredGroups`. Usa `directAmount` (como `sumDirectAmountForGroup`) para
+ * não somar pai e filho duas vezes.
+ */
+export function summarizeExpenseOutsideGroups(
+  nodes: readonly CategoryCompositionNode[],
+  metadata: PresentationCategoryMetadataMap,
+  coveredGroups: readonly string[],
+): PresentationExpenseOutsideGroups {
+  const covered = new Set(
+    coveredGroups.map(normalizarGrupo).filter((value): value is string => value !== null),
+  );
+  const categories: PresentationExpenseOutsideGroupsItem[] = [];
+  let total = 0;
+
+  const visit = (
+    list: readonly CategoryCompositionNode[],
+    inheritedGroup: string | null,
+    parentPath: readonly string[],
+  ) => {
+    for (const node of list) {
+      const group = categoryGroup(node, metadata, inheritedGroup);
+      const path = [...parentPath, node.name];
+      if ((group === null || !covered.has(group)) && node.directAmount !== 0) {
+        total += node.directAmount;
+        categories.push({ categoryId: node.categoryId, path, group, amount: roundToCents(node.directAmount) });
+      }
+      visit(node.children, group, path);
+    }
+  };
+  visit(nodes, null, []);
+
+  categories.sort((a, b) => b.amount - a.amount);
+  return { amount: roundToCents(total), categories };
 }
 
 export function calculatePresentationGroupMetric(
@@ -116,7 +181,7 @@ export function filterPresentationCategoriesByGroups(
   targetGroups: readonly string[],
 ): CategoryCompositionNode[] {
   const normalizedTargets = new Set(
-    targetGroups.map(normalizedGroup).filter((value): value is string => value !== null),
+    targetGroups.map(normalizarGrupo).filter((value): value is string => value !== null),
   );
   return filterNodesByGroup(nodes, metadata, normalizedTargets, null);
 }

@@ -31,8 +31,8 @@ describe('estados visuais da Apresentação Sócios', () => {
       <PresentationAnalytics
         data={createPresentationSociosData()}
         categoryMetadata={{
-          despesas: { group: null, dreLine: 'Despesas Operacionais' },
-          insumos: { group: 'cmv', dreLine: 'CMV' },
+          despesas: { group: null },
+          insumos: { group: 'cmv' },
         }}
       />,
     );
@@ -54,8 +54,8 @@ describe('estados visuais da Apresentação Sócios', () => {
       <PresentationAnalytics
         data={createPresentationSociosData()}
         categoryMetadata={{
-          despesas: { group: null, dreLine: 'Despesas Operacionais' },
-          insumos: { group: 'cmv', dreLine: 'CMV' },
+          despesas: { group: null },
+          insumos: { group: 'cmv' },
         }}
         onOpenDetail={onOpenDetail}
       />,

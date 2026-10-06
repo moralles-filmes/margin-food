@@ -31,7 +31,7 @@ vi.mock('@/lib/dataEvents', () => ({ useDataEvent: () => undefined }));
 vi.mock('@/lib/exportDemonstrativo', () => ({ exportDemonstrativoPDF: state.pdf, exportDemonstrativoExcel: state.excel }));
 
 const cat = (id: string, nome: string, tipo: 'receita' | 'despesa', parent_id: string | null = null, extra = {}) => ({
-  id, nome, codigo: '', tipo, parent_id, ordem: 0, grupo: null, linha_dre: null, system_key: null,
+  id, nome, codigo: '', tipo, parent_id, ordem: 0, grupo: null, system_key: null,
   excluir_dos_totais: false, ativo: true, updated_at: '2026-01-01T00:00:00Z', ...extra,
 });
 const CATEGORIAS = [

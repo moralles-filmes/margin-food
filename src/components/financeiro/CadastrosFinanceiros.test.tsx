@@ -1,12 +1,11 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { BookOpen, FolderTree } from 'lucide-react';
-import PlanoContasFinSection from './PlanoContasFinSection';
+import { FolderTree, Target } from 'lucide-react';
 import CentrosCustoFinSection from './CentrosCustoFinSection';
 import { SubmoduleSwitcher } from '@/components/ui/SubmoduleSwitcher';
 
 /**
- * Plano de Contas e Centros de Custo com cliente falso que registra TODA chamada (RPC `_guarded_*`
+ * Centros de Custo com cliente falso que registra TODA chamada (RPC `_guarded_*`
  * e escrita direta). Nenhum teste aqui salva nem remove.
  */
 const state = vi.hoisted(() => ({
@@ -57,10 +56,6 @@ beforeEach(() => {
   state.erro = {};
   state.perms = new Set(['financeiro:cadastros:view']);
   state.dados = {
-    fin_plano_contas: [
-      { id: 'p1', codigo: '1.1.01', nome: 'Caixa Teste', tipo: 'ativo', natureza: 'operacional', linha_dre: null, updated_at: 'x' },
-      { id: 'p2', codigo: '5.1.01', nome: 'Capital Teste', tipo: 'patrimonio', natureza: 'nao_operacional', linha_dre: null, updated_at: 'x' },
-    ],
     fin_centros_custo: [
       { id: 'c1', nome: 'Cozinha Teste', descricao: 'Produção', updated_at: 'x' },
       { id: 'c2', nome: 'Salão Teste', descricao: null, updated_at: 'x' },
@@ -69,64 +64,6 @@ beforeEach(() => {
   largura(1366);
 });
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
-
-describe('Plano de Contas (V2)', () => {
-  it('tipo e natureza com os rótulos do formulário, ações nomeadas e nenhuma escrita ao abrir', async () => {
-    render(<PlanoContasFinSection canCreate canEdit canDelete />);
-    expect(await screen.findByText('Capital Teste')).toBeInTheDocument();
-    expect(screen.getByText('Patrimônio')).toBeInTheDocument();
-    expect(screen.getByText('Não Operacional')).toBeInTheDocument();
-    expect(screen.getByText('2 contas ativas')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Editar 1.1.01 Caixa Teste' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Remover 5.1.01 Capital Teste' })).toBeInTheDocument();
-    expect(escritas()).toEqual([]);
-  });
-
-  it('Remover abre a confirmação de antes; Cancelar não grava e devolve o foco ao botão', async () => {
-    render(<PlanoContasFinSection canCreate canEdit canDelete />);
-    const remover = await screen.findByRole('button', { name: 'Remover 5.1.01 Capital Teste' });
-    remover.focus();
-    fireEvent.click(remover);
-    const dialogo = await screen.findByRole('alertdialog');
-    expect(within(dialogo).getByText('Tem certeza que deseja remover a conta "Capital Teste"?')).toBeInTheDocument();
-    fireEvent.click(within(dialogo).getByRole('button', { name: 'Cancelar' }));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Remover 5.1.01 Capital Teste' })).toHaveFocus());
-    expect(escritas()).toEqual([]);
-  });
-
-  it('leitura falhou: erro com nova tentativa, não "Nenhuma conta cadastrada"', async () => {
-    state.erro.fin_plano_contas = true;
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-    render(<PlanoContasFinSection canCreate canEdit canDelete />);
-    expect(await screen.findByText('Não foi possível carregar o plano de contas')).toBeInTheDocument();
-    expect(screen.queryByText('Nenhuma conta cadastrada')).not.toBeInTheDocument();
-    consoleError.mockRestore();
-  });
-
-  it('tela estreita: cartões com as mesmas ações', async () => {
-    largura(390);
-    render(<PlanoContasFinSection canCreate canEdit canDelete />);
-    expect(await screen.findByText('Capital Teste')).toBeInTheDocument();
-    expect(screen.queryByRole('table')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Editar 5.1.01 Capital Teste' })).toBeInTheDocument();
-  });
-
-  it('formulário com rótulos associados (Dialog continua só com permissão de criar — PF-009)', async () => {
-    render(<PlanoContasFinSection canCreate canEdit canDelete />);
-    fireEvent.click(await screen.findByRole('button', { name: /Nova Conta/ }));
-    const dialogo = await screen.findByRole('dialog', { name: 'Nova Conta Contábil' });
-    for (const rotulo of ['Código', 'Nome', 'Tipo', 'Natureza', 'Linha DRE']) {
-      expect(within(dialogo).getByLabelText(rotulo)).toBeInTheDocument();
-    }
-    expect(escritas()).toEqual([]);
-  });
-
-  it('sem permissão: acesso negado em vez de tela em branco', () => {
-    state.perms = new Set();
-    render(<PlanoContasFinSection canCreate canEdit canDelete />);
-    expect(screen.getByText('Acesso negado')).toBeInTheDocument();
-  });
-});
 
 describe('Centros de Custo (V2)', () => {
   it('lista com descrição ausente e ações nomeadas; vazio é vazio', async () => {
@@ -157,12 +94,12 @@ describe('SubmoduleSwitcher com nome acessível', () => {
   it('o botão diz o que escolhe e qual está aberto; sem ariaLabel nada muda', () => {
     const items = [
       { id: 'arvore', label: 'Estrutura de Categorias', icon: FolderTree },
-      { id: 'plano', label: 'Plano de Contas', icon: BookOpen },
+      { id: 'centros', label: 'Centros de Custo', icon: Target },
     ];
-    const { unmount } = render(<SubmoduleSwitcher items={items} value="plano" onChange={vi.fn()} ariaLabel="Cadastro exibido" />);
-    expect(screen.getByRole('button', { name: 'Cadastro exibido: Plano de Contas' })).toBeInTheDocument();
+    const { unmount } = render(<SubmoduleSwitcher items={items} value="centros" onChange={vi.fn()} ariaLabel="Cadastro exibido" />);
+    expect(screen.getByRole('button', { name: 'Cadastro exibido: Centros de Custo' })).toBeInTheDocument();
     unmount();
-    render(<SubmoduleSwitcher items={items} value="plano" onChange={vi.fn()} />);
-    expect(screen.getByRole('button', { name: 'Plano de Contas' })).toBeInTheDocument();
+    render(<SubmoduleSwitcher items={items} value="centros" onChange={vi.fn()} />);
+    expect(screen.getByRole('button', { name: 'Centros de Custo' })).toBeInTheDocument();
   });
 });

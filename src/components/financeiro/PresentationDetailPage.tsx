@@ -37,6 +37,8 @@ import {
   calculatePresentationGroupMetric,
   filterPresentationCategoriesByGroup,
   formatMonthPeriodPtBR,
+  PRESENTATION_DETAILED_GROUPS,
+  summarizeExpenseOutsideGroups,
   type CategoryCompositionNode,
   type DataAvailability,
   type PresentationCategoryMetadataMap,
@@ -54,6 +56,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import PresentationFinancialTree from '@/components/financeiro/PresentationFinancialTree';
 import PresentationPlanComparison from '@/components/financeiro/PresentationPlanComparison';
+import PresentationUngroupedExpenseNotice from '@/components/financeiro/PresentationUngroupedExpenseNotice';
 import {
   isPresentationDetailPermissionError,
   usePresentationDetailRows,
@@ -660,6 +663,16 @@ export default function PresentationDetailPage({
         </section>
       ) : definition.rowsKind === 'ledger' ? (
         <PresentationFinancialTree title={`Composição — ${definition.title}`} nodes={categoryPath ? categoryPath.at(-1)?.children ?? [] : nodes} tone={definition.tone === 'revenue' ? 'revenue' : 'expense'} onSelectNode={node => node.categoryId && onSelectCategory(node.categoryId)} />
+      ) : null}
+
+      {definition.group && categoryMetadata && !categoryId ? (
+        <PresentationUngroupedExpenseNotice
+          outside={summarizeExpenseOutsideGroups(
+            snapshot.categoryComposition.operational.expense,
+            categoryMetadata,
+            PRESENTATION_DETAILED_GROUPS,
+          )}
+        />
       ) : null}
 
       {target === 'result' || target === 'margin' ? (

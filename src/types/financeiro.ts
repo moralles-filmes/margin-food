@@ -33,7 +33,6 @@ export interface DfcCategoria {
   parent_id: string | null;
   ordem: number | null;
   grupo: string | null;
-  linha_dre: string | null;
   system_key: string | null;
   excluir_dos_totais: boolean;
   ativo: boolean;

@@ -60,7 +60,7 @@ const PAGE_SIZE = 50;
 const ENTIDADES = [
   'todos', 'fin_lancamentos', 'fin_contas_pagar', 'fin_contas_receber',
   'fin_contas', 'fin_categorias', 'fin_orcamentos', 'fin_centros_custo',
-  'fin_plano_contas', 'fin_lancamento_rateios',
+  'fin_lancamento_rateios',
 ];
 
 const ACOES = ['todos', 'INSERT', 'UPDATE', 'DELETE', 'APPROVE', 'REJECT', 'CANCEL'];
