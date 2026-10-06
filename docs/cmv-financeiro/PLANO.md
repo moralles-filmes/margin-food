@@ -58,3 +58,16 @@ Indicador **gerencial**: boletos de Contas a Pagar marcados para o CMV, pela **d
 | 4 | `src/components/financeiro/cmv/*` (Visão Geral, Análise por Categoria, Comparativo, Regras de vínculo, revisão de pendências) |
 | 5 | `src/lib/cmvFinanceiroPdfExport.ts` + painel de exportação |
 | 6 | Revisão, auditoria de módulo, plano de ativação/reversão |
+
+## 6. Extensão (2026-10-05): despesas de Lançamentos e da Conciliação
+
+Spec: [`../superpowers/specs/2026-10-05-cmv-financeiro-lancamentos-design.md`](../superpowers/specs/2026-10-05-cmv-financeiro-lancamentos-design.md) · Plano: [`../superpowers/plans/2026-10-05-cmv-financeiro-lancamentos.md`](../superpowers/plans/2026-10-05-cmv-financeiro-lancamentos.md)
+
+1. **Fonte única.** `_fin_cmv_linhas_fontes` = boletos (regra do §3, inalterada) + despesas de `fin_lancamentos` (`DESPESA`, não `CANCELADO`, sem `referencia_modulo`, não referenciada por `fin_contas_pagar.lancamento_id`, conciliada quando vem da conciliação). Relatório, lista, classificação, "Aplicar padrões" e PDF leem dela.
+2. **Decisão.** Linha de rateio (`fin_lancamento_rateios.cmv_incluir`) ou, sem rateio, `fin_lancamentos.cmv_incluir`. Livro Razão e conciliação **não exigem** a resposta (a linha nasce sugerida pelo padrão da categoria quando a classificação está ativa); a pendência aparece na revisão.
+3. **Sem dupla contagem.** O espelho da baixa do boleto (`referencia_modulo = 'contas_pagar'`) fica fora: o boleto conta pela própria competência. A baixa legada que perdeu o `referencia_modulo`, mas é apontada por `fin_contas_pagar.lancamento_id`, também fica fora (1 caso em produção em 2026-10-05).
+4. **Competência na conciliação.** `p_data` continua a data do banco (chave e duplicata). `p_data_competencia` muda só `data_competencia` (DRE e CMV); caixa, saldos e Livro Razão não mudam. A reclassificação de lançamento conciliado também ajusta a competência.
+5. **Histórico.** Nada é classificado pela migration. "Aplicar padrões às pendentes" (Regras de vínculo) grava o padrão da categoria só nas linhas pendentes a partir de uma data, depois de prévia, com justificativa e auditoria por documento; exige `financeiro:cmv:manage`.
+6. **Compatibilidade.** O contrato do relatório continua `v1` (só ganha `lancamentos` e `pendentes_geral_por_fonte`). As três RPCs com parâmetro novo têm default: o cliente antigo segue funcionando. O frontend só mostra os controles com `get_fin_cmv_config().recursos.lancamentos`.
+
+Limites (aceitos): conta a pagar criada a partir do extrato continua como boleto (com rateio, aparece sem categoria e pendente); parcela gerada por `gerar_parcela_recorrente` nasce pendente; compra lançada como boleto **e** paga na conciliação como "criar lançamento" conta duas vezes (como na DRE).

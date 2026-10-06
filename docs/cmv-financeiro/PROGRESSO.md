@@ -6,7 +6,7 @@ Checkpoint por fase. Diagnóstico e decisões: [`PLANO.md`](./PLANO.md). Entregu
 
 ## Estado atual (2026-10-03)
 
-Fases 0 a 6 concluídas, auditadas e **em produção**: frontend publicado pelo PR #138 (deploy Vercel de `main` em 2026-10-03) e migration executada no SQL Editor do Supabase em 2026-10-03, registrada no histórico como `20261003140000 cmv_financeiro` (mesmo nome do arquivo; não renomear). Nenhuma unidade está com a classificação ligada e nada do histórico foi classificado — a ativação por unidade é decisão do negócio (ver "Ativação", passo 4).
+Fases 0 a 6 concluídas, auditadas e **em produção**: frontend publicado pelo PR #138 (deploy Vercel de `main` em 2026-10-03) e migration executada no SQL Editor do Supabase em 2026-10-03, registrada no histórico como `20261003140000 cmv_financeiro` (mesmo nome do arquivo; não renomear). Em 2026-10-05 a Ren Sushi já estava com a classificação ligada e 121 padrões de categoria (a Aoi Sushi, com 93 padrões, ainda desligada) — a ativação por unidade é decisão do negócio (ver "Ativação", passo 4).
 
 Conferido em produção depois da execução (2026-10-03):
 - 3 colunas novas anuláveis e sem default; nenhuma linha classificada, nenhum padrão de categoria, nenhuma unidade ativada.
@@ -131,3 +131,38 @@ Aceito / em aberto (P3):
 - Série = parcelas criadas juntas (`created_at` idêntico + `parcela_total`, autor e fornecedor) ou ligadas por `lancamento_pai_id`. No histórico (11 séries, 476 boletos) o vínculo de pai está vazio porque a 1ª parcela foi excluída.
 - Conferido em produção: corpo das 3 funções idêntico ao do banco de teste (md5), helpers sem EXECUTE para clientes, prévia (`p_simular`) executada como admin sem gravar nada.
 - Limite aceito: `serie_boletos` é calculado por linha da página, sem índice próprio — rever se o volume de boletos crescer muito.
+
+## Extensão: despesas de Lançamentos e Conciliação (2026-10-05)
+
+Spec e plano em `docs/superpowers/` (links no PLANO.md §6). Branch `feat/cmv-financeiro-lancamentos`, a partir do PR #144 (Redesign V2).
+
+### Entregue
+- Migration `supabase/migrations/20261005120000_cmv_financeiro_lancamentos.sql`:
+  - coluna `fin_lancamentos.cmv_incluir` e a trava de escrita direta;
+  - `_fin_cmv_linhas_lancamentos`, `_fin_cmv_linhas_fontes`, `_fin_cmv_retrato_lancamento` e `_fin_cmv_heranca`;
+  - payload, lista e config com as duas fontes;
+  - `reconcile_import_lancamento` (+ `p_data_competencia`), `_guarded_upsert_lancamento` (+ `p_cmv`) e `_guarded_update_reconciled_classification` (+ `p_cmv`, `p_data_competencia`);
+  - `fin_cmv_classificar` (boleto ou lançamento) e `fin_cmv_aplicar_padroes` (nova).
+- Teste de banco real: `supabase/tests/database/cmv_lancamentos_ephemeral.sql`, rodado por `run_ephemeral.ps1`.
+- Telas:
+  - Livro Razão: pergunta, competência na reclassificação e abertura vinda do CMV;
+  - Conciliação: Sim/Não e competência na linha e no rateio; diálogo "Criar";
+  - CMV: "despesas", origem, classificar lançamento e "Aplicar padrões";
+  - PDF.
+
+### Ativação (requer autorização)
+1. **Migration.** Remove e recria três funções (`DROP FUNCTION`): o conector MCP deve recusar, então ela é rodada pelo SQL Editor. É reexecutável (`CREATE OR REPLACE`). Depois:
+   - conferir uma assinatura por função, grants, triggers e o md5 dos corpos contra o banco descartável;
+   - registrar a versão `20261005120000` com o nome do arquivo;
+   - antes de rodar "Aplicar padrões" em unidade grande, medir `fin_cmv_aplicar_padroes` contra o `statement_timeout` de 8 s, porque cada lançamento atualizado recalcula o cache de saldo da conta.
+2. **Frontend.** Pode entrar primeiro: sem `recursos` ele se comporta exatamente como hoje. Aplicar a migration logo em seguida, porque com a migration e o cliente antigo publicado os totais do CMV contariam lançamentos que a lista não mostra.
+3. **Por unidade.** Em CMV → Regras de vínculo:
+   - conferir os padrões das categorias de mercadoria;
+   - rodar "Aplicar padrões às pendentes" a partir da data desejada (prévia antes);
+   - revisar o que ficou pendente (categorias sem padrão).
+
+### Reversão
+- Desligar "Pedir a resposta nas novas despesas" tira a pergunta das telas.
+- Revert do PR não exige mexer no banco.
+- As colunas não são removidas.
+- As decisões gravadas em lançamentos só passam a ser ignoradas se a migration for revertida, recriando `_fin_cmv_payload`/`_fin_cmv_lista` de `20261003203219` e `20261003140000`.
