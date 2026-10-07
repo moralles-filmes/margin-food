@@ -151,18 +151,16 @@ Spec e plano em `docs/superpowers/` (links no PLANO.md §6). Branch `feat/cmv-fi
   - PDF.
 
 ### Ativação (requer autorização)
-1. **Migration.** Remove e recria três funções (`DROP FUNCTION`): o conector MCP deve recusar, então ela é rodada pelo SQL Editor. É reexecutável (`CREATE OR REPLACE`). Depois:
+1. **Frontend.** Entra primeiro: sem `recursos` ele se comporta exatamente como hoje. A migration vem logo em seguida (passo 2), porque com a migration e o cliente antigo publicado os totais do CMV contariam lançamentos que a lista não mostra.
+2. **Migration**, logo depois do frontend. Remove e recria três funções (`DROP FUNCTION`): o conector MCP deve recusar, então ela é rodada pelo SQL Editor. É reexecutável (`CREATE OR REPLACE`). Depois:
    - conferir uma assinatura por função, grants, triggers e o md5 dos corpos contra o banco descartável;
    - registrar a versão `20261005120000` com o nome do arquivo;
    - antes de rodar "Aplicar padrões" em unidade grande, medir `fin_cmv_aplicar_padroes` contra o `statement_timeout` de 8 s, porque cada lançamento atualizado recalcula o cache de saldo da conta.
-2. **Frontend.** Pode entrar primeiro: sem `recursos` ele se comporta exatamente como hoje. Aplicar a migration logo em seguida, porque com a migration e o cliente antigo publicado os totais do CMV contariam lançamentos que a lista não mostra.
 3. **Por unidade.** Em CMV → Regras de vínculo:
    - conferir os padrões das categorias de mercadoria;
    - rodar "Aplicar padrões às pendentes" a partir da data desejada (prévia antes);
    - revisar o que ficou pendente (categorias sem padrão).
 
 ### Reversão
-- Desligar "Pedir a resposta nas novas despesas" tira a pergunta das telas.
-- Revert do PR não exige mexer no banco.
-- As colunas não são removidas.
-- As decisões gravadas em lançamentos só passam a ser ignoradas se a migration for revertida, recriando `_fin_cmv_payload`/`_fin_cmv_lista` de `20261003203219` e `20261003140000`.
+- Desligar "Pedir a resposta nas novas despesas" só esconde a pergunta nas telas: a apuração continua lendo as duas fontes e contando as despesas.
+- Revert do PR sozinho não basta com a migration aplicada: o cliente antigo leria pendências e totais com lançamentos que a lista dele não mostra. Reverter o frontend e, na mesma janela, recriar `_fin_cmv_payload` (de `20261003140000`) e `_fin_cmv_lista` (de `20261003203219`) pelo SQL Editor; colunas e decisões gravadas ficam e passam a ser ignoradas.

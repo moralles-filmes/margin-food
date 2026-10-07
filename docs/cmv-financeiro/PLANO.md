@@ -5,7 +5,7 @@ Checkpoint de execução: [`PROGRESSO.md`](./PROGRESSO.md)
 
 ## 1. O que é
 
-Indicador **gerencial**: boletos de Contas a Pagar marcados para o CMV, pela **data de competência**, sobre o **faturamento bruto do Fechamento de Caixa**. Não é o CMV de estoque/ficha técnica (aba CMV, Edge `cmv`, `metas_cmv`) e não altera DRE, DFC, Borderô, fluxo de caixa nem a baixa dos boletos.
+Indicador **gerencial**: boletos de Contas a Pagar marcados para o CMV (ampliado em §6 com as despesas de Lançamentos e da Conciliação), pela **data de competência**, sobre o **faturamento bruto do Fechamento de Caixa**. Não é o CMV de estoque/ficha técnica (aba CMV, Edge `cmv`, `metas_cmv`) e não altera DRE, DFC, Borderô, fluxo de caixa nem a baixa dos boletos.
 
 ## 2. Diagnóstico do sistema (schema vivo, 2026-10-03)
 
