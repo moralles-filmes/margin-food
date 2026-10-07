@@ -1,7 +1,7 @@
 import { useCompanyId } from '@/hooks/useCompanyId';
 import { withCompanyId } from '@/lib/companyPayload';
 import { useSupabase } from '@/contexts/CompanyScopeContext';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useScopedToast } from '@/hooks/useScopedToast';
 import { useTravaEnvio } from '@/hooks/useTravaEnvio';
@@ -18,6 +18,8 @@ import { format, addDays, startOfWeek, addWeeks, subWeeks } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { fmtBRL } from '@/lib/formatters';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
+import { calcularCustoEscala } from '@/domain/rh/custoEscala';
+import { sortByName } from '@/lib/sortByName';
 
 import { useCan } from '@/permissions/hooks';
 const SETORES = ['cozinha', 'sushi', 'limpeza', 'salao', 'copa'];
@@ -33,6 +35,7 @@ interface Colaborador {
   funcao: string;
   valor_hora: number | null;
   carga_horaria_semanal: number;
+  status?: string;
   // false quando quem vê a escala não tem acesso à remuneração (valor_hora vem nulo).
   remuneracao_visivel?: boolean;
 }
@@ -100,7 +103,21 @@ export default function EscalasSection({
   const weekStartStr = format(weekStart, 'yyyy-MM-dd');
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
-  const colabsSetor = colaboradores.filter(c => c.setor === setor);
+  // Só ativos recebem turno novo (a lista do RH inclui inativos quando o Prontuário mostra inativos).
+  const colabsSetor = colaboradores.filter(c => c.setor === setor && c.status !== 'inativo');
+
+  // Colaboradores com turno na escala que não estão na lista do RH (vem só com ativos):
+  // buscados à parte para o custo e os nomes não ignorarem quem foi desativado.
+  const [colabsExtras, setColabsExtras] = useState<Colaborador[]>([]);
+  const [erroExtras, setErroExtras] = useState(false);
+  // Buscados sem erro e não devolvidos: dado inconsistente, não "ainda carregando".
+  const [naoEncontrados, setNaoEncontrados] = useState<ReadonlySet<string>>(() => new Set());
+  const colabsPorId = useMemo(() => {
+    const mapa = new Map<string, Colaborador>();
+    for (const c of colabsExtras) mapa.set(c.id, c);
+    for (const c of colaboradores) mapa.set(c.id, c);
+    return mapa;
+  }, [colaboradores, colabsExtras]);
 
   const fetchEscala = useCallback(async () => {
     setLoading(true);
@@ -142,6 +159,30 @@ export default function EscalasSection({
 
   useEffect(() => { fetchEscala(); }, [fetchEscala]);
 
+  const faltantes = useMemo(
+    () => [...new Set(slots.map(s => s.colaborador_id))]
+      .filter(id => !colabsPorId.has(id) && !naoEncontrados.has(id)).sort().join(','),
+    [slots, colabsPorId, naoEncontrados],
+  );
+
+  useEffect(() => {
+    if (!faltantes) return;
+    let cancelado = false;
+    setErroExtras(false);
+    (async () => {
+      const ids = faltantes.split(',');
+      const { data, error } = await (supabase.rpc as any)('rh_listar_colaboradores', { p_incluir_inativos: true })
+        .in('id', ids);
+      if (cancelado) return;
+      if (error) { console.error(error); setErroExtras(true); return; }
+      const vieram = (data ?? []) as Colaborador[];
+      if (vieram.length) setColabsExtras(prev => [...prev, ...vieram]);
+      const sumidos = ids.filter(id => !vieram.some(c => c.id === id));
+      if (sumidos.length) setNaoEncontrados(prev => new Set([...prev, ...sumidos]));
+    })();
+    return () => { cancelado = true; };
+  }, [supabase, faltantes]);
+
   const [savingEscala, setSavingEscala] = useState(false);
   const { enviando: savingSlot, executar: executarSlot } = useTravaEnvio();
 
@@ -165,26 +206,24 @@ export default function EscalasSection({
 
   const handlePublicar = async () => {
     if (!escala) return;
-    // Calculate projected cost
-    let custoTotal = 0;
-    for (const slot of slots) {
-      if (slot.tipo !== 'TRABALHO') continue;
-      const colab = colaboradores.find(c => c.id === slot.colaborador_id);
-      if (!colab || !colab.valor_hora) continue;
-      const [hi, mi] = slot.hora_inicio.split(':').map(Number);
-      const [hf, mf] = slot.hora_fim.split(':').map(Number);
-      const horas = (hf * 60 + mf - hi * 60 - mi) / 60;
-      custoTotal += horas * colab.valor_hora;
+    // Custo calculado sem todos os colaboradores dos turnos sairia menor: espera a lista completar.
+    if (aguardandoColabs) {
+      toast.error(erroExtras
+        ? 'Não foi possível carregar os colaboradores da escala. Recarregue a página e tente de novo.'
+        : 'Os colaboradores da escala ainda não carregaram. Tente de novo em instantes.');
+      return;
     }
 
-    const { error } = await supabase.from('rh_escalas').update({
+    const { data, error } = await supabase.from('rh_escalas').update({
       status: 'PUBLICADA',
       publicada_em: new Date().toISOString(), // timestamptz — UTC is correct
       publicada_por: user?.id,
-      // Sem a remuneração o cálculo daria zero e gravaria por cima do custo projetado.
-      ...(custoOculto ? {} : { custo_projetado: Math.round(custoTotal * 100) / 100 }),
-    }).eq('id', escala.id);
-    if (error) { toast.error('Erro: ' + error.message); return; }
+      // Sem a remuneração (ou sem algum colaborador) o cálculo sairia menor e gravaria por cima do custo projetado.
+      ...(custo.situacao === 'ok' ? { custo_projetado: custo.valor } : {}),
+    }).eq('id', escala.id).select('id');
+    if (error) { console.error(error); toast.error('Erro: ' + error.message); return; }
+    // A RLS descarta o UPDATE sem erro para quem não pode: confere a linha devolvida.
+    if (!data?.length) { toast.error('Você não tem permissão para publicar escalas.'); return; }
     toast.success('Escala publicada!');
     fetchEscala();
   };
@@ -219,37 +258,45 @@ export default function EscalasSection({
     });
     if (!ok) return;
 
-    const { error } = await supabase.from('rh_escala_slots').delete().eq('id', slotId);
-    if (error) { toast.error('Erro: ' + error.message); return; }
+    const { data, error } = await supabase.from('rh_escala_slots').delete().eq('id', slotId).select('id');
+    if (error) { console.error(error); toast.error('Erro: ' + error.message); return; }
+    if (!data?.length) { toast.error('Você não tem permissão para remover turnos.'); return; }
     toast.success('Turno removido');
     fetchEscala();
   };
 
   const handleAprovarTroca = async (trocaId: string, aprovado: boolean) => {
-    const { error } = await supabase.from('rh_trocas_turno').update({
+    const { data, error } = await supabase.from('rh_trocas_turno').update({
       status: aprovado ? 'APROVADA' : 'REJEITADA',
       aprovado_por: user?.id,
       aprovado_em: new Date().toISOString(),
-    }).eq('id', trocaId);
-    if (error) { toast.error('Erro: ' + error.message); return; }
+    }).eq('id', trocaId).select('id');
+    if (error) { console.error(error); toast.error('Erro: ' + error.message); return; }
+    if (!data?.length) { toast.error('Você não tem permissão para decidir trocas de turno.'); return; }
     toast.success(aprovado ? 'Troca aprovada!' : 'Troca rejeitada');
     fetchEscala();
   };
 
-  const getColabNome = (id: string) => colaboradores.find(c => c.id === id)?.nome || '—';
+  const getColabNome = (id: string) => colabsPorId.get(id)?.nome || '—';
 
-  // Custo projetado calculation
-  const custoProjetadoAtual = slots.reduce((total, slot) => {
-    if (slot.tipo !== 'TRABALHO') return total;
-    const colab = colaboradores.find(c => c.id === slot.colaborador_id);
-    if (!colab?.valor_hora) return total;
-    const [hi, mi] = slot.hora_inicio.split(':').map(Number);
-    const [hf, mf] = slot.hora_fim.split(':').map(Number);
-    const horas = (hf * 60 + mf - hi * 60 - mi) / 60;
-    return total + horas * colab.valor_hora;
-  }, 0);
-  const custoOculto = slots.some(s => s.tipo === 'TRABALHO'
-    && colaboradores.find(c => c.id === s.colaborador_id)?.remuneracao_visivel === false);
+  const custo = calcularCustoEscala(slots, colabsPorId);
+  const aguardandoColabs = custo.situacao === 'incompleto' && custo.faltantes.some(id => !naoEncontrados.has(id));
+
+  // Quem tem turno na escala mas não está entre os ativos do setor (desativado ou mudou de
+  // setor) ganha linha própria, sem "adicionar turno": senão o turno conta no custo sem aparecer.
+  const idsSetor = new Set(colabsSetor.map(c => c.id));
+  const linhasForaDoSetor = [...new Set(slots.map(s => s.colaborador_id))]
+    .filter(id => !idsSetor.has(id))
+    .map(id => {
+      const c = colabsPorId.get(id);
+      const marca = !c ? (naoEncontrados.has(id) ? 'não encontrado' : 'carregando')
+        : c.status === 'inativo' ? 'inativo' : 'outro setor';
+      return { id, nome: c?.nome ?? '—', marca };
+    });
+  const linhasGrade = [
+    ...colabsSetor.map(c => ({ id: c.id, nome: c.nome, marca: null as string | null })),
+    ...sortByName(linhasForaDoSetor, l => l.nome),
+  ];
 
   if (loading) {
     return <div className="flex items-center justify-center py-12"><div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>;
@@ -300,9 +347,16 @@ export default function EscalasSection({
             <div>
               <p className="text-xs text-muted-foreground">Custo projetado da semana</p>
               <p className="text-lg font-bold text-foreground">
-                {custoOculto ? '—' : fmtBRL(custoProjetadoAtual)}
+                {custo.situacao === 'ok' ? fmtBRL(custo.valor) : '—'}
               </p>
-              {custoOculto && <p className="text-xs text-muted-foreground">Sem acesso à remuneração</p>}
+              {custo.situacao === 'oculto' && <p className="text-xs text-muted-foreground">Sem acesso à remuneração</p>}
+              {custo.situacao === 'incompleto' && (
+                <p className="text-xs text-muted-foreground">
+                  {!aguardandoColabs ? 'Há turno de colaborador não encontrado'
+                    : erroExtras ? 'Não foi possível carregar todos os colaboradores da escala'
+                      : 'Carregando colaboradores da escala…'}
+                </p>
+              )}
             </div>
             <div className="ml-auto text-right">
               <p className="text-xs text-muted-foreground">{slots.filter(s => s.tipo === 'TRABALHO').length} turnos</p>
@@ -328,10 +382,11 @@ export default function EscalasSection({
             </div>
 
             {/* Rows per colaborador */}
-            {colabsSetor.map(colab => (
+            {linhasGrade.map(colab => (
               <div key={colab.id} className="grid grid-cols-8 gap-1 mb-1">
-                <div className="flex items-center text-xs font-medium p-2 truncate bg-background-subtle rounded">
-                  {colab.nome}
+                <div className="flex flex-col justify-center text-xs font-medium p-2 bg-background-subtle rounded min-w-0">
+                  <span className="truncate">{colab.nome}</span>
+                  {colab.marca && <span className="text-[10px] font-normal text-muted-foreground">{colab.marca}</span>}
                 </div>
                 {weekDays.map((day, i) => {
                   const dayStr = format(day, 'yyyy-MM-dd');
@@ -353,7 +408,7 @@ export default function EscalasSection({
                           )}
                         </div>
                       ))}
-                      {canManage && escala.status === 'RASCUNHO' && (
+                      {canManage && escala.status === 'RASCUNHO' && !colab.marca && (
                         <button
                           onClick={() => { setSelectedDay(dayStr); setSlotForm(p => ({ ...p, colaborador_id: colab.id })); setShowAddSlot(true); }}
                           className="absolute inset-0 opacity-0 group-hover:opacity-100 flex items-center justify-center bg-primary-soft rounded transition-opacity"
@@ -367,7 +422,7 @@ export default function EscalasSection({
               </div>
             ))}
 
-            {colabsSetor.length === 0 && (
+            {linhasGrade.length === 0 && (
               <p className="text-sm text-muted-foreground text-center py-8">Nenhum colaborador neste setor.</p>
             )}
           </div>

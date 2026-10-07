@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { usePersistedTab } from '@/hooks/usePersistedTab';
 import { useTravaEnvio } from '@/hooks/useTravaEnvio';
 import { chavePonto, sementeDaBatida, type BatidaPonto } from '@/domain/rh/idempotencia';
+import { mensagemErroEdicaoColaborador } from '@/domain/rh/prontuario';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { DecimalInput, parseDecimal } from '@/components/ui/decimal-input';
 import { CurrencyInput } from '@/components/ui/brl-input';
@@ -316,6 +317,11 @@ function RhViewInner({ visibleSubtabs, user }: {
   };
 
   const handleOpenEdit = (c: Colaborador) => {
+    // O formulário reenvia CPF e remuneração: abrir com valor mascarado gravaria zero por cima.
+    if (c.remuneracao_visivel === false) {
+      toast.error('Sem acesso aos dados completos deste colaborador para editar.');
+      return;
+    }
     setEditingColab(c);
     setEditForm({
       nome: c.nome, email: c.email, telefone: c.telefone, cpf: c.cpf || '',
@@ -332,18 +338,22 @@ function RhViewInner({ visibleSubtabs, user }: {
     if (!editForm.nome.trim()) { toast.error('Nome é obrigatório'); return; }
     setSavingEditColab(true);
     try {
-      const payload: any = {
-        nome: padronizarTexto(editForm.nome), email: editForm.email, telefone: editForm.telefone,
-        cpf: editForm.cpf || null, cargo: padronizarTexto(editForm.cargo), funcao: padronizarTexto(editForm.funcao),
-        setor: editForm.setor, tipo_contrato: editForm.tipo_contrato,
-        carga_horaria_semanal: parseDecimal(editForm.carga_horaria_semanal) ?? 44,
-        salario: normalizeBRLMoneyToNumber(editForm.salario) ?? 0,
-        valor_hora: normalizeBRLMoneyToNumber(editForm.valor_hora) ?? 0,
-        data_admissao: editForm.data_admissao,
-        user_id: editForm.user_id || null,
-      };
-      const { error } = await supabase.from('rh_colaboradores').update(payload).eq('id', editingColab.id);
-      if (error) { toast.error('Erro: ' + error.message); return; }
+      // Pela RPC, não pela tabela: a RLS de UPDATE só aceita :manage e devolvia 0 linhas
+      // sem erro para quem tem :edit — a tela confirmava sem ter gravado nada.
+      // Remuneração e usuário vinculado são de :manage (o servidor recusa a mudança):
+      // sem ela, volta o valor que veio do banco, sem passar pelo campo de texto.
+      const { error } = await (supabase.rpc as any)('rh_atualizar_colaborador', {
+        p_id: editingColab.id,
+        p_nome: padronizarTexto(editForm.nome), p_email: editForm.email, p_telefone: editForm.telefone,
+        p_cpf: editForm.cpf || null, p_cargo: padronizarTexto(editForm.cargo), p_funcao: padronizarTexto(editForm.funcao),
+        p_setor: editForm.setor, p_tipo_contrato: editForm.tipo_contrato,
+        p_carga_horaria_semanal: parseDecimal(editForm.carga_horaria_semanal) ?? 44,
+        p_salario: canManageProntuario ? (normalizeBRLMoneyToNumber(editForm.salario) ?? 0) : editingColab.salario,
+        p_valor_hora: canManageProntuario ? (normalizeBRLMoneyToNumber(editForm.valor_hora) ?? 0) : editingColab.valor_hora,
+        p_data_admissao: editForm.data_admissao,
+        p_user_id: canManageProntuario ? (editForm.user_id || null) : (editingColab.user_id ?? null),
+      });
+      if (error) { console.error(error); toast.error(mensagemErroEdicaoColaborador(error.message)); return; }
       toast.success('Colaborador atualizado!');
       setShowEditColab(false);
       setEditingColab(null);
@@ -356,15 +366,18 @@ function RhViewInner({ visibleSubtabs, user }: {
   const handleDesativar = async (id: string) => {
     const ok = await confirm({ title: 'Desativar colaborador', description: 'Tem certeza que deseja desativar este colaborador? O histórico será mantido.', confirmLabel: 'Desativar', variant: 'destructive' });
     if (!ok) return;
-    const { error } = await supabase.from('rh_colaboradores').update({ status: 'inativo' }).eq('id', id);
-    if (error) { toast.error('Erro: ' + error.message); return; }
+    // A RLS descarta o UPDATE sem erro para quem não pode: confere a linha devolvida.
+    const { data, error } = await supabase.from('rh_colaboradores').update({ status: 'inativo' }).eq('id', id).select('id');
+    if (error) { console.error(error); toast.error('Erro: ' + error.message); return; }
+    if (!data?.length) { toast.error('Você não tem permissão para desativar colaboradores.'); return; }
     toast.success('Colaborador desativado.');
     fetchColaboradores();
   };
 
   const handleReativar = async (id: string) => {
-    const { error } = await supabase.from('rh_colaboradores').update({ status: 'ativo' }).eq('id', id);
-    if (error) { toast.error('Erro: ' + error.message); return; }
+    const { data, error } = await supabase.from('rh_colaboradores').update({ status: 'ativo' }).eq('id', id).select('id');
+    if (error) { console.error(error); toast.error('Erro: ' + error.message); return; }
+    if (!data?.length) { toast.error('Você não tem permissão para reativar colaboradores.'); return; }
     toast.success('Colaborador reativado.');
     fetchColaboradores();
   };
@@ -555,11 +568,11 @@ function RhViewInner({ visibleSubtabs, user }: {
         </div>
         <div>
           <Label>Salário (R$)</Label>
-          <CurrencyInput className="h-9" value={form.salario} onValueChange={(raw) => setForm(p => ({ ...p, salario: raw }))} showPrefix maxDecimals={2} />
+          <CurrencyInput className="h-9" value={form.salario} onValueChange={(raw) => setForm(p => ({ ...p, salario: raw }))} showPrefix maxDecimals={2} disabled={isEdit && !canManageProntuario} />
         </div>
         <div>
           <Label>Valor/Hora (R$)</Label>
-          <CurrencyInput className="h-9" value={form.valor_hora} onValueChange={(raw) => setForm(p => ({ ...p, valor_hora: raw }))} showPrefix maxDecimals={2} />
+          <CurrencyInput className="h-9" value={form.valor_hora} onValueChange={(raw) => setForm(p => ({ ...p, valor_hora: raw }))} showPrefix maxDecimals={2} disabled={isEdit && !canManageProntuario} />
         </div>
       </div>
       <div className="grid grid-cols-2 gap-3">
@@ -569,7 +582,7 @@ function RhViewInner({ visibleSubtabs, user }: {
         </div>
         <div>
           <Label>Vincular Usuário (opcional)</Label>
-          <Select value={form.user_id} onValueChange={v => setForm(p => ({ ...p, user_id: v }))}>
+          <Select value={form.user_id} onValueChange={v => setForm(p => ({ ...p, user_id: v }))} disabled={isEdit && !canManageProntuario}>
             <SelectTrigger><SelectValue placeholder="Nenhum" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="">Nenhum</SelectItem>
@@ -578,6 +591,9 @@ function RhViewInner({ visibleSubtabs, user }: {
           </Select>
         </div>
       </div>
+      {isEdit && !canManageProntuario && (
+        <p className="text-xs text-muted-foreground">Salário, valor/hora e usuário vinculado só podem ser alterados por quem gerencia o Prontuário.</p>
+      )}
     </div>
   );
 
