@@ -31,9 +31,11 @@ Deno.serve(withRequestCors(async (req) => {
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey, { global: { headers: companyHeaders(req) } });
 
-    // ── Permission: system:global:manage ──
-    const { data: hasPerm } = await adminClient.rpc('has_permission', { _user_id: callerUserId, _permission: 'system:global:manage' });
-    if (hasPerm !== true) return json({ error: 'Sem permissão (system:global:manage)' }, 403);
+    // ── Permission: super admin, ou Empresas → Criar com a unidade da plataforma ativa ──
+    // Avaliado como o próprio usuário: o banco valida o x-company-id contra o membership.
+    const { data: canCreate, error: gateError } = await authClient.rpc('can_manage_companies', { p_action: 'create' });
+    if (gateError) throw gateError;
+    if (canCreate !== true) return json({ error: 'Sem permissão (configuracoes:empresas:create)' }, 403);
 
     // ── Parse body ──
     let body: Record<string, any>;

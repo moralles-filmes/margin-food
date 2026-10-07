@@ -29,6 +29,8 @@ interface Company {
   total_usuarios: number;
   /** Algum membro ativo gerencia usuários: aí o acesso é concedido pela própria empresa. */
   tem_gestor?: boolean;
+  /** Unidade da plataforma (Moralles): não pode ser desativada. */
+  plataforma?: boolean;
 }
 
 function extractEdgeFnError(data: any, error: any): string {
@@ -43,6 +45,9 @@ export default function AdminCompaniesView() {
   const { user } = useAuth();
   const canCreate = useCan('configuracoes:empresas:create');
   const canEdit = useCan('configuracoes:empresas:edit');
+  const canDeactivate = useCan('configuracoes:empresas:delete');
+  // Delegado de Empresas só cria o 1º Admin de empresa sem nenhum usuário (o banco confere).
+  const isSuperAdmin = useCan('system:global:manage');
 
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
@@ -86,7 +91,7 @@ export default function AdminCompaniesView() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [supabase]);
 
   useEffect(() => { fetchCompanies(); }, [fetchCompanies]);
 
@@ -297,10 +302,10 @@ export default function AdminCompaniesView() {
                   <Badge variant={c.ativo ? 'default' : 'destructive'} className="text-[10px]">
                     {c.ativo ? 'Ativa' : 'Inativa'}
                   </Badge>
-                  {canEdit && (
+                  {(canEdit || canDeactivate) && (
                     <TableActions
                       onEdit={() => openEdit(c)}
-                      onDelete={() => handleToggleAtivo(c)}
+                      onDelete={c.plataforma && c.ativo ? undefined : () => handleToggleAtivo(c)}
                       editPermission="configuracoes:empresas:edit"
                       deletePermission="configuracoes:empresas:delete"
                       deleteConfirmTitle={c.ativo ? 'Desativar empresa?' : 'Reativar empresa?'}
@@ -320,7 +325,12 @@ export default function AdminCompaniesView() {
                   <Users className="w-3.5 h-3.5" />
                   <span>{c.total_usuarios} usuário{c.total_usuarios !== 1 ? 's' : ''}</span>
                 </div>
-                {c.ativo && canCreate && !c.tem_gestor && (
+                {c.ativo && canCreate && !c.tem_gestor && !isSuperAdmin && c.total_usuarios > 0 && (
+                  <span className="text-[10px] text-muted-foreground" title="O 1º Admin de uma unidade que já tem usuários é criado pelo administrador do sistema.">
+                    Sem gestor — fale com o administrador do sistema
+                  </span>
+                )}
+                {c.ativo && canCreate && !c.tem_gestor && (isSuperAdmin || c.total_usuarios === 0) && (
                   <Button
                     variant="outline"
                     size="sm"

@@ -21,6 +21,9 @@ verify_jwt = false
 [functions.admin-users]
 verify_jwt = false
 
+[functions.admin-companies]
+verify_jwt = false
+
 [functions.requisicao-estoque]
 verify_jwt = false
 

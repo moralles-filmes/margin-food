@@ -1,15 +1,18 @@
 import { useState } from 'react';
 import { SubmoduleSwitcher } from '@/components/ui/SubmoduleSwitcher';
-import { Settings, Users, ShieldAlert, Database, Fish, Shield, ShieldCheck, Activity, Plug } from 'lucide-react';
+import { Settings, Users, ShieldAlert, Database, Fish, Shield, ShieldCheck, Activity, Plug, Building2 } from 'lucide-react';
 import AuditView from './AuditView';
 import SecurityAuditView from './SecurityAuditView';
 import GlobalAuditView from './GlobalAuditView';
 import PerformanceMonitorView from './PerformanceMonitorView';
 import AdminUsersView from './AdminUsersView';
+import AdminCompaniesView from './admin/AdminCompaniesView';
 import IntegracoesView from './configuracoes/IntegracoesView';
 import { useSalmonStore } from '@/hooks/useSalmonStore';
+import { useCompanyScope } from '@/contexts/CompanyScopeContext';
 
 import { useCan, useModuleAccess } from '@/permissions';
+import { isPlatformCompany } from '@/permissions/plataforma';
 import { Input } from '@/components/ui/input';
 import { CurrencyInput } from '@/components/ui/brl-input';
 import { DecimalInput, parseDecimal } from '@/components/ui/decimal-input';
@@ -25,19 +28,21 @@ const SUBTAB_MAP: Record<string, string> = {
   'integracoes': 'integracoes',
   'salmao': 'salmon',
   'usuarios': 'usuarios',
+  'empresas': 'empresas',
   'audit-global': 'auditoria-sistema',
   'performance': 'performance',
   'seguranca': 'auditoria-seguranca',
   'auditoria': 'auditoria-compras',
 };
 
-type SubView = 'geral' | 'integracoes' | 'salmao' | 'usuarios' | 'auditoria' | 'seguranca' | 'audit-global' | 'performance';
+type SubView = 'geral' | 'integracoes' | 'salmao' | 'usuarios' | 'empresas' | 'auditoria' | 'seguranca' | 'audit-global' | 'performance';
 
 const allSubViews: { id: SubView; label: string; icon: typeof Settings; registryKey: string }[] = [
   { id: 'geral', label: 'Geral', icon: Settings, registryKey: 'geral' },
   { id: 'integracoes', label: 'Integrações', icon: Plug, registryKey: 'integracoes' },
   { id: 'salmao', label: 'Salmão', icon: Fish, registryKey: 'salmon' },
   { id: 'usuarios', label: 'Usuários', icon: Users, registryKey: 'usuarios' },
+  { id: 'empresas', label: 'Empresas', icon: Building2, registryKey: 'empresas' },
   { id: 'audit-global', label: 'Auditoria Sistema', icon: ShieldCheck, registryKey: 'auditoria-sistema' },
   { id: 'performance', label: 'Performance', icon: Activity, registryKey: 'performance' },
   { id: 'seguranca', label: 'Auditoria Segurança', icon: Shield, registryKey: 'auditoria-seguranca' },
@@ -54,6 +59,7 @@ export default function ConfiguracoesView({ store, initialSubTab }: Props) {
   const [activeView, setActiveView] = useState<SubView>(initialSubTab ?? 'geral');
   const { stockConfig, setStockConfig } = store;
   const { visibleSubtabs } = useModuleAccess('configuracoes');
+  const companyId = useCompanyScope()?.companyId ?? null;
 
   // Granular permission checks for actions
   const canManageGeral = useCan('configuracoes:geral:manage');
@@ -75,8 +81,10 @@ export default function ConfiguracoesView({ store, initialSubTab }: Props) {
     toast.success('Configurações de salmão atualizadas!');
   };
 
-  // Filter subtabs by permission
-  const visibleViews = allSubViews.filter(v => visibleSubtabs.includes(v.registryKey));
+  // Filter subtabs by permission. Empresas só existe na unidade da plataforma
+  // (o banco também só aceita a chave com ela ativa).
+  const visibleViews = allSubViews.filter(v => visibleSubtabs.includes(v.registryKey)
+    && (v.registryKey !== 'empresas' || isPlatformCompany(companyId)));
 
   // If active view is not visible, switch to first visible
   const effectiveActive = visibleViews.some(v => v.id === activeView)
@@ -193,6 +201,7 @@ export default function ConfiguracoesView({ store, initialSubTab }: Props) {
           </Card>
         )
       )}
+      {effectiveActive === 'empresas' && <AdminCompaniesView />}
       {effectiveActive === 'audit-global' && <GlobalAuditView />}
       {effectiveActive === 'performance' && <PerformanceMonitorView />}
       {effectiveActive === 'seguranca' && <SecurityAuditView />}

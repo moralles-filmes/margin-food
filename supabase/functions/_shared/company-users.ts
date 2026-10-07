@@ -16,6 +16,9 @@ const MEMBERSHIP_ERRORS: Record<string, string> = {
   COMPANY_HAS_USER_MANAGER: 'Esta unidade já tem administrador. Novos acessos são criados pelo admin da própria unidade.',
   GLOBAL_KEY_REMOVAL_DENIED: 'A permissão de administração do sistema não sai pela edição de usuário. Use a tela de Super Admin, com dupla confirmação.',
   COMPANY_INACTIVE: 'Esta empresa está inativa.',
+  COMPANY_ALREADY_HAS_MEMBERS: 'Esta unidade já tem usuários. O 1º Admin dela só pode ser criado pelo administrador do sistema.',
+  PRIVILEGE_ESCALATION_DENIED: 'Você não pode conceder um perfil ou permissão que vai além do seu próprio acesso.',
+  PERMISSION_DENIED: 'Você não tem permissão para gerenciar os acessos desta unidade.',
 };
 
 export function describeMembershipError(message: string): string | null {
