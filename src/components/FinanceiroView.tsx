@@ -3,7 +3,6 @@ import { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react
 import { useModuleBadges } from '@/contexts/ModuleBadgesContext';
 import { usePersistedTab } from '@/hooks/usePersistedTab';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
 import { useCan, useModuleAccess } from '@/permissions';
 import { ModuleNav, type ModuleNavItem } from '@/components/ui/ModuleNav';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
@@ -14,7 +13,7 @@ import {
   LayoutDashboard, FolderTree, Landmark, Receipt,
   DollarSign, TrendingUp, LayoutGrid, Settings,
   Building2, RefreshCw, CreditCard, ArrowDownToLine, Activity, BarChart3,
-  Target, Bell, ClipboardList, BookOpen
+  Target, Bell, ClipboardList
 } from 'lucide-react';
 import ContasPagarSection from '@/components/financeiro/ContasPagarSection';
 import ContasReceberSection from '@/components/financeiro/ContasReceberSection';
@@ -35,11 +34,11 @@ const KPIsSection = lazy(() => import('@/components/financeiro/KPIsSection'));
 const AuditoriaFinSection = lazy(() => import('@/components/financeiro/AuditoriaFinSection'));
 const ComparativoSection = lazy(() => import('@/components/financeiro/ComparativoSection'));
 const CmvFinanceiroSection = lazy(() => import('@/components/financeiro/cmv/CmvFinanceiroSection'));
+const FornecedoresFinSection = lazy(() => import('@/components/financeiro/FornecedoresFinSection'));
 import FechamentoCaixaSection from '@/components/financeiro/FechamentoCaixaSection';
 import CadastroBaseTree from '@/components/financeiro/CadastroBaseTree';
 import ContasBancariasSection from '@/components/financeiro/ContasBancariasSection';
 import LivroRazaoSection from '@/components/financeiro/LivroRazaoSection';
-import PlanoContasFinSection from '@/components/financeiro/PlanoContasFinSection';
 import CentrosCustoFinSection from '@/components/financeiro/CentrosCustoFinSection';
 
 type FinSubTab = 'dashboard' | 'cadastros' | 'contas' | 'lancamentos' | 'pagar' | 'codigos_pagamento' | 'receber' | 'fluxo' | 'dre' | 'orcamento' | 'conciliacao' | 'alertas' | 'recorrencias' | 'categorizacao' | 'bordero' | 'apresentacao_socios' | 'projecao' | 'kpis' | 'auditoria' | 'comparativo' | 'fechamento' | 'cmv';
@@ -47,13 +46,14 @@ type FinSubTab = 'dashboard' | 'cadastros' | 'contas' | 'lancamentos' | 'pagar' 
 // DashboardFinanceiro extracted to src/components/financeiro/DashboardFinanceiroSection.tsx
 
 // ==================== CADASTROS BASE ====================
-type CadastroSubView = 'arvore' | 'plano' | 'centros';
+type CadastroSubView = 'arvore' | 'centros' | 'fornecedores';
 
 // Mesmo seletor de sub-módulo do Fechamento de Caixa (CLAUDE.md: substitui a fileira de botões).
 const CADASTROS_ITEMS: SubmoduleItem<CadastroSubView>[] = [
   { id: 'arvore', label: 'Estrutura de Categorias', icon: FolderTree },
-  { id: 'plano', label: 'Plano de Contas', icon: BookOpen },
   { id: 'centros', label: 'Centros de Custo', icon: Target },
+  // Mesma tabela `suppliers` de Compras: o que se cadastra num módulo aparece no outro.
+  { id: 'fornecedores', label: 'Fornecedores', icon: Building2 },
 ];
 
 function CadastrosBase() {
@@ -71,8 +71,8 @@ function CadastrosBase() {
         ariaLabel="Cadastro exibido"
       />
       {subView === 'arvore' && <CadastroBaseTree />}
-      {subView === 'plano' && <PlanoContasFinSection canCreate={canCreate} canEdit={canEdit} canDelete={canDelete} />}
       {subView === 'centros' && <CentrosCustoFinSection canCreate={canCreate} canEdit={canEdit} canDelete={canDelete} />}
+      {subView === 'fornecedores' && <Suspense fallback={<FinSpinner />}><FornecedoresFinSection /></Suspense>}
     </div>
   );
 }
@@ -104,13 +104,25 @@ function LancamentosSection({ initialContaId, initialDateFrom, initialDateTo, in
 }
 
 // ==================== DRE / DFC WRAPPER ====================
+// Trocar desmonta o demonstrativo e recarrega os dados: ativação manual, como em Lançamentos (D39).
+// Cada lado mantém a própria permissão (o DFC exige financeiro:fluxo:view — PF-002).
+const DEMONSTRATIVO_VIEWS = [
+  { value: 'dre', label: 'DRE' },
+  { value: 'dfc', label: 'DFC' },
+];
+
 function DREDFCSection() {
   const [innerTab, setInnerTab] = useState<'dre' | 'dfc'>('dre');
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2 mb-2">
-        <Button variant={innerTab === 'dre' ? 'default' : 'outline'} size="sm" onClick={() => setInnerTab('dre')}>DRE</Button>
-        <Button variant={innerTab === 'dfc' ? 'default' : 'outline'} size="sm" onClick={() => setInnerTab('dfc')}>DFC</Button>
+      <div className="max-w-full overflow-x-auto">
+        <SegmentedControl
+          ariaLabel="Demonstrativo exibido"
+          manualActivation
+          options={DEMONSTRATIVO_VIEWS}
+          value={innerTab}
+          onChange={v => setInnerTab(v as 'dre' | 'dfc')}
+        />
       </div>
       {innerTab === 'dre' ? <DRESection /> : <DFCSection />}
     </div>

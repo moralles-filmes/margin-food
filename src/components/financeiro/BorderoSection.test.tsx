@@ -232,6 +232,70 @@ describe('Borderô — tela', () => {
     expect(within(paidRow).getAllByText('R$15.000,00')).toHaveLength(2); // coluna Pagas + Total
   });
 
+  it('V2 — saldo final em destaque azul quando cobre as contas; negativo fica em card branco de perigo', () => {
+    state.responses.set(WEEK, ready(weekReport()));
+    const { unmount } = render(<BorderoSection />);
+    const positivo = screen.getByText(/Saldo final provisionado · Positivo/).closest('.animate-fade-up') as HTMLElement;
+    expect(positivo.className).toContain('bg-gradient-highlight');
+    unmount();
+    state.responses.set(WEEK, ready(buildBorderoReport(createBorderoPayload({
+      items: [borderoItem('c-adm', 5_000_000)],
+      accounts: [borderoAccount('Banco', 2_000_000)],
+    }))));
+    render(<BorderoSection />);
+    const negativo = screen.getByText(/Saldo final provisionado · Negativo/).closest('.animate-fade-up') as HTMLElement;
+    expect(negativo.className).not.toContain('bg-gradient-highlight');
+    expect(within(negativo).getByText('-R$30.000,00').className).toContain('text-destructive');
+    expect(screen.getByText('31/08/2026 a 06/09/2026', { selector: 'p' })).toBeInTheDocument();
+  });
+
+  it('V2 — composição do saldo devolve o foco ao card ao fechar; conta sem saldo tem selo', async () => {
+    state.responses.set(WEEK, ready(buildBorderoReport(createBorderoPayload({
+      accounts: [borderoAccount('Banco A', 1_000_000), borderoAccount('Caixa', 0, { balanceAvailable: false, bank: null })],
+    }))));
+    render(<BorderoSection />);
+    const card = screen.getByRole('button', { name: 'Saldo das contas — ver composição' });
+    card.focus();
+    fireEvent.click(card);
+    const dialog = await screen.findByRole('dialog', { name: 'Composição do saldo das contas' });
+    expect(within(dialog).getByText('Saldo indisponível')).toBeInTheDocument();
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    await waitFor(() => expect(document.activeElement).toBe(card));
+  });
+
+  it('V2 — tipo de período com ativação manual: seta move o foco, não troca o período', () => {
+    state.responses.set(WEEK, ready(weekReport()));
+    render(<BorderoSection />);
+    const semana = screen.getByRole('radio', { name: 'Semana' });
+    expect(screen.getByRole('radiogroup', { name: 'Tipo de período' })).toBeInTheDocument();
+    fireEvent.keyDown(semana, { key: 'ArrowRight' });
+    expect(screen.getByTestId('bordero-period-label')).toHaveTextContent('31/08/2026 a 06/09/2026');
+    expect(state.calls.at(-1)?.period).toEqual({ start: '2026-08-31', end: '2026-09-06' });
+  });
+
+  it('V2 — no celular a tabela vira lista com os mesmos totais e o detalhe por categoria', () => {
+    const original = window.innerWidth;
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
+    try {
+      const report = weekReport();
+      state.responses.set(WEEK, ready(report));
+      render(<BorderoSection />);
+      const model = buildBorderoPdfModel(report, { mode: 'week' });
+      expect(screen.queryByRole('table')).not.toBeInTheDocument();
+      expect(screen.getByTestId('bordero-table-total')).toHaveTextContent(model.totals[0].value);
+      expect(screen.getByTestId('bordero-table-paid')).toHaveTextContent(model.totals[0].paid);
+      expect(screen.getByTestId('bordero-table-open')).toHaveTextContent(model.totals[0].open);
+      fireEvent.click(screen.getByRole('button', { name: 'Expandir CMV' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Expandir Peixes e frutos do mar' }));
+      const itens = screen.getByRole('list', { name: 'Despesas de Peixes e frutos do mar' });
+      expect(within(itens).getAllByText('Peixaria Atlantico').length).toBeGreaterThan(0);
+      expect(within(itens).getByText('A vencer: R$20.000,00')).toBeInTheDocument();
+    } finally {
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: original });
+    }
+  });
+
   it('contas a vencer mostra quantas já venceram dentro do período', () => {
     state.responses.set(WEEK, ready(buildBorderoReport(createBorderoPayload({
       items: [borderoItem('c-adm', 100, { dueDate: '2026-09-01' }), borderoItem('c-adm', 200, { dueDate: '2026-09-04' })],

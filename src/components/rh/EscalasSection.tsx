@@ -1,7 +1,5 @@
-import { useCompanyId } from '@/hooks/useCompanyId';
-import { withCompanyId } from '@/lib/companyPayload';
 import { useSupabase } from '@/contexts/CompanyScopeContext';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useScopedToast } from '@/hooks/useScopedToast';
 import { useTravaEnvio } from '@/hooks/useTravaEnvio';
@@ -18,6 +16,9 @@ import { format, addDays, startOfWeek, addWeeks, subWeeks } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { fmtBRL } from '@/lib/formatters';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
+import { calcularCustoEscala } from '@/domain/rh/custoEscala';
+import { mensagemErroEscala } from '@/domain/rh/escala';
+import { sortByName } from '@/lib/sortByName';
 
 import { useCan } from '@/permissions/hooks';
 const SETORES = ['cozinha', 'sushi', 'limpeza', 'salao', 'copa'];
@@ -31,8 +32,12 @@ interface Colaborador {
   nome: string;
   setor: string;
   funcao: string;
-  valor_hora: number;
+  valor_hora: number | null;
+  salario?: number | null;
   carga_horaria_semanal: number;
+  status?: string;
+  // false quando quem vê a escala não tem acesso à remuneração (valor_hora vem nulo).
+  remuneracao_visivel?: boolean;
 }
 
 interface Escala {
@@ -40,7 +45,6 @@ interface Escala {
   semana_inicio: string;
   setor: string;
   status: string;
-  custo_projetado: number;
   observacoes: string;
 }
 
@@ -67,16 +71,16 @@ interface TrocaTurno {
 
 interface Props {
   colaboradores: Colaborador[];
-  canManage: boolean;
 }
 
-export default function EscalasSection({
- colaboradores, canManage }: Props) {
+export default function EscalasSection({ colaboradores }: Props) {
   const toast = useScopedToast();
   const supabase = useSupabase();
-  const { companyId } = useCompanyId();
   const canViewRbac = useCan('rh:escalas:view');
-  const { user, profile } = useAuth();
+  // Mesmas chaves das RPCs rh_escala_*: criar a semana é :create; turnos, publicação e trocas, :edit.
+  const canCreate = useCan('rh:escalas:create');
+  const canEdit = useCan('rh:escalas:edit');
+  const { profile } = useAuth();
   const { confirm, ConfirmDialog } = useConfirmDialog();
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [setor, setSetor] = useState('salao');
@@ -99,13 +103,29 @@ export default function EscalasSection({
   const weekStartStr = format(weekStart, 'yyyy-MM-dd');
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
-  const colabsSetor = colaboradores.filter(c => c.setor === setor);
+  // Só ativos recebem turno novo (a lista do RH inclui inativos quando o Prontuário mostra inativos).
+  const colabsSetor = colaboradores.filter(c => c.setor === setor && c.status !== 'inativo');
+
+  // Colaboradores com turno na escala que não estão na lista do RH (vem só com ativos):
+  // buscados à parte para o custo e os nomes não ignorarem quem foi desativado.
+  const [colabsExtras, setColabsExtras] = useState<Colaborador[]>([]);
+  const [erroExtras, setErroExtras] = useState(false);
+  // Buscados sem erro e não devolvidos: dado inconsistente, não "ainda carregando".
+  const [naoEncontrados, setNaoEncontrados] = useState<ReadonlySet<string>>(() => new Set());
+  const colabsPorId = useMemo(() => {
+    const mapa = new Map<string, Colaborador>();
+    for (const c of colabsExtras) mapa.set(c.id, c);
+    for (const c of colaboradores) mapa.set(c.id, c);
+    return mapa;
+  }, [colaboradores, colabsExtras]);
 
   const fetchEscala = useCallback(async () => {
     setLoading(true);
     const { data: escalaData } = await supabase
       .from('rh_escalas')
-      .select('id, setor, semana_inicio, status, custo_projetado, observacoes, created_at, created_by')
+      // custo_projetado não é legível pelo cliente (o servidor calcula e guarda na publicação):
+      // a tela recalcula pela lista de colaboradores, que respeita o acesso à remuneração.
+      .select('id, setor, semana_inicio, status, observacoes, created_at, created_by')
       .eq('company_id', profile?.company_id ?? '')
       .eq('semana_inicio', weekStartStr)
       .eq('setor', setor)
@@ -140,67 +160,89 @@ export default function EscalasSection({
 
   useEffect(() => { fetchEscala(); }, [fetchEscala]);
 
+  const faltantes = useMemo(
+    () => [...new Set(slots.map(s => s.colaborador_id))]
+      .filter(id => !colabsPorId.has(id) && !naoEncontrados.has(id)).sort().join(','),
+    [slots, colabsPorId, naoEncontrados],
+  );
+
+  useEffect(() => {
+    if (!faltantes) return;
+    let cancelado = false;
+    setErroExtras(false);
+    (async () => {
+      const ids = faltantes.split(',');
+      const { data, error } = await (supabase.rpc as any)('rh_listar_colaboradores', { p_incluir_inativos: true })
+        .in('id', ids);
+      if (cancelado) return;
+      if (error) { console.error(error); setErroExtras(true); return; }
+      const vieram = (data ?? []) as Colaborador[];
+      if (vieram.length) setColabsExtras(prev => [...prev, ...vieram]);
+      const sumidos = ids.filter(id => !vieram.some(c => c.id === id));
+      if (sumidos.length) setNaoEncontrados(prev => new Set([...prev, ...sumidos]));
+    })();
+    return () => { cancelado = true; };
+  }, [supabase, faltantes]);
+
   const [savingEscala, setSavingEscala] = useState(false);
   const { enviando: savingSlot, executar: executarSlot } = useTravaEnvio();
+  const { enviando: publicando, executar: executarPublicar } = useTravaEnvio();
+
+  // Erro de RPC: a escala pode ter mudado por outra pessoa (publicada, turno removido), então recarrega.
+  const falhou = (error: { message?: string }) => {
+    console.error(error);
+    toast.error(mensagemErroEscala(error.message));
+    fetchEscala();
+  };
 
   const handleCreateEscala = async () => {
     if (savingEscala) return;
     setSavingEscala(true);
     try {
-      const { data, error } = await supabase.from('rh_escalas').insert({
-        semana_inicio: weekStartStr,
-        setor,
-        created_by: user?.id,
-        company_id: profile?.company_id,
-      }).select().single();
-      if (error) { toast.error('Erro: ' + error.message); return; }
+      // Uma escala por semana e setor: o reenvio devolve a mesma.
+      const { error } = await (supabase.rpc as any)('rh_escala_criar', { p_semana_inicio: weekStartStr, p_setor: setor });
+      if (error) { falhou(error); return; }
       toast.success('Escala criada!');
-      setEscala(data);
+      fetchEscala();
     } finally {
       setSavingEscala(false);
     }
   };
 
-  const handlePublicar = async () => {
+  const handlePublicar = () => executarPublicar(async () => {
     if (!escala) return;
-    // Calculate projected cost
-    let custoTotal = 0;
-    for (const slot of slots) {
-      if (slot.tipo !== 'TRABALHO') continue;
-      const colab = colaboradores.find(c => c.id === slot.colaborador_id);
-      if (!colab || !colab.valor_hora) continue;
-      const [hi, mi] = slot.hora_inicio.split(':').map(Number);
-      const [hf, mf] = slot.hora_fim.split(':').map(Number);
-      const horas = (hf * 60 + mf - hi * 60 - mi) / 60;
-      custoTotal += horas * colab.valor_hora;
-    }
-
-    const { error } = await supabase.from('rh_escalas').update({
-      status: 'PUBLICADA',
-      publicada_em: new Date().toISOString(), // timestamptz — UTC is correct
-      publicada_por: user?.id,
-      custo_projetado: Math.round(custoTotal * 100) / 100,
-    }).eq('id', escala.id);
-    if (error) { toast.error('Erro: ' + error.message); return; }
+    const ok = await confirm({
+      title: 'Publicar escala',
+      description: 'Depois de publicada, a escala não pode mais ser alterada. Publicar com os turnos que estão na tela?',
+      confirmLabel: 'Publicar',
+    });
+    if (!ok) return;
+    // O servidor calcula o custo projetado com a remuneração completa e recusa a publicação
+    // se os turnos mudaram desde que esta tela os carregou.
+    const { error } = await (supabase.rpc as any)('rh_escala_publicar', {
+      p_escala_id: escala.id,
+      p_turnos_vistos: slots.map(s => s.id),
+    });
+    if (error) { falhou(error); return; }
     toast.success('Escala publicada!');
     fetchEscala();
-  };
+  });
 
   const handleAddSlot = () => executarSlot(async () => {
     if (!escala || !slotForm.colaborador_id || !selectedDay) {
       toast.error('Preencha todos os campos'); return;
     }
-    const { error } = await supabase.from('rh_escala_slots').insert(withCompanyId(companyId, {
-      escala_id: escala.id,
-      colaborador_id: slotForm.colaborador_id,
-      dia: selectedDay,
-      hora_inicio: slotForm.hora_inicio,
-      hora_fim: slotForm.hora_fim,
-      funcao: slotForm.funcao,
-      tipo: slotForm.tipo,
-      observacao: slotForm.observacao,
-    }));
-    if (error) { toast.error('Erro: ' + error.message); return; }
+    const { error } = await (supabase.rpc as any)('rh_escala_adicionar_turno', {
+      p_escala_id: escala.id,
+      p_colaborador_id: slotForm.colaborador_id,
+      p_dia: selectedDay,
+      p_hora_inicio: slotForm.hora_inicio,
+      p_hora_fim: slotForm.hora_fim,
+      p_funcao: slotForm.funcao,
+      p_tipo: slotForm.tipo,
+      p_observacao: slotForm.observacao,
+    });
+    if (error) { falhou(error); return; }
     toast.success('Turno adicionado!');
     setShowAddSlot(false);
     setSlotForm({ colaborador_id: '', hora_inicio: '08:00', hora_fim: '16:00', funcao: 'Geral', tipo: 'TRABALHO', observacao: '' });
@@ -216,35 +258,39 @@ export default function EscalasSection({
     });
     if (!ok) return;
 
-    const { error } = await supabase.from('rh_escala_slots').delete().eq('id', slotId);
-    if (error) { toast.error('Erro: ' + error.message); return; }
+    const { error } = await (supabase.rpc as any)('rh_escala_remover_turno', { p_slot_id: slotId });
+    if (error) { falhou(error); return; }
     toast.success('Turno removido');
     fetchEscala();
   };
 
   const handleAprovarTroca = async (trocaId: string, aprovado: boolean) => {
-    const { error } = await supabase.from('rh_trocas_turno').update({
-      status: aprovado ? 'APROVADA' : 'REJEITADA',
-      aprovado_por: user?.id,
-      aprovado_em: new Date().toISOString(),
-    }).eq('id', trocaId);
-    if (error) { toast.error('Erro: ' + error.message); return; }
+    const { error } = await (supabase.rpc as any)('rh_escala_decidir_troca', { p_troca_id: trocaId, p_aprovar: aprovado });
+    if (error) { falhou(error); return; }
     toast.success(aprovado ? 'Troca aprovada!' : 'Troca rejeitada');
     fetchEscala();
   };
 
-  const getColabNome = (id: string) => colaboradores.find(c => c.id === id)?.nome || '—';
+  const getColabNome = (id: string) => colabsPorId.get(id)?.nome || '—';
 
-  // Custo projetado calculation
-  const custoProjetadoAtual = slots.reduce((total, slot) => {
-    if (slot.tipo !== 'TRABALHO') return total;
-    const colab = colaboradores.find(c => c.id === slot.colaborador_id);
-    if (!colab?.valor_hora) return total;
-    const [hi, mi] = slot.hora_inicio.split(':').map(Number);
-    const [hf, mf] = slot.hora_fim.split(':').map(Number);
-    const horas = (hf * 60 + mf - hi * 60 - mi) / 60;
-    return total + horas * colab.valor_hora;
-  }, 0);
+  const custo = calcularCustoEscala(slots, colabsPorId);
+  const aguardandoColabs = custo.situacao === 'incompleto' && custo.faltantes.some(id => !naoEncontrados.has(id));
+
+  // Quem tem turno na escala mas não está entre os ativos do setor (desativado ou mudou de
+  // setor) ganha linha própria, sem "adicionar turno": senão o turno conta no custo sem aparecer.
+  const idsSetor = new Set(colabsSetor.map(c => c.id));
+  const linhasForaDoSetor = [...new Set(slots.map(s => s.colaborador_id))]
+    .filter(id => !idsSetor.has(id))
+    .map(id => {
+      const c = colabsPorId.get(id);
+      const marca = !c ? (naoEncontrados.has(id) ? 'não encontrado' : 'carregando')
+        : c.status === 'inativo' ? 'inativo' : 'outro setor';
+      return { id, nome: c?.nome ?? '—', marca };
+    });
+  const linhasGrade = [
+    ...colabsSetor.map(c => ({ id: c.id, nome: c.nome, marca: null as string | null })),
+    ...sortByName(linhasForaDoSetor, l => l.nome),
+  ];
 
   if (loading) {
     return <div className="flex items-center justify-center py-12"><div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>;
@@ -279,11 +325,11 @@ export default function EscalasSection({
           </Badge>
         )}
 
-        {canManage && !escala && (
+        {canCreate && !escala && (
           <Button size="sm" onClick={handleCreateEscala} disabled={savingEscala} className="gap-1.5"><Plus className="w-3.5 h-3.5" /> {savingEscala ? 'Criando...' : 'Criar Escala'}</Button>
         )}
-        {canManage && escala && escala.status === 'RASCUNHO' && (
-          <Button size="sm" onClick={handlePublicar} className="gap-1.5"><Send className="w-3.5 h-3.5" /> Publicar</Button>
+        {canEdit && escala && escala.status === 'RASCUNHO' && (
+          <Button size="sm" onClick={handlePublicar} disabled={publicando || slots.length === 0} className="gap-1.5"><Send className="w-3.5 h-3.5" /> {publicando ? 'Publicando...' : 'Publicar'}</Button>
         )}
       </div>
 
@@ -295,8 +341,16 @@ export default function EscalasSection({
             <div>
               <p className="text-xs text-muted-foreground">Custo projetado da semana</p>
               <p className="text-lg font-bold text-foreground">
-                {fmtBRL(custoProjetadoAtual)}
+                {custo.situacao === 'ok' ? fmtBRL(custo.valor) : '—'}
               </p>
+              {custo.situacao === 'oculto' && <p className="text-xs text-muted-foreground">Sem acesso à remuneração</p>}
+              {custo.situacao === 'incompleto' && (
+                <p className="text-xs text-muted-foreground">
+                  {!aguardandoColabs ? 'Há turno de colaborador não encontrado'
+                    : erroExtras ? 'Não foi possível carregar todos os colaboradores da escala'
+                      : 'Carregando colaboradores da escala…'}
+                </p>
+              )}
             </div>
             <div className="ml-auto text-right">
               <p className="text-xs text-muted-foreground">{slots.filter(s => s.tipo === 'TRABALHO').length} turnos</p>
@@ -322,10 +376,11 @@ export default function EscalasSection({
             </div>
 
             {/* Rows per colaborador */}
-            {colabsSetor.map(colab => (
+            {linhasGrade.map(colab => (
               <div key={colab.id} className="grid grid-cols-8 gap-1 mb-1">
-                <div className="flex items-center text-xs font-medium p-2 truncate bg-background-subtle rounded">
-                  {colab.nome}
+                <div className="flex flex-col justify-center text-xs font-medium p-2 bg-background-subtle rounded min-w-0">
+                  <span className="truncate">{colab.nome}</span>
+                  {colab.marca && <span className="text-[10px] font-normal text-muted-foreground">{colab.marca}</span>}
                 </div>
                 {weekDays.map((day, i) => {
                   const dayStr = format(day, 'yyyy-MM-dd');
@@ -342,12 +397,12 @@ export default function EscalasSection({
                           }`}
                         >
                           {slot.tipo === 'TRABALHO' ? `${slot.hora_inicio.slice(0,5)}–${slot.hora_fim.slice(0,5)}` : slot.tipo}
-                          {canManage && escala.status === 'RASCUNHO' && (
+                          {canEdit && escala.status === 'RASCUNHO' && (
                             <button onClick={() => handleDeleteSlot(slot.id)} className="ml-1 text-destructive hover:text-destructive">×</button>
                           )}
                         </div>
                       ))}
-                      {canManage && escala.status === 'RASCUNHO' && (
+                      {canEdit && escala.status === 'RASCUNHO' && !colab.marca && (
                         <button
                           onClick={() => { setSelectedDay(dayStr); setSlotForm(p => ({ ...p, colaborador_id: colab.id })); setShowAddSlot(true); }}
                           className="absolute inset-0 opacity-0 group-hover:opacity-100 flex items-center justify-center bg-primary-soft rounded transition-opacity"
@@ -361,7 +416,7 @@ export default function EscalasSection({
               </div>
             ))}
 
-            {colabsSetor.length === 0 && (
+            {linhasGrade.length === 0 && (
               <p className="text-sm text-muted-foreground text-center py-8">Nenhum colaborador neste setor.</p>
             )}
           </div>
@@ -371,13 +426,13 @@ export default function EscalasSection({
           <CardContent className="py-12 text-center">
             <CalendarDays className="w-10 h-10 mx-auto mb-3 text-muted-foreground/30" />
             <p className="text-sm text-muted-foreground">Nenhuma escala para esta semana/setor.</p>
-            {canManage && <p className="text-xs text-muted-foreground mt-1">Clique em "Criar Escala" para começar.</p>}
+            {canCreate && <p className="text-xs text-muted-foreground mt-1">Clique em "Criar Escala" para começar.</p>}
           </CardContent>
         </Card>
       )}
 
       {/* Trocas pendentes */}
-      {canManage && trocas.filter(t => t.status === 'PENDENTE').length > 0 && (
+      {canEdit && trocas.filter(t => t.status === 'PENDENTE').length > 0 && (
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">

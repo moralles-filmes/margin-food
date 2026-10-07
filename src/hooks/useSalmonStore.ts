@@ -2,17 +2,43 @@ import { withCompanyId } from '@/lib/companyPayload';
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useCompanyId } from '@/hooks/useCompanyId';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { SalmonEntry, Manipulation, DailyRecord, StockConfig, StockState, Supplier, LotStock, MetaCompraMensal, AuditoriaCompra, LoteSalmaoLimpo, MetaProvisionadaSalmao, SmartSuggestion } from '@/types/salmon';
+import { SalmonEntry, Manipulation, DailyRecord, StockConfig, StockState, LotStock, MetaCompraMensal, AuditoriaCompra, LoteSalmaoLimpo, MetaProvisionadaSalmao, SmartSuggestion } from '@/types/salmon';
 import { supabase } from '@/integrations/supabase/client';
 import { useScopedToast } from '@/hooks/useScopedToast';
+import { useSuppliers } from '@/hooks/useSuppliers';
 import { useEmitDataEvent } from '@/lib/dataEvents';
 import { todayBR } from '@/lib/datetime';
-import { sortByName } from '@/lib/sortByName';
 
 const defaultStockConfig: StockConfig = {
   minGrossKg: 50, minCleanKg: 30, staleDaysLimit: 7,
   perdaPercentAlerta: 15, perdaValorAlerta: 500,
   validadePadraoDias: 2, alertaVencimentoDias: 1,
+};
+
+// Linha de salmon_config → StockConfig. Só cai no padrão quando o valor não veio:
+// zero gravado é zero (com `||` um mínimo 0 voltava como 50 no próximo carregamento).
+function mapDbConfig(row: Record<string, unknown>): StockConfig {
+  const num = (v: unknown, padrao: number) => (v === null || v === undefined || Number.isNaN(Number(v)) ? padrao : Number(v));
+  return {
+    minGrossKg: num(row.min_gross_kg, defaultStockConfig.minGrossKg),
+    minCleanKg: num(row.min_clean_kg, defaultStockConfig.minCleanKg),
+    staleDaysLimit: num(row.stale_days_limit, defaultStockConfig.staleDaysLimit),
+    perdaPercentAlerta: num(row.loss_percent_alert, defaultStockConfig.perdaPercentAlerta),
+    perdaValorAlerta: num(row.loss_value_alert, defaultStockConfig.perdaValorAlerta),
+    validadePadraoDias: num(row.expiration_days, defaultStockConfig.validadePadraoDias),
+    alertaVencimentoDias: num(row.expiration_alert_days, defaultStockConfig.alertaVencimentoDias),
+  };
+}
+
+// Campo do StockConfig → parâmetro de salmon_salvar_config.
+const STOCK_CONFIG_PARAMS: Record<keyof StockConfig, string> = {
+  minGrossKg: 'p_min_gross_kg',
+  minCleanKg: 'p_min_clean_kg',
+  staleDaysLimit: 'p_stale_days_limit',
+  perdaPercentAlerta: 'p_loss_percent_alert',
+  perdaValorAlerta: 'p_loss_value_alert',
+  validadePadraoDias: 'p_expiration_days',
+  alertaVencimentoDias: 'p_expiration_alert_days',
 };
 
 async function getCurrentUserId(): Promise<string | null> {
@@ -102,8 +128,8 @@ export function useSalmonStore() {
   const [manipulations, setManipulations] = useState<Manipulation[]>([]);
   const [dailyRecords, setDailyRecords] = useState<DailyRecord[]>([]);
   const [stockConfig, setStockConfigState] = useState<StockConfig>(defaultStockConfig);
-  const [suppliersRaw, setSuppliers] = useState<Supplier[]>([]);
-  const suppliers = useMemo(() => sortByName(suppliersRaw, s => s.name), [suppliersRaw]);
+  // Fornecedores: cadastro compartilhado com Compras e Financeiro (mesma fonte, mesmo hook).
+  const { suppliers, activeSuppliers, addSupplier, updateSupplier, deleteSupplier } = useSuppliers();
   const [metasCompra, setMetasCompra] = useState<MetaCompraMensal[]>([]);
   const [auditorias, setAuditorias] = useState<AuditoriaCompra[]>([]);
   const [metasProvisionadas, setMetasProvisionadas] = useState<MetaProvisionadaSalmao[]>([]);
@@ -122,7 +148,6 @@ export function useSalmonStore() {
           { data: dbManips },
           { data: dbConfig },
           { data: dbDaily },
-          { data: dbSuppliers },
           { data: dbMetas },
           { data: dbMetasProv },
           { data: dbAuditorias },
@@ -131,7 +156,6 @@ export function useSalmonStore() {
           supabase.from('salmon_manipulations').select('*').eq('status', 'ACTIVE').order('manipulation_date', { ascending: false }),
           supabase.from('salmon_config').select('*').limit(1).maybeSingle(),
           supabase.from('salmon_daily_records').select('*').order('record_date', { ascending: false }),
-          supabase.from('suppliers').select('*').order('name', { ascending: true }),
           supabase.from('planning_metas_compra').select('*').eq('ativo', true).order('year', { ascending: false }).order('month', { ascending: false }),
           supabase.from('salmon_metas_provisionadas').select('*').order('created_at', { ascending: false }),
           supabase.from('salmon_auditorias_compra').select('*').order('created_at', { ascending: false }),
@@ -146,15 +170,7 @@ export function useSalmonStore() {
         }
 
         if (dbConfig) {
-          setStockConfigState({
-            minGrossKg: Number(dbConfig.min_gross_kg) || 50,
-            minCleanKg: Number(dbConfig.min_clean_kg) || 30,
-            staleDaysLimit: Number(dbConfig.stale_days_limit) || 7,
-            perdaPercentAlerta: Number(dbConfig.loss_percent_alert) || 15,
-            perdaValorAlerta: Number(dbConfig.loss_value_alert) || 500,
-            validadePadraoDias: Number(dbConfig.expiration_days) || 2,
-            alertaVencimentoDias: Number(dbConfig.expiration_alert_days) || 1,
-          });
+          setStockConfigState(mapDbConfig(dbConfig));
         }
 
         if (dbDaily && dbDaily.length > 0) {
@@ -164,24 +180,6 @@ export function useSalmonStore() {
             revenue: Number(r.revenue) || 0,
             customers: r.clients_count || 0,
             createdAt: r.created_at,
-          })));
-        }
-
-        if (dbSuppliers && dbSuppliers.length > 0) {
-          setSuppliers(dbSuppliers.map((s: any) => ({
-            id: s.id,
-            name: s.name,
-            cnpj: (s.contact_info as any)?.cnpj || '',
-            contact: (s.contact_info as any)?.contact || '',
-            notes: (s.contact_info as any)?.notes || '',
-            active: s.is_active,
-            categoriasAtendidas: (s.contact_info as any)?.categoriasAtendidas || [],
-            prazoEntregaPadrao: (s.contact_info as any)?.prazoEntregaPadrao || 0,
-            formaPagamentoPadrao: (s.contact_info as any)?.formaPagamentoPadrao || '',
-            createdAt: s.created_at,
-            pedidoMinimoValor: Number(s.minimum_order_value) || 0,
-            pedidoMinimoQtd: Number(s.minimum_order_quantity) || 0,
-            whatsappNumber: s.whatsapp_number || '',
           })));
         }
 
@@ -250,97 +248,6 @@ export function useSalmonStore() {
       }
     })();
   }, [entries, manipulations, supabase]);
-
-  // Supplier CRUD — persisted to suppliers table
-  const addSupplier = useCallback(async (s: Omit<Supplier, 'id' | 'createdAt'>) => {
-    if (!companyId) throw new Error('Unidade não selecionada');
-    const contactInfo = {
-      cnpj: s.cnpj || '',
-      contact: s.contact || '',
-      notes: s.notes || '',
-      categoriasAtendidas: s.categoriasAtendidas || [],
-      prazoEntregaPadrao: s.prazoEntregaPadrao || 0,
-      formaPagamentoPadrao: s.formaPagamentoPadrao || '',
-    };
-    const { data, error } = await supabase
-      .from('suppliers')
-      .insert({
-        company_id: companyId,
-        name: s.name,
-        is_active: s.active,
-        contact_info: contactInfo as any,
-        minimum_order_value: s.pedidoMinimoValor ?? 0,
-        minimum_order_quantity: s.pedidoMinimoQtd ?? 0,
-        whatsapp_number: s.whatsappNumber || null,
-      } as any)
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Erro ao cadastrar fornecedor', error);
-      toast.error('Erro ao cadastrar fornecedor: ' + error.message);
-      throw new Error(error.message);
-    }
-
-    const newS: Supplier = {
-      id: data.id,
-      name: data.name,
-      cnpj: contactInfo.cnpj,
-      contact: contactInfo.contact,
-      notes: contactInfo.notes,
-      active: data.is_active,
-      categoriasAtendidas: contactInfo.categoriasAtendidas,
-      prazoEntregaPadrao: contactInfo.prazoEntregaPadrao,
-      formaPagamentoPadrao: contactInfo.formaPagamentoPadrao,
-      createdAt: data.created_at,
-      pedidoMinimoValor: s.pedidoMinimoValor ?? 0,
-      pedidoMinimoQtd: s.pedidoMinimoQtd ?? 0,
-      whatsappNumber: s.whatsappNumber || '',
-    };
-    setSuppliers(prev => [newS, ...prev]);
-    return newS;
-  }, [supabase, companyId, toast]);
-
-  const updateSupplier = useCallback(async (id: string, data: Partial<Supplier>) => {
-    const current = suppliers.find(s => s.id === id);
-    if (!current) return;
-
-    const merged = { ...current, ...data };
-    const contactInfo = {
-      cnpj: merged.cnpj || '',
-      contact: merged.contact || '',
-      notes: merged.notes || '',
-      categoriasAtendidas: merged.categoriasAtendidas || [],
-      prazoEntregaPadrao: merged.prazoEntregaPadrao || 0,
-      formaPagamentoPadrao: merged.formaPagamentoPadrao || '',
-    };
-    const updatePayload: any = { contact_info: contactInfo as any };
-    if (data.name !== undefined) updatePayload.name = data.name;
-    if (data.active !== undefined) updatePayload.is_active = data.active;
-    if (data.pedidoMinimoValor !== undefined) updatePayload.minimum_order_value = data.pedidoMinimoValor ?? 0;
-    if (data.pedidoMinimoQtd !== undefined) updatePayload.minimum_order_quantity = data.pedidoMinimoQtd ?? 0;
-    if (data.whatsappNumber !== undefined) updatePayload.whatsapp_number = data.whatsappNumber || null;
-
-    const { error } = await supabase.from('suppliers').update(updatePayload).eq('id', id);
-    if (error) {
-      console.error('Erro ao atualizar fornecedor', error);
-      toast.error('Erro ao atualizar fornecedor: ' + error.message);
-      return;
-    }
-    setSuppliers(prev => prev.map(s => s.id === id ? { ...s, ...data } : s));
-  }, [supabase, suppliers, toast]);
-
-  const deleteSupplier = useCallback(async (id: string) => {
-    const { error } = await supabase.from('suppliers').delete().eq('id', id);
-    if (error) {
-      console.error('Erro ao excluir fornecedor', error);
-      toast.error('Erro ao excluir fornecedor: ' + error.message);
-      return;
-    }
-    setSuppliers(prev => prev.filter(s => s.id !== id));
-  }, [supabase, toast]);
-
-  const activeSuppliers = useMemo(() => suppliers.filter(s => s.active), [suppliers]);
 
   // Meta Compra Mensal CRUD — persisted to planning_metas_compra via direct insert/upsert
   const saveMetaCompra = useCallback(async (data: Omit<MetaCompraMensal, 'id' | 'createdAt'>) => {
@@ -689,26 +596,28 @@ export function useSalmonStore() {
     setDailyRecords(prev => prev.filter(r => r.id !== id));
   }, [supabase, toast]);
 
-  const setStockConfig = useCallback(async (config: StockConfig) => {
-    setStockConfigState(config);
-    // Persist to DB
-    try {
-      const { data: existing } = await supabase.from('salmon_config').select('id').limit(1).maybeSingle();
-      if (existing) {
-        await supabase.from('salmon_config').update({
-          min_gross_kg: config.minGrossKg,
-          min_clean_kg: config.minCleanKg,
-          stale_days_limit: config.staleDaysLimit,
-          loss_percent_alert: config.perdaPercentAlerta,
-          loss_value_alert: config.perdaValorAlerta,
-          expiration_days: config.validadePadraoDias,
-          expiration_alert_days: config.alertaVencimentoDias,
-        }).eq('id', existing.id);
-      }
-    } catch (e) {
-      console.error('Error saving salmon config:', e);
+  // Grava só os campos informados (cada tela salva os seus) e devolve se deu certo:
+  // quem chama só confirma ao usuário depois da resposta. A RPC cria a linha da unidade
+  // na primeira gravação — antes o UPDATE sem linha não gravava nada e a tela dizia
+  // "atualizado" mesmo assim.
+  const setStockConfig = useCallback(async (campos: Partial<StockConfig>): Promise<boolean> => {
+    const params: Record<string, number> = {};
+    for (const [campo, param] of Object.entries(STOCK_CONFIG_PARAMS) as [keyof StockConfig, string][]) {
+      const valor = campos[campo];
+      if (valor !== undefined) params[param] = valor;
     }
-  }, [supabase]);
+    const { data, error } = await (supabase.rpc as any)('salmon_salvar_config', params);
+    if (error) {
+      console.error('[useSalmonStore.setStockConfig]', error);
+      const semPermissao = error.code === '42501' || String(error.message ?? '').startsWith('PERMISSION_DENIED');
+      toast.error(semPermissao
+        ? 'Você não tem permissão para alterar estes parâmetros.'
+        : 'Erro ao salvar parâmetros do salmão: ' + error.message);
+      return false;
+    }
+    setStockConfigState(mapDbConfig(data));
+    return true;
+  }, [supabase, toast]);
 
   // Computed stock
   const stock: StockState = useMemo(() => {

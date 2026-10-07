@@ -1,15 +1,18 @@
 import { useState } from 'react';
 import { SubmoduleSwitcher } from '@/components/ui/SubmoduleSwitcher';
-import { Settings, Users, ShieldAlert, Database, Fish, Shield, ShieldCheck, Activity, Plug } from 'lucide-react';
+import { Settings, Users, ShieldAlert, Database, Fish, Shield, ShieldCheck, Activity, Plug, Building2 } from 'lucide-react';
 import AuditView from './AuditView';
 import SecurityAuditView from './SecurityAuditView';
 import GlobalAuditView from './GlobalAuditView';
 import PerformanceMonitorView from './PerformanceMonitorView';
 import AdminUsersView from './AdminUsersView';
+import AdminCompaniesView from './admin/AdminCompaniesView';
 import IntegracoesView from './configuracoes/IntegracoesView';
 import { useSalmonStore } from '@/hooks/useSalmonStore';
+import { useCompanyScope } from '@/contexts/CompanyScopeContext';
 
 import { useCan, useModuleAccess } from '@/permissions';
+import { isPlatformCompany } from '@/permissions/plataforma';
 import { Input } from '@/components/ui/input';
 import { CurrencyInput } from '@/components/ui/brl-input';
 import { DecimalInput, parseDecimal } from '@/components/ui/decimal-input';
@@ -25,19 +28,21 @@ const SUBTAB_MAP: Record<string, string> = {
   'integracoes': 'integracoes',
   'salmao': 'salmon',
   'usuarios': 'usuarios',
+  'empresas': 'empresas',
   'audit-global': 'auditoria-sistema',
   'performance': 'performance',
   'seguranca': 'auditoria-seguranca',
   'auditoria': 'auditoria-compras',
 };
 
-type SubView = 'geral' | 'integracoes' | 'salmao' | 'usuarios' | 'auditoria' | 'seguranca' | 'audit-global' | 'performance';
+type SubView = 'geral' | 'integracoes' | 'salmao' | 'usuarios' | 'empresas' | 'auditoria' | 'seguranca' | 'audit-global' | 'performance';
 
 const allSubViews: { id: SubView; label: string; icon: typeof Settings; registryKey: string }[] = [
   { id: 'geral', label: 'Geral', icon: Settings, registryKey: 'geral' },
   { id: 'integracoes', label: 'Integrações', icon: Plug, registryKey: 'integracoes' },
   { id: 'salmao', label: 'Salmão', icon: Fish, registryKey: 'salmon' },
   { id: 'usuarios', label: 'Usuários', icon: Users, registryKey: 'usuarios' },
+  { id: 'empresas', label: 'Empresas', icon: Building2, registryKey: 'empresas' },
   { id: 'audit-global', label: 'Auditoria Sistema', icon: ShieldCheck, registryKey: 'auditoria-sistema' },
   { id: 'performance', label: 'Performance', icon: Activity, registryKey: 'performance' },
   { id: 'seguranca', label: 'Auditoria Segurança', icon: Shield, registryKey: 'auditoria-seguranca' },
@@ -54,9 +59,12 @@ export default function ConfiguracoesView({ store, initialSubTab }: Props) {
   const [activeView, setActiveView] = useState<SubView>(initialSubTab ?? 'geral');
   const { stockConfig, setStockConfig } = store;
   const { visibleSubtabs } = useModuleAccess('configuracoes');
+  const companyId = useCompanyScope()?.companyId ?? null;
 
   // Granular permission checks for actions
   const canManageGeral = useCan('configuracoes:geral:manage');
+  // Parâmetros do Salmão: a sub-aba tem ação própria no registry; geral:manage continua valendo.
+  const canManageSalmao = useCan('configuracoes:salmon:manage') || canManageGeral;
   const canManageUsuarios = useCan('configuracoes:usuarios:manage');
 
   const [perdaPercent, setPerdaPercent] = useState(String(stockConfig.perdaPercentAlerta ?? 15));
@@ -64,19 +72,22 @@ export default function ConfiguracoesView({ store, initialSubTab }: Props) {
   const [validadeDias, setValidadeDias] = useState(String(stockConfig.validadePadraoDias ?? 2));
   const [alertaVencimento, setAlertaVencimento] = useState(String(stockConfig.alertaVencimentoDias ?? 1));
 
-  const handleSaveSalmaoConfig = () => {
-    setStockConfig({
-      ...stockConfig,
-      perdaPercentAlerta: parseDecimal(perdaPercent) || 15,
-      perdaValorAlerta: normalizeBRLMoneyToNumber(perdaValor) || 500,
-      validadePadraoDias: parseInt(validadeDias) || 2,
-      alertaVencimentoDias: parseInt(alertaVencimento) || 1,
+  const handleSaveSalmaoConfig = async () => {
+    // Campo vazio volta ao padrão; zero é valor válido (desliga o alerta), como em Salmão → Estoque.
+    const ouPadrao = (v: number | null | undefined, padrao: number) => (v == null || Number.isNaN(v) ? padrao : v);
+    const ok = await setStockConfig({
+      perdaPercentAlerta: ouPadrao(parseDecimal(perdaPercent), 15),
+      perdaValorAlerta: ouPadrao(normalizeBRLMoneyToNumber(perdaValor), 500),
+      validadePadraoDias: ouPadrao(parseInt(validadeDias), 2),
+      alertaVencimentoDias: ouPadrao(parseInt(alertaVencimento), 1),
     });
-    toast.success('Configurações de salmão atualizadas!');
+    if (ok) toast.success('Configurações de salmão atualizadas!');
   };
 
-  // Filter subtabs by permission
-  const visibleViews = allSubViews.filter(v => visibleSubtabs.includes(v.registryKey));
+  // Filter subtabs by permission. Empresas só existe na unidade da plataforma
+  // (o banco também só aceita a chave com ela ativa).
+  const visibleViews = allSubViews.filter(v => visibleSubtabs.includes(v.registryKey)
+    && (v.registryKey !== 'empresas' || isPlatformCompany(companyId)));
 
   // If active view is not visible, switch to first visible
   const effectiveActive = visibleViews.some(v => v.id === activeView)
@@ -134,13 +145,13 @@ export default function ConfiguracoesView({ store, initialSubTab }: Props) {
                 <div className="space-y-1.5">
                   <label className="text-[11px] text-muted-foreground font-medium">Perda % máxima</label>
                   <div className="flex items-center gap-1.5">
-                    <DecimalInput value={perdaPercent} onValueChange={raw => setPerdaPercent(raw)} maxDecimals={2} suffix="%" className="bg-secondary border-border text-foreground h-8 text-sm" disabled={!canManageGeral} />
+                    <DecimalInput value={perdaPercent} onValueChange={raw => setPerdaPercent(raw)} maxDecimals={2} suffix="%" className="bg-secondary border-border text-foreground h-8 text-sm" disabled={!canManageSalmao} />
                   </div>
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-[11px] text-muted-foreground font-medium">Perda R$ máxima</label>
                   <div className="flex items-center gap-1.5">
-                    <CurrencyInput value={perdaValor} onValueChange={raw => setPerdaValor(raw)} showPrefix className="bg-secondary border-border text-foreground h-8 text-sm" disabled={!canManageGeral} />
+                    <CurrencyInput value={perdaValor} onValueChange={raw => setPerdaValor(raw)} showPrefix className="bg-secondary border-border text-foreground h-8 text-sm" disabled={!canManageSalmao} />
                   </div>
                 </div>
               </div>
@@ -157,14 +168,14 @@ export default function ConfiguracoesView({ store, initialSubTab }: Props) {
                 <div className="space-y-1.5">
                   <label className="text-[11px] text-muted-foreground font-medium">Validade padrão (dias)</label>
                   <div className="flex items-center gap-1.5">
-                    <Input type="number" step="1" value={validadeDias} onChange={e => setValidadeDias(e.target.value)} className="bg-secondary border-border text-foreground h-8 text-sm" disabled={!canManageGeral} />
+                    <Input type="number" step="1" value={validadeDias} onChange={e => setValidadeDias(e.target.value)} className="bg-secondary border-border text-foreground h-8 text-sm" disabled={!canManageSalmao} />
                     <span className="text-xs text-muted-foreground">dias</span>
                   </div>
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-[11px] text-muted-foreground font-medium">Alerta de vencimento (dias antes)</label>
                   <div className="flex items-center gap-1.5">
-                    <Input type="number" step="1" value={alertaVencimento} onChange={e => setAlertaVencimento(e.target.value)} className="bg-secondary border-border text-foreground h-8 text-sm" disabled={!canManageGeral} />
+                    <Input type="number" step="1" value={alertaVencimento} onChange={e => setAlertaVencimento(e.target.value)} className="bg-secondary border-border text-foreground h-8 text-sm" disabled={!canManageSalmao} />
                     <span className="text-xs text-muted-foreground">dias</span>
                   </div>
                 </div>
@@ -172,7 +183,7 @@ export default function ConfiguracoesView({ store, initialSubTab }: Props) {
             </CardContent>
           </Card>
 
-          {canManageGeral && (
+          {canManageSalmao && (
             <Button size="sm" className="text-xs" onClick={handleSaveSalmaoConfig}>
               Salvar Configurações
             </Button>
@@ -193,6 +204,7 @@ export default function ConfiguracoesView({ store, initialSubTab }: Props) {
           </Card>
         )
       )}
+      {effectiveActive === 'empresas' && <AdminCompaniesView />}
       {effectiveActive === 'audit-global' && <GlobalAuditView />}
       {effectiveActive === 'performance' && <PerformanceMonitorView />}
       {effectiveActive === 'seguranca' && <SecurityAuditView />}

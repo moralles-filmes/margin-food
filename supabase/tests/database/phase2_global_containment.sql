@@ -74,7 +74,6 @@ DO $$ DECLARE actor integer; n integer; BEGIN
    PERFORM pg_temp.denied($q$SELECT onboard_new_company('Denied')$q$,format('actor %s onboarding',actor),'P0001');
    PERFORM pg_temp.denied('SELECT list_companies()',format('actor %s global list',actor),'P0001');
    PERFORM pg_temp.denied($q$SELECT update_company('b0000000-0000-4000-8000-000000000002','Denied')$q$,format('actor %s global update',actor),'P0001');
-   PERFORM pg_temp.denied($q$SELECT rpc_set_user_company(auth.uid(),'b0000000-0000-4000-8000-000000000002')$q$,format('actor %s global membership',actor));
    UPDATE companies SET ativo=false WHERE id='b0000000-0000-4000-8000-000000000002'; GET DIAGNOSTICS n=ROW_COUNT;
    PERFORM pg_temp.ok(n=0,format('actor %s cannot update B',actor));
    DELETE FROM companies WHERE id='b0000000-0000-4000-8000-000000000002'; GET DIAGNOSTICS n=ROW_COUNT;
@@ -104,7 +103,11 @@ UPDATE companies SET nome='Fase2 B' WHERE id='b0000000-0000-4000-8000-0000000000
 SELECT pg_temp.ok((SELECT nome='Fase2 B' FROM companies WHERE id='b0000000-0000-4000-8000-000000000002'),'global direct update');
 SELECT pg_temp.ok((rpc_create_company('Created by global')->>'id') IS NOT NULL,'global legacy RPC create and audit');
 SELECT pg_temp.ok((onboard_new_company('Onboarded by global')->>'success')::boolean,'global onboarding with category and role seeds');
-SELECT pg_temp.ok((rpc_set_user_company('a0000000-0000-4000-8000-000000000001','b0000000-0000-4000-8000-000000000002')->>'membership_id') IS NOT NULL,'global membership compatibility');
+-- Super admin não ganha acesso implícito: criar a empresa não o vincula a ela, e o
+-- atalho rpc_set_user_company (vínculo entre unidades) foi removido (20261006200000).
+SELECT pg_temp.ok(NOT EXISTS(SELECT 1 FROM company_memberships m JOIN companies c ON c.id=m.company_id
+  WHERE c.nome='Onboarded by global' AND m.user_id=auth.uid()),'onboarding does not grant the creator access');
+SELECT pg_temp.ok(to_regprocedure('public.rpc_set_user_company(uuid,uuid)') IS NULL,'global membership shortcut removed');
 DO $$ DECLARE v_id uuid; n integer; BEGIN
  INSERT INTO companies(nome) VALUES('Direct global') RETURNING id INTO v_id;
  PERFORM pg_temp.ok(v_id IS NOT NULL,'global direct insert');

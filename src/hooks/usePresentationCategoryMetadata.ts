@@ -30,7 +30,6 @@ export function parsePresentationCategoryMetadata(payload: unknown): Presentatio
     const record = value as Record<string, unknown>;
     parsed[categoryId] = {
       group: nullableString(record.group, `${categoryId}.group`),
-      dreLine: nullableString(record.dreLine, `${categoryId}.dreLine`),
     };
   }
   return parsed;

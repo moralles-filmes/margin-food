@@ -1,10 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ChevronRight, ChevronDown } from 'lucide-react';
+import EmptyState from '@/components/ui/EmptyState';
+import { Skeleton } from '@/components/ui/skeleton';
+import { ChevronRight, ChevronDown, FolderTree } from 'lucide-react';
 import { fmtBRL, formatPercentBR } from '@/lib/formatters';
 import { buildTree, type CatNode } from './CadastroBaseTree';
+import { FinNote } from './finV2Layout';
+import { useConteinerEstreito } from './useConteinerEstreito';
 import { cn } from '@/lib/utils';
+
+/**
+ * Abaixo desta largura do contêiner a tabela (Descrição · Valor · %) vira lista: com o recuo da
+ * hierarquia, o valor e o percentual não cabem em três colunas no celular (Redesign V2, Fase 06A).
+ * Uma só marcação no DOM: a árvore abre e fecha nós e não se duplica (D64).
+ */
+const LIMITE_LISTA_PX = 600;
 
 interface DemonstrativoTreeProps {
   categorias: any[];
@@ -15,6 +25,8 @@ interface DemonstrativoTreeProps {
   /** DFC mode: show saldo inicial / acumulado */
   saldoInicial?: number;
   isDFC?: boolean;
+  /** DFC: false omite SALDO INICIAL e SALDO ACUMULADO (o saldo é da empresa, não de um recorte). */
+  mostrarSaldo?: boolean;
 }
 
 interface RowData {
@@ -39,6 +51,7 @@ export default function DemonstrativoTree({
   showPctReceita = false,
   saldoInicial = 0,
   isDFC = false,
+  mostrarSaldo = true,
 }: DemonstrativoTreeProps) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set(['_receitas', '_despesas']));
 
@@ -111,7 +124,7 @@ export default function DemonstrativoTree({
     };
 
     // — SALDO INICIAL (DFC only) —
-    if (isDFC) {
+    if (isDFC && mostrarSaldo) {
       result.push({
         id: '_saldo_inicial',
         codigo: '',
@@ -168,16 +181,18 @@ export default function DemonstrativoTree({
         isSectionHeader: true,
         isTotalRow: false,
       });
-      result.push({
-        id: '_resultado',
-        codigo: '',
-        nome: 'SALDO ACUMULADO',
-        valor: saldoInicial + resultadoLiquido,
-        depth: 0,
-        hasChildren: false,
-        tipo: 'total',
-        isTotalRow: true,
-      });
+      if (mostrarSaldo) {
+        result.push({
+          id: '_resultado',
+          codigo: '',
+          nome: 'SALDO ACUMULADO',
+          valor: saldoInicial + resultadoLiquido,
+          depth: 0,
+          hasChildren: false,
+          tipo: 'total',
+          isTotalRow: true,
+        });
+      }
     } else {
       result.push({
         id: '_resultado',
@@ -209,7 +224,7 @@ export default function DemonstrativoTree({
     }
 
     return { rows: result, receitaTotal: recTotal };
-  }, [categorias, lancamentos, rateios, expanded, isDFC, saldoInicial]);
+  }, [categorias, lancamentos, rateios, expanded, isDFC, saldoInicial, mostrarSaldo]);
 
   const toggleExpand = (id: string) => {
     setExpanded(prev => {
@@ -219,96 +234,147 @@ export default function DemonstrativoTree({
     });
   };
 
+  const [conteinerRef, estreito] = useConteinerEstreito(LIMITE_LISTA_PX);
+  const pctLabel = isDFC ? '% Recebimentos' : '% Receita Líq.';
+
   if (loading) {
-    return <Card><CardContent className="p-8 text-center text-muted-foreground">Carregando...</CardContent></Card>;
+    return (
+      <div role="status" className="space-y-2 rounded-summary border bg-card p-4">
+        <span className="sr-only">Carregando o demonstrativo…</span>
+        {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} aria-hidden="true" className="h-8 w-full" />)}
+      </div>
+    );
   }
 
   if (rows.length === 0) {
     return (
-      <Card><CardContent className="p-8 text-center text-muted-foreground">
-        <p className="font-medium">Nenhuma categoria cadastrada</p>
-        <p className="text-sm">Configure a estrutura em Cadastros Base primeiro.</p>
-      </CardContent></Card>
+      <EmptyState
+        icon={FolderTree}
+        title="Nenhuma categoria cadastrada"
+        description="Configure a estrutura em Cadastros Base primeiro."
+      />
     );
   }
 
+  // Mesma regra de antes: % sobre a receita/recebimento do próprio demonstrativo, com sinal só nas
+  // linhas de total; sem receita no período, a coluna fica em "—".
+  const linhas = rows.map(row => {
+    const valor = row.valor === 0 ? 0 : row.valor; // -0 (categoria zerada na seção de despesas) não vira "-R$0,00"
+    const pctReceita = showPctReceita && receitaTotal > 0 && !row.isInformational
+      ? formatPercentBR((Math.abs(valor) / receitaTotal) * 100)
+      : '—';
+    const pctResult = showPctReceita && receitaTotal > 0 && row.isTotalRow
+      ? formatPercentBR((valor / receitaTotal) * 100)
+      : pctReceita;
+    return { row, valor, pct: row.isTotalRow ? pctResult : pctReceita, aberto: expanded.has(row.id) };
+  });
+
+  const corDoValor = (valor: number) => (valor >= 0 ? 'text-success' : 'text-destructive');
+  const fundoDaLinha = (row: RowData) => cn(
+    row.isTotalRow && 'bg-primary-soft border-t-2 border-primary-border',
+    row.isSectionHeader && !row.isInformational && 'bg-muted border-t-2 border-border',
+    row.isInformational && 'bg-warning-soft',
+    row.isInformational && row.isSectionHeader && 'border-t-2 border-warning-border',
+  );
+  const pesoDoNome = (row: RowData) => cn(
+    row.isSectionHeader && 'font-bold text-sm uppercase tracking-wider',
+    row.isTotalRow && 'font-bold text-base',
+    row.depth === 1 && !row.isSectionHeader && !row.isTotalRow && 'font-semibold text-xs uppercase tracking-wider',
+    row.depth > 1 && !row.isTotalRow && 'font-medium text-sm',
+  );
+  const pesoDoValor = (row: RowData) => cn(
+    (row.isTotalRow || row.isSectionHeader) && 'font-bold text-base',
+    row.depth === 1 && !row.isSectionHeader && 'font-semibold',
+  );
+
+  const abrirFechar = (row: RowData, aberto: boolean) => row.hasChildren ? (
+    <button
+      type="button"
+      onClick={() => toggleExpand(row.id)}
+      aria-expanded={aberto}
+      aria-label={`${aberto ? 'Recolher' : 'Expandir'} ${row.nome}`}
+      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-surface-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      {aberto ? <ChevronDown aria-hidden="true" className="h-4 w-4" /> : <ChevronRight aria-hidden="true" className="h-4 w-4" />}
+    </button>
+  ) : (
+    <span aria-hidden="true" className="w-7 shrink-0" />
+  );
+
+  const nome = (row: RowData) => (
+    <span className={cn('min-w-0 break-words', pesoDoNome(row))}>
+      {row.codigo && <span className="mr-1.5 font-mono text-xs font-normal normal-case tracking-normal text-muted-foreground">{row.codigo}</span>}
+      {row.nome}
+    </span>
+  );
+
   return (
-    <Card>
-      <CardContent className="p-0">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Descrição</TableHead>
-              <TableHead className="text-right w-[180px]">Valor (R$)</TableHead>
-              {showPctReceita && (
-                <TableHead className="text-right w-[100px]">{isDFC ? '% Recebimentos' : '% Receita Líq.'}</TableHead>
-              )}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map(row => {
-              const isPositive = row.valor >= 0;
-
-              const pctReceita = showPctReceita && receitaTotal > 0 && !row.isInformational
-                ? formatPercentBR((Math.abs(row.valor) / receitaTotal) * 100)
-                : '—';
-
-              // For resultado row, show signed %
-              const pctResult = showPctReceita && receitaTotal > 0 && row.isTotalRow
-                ? formatPercentBR((row.valor / receitaTotal) * 100)
-                : pctReceita;
-
-              return (
-                <TableRow
-                  key={row.id}
-                  className={cn(
-                    row.isTotalRow && 'bg-primary/5 font-bold border-t-2 border-primary/20',
-                    row.isSectionHeader && 'bg-muted/50 border-t border-border',
-                    row.isInformational && 'bg-warning-soft',
-                  )}
-                >
-                  <TableCell
-                    className={cn(
-                      'flex items-center gap-1',
-                      row.isSectionHeader && 'font-bold text-sm uppercase tracking-wider',
-                      row.isTotalRow && 'font-bold text-base',
-                      row.depth === 1 && !row.isSectionHeader && !row.isTotalRow && 'font-semibold text-xs uppercase tracking-wider',
-                      row.depth > 1 && !row.isTotalRow && 'font-medium',
+    <div className="space-y-2">
+      <div ref={conteinerRef} className="overflow-hidden rounded-summary border bg-card shadow-card">
+        {estreito ? (
+          <>
+            <div className="flex items-center justify-between gap-3 border-b bg-muted px-3 py-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              <span>Descrição</span>
+              <span className="text-right">Valor (R$){showPctReceita && <> · {pctLabel}</>}</span>
+            </div>
+            <ul aria-label={isDFC ? 'Demonstração de fluxo de caixa' : 'Demonstrativo de resultado'}>
+              {linhas.map(({ row, valor, pct, aberto }) => (
+                <li key={row.id} className={cn('border-t px-3 py-2 first:border-t-0', fundoDaLinha(row))}>
+                  <div className="flex items-start gap-1" style={{ paddingLeft: `${row.depth * 12}px` }}>
+                    {abrirFechar(row, aberto)}
+                    <div className="min-w-0 flex-1 pt-1">{nome(row)}</div>
+                  </div>
+                  <p className="mt-1 flex flex-wrap items-baseline justify-end gap-x-3 gap-y-0.5 text-right">
+                    <span className={cn('whitespace-nowrap tabular-nums', pesoDoValor(row), !row.hideValue && corDoValor(valor))}>
+                      <span className="sr-only">Valor: </span>{row.hideValue ? '—' : fmtBRL(valor)}
+                    </span>
+                    {showPctReceita && (
+                      <span className="whitespace-nowrap text-xs tabular-nums text-muted-foreground">
+                        <span className="sr-only">{pctLabel}: </span>{pct}
+                      </span>
                     )}
-                    style={{ paddingLeft: `${row.depth * 20 + 12}px` }}
-                  >
-                    {row.hasChildren ? (
-                      <button
-                        onClick={() => toggleExpand(row.id)}
-                        className="w-5 h-5 flex items-center justify-center rounded hover:bg-muted"
-                      >
-                        {expanded.has(row.id) ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                      </button>
-                    ) : (
-                      <span className="w-5" />
-                    )}
-                    {row.codigo && <span className="font-mono text-xs text-muted-foreground mr-1">{row.codigo}</span>}
-                    {row.nome}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Descrição</TableHead>
+                <TableHead className="w-[190px] text-right">Valor (R$)</TableHead>
+                {showPctReceita && <TableHead className="w-[140px] text-right">{pctLabel}</TableHead>}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {linhas.map(({ row, valor, pct, aberto }) => (
+                <TableRow key={row.id} className={fundoDaLinha(row)}>
+                  <TableCell className="py-2" style={{ paddingLeft: `${row.depth * 20 + 8}px` }}>
+                    <div className="flex items-center gap-1">
+                      {abrirFechar(row, aberto)}
+                      {nome(row)}
+                    </div>
                   </TableCell>
-                  <TableCell className={cn(
-                    'text-right font-mono',
-                    (row.isTotalRow || row.isSectionHeader) && 'font-bold text-base',
-                    row.depth === 1 && !row.isSectionHeader && 'font-semibold',
-                    isPositive ? 'text-success' : 'text-destructive',
-                  )}>
-                    {row.hideValue ? '—' : fmtBRL(row.valor)}
+                  <TableCell className={cn('whitespace-nowrap py-2 text-right tabular-nums', pesoDoValor(row), !row.hideValue && corDoValor(valor))}>
+                    {row.hideValue ? '—' : fmtBRL(valor)}
                   </TableCell>
                   {showPctReceita && (
-                    <TableCell className="text-right text-muted-foreground text-sm">
-                      {row.isTotalRow ? pctResult : pctReceita}
-                    </TableCell>
+                    <TableCell className="whitespace-nowrap py-2 text-right text-sm tabular-nums text-muted-foreground">{pct}</TableCell>
                   )}
                 </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </div>
+      {showPctReceita && receitaTotal <= 0 && (
+        <FinNote>
+          {isDFC
+            ? 'Sem recebimentos no período: a coluna “% Recebimentos” não se aplica e fica em “—”.'
+            : 'Sem receita no período: a coluna “% Receita Líq.” não se aplica e fica em “—”.'}
+        </FinNote>
+      )}
+    </div>
   );
 }

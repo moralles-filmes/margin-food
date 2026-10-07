@@ -29,6 +29,7 @@ import type { CmvConfig } from '@/hooks/useCmvFinanceiro';
 import { datasDoLancamentoCriado, decisaoDaLinhaExtrato, type LinhaExtratoCmv } from '@/lib/conciliacaoCmv';
 
 import { useCan } from '@/permissions/hooks';
+import { usePodeCadastrarFornecedor } from '@/hooks/useSuppliers';
 /**
  * Linha do extrato como a conciliação a entrega: além dos dados do banco, o que o usuário já
  * ajustou nela (`competencia`, `categoriaId`, resposta do CMV), que o diálogo herda com o recurso.
@@ -74,6 +75,7 @@ export default function CriarLancamentoExtratoDialog({
   const toast = useScopedToast();
   const supabase = useSupabase();
   const canViewRbac = useCan('financeiro:conciliacao:reconcile');
+  const podeCadastrarFornecedor = usePodeCadastrarFornecedor();
   const { user } = useAuth();
   const retornoFoco = useRetornoFoco();
 
@@ -631,6 +633,7 @@ export default function CriarLancamentoExtratoDialog({
                 value={supplierId}
                 onValueChange={setSupplierId}
                 options={suppliers}
+                enableQuickAdd={podeCadastrarFornecedor}
                 placeholder="Pesquisar fornecedor..."
                 className="h-9"
               />

@@ -16,6 +16,8 @@ import { useScopedToast } from '@/hooks/useScopedToast';
 import { sortByName } from '@/lib/sortByName';
 import { novaSemente } from '@/lib/chaveOperacao';
 import { chaveCriacaoEmpresa, mensagemErroCriacaoEmpresa } from '@/domain/admin/empresa';
+import { useTravaEnvio } from '@/hooks/useTravaEnvio';
+import { mensagemErroEdge } from '@/lib/edgeFunctionError';
 
 interface Company {
   id: string;
@@ -25,6 +27,10 @@ interface Company {
   created_at: string;
   updated_at: string;
   total_usuarios: number;
+  /** Algum membro ativo gerencia usuários: aí o acesso é concedido pela própria empresa. */
+  tem_gestor?: boolean;
+  /** Unidade da plataforma (Moralles): não pode ser desativada. */
+  plataforma?: boolean;
 }
 
 function extractEdgeFnError(data: any, error: any): string {
@@ -39,6 +45,9 @@ export default function AdminCompaniesView() {
   const { user } = useAuth();
   const canCreate = useCan('configuracoes:empresas:create');
   const canEdit = useCan('configuracoes:empresas:edit');
+  const canDeactivate = useCan('configuracoes:empresas:delete');
+  // Delegado de Empresas só cria o 1º Admin de empresa sem nenhum usuário (o banco confere).
+  const isSuperAdmin = useCan('system:global:manage');
 
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,7 +75,7 @@ export default function AdminCompaniesView() {
   const [adminNome, setAdminNome] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
-  const [creatingAdmin, setCreatingAdmin] = useState(false);
+  const { enviando: creatingAdmin, executar: executarCriacaoAdmin } = useTravaEnvio();
 
   const fetchCompanies = useCallback(async () => {
     setLoading(true);
@@ -82,7 +91,7 @@ export default function AdminCompaniesView() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [supabase]);
 
   useEffect(() => { fetchCompanies(); }, [fetchCompanies]);
 
@@ -103,14 +112,21 @@ export default function AdminCompaniesView() {
         p_onboarding_request_id: await chaveCriacaoEmpresa(sementeCriacao, { nome: newNome, cnpj }),
       });
       if (rpcError) throw rpcError;
-      const jaExistia = (data as { idempotente?: boolean } | null)?.idempotente;
-      toast.success(jaExistia
+      const criada = data as { idempotente?: boolean; company_id?: string; company_name?: string } | null;
+      toast.success(criada?.idempotente
         ? `Empresa "${newNome.trim()}" já estava criada.`
         : `Empresa "${newNome.trim()}" criada com sucesso!`);
       setSementeCriacao(novaSemente());
       setShowCreate(false);
       setNewNome('');
       setNewCnpj('');
+      // Quem cria a empresa não entra nela: o próximo passo é o 1º admin.
+      if (criada?.company_id && !criada.idempotente) {
+        openCreateAdmin({
+          id: criada.company_id, nome: criada.company_name ?? newNome.trim(), cnpj, ativo: true,
+          created_at: '', updated_at: '', total_usuarios: 0, tem_gestor: false,
+        });
+      }
       // Recarregar a lista é depois do commit: falhar aqui não é erro do cadastro.
       fetchCompanies();
     } catch (e: any) {
@@ -161,7 +177,7 @@ export default function AdminCompaniesView() {
     setAdminPassword('');
   };
 
-  const handleCreateAdmin = async () => {
+  const handleCreateAdmin = () => executarCriacaoAdmin(async () => {
     if (!adminTarget) return;
     if (!adminEmail.trim()) { toast.error('Email é obrigatório'); return; }
     if (adminPassword && adminPassword.length < 12) {
@@ -169,7 +185,6 @@ export default function AdminCompaniesView() {
       return;
     }
 
-    setCreatingAdmin(true);
     try {
       const { data, error } = await supabase.functions.invoke('admin-companies', {
         body: {
@@ -182,7 +197,10 @@ export default function AdminCompaniesView() {
       });
 
       if (error || data?.error) {
-        toast.error(extractEdgeFnError(data, error));
+        console.error('admin-companies create-first-user error:', error ?? data?.error);
+        toast.error(error ? await mensagemErroEdge(error, 'Erro ao criar admin') : extractEdgeFnError(data, null));
+        // A empresa pode ter ganho um gestor nesse meio-tempo: o card precisa refletir.
+        fetchCompanies();
         return;
       }
 
@@ -190,11 +208,10 @@ export default function AdminCompaniesView() {
       setAdminTarget(null);
       await fetchCompanies();
     } catch (e: any) {
+      console.error('admin-companies create-first-user error:', e);
       toast.error(e?.message || 'Erro ao criar admin');
-    } finally {
-      setCreatingAdmin(false);
     }
-  };
+  });
 
   // ── Toggle ativo ──
   const handleToggleAtivo = async (company: Company) => {
@@ -285,10 +302,10 @@ export default function AdminCompaniesView() {
                   <Badge variant={c.ativo ? 'default' : 'destructive'} className="text-[10px]">
                     {c.ativo ? 'Ativa' : 'Inativa'}
                   </Badge>
-                  {canEdit && (
+                  {(canEdit || canDeactivate) && (
                     <TableActions
                       onEdit={() => openEdit(c)}
-                      onDelete={() => handleToggleAtivo(c)}
+                      onDelete={c.plataforma && c.ativo ? undefined : () => handleToggleAtivo(c)}
                       editPermission="configuracoes:empresas:edit"
                       deletePermission="configuracoes:empresas:delete"
                       deleteConfirmTitle={c.ativo ? 'Desativar empresa?' : 'Reativar empresa?'}
@@ -308,7 +325,12 @@ export default function AdminCompaniesView() {
                   <Users className="w-3.5 h-3.5" />
                   <span>{c.total_usuarios} usuário{c.total_usuarios !== 1 ? 's' : ''}</span>
                 </div>
-                {c.ativo && canCreate && (
+                {c.ativo && canCreate && !c.tem_gestor && !isSuperAdmin && c.total_usuarios > 0 && (
+                  <span className="text-[10px] text-muted-foreground" title="O 1º Admin de uma unidade que já tem usuários é criado pelo administrador do sistema.">
+                    Sem gestor — fale com o administrador do sistema
+                  </span>
+                )}
+                {c.ativo && canCreate && !c.tem_gestor && (isSuperAdmin || c.total_usuarios === 0) && (
                   <Button
                     variant="outline"
                     size="sm"
@@ -317,6 +339,11 @@ export default function AdminCompaniesView() {
                   >
                     <UserPlus className="w-3 h-3" /> Criar Admin
                   </Button>
+                )}
+                {c.ativo && c.tem_gestor && (
+                  <span className="text-[10px] text-muted-foreground" title="Novos acessos, inclusive o seu, são criados pelo admin da própria empresa.">
+                    Acessos geridos pela empresa
+                  </span>
                 )}
               </div>
               <div className="flex justify-between text-[10px] text-muted-foreground">
@@ -364,8 +391,9 @@ export default function AdminCompaniesView() {
               <p>Ao criar a empresa:</p>
               <ul className="list-disc ml-4 space-y-0.5">
                 <li>Cargos padrão serão criados automaticamente</li>
-                <li>Crie o primeiro usuário admin pela aba Usuários</li>
+                <li>Em seguida, cadastre o primeiro admin da empresa</li>
                 <li>O admin da nova loja poderá criar os demais usuários</li>
+                <li>Você não terá acesso aos dados da empresa — se precisar, o admin dela cadastra o seu e-mail</li>
               </ul>
             </div>
           </div>
@@ -477,7 +505,7 @@ export default function AdminCompaniesView() {
                 placeholder="Senha segura..."
                 disabled={creatingAdmin}
               />
-              <p id="admin-password-hint" className="rounded-md border border-primary/20 bg-primary/5 p-2 text-xs leading-relaxed text-foreground">Se o usuário já tem acesso a outra unidade, informe o mesmo e-mail e <strong>deixe a senha em branco</strong>. Ele continuará usando o mesmo login e senha.</p>
+              <p id="admin-password-hint" className="rounded-md border border-primary/20 bg-primary/5 p-2 text-xs leading-relaxed text-foreground">Se o usuário já tem acesso a outra unidade, informe o mesmo e-mail e <strong>deixe a senha em branco</strong>. Ele continuará usando o mesmo login e senha. O seu próprio e-mail não é aceito: o seu acesso é concedido pelo admin da empresa.</p>
               {adminPassword.length > 0 && adminPassword.length < 12 && (
                 <p className="text-[10px] text-destructive">
                   {12 - adminPassword.length} caractere{12 - adminPassword.length !== 1 ? 's' : ''} restante{12 - adminPassword.length !== 1 ? 's' : ''}

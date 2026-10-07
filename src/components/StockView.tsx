@@ -29,13 +29,13 @@ export default function StockView({ store, onStartManipulation }: StockViewProps
   const lowGross = stock.grossKg <= stockConfig.minGrossKg;
   const lowClean = stock.cleanKg <= stockConfig.minCleanKg;
 
-  const handleSaveConfig = () => {
-    setStockConfig({
-      ...stockConfig,
+  const handleSaveConfig = async () => {
+    const ok = await setStockConfig({
       minGrossKg: parseDecimal(minGross) ?? 0,
       minCleanKg: parseDecimal(minClean) ?? 0,
       staleDaysLimit: parseDecimal(staleDays) ?? 7,
     });
+    if (!ok) return;
     toast.success('Configurações atualizadas!');
     setShowConfig(false);
   };

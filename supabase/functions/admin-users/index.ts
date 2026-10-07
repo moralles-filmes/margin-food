@@ -1,6 +1,6 @@
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { companyHeaders, requireRequestCompany } from '../_shared/company-scope.ts';
-import { addCompanyUser, normalizeIdentityEmail } from '../_shared/company-users.ts';
+import { addCompanyUser, describeMembershipError, normalizeIdentityEmail } from '../_shared/company-users.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const VALID_ROLES = ['admin','operador','viewer','sem_role'];
@@ -55,6 +55,24 @@ Deno.serve(async req => {
       if (error || originalError) throw error ?? originalError;
       if (count !== 1 || original.company_id !== companyId) throw new Error('403: A identidade possui acessos compartilhados. Somente a administração global pode alterar e-mail ou senha.');
     };
+    // Quem detém system:global:manage nesta unidade (ALLOW direto ou papel que a
+    // carregue — mesma regra do banco) só é alterado por quem também detém. O banco
+    // barra status/papel/permissões; aqui barra também senha/e-mail.
+    const globalRoles = async () => {
+      const { data, error } = await admin.from('role_permissions').select('role').eq('permission_key','system:global:manage');
+      if (error) throw error;
+      return new Set((data ?? []).map((r: { role: string }) => r.role));
+    };
+    const isProtected = async (targetId: string) => {
+      const [{ count, error }, { data: targetRoles, error: rolesError }, roles] = await Promise.all([
+        admin.from('user_permissions').select('id',{ count:'exact',head:true })
+          .eq('user_id',targetId).eq('company_id',companyId).eq('permission_key','system:global:manage').eq('effect','ALLOW'),
+        admin.from('user_roles').select('role').eq('user_id',targetId).eq('company_id',companyId),
+        globalRoles(),
+      ]);
+      if (error || rolesError) throw error ?? rolesError;
+      return (count ?? 0) > 0 || (targetRoles ?? []).some((r: { role: string }) => roles.has(r.role));
+    };
     const allRows = async (query: any) => {
       const rows: any[] = [];
       for (let offset=0;;offset+=500) {
@@ -67,15 +85,18 @@ Deno.serve(async req => {
     if (action === 'list') {
       const members = await allRows(admin.from('company_memberships').select('*, profiles(id,nome,email,created_at)')
         .eq('company_id',companyId).neq('status','revoked').order('id'));
-      const [roles,overrides,jobs] = await Promise.all([
+      const [roles,overrides,jobs,protectedRoles] = await Promise.all([
         allRows(admin.from('user_roles').select('id,user_id,role').eq('company_id',companyId).order('id')),
         allRows(admin.from('user_permissions').select('id,user_id,permission_key,effect').eq('company_id',companyId).order('id')),
         allRows(admin.from('job_roles').select('id,nome').eq('company_id',companyId).order('id')),
+        globalRoles(),
       ]);
       return json({ users:(members ?? []).map(m => ({ ...m.profiles,id:m.user_id,sector:m.sector,job_role_id:m.job_role_id,
         role:roles.find(r => r.user_id===m.user_id)?.role ?? 'sem_role',
         job_role_name:jobs.find(j => j.id===m.job_role_id)?.nome ?? null,
         disabled:m.status!=='active',permissions:overrides.filter(p => p.user_id===m.user_id).map(p => ({ key:p.permission_key,effect:p.effect })) ?? [],
+        protegido:overrides.some(p => p.user_id===m.user_id && p.permission_key==='system:global:manage' && p.effect==='ALLOW')
+          || roles.some(r => r.user_id===m.user_id && protectedRoles.has(r.role)),
       })) });
     }
     if (action === 'create') {
@@ -89,6 +110,7 @@ Deno.serve(async req => {
       const targetId = body.userId;
       if (!targetId) return json({ error:'userId obrigatório' },400);
       const previous = await member(targetId);
+      if (!globalManager && await isProtected(targetId)) return json({ error:describeMembershipError('PROTECTED_MEMBERSHIP') },403);
       if (action === 'edit-user' || action === 'update-role') {
         if (body.role !== undefined && !VALID_ROLES.includes(body.role)) return json({ error:'Role inválido.' },400);
         const changeEmail = body.email !== undefined && normalizeIdentityEmail(body.email)!==previous.profiles.email;
@@ -137,6 +159,8 @@ Deno.serve(async req => {
   } catch (error) {
     console.error('[admin-users]',error);
     const message = error instanceof Error ? error.message : (error as {message?:string})?.message ?? 'Erro interno';
+    const denied = describeMembershipError(message);
+    if (denied) return json({ error:denied },403);
     return json({ error:message },message.includes('403:') || message.includes('PERMISSION_DENIED') || message.includes('COMPANY_ACCESS_DENIED') ? 403 : message.includes('404:') ? 404 : 400);
   }
 });

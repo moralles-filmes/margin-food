@@ -7,6 +7,7 @@ import { useEmitDataEvent, useDataEvent } from '@/lib/dataEvents';
 import { fmtBRL, formatDateBR, parseLocalDate } from '@/lib/formatters';
 import { cn } from '@/lib/utils';
 import { useCan } from '@/permissions/hooks';
+import { usePodeCadastrarFornecedor } from '@/hooks/useSuppliers';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -112,6 +113,7 @@ export default function ContasPagarSection({ initialStatus }: ContasPagarSection
   const canExport = useCan('financeiro:pagar:export');
   const canCmvSerie = useCan('financeiro:cmv:manage');
   const canDelete = useCan('financeiro:pagar:delete');
+  const canQuickAddSupplier = usePodeCadastrarFornecedor();
 
   const [items, setItems] = useState<ContaPagar[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
@@ -1131,6 +1133,7 @@ export default function ContasPagarSection({ initialStatus }: ContasPagarSection
         centros={centros}
         contas={contas}
         suppliers={suppliers}
+        canQuickAddSupplier={canQuickAddSupplier}
         isEditing={!!editingItem}
         saving={saving}
         cmv={editingItem && !cmvLidoNaEdicao.current ? null : cmvForm}

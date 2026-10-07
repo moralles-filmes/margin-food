@@ -314,6 +314,116 @@ describe('Conciliação Bancária — visão Importar (rascunho restaurado)', ()
     expect(escritas()).toEqual([]);
   });
 
+  it('outra conta só é escolhida após confirmar e usa o vínculo atômico ao processar', async () => {
+    state.contas = [CONTA, { id: 'conta-2', nome: 'Conta Dois' }];
+    restaurar([linha({
+      descricao: 'LINHA PARA VINCULAR', fitId: 'FIT-MANUAL', suggestions: [{
+        id: 'manual-1', origin: 'lancamento', descricao: 'NOTA EM OUTRA CONTA', valor: 10,
+        data: '2026-09-05', score: 100, situacaoConta: 'outra',
+        raw: lanc({ id: 'manual-1', conta_id: 'conta-2' }),
+      }],
+    })]);
+    render(<ConciliacaoBancariaSection />);
+    fireEvent.click(await screen.findByRole('button', { name: '1 sugestão' }));
+    fireEvent.click(screen.getByRole('button', { name: /NOTA EM OUTRA CONTA/ }));
+    let confirmation = await screen.findByRole('alertdialog');
+    expect(confirmation).toHaveTextContent('Lançamento de outra conta');
+    expect(confirmation).toHaveTextContent('Conta Dois');
+    expect(confirmation).toHaveTextContent(CONTA.nome);
+    expect(escritas()).toEqual([]);
+    fireEvent.click(within(confirmation).getByRole('button', { name: 'Cancelar' }));
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
+    expect(screen.getByRole('button', { name: /NOTA EM OUTRA CONTA/ })).toHaveAttribute('aria-pressed', 'false');
+
+    fireEvent.click(screen.getByRole('button', { name: /NOTA EM OUTRA CONTA/ }));
+    confirmation = await screen.findByRole('alertdialog');
+    fireEvent.click(within(confirmation).getByRole('button', { name: 'Trazer para esta conta' }));
+    expect(await screen.findByText('Estava em Conta Dois — ao processar passa para esta conta.')).toBeInTheDocument();
+    expect(escritas()).toEqual([]);
+    fireEvent.click(screen.getByRole('button', { name: 'Processar' }));
+    await waitFor(() => expect(state.rpc).toHaveBeenCalledWith('reconcile_link_existing_lancamento', {
+      p_conta_id: CONTA.id, p_lancamento_id: 'manual-1', p_external_id: 'FIT-MANUAL',
+      p_tipo: 'DESPESA', p_data_extrato: '2026-09-05', p_mover_conta: true, p_valor_extrato: 10,
+    }));
+    expect(escritas()).toEqual(['reconcile_link_existing_lancamento']);
+  });
+
+  it('previsto sem conta avisa a realização e envia o vínculo sem autorização de mudança', async () => {
+    restaurar([linha({
+      descricao: 'PREVISTO ESCOLHIDO', selecionada: false, matchId: 'prev-1', matchOrigin: 'lancamento',
+      matchDescricao: 'NOTA PREVISTA', matchRaw: lanc({ id: 'prev-1', status: 'PREVISTO', conta_id: null }),
+    })]);
+    render(<ConciliacaoBancariaSection />);
+    expect(await screen.findByText('Lançado como Previsto — ao processar vira Realizado com a data do extrato (05/09/2026).')).toBeInTheDocument();
+    expect(screen.getByText('Lançamento sem conta bancária — ao processar recebe esta conta.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Processar' }));
+    await waitFor(() => expect(state.rpc).toHaveBeenCalledWith('reconcile_link_existing_lancamento', {
+      p_conta_id: CONTA.id, p_lancamento_id: 'prev-1', p_external_id: null,
+      p_tipo: 'DESPESA', p_data_extrato: '2026-09-05', p_mover_conta: false, p_valor_extrato: 10,
+    }));
+    expect(escritas()).toEqual(['reconcile_link_existing_lancamento']);
+  });
+
+  it('lançamento manual com valor diferente do extrato não é escolhido', async () => {
+    restaurar([linha({
+      descricao: 'PIX MERCADO', suggestions: [{
+        id: 'manual-2', origin: 'lancamento', descricao: 'NOTA DE MERCADO', valor: 10.5,
+        data: '2026-09-05', score: 90, situacaoConta: 'mesma',
+        raw: lanc({ id: 'manual-2', valor: 10.5 }),
+      }],
+    })]);
+    render(<ConciliacaoBancariaSection />);
+    fireEvent.click(await screen.findByRole('button', { name: '1 sugestão' }));
+    fireEvent.click(screen.getByRole('button', { name: /NOTA DE MERCADO/ }));
+    await waitFor(() => expect(state.toast.error).toHaveBeenCalledWith(expect.stringContaining('Corrija o valor no Livro Razão')));
+    expect(screen.getByRole('button', { name: /NOTA DE MERCADO/ })).toHaveAttribute('aria-pressed', 'false');
+    expect(escritas()).toEqual([]);
+  });
+
+  it('o mesmo lançamento não cobre duas linhas do extrato', async () => {
+    const sugestao = {
+      id: 'manual-4', origin: 'lancamento', descricao: 'NOTA ÚNICA', valor: 10,
+      data: '2026-09-05', score: 110, situacaoConta: 'mesma', raw: lanc({ id: 'manual-4' }),
+    };
+    restaurar([
+      linha({
+        descricao: 'PIX UM', selecionada: false, matchId: 'manual-4', matchOrigin: 'lancamento',
+        matchDescricao: 'NOTA ÚNICA', matchRaw: lanc({ id: 'manual-4' }), suggestions: [sugestao],
+      }),
+      linha({ descricao: 'PIX DOIS', suggestions: [sugestao] }),
+    ]);
+    render(<ConciliacaoBancariaSection />);
+    fireEvent.click(await screen.findByRole('button', { name: '1 sugestão' }));
+    fireEvent.click(screen.getByRole('button', { name: /NOTA ÚNICA/ }));
+    await waitFor(() => expect(state.toast.error).toHaveBeenCalledWith(expect.stringContaining('já está vinculado à linha "PIX UM"')));
+    expect(escritas()).toEqual([]);
+  });
+
+  it('rascunho com duas linhas no mesmo lançamento barra o Processar antes de gravar', async () => {
+    restaurar([
+      linha({ descricao: 'PIX UM', selecionada: false, matchId: 'manual-5', matchOrigin: 'lancamento', matchDescricao: 'NOTA', matchRaw: lanc({ id: 'manual-5' }) }),
+      linha({ descricao: 'PIX DOIS', selecionada: false, matchId: 'manual-5', matchOrigin: 'lancamento', matchDescricao: 'NOTA', matchRaw: lanc({ id: 'manual-5' }) }),
+    ]);
+    render(<ConciliacaoBancariaSection />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Processar' }));
+    await waitFor(() => expect(state.toast.error).toHaveBeenCalledWith(expect.stringContaining('"PIX UM" e "PIX DOIS" estão vinculadas ao mesmo lançamento')));
+    expect(escritas()).toEqual([]);
+  });
+
+  it('rascunho com vínculo de valor diferente barra o Processar antes de gravar', async () => {
+    restaurar([
+      linha({ descricao: 'NOVA COM CATEGORIA', valor: 7, categoriaId: 'cat1' }),
+      linha({
+        descricao: 'PIX MERCADO', selecionada: false, matchId: 'manual-3', matchOrigin: 'lancamento',
+        matchDescricao: 'NOTA DE MERCADO', matchRaw: lanc({ id: 'manual-3', valor: 10.5 }),
+      }),
+    ]);
+    render(<ConciliacaoBancariaSection />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Processar' }));
+    await waitFor(() => expect(state.toast.error).toHaveBeenCalledWith(expect.stringContaining('"PIX MERCADO": o lançamento vinculado é de')));
+    expect(escritas()).toEqual([]);
+  });
+
   it('possível duplicata: mesmo payload de antes (ocorrência 0) e decisão com os mesmos botões', async () => {
     restaurar([linha({ descricao: 'VENDA REPETIDA', tipo: 'RECEITA', valor: 42, categoriaId: 'cat1', fitId: 'F1' })]);
     state.rpc.mockImplementation((nome: string) => {

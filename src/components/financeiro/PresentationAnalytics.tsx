@@ -44,6 +44,9 @@ import {
   calculatePresentationGroupMetric,
   filterPresentationCategoriesByGroups,
   formatMonthPeriodPtBR,
+  PRESENTATION_ANALYSIS_GROUPS,
+  PRESENTATION_DETAILED_GROUPS,
+  summarizeExpenseOutsideGroups,
   type CategoryCompositionNode,
   type DataAvailability,
   type PresentationCategoryMetadataMap,
@@ -76,6 +79,7 @@ import type {
 } from '@/lib/financeiroPresentationAdapter';
 import PresentationFinancialTree from '@/components/financeiro/PresentationFinancialTree';
 import PresentationPlanComparison from '@/components/financeiro/PresentationPlanComparison';
+import PresentationUngroupedExpenseNotice from '@/components/financeiro/PresentationUngroupedExpenseNotice';
 import type {
   PresentationDetailTarget,
   PresentationReturnAnchor,
@@ -136,13 +140,7 @@ const QUICK_ANALYSES: Array<{ target: AnalysisTarget; label: string }> = [
   { target: 'payables', label: 'Contas em aberto' },
 ];
 
-const ANALYSIS_GROUPS: Partial<Record<AnalysisTarget, readonly string[]>> = {
-  cmv: ['cmv'],
-  personnel: ['pessoal'],
-  operations: ['ocupacao', 'utilidades', 'marketing', 'administrativa', 'manutencao'],
-  financial: ['financeira', 'taxa'],
-  investments: ['investimento'],
-};
+const ANALYSIS_GROUPS: Partial<Record<AnalysisTarget, readonly string[]>> = PRESENTATION_ANALYSIS_GROUPS;
 
 const ANALYSIS_TITLES: Record<AnalysisTarget, string> = {
   overview: 'Composição operacional',
@@ -585,12 +583,21 @@ function AnalysisContent({
       </CardHeader>
       <CardContent>
         {metadata ? (
-          <PresentationFinancialTree
-            title={ANALYSIS_TITLES[target]}
-            nodes={nodes}
-            tone="expense"
-            onSelectNode={node => onSelectCategory(target === 'cmv' ? 'cmv' : 'expense', node)}
-          />
+          <div className="space-y-4">
+            <PresentationFinancialTree
+              title={ANALYSIS_TITLES[target]}
+              nodes={nodes}
+              tone="expense"
+              onSelectNode={node => onSelectCategory(target === 'cmv' ? 'cmv' : 'expense', node)}
+            />
+            <PresentationUngroupedExpenseNotice
+              outside={summarizeExpenseOutsideGroups(
+                snapshot.categoryComposition.operational.expense,
+                metadata,
+                PRESENTATION_DETAILED_GROUPS,
+              )}
+            />
+          </div>
         ) : (
           <p className="rounded-lg border border-dashed p-5 text-sm text-muted-foreground">Metadados gerenciais indisponíveis. Os totais operacionais continuam preservados.</p>
         )}

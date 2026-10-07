@@ -373,7 +373,6 @@ export function buildBorderoReport(payload: BorderoPayload): BorderoReport {
     ordem: category.sortOrder,
     centro_custo_padrao_id: null,
     grupo: null,
-    linha_dre: null,
     system_key: null,
     excluir_dos_totais: category.nonOperational,
     ativo: category.active,

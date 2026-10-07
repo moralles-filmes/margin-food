@@ -23,6 +23,10 @@ export interface DfcSummary {
   categorias: DfcCategoria[];
   valores_por_categoria: Record<string, number>;
   saldo_inicial: number;
+  /** Centros com valor no período; vazio quando nenhum valor do período tem centro de custo. */
+  centros_custo?: unknown;
+  /** { <centro_id> | 'sem_centro': { <cat_id>: total } } — vazio junto com centros_custo. */
+  valores_por_centro_custo?: Record<string, Record<string, number>>;
 }
 
 export interface DfcCategoria {
@@ -33,7 +37,6 @@ export interface DfcCategoria {
   parent_id: string | null;
   ordem: number | null;
   grupo: string | null;
-  linha_dre: string | null;
   system_key: string | null;
   excluir_dos_totais: boolean;
   ativo: boolean;
@@ -101,7 +104,11 @@ export interface LancamentoCandidate {
   tipo: string;
   descricao: string;
   conciliado: boolean | null;
-  conta_id: string;
+  conta_id: string | null;
+  status?: string | null;
+  data_vencimento?: string | null;
+  /** Previsto vinculado a módulo deve ser baixado pelo título. */
+  referencia_modulo?: string | null;
   origem?: string | null;
   /** Runtime flag: true if from same bank account */
   _sameAccount?: boolean;

@@ -59,6 +59,30 @@ export function getBankBalanceAtDate(
   );
 }
 
+/**
+ * Saldo inicial que faz a conta bater com o extrato, para conta que ainda não
+ * tem lançamento antes do período importado.
+ *
+ * Sem lançamento anterior, o saldo do sistema na véspera do período é o próprio
+ * `saldo_inicial` — nenhum cálculo de saldo lê `data_saldo_inicial`. Então o
+ * saldo inicial correto é o saldo do banco na véspera: o saldo informado menos
+ * o que o extrato movimentou até a data dele. O erro típico é cadastrar a conta
+ * com o saldo de hoje e depois conciliar um extrato de dias anteriores.
+ */
+export function sugerirSaldoInicial({ informado, deltaAteData }: {
+  informado: number;
+  deltaAteData: number;
+}): number {
+  return (Math.round(informado * 100) - Math.round(deltaAteData * 100)) / 100;
+}
+
+/** Dia seguinte em ISO `yyyy-MM-dd`, por componentes locais (nunca `new Date(iso)`, que é UTC). */
+export function diaSeguinte(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  const dt = new Date(y, m - 1, d + 1);
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+}
+
 const saldoExtratoKey = (contaId: string) => `conciliacao_saldo_extrato_${contaId}`;
 
 export function saveSaldoExtrato(contaId: string, saldo: SaldoExtratoRef) {

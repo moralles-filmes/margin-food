@@ -329,7 +329,7 @@ CREATE POLICY "select_own_company" ON tabela
 - Auditoria Financeira
 - Comparativo de Períodos
 
-**Tabelas:** `fin_lancamentos`, `fin_contas`, `fin_categorias`, `fin_centros_custo`, `fin_plano_contas`, `fin_contas_pagar`, `fin_contas_receber`, `fin_orcamentos`, `fin_dre_linhas`, `fin_rateios`, `fin_lancamento_rateios`, `fin_regras_categorizacao`, `fin_audit_logs`, `financeiro_fechamento_caixa`
+**Tabelas:** `fin_lancamentos`, `fin_contas`, `fin_categorias`, `fin_centros_custo`, `fin_contas_pagar`, `fin_contas_receber`, `fin_orcamentos`, `fin_rateios`, `fin_lancamento_rateios`, `fin_regras_categorizacao`, `fin_audit_logs`, `financeiro_fechamento_caixa`
 
 **RPCs:** `get_fin_dashboard_summary`, `get_fin_dashboard_charts`, `get_fin_cashflow`, `get_fin_dre_summary`, `get_fin_kpis`, `get_fin_counts_by_status`, `list_fin_lancamentos_cursor`, `list_fin_contas_pagar_cursor`, `list_fin_contas_receber_cursor`, `pay_conta_pagar`, `receive_conta_receber`, `create_transfer`, `update_transfer`, `delete_transfer`, `reconcile_batch_lancamentos`, `reconcile_import_lancamento`, `reconcile_pay_conta_pagar`, `reconcile_create_transfer`, `rpc_upsert_fechamento_caixa`, `rpc_delete_fechamento_caixa`, `gerar_parcela_recorrente`
 
@@ -447,11 +447,9 @@ CREATE POLICY "select_own_company" ON tabela
 | `fin_contas` | Contas bancárias |
 | `fin_categorias` | Categorias financeiras |
 | `fin_centros_custo` | Centros de custo |
-| `fin_plano_contas` | Plano de contas contábil |
 | `fin_contas_pagar` | Contas a pagar |
 | `fin_contas_receber` | Contas a receber |
 | `fin_orcamentos` | Orçamentos por categoria/mês |
-| `fin_dre_linhas` | Linhas da DRE |
 | `fin_rateios` | Rateios de lançamentos |
 | `fin_lancamento_rateios` | Rateios detalhados |
 | `fin_regras_categorizacao` | Regras automáticas de categorização |
@@ -633,7 +631,6 @@ CREATE POLICY "select_own_company" ON tabela
 | `admin_checkup_suite()` | Suite de verificação do sistema |
 | `admin_health_counts()` | Contagens de saúde |
 | `rpc_create_company(...)` | Criar empresa |
-| `rpc_set_user_company(...)` | Vincular usuário a empresa |
 | `sync_permissions_from_registry(...)` | Sincronizar permissões |
 | `rbac_permissions_diff(...)` | Diff de permissões |
 | `rbac_sql_lint_report(...)` | Lint de SQL do RBAC |

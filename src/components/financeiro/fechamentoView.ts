@@ -9,8 +9,6 @@ import { formatDateBR, parseLocalDate } from '@/lib/formatters';
 export const FECHAMENTO_LISTA_LIMITE_PX = 1000;
 /** Marcas: 5 colunas com Switch e edição. */
 export const MARCAS_LISTA_LIMITE_PX = 720;
-/** Plano de Contas: código, nome, tipo, natureza e ações. */
-export const PLANO_LISTA_LIMITE_PX = 640;
 /** Centros de Custo: nome, descrição e ações. */
 export const CENTROS_LISTA_LIMITE_PX = 560;
 /** Regras de categorização: padrão, tipo, categoria, centro, prioridade e ações. */
@@ -28,28 +26,6 @@ export function periodoFechamentoLabel(inicio: string, fim: string): string {
 
 export function diasFechamentoLabel(dias: number): string {
   return dias === 1 ? '1 dia com fechamento' : `${dias} dias com fechamento`;
-}
-
-/** Tipo da conta contábil — os mesmos rótulos das opções do formulário. */
-export const PLANO_TIPO_LABEL: Record<string, string> = {
-  receita: 'Receita',
-  despesa: 'Despesa',
-  ativo: 'Ativo',
-  passivo: 'Passivo',
-  patrimonio: 'Patrimônio',
-};
-
-/** Natureza da conta contábil — os mesmos rótulos das opções do formulário. */
-export const PLANO_NATUREZA_LABEL: Record<string, string> = {
-  operacional: 'Operacional',
-  financeira: 'Financeira',
-  nao_operacional: 'Não Operacional',
-};
-
-/** Rótulo do mapa; valor fora dele (legado) aparece cru, nunca some. */
-export function rotuloOuValor(mapa: Record<string, string>, valor: string | null | undefined): string {
-  if (!valor) return '—';
-  return mapa[valor] ?? valor;
 }
 
 /** Selo do tipo da categoria (receita/despesa), com a mesma semântica de Recorrências (D57). */
