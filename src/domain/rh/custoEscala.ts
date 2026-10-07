@@ -1,10 +1,10 @@
 /**
  * ─── Custo projetado da escala semanal ───
  *
- * Soma horas × valor-hora dos turnos de TRABALHO. O valor-hora vem de
- * `rh_listar_colaboradores`, que mascara a remuneração por chave; por isso o
- * resultado distingue "não dá para calcular" de "custa zero" — gravar zero por
- * cima do custo projetado é o que se quer evitar.
+ * Soma horas × valor-hora dos turnos de TRABALHO; sem valor-hora, salário/220,
+ * como Folha e Custos (o servidor usa a mesma regra em `rh_escala_publicar`). A
+ * remuneração vem de `rh_listar_colaboradores`, que a mascara por chave; por isso
+ * o resultado distingue "não dá para calcular" de "custa zero".
  */
 
 export interface TurnoCusto {
@@ -17,6 +17,7 @@ export interface TurnoCusto {
 export interface ColaboradorCusto {
   id: string;
   valor_hora: number | null;
+  salario?: number | null;
   /** false quando quem vê a escala não tem acesso à remuneração (valor_hora vem nulo). */
   remuneracao_visivel?: boolean;
 }
@@ -54,7 +55,8 @@ export function calcularCustoEscala(
   }
 
   const total = trabalho.reduce((soma, t) => {
-    const valorHora = colaboradoresPorId.get(t.colaborador_id)!.valor_hora ?? 0;
+    const c = colaboradoresPorId.get(t.colaborador_id)!;
+    const valorHora = c.valor_hora || (c.salario ?? 0) / 220;
     return soma + horasTurno(t.hora_inicio, t.hora_fim) * valorHora;
   }, 0);
   return { situacao: 'ok', valor: Math.round(total * 100) / 100 };

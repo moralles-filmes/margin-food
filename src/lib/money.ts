@@ -64,6 +64,28 @@ export function normalizeBRLMoneyToNumber(value: string | null | undefined): num
 }
 
 /**
+ * Número do banco → texto de campo monetário (`CurrencyInput`) sem perder casas.
+ * `String(12.345)` dá "12.345", que `normalizeBRLMoneyToNumber` relê como milhar
+ * (12345); aqui sai "12,345" — vírgula decimal, sem agrupamento — e volta igual.
+ */
+export function numeroParaCampoMoeda(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value)) return '';
+  return value.toLocaleString('pt-BR', { useGrouping: false, maximumFractionDigits: 20 });
+}
+
+/**
+ * Texto do campo monetário → número a gravar, sem arredondar o que o usuário não
+ * mudou. O `CurrencyInput` mostra 2 casas e, só de passar pelo campo, devolve
+ * "12,35" para um 12,345 gravado; se o texto ainda é o original como ele aparece
+ * na tela, volta o original.
+ */
+export function campoMoedaParaNumero(campo: string, original: number | null | undefined): number | null {
+  const valor = normalizeBRLMoneyToNumber(campo);
+  if (valor != null && original != null && formatNumberToBRL(valor) === formatNumberToBRL(original)) return original;
+  return valor;
+}
+
+/**
  * Formats a number as pt-BR currency string (without R$ prefix).
  * Example: 1900.5 → "1.900,50"
  */

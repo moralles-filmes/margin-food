@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { usePersistedTab } from '@/hooks/usePersistedTab';
 import { useTravaEnvio } from '@/hooks/useTravaEnvio';
 import { chavePonto, sementeDaBatida, type BatidaPonto } from '@/domain/rh/idempotencia';
-import { mensagemErroEdicaoColaborador } from '@/domain/rh/prontuario';
+import { mensagemErroCriacaoColaborador, mensagemErroEdicaoColaborador } from '@/domain/rh/prontuario';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { DecimalInput, parseDecimal } from '@/components/ui/decimal-input';
 import { CurrencyInput } from '@/components/ui/brl-input';
@@ -13,6 +13,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCan, useModuleAccess } from '@/permissions/hooks';
 import { useScopedToast } from '@/hooks/useScopedToast';
 import { fmtBRL, formatDateBR, formatInBR, normalizeBRLMoneyToNumber, todayBR } from '@/lib/formatters';
+import { campoMoedaParaNumero, numeroParaCampoMoeda } from '@/lib/money';
 import { formatDateISO } from '@/lib/datetime';
 
 const COLORS = [
@@ -81,6 +82,8 @@ interface Colaborador {
   valor_hora: number | null;
   created_at: string;
   remuneracao_visivel?: boolean;
+  // Só no colaborador em edição (lido da tabela ao abrir): trava contra gravação simultânea.
+  updated_at?: string;
 }
 
 interface PontoRegistro {
@@ -187,7 +190,7 @@ function RhViewInner({ visibleSubtabs, user }: {
   const [profiles, setProfiles] = useState<Profile[]>([]);
 
   // Double-click protection
-  const [savingColab, setSavingColab] = useState(false);
+  const { enviando: savingColab, executar: executarCriacaoColab } = useTravaEnvio();
   const [savingEditColab, setSavingEditColab] = useState(false);
   const { enviando: savingPonto, executar: executarPonto } = useTravaEnvio();
   // Semente da batida em andamento: o retry da mesma batida reaproveita a chave
@@ -289,45 +292,50 @@ function RhViewInner({ visibleSubtabs, user }: {
     Promise.all([fetchColaboradores(), fetchPontos(), fetchBancoHoras(0), fetchProfiles()]).finally(() => setLoading(false));
   }, [fetchColaboradores, fetchPontos, fetchBancoHoras, fetchProfiles]);
 
-  const handleCreateColab = async () => {
-    if (savingColab) return;
+  const handleCreateColab = () => executarCriacaoColab(async () => {
     if (!formColab.nome.trim()) { toast.error('Nome é obrigatório'); return; }
-    setSavingColab(true);
-    try {
-      const payload: any = {
-        nome: padronizarTexto(formColab.nome), email: formColab.email, telefone: formColab.telefone,
-        cpf: formColab.cpf, cargo: padronizarTexto(formColab.cargo), funcao: padronizarTexto(formColab.funcao),
-        setor: formColab.setor, tipo_contrato: formColab.tipo_contrato,
-        carga_horaria_semanal: parseDecimal(formColab.carga_horaria_semanal) ?? 44,
-        salario: normalizeBRLMoneyToNumber(formColab.salario) ?? 0,
-        valor_hora: normalizeBRLMoneyToNumber(formColab.valor_hora) ?? 0,
-        data_admissao: formColab.data_admissao,
-        created_by: user?.id,
-      };
-      if (formColab.user_id) payload.user_id = formColab.user_id;
-      const { error } = await supabase.from('rh_colaboradores').insert(withCompanyId(companyId, payload));
-      if (error) { toast.error('Erro ao criar colaborador: ' + error.message); return; }
-      toast.success('Colaborador criado com sucesso!');
-      setShowNewColab(false);
-      setFormColab({ nome: '', email: '', telefone: '', cpf: '', cargo: 'Colaborador', funcao: 'Geral', setor: 'salao', tipo_contrato: 'CLT', carga_horaria_semanal: '44', salario: '0', valor_hora: '0', user_id: '', data_admissao: todayBR() });
-      fetchColaboradores();
-    } finally {
-      setSavingColab(false);
-    }
-  };
+    // Remuneração e usuário vinculado são de :manage também na criação (a RLS recusa).
+    const payload: any = {
+      nome: padronizarTexto(formColab.nome), email: formColab.email, telefone: formColab.telefone,
+      cpf: formColab.cpf, cargo: padronizarTexto(formColab.cargo), funcao: padronizarTexto(formColab.funcao),
+      setor: formColab.setor, tipo_contrato: formColab.tipo_contrato,
+      carga_horaria_semanal: parseDecimal(formColab.carga_horaria_semanal) ?? 44,
+      salario: canManageProntuario ? (normalizeBRLMoneyToNumber(formColab.salario) ?? 0) : 0,
+      valor_hora: canManageProntuario ? (normalizeBRLMoneyToNumber(formColab.valor_hora) ?? 0) : 0,
+      data_admissao: formColab.data_admissao,
+      created_by: user?.id,
+    };
+    if (canManageProntuario && formColab.user_id) payload.user_id = formColab.user_id;
+    const { error } = await supabase.from('rh_colaboradores').insert(withCompanyId(companyId, payload));
+    if (error) { console.error(error); toast.error(mensagemErroCriacaoColaborador(error.message)); return; }
+    toast.success('Colaborador criado com sucesso!');
+    setShowNewColab(false);
+    setFormColab({ nome: '', email: '', telefone: '', cpf: '', cargo: 'Colaborador', funcao: 'Geral', setor: 'salao', tipo_contrato: 'CLT', carga_horaria_semanal: '44', salario: '0', valor_hora: '0', user_id: '', data_admissao: todayBR() });
+    fetchColaboradores();
+  });
 
-  const handleOpenEdit = (c: Colaborador) => {
+  const handleOpenEdit = async (c: Colaborador) => {
     // O formulário reenvia CPF e remuneração: abrir com valor mascarado gravaria zero por cima.
     if (c.remuneracao_visivel === false) {
       toast.error('Sem acesso aos dados completos deste colaborador para editar.');
       return;
     }
-    setEditingColab(c);
+    // Abre com a linha atual, não a da lista: o updated_at dela é a trava contra gravar por
+    // cima de outra edição, e só vale se o formulário mostrar os mesmos dados.
+    const { data, error } = await supabase.from('rh_colaboradores')
+      .select('id, user_id, nome, cpf, telefone, email, cargo, funcao, setor, data_admissao, tipo_contrato, carga_horaria_semanal, salario, valor_hora, updated_at')
+      .eq('id', c.id)
+      .maybeSingle();
+    if (error) { console.error(error); toast.error('Erro ao abrir o colaborador: ' + error.message); return; }
+    if (!data) { toast.error('Sem acesso aos dados completos deste colaborador para editar.'); return; }
+    const atual: Colaborador = { ...c, ...data };
+    setEditingColab(atual);
     setEditForm({
-      nome: c.nome, email: c.email, telefone: c.telefone, cpf: c.cpf || '',
-      cargo: c.cargo, funcao: c.funcao, setor: c.setor, tipo_contrato: c.tipo_contrato,
-      carga_horaria_semanal: String(c.carga_horaria_semanal), salario: String(c.salario), valor_hora: String(c.valor_hora),
-      user_id: c.user_id || '', data_admissao: c.data_admissao,
+      nome: atual.nome, email: atual.email, telefone: atual.telefone, cpf: atual.cpf || '',
+      cargo: atual.cargo, funcao: atual.funcao, setor: atual.setor, tipo_contrato: atual.tipo_contrato,
+      carga_horaria_semanal: String(atual.carga_horaria_semanal),
+      salario: numeroParaCampoMoeda(atual.salario), valor_hora: numeroParaCampoMoeda(atual.valor_hora),
+      user_id: atual.user_id || '', data_admissao: atual.data_admissao,
     });
     setShowEditColab(true);
   };
@@ -336,22 +344,26 @@ function RhViewInner({ visibleSubtabs, user }: {
     if (savingEditColab) return;
     if (!editingColab) return;
     if (!editForm.nome.trim()) { toast.error('Nome é obrigatório'); return; }
+    // Sem o updated_at lido ao abrir, a gravação iria sem a trava contra edição simultânea.
+    if (!editingColab.updated_at) { toast.error('Feche e abra o colaborador de novo para editar.'); return; }
     setSavingEditColab(true);
     try {
       // Pela RPC, não pela tabela: a RLS de UPDATE só aceita :manage e devolvia 0 linhas
       // sem erro para quem tem :edit — a tela confirmava sem ter gravado nada.
       // Remuneração e usuário vinculado são de :manage (o servidor recusa a mudança):
-      // sem ela, volta o valor que veio do banco, sem passar pelo campo de texto.
+      // sem ela, volta o valor que veio do banco, sem passar pelo campo de texto; com ela,
+      // campo não alterado devolve o valor gravado (o campo mostra só 2 casas).
       const { error } = await (supabase.rpc as any)('rh_atualizar_colaborador', {
         p_id: editingColab.id,
         p_nome: padronizarTexto(editForm.nome), p_email: editForm.email, p_telefone: editForm.telefone,
         p_cpf: editForm.cpf || null, p_cargo: padronizarTexto(editForm.cargo), p_funcao: padronizarTexto(editForm.funcao),
         p_setor: editForm.setor, p_tipo_contrato: editForm.tipo_contrato,
         p_carga_horaria_semanal: parseDecimal(editForm.carga_horaria_semanal) ?? 44,
-        p_salario: canManageProntuario ? (normalizeBRLMoneyToNumber(editForm.salario) ?? 0) : editingColab.salario,
-        p_valor_hora: canManageProntuario ? (normalizeBRLMoneyToNumber(editForm.valor_hora) ?? 0) : editingColab.valor_hora,
+        p_salario: canManageProntuario ? (campoMoedaParaNumero(editForm.salario, editingColab.salario) ?? 0) : editingColab.salario,
+        p_valor_hora: canManageProntuario ? (campoMoedaParaNumero(editForm.valor_hora, editingColab.valor_hora) ?? 0) : editingColab.valor_hora,
         p_data_admissao: editForm.data_admissao,
         p_user_id: canManageProntuario ? (editForm.user_id || null) : (editingColab.user_id ?? null),
+        p_expected_updated_at: editingColab.updated_at,
       });
       if (error) { console.error(error); toast.error(mensagemErroEdicaoColaborador(error.message)); return; }
       toast.success('Colaborador atualizado!');
@@ -531,7 +543,7 @@ function RhViewInner({ visibleSubtabs, user }: {
   const availableItems = availableTabs.map(t => ({ id: t.id, label: t.label, icon: t.icon }));
   const effectiveSubTab: RhSubTab = availableItems.some(i => i.id === subTab) ? subTab : (availableItems[0]?.id ?? 'prontuario');
 
-  const renderColabForm = (form: typeof formColab, setForm: typeof setFormColab, isEdit: boolean) => (
+  const renderColabForm = (form: typeof formColab, setForm: typeof setFormColab) => (
     <div className="grid gap-3">
       <div className="grid grid-cols-2 gap-3">
         <div><Label>Nome *</Label><Input value={form.nome} onChange={e => setForm(p => ({ ...p, nome: e.target.value }))} /></div>
@@ -568,11 +580,11 @@ function RhViewInner({ visibleSubtabs, user }: {
         </div>
         <div>
           <Label>Salário (R$)</Label>
-          <CurrencyInput className="h-9" value={form.salario} onValueChange={(raw) => setForm(p => ({ ...p, salario: raw }))} showPrefix maxDecimals={2} disabled={isEdit && !canManageProntuario} />
+          <CurrencyInput className="h-9" value={form.salario} onValueChange={(raw) => setForm(p => ({ ...p, salario: raw }))} showPrefix maxDecimals={2} disabled={!canManageProntuario} />
         </div>
         <div>
           <Label>Valor/Hora (R$)</Label>
-          <CurrencyInput className="h-9" value={form.valor_hora} onValueChange={(raw) => setForm(p => ({ ...p, valor_hora: raw }))} showPrefix maxDecimals={2} disabled={isEdit && !canManageProntuario} />
+          <CurrencyInput className="h-9" value={form.valor_hora} onValueChange={(raw) => setForm(p => ({ ...p, valor_hora: raw }))} showPrefix maxDecimals={2} disabled={!canManageProntuario} />
         </div>
       </div>
       <div className="grid grid-cols-2 gap-3">
@@ -582,17 +594,18 @@ function RhViewInner({ visibleSubtabs, user }: {
         </div>
         <div>
           <Label>Vincular Usuário (opcional)</Label>
-          <Select value={form.user_id} onValueChange={v => setForm(p => ({ ...p, user_id: v }))} disabled={isEdit && !canManageProntuario}>
+          <Select value={form.user_id} onValueChange={v => setForm(p => ({ ...p, user_id: v }))} disabled={!canManageProntuario}>
             <SelectTrigger><SelectValue placeholder="Nenhum" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="">Nenhum</SelectItem>
-              {profiles.map(p => <SelectItem key={p.id} value={p.id}>{p.nome || p.email}</SelectItem>)}
+              {/* Ninguém vincula o próprio usuário (o servidor recusa); fica na lista só se já for o vínculo. */}
+              {profiles.filter(p => p.id !== user?.id || p.id === form.user_id).map(p => <SelectItem key={p.id} value={p.id}>{p.nome || p.email}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
       </div>
-      {isEdit && !canManageProntuario && (
-        <p className="text-xs text-muted-foreground">Salário, valor/hora e usuário vinculado só podem ser alterados por quem gerencia o Prontuário.</p>
+      {!canManageProntuario && (
+        <p className="text-xs text-muted-foreground">Salário, valor/hora e usuário vinculado só podem ser definidos por quem gerencia o Prontuário.</p>
       )}
     </div>
   );
@@ -618,7 +631,7 @@ function RhViewInner({ visibleSubtabs, user }: {
                 </DialogTrigger>
                 <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
                   <DialogHeader><DialogTitle>Novo Colaborador</DialogTitle></DialogHeader>
-                  {renderColabForm(formColab, setFormColab, false)}
+                  {renderColabForm(formColab, setFormColab)}
                   <Button onClick={handleCreateColab} disabled={savingColab} className="w-full mt-2">
                     {savingColab ? 'Salvando...' : 'Criar Colaborador'}
                   </Button>
@@ -688,7 +701,7 @@ function RhViewInner({ visibleSubtabs, user }: {
           <Dialog open={showEditColab} onOpenChange={o => { setShowEditColab(o); if (!o) setEditingColab(null); }}>
             <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
               <DialogHeader><DialogTitle>Editar Colaborador</DialogTitle></DialogHeader>
-              {renderColabForm(editForm, setEditForm, true)}
+              {renderColabForm(editForm, setEditForm)}
               <Button onClick={handleUpdateColab} disabled={savingEditColab} className="w-full mt-2">
                 {savingEditColab ? 'Salvando...' : 'Salvar Alterações'}
               </Button>
@@ -876,7 +889,7 @@ function RhViewInner({ visibleSubtabs, user }: {
         </div>}
 
         {/* ── SUB-COMPONENTS ── */}
-        {effectiveSubTab === 'escalas' && <EscalasSection colaboradores={colaboradores} canManage={canManage} />}
+        {effectiveSubTab === 'escalas' && <EscalasSection colaboradores={colaboradores} />}
         {effectiveSubTab === 'tarefas' && <TarefasSection colaboradores={colaboradores} canManage={canManage} />}
         {effectiveSubTab === 'onboarding' && <OnboardingSection colaboradores={colaboradores} canManage={canManage} />}
         {effectiveSubTab === 'treinamento' && <TreinamentoSection colaboradores={colaboradores} canManage={canManage} />}
