@@ -188,10 +188,10 @@ RETURNS TABLE(id uuid, updated_at timestamptz) LANGUAGE sql AS $$ SELECT NULL::u
 
 \ir ../../migrations/20261003140000_cmv_financeiro.sql
 \ir ../../migrations/20261003203219_cmv_financeiro_serie.sql
-\ir ../../migrations/20261005120000_cmv_financeiro_lancamentos.sql
+\ir ../../migrations/20261008120000_cmv_financeiro_lancamentos.sql
 -- A migration é aplicada no SQL Editor e pode ser executada de novo: uma segunda aplicação, no mesmo
 -- banco, precisa passar sem erro e sem mudar nada (CREATE OR REPLACE, IF EXISTS, comentários e grants).
-\ir ../../migrations/20261005120000_cmv_financeiro_lancamentos.sql
+\ir ../../migrations/20261008120000_cmv_financeiro_lancamentos.sql
 
 -- ─────────────────────────────────────────────────────────────────────────────
 

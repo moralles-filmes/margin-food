@@ -137,7 +137,7 @@ Aceito / em aberto (P3):
 Spec e plano em `docs/superpowers/` (links no PLANO.md §6). Branch `feat/cmv-financeiro-lancamentos`, a partir do PR #144 (Redesign V2).
 
 ### Entregue
-- Migration `supabase/migrations/20261005120000_cmv_financeiro_lancamentos.sql`:
+- Migration `supabase/migrations/20261008120000_cmv_financeiro_lancamentos.sql`:
   - coluna `fin_lancamentos.cmv_incluir` e a trava de escrita direta;
   - `_fin_cmv_linhas_lancamentos`, `_fin_cmv_linhas_fontes`, `_fin_cmv_retrato_lancamento` e `_fin_cmv_heranca`;
   - payload, lista e config com as duas fontes;
@@ -154,7 +154,7 @@ Spec e plano em `docs/superpowers/` (links no PLANO.md §6). Branch `feat/cmv-fi
 1. **Frontend.** Entra primeiro: sem `recursos` ele se comporta exatamente como hoje. A migration vem logo em seguida (passo 2), porque com a migration e o cliente antigo publicado os totais do CMV contariam lançamentos que a lista não mostra.
 2. **Migration**, logo depois do frontend. Remove e recria três funções (`DROP FUNCTION`): o conector MCP deve recusar, então ela é rodada pelo SQL Editor. É reexecutável (`CREATE OR REPLACE`). Depois:
    - conferir uma assinatura por função, grants, triggers e o md5 dos corpos contra o banco descartável;
-   - registrar a versão `20261005120000` com o nome do arquivo;
+   - registrar a versão `20261008120000` com o nome do arquivo;
    - antes de rodar "Aplicar padrões" em unidade grande, medir `fin_cmv_aplicar_padroes` contra o `statement_timeout` de 8 s, porque cada lançamento atualizado recalcula o cache de saldo da conta.
 3. **Por unidade.** Em CMV → Regras de vínculo:
    - conferir os padrões das categorias de mercadoria;
