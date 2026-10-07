@@ -9,7 +9,7 @@ paths:
 
 # Integrações — ao tocar código de provedor, webhook, OAuth ou MCP
 
-Antes de alterar, leia `docs/standards/INTEGRATIONS.md` e o `docs/integrations/providers/<provider>.md` do provedor envolvido (hoje: `zapi.md`; Gemini, Anthropic, OpenAI e HaveIBeenPwned ainda sem documento). Confirme a versão vigente da API na documentação oficial; não codifique versão ou política de memória.
+Antes de alterar, leia `docs/standards/INTEGRATIONS.md` e o `docs/integrations/providers/<provider>.md` do provedor envolvido (`zapi.md`, `gemini.md`, `anthropic.md`, `openai.md`, `haveibeenpwned.md`; os riscos conhecidos de cada um estão em "Particularidades operacionais"). Confirme a versão vigente da API na documentação oficial; não codifique versão ou política de memória.
 
 Pontos que mais causam incidente:
 

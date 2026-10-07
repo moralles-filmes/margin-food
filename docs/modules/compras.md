@@ -54,7 +54,7 @@
 
 ## Integrações
 
-- Z-API → `docs/integrations/providers/zapi.md`. IA da Cotação (`cotacao-ia`, Anthropic/OpenAI/Gemini, chave por empresa) ainda sem documento de provedor.
+- Z-API → `docs/integrations/providers/zapi.md`. IA da Cotação (`cotacao-ia`, chave por empresa): `anthropic.md`, `openai.md` e `gemini.md` na mesma pasta.
 
 ## Dependências
 

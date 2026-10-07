@@ -465,7 +465,7 @@ Marque cada item como APLICÁVEL, NÃO APLICÁVEL (com justificativa) ou PENDENT
 - Provedores em uso: Z-API (WhatsApp da Cotação, `send-whatsapp-zapi`, configuração por empresa em `cotacao_zapi_config`); Gemini (`ai-chat`, chave da plataforma); Anthropic, OpenAI ou Gemini (`cotacao-ia`, chave por empresa em `cotacao_ia_config`); HaveIBeenPwned (`check-password`).
 - Efeito externo registra a tentativa antes de enviar: `cotacao_whatsapp_logs` (PENDING → SENT, ERROR ou UNKNOWN; índice `uq_cotacao_wa_logs_company_idempotency`) e `ai_logs` no `ai-chat`.
 - Não há webhooks recebidos. Job: `scheduled-jobs` (Bearer `CRON_SECRET`); o agendador não está no repositório.
-- Documentos de provedor: `providers/zapi.md`. Gemini, Anthropic, OpenAI e HaveIBeenPwned ainda sem documento.
+- Documentos de provedor (verificados em 2026-10-07): `providers/zapi.md`, `providers/gemini.md`, `providers/anthropic.md`, `providers/openai.md` e `providers/haveibeenpwned.md`. Riscos abertos de cada um (modelo `gemini-2.0-flash` desligado pelo Google em 2026-06-01 e ainda fixo no `ai-chat`, modelo padrão da Anthropic aposentado, chamadas sem timeout, chaves de IA e token da Z-API legíveis pelo cliente, HIBP em fail-open) ficam em "Particularidades operacionais" do documento do provedor.
 
 ### Envio externo sem deduplicação no provedor (movido do AGENTS.md em 2026-10-07)
 
