@@ -104,7 +104,11 @@ export interface LancamentoCandidate {
   tipo: string;
   descricao: string;
   conciliado: boolean | null;
-  conta_id: string;
+  conta_id: string | null;
+  status?: string | null;
+  data_vencimento?: string | null;
+  /** Previsto vinculado a módulo deve ser baixado pelo título. */
+  referencia_modulo?: string | null;
   origem?: string | null;
   /** Runtime flag: true if from same bank account */
   _sameAccount?: boolean;

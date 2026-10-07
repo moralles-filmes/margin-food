@@ -3,6 +3,20 @@ export function mapPagamentoError(err: unknown): string {
   const msg = String((err as { message?: string })?.message ?? '');
   if (msg.includes('CONTA_OBRIGATORIA'))
     return 'Selecione a conta bancária de onde o pagamento saiu.';
+  if (msg.includes('JA_CONCILIADO_OUTRA_CONTA'))
+    return 'Este lançamento já foi conciliado no extrato de outra conta. Desconcilie lá antes de trazê-lo para esta.';
+  if (msg.includes('LANCAMENTO_PREVISTO_VINCULADO'))
+    return 'Este lançamento previsto pertence a um título de Contas a Pagar/Receber. Dê baixa pelo título.';
+  if (msg.includes('TIPO_DIVERGENTE'))
+    return 'O lançamento escolhido é de outro tipo (receita × despesa) que a linha do extrato.';
+  if (msg.includes('VALOR_DIVERGENTE'))
+    return 'O valor do lançamento é diferente do extrato. Corrija o valor no Livro Razão antes de conciliar.';
+  if (msg.includes('LANCAMENTO_JA_VINCULADO'))
+    return 'Este lançamento já está vinculado a outra linha do extrato desta conta. Recarregue o extrato antes de continuar.';
+  if (msg.includes('DATA_EXTRATO_FUTURA'))
+    return 'A linha do extrato tem data futura. Um lançamento previsto só vira realizado com pagamento já feito.';
+  if (msg.includes('LINHA_EXTRATO_OBRIGATORIA'))
+    return 'Faltam o tipo ou a data da linha do extrato para confirmar o pagamento do lançamento previsto.';
   if (msg.includes('CONTA_DIVERGENTE'))
     return 'Este lançamento pertence a outra conta bancária. Concilie pelo extrato da conta correta.';
   if (msg.includes('CATEGORIA_OPERACIONAL'))
