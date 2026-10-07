@@ -1,0 +1,71 @@
+# Contrato de tenancy e acesso do projeto — Padrão SaaS v3.1
+# Fonte única lida pelo Padrão SaaS e pelos plugins saas-shield-br, saas-builder-br e saas-audit-br.
+#
+# Projeto EXISTENTE (modo A): declara o modelo que já roda em produção. Não é o arquétipo E do padrão.
+# Trocar de arquétipo exige ADR e plano expand → backfill → contract (MULTI_TENANCY §1).
+# Levantado em 2026-10-07 por leitura do código (main dd1cbee) e do catálogo de produção (somente SELECT).
+
+archetype: hybrid-A-C             # company_id + resolver escalar (A) + RBAC por chaves e escrita crítica por RPC (C)
+framework: vite                   # Vite 8 SPA + Supabase (PostgREST, RPC, Edge Functions Deno)
+
+tenant:
+  columns: [company_id]
+  resolver: public.get_current_company_id   # () → uuid; STABLE SECURITY DEFINER, search_path ''
+  resolver_kind: membership-lookup          # escalar: empresa indicada pelo header, confirmada por is_company_member
+  strict_resolver: public.assert_tenant     # levanta erro quando não há tenant; usar em RPC SECURITY DEFINER
+  membership_check: public.is_company_member  # membership 'active' + companies.ativo
+  force_trigger: partial                    # só algumas tabelas (ex.: cotacao_force_company_id); a regra do projeto é INSERT com company_id explícito
+  write_path: server-scoped                 # ver write_path_detail
+  write_path_detail: >
+    CRUD comum: PostgREST com company_id explícito no payload, validado por
+    WITH CHECK (company_id = (select get_current_company_id())).
+    Mutações críticas (Financeiro _guarded_*, conciliação reconcile_*, estoque op_*/lotes, RH, Salmão,
+    Compras *_atomic, acessos): RPC SECURITY DEFINER com assert_tenant() + has_any_permission().
+  active_source: header                     # fora do enum canônico (url | jwt-claim | session):
+  active_source_detail: >
+    estado do cliente (AuthContext/CompanyScopeProvider) → header x-company-id em um cliente
+    Supabase por empresa (src/integrations/supabase/companyClient.ts). Sem header, vale
+    profiles.company_id, também conferido pela membership. Não vem da URL nem de claim do JWT.
+
+locations:
+  enabled: false                  # "Unidade" na interface = empresa (company_id). Não há filial abaixo da empresa.
+  note: stock_locations é local físico de estoque, não filial.
+
+membership:
+  model: multi                    # 3 usuários em mais de uma empresa (2026-10-07)
+  table: company_memberships      # (user_id, company_id, status active|revoked, job_role_id, sector)
+  owner_flag: null                # não existe proprietário; "gestor" = quem tem users:manage / configuracoes:usuarios:manage
+
+roles:
+  model: permission-strings       # '<modulo>:<submodulo>:<acao>' (separador ':'), ações em src/permissions/actions.ts
+  catalog_table: permissions      # sincronizado a partir de src/permissions/registry.ts (sync_permissions_from_registry)
+  modules_table: null             # módulos e submódulos vivem no registry do frontend
+  grant_tables: [role_permissions, user_permissions]
+  role_grants_scope: global       # role_permissions(role, permission_key) vale para todas as empresas
+  member_roles_table: user_roles  # (user_id, role app_role, company_id)
+  direct_grants_effect: [ALLOW, DENY]   # DENY vence papel e ALLOW
+  client_write: denied            # policies RESTRICTIVE / sem policy de escrita; concessão só por RPC/Edge
+  grant_rpc: public.admin_upsert_company_membership
+  helpers:
+    check: public.has_permission              # (user_id, key)
+    check_any: public.has_any_permission      # (user_id, keys[])
+    effective: public.get_effective_permissions
+    company: public.get_company_permissions
+  legacy_keys: frontend-only      # LEGACY_PERMISSION_MAP é expandido só no useCan; o banco não expande
+
+entitlements:
+  table: null                     # não há módulos contratados por empresa
+  company_status: companies.ativo # só boolean; não há read_only/suspended
+
+super_admin:
+  authority: user_permissions ALLOW 'system:global:manage'   # mesma tabela do RBAC de tenant
+  fn: public.has_permission
+  platform_company_fn: public.platform_company_id
+  companies_fn: public.can_manage_companies
+  implicit_tenant_access: false   # entrar numa unidade exige membership concedido por ela
+
+secrets_boundary: edge-function   # e RPC SECURITY DEFINER; service role só em Edge Function
+client_env_prefix: VITE_
+rls_helper_namespace: public      # helpers de RLS ficam em public (não em private)
+display_term: Unidade
+location_display_term: null

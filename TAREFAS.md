@@ -11,8 +11,27 @@ Este arquivo serve para sincronizar o progresso do desenvolvimento entre os dife
 ---
 
 ## 🚀 Próximas Tarefas (To-Do)
+- [ ] Verificação visual em navegador real (light/dark, todos os breakpoints) do redesign — nenhuma das 11 fases teve acesso a Playwright/credenciais neste ambiente; recomendado antes do próximo deploy de UI
+- [ ] Conceder permissão `inventario:detalhe:export` aos roles Admin/Conferente/Gerente via Admin → Permissões
 - [ ] Monitorar integridade dos dados na empresa piloto após ativação multi-tenant
 - [ ] Testar fluxo completo: criar empresa → criar admin → login admin → criar usuários
+- [ ] Validar isolamento: logar como user do tenant A e tentar `GET /rest/v1/faturamento_periodos_legacy` — deve retornar só registros do mesmo tenant
+- [ ] Dropar tabelas `*_bkp_reset_20260301` (18 tabelas) e `z_canary_test`
+- [ ] Auditar outras telas (Compras, CMV, Financeiro, Relatórios) por padrão `select sem limit + reduce client`
+- [ ] Auditar outros INSERTs diretos via PostgREST em tabelas multi-tenant sem `company_id` explícito
+- [ ] Avaliar trava de saldo negativo no banco para o módulo administrativo (`estoque_registrar_movimentacoes_lote`) — hoje só o operacional barra no banco; o admin continua barrando apenas no cliente
+- [ ] Liberar "Nova Transferência" entre locais (`NOVA_TRANSFERENCIA_LIBERADA` em `StockTransfersSection.tsx`) só depois que o CMV (Edge `cmv`, soma as saídas de `CMV_OUTFLOW_TYPES`) e as RPCs de consumo/entrada (`get_movimentacoes_kpis`, `get_stock_top_consumed`, `get_stock_predictive_analysis_v2`, `get_spend_by_sector`, `get_relatorios_kpis`, `get_report_items_summary`, planejamento…) desconsiderarem `internal_transfer` — cada transferência grava SAÍDA + ENTRADA; decidir junto se a manipulação do Salmão (também `internal_transfer=true`) sai do consumo
+- [ ] Fechar UPDATE de `status`/DELETE direto em `movimentacoes_estoque` via PostgREST — `authenticated` tem UPDATE/DELETE, e quem tem `estoque:movimentacoes:edit`/`delete` cancela ou apaga qualquer movimentação sem estorno nem cascata (Salmão, transferência); trigger que só aceite a mudança vinda das RPCs de cancelamento, sem quebrar a edição com `justificativa_edicao`
+- [ ] Vincular produtos aos setores em Controle de Estoque → Cadastros → Produtos p/ Setor (enquanto o setor estiver vazio, o operacional mostra o catálogo inteiro nele)
+- [ ] Conceder `operacional:movimentacao:view/create` (+ `operacional:historico:view`) e os setores de cada operador antes de liberar o módulo em produção
+- [ ] Dropar `produtos.barcode` (coluna legada, substituída por `produto_codigos_barras`) — só depois de confirmar que o frontend novo está publicado; dropar antes devolve 400 para quem estiver com a aba antiga aberta
+- [ ] Conciliação: permitir override de competência no lançamento criado pela conciliação (`p_competencia` em `reconcile_import_lancamento`)
+- [ ] Otimizar `rbac_sql_lint_report()` completo para não estourar `statement_timeout` em produção (`bun run security:check` usa o fallback `rbac_sql_lint_report_quick()`)
+- [ ] Policy `fin_conciliacao_vinculos_tenant_select` ainda chama `get_current_company_id()` fora de `(select …)` — a única entre as 588 policies de `public` em 2026-10-07; corrigir em migration (DATABASE, "Particularidades").
+- [ ] CMV Financeiro (no ar desde 2026-10-03, nenhuma unidade ativada): conceder `financeiro:cmv:*` além de admin/diretor/gerente_geral a quem deve ver, definir padrões por categoria, ligar a classificação por unidade em CMV → Regras de vínculo e revisar os boletos pendentes do histórico — roteiro em `docs/cmv-financeiro/PROGRESSO.md`
+- [ ] Monitor de Performance (Configurações) sem fonte: nada grava `SLOW_QUERY` em `audit_logs` — a lista de slow queries vem sempre vazia
+- [ ] Tornar obrigatório o `p_expected_updated_at` de `rh_atualizar_colaborador` (hoje `DEFAULT NULL` só para a aba aberta antes do deploy de `20261007220000` continuar gravando) — DROP da assinatura e CREATE sem o default
+- [ ] Avaliar chave RBAC própria para o Borderô (`financeiro:bordero:view/export`) — hoje herda `financeiro:relatorio-socios:*` da Apresentação Sócios (em 2026-09-15 todo membro com essa chave já tinha `pagar:view` e `contas:view`)
 
 ## 🔄 Em Progresso (Doing)
 (Nenhuma tarefa em progresso)

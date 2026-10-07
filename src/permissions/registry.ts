@@ -7,7 +7,7 @@
  * Allowed actions are defined in ./actions.ts (11 total).
  *
  * This registry is synced to the `permissions` table via
- * rpc_sync_permissions_from_registry().
+ * sync_permissions_from_registry(_entries jsonb).
  */
 
 import { isAllowedAction, ALLOWED_ACTIONS, validatePermissionKey } from './actions';

@@ -1,0 +1,16 @@
+{
+  "supabase/AGENTS.md": ["banco-de-dados", "integracoes", "seguranca-multitenancy"],
+  "src/components/financeiro/AGENTS.md": ["financeiro", "conciliacao", "apresentacao-socios"],
+  "src/domain/financeiro/AGENTS.md": ["financeiro", "apresentacao-socios"],
+  "src/lib/AGENTS.md": ["ui", "conciliacao"],
+  "src/components/estoque/AGENTS.md": ["estoque"],
+  "src/domain/estoque/AGENTS.md": ["estoque"],
+  "src/components/estoque-operacional/AGENTS.md": ["operacional"],
+  "src/components/compras/AGENTS.md": ["compras"],
+  "src/domain/compras/AGENTS.md": ["compras"],
+  "src/components/rh/AGENTS.md": ["rh"],
+  "src/domain/rh/AGENTS.md": ["rh"],
+  "src/components/inventario/AGENTS.md": ["inventario"],
+  "src/components/ui/AGENTS.md": ["ui"],
+  "src/components/AGENTS.md": ["telas-raiz", "salmao"]
+}
