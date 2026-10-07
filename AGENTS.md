@@ -1,7 +1,7 @@
 # Contexto do Projeto Moralles Food
 
 > **Leia este arquivo primeiro.** Ele contém o contexto necessário para trabalhar neste projeto.
-> `CLAUDE.md` e `AGENTS.md` são mantidos **idênticos** — ao editar um, replique a mudança no outro.
+> Fonte única para Claude Code e Codex: o `CLAUDE.md` importa este arquivo (`@AGENTS.md`) e só acrescenta o que é específico do Claude Code. Edite apenas o AGENTS.md.
 
 ---
 
@@ -13,6 +13,16 @@
 - **Sem limite de tamanho fixo** — mas isso não é licença para inflar. O critério é sempre "é necessário para o sistema", nunca "documentar o que eu fiz agora".
 - Itens concluídos na seção **Pendente / Em Aberto** são removidos, não acumulados — o histórico já mora em `git log` e `TAREFAS.md`.
 - Ao corrigir/atualizar uma regra existente, **substitua** o texto antigo — não empilhe um novo parágrafo "REVISÃO" em cima do anterior.
+
+---
+
+## 🧩 Padrão SaaS v3.1 — como usar a camada de contexto
+
+- **Modelo de tenant e de acesso:** `.claude/tenancy-profile.yml` (híbrido A/C: `company_id`, empresa ativa pelo header `x-company-id` confirmado por `get_current_company_id()`, permissões `<modulo>:<sub>:<acao>` com ALLOW/DENY, sem filial, sem módulos contratados). Não é o arquétipo E dos exemplos do padrão.
+- **Normas:** `docs/standards/` (corpo copiado do kit, não editar; adaptações só em "Particularidades deste projeto"). Leia só o que a tarefa exige: migration/RPC/policy → `DATABASE` + `MULTI_TENANCY`; permissão, papel, convite, menu → `ACCESS_CONTROL` + `MULTI_TENANCY`; auth, RLS, dados pessoais → `SECURITY`; Edge Function com provedor externo, Z-API, IA → `INTEGRATIONS` + `docs/integrations/providers/`; módulo novo → `MODULES` + `ARCHITECTURE`; empresas, onboarding → `TENANT_LIFECYCLE`; testes/CI → `TESTING`; deploy, incidente → `OPERATIONS`; lentidão → `PERFORMANCE`.
+- **Precedência:** quando um exemplo do padrão (URL com a empresa, helpers em `private`, chaves com ponto, `company_modules`, filial) divergir de uma regra deste arquivo, vale este arquivo até existir ADR. Reporte a divergência; não migre o modelo como efeito colateral de outra tarefa.
+- **Regras por caminho:** `.claude/rules/` (Claude Code) e `supabase/AGENTS.md` (Codex, gerado por `node scripts/check-padrao.mjs --write-nested`). Conferência: `node scripts/check-padrao.mjs`.
+- **Riscos e achados:** P0 (bloqueia) · P1 (alto) · P2 (médio) · P3 (baixo), com evidência e marcados CONFIRMADO, INFERIDO ou NÃO CONFIRMADO. Nunca declare como testado o que não rodou.
 
 ---
 
@@ -49,9 +59,9 @@ git diff --cached | grep -E 'eyJ|sb_secret_|password|api_key'
 
 ## 🧱 Stack Tecnológica
 
-**Frontend:** React 18 + TypeScript 5, Vite 5 + SWC, shadcn/ui + Radix UI, Tailwind CSS 3, React Router DOM 6, TanStack React Query 5, React Hook Form 7 + Zod 3, Recharts 2, Sonner, jsPDF + ExcelJS (export PDF/Excel), vite-plugin-pwa, Bun (`bun install`, `bun run dev`).
+**Frontend:** React 18 + TypeScript 5, Vite 8 + SWC, shadcn/ui + Radix UI, Tailwind CSS 3, React Router DOM 6, TanStack React Query 5, Recharts 3, Sonner, jsPDF + ExcelJS (export PDF/Excel), vite-plugin-pwa, Vitest 4, Bun 1.3 (`bun install`, `bun run dev`). Versões instaladas: `bun.lock`. Não há React Hook Form nem Zod no `package.json`.
 
-**Backend:** Supabase — PostgreSQL 15+ com RLS global, Supabase Auth (email/senha), PostgREST + RPCs customizadas (30+), Edge Functions (Deno/TypeScript), Realtime (`postgres_changes`), Storage.
+**Backend:** Supabase — PostgreSQL 17 com RLS global, Supabase Auth (email/senha), PostgREST + RPCs customizadas (30+), Edge Functions (Deno/TypeScript), Realtime (`postgres_changes`), Storage.
 
 ---
 
@@ -78,8 +88,14 @@ margin-food/
 │   ├── ARCHITECTURE.md
 │   ├── DOMAIN_RULES.md
 │   ├── ENTERPRISE_SAFE_STANDARDS.md
+│   ├── standards/                 # Padrão SaaS v3.1 (normativo, com .manifest.json)
+│   ├── modules/ adr/ runbooks/    # modelos do padrão
+│   ├── integrations/providers/    # um documento por provedor externo
 │   └── rbac/
-├── CLAUDE.md / AGENTS.md          # ← Este arquivo (contexto para AIs, mantidos idênticos)
+├── .claude/                       # tenancy-profile.yml, rules/, settings.json
+├── scripts/check-padrao.mjs       # conferência do padrão (manifest, @AGENTS.md, AGENTS aninhados, links)
+├── AGENTS.md                      # ← Este arquivo (fonte única para Claude Code e Codex)
+├── CLAUDE.md                      # @AGENTS.md + específico do Claude Code
 └── TAREFAS.md                     # Histórico detalhado de tarefas concluídas
 ```
 
