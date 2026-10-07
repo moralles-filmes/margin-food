@@ -1,0 +1,120 @@
+# Módulo: Financeiro
+
+> Regras movidas do `AGENTS.md` em 2026-10-07 (Padrão SaaS, Fase 9), com o texto preservado. Submódulos: `src/permissions/registry.ts`. Tabelas: tipo gerado `src/integrations/supabase/types.ts` (todas com `company_id`; o tipo pode estar atrás do banco vivo).
+
+- Chave do módulo: `financeiro`
+- Status: ativo
+- Flag: nenhuma. Não há módulos contratados; o acesso é só por permissão (ACCESS_CONTROL, "Particularidades").
+
+## Responsabilidade
+
+- Faz: contas a pagar e a receber, Livro Razão (lançamentos), contas bancárias, Cadastros Base (categorias, plano de contas, centros de custo), Fechamento de Caixa por marca, recorrências, categorização, orçamento, DRE, DFC/Fluxo de Caixa, Projeção, KPIs, Comparativo, Alertas, Auditoria, Borderô e CMV Financeiro.
+- Não faz (outro documento):
+  - importação de extrato e conciliação bancária → [conciliacao.md](conciliacao.md) (submódulo `financeiro:conciliacao`);
+  - Apresentação Sócios → [apresentacao-socios.md](apresentacao-socios.md) (divide a chave `financeiro:relatorio-socios:*` com o Borderô);
+  - CMV de estoque (módulo `cmv`, Edge `cmv`, `metas_cmv`), que não é o CMV Financeiro.
+
+## Submódulos e permissões
+
+| Submódulo | Ações (`financeiro:<submodulo>:<acao>`) | Escopo |
+|---|---|---|
+| `dashboard` | view | empresa |
+| `fechamento` | view, create, edit, delete, close | empresa |
+| `cadastros` | view, create, edit, delete, manage, export | empresa |
+| `contas` | view, create, edit, delete, export | empresa |
+| `lancamentos` | view, create, edit, delete, export | empresa |
+| `pagar` | view, create, edit, approve, delete, export | empresa |
+| `receber` | view, create, edit, delete, export | empresa |
+| `fluxo` | view, export | empresa |
+| `dre` | view, export | empresa |
+| `orcamento` | view, edit, delete, export | empresa |
+| `conciliacao` | view, reconcile | empresa |
+| `alertas` | view, export | empresa |
+| `recorrencias` | view, create, edit, delete, export | empresa |
+| `categorizacao` | view, create, edit, delete, manage | empresa |
+| `relatorio-socios` | view, export, manage, approve, simulate | empresa |
+| `projecao` | view, export | empresa |
+| `kpis` | view, export | empresa |
+| `auditoria` | view, export | empresa |
+| `comparativo` | view, export | empresa |
+| `cmv` | view, export, manage | empresa |
+
+Papéis de sistema que recebem: `admin`, `diretor` e `gerente_geral` recebem o catálogo inteiro por `role_permissions`. Chaves legadas `finance:read`/`finance:manage` continuam aceitas nos gates do banco ao lado da chave granular, exceto no CMV Financeiro (ver Invariantes).
+
+## Tabelas
+
+| Tabela | Escopo | Observação |
+|---|---|---|
+| `fin_lancamentos` | empresa | Livro Razão; espelhos de baixa (`espelho_cp`/`espelho_cr`), `idempotency_key` compartilhada |
+| `fin_contas_pagar` / `fin_contas_receber` | empresa | títulos; escrita pelas RPCs `_guarded_*` e de baixa |
+| `fin_lancamento_rateios` | empresa | rateio de lançamento/CP/CR; decide categoria e centro de custo quando existe |
+| `fin_categorias` / `fin_centros_custo` | empresa | árvore de categorias (`system_key`, `excluir_dos_totais`, `grupo`, `cmv_sugerir`) |
+| `fin_contas` / `fin_contas_saldo_cache` | empresa | contas bancárias e saldo |
+| `fin_config` | empresa | limite de aprovação, `cmv_financeiro_ativo` |
+| `fin_orcamentos` | empresa | orçamento mensal |
+| `fin_audit_logs` | empresa | trilha das RPCs `_guarded_` |
+| `financeiro_fechamento_caixa` / `financeiro_fechamento_marcas` / `financeiro_fechamento_marca_valores` | empresa | faturamento bruto oficial e detalhamento por marca |
+| `app_config` | global | só service role; nunca para parâmetro por empresa |
+
+## Invariantes
+
+### Operações e RPCs
+
+- **Financeiro: RPCs `_guarded_`** — toda operação financeira (CP, CR, lançamentos, conciliação) usa prefixo `_guarded_`, `assert_tenant()`, `has_permission()`, optimistic lock via `updated_at`, log em `fin_audit_logs`. Deletes exigem `p_expected_updated_at` e gravam `entidade_id` como `uuid` nativo — **nunca `::text`** (cast explícito sobre variável uuid bloqueia o assignment cast do Postgres, erro 42804, reverte a transação inteira). Erros padrão: `OPTIMISTIC_LOCK_CONFLICT`, `LANCAMENTO_VINCULADO`, `STATUS_INVALIDO: %`, `PERMISSION_DENIED: %`, `NOT_FOUND` (helper client: `mapFinanceiroDeleteError`).
+- **Criações do Financeiro são idempotentes, com semente por conteúdo pendente** — Livro Razão, transferência manual e CP/CR (só o título pai guarda a chave; as parcelas nascem na mesma transação) recebem `p_idempotency_key` de `useChavesPendentes` (semente por conteúdo pendente, ver "Chave de idempotência precisa identificar a OPERAÇÃO"). `fin_lancamentos.idempotency_key` é compartilhada (md5 da conciliação, `recorrencia:<pai>:<n>`, `manual:`, `transferencia_manual:`) — origem nova usa prefixo próprio. Um lançamento é baixa de no máximo um título (`uq_fin_contas_pagar/receber_lancamento`); título já baixado a partir do extrato nasce só por `reconcile_create_titulo_from_extrato`, nunca por INSERT direto. `gerar_parcela_recorrente` recebe do cliente o número esperado (`p_parcela_esperada`), senão o reenvio gera a parcela seguinte. `fin_lancamentos.referencia_modulo/referencia_id` têm DEFAULT `''`: vínculo se testa com `NULLIF(..., '')`, nunca `IS NULL`.
+- **Baixa de conta a pagar exige conta bancária** (`pay_conta_pagar`/`reconcile_pay_conta_pagar` → `CONTA_OBRIGATORIA`) — no cadastro do boleto continua opcional. Sem conta, o espelho nasce com `conta_id NULL`, some da conciliação (que filtra por conta) e o extrato traz a mesma despesa como nova.
+- **Alterar `conta_id` de lançamento `REALIZADO` exige `justificativa_edicao` no mesmo UPDATE** — `trg_validate_fin_lancamento_update` vigia valor/categoria/conta/data/centro de custo e derruba a transação com P0003 sem ela.
+- **Limite de aprovação de contas a pagar vem de `fin_config` por empresa** (`fin_get_limite_aprovacao`, fallback `app_config` → R$ 2.500). `app_config` é global e service-role-only — nunca usar para parâmetro que cada empresa ajusta. Editável em Contas a Pagar por quem tem `financeiro:pagar:approve`.
+- **Espelho de baixa não pode ser excluído, só estornado** — `_guarded_delete_lancamento` recusa lançamento com `referencia_modulo` de CP/CR cujo título está PAGO/RECEBIDO (`LANCAMENTO_ESPELHO`). Excluir não desfaz a baixa: o título fica PAGO sem despesa no razão (aconteceu com 4 contas, R$ 4.534,24).
+- **`_guarded_update_conta_pagar` apaga e reinsere o rateio, mas com o MESMO `id`/`created_at` quando o cliente devolve o `id` da linha** — a decisão do CMV é persistida por linha de rateio; RPC nova que regrave rateio de boleto precisa preservar o id e a coluna `cmv_incluir`. Cliente sem `p_cmv` (legado/integração) segue aceito: cria pendente e, na edição, herda a decisão da mesma categoria do próprio boleto. Boleto `PAGO` só muda a decisão por `fin_cmv_classificar` (lock otimista por boleto, auditoria antes/depois; lote exige `financeiro:cmv:manage`). `cmv_incluir` e `fin_config.cmv_financeiro_ativo` só são gravados pelas RPCs: os triggers `trg_fin_cmv_guard_*` recusam a escrita direta de `authenticated` (as policies de UPDATE dessas tabelas a aceitariam, sem gate nem auditoria) — RPC nova que grave essas colunas precisa ser `SECURITY DEFINER`.
+- **Série de recorrência de Contas a Pagar não se acha só por `lancamento_pai_id`** — excluir a 1ª parcela zera o vínculo das demais (todas as séries do histórico estão assim). `_fin_cmv_serie` reconhece a série pelo `created_at` idêntico da criação (+ `parcela_total`, autor e fornecedor) ou pelo pai; `fin_cmv_aplicar_serie` copia a decisão do CMV de um boleto para as outras parcelas, categoria por categoria, e exige `financeiro:cmv:manage`.
+
+### Fechamento de Caixa
+
+- **Fechamento de Caixa por marca é detalhamento, não nova receita** — `financeiro_fechamento_caixa.faturamento_bruto` continua a fonte oficial; `financeiro_fechamento_marca_valores` apenas decompõe esse total e deve somar exatamente o bruto via `rpc_upsert_fechamento_caixa_com_marcas`.
+- **Forma de venda da marca (`PEDIDOS`/`PESSOAS`) e quantidade do fechamento** — a quantidade mora em `financeiro_fechamento_marca_valores` junto com uma cópia da forma de venda do dia; a forma já gravada no dia vence a atual da marca (RPC e formulário), então trocar a forma da marca nunca reinterpreta dia lançado. Pedidos e pessoas nunca se somam. A obrigatoriedade da quantidade é só do cliente e não vale para dia lançado antes do campo existir; na RPC, chave `quantidade` ausente preserva o valor gravado e `null` explícito limpa.
+- **Vínculo marca→categoria (`financeiro_fechamento_marcas.categoria_id`)** — obrigatório em marca nova (trigger `validate_marca_categoria_vinculo`), mas marca legada sem vínculo continua válida (UI avisa em 3 lugares: aba Marcas, formulário de fechamento diário, Apresentação Sócios). Só aceita categoria **folha** (sem sub-categoria/item ativo abaixo) de RECEITA operacional ativa — vincular categoria com filho, ou criar/mover um filho para dentro de categoria já vinculada, é bloqueado (`CATEGORIA_MARCA_NAO_FOLHA` / `CATEGORIA_VINCULADA_A_MARCA`). Várias marcas podem apontar para a MESMA categoria (ex.: "Salão" e "Jantar" caindo na mesma linha do extrato) — a leitura por loja (`get_fin_presentation_revenue.byBrand`) soma essas marcas numa única linha, **sem rateio**, e compara com o valor da categoria no razão. Dois resíduos garantem que os totais sempre fechem: "Sem marca vinculada" (líquido do razão em categoria que nenhuma marca aponta) e "Sem detalhamento por marca" (bruto de fechamento legado sem nenhuma marca informada).
+
+### Categorias, rateio e centro de custo
+
+- **Rateio manda: quando o lançamento/CP/CR tem linhas em `fin_lancamento_rateios`, `categoria_id` do registro principal é ignorado** — DRE, DFC e KPIs somam o rateio e só caem no `categoria_id` do cabeçalho quando não existe rateio. Duas consequências: (1) reclassificar uma despesa rateada exige alterar as linhas do rateio, não só o cabeçalho (mudar só o cabeçalho não move nada no relatório); (2) `categoria_id IS NULL` não significa "sem categoria" — é o estado normal de registro rateado, e filtro/alerta de "Sem categoria" precisa excluir quem tem rateio; o filtro de categoria do Livro Razão casa pelas linhas do rateio (com subcategorias) e soma só a parte rateada, igual ao DFC. Rateio com `categoria_id` nulo, esse sim, cai em "Sem categoria — Despesas" (aconteceu com R$ 125,00 de um boleto em produção). Categoria e centro de custo do rateio são conferidos contra a empresa do próprio rateio pelo trigger `trg_fin_rateio_valida_empresa` (a RLS de `fin_lancamento_rateios` só confere o `company_id` da linha e aceita INSERT direto) — RPC nova que grava rateio herda a trava, não reimplementa.
+- **Centro de custo nos relatórios (DRE, DFC, Dashboard) é recorte, nunca novo total** — `get_fin_dre_summary`/`get_fin_dfc_summary` devolvem `valores_por_centro_custo` (chave = id do centro ou `sem_centro`) com as mesmas chaves de categoria de `valores_por_categoria`, e para cada categoria a soma dos centros é exatamente o valor da categoria; "Todos os centros" é sempre o próprio `valores_por_categoria`. Centro de cada valor segue o "rateio manda": com rateio vale só o centro de cada linha (linha sem centro é `sem_centro` — nunca herda o do cabeçalho, que o formulário esconde com o rateio ligado); sem rateio, o do cabeçalho (lançamento/CP/CR); centro de outra empresa cai em `sem_centro`. Sem nenhum valor com centro no período as chaves novas voltam vazias e a tela não mostra filtro nem card de centro de custo (`src/domain/financeiro/centroCusto.ts`). No recorte, saldo inicial/acumulado do DFC (`mostrarSaldo`) e a coluna de % sobre a receita saem da tela e do export — são da empresa inteira.
+- **Rateio órfão só sai com os triggers desligados** — `trg_validate_rateio_sum` resolve o lançamento pai a cada DELETE/UPDATE e aborta com P0002 quando ele não existe, que é exatamente a condição do órfão. Limpar exige `set local session_replication_role = replica` dentro da transação (escopo de sessão, não afeta outras conexões); nunca `ALTER TABLE ... DISABLE TRIGGER`, que é global.
+- **Categorias não operacionais** — raízes fixas `RECEITAS/DESPESAS NÃO OPERACIONAIS` (`fin_categorias.system_key`); `excluir_dos_totais` é herdado pela árvore e materializado em `excluir_dos_relatorios` nos lançamentos/CP/CR. DRE/DFC exibem como seção informativa fora do resultado; `get_fin_dashboard_summary` filtra o marcador nas receitas/despesas atuais e anteriores, mas **Saldo bancário/caixa permanece real e inclui tudo**. `get_fin_dre_summary`/`get_fin_dfc_summary` precisam devolver `excluir_dos_totais`/`system_key` nas categorias e mandar valor sem categoria para as linhas sintéticas `…101`/`…102` — o `DemonstrativoTree` decide pelo flag da raiz, e sem ele o DRE somou não operacionais no resultado (R$ 118 mil em 2026 na Ren Sushi) desde `20260901140000` até `20261006163434`. Criadas de forma proativa e idempotente (`fin_get_categoria_desconto_baixa`/`_concedido`) tanto em `onboard_new_company()` (empresa nova) quanto ao final de `seed_default_categories()` (empresa existente que roda o Modelo Padrão) — antes só nasciam reativamente no 1º ajuste de pagamento com divergência, deixando empresa nova sem a estrutura até algo disparar a criação.
+- **`seed_default_categories()`: "já existe" precisa excluir a subárvore de sistema** — a raiz NÃO OPERACIONAIS tem `system_key` preenchido, mas os filhos lazy-criados (`Descontos Obtidos`/`Descontos Concedidos`) nascem com `system_key IS NULL`; contá-los como categoria regular no `WHERE system_key IS NULL` bloqueava o Modelo Padrão pra sempre com "Categories already exist", mesmo sem nenhuma categoria de verdade cadastrada. A checagem correta exclui via CTE recursiva (raiz + descendentes) qualquer linha alcançável a partir de um `system_key IS NOT NULL`.
+- **`fin_categorias.system_key` é reservado às duas raízes não operacionais** — `fin_prepare_category_reporting_class` recusa qualquer outro valor com `SYSTEM_CATEGORY_INVALID` e força nome/código/tipo das raízes; categoria de sistema nova identifica-se por raiz + nome. O mesmo trigger herda `excluir_dos_totais` do pai no INSERT/UPDATE, e `trg_fin_category_propagate_reporting_class` propaga para a subárvore.
+- **Desconto obtido não é faturamento** — a diferença a menor nasce tipo RECEITA e, em categoria operacional, entraria no total de RECEITAS do DRE/DFC. `reconcile_pay_conta_pagar` exige categoria cuja cadeia inteira até a raiz esteja marcada `excluir_dos_totais` (`fin_categoria_fora_do_resultado`, erro `CATEGORIA_OPERACIONAL`) e, sem categoria informada, usa a de sistema `Descontos Obtidos` sob RECEITAS NÃO OPERACIONAIS (`fin_get_categoria_desconto_baixa`). Duas engrenagens exigem isso ao mesmo tempo: `DemonstrativoTree` separa pela **raiz** (`calcNodeValue` soma a subárvore sem olhar o flag dos filhos) e os relatórios filtram `excluir_dos_relatorios`, que materializa o flag **da própria** categoria. Juros/tarifa continuam operacionais em Despesas Financeiras.
+
+### Relatórios
+
+- **Só a DRE é competência; todo outro relatório do Financeiro é caixa pelo Livro Razão** — Dashboard, KPIs, Comparativo, Orçamento (aba e metas da Apresentação Sócios), Fluxo de Caixa, Borderô e Apresentação Sócios leem `fin_lancamentos` REALIZADO/CONCILIADO pela data efetiva `COALESCE(data_pagamento, conciliado_em::date, data_competencia)` — a mesma do DFC (`_fin_dfc_effective_allocations`, com rateio) — e precisam fechar com o Livro Razão do período; a DRE permanece accrual (competência + CP/CR em aberto) e o faturamento bruto vem do Fechamento de Caixa. Orçamento por competência chegou a mostrar R$ 14,5 mil de salmão num mês com R$ 98,8 mil pagos (migration `20261002142926`). Dashboard/KPIs/Comparativo/Orçamento excluem não operacionais; Fluxo de Caixa e Projeção incluem (é dinheiro que saiu do banco). Espelho de pagamento (`pay_conta_pagar`/`receive_conta_receber`) grava `data_pagamento` = data escolhida pelo usuário, **nunca `CURRENT_DATE`** (UTC desloca o mês à noite no BR). Lançamentos `origem='conciliacao'` ainda não conciliados (`conciliado=false`) são excluídos de todos os agregados de relatório — só o saldo acumulado/em caixa os inclui, pois reflete dinheiro real já movimentado.
+- **`DemonstrativoTree` (DRE/DFC): coluna de % usa a receita/recebimento do PRÓPRIO demonstrativo como denominador** (`receitaTotal` do `useMemo`, não o `netRevenue` do razão da Apresentação Sócios) — mantém numerador e denominador no mesmo regime (DRE competência, DFC caixa). Rótulo do cabeçalho é explícito por regime (`% Receita Líq.` no DRE, `% Recebimentos` no DFC, via prop `isDFC`); `exportDemonstrativo.ts` espelha a mesma lógica e o mesmo `formatPercentBR` (2 casas) para PDF/Excel baterem com a tela.
+- **Borderô (Financeiro, antigo Relatório Sócios)** — `get_fin_bordero` mostra a despesa completa do período: contas a vencer = CP em aberto por `data_vencimento` inclusivo; contas já pagas = **todas** as despesas do razão pela regra de caixa do DFC (`_fin_dfc_effective_allocations`, data do pagamento) — precisa bater com as saídas do Livro Razão. A baixa do boleto é a despesa paga; a CP só identifica a linha e **nunca é somada de novo** (somar CP `PAGO` + baixa duplica; filtrar CP paga por vencimento diverge do Livro Razão quando o boleto é pago em outra data); saldo final provisionado desconta só as a vencer (as pagas já saíram de `fin_contas_saldo_cache`). Agrupa pela árvore do DRE/DFC com rateio; tela e PDF consomem o mesmo `BorderoReport` em centavos (`src/domain/financeiro/bordero`). A chave `financeiro:relatorio-socios:*` governa Borderô **e** Apresentação Sócios — renomear ou dividir exige migrar as RPCs e as permissões já concedidas das duas telas.
+
+### CMV Financeiro
+
+- **CMV Financeiro (Financeiro → CMV) é indicador gerencial, não o CMV de estoque** — numerador = linhas de rateio dos boletos de Contas a Pagar com `cmv_incluir = true`, pela `data_competencia` do boleto (status `AGUARDANDO_APROVACAO`/`APROVADO`/`PAGO`; baixa, pagamento parcial, estorno e vencimento não mudam valor nem período; cada parcela é um título próprio); denominador = `faturamento_bruto` do Fechamento de Caixa (dia sem linha é "sem fechamento", nunca zero). A decisão mora em `fin_lancamento_rateios.cmv_incluir` e, só para boleto **sem** rateio, em `fin_contas_pagar.cmv_incluir`; `NULL` = pendente e nunca é assumido como Sim. `fin_categorias.cmv_sugerir` só sugere em lançamento novo — nenhuma apuração lê essa coluna. O servidor devolve fatos por dia em centavos (`get_fin_cmv_financeiro`) e `src/domain/financeiro/cmv` é a única implementação de totais/%/variações, usada pela tela e pelo PDF. Não reutilizar `metas_cmv`, Edge `cmv` nem DRE/DFC aqui, e não ler este indicador neles. Decisões e limites: `docs/cmv-financeiro/PLANO.md`.
+- **`financeiro:cmv:*` fica fora do `LEGACY_PERMISSION_MAP` e as RPCs do CMV não aceitam `finance:read`** — é a ativação controlada do relatório (só admin/diretor/gerente_geral recebem por papel). A pergunta "Aparecer no CMV financeiro?" no formulário de Contas a Pagar é ligada por empresa (`fin_config.cmv_financeiro_ativo`, default desligado) e some inteira quando `get_fin_cmv_config` não responde.
+
+### Ligações com a conciliação
+
+- Divergência entre boleto e extrato (`reconcile_pay_conta_pagar`), estorno de CP limpando `fin_conciliacao_vinculos` e significado de `fin_contas.saldo_inicial`: [conciliacao.md](conciliacao.md).
+
+## Commands, queries e eventos
+
+- Commands: `_guarded_*` (CP, CR, lançamentos, contas, reclassificação), `pay_conta_pagar`, `receive_conta_receber`, `gerar_parcela_recorrente`, `rpc_upsert_fechamento_caixa_com_marcas`, `seed_default_categories`, `fin_cmv_classificar`, `fin_cmv_aplicar_serie`.
+- Queries: `get_fin_dashboard_summary`, `get_fin_dre_summary`, `get_fin_dfc_summary`, `get_fin_bordero`, `get_fin_cmv_financeiro`, `get_fin_cmv_config`, `get_fin_saldo_conta_em`, `fin_get_limite_aprovacao`.
+- Eventos publicados: nenhum (o projeto não tem barramento de eventos).
+
+## Integrações
+
+- Nenhum provedor externo. O extrato bancário é arquivo importado pelo usuário ([conciliacao.md](conciliacao.md)).
+
+## Dependências
+
+- Compras: `suppliers` é o mesmo cadastro de fornecedores ([compras.md](compras.md)).
+- Apresentação Sócios lê categorias (`grupo`), orçamento e o caixa do Livro Razão ([apresentacao-socios.md](apresentacao-socios.md)).
+
+## Decisões
+
+- CMV Financeiro: `docs/cmv-financeiro/PLANO.md` (diagnóstico e decisões) e `docs/cmv-financeiro/PROGRESSO.md` (fases, ativação e reversão).
