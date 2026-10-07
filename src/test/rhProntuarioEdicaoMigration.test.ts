@@ -9,8 +9,8 @@ const ler = (caminho: string) => readFileSync(resolve(process.cwd(), caminho), '
 const sql = ler('supabase/migrations/20261007200000_rh_prontuario_edicao.sql');
 // Sem comentários, para as regras abaixo olharem só o SQL executado.
 const codigo = sql.replace(/--.*$/gm, '');
+// Tela e assinatura atuais da RPC: rhEscalasResiduaisMigration.test.ts (20261007220000).
 const rhView = ler('src/components/RhView.tsx');
-const escalas = ler('src/components/rh/EscalasSection.tsx');
 
 function trecho(texto: string, inicio: RegExp, fim: string): string {
   const pos = texto.search(inicio);
@@ -95,14 +95,6 @@ describe('migração: edição do Prontuário', () => {
     expect(corpo).not.toMatch(/p_id::text/);
   });
 
-  it('a tela envia exatamente os parâmetros da RPC', () => {
-    const assinatura = entre(funcaoEdicao(), 'rh_atualizar_colaborador(', ')\nRETURNS');
-    const params = [...assinatura.matchAll(/(p_\w+) [a-z]+/g)].map(m => m[1]).sort();
-    const chamada = entre(rhView, "('rh_atualizar_colaborador', {", '});');
-    const enviados = [...chamada.matchAll(/\b(p_\w+):/g)].map(m => m[1]).sort();
-    expect(enviados).toEqual(params);
-  });
-
   it('rh_listar_colaboradores não muda (lista completa continua só para quem vê o Prontuário)', () => {
     expect(codigo).not.toMatch(/FUNCTION public\.rh_listar_colaboradores/);
   });
@@ -147,31 +139,16 @@ describe('migração: edição do Prontuário', () => {
   });
 });
 
-describe('Prontuário e Escala na tela', () => {
+describe('Prontuário na tela', () => {
   it('edição grava pela RPC, nunca por UPDATE direto na tabela', () => {
     expect(rhView).not.toMatch(/from\('rh_colaboradores'\)\.update\(payload\)/);
     expect(rhView).toContain("('rh_atualizar_colaborador', {");
   });
 
-  it('sem :manage, remuneração e vínculo voltam do banco e os campos ficam travados', () => {
-    const chamada = entre(rhView, "('rh_atualizar_colaborador', {", '});');
-    for (const campo of ['salario', 'valor_hora', 'user_id']) {
-      expect(chamada).toMatch(new RegExp(`p_${campo}: canManageProntuario \\? .+ : \\(?editingColab\\.${campo}`));
-    }
-    expect(rhView.match(/disabled=\{isEdit && !canManageProntuario\}/g)).toHaveLength(3);
-  });
-
-  it('UPDATE/DELETE que a RLS pode descartar conferem a linha devolvida', () => {
+  it('UPDATE que a RLS pode descartar confere a linha devolvida', () => {
     const updates = [...rhView.matchAll(/from\('rh_colaboradores'\)\.update\(\{ status: '(\w+)' \}\)[^;]*;/g)];
     expect(updates.map(m => m[1]).sort()).toEqual(['ativo', 'inativo']);
     for (const m of updates) expect(m[0]).toContain(".select('id')");
-    for (const inicio of ["from('rh_escalas').update(", "from('rh_escala_slots').delete()", "from('rh_trocas_turno').update("]) {
-      const pos = escalas.indexOf(inicio);
-      expect(pos, inicio).toBeGreaterThanOrEqual(0);
-      const resto = escalas.slice(pos, escalas.indexOf('fetchEscala();', pos));
-      expect(resto, inicio).toContain(".select('id')");
-      expect(resto, inicio).toContain('if (!data?.length)');
-    }
   });
 
   it('mensagens de erro da RPC', () => {

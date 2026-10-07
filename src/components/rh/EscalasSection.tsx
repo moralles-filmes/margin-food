@@ -1,5 +1,3 @@
-import { useCompanyId } from '@/hooks/useCompanyId';
-import { withCompanyId } from '@/lib/companyPayload';
 import { useSupabase } from '@/contexts/CompanyScopeContext';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -19,6 +17,7 @@ import { ptBR } from 'date-fns/locale';
 import { fmtBRL } from '@/lib/formatters';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { calcularCustoEscala } from '@/domain/rh/custoEscala';
+import { mensagemErroEscala } from '@/domain/rh/escala';
 import { sortByName } from '@/lib/sortByName';
 
 import { useCan } from '@/permissions/hooks';
@@ -34,6 +33,7 @@ interface Colaborador {
   setor: string;
   funcao: string;
   valor_hora: number | null;
+  salario?: number | null;
   carga_horaria_semanal: number;
   status?: string;
   // false quando quem vê a escala não tem acesso à remuneração (valor_hora vem nulo).
@@ -71,16 +71,16 @@ interface TrocaTurno {
 
 interface Props {
   colaboradores: Colaborador[];
-  canManage: boolean;
 }
 
-export default function EscalasSection({
- colaboradores, canManage }: Props) {
+export default function EscalasSection({ colaboradores }: Props) {
   const toast = useScopedToast();
   const supabase = useSupabase();
-  const { companyId } = useCompanyId();
   const canViewRbac = useCan('rh:escalas:view');
-  const { user, profile } = useAuth();
+  // Mesmas chaves das RPCs rh_escala_*: criar a semana é :create; turnos, publicação e trocas, :edit.
+  const canCreate = useCan('rh:escalas:create');
+  const canEdit = useCan('rh:escalas:edit');
+  const { profile } = useAuth();
   const { confirm, ConfirmDialog } = useConfirmDialog();
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [setor, setSetor] = useState('salao');
@@ -123,7 +123,8 @@ export default function EscalasSection({
     setLoading(true);
     const { data: escalaData } = await supabase
       .from('rh_escalas')
-      // Sem custo_projetado: a tela recalcula pela lista de colaboradores (que respeita o acesso à remuneração).
+      // custo_projetado não é legível pelo cliente (o servidor calcula e guarda na publicação):
+      // a tela recalcula pela lista de colaboradores, que respeita o acesso à remuneração.
       .select('id, setor, semana_inicio, status, observacoes, created_at, created_by')
       .eq('company_id', profile?.company_id ?? '')
       .eq('semana_inicio', weekStartStr)
@@ -185,64 +186,63 @@ export default function EscalasSection({
 
   const [savingEscala, setSavingEscala] = useState(false);
   const { enviando: savingSlot, executar: executarSlot } = useTravaEnvio();
+  const { enviando: publicando, executar: executarPublicar } = useTravaEnvio();
+
+  // Erro de RPC: a escala pode ter mudado por outra pessoa (publicada, turno removido), então recarrega.
+  const falhou = (error: { message?: string }) => {
+    console.error(error);
+    toast.error(mensagemErroEscala(error.message));
+    fetchEscala();
+  };
 
   const handleCreateEscala = async () => {
     if (savingEscala) return;
     setSavingEscala(true);
     try {
-      const { data, error } = await supabase.from('rh_escalas').insert({
-        semana_inicio: weekStartStr,
-        setor,
-        created_by: user?.id,
-        company_id: profile?.company_id,
-      }).select().single();
-      if (error) { toast.error('Erro: ' + error.message); return; }
+      // Uma escala por semana e setor: o reenvio devolve a mesma.
+      const { error } = await (supabase.rpc as any)('rh_escala_criar', { p_semana_inicio: weekStartStr, p_setor: setor });
+      if (error) { falhou(error); return; }
       toast.success('Escala criada!');
-      setEscala(data);
+      fetchEscala();
     } finally {
       setSavingEscala(false);
     }
   };
 
-  const handlePublicar = async () => {
+  const handlePublicar = () => executarPublicar(async () => {
     if (!escala) return;
-    // Custo calculado sem todos os colaboradores dos turnos sairia menor: espera a lista completar.
-    if (aguardandoColabs) {
-      toast.error(erroExtras
-        ? 'Não foi possível carregar os colaboradores da escala. Recarregue a página e tente de novo.'
-        : 'Os colaboradores da escala ainda não carregaram. Tente de novo em instantes.');
-      return;
-    }
-
-    const { data, error } = await supabase.from('rh_escalas').update({
-      status: 'PUBLICADA',
-      publicada_em: new Date().toISOString(), // timestamptz — UTC is correct
-      publicada_por: user?.id,
-      // Sem a remuneração (ou sem algum colaborador) o cálculo sairia menor e gravaria por cima do custo projetado.
-      ...(custo.situacao === 'ok' ? { custo_projetado: custo.valor } : {}),
-    }).eq('id', escala.id).select('id');
-    if (error) { console.error(error); toast.error('Erro: ' + error.message); return; }
-    // A RLS descarta o UPDATE sem erro para quem não pode: confere a linha devolvida.
-    if (!data?.length) { toast.error('Você não tem permissão para publicar escalas.'); return; }
+    const ok = await confirm({
+      title: 'Publicar escala',
+      description: 'Depois de publicada, a escala não pode mais ser alterada. Publicar com os turnos que estão na tela?',
+      confirmLabel: 'Publicar',
+    });
+    if (!ok) return;
+    // O servidor calcula o custo projetado com a remuneração completa e recusa a publicação
+    // se os turnos mudaram desde que esta tela os carregou.
+    const { error } = await (supabase.rpc as any)('rh_escala_publicar', {
+      p_escala_id: escala.id,
+      p_turnos_vistos: slots.map(s => s.id),
+    });
+    if (error) { falhou(error); return; }
     toast.success('Escala publicada!');
     fetchEscala();
-  };
+  });
 
   const handleAddSlot = () => executarSlot(async () => {
     if (!escala || !slotForm.colaborador_id || !selectedDay) {
       toast.error('Preencha todos os campos'); return;
     }
-    const { error } = await supabase.from('rh_escala_slots').insert(withCompanyId(companyId, {
-      escala_id: escala.id,
-      colaborador_id: slotForm.colaborador_id,
-      dia: selectedDay,
-      hora_inicio: slotForm.hora_inicio,
-      hora_fim: slotForm.hora_fim,
-      funcao: slotForm.funcao,
-      tipo: slotForm.tipo,
-      observacao: slotForm.observacao,
-    }));
-    if (error) { toast.error('Erro: ' + error.message); return; }
+    const { error } = await (supabase.rpc as any)('rh_escala_adicionar_turno', {
+      p_escala_id: escala.id,
+      p_colaborador_id: slotForm.colaborador_id,
+      p_dia: selectedDay,
+      p_hora_inicio: slotForm.hora_inicio,
+      p_hora_fim: slotForm.hora_fim,
+      p_funcao: slotForm.funcao,
+      p_tipo: slotForm.tipo,
+      p_observacao: slotForm.observacao,
+    });
+    if (error) { falhou(error); return; }
     toast.success('Turno adicionado!');
     setShowAddSlot(false);
     setSlotForm({ colaborador_id: '', hora_inicio: '08:00', hora_fim: '16:00', funcao: 'Geral', tipo: 'TRABALHO', observacao: '' });
@@ -258,21 +258,15 @@ export default function EscalasSection({
     });
     if (!ok) return;
 
-    const { data, error } = await supabase.from('rh_escala_slots').delete().eq('id', slotId).select('id');
-    if (error) { console.error(error); toast.error('Erro: ' + error.message); return; }
-    if (!data?.length) { toast.error('Você não tem permissão para remover turnos.'); return; }
+    const { error } = await (supabase.rpc as any)('rh_escala_remover_turno', { p_slot_id: slotId });
+    if (error) { falhou(error); return; }
     toast.success('Turno removido');
     fetchEscala();
   };
 
   const handleAprovarTroca = async (trocaId: string, aprovado: boolean) => {
-    const { data, error } = await supabase.from('rh_trocas_turno').update({
-      status: aprovado ? 'APROVADA' : 'REJEITADA',
-      aprovado_por: user?.id,
-      aprovado_em: new Date().toISOString(),
-    }).eq('id', trocaId).select('id');
-    if (error) { console.error(error); toast.error('Erro: ' + error.message); return; }
-    if (!data?.length) { toast.error('Você não tem permissão para decidir trocas de turno.'); return; }
+    const { error } = await (supabase.rpc as any)('rh_escala_decidir_troca', { p_troca_id: trocaId, p_aprovar: aprovado });
+    if (error) { falhou(error); return; }
     toast.success(aprovado ? 'Troca aprovada!' : 'Troca rejeitada');
     fetchEscala();
   };
@@ -331,11 +325,11 @@ export default function EscalasSection({
           </Badge>
         )}
 
-        {canManage && !escala && (
+        {canCreate && !escala && (
           <Button size="sm" onClick={handleCreateEscala} disabled={savingEscala} className="gap-1.5"><Plus className="w-3.5 h-3.5" /> {savingEscala ? 'Criando...' : 'Criar Escala'}</Button>
         )}
-        {canManage && escala && escala.status === 'RASCUNHO' && (
-          <Button size="sm" onClick={handlePublicar} className="gap-1.5"><Send className="w-3.5 h-3.5" /> Publicar</Button>
+        {canEdit && escala && escala.status === 'RASCUNHO' && (
+          <Button size="sm" onClick={handlePublicar} disabled={publicando || slots.length === 0} className="gap-1.5"><Send className="w-3.5 h-3.5" /> {publicando ? 'Publicando...' : 'Publicar'}</Button>
         )}
       </div>
 
@@ -403,12 +397,12 @@ export default function EscalasSection({
                           }`}
                         >
                           {slot.tipo === 'TRABALHO' ? `${slot.hora_inicio.slice(0,5)}–${slot.hora_fim.slice(0,5)}` : slot.tipo}
-                          {canManage && escala.status === 'RASCUNHO' && (
+                          {canEdit && escala.status === 'RASCUNHO' && (
                             <button onClick={() => handleDeleteSlot(slot.id)} className="ml-1 text-destructive hover:text-destructive">×</button>
                           )}
                         </div>
                       ))}
-                      {canManage && escala.status === 'RASCUNHO' && !colab.marca && (
+                      {canEdit && escala.status === 'RASCUNHO' && !colab.marca && (
                         <button
                           onClick={() => { setSelectedDay(dayStr); setSlotForm(p => ({ ...p, colaborador_id: colab.id })); setShowAddSlot(true); }}
                           className="absolute inset-0 opacity-0 group-hover:opacity-100 flex items-center justify-center bg-primary-soft rounded transition-opacity"
@@ -432,13 +426,13 @@ export default function EscalasSection({
           <CardContent className="py-12 text-center">
             <CalendarDays className="w-10 h-10 mx-auto mb-3 text-muted-foreground/30" />
             <p className="text-sm text-muted-foreground">Nenhuma escala para esta semana/setor.</p>
-            {canManage && <p className="text-xs text-muted-foreground mt-1">Clique em "Criar Escala" para começar.</p>}
+            {canCreate && <p className="text-xs text-muted-foreground mt-1">Clique em "Criar Escala" para começar.</p>}
           </CardContent>
         </Card>
       )}
 
       {/* Trocas pendentes */}
-      {canManage && trocas.filter(t => t.status === 'PENDENTE').length > 0 && (
+      {canEdit && trocas.filter(t => t.status === 'PENDENTE').length > 0 && (
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">

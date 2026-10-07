@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { normalizeBRLMoneyToNumber, fmtBRL, fmtBRLRaw, fmtBRLCompact } from "@/lib/money";
+import { normalizeBRLMoneyToNumber, numeroParaCampoMoeda, campoMoedaParaNumero, fmtBRL, fmtBRLRaw, fmtBRLCompact } from "@/lib/money";
 import { formatPercentBR, formatDecimalBR, formatIntegerBR, formatFixedBR, formatMoneyBR, formatQuantityBR } from "@/lib/formatters";
 import { parseDecimal } from "@/components/ui/decimal-input";
 
@@ -202,5 +202,42 @@ describe("parseDecimal (DecimalInput)", () => {
 
   it('"0,001" → 0.001', () => {
     expect(parseDecimal("0,001")).toBe(0.001);
+  });
+});
+
+describe("numeroParaCampoMoeda (número do banco → campo)", () => {
+  it("volta igual pelo normalizeBRLMoneyToNumber, inclusive com 3 casas", () => {
+    // String(12.345) = "12.345" era relido como milhar: 12345.
+    for (const valor of [12.345, 1234.567, 1518, 1518.5, 0.1, 9.090909, 1234567.89, 0]) {
+      expect(normalizeBRLMoneyToNumber(numeroParaCampoMoeda(valor))).toBe(valor);
+    }
+  });
+
+  it("sem agrupamento de milhar e com vírgula decimal", () => {
+    expect(numeroParaCampoMoeda(12.345)).toBe("12,345");
+    expect(numeroParaCampoMoeda(1234567.89)).toBe("1234567,89");
+  });
+
+  it("nulo vira campo vazio", () => {
+    expect(numeroParaCampoMoeda(null)).toBe("");
+    expect(numeroParaCampoMoeda(undefined)).toBe("");
+  });
+});
+
+describe("campoMoedaParaNumero (campo → número a gravar)", () => {
+  it("passar pelo campo (que mostra 2 casas) não arredonda o valor gravado", () => {
+    expect(campoMoedaParaNumero("12,35", 12.345)).toBe(12.345);
+    expect(campoMoedaParaNumero("12,345", 12.345)).toBe(12.345);
+    expect(campoMoedaParaNumero("1.518,00", 1518)).toBe(1518);
+  });
+
+  it("valor editado grava o que foi digitado", () => {
+    expect(campoMoedaParaNumero("12,40", 12.345)).toBe(12.4);
+    expect(campoMoedaParaNumero("1.600,00", 1518)).toBe(1600);
+    expect(campoMoedaParaNumero("10,00", null)).toBe(10);
+  });
+
+  it("campo vazio é nulo", () => {
+    expect(campoMoedaParaNumero("", 12.345)).toBeNull();
   });
 });

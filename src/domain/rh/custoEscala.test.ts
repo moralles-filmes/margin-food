@@ -58,7 +58,15 @@ describe('calcularCustoEscala', () => {
     expect(custo).toEqual({ situacao: 'ok', valor: 80 });
   });
 
-  it('valor-hora não informado conta zero (remuneração visível)', () => {
+  it('sem valor-hora usa salário/220, como Folha e Custos', () => {
+    const custo = calcularCustoEscala(
+      [turno('a', '08:00', '09:00'), turno('b', '08:00', '09:00')],
+      mapa({ id: 'a', valor_hora: 0, salario: 2200 }, { id: 'b', valor_hora: null, salario: 4400 }),
+    );
+    expect(custo).toEqual({ situacao: 'ok', valor: 30 });
+  });
+
+  it('sem valor-hora nem salário conta zero (remuneração visível)', () => {
     const custo = calcularCustoEscala([turno('a', '08:00', '16:00')], mapa({ id: 'a', valor_hora: null }));
     expect(custo).toEqual({ situacao: 'ok', valor: 0 });
   });
