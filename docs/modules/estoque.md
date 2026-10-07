@@ -10,7 +10,7 @@
 
 - Faz: catálogo de produtos e códigos de barras, movimentações (entrada, saída, cancelamento com estorno), saldo, dashboard, ranking, perdas, preditivo, transferências entre locais, requisições de estoque e listas fixas, cadastros (setores, categorias, locais).
 - Não faz: a saída simplificada do chão de operação → [operacional.md](operacional.md) (mesmo estoque, outra superfície); contagem física → [inventario.md](inventario.md); salmão → [salmao.md](salmao.md).
-- Código: `src/components/EstoqueGeralView.tsx`, `StockView.tsx`, `MovimentacoesSection.tsx`, `StockCadastrosSection.tsx`, `RequisicaoEstoqueSection.tsx`, `src/components/estoque/`, `src/domain/estoque/`, `src/hooks/useEstoqueGeralStore.ts`, Edge `requisicao-estoque`.
+- Código: `src/components/EstoqueGeralView.tsx`, `MovimentacoesSection.tsx`, `SimuladorCompraGeral.tsx`, `StockCadastrosSection.tsx`, `RequisicaoEstoqueSection.tsx`, `src/components/estoque/`, `src/domain/estoque/`, `src/hooks/useEstoqueGeralStore.ts`, Edge `requisicao-estoque`.
 
 ## Submódulos e permissões
 
@@ -66,7 +66,7 @@ Chaves legadas ainda aceitas nas policies: `stock:read`, `stock:movements:read` 
 
 ## Dependências
 
-- Compras (recebimento dá entrada, ver [compras.md](compras.md)), Salmão (manipulação e cancelamento em cascata, ver [salmao.md](salmao.md)), Inventário (finalização ajusta saldo), CMV de estoque (soma `tipo='SAIDA'`).
+- Compras (recebimento dá entrada, ver [compras.md](compras.md)), Salmão (manipulação e cancelamento em cascata, ver [salmao.md](salmao.md)), Inventário (finalização ajusta saldo), CMV de estoque (soma as saídas de `CMV_OUTFLOW_TYPES`, ver [cmv.md](cmv.md)).
 
 ## Decisões
 

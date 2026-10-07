@@ -73,7 +73,9 @@ Marque cada item como APLICÁVEL, NÃO APLICÁVEL (com justificativa) ou PENDENT
 ## Particularidades deste projeto
 
 - Catálogo de módulos e sub-abas: `src/permissions/registry.ts`. Permissão nova exige registry + `sync_permissions_from_registry` + concessão a admin, diretor e gerente_geral na mesma migration.
-- Documentos de módulo em `docs/modules/`: `financeiro`, `conciliacao`, `apresentacao-socios`, `estoque`, `operacional`, `compras`, `rh`, `salmao`, `inventario` e `ui` (componentes compartilhados). CMV de estoque, Ficha Técnica, Planejamento, Relatórios, IA Central e Admin ainda sem documento. Documentação por tema: `docs/cmv-financeiro/`, `docs/multi-unidades/`, `docs/rbac/`, `docs/apresentacao-socios/`.
+- Documentos de módulo em `docs/modules/`: `financeiro`, `conciliacao`, `apresentacao-socios`, `estoque`, `operacional`, `compras`, `cmv`, `ficha-tecnica`, `salmao`, `rh`, `planejamento`, `relatorios`, `inventario`, `ia`, `admin` e `ui` (componentes compartilhados). Documentação por tema: `docs/cmv-financeiro/`, `docs/multi-unidades/`, `docs/rbac/`, `docs/apresentacao-socios/`.
+- Telas de vários módulos ficam soltas na raiz de `src/components/`; o mapa tela → documento está em `.claude/rules/telas-raiz.md` (e no `src/components/AGENTS.md` gerado para o Codex).
+- Exceções conhecidas à regra "não lê tabela de outro módulo sem contrato": a IA Central (`ai-chat`) e o CMV de estoque (Edge `cmv`) leem direto, com service role, tabelas de vários módulos; renomear coluna ou status nesses módulos esvazia o resultado sem erro ([ia.md](../modules/ia.md), [cmv.md](../modules/cmv.md)).
 
 Módulos do sistema (movido do AGENTS.md em 2026-10-07):
 

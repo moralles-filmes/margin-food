@@ -10,7 +10,7 @@
 
 - Faz: entradas de lote bruto (SIF, validade, custo/kg), manipulação em produto limpo com rendimento, estoque por lote, metas, planejamento de compra e parâmetros por unidade.
 - Não faz: o ledger de estoque (a manipulação e a entrada geram movimentação em `movimentacoes_estoque`, ver [estoque.md](estoque.md)).
-- Código: `src/components/SalmonControlView.tsx`, `EntriesView.tsx`, `ManipulationView.tsx`, `src/hooks/useSalmonStore.ts`, `src/hooks/useSalmonDashboard.ts`.
+- Código: `src/components/SalmonControlView.tsx` (abas), `EntriesView.tsx`, `ManipulationView.tsx`, `StockView.tsx` (estoque por lote), `DashboardView.tsx`, `GoalsView.tsx`, `SmartSuggestionCard.tsx`, `EtiquetaModal.tsx`, `ValidadeAlertCard.tsx`, `src/hooks/useSalmonStore.ts`, `src/hooks/useSalmonDashboard.ts`. A aba Planejamento monta a `PlanningView` ([planejamento.md](planejamento.md)).
 
 ## Submódulos e permissões
 

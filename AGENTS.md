@@ -128,9 +128,15 @@ Leia este arquivo e, depois, só o que a tarefa exige (a união, se tocar vário
 | Estoque Geral (catálogo, movimentações, requisições) | `docs/modules/estoque.md` |
 | Movimentação Operacional | `docs/modules/operacional.md` |
 | Compras e Cotação | `docs/modules/compras.md` |
+| Centro de CMV (CMV de estoque, Edge `cmv`) | `docs/modules/cmv.md` |
+| Ficha Técnica e precificação | `docs/modules/ficha-tecnica.md` |
 | RH | `docs/modules/rh.md` |
 | Salmão | `docs/modules/salmao.md` |
+| Planejamento (metas de compra) | `docs/modules/planejamento.md` |
+| Relatórios | `docs/modules/relatorios.md` |
 | Inventário | `docs/modules/inventario.md` |
+| IA Central (`ai-chat`) | `docs/modules/ia.md` |
+| Admin e Configurações (usuários, empresas, logs, integrações) | `docs/modules/admin.md` |
 | Componentes, busca de texto, números, design system | `docs/modules/ui.md` |
 
 Documentação adicional:
