@@ -9,7 +9,7 @@ Antes de criar ou alterar migration, policy, função ou índice, leia `docs/sta
 
 Pontos que mais causam vazamento ou perda de dados:
 
-- Migration já aplicada não é editada. Crie uma nova (forward-only). Neste repo, `supabase db push` está bloqueado desde o release F12: migration nova vai por MCP `apply_migration` + `supabase migration repair` na mesma sessão (AGENTS.md, Convenções).
+- Migration já aplicada não é editada. Crie uma nova (forward-only). Neste repo, `supabase db push` está bloqueado desde o release F12: migration nova vai por MCP `apply_migration` + `supabase migration repair` na mesma sessão (AGENTS.md §3; procedimento em DATABASE, "Particularidades").
 - Toda tabela nova em schema exposto recebe, na **mesma** migration: RLS habilitada e forçada, policies e GRANT só do DML necessário a `authenticated` (nunca `ALL`).
 - Tabela da empresa filtra por `company_id = (select public.get_current_company_id())`. Não há filial.
 - Policies de insert e update usam `with check`. Helpers (`get_current_company_id`, `has_permission`, `has_any_permission`) sempre dentro de `(select …)`.
@@ -47,7 +47,7 @@ Pontos que mais causam incidente:
 
 ## Segurança, acesso e multi-tenancy — ao tocar auth, permissões ou código de servidor
 
-Antes de alterar, leia `docs/standards/SECURITY.md`, `docs/standards/MULTI_TENANCY.md` e `docs/standards/ACCESS_CONTROL.md`. O modelo do projeto está em `.claude/tenancy-profile.yml` e as regras detalhadas em AGENTS.md (Multi-tenancy, RLS, RBAC, Autenticação).
+Antes de alterar, leia `docs/standards/SECURITY.md`, `docs/standards/MULTI_TENANCY.md` e `docs/standards/ACCESS_CONTROL.md`. O modelo do projeto está em `.claude/tenancy-profile.yml` e as regras detalhadas nas "Particularidades deste projeto" de MULTI_TENANCY, ACCESS_CONTROL e SECURITY (resumo no AGENTS.md §4).
 
 Pontos que mais causam vazamento entre empresas ou escalada de privilégio:
 

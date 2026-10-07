@@ -17,7 +17,7 @@ paths:
 
 # Segurança, acesso e multi-tenancy — ao tocar auth, permissões ou código de servidor
 
-Antes de alterar, leia `docs/standards/SECURITY.md`, `docs/standards/MULTI_TENANCY.md` e `docs/standards/ACCESS_CONTROL.md`. O modelo do projeto está em `.claude/tenancy-profile.yml` e as regras detalhadas em AGENTS.md (Multi-tenancy, RLS, RBAC, Autenticação).
+Antes de alterar, leia `docs/standards/SECURITY.md`, `docs/standards/MULTI_TENANCY.md` e `docs/standards/ACCESS_CONTROL.md`. O modelo do projeto está em `.claude/tenancy-profile.yml` e as regras detalhadas nas "Particularidades deste projeto" de MULTI_TENANCY, ACCESS_CONTROL e SECURITY (resumo no AGENTS.md §4).
 
 Pontos que mais causam vazamento entre empresas ou escalada de privilégio:
 

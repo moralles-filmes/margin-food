@@ -65,7 +65,7 @@ TAREFAS.md                pendências (Próximas Tarefas) e histórico concluíd
 - Normas em `docs/standards/` (corpo copiado do kit, não editar; adaptações só em "Particularidades deste projeto").
 - Níveis das regras: **[N1]** base, sempre que o fluxo protegido existir; **[N2]** operação crítica; **[N3]** escala, só com necessidade medida. Este projeto é **N2**: valem as regras N1 e N2 dos fluxos que existem. Controles N1 de um fluxo existente nunca são dispensados.
 - Não adicione infraestrutura, troque a stack ou amplie escopo só para preencher checklist. Em tarefa sensível, classifique os requisitos como APLICÁVEL, NÃO APLICÁVEL (com justificativa) ou PENDENTE.
-- **Regras por caminho:** `.claude/rules/` (Claude Code) e `supabase/AGENTS.md` (Codex, gerado por `node scripts/check-padrao.mjs --write-nested`). Conferência: `node scripts/check-padrao.mjs`.
+- **Regras por caminho:** `.claude/rules/` (Claude Code; banco, integrações, segurança e uma por módulo) e os AGENTS.md aninhados para o Codex (`supabase/`, pastas de módulo em `src/`; alvos em `.claude/nested-agents.json`), gerados por `node scripts/check-padrao.mjs --write-nested`. Conferência: `node scripts/check-padrao.mjs`.
 - **Riscos e achados:** P0 (bloqueia) · P1 (alto) · P2 (médio) · P3 (baixo), com evidência e marcados CONFIRMADO, INFERIDO ou NÃO CONFIRMADO. Nunca declare como testado o que não rodou.
 
 ## 6. Segurança — vale em toda tarefa
