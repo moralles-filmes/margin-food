@@ -490,4 +490,4 @@ Marque cada item como APLICÁVEL, NÃO APLICÁVEL (com justificativa) ou PENDENT
 | `send-whatsapp-zapi` | WhatsApp da Cotação via Z-API (config por empresa em `cotacao_zapi_config`) |
 | `cotacao-ia` | Assistente de IA da Cotação (chave por empresa em `cotacao_ia_config`) |
 
-CORS e validação de JWT: SECURITY, "Particularidades".
+São 17 funções publicadas. `check-password`, `rbac-lint-quick` e `rbac-lint-full` estão fora do `supabase/config.toml` e publicadas com `verify_jwt = true`; as demais têm `verify_jwt = false`. CORS e validação de JWT: SECURITY, "Particularidades".

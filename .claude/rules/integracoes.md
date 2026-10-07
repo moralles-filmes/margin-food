@@ -25,5 +25,5 @@ Pontos que mais causam incidente:
 - **Retry automático** só com erro transitório **e** repetição comprovadamente segura. Nunca em 4xx definitivo, validação ou autorização.
 - **Fallback entre provedores** nunca é automático quando pode duplicar o efeito. Em IA, só em geração sem efeito externo.
 - **Credenciais** só no servidor e nunca em logs. A Z-API põe o token no path da URL: redija a URL inteira.
-- **Edge Function:** valide o JWT manualmente (`verify_jwt = false` no config), resolva o tenant com o JWT do usuário (`assert_tenant`) antes de usar a service role, e filtre `company_id` em toda query do cliente admin. CORS só por `_shared/cors.ts`.
+- **Edge Function:** valide o JWT dentro da função (14 das 17 têm `verify_jwt = false` no `config.toml`; `check-password` e `rbac-lint-quick/-full` estão fora dele, publicadas com `verify_jwt = true`), resolva o tenant com o JWT do usuário (`assert_tenant`) antes de usar a service role, e filtre `company_id` em toda query do cliente admin. CORS só por `_shared/cors.ts`.
 - **Testes, CI e previews** usam fake adapter ou sandbox. Nunca disparam efeito real.
