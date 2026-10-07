@@ -63,6 +63,8 @@ export default function ConfiguracoesView({ store, initialSubTab }: Props) {
 
   // Granular permission checks for actions
   const canManageGeral = useCan('configuracoes:geral:manage');
+  // Parâmetros do Salmão: a sub-aba tem ação própria no registry; geral:manage continua valendo.
+  const canManageSalmao = useCan('configuracoes:salmon:manage') || canManageGeral;
   const canManageUsuarios = useCan('configuracoes:usuarios:manage');
 
   const [perdaPercent, setPerdaPercent] = useState(String(stockConfig.perdaPercentAlerta ?? 15));
@@ -70,15 +72,16 @@ export default function ConfiguracoesView({ store, initialSubTab }: Props) {
   const [validadeDias, setValidadeDias] = useState(String(stockConfig.validadePadraoDias ?? 2));
   const [alertaVencimento, setAlertaVencimento] = useState(String(stockConfig.alertaVencimentoDias ?? 1));
 
-  const handleSaveSalmaoConfig = () => {
-    setStockConfig({
-      ...stockConfig,
-      perdaPercentAlerta: parseDecimal(perdaPercent) || 15,
-      perdaValorAlerta: normalizeBRLMoneyToNumber(perdaValor) || 500,
-      validadePadraoDias: parseInt(validadeDias) || 2,
-      alertaVencimentoDias: parseInt(alertaVencimento) || 1,
+  const handleSaveSalmaoConfig = async () => {
+    // Campo vazio volta ao padrão; zero é valor válido (desliga o alerta), como em Salmão → Estoque.
+    const ouPadrao = (v: number | null | undefined, padrao: number) => (v == null || Number.isNaN(v) ? padrao : v);
+    const ok = await setStockConfig({
+      perdaPercentAlerta: ouPadrao(parseDecimal(perdaPercent), 15),
+      perdaValorAlerta: ouPadrao(normalizeBRLMoneyToNumber(perdaValor), 500),
+      validadePadraoDias: ouPadrao(parseInt(validadeDias), 2),
+      alertaVencimentoDias: ouPadrao(parseInt(alertaVencimento), 1),
     });
-    toast.success('Configurações de salmão atualizadas!');
+    if (ok) toast.success('Configurações de salmão atualizadas!');
   };
 
   // Filter subtabs by permission. Empresas só existe na unidade da plataforma
@@ -142,13 +145,13 @@ export default function ConfiguracoesView({ store, initialSubTab }: Props) {
                 <div className="space-y-1.5">
                   <label className="text-[11px] text-muted-foreground font-medium">Perda % máxima</label>
                   <div className="flex items-center gap-1.5">
-                    <DecimalInput value={perdaPercent} onValueChange={raw => setPerdaPercent(raw)} maxDecimals={2} suffix="%" className="bg-secondary border-border text-foreground h-8 text-sm" disabled={!canManageGeral} />
+                    <DecimalInput value={perdaPercent} onValueChange={raw => setPerdaPercent(raw)} maxDecimals={2} suffix="%" className="bg-secondary border-border text-foreground h-8 text-sm" disabled={!canManageSalmao} />
                   </div>
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-[11px] text-muted-foreground font-medium">Perda R$ máxima</label>
                   <div className="flex items-center gap-1.5">
-                    <CurrencyInput value={perdaValor} onValueChange={raw => setPerdaValor(raw)} showPrefix className="bg-secondary border-border text-foreground h-8 text-sm" disabled={!canManageGeral} />
+                    <CurrencyInput value={perdaValor} onValueChange={raw => setPerdaValor(raw)} showPrefix className="bg-secondary border-border text-foreground h-8 text-sm" disabled={!canManageSalmao} />
                   </div>
                 </div>
               </div>
@@ -165,14 +168,14 @@ export default function ConfiguracoesView({ store, initialSubTab }: Props) {
                 <div className="space-y-1.5">
                   <label className="text-[11px] text-muted-foreground font-medium">Validade padrão (dias)</label>
                   <div className="flex items-center gap-1.5">
-                    <Input type="number" step="1" value={validadeDias} onChange={e => setValidadeDias(e.target.value)} className="bg-secondary border-border text-foreground h-8 text-sm" disabled={!canManageGeral} />
+                    <Input type="number" step="1" value={validadeDias} onChange={e => setValidadeDias(e.target.value)} className="bg-secondary border-border text-foreground h-8 text-sm" disabled={!canManageSalmao} />
                     <span className="text-xs text-muted-foreground">dias</span>
                   </div>
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-[11px] text-muted-foreground font-medium">Alerta de vencimento (dias antes)</label>
                   <div className="flex items-center gap-1.5">
-                    <Input type="number" step="1" value={alertaVencimento} onChange={e => setAlertaVencimento(e.target.value)} className="bg-secondary border-border text-foreground h-8 text-sm" disabled={!canManageGeral} />
+                    <Input type="number" step="1" value={alertaVencimento} onChange={e => setAlertaVencimento(e.target.value)} className="bg-secondary border-border text-foreground h-8 text-sm" disabled={!canManageSalmao} />
                     <span className="text-xs text-muted-foreground">dias</span>
                   </div>
                 </div>
@@ -180,7 +183,7 @@ export default function ConfiguracoesView({ store, initialSubTab }: Props) {
             </CardContent>
           </Card>
 
-          {canManageGeral && (
+          {canManageSalmao && (
             <Button size="sm" className="text-xs" onClick={handleSaveSalmaoConfig}>
               Salvar Configurações
             </Button>

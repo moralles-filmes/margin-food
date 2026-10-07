@@ -31,8 +31,10 @@ interface Colaborador {
   nome: string;
   setor: string;
   funcao: string;
-  valor_hora: number;
+  valor_hora: number | null;
   carga_horaria_semanal: number;
+  // false quando quem vê a escala não tem acesso à remuneração (valor_hora vem nulo).
+  remuneracao_visivel?: boolean;
 }
 
 interface Escala {
@@ -40,7 +42,6 @@ interface Escala {
   semana_inicio: string;
   setor: string;
   status: string;
-  custo_projetado: number;
   observacoes: string;
 }
 
@@ -105,7 +106,8 @@ export default function EscalasSection({
     setLoading(true);
     const { data: escalaData } = await supabase
       .from('rh_escalas')
-      .select('id, setor, semana_inicio, status, custo_projetado, observacoes, created_at, created_by')
+      // Sem custo_projetado: a tela recalcula pela lista de colaboradores (que respeita o acesso à remuneração).
+      .select('id, setor, semana_inicio, status, observacoes, created_at, created_by')
       .eq('company_id', profile?.company_id ?? '')
       .eq('semana_inicio', weekStartStr)
       .eq('setor', setor)
@@ -179,7 +181,8 @@ export default function EscalasSection({
       status: 'PUBLICADA',
       publicada_em: new Date().toISOString(), // timestamptz — UTC is correct
       publicada_por: user?.id,
-      custo_projetado: Math.round(custoTotal * 100) / 100,
+      // Sem a remuneração o cálculo daria zero e gravaria por cima do custo projetado.
+      ...(custoOculto ? {} : { custo_projetado: Math.round(custoTotal * 100) / 100 }),
     }).eq('id', escala.id);
     if (error) { toast.error('Erro: ' + error.message); return; }
     toast.success('Escala publicada!');
@@ -245,6 +248,8 @@ export default function EscalasSection({
     const horas = (hf * 60 + mf - hi * 60 - mi) / 60;
     return total + horas * colab.valor_hora;
   }, 0);
+  const custoOculto = slots.some(s => s.tipo === 'TRABALHO'
+    && colaboradores.find(c => c.id === s.colaborador_id)?.remuneracao_visivel === false);
 
   if (loading) {
     return <div className="flex items-center justify-center py-12"><div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>;
@@ -295,8 +300,9 @@ export default function EscalasSection({
             <div>
               <p className="text-xs text-muted-foreground">Custo projetado da semana</p>
               <p className="text-lg font-bold text-foreground">
-                {fmtBRL(custoProjetadoAtual)}
+                {custoOculto ? '—' : fmtBRL(custoProjetadoAtual)}
               </p>
+              {custoOculto && <p className="text-xs text-muted-foreground">Sem acesso à remuneração</p>}
             </div>
             <div className="ml-auto text-right">
               <p className="text-xs text-muted-foreground">{slots.filter(s => s.tipo === 'TRABALHO').length} turnos</p>

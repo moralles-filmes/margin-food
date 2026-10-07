@@ -75,9 +75,11 @@ interface Colaborador {
   tipo_contrato: string;
   status: string;
   carga_horaria_semanal: number;
-  salario: number;
-  valor_hora: number;
+  // Nulos quando a pessoa não tem acesso à remuneração (rh_listar_colaboradores).
+  salario: number | null;
+  valor_hora: number | null;
   created_at: string;
+  remuneracao_visivel?: boolean;
 }
 
 interface PontoRegistro {
@@ -227,14 +229,15 @@ function RhViewInner({ visibleSubtabs, user }: {
   // Carrega TODOS os colaboradores (em lotes): as subseções (Escalas, Folha, Férias,
   // Benefícios…) recebem esta lista para seletores e para resolver nomes — uma lista
   // truncada fazia colaboradores sumirem dos selects e aparecerem como "Desconhecido".
+  // Vem pela RPC, não pela tabela: a RLS de rh_colaboradores só libera o Prontuário, e a
+  // RPC entrega a lista às demais sub-abas sem CPF/contato e, fora de Folha/Custos/
+  // Dashboard, sem remuneração.
   const fetchColaboradores = useCallback(async () => {
     const all: Colaborador[] = [];
     for (let from = 0; ; from += COLAB_BATCH_SIZE) {
-      let query = supabase.from('rh_colaboradores').select('id, user_id, nome, cpf, telefone, email, cargo, funcao, setor, data_admissao, tipo_contrato, status, carga_horaria_semanal, salario, valor_hora, created_at, adicional_noturno_percent')
+      const { data, error } = await (supabase.rpc as any)('rh_listar_colaboradores', { p_incluir_inativos: showInativos })
         .order('nome').order('id')
         .range(from, from + COLAB_BATCH_SIZE - 1);
-      if (!showInativos) query = query.eq('status', 'ativo');
-      const { data, error } = await query;
       if (error) { console.error(error); return; }
       all.push(...((data || []) as Colaborador[]));
       if (!data || data.length < COLAB_BATCH_SIZE) break;

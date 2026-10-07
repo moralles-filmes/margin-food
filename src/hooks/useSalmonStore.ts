@@ -15,6 +15,32 @@ const defaultStockConfig: StockConfig = {
   validadePadraoDias: 2, alertaVencimentoDias: 1,
 };
 
+// Linha de salmon_config → StockConfig. Só cai no padrão quando o valor não veio:
+// zero gravado é zero (com `||` um mínimo 0 voltava como 50 no próximo carregamento).
+function mapDbConfig(row: Record<string, unknown>): StockConfig {
+  const num = (v: unknown, padrao: number) => (v === null || v === undefined || Number.isNaN(Number(v)) ? padrao : Number(v));
+  return {
+    minGrossKg: num(row.min_gross_kg, defaultStockConfig.minGrossKg),
+    minCleanKg: num(row.min_clean_kg, defaultStockConfig.minCleanKg),
+    staleDaysLimit: num(row.stale_days_limit, defaultStockConfig.staleDaysLimit),
+    perdaPercentAlerta: num(row.loss_percent_alert, defaultStockConfig.perdaPercentAlerta),
+    perdaValorAlerta: num(row.loss_value_alert, defaultStockConfig.perdaValorAlerta),
+    validadePadraoDias: num(row.expiration_days, defaultStockConfig.validadePadraoDias),
+    alertaVencimentoDias: num(row.expiration_alert_days, defaultStockConfig.alertaVencimentoDias),
+  };
+}
+
+// Campo do StockConfig → parâmetro de salmon_salvar_config.
+const STOCK_CONFIG_PARAMS: Record<keyof StockConfig, string> = {
+  minGrossKg: 'p_min_gross_kg',
+  minCleanKg: 'p_min_clean_kg',
+  staleDaysLimit: 'p_stale_days_limit',
+  perdaPercentAlerta: 'p_loss_percent_alert',
+  perdaValorAlerta: 'p_loss_value_alert',
+  validadePadraoDias: 'p_expiration_days',
+  alertaVencimentoDias: 'p_expiration_alert_days',
+};
+
 async function getCurrentUserId(): Promise<string | null> {
   const { data } = await supabase.auth.getUser();
   return data?.user?.id ?? null;
@@ -144,15 +170,7 @@ export function useSalmonStore() {
         }
 
         if (dbConfig) {
-          setStockConfigState({
-            minGrossKg: Number(dbConfig.min_gross_kg) || 50,
-            minCleanKg: Number(dbConfig.min_clean_kg) || 30,
-            staleDaysLimit: Number(dbConfig.stale_days_limit) || 7,
-            perdaPercentAlerta: Number(dbConfig.loss_percent_alert) || 15,
-            perdaValorAlerta: Number(dbConfig.loss_value_alert) || 500,
-            validadePadraoDias: Number(dbConfig.expiration_days) || 2,
-            alertaVencimentoDias: Number(dbConfig.expiration_alert_days) || 1,
-          });
+          setStockConfigState(mapDbConfig(dbConfig));
         }
 
         if (dbDaily && dbDaily.length > 0) {
@@ -578,26 +596,28 @@ export function useSalmonStore() {
     setDailyRecords(prev => prev.filter(r => r.id !== id));
   }, [supabase, toast]);
 
-  const setStockConfig = useCallback(async (config: StockConfig) => {
-    setStockConfigState(config);
-    // Persist to DB
-    try {
-      const { data: existing } = await supabase.from('salmon_config').select('id').limit(1).maybeSingle();
-      if (existing) {
-        await supabase.from('salmon_config').update({
-          min_gross_kg: config.minGrossKg,
-          min_clean_kg: config.minCleanKg,
-          stale_days_limit: config.staleDaysLimit,
-          loss_percent_alert: config.perdaPercentAlerta,
-          loss_value_alert: config.perdaValorAlerta,
-          expiration_days: config.validadePadraoDias,
-          expiration_alert_days: config.alertaVencimentoDias,
-        }).eq('id', existing.id);
-      }
-    } catch (e) {
-      console.error('Error saving salmon config:', e);
+  // Grava só os campos informados (cada tela salva os seus) e devolve se deu certo:
+  // quem chama só confirma ao usuário depois da resposta. A RPC cria a linha da unidade
+  // na primeira gravação — antes o UPDATE sem linha não gravava nada e a tela dizia
+  // "atualizado" mesmo assim.
+  const setStockConfig = useCallback(async (campos: Partial<StockConfig>): Promise<boolean> => {
+    const params: Record<string, number> = {};
+    for (const [campo, param] of Object.entries(STOCK_CONFIG_PARAMS) as [keyof StockConfig, string][]) {
+      const valor = campos[campo];
+      if (valor !== undefined) params[param] = valor;
     }
-  }, [supabase]);
+    const { data, error } = await (supabase.rpc as any)('salmon_salvar_config', params);
+    if (error) {
+      console.error('[useSalmonStore.setStockConfig]', error);
+      const semPermissao = error.code === '42501' || String(error.message ?? '').startsWith('PERMISSION_DENIED');
+      toast.error(semPermissao
+        ? 'Você não tem permissão para alterar estes parâmetros.'
+        : 'Erro ao salvar parâmetros do salmão: ' + error.message);
+      return false;
+    }
+    setStockConfigState(mapDbConfig(data));
+    return true;
+  }, [supabase, toast]);
 
   // Computed stock
   const stock: StockState = useMemo(() => {
