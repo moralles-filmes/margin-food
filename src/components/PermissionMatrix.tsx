@@ -1,6 +1,8 @@
 import { useState, useCallback } from 'react';
 import { MODULE_MANIFESTS, type ModuleManifest } from '@/permissions/registry';
+import { matrizMostraSubtab } from '@/permissions/plataforma';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCompanyScope } from '@/contexts/CompanyScopeContext';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { ChevronDown, ChevronRight, Zap } from 'lucide-react';
@@ -11,14 +13,22 @@ interface PermissionMatrixProps {
   onChange: React.Dispatch<React.SetStateAction<Set<string>>>;
 }
 
-function getModuleKeys(mod: ModuleManifest): string[] {
-  return mod.subtabs.flatMap(s => s.actions.map(a => `${mod.key}:${s.key}:${a.action}`));
+type Subtab = ModuleManifest['subtabs'][number];
+
+function getModuleKeys(mod: ModuleManifest, subtabs: Subtab[]): string[] {
+  return subtabs.flatMap(s => s.actions.map(a => `${mod.key}:${s.key}:${a.action}`));
 }
 
 export default function PermissionMatrix({ selected, onChange }: PermissionMatrixProps) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const { effectivePermissions } = useAuth();
   const isSuperAdmin = effectivePermissions.includes('system:global:manage');
+  // A matriz edita usuários da unidade em escopo (a mesma do admin-users).
+  const companyId = useCompanyScope()?.companyId ?? null;
+  const visibleSubtabs = useCallback(
+    (mod: ModuleManifest) => mod.subtabs.filter(s => matrizMostraSubtab(mod.key, s.key, { isSuperAdmin, companyId })),
+    [isSuperAdmin, companyId],
+  );
 
   const toggle = useCallback((key: string) => {
     onChange(prev => {
@@ -29,7 +39,7 @@ export default function PermissionMatrix({ selected, onChange }: PermissionMatri
   }, [onChange]);
 
   const toggleModule = useCallback((mod: ModuleManifest) => {
-    const keys = getModuleKeys(mod);
+    const keys = getModuleKeys(mod, visibleSubtabs(mod));
     onChange(prev => {
       const next = new Set(prev);
       const allChecked = keys.every(k => next.has(k));
@@ -40,7 +50,7 @@ export default function PermissionMatrix({ selected, onChange }: PermissionMatri
       }
       return next;
     });
-  }, [onChange]);
+  }, [onChange, visibleSubtabs]);
 
   const toggleExpand = (key: string) => {
     const next = new Set(expanded);
@@ -77,7 +87,8 @@ export default function PermissionMatrix({ selected, onChange }: PermissionMatri
       {/* Module tree — new granular structure */}
       <div className="border border-border rounded-lg divide-y divide-border max-h-[400px] overflow-y-auto">
         {MODULE_MANIFESTS.filter(mod => mod.key !== 'system' || isSuperAdmin).map(mod => {
-          const moduleKeys = getModuleKeys(mod);
+          const subtabs = visibleSubtabs(mod);
+          const moduleKeys = getModuleKeys(mod, subtabs);
           const allChecked = moduleKeys.length > 0 && moduleKeys.every(k => selected.has(k));
           const someChecked = moduleKeys.some(k => selected.has(k));
           const isExpanded = expanded.has(mod.key);
@@ -102,7 +113,7 @@ export default function PermissionMatrix({ selected, onChange }: PermissionMatri
               {/* Expanded: subtabs */}
               {isExpanded && (
                 <div className="pl-8 pr-3 py-1.5 space-y-1.5 bg-background">
-                  {mod.subtabs.map(sub => (
+                  {subtabs.map(sub => (
                     <div key={sub.key} className="border-l-2 border-border pl-3 py-1">
                       <p className="text-[11px] font-medium text-muted-foreground mb-1">{sub.label}</p>
                       <div className="flex flex-wrap gap-3">
