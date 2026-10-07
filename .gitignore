@@ -40,3 +40,6 @@ supabase/.temp/
 # Projeto usa Bun (bun.lock/bun.lockb versionados) — lockfile de npm é artefato
 # de um `npm install` acidental e divergiria do CI (`bun install --frozen-lockfile`)
 package-lock.json
+
+# Estado de tarefas do Padrão SaaS (local, fora do Git)
+.tasks/
