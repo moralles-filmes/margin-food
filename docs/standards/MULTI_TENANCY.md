@@ -130,8 +130,18 @@ Levantado em 2026-10-07 (código main dd1cbee + catálogo de produção, só lei
 - Coluna `company_id`. Resolver `public.get_current_company_id()`: header `x-company-id` confirmado por `public.is_company_member` (membership `active` + `companies.ativo`); sem header, `profiles.company_id`, também confirmado. RPC `SECURITY DEFINER` usa `public.assert_tenant()`.
 - A empresa ativa vem do estado do cliente, enviada pelo header de um cliente Supabase por empresa (`src/integrations/supabase/companyClient.ts`), não da URL. Troca de empresa limpa o cache (`queryClient.clear()` em `CompanyScopeProvider`).
 - As policies filtram pela empresa **ativa** (`company_id = (select get_current_company_id())`), não por todas as empresas do usuário.
-- Sem filial: "Unidade" na interface é a empresa. `stock_locations` é local físico de estoque.
+- Sem filial: "Unidade" na interface é a empresa. `stock_locations` é local físico de estoque. Decisão: [ADR-0001](../adr/0001-unidade-e-empresa-sem-filial.md).
 - Entidades globais (sem `company_id`): `permissions`, `role_permissions`, `companies`, `unidades_medida`, `app_config` (só service role), `security_risk_register`, `dashboard_cache`.
 - FK composta: a maioria das FKs entre tabelas da empresa é simples. Tabela nova usa FK composta; nas existentes, a RPC ou um trigger confere a empresa (ex.: `trg_fin_rateio_valida_empresa`).
 - Há tabelas com `company_id` sem FORCE RLS (inventário: `docs/multi-unidades/03-AUDITORIA-POS-IMPLANTACAO.md`). Todas as funções `SECURITY DEFINER` pertencem a `postgres`, que tem BYPASSRLS.
-- Regras detalhadas: AGENTS.md → "Multi-tenancy" e "RLS".
+
+Regras do projeto (movidas do AGENTS.md em 2026-10-07):
+
+- INSERTs operacionais em tabelas tenant-scoped devem enviar `company_id` explícito de `useCompanyId()`; não depender de defaults/triggers implícitos. Existem tabelas globais e logs legados sem coluna ou com tenant nullable — classificar pelo schema vivo antes de alterar constraints.
+- `get_current_company_id()` valida o header `x-company-id` contra `company_memberships` ativo + empresa ativa; sem header usa a empresa original autorizada. `profiles.company_id` é legado/origem, nunca preferência de navegação.
+- UUID placeholder `00000000-0000-0000-0000-000000000001` é reservado para o sistema, bloqueado para operações comuns.
+- Uma identidade Auth pode ter N memberships; roles/overrides são por `(user_id, company_id)`. `AuthContext` persiste só a preferência de unidade e revalida acessos; dados operacionais usam `useSupabase()`/`CompanyScopeProvider`, nunca o cliente global.
+- **`SECURITY DEFINER` que retorna dados sensíveis** (ex: `list_profiles_minimal`) exige `assert_tenant()` + `has_any_permission()` explícitos — nunca resolver tenant via JOIN manual. Busca/UPDATE por id dentro de `SECURITY DEFINER` filtra `company_id = assert_tenant()`, nunca adota a empresa do próprio registro (`receive_conta_receber` baixava título de outra empresa); vale também para trigger que resolve pai sem FK (`trg_validate_rateio_sum`).
+- Onboarding e CNPJ: TENANT_LIFECYCLE, "Particularidades".
+- Apresentação Sócios tem escopo de unidade próprio (`presentationUnit`): `docs/modules/apresentacao-socios.md`.
+- RLS e FORCE RLS em tabela nova, policies e grants: DATABASE, "Particularidades".

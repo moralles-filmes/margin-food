@@ -246,4 +246,4 @@ Formato: contexto, decisão, alternativas consideradas, consequências.
 
 - Runtime de servidor: Vite SPA + Supabase. Não há camada própria de casos de uso no servidor: a regra de negócio crítica mora em RPCs `SECURITY DEFINER` (`_guarded_*`, `*_atomic`, `op_*`, `reconcile_*`), em Edge Functions e em funções puras de `src/domain/`.
 - Código por módulo: `src/components/<modulo>/`, `src/domain/<modulo>/`, `src/hooks/`. Navegação e permissões: `src/permissions/registry.ts`.
-- Decisões arquiteturais vigentes: AGENTS.md → "Princípios e Decisões Arquiteturais". Novas decisões: `docs/adr/`.
+- Decisões vigentes: invariantes transversais no AGENTS.md §12; regras de cada módulo em `docs/modules/<modulo>.md`; regras de um assunto nas "Particularidades" dos padrões. Novas decisões: `docs/adr/` (ADR-0001: unidade = empresa, sem filial).

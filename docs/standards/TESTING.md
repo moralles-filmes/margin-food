@@ -100,4 +100,5 @@ Quando o fluxo existir, os testes cobrem:
 - Comandos: `bun run test` (Vitest + jsdom, `src/**/*.{test,spec}.{ts,tsx}`), `bun run lint`, `bun run build`, `bun run rbac:lint`, `bun run security:check`. Não há script de typecheck e o build (SWC) não confere tipos: `bunx tsc --noEmit -p tsconfig.app.json`.
 - Testes de banco: `supabase/tests/database/*.sql` com `scripts/test-*` (SQL próprio). Testes estáticos de migration: `src/test/*Migration.test.ts`.
 - CI (`.github/workflows/security-gate.yml`): `rbac:lint`, `scripts/verify-security.ts` e build. Lint, testes unitários e testes de banco não rodam no CI.
-- Integração sempre contra banco real, sem mock de banco (AGENTS.md → "Convenções de Desenvolvimento").
+- **CI**: GitHub Actions instala com Bun e lockfile congelado (`bun install --frozen-lockfile`).
+- **Sem mock de banco**: testes de integração sempre usam banco real.

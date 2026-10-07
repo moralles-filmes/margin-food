@@ -83,5 +83,13 @@ Teste de carga só em ambiente isolado, nunca em produção, com dados sintétic
 
 ## Particularidades deste projeto
 
-- Agregados e KPIs sempre por RPC com `SUM` no Postgres; React Query com `staleTime` 3 min e `gcTime` 10 min; `exceljs` em chunk separado. Detalhes: AGENTS.md → "Otimizações de Performance".
-- Helpers de RLS dentro de `(select …)`: sem isso, `fin_lancamentos.tenant_read` ficou 185x mais lento (migration `20260806171500`).
+- Helpers de RLS dentro de `(select …)`: sem isso, `fin_lancamentos.tenant_read` ficou 185x mais lento (migration `20260806171500`). Regra completa: DATABASE, "Particularidades".
+
+Otimizações implementadas (movidas do AGENTS.md em 2026-10-07):
+
+- `get_catalog_counts()` — uma RPC para contagens do catálogo (evita queries separadas com timeout).
+- `produtos.saldo_atual` cacheado por trigger — fonte única da verdade (`docs/modules/estoque.md`).
+- Índices em `movimentacoes_estoque` (company_id + produto_id + status).
+- React Query: `staleTime: 3min`, `gcTime: 10min` (`App.tsx`).
+- KPIs agregados (`Total R$`, `Qtd Total`) sempre via RPC com `SUM` no Postgres — nunca `.select()` sem `.limit()` + `.reduce()` no client (baixa a tabela inteira, cresce O(n)). Referência: `get_movimentacoes_kpis`.
+- **Bundle**: `exceljs` (não `xlsx`, removido por advisories HIGH) em chunk separado (`vendor-excel` no `vite.config.ts`); exports usam `src/lib/safeXlsx.ts`. Seções raras do FinanceiroView são `React.lazy`.

@@ -181,5 +181,13 @@ As restrições sobre SQL, shell e filesystem arbitrários (INTEGRATIONS §16) v
 - Edge Functions com `verify_jwt = false` e validação manual do JWT; tenant resolvido com o JWT do usuário (`assert_tenant`) antes de usar a service role; CORS só por `supabase/functions/_shared/cors.ts`; segredos por `Deno.env.get` (`SB_SECRET_KEY`).
 - Senha vazada: verificada pela Edge `check-password` (HaveIBeenPwned). A proteção nativa do Supabase Auth está desligada.
 - Audit log: `fin_audit_logs` (Financeiro), `admin_actions_log` (acessos e identidade), `rh_audit_log` (RH), `audit_logs`.
-- Storage: bucket `rh-documentos`, path começando por `company_id`, saga `PENDING_UPLOAD` → `ACTIVE` → `DELETING`.
-- Checklist de segredos antes de commit e incidente de referência: AGENTS.md → "SEGURANÇA".
+- Storage: bucket `rh-documentos`, path começando por `company_id`, saga `PENDING_UPLOAD` → `ACTIVE` → `DELETING` (`docs/modules/rh.md`).
+- Checklist de segredos antes de commit e incidente de referência: AGENTS.md §6.
+- Headers de `vercel.json` com `camera=(self)` e `'wasm-unsafe-eval'` existem pela leitura de código de barras do Inventário: `docs/modules/inventario.md`.
+
+### Autenticação e Edge Functions (movidas do AGENTS.md em 2026-10-07)
+
+- JWT Supabase Auth, validado via Bearer token nas Edge Functions (`verify_jwt = false` no config, validação manual dentro de cada função).
+- Eventos de acesso (membership criado/alterado/revogado, reset de senha) gravam em `admin_actions_log` com o `company_id` da unidade, não em `audit_log`; a Auditoria Segurança lê de lá (policy `admin_actions_unit_security_read`, chave `configuracoes:auditoria-seguranca:view`).
+- GoTrue grava `app_metadata` após o INSERT de `auth.users`; tanto cadastro com senha quanto convite exigem a reserva administrativa de empresa antes da criação, para o trigger não depender desses metadados ainda ausentes.
+Todas as Edge Functions usam CORS compartilhado via `supabase/functions/_shared/cors.ts` (`getCorsHeaders()`, restringe a `ALLOWED_ORIGINS`) — nunca reintroduzir `Access-Control-Allow-Origin: '*'`.

@@ -73,4 +73,22 @@ Marque cada item como APLICÁVEL, NÃO APLICÁVEL (com justificativa) ou PENDENT
 ## Particularidades deste projeto
 
 - Catálogo de módulos e sub-abas: `src/permissions/registry.ts`. Permissão nova exige registry + `sync_permissions_from_registry` + concessão a admin, diretor e gerente_geral na mesma migration.
-- Lista de módulos: AGENTS.md → "Módulos do Sistema". Ainda não há documentos em `docs/modules/`; a documentação por tema está em `docs/cmv-financeiro/`, `docs/multi-unidades/` e `docs/rbac/`.
+- Documentos de módulo em `docs/modules/`: `financeiro`, `conciliacao`, `apresentacao-socios`, `estoque`, `operacional`, `compras`, `rh`, `salmao`, `inventario` e `ui` (componentes compartilhados). CMV de estoque, Ficha Técnica, Planejamento, Relatórios, IA Central e Admin ainda sem documento. Documentação por tema: `docs/cmv-financeiro/`, `docs/multi-unidades/`, `docs/rbac/`, `docs/apresentacao-socios/`.
+
+Módulos do sistema (movido do AGENTS.md em 2026-10-07):
+
+| Módulo | Descrição | Componente Principal |
+|--------|-----------|---------------------|
+| **Estoque** | Gestão de inventário (dual-unit) | `EstoqueGeralView` |
+| **Movimentação Operacional** | Saída simplificada para o chão de operação | `MovimentacaoOperacionalView` |
+| **Compras** | Pedidos, requisições, fornecedores, Cotação (RFQ) | `ComprasView` |
+| **CMV** | Custo da Mercadoria Vendida + metas | `CmvView` |
+| **Ficha Técnica** | Fichas de receitas e precificação | `FichaTecnicaView` |
+| **Salmão** | Controle de rendimento de salmão | `SalmonControlView` |
+| **Financeiro** | Contas a pagar/receber, DRE, Conciliação | `FinanceiroView` |
+| **RH** | Folha de pagamento, escalas | `RhView` |
+| **Planejamento** | Projeções e radar de compras | `PlanningView` |
+| **Relatórios** | Analytics e KPIs | `RelatoriosView` |
+| **Inventário** | Auditorias físicas | `InventarioView` |
+| **IA Central** | Assistentes AI por módulo | `CentralIAView` |
+| **Admin** | Usuários, empresas, logs, segurança | `AdminUsersView` |

@@ -74,6 +74,8 @@ Falhou um passo, nada fica. Idempotente pela chave do fluxo de cadastro: repetir
 ## Particularidades deste projeto
 
 - Provisionamento: `onboard_new_company()`, idempotente por `p_onboarding_request_id`, CNPJ único pelos dígitos, restrito à plataforma (`can_manage_companies`, Configurações → Empresas).
+- Onboarding via `onboard_new_company()` — idempotente por `p_onboarding_request_id`. CNPJ é único pelos DÍGITOS (`uq_companies_cnpj_digitos`): toda conferência de CNPJ compara `regexp_replace(cnpj, '\D', '', 'g')`, nunca o texto digitado.
 - Estado da empresa: só `companies.ativo`. Empresa inativa nega a membership. Não há `read_only`, `suspended`, planos nem cobrança da assinatura.
 - Membros: `admin-users` cria a membership direto, sem convite com aceite. E-mail já existente ganha acesso sem alterar senha, nome ou e-mail. Revogar é `status = 'revoked'` na unidade; a identidade compartilhada nunca é excluída.
+- Quem administra Configurações → Empresas e provisiona o 1º gestor de uma unidade: ACCESS_CONTROL, "Particularidades".
 - Exportação e exclusão dos dados de uma empresa: sem fluxo implementado.

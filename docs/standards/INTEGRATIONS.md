@@ -466,3 +466,28 @@ Marque cada item como APLICÁVEL, NÃO APLICÁVEL (com justificativa) ou PENDENT
 - Efeito externo registra a tentativa antes de enviar: `cotacao_whatsapp_logs` (PENDING → SENT, ERROR ou UNKNOWN; índice `uq_cotacao_wa_logs_company_idempotency`) e `ai_logs` no `ai-chat`.
 - Não há webhooks recebidos. Job: `scheduled-jobs` (Bearer `CRON_SECRET`); o agendador não está no repositório.
 - Documentos de provedor: `providers/zapi.md`. Gemini, Anthropic, OpenAI e HaveIBeenPwned ainda sem documento.
+
+### Envio externo sem deduplicação no provedor (movido do AGENTS.md em 2026-10-07)
+
+- **A Z-API não deduplica: o WhatsApp da Cotação registra a tentativa antes de enviar** — `send-whatsapp-zapi` grava a linha `PENDING` com a chave derivada (`uq_cotacao_wa_logs_company_idempotency`) e só então chama a Z-API; reenvio com a mesma chave nunca manda de novo (salvo após `ERROR`, recusa 4xx explícita), e timeout/queda/5xx viram `UNKNOWN` — a tela avisa que pode ter saído e só reenvia com confirmação (semente nova). Todo envio externo sem deduplicação no provedor segue esse desenho — inclusive chamada paga de IA (`ai-chat` reserva a linha de `ai_logs` com a chave antes de chamar o modelo; reenvio recebe a resposta gravada).
+
+### Edge Functions (Supabase)
+
+| Função | Propósito |
+|--------|-----------|
+| `admin-users` / `admin-create-user` | Gestão de usuários com RBAC |
+| `admin-companies` | Gestão multi-tenant de empresas |
+| `cmv` | Cálculo de CMV |
+| `ficha-tecnica` | Fichas técnicas de receitas |
+| `inventario` | Operações de inventário |
+| `ai-chat` | Assistente IA central |
+| `requisicao-estoque` | Requisições de estoque (estorno, notificação, ack) |
+| `check-password` | Validação de senha (exige Bearer + rate limit) |
+| `rbac-lint` (+ variantes `-full`/`-quick`) | Auditoria de permissões RBAC |
+| `rh` | Recursos humanos |
+| `purchase-requisitions` | Ordens de compra |
+| `scheduled-jobs` | Jobs em background (cron) |
+| `send-whatsapp-zapi` | WhatsApp da Cotação via Z-API (config por empresa em `cotacao_zapi_config`) |
+| `cotacao-ia` | Assistente de IA da Cotação (chave por empresa em `cotacao_ia_config`) |
+
+CORS e validação de JWT: SECURITY, "Particularidades".

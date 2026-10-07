@@ -130,5 +130,5 @@ Major de Next.js, React, Node, Postgres, supabase-js, Supabase CLI e runtime Den
 
 - Deploy do frontend: Vercel, auto-deploy no push para `main`. Migrations e Edge Functions são publicadas à parte, com autorização explícita.
 - Ambientes: um projeto Supabase (produção). O CSP de `vercel.json` só libera esse projeto, então preview deployments falam com produção.
-- Git: branch por tarefa, PR para `main`, sem amend em commit público, checklist de segredos antes do commit (AGENTS.md → "SEGURANÇA").
+- Git: branch por tarefa, PR para `main`, sem amend em commit público, checklist de segredos antes do commit (AGENTS.md §6 e §9).
 - Release multiunidade e regra do histórico de migrations: `docs/multi-unidades/fase12-20260916/MANIFESTO-RELEASE.md`.
