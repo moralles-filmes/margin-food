@@ -39,6 +39,7 @@ import { cn, normalizeSearchText } from '@/lib/utils';
 import { runOptionalAutoBind } from '@/lib/conciliacaoAutoBind';
 import { extractSupabaseErrorMessage } from '@/lib/supabaseErrors';
 import { computeScore } from '@/lib/conciliacaoScore';
+import { avaliarLancamentoCandidato, casaSozinho, janelaCandidatos, valorDivergenteDoExtrato, type SituacaoConta } from '@/lib/conciliacaoLancamentoMatch';
 import { matchTransferCandidate, findTransferWarnings, type TransferCandidate, type TransferWarning } from '@/lib/conciliacaoTransferMatch';
 import { bankLineKey, buildConciliadosCounts, findStaleImportedRows, fitidKey, type ConciliadoRow, type VinculoRow } from '@/lib/conciliacaoConciliados';
 import { registrarOcorrenciaUsada, reservarOcorrencias, type OcorrenciasLivres } from '@/lib/conciliacaoOcorrencia';
@@ -91,6 +92,8 @@ interface MatchSuggestion {
   /** O lançamento já está no razão porque a baixa foi feita em Contas a
    *  Pagar/Receber. Conciliar aqui é vincular; criar um novo duplicaria. */
   jaNoRazao?: boolean;
+  previsto?: boolean;
+  situacaoConta?: SituacaoConta;
 }
 
 interface LinhaExtrato {
@@ -106,6 +109,8 @@ interface LinhaExtrato {
   matchRaw?: MatchSuggestion['raw'];
   /** Espelho do match escolhido: já existe no razão (veio de CP/CR). */
   matchJaNoRazao?: boolean;
+  /** A pessoa confirmou trazer o lançamento de outra conta para esta. */
+  matchMoverConta?: boolean;
   suggestions?: MatchSuggestion[];
   rateioLinhas?: RateioLinha[];
   categoriaId?: string;
@@ -362,6 +367,7 @@ export default function ConciliacaoBancariaSection() {
 
   // Edição de lançamento já existente (aba "Lançamentos")
   const { confirm: confirmDelete, ConfirmDialog: DeleteConfirmDialog } = useConfirmDialog();
+  const { confirm: confirmMoverConta, ConfirmDialog: MoverContaConfirmDialog } = useConfirmDialog();
   const [showEditForm, setShowEditForm] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -992,8 +998,8 @@ export default function ConciliacaoBancariaSection() {
     const data: LancamentoCandidate[] = [];
     for (let from = 0; ; from += pageSize) {
       const { data: page, error } = await supabase.from('fin_lancamentos')
-        .select('id, data_competencia, data_pagamento, valor, tipo, descricao, conciliado, conta_id, origem')
-        .eq('conta_id', contaSel).eq('status', 'REALIZADO').or('conciliado.is.null,conciliado.eq.false')
+        .select('id, data_competencia, data_pagamento, valor, tipo, descricao, conciliado, conta_id, origem, status, data_vencimento, referencia_modulo')
+        .eq('conta_id', contaSel).in('status', ['REALIZADO', 'PREVISTO']).or('conciliado.is.null,conciliado.eq.false')
         .order('id', { ascending: true })
         .range(from, from + pageSize - 1);
       if (error) throw error;
@@ -1012,11 +1018,29 @@ export default function ConciliacaoBancariaSection() {
     fitidsNoArquivo: ReadonlySet<string>,
     linhasArquivo: ReadonlyArray<LinhaExtrato>,
   ): Promise<MatchContext> => {
+    const fetchLancamentosNaJanela = async () => {
+      const window = janelaCandidatos(linhasArquivo.map(l => l.data));
+      if (!window) return { data: [] as LancamentoCandidate[] };
+      const { inicio, fim } = window;
+      const pageSize = 1000;
+      const data: LancamentoCandidate[] = [];
+      // O limit(500) sem ordem cortava candidatos ao acaso; fora de ±7 dias o score é zero.
+      for (let from = 0; ; from += pageSize) {
+        const { data: page, error } = await supabase.from('fin_lancamentos')
+          .select('id, data_competencia, data_pagamento, valor, tipo, descricao, conciliado, conta_id, origem, status, data_vencimento, referencia_modulo')
+          .in('status', ['REALIZADO', 'PREVISTO']).not('conciliado', 'is', true)
+          .or(`and(data_competencia.gte.${inicio},data_competencia.lte.${fim}),and(data_pagamento.gte.${inicio},data_pagamento.lte.${fim}),and(data_vencimento.gte.${inicio},data_vencimento.lte.${fim})`)
+          .order('id', { ascending: true }).range(from, from + pageSize - 1);
+        if (error) throw error;
+        data.push(...((page || []) as LancamentoCandidate[]));
+        if (!page || page.length < pageSize) break;
+      }
+      return { data };
+    };
     // Busca dados para match + entradas já conciliadas + entradas ignoradas
     const [lancRes, lancAllRes, cpRes, crRes, conciliadosRes, ignoradasRes, vinculosRes, transferRes, espelhosRes] = await Promise.all([
       fetchLancamentosPendentesConta(),
-      supabase.from('fin_lancamentos').select('id, data_competencia, data_pagamento, valor, tipo, descricao, conciliado, conta_id, origem')
-        .eq('status', 'REALIZADO').or('conciliado.is.null,conciliado.eq.false').limit(500),
+      fetchLancamentosNaJanela(),
       supabase.from('fin_contas_pagar').select('id, descricao, valor, data_vencimento, status, fornecedor, recorrente, recorrencia_config')
         .in('status', ['AGUARDANDO_APROVACAO', 'APROVADO']).order('data_vencimento'),
       supabase.from('fin_contas_receber').select('id, descricao, valor, data_vencimento, status, cliente, recorrente, recorrencia_config')
@@ -1118,7 +1142,7 @@ export default function ConciliacaoBancariaSection() {
     const base = {
       ...linha,
       matchId: undefined, matchOrigin: undefined, matchDescricao: undefined, matchRaw: undefined,
-      matchJaNoRazao: undefined, suggestions: undefined,
+      matchJaNoRazao: undefined, matchMoverConta: undefined, suggestions: undefined,
       transferReconhecida: undefined, transferAlertas: undefined,
       ignoradaId: undefined,
       movimentacaoInterna: undefined,
@@ -1216,21 +1240,32 @@ export default function ConciliacaoBancariaSection() {
       // Já amarrado a outra linha bancária — oferecê-lo de novo esconderia uma
       // despesa real atrás de uma baixa que já foi conciliada.
       if (ctx.lancamentosVinculados.has(ex.id)) continue;
-      // A linha do extrato traz a data em que o dinheiro se moveu. Para uma baixa
-      // de CP/CR isso é `data_pagamento` — `data_competencia` guarda a competência
-      // do boleto e pode estar semanas atrás, o que zerava o score e fazia a linha
-      // parecer nova.
-      const dataCandidato = ex.data_pagamento || ex.data_competencia;
-      let score = computeScore(linha.valor, linha.data, linha.descricao, Number(ex.valor), dataCandidato, ex.descricao || '');
-      if (score === 0) continue;
-      if (ex._sameAccount) score += 10;
+      if (ex._jaNoRazao) {
+        // Espelhos usam a data da baixa e preservam o score e o aviso existentes.
+        const dataCandidato = ex.data_pagamento || ex.data_competencia;
+        let score = computeScore(linha.valor, linha.data, linha.descricao, Number(ex.valor), dataCandidato, ex.descricao || '');
+        if (score === 0) continue;
+        if (ex.conta_id === contaSel) score += 10;
+        suggestions.push({
+          id: ex.id, origin: 'lancamento', descricao: ex.descricao || '(sem desc.)',
+          valor: Number(ex.valor), data: dataCandidato,
+          extra: ex.origem === 'espelho_cr' ? 'Já baixado em Contas a Receber' : 'Já baixado em Contas a Pagar',
+          score, raw: ex, jaNoRazao: true,
+        });
+        continue;
+      }
+      const evaluation = avaliarLancamentoCandidato(linha, ex, contaSel);
+      if (!evaluation) continue;
+      const extra = [
+        ...(evaluation.previsto ? ['Previsto — vira Realizado ao conciliar'] : []),
+        evaluation.situacaoConta === 'mesma' ? 'Mesma conta'
+          : evaluation.situacaoConta === 'sem_conta' ? 'Sem conta — recebe esta conta'
+            : `Conta: ${getContaNome(ex.conta_id)} — muda para esta conta`,
+        ...(valorDivergenteDoExtrato(linha.valor, ex) ? ['Valor diferente — corrija no Livro Razão para vincular'] : []),
+      ].join(' · ');
       suggestions.push({
         id: ex.id, origin: 'lancamento', descricao: ex.descricao || '(sem desc.)',
-        valor: Number(ex.valor), data: dataCandidato,
-        extra: ex._jaNoRazao
-          ? (ex.origem === 'espelho_cr' ? 'Já baixado em Contas a Receber' : 'Já baixado em Contas a Pagar')
-          : (ex._sameAccount ? 'Mesma conta' : `Conta: ${getContaNome(ex.conta_id)}`),
-        score, raw: ex, jaNoRazao: ex._jaNoRazao,
+        valor: Number(ex.valor), ...evaluation, extra, raw: ex,
       });
     }
 
@@ -1263,15 +1298,8 @@ export default function ConciliacaoBancariaSection() {
     suggestions.sort((a, b) => b.score - a.score);
 
     const best = suggestions[0];
-    // Boleto só vira match automático com o valor batendo no centavo. A tolerância
-    // de 5% do score já casou boleto de um fornecedor com linha de outro (KIDELICIA
-    // 1.185,14 × 1.138,60, exatamente 60 pontos) e baixou 21 contas de uma vez.
-    // Valor aproximado continua aparecendo como sugestão, para escolha manual.
-    const valorExatoSeNecessario = !best
-      || (best.origin === 'lancamento')
-      || Math.abs(Number(best.valor) - linha.valor) < 0.01;
-
-    if (best && best.score >= 60 && valorExatoSeNecessario) {
+    // Manual e boleto exigem valor exato; previsto e outra conta exigem escolha explícita.
+    if (best && casaSozinho(linha.valor, best)) {
       usedIds.add(`${best.origin === 'lancamento' ? 'lanc' : best.origin === 'conta_pagar' ? 'cp' : 'cr'}-${best.id}`);
       return {
         ...base,
@@ -1280,6 +1308,7 @@ export default function ConciliacaoBancariaSection() {
         matchDescricao: best.descricao,
         matchRaw: best.raw,
         matchJaNoRazao: best.jaNoRazao,
+        matchMoverConta: false,
         suggestions,
         selecionada: false,
         jaConciliada: false,
@@ -1693,7 +1722,30 @@ export default function ConciliacaoBancariaSection() {
     toast.success('Rateio configurado com sucesso!');
   };
 
-  const selectSuggestion = (linhaIndex: number, suggestion: MatchSuggestion) => {
+  const selectSuggestion = async (linhaIndex: number, suggestion: MatchSuggestion) => {
+    const linhaAlvo = linhas[linhaIndex];
+    // O `usedIds` do match automático não cobre a escolha manual: duas linhas no
+    // mesmo lançamento esconderiam uma movimentação real (sem FITID, calada).
+    const outraLinha = linhas.find((l, i) => i !== linhaIndex && !l.jaConciliada
+      && l.matchId === suggestion.id && l.matchOrigin === suggestion.origin);
+    if (outraLinha) {
+      toast.error(`Este ${suggestion.origin === 'lancamento' ? 'lançamento' : 'título'} já está vinculado à linha "${outraLinha.descricao}" deste extrato. Cada lançamento cobre uma única linha do extrato.`);
+      return;
+    }
+    if (linhaAlvo && suggestion.origin === 'lancamento' && !suggestion.jaNoRazao
+      && valorDivergenteDoExtrato(linhaAlvo.valor, suggestion.raw as LancamentoCandidate)) {
+      toast.error(`Este lançamento é de ${fmt(suggestion.valor)} e o extrato de ${fmt(linhaAlvo.valor)}. Corrija o valor no Livro Razão para vincular, ou lance esta linha como nova.`);
+      return;
+    }
+    const moveAccount = suggestion.origin === 'lancamento' && !suggestion.jaNoRazao && suggestion.situacaoConta === 'outra';
+    if (moveAccount) {
+      const ok = await confirmMoverConta({
+        title: 'Lançamento de outra conta',
+        description: `O lançamento está na conta ${getContaNome((suggestion.raw as LancamentoCandidate).conta_id)}. Ao processar, ele passa para a conta selecionada: ${getContaNome(contaSel)}.`,
+        confirmLabel: 'Trazer para esta conta',
+      });
+      if (!ok || !isScopeActive() || currentAccount.current !== contaSel) return;
+    }
     setLinhas(prev => prev.map((l, i) => i === linhaIndex ? {
       ...l,
       matchId: suggestion.id,
@@ -1701,6 +1753,7 @@ export default function ConciliacaoBancariaSection() {
       matchDescricao: suggestion.descricao,
       matchRaw: suggestion.raw,
       matchJaNoRazao: suggestion.jaNoRazao,
+      matchMoverConta: moveAccount,
       selecionada: false,
     } : l));
     setSuggestionsDialog({ open: false, linhaIndex: -1 });
@@ -1714,6 +1767,7 @@ export default function ConciliacaoBancariaSection() {
       matchDescricao: undefined,
       matchRaw: undefined,
       matchJaNoRazao: undefined,
+      matchMoverConta: undefined,
       selecionada: true,
     } : l));
   };
@@ -2053,14 +2107,13 @@ export default function ConciliacaoBancariaSection() {
     // baixa lançamento, mesmo se uma resposta de neutralização falhar.
     const isFinancialLine = (line: LinhaExtrato) => !isAutomaticInvestmentLine(line);
     const toImport = linhas.filter(l => isFinancialLine(l) && l.selecionada && !l.matchId && !l.jaConciliada && !l.ignorada);
-    const toLinkExisting = linhas.filter(l => isFinancialLine(l) && l.matchId && l.matchOrigin === 'lancamento' && l.matchJaNoRazao && !l.jaConciliada);
-    const toReconcileLanc = linhas.filter(l => isFinancialLine(l) && l.matchId && l.matchOrigin === 'lancamento' && !l.matchJaNoRazao && !l.jaConciliada);
+    const toLinkExisting = linhas.filter(l => isFinancialLine(l) && l.matchId && l.matchOrigin === 'lancamento' && !l.jaConciliada);
     const pendingCP = linhas.filter(l => isFinancialLine(l) && l.matchId && l.matchOrigin === 'conta_pagar');
     const pendingCR = linhas.filter(l => isFinancialLine(l) && l.matchId && l.matchOrigin === 'conta_receber');
     // Conjunto das linhas que serão efetivamente processadas — usado para remover apenas elas da lista no sucesso
-    const processadas = new Set<LinhaExtrato>([...toImport, ...toLinkExisting, ...toReconcileLanc, ...pendingCP, ...pendingCR]);
+    const processadas = new Set<LinhaExtrato>([...toImport, ...toLinkExisting, ...pendingCP, ...pendingCR]);
 
-    if (toImport.length === 0 && toLinkExisting.length === 0 && toReconcileLanc.length === 0 && pendingCP.length === 0 && pendingCR.length === 0) {
+    if (toImport.length === 0 && toLinkExisting.length === 0 && pendingCP.length === 0 && pendingCR.length === 0) {
       toast.error('Nenhuma ação a realizar');
       return;
     }
@@ -2071,6 +2124,37 @@ export default function ConciliacaoBancariaSection() {
     });
     if (novasSemCategoria.length > 0) {
       toast.error(`${novasSemCategoria.length} linha(s) selecionada(s) estão sem categoria. Selecione a categoria antes de processar.`);
+      return;
+    }
+
+    // A RPC recusa lançamento manual com valor diferente do extrato (VALOR_DIVERGENTE).
+    // Barrar aqui, antes de gravar, evita que a recusa pare o Processar no meio —
+    // um rascunho restaurado pode trazer um vínculo escolhido antes desta regra.
+    const vinculoValorDivergente = toLinkExisting.find(l => !l.matchJaNoRazao && l.matchRaw
+      && valorDivergenteDoExtrato(l.valor, l.matchRaw as LancamentoCandidate));
+    if (vinculoValorDivergente) {
+      const raw = vinculoValorDivergente.matchRaw as LancamentoCandidate;
+      toast.error(`"${vinculoValorDivergente.descricao}": o lançamento vinculado é de ${fmt(Number(raw.valor))} e o extrato de ${fmt(vinculoValorDivergente.valor)}. Corrija o valor no Livro Razão ou remova o vínculo.`);
+      return;
+    }
+    // Mesma trava de `selectSuggestion`, para rascunho restaurado: a 2ª linha no
+    // mesmo lançamento/título pararia o Processar no meio (com FITID) ou passaria
+    // calada (sem FITID), escondendo uma movimentação real.
+    const vinculoPorAlvo = new Map<string, LinhaExtrato>();
+    for (const l of [...toLinkExisting, ...pendingCP, ...pendingCR]) {
+      const alvo = `${l.matchOrigin}:${l.matchId}`;
+      const primeira = vinculoPorAlvo.get(alvo);
+      if (primeira) {
+        toast.error(`"${primeira.descricao}" e "${l.descricao}" estão vinculadas ao mesmo lançamento. Cada lançamento cobre uma única linha do extrato — remova um dos vínculos.`);
+        return;
+      }
+      vinculoPorAlvo.set(alvo, l);
+    }
+    // Previsto só vira realizado com pagamento já feito (DATA_EXTRATO_FUTURA na RPC).
+    const previstoFuturo = toLinkExisting.find(l => !l.matchJaNoRazao
+      && (l.matchRaw as LancamentoCandidate | undefined)?.status === 'PREVISTO' && l.data > todayBR());
+    if (previstoFuturo) {
+      toast.error(`"${previstoFuturo.descricao}": a linha do extrato tem data futura. Um lançamento previsto só vira realizado com o pagamento já feito.`);
       return;
     }
 
@@ -2113,26 +2197,24 @@ export default function ConciliacaoBancariaSection() {
         }
       }
 
-      // Baixa que já está no razão: só amarra a linha bancária ao lançamento
-      // existente. Nada de lançamento novo — é o que duplicava a despesa.
+      // Vínculo, realização e mudança de conta acontecem na mesma transação.
+      let realized = 0;
+      let movedAccounts = 0;
       for (const l of toLinkExisting) {
-        const { error } = await supabase.rpc('reconcile_link_existing_lancamento' as any, {
+        const { data, error } = await supabase.rpc('reconcile_link_existing_lancamento' as any, {
           p_conta_id: contaSel,
           p_lancamento_id: l.matchId!,
           p_external_id: l.fitId || null,
           p_tipo: l.tipo,
           p_data_extrato: l.data,
+          p_mover_conta: !!l.matchMoverConta,
+          p_valor_extrato: l.valor,
         } as any);
-        if (error) throw error;
-      }
-
-      if (toReconcileLanc.length > 0) {
-        const matchIds = toReconcileLanc.map(l => l.matchId!);
-        const { error } = await supabase.rpc('reconcile_batch_lancamentos', {
-          p_lancamento_ids: matchIds,
-        });
-        if (error) throw error;
-        for (const l of toReconcileLanc) await bindExtratoLine(l, l.matchId);
+        // A recusa de um vínculo para o Processar: o toast diz qual linha travou.
+        if (error) throw Object.assign(error, { linhaDescricao: l.descricao });
+        const result = data as { realizado?: boolean; conta_movida?: boolean } | null;
+        if (result?.realizado) realized++;
+        if (result?.conta_movida) movedAccounts++;
       }
 
       for (const l of pendingCP) {
@@ -2171,11 +2253,16 @@ export default function ConciliacaoBancariaSection() {
         await bindExtratoLine(l, result?.lancamento_id);
       }
 
-      const total = toImport.length + toLinkExisting.length + toReconcileLanc.length + pendingCP.length + pendingCR.length - duplicatasDetectadas.length;
-      const vinculadas = toLinkExisting.length > 0
-        ? ` (${toLinkExisting.length} vinculada(s) a baixas já lançadas, sem duplicar)`
+      const total = toImport.length + toLinkExisting.length + pendingCP.length + pendingCR.length - duplicatasDetectadas.length;
+      const linkedMirrors = toLinkExisting.filter(l => l.matchJaNoRazao).length;
+      const vinculadas = linkedMirrors > 0
+        ? ` (${linkedMirrors} vinculada(s) a baixas já lançadas, sem duplicar)`
         : '';
-      if (total > 0) toast.success(`${total} operação(ões) processada(s) com sucesso${vinculadas}`);
+      const changes = [
+        ...(realized ? [`${realized} previsto(s) marcado(s) como Realizado`] : []),
+        ...(movedAccounts ? [`${movedAccounts} trazido(s) de outra conta`] : []),
+      ];
+      if (total > 0) toast.success(`${total} operação(ões) processada(s) com sucesso${vinculadas}${changes.length ? ` · ${changes.join(' · ')}` : ''}`);
       // A linha recusada guarda o índice com que foi enviada: "Importar mesmo
       // assim" e um novo "Processar" reenviam com ele.
       const recusadas = new Map(duplicatasDetectadas.map(d => [d.linha, { ...d.linha, ocorrencia: d.ocorrencia }]));
@@ -2201,7 +2288,8 @@ export default function ConciliacaoBancariaSection() {
       emitDataEvent('financeiro:contas_receber');
     } catch (err: unknown) {
       console.error('[ConciliacaoBancariaSection.importarEConciliar]', err);
-      toast.error(mapPagamentoError(err));
+      const linhaComErro = (err as { linhaDescricao?: string } | null)?.linhaDescricao;
+      toast.error(linhaComErro ? `"${linhaComErro}": ${mapPagamentoError(err)}` : mapPagamentoError(err));
     } finally {
       importandoRef.current = false;
       setImportando(false);
@@ -2261,7 +2349,7 @@ export default function ConciliacaoBancariaSection() {
 
   const getNomeCategoria = (id: string) => categorias.find(c => c.id === id)?.nome || '';
   const getNomeCentro = (id: string) => centrosCusto.find(c => c.id === id)?.nome || '';
-  const getContaNome = (id: string) => contas.find(c => c.id === id)?.nome || '—';
+  const getContaNome = (id: string | null | undefined) => contas.find(c => c.id === id)?.nome || '—';
 
   // Categorias filtradas pelo tipo da linha (tipo lowercase no banco; categorias sem tipo valem para ambos)
   const categoriasForTipo = (tipo: 'RECEITA' | 'DESPESA') =>
@@ -2414,6 +2502,21 @@ export default function ConciliacaoBancariaSection() {
             sem criar outro.
           </span>
         </span>
+      )}
+      {e.hasMatch && linha.matchOrigin === 'lancamento' && !linha.matchJaNoRazao && linha.matchRaw && (
+        [
+          (linha.matchRaw as LancamentoCandidate).status === 'PREVISTO'
+            ? `Lançado como Previsto — ao processar vira Realizado com a data do extrato (${dataBR(linha.data)}).` : null,
+          !(linha.matchRaw as LancamentoCandidate).conta_id
+            ? 'Lançamento sem conta bancária — ao processar recebe esta conta.' : null,
+          linha.matchMoverConta
+            ? `Estava em ${getContaNome((linha.matchRaw as LancamentoCandidate).conta_id)} — ao processar passa para esta conta.` : null,
+        ].filter(Boolean).map(note => (
+          <span key={note} className="mt-1 flex items-start gap-1.5 text-xs text-warning">
+            <AlertTriangle aria-hidden="true" className="mt-px h-3.5 w-3.5 shrink-0" />
+            <span>{note}</span>
+          </span>
+        ))
       )}
       {e.isJaConciliada && (
         linha.transferReconhecida ? (
@@ -3961,6 +4064,7 @@ export default function ConciliacaoBancariaSection() {
         />
       )}
       <DeleteConfirmDialog />
+      <MoverContaConfirmDialog />
     </div>
   );
 }
