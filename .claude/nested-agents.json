@@ -11,5 +11,6 @@
   "src/components/rh/AGENTS.md": ["rh"],
   "src/domain/rh/AGENTS.md": ["rh"],
   "src/components/inventario/AGENTS.md": ["inventario"],
-  "src/components/ui/AGENTS.md": ["ui"]
+  "src/components/ui/AGENTS.md": ["ui"],
+  "src/components/AGENTS.md": ["telas-raiz", "salmao"]
 }

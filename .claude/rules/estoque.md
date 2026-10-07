@@ -3,7 +3,7 @@ paths:
   - "src/components/estoque/**"
   - "src/domain/estoque/**"
   - "src/components/EstoqueGeralView.tsx"
-  - "src/components/StockView.tsx"
+  - "src/components/SimuladorCompraGeral.tsx"
   - "src/components/MovimentacoesSection.tsx"
   - "src/components/StockCadastrosSection.tsx"
   - "src/components/RequisicaoEstoqueSection.tsx"

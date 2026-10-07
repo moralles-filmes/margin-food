@@ -3,6 +3,12 @@ paths:
   - "src/components/SalmonControlView.tsx"
   - "src/components/EntriesView.tsx"
   - "src/components/ManipulationView.tsx"
+  - "src/components/StockView.tsx"
+  - "src/components/DashboardView.tsx"
+  - "src/components/GoalsView.tsx"
+  - "src/components/SmartSuggestionCard.tsx"
+  - "src/components/EtiquetaModal.tsx"
+  - "src/components/ValidadeAlertCard.tsx"
   - "src/hooks/useSalmon*.ts"
 ---
 
