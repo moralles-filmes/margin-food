@@ -8,6 +8,8 @@ Checkpoint por fase. Diagnóstico e decisões: [`PLANO.md`](./PLANO.md). Entregu
 
 Fases 0 a 6 concluídas, auditadas e **em produção**: frontend publicado pelo PR #138 (deploy Vercel de `main` em 2026-10-03) e migration executada no SQL Editor do Supabase em 2026-10-03, registrada no histórico como `20261003140000 cmv_financeiro` (mesmo nome do arquivo; não renomear). Em 2026-10-05 a Ren Sushi já estava com a classificação ligada e 121 padrões de categoria (a Aoi Sushi, com 93 padrões, ainda desligada) — a ativação por unidade é decisão do negócio (ver "Ativação", passo 4).
 
+Em 2026-10-09 entrou a extensão às despesas de Lançamentos e da Conciliação (PR #160 + migration `20261008120000`). Ver a seção "Extensão" no fim deste arquivo.
+
 Conferido em produção depois da execução (2026-10-03):
 - 3 colunas novas anuláveis e sem default; nenhuma linha classificada, nenhum padrão de categoria, nenhuma unidade ativada.
 - `_guarded_create/update_conta_pagar` com uma única assinatura cada (as antigas saíram); 15 funções com `search_path` vazio, owner `postgres`; helpers e funções de trigger sem EXECUTE para clientes; RPCs só para `authenticated` (nenhuma para `anon`).
@@ -178,16 +180,21 @@ psql cmv_financeiro_ephemeral.sql (PostgreSQL 16 local)      ✅  OK
   - 1003 lançamentos elegíveis na maior unidade.
 - **Não verificado:**
   - fluxo no navegador com login real;
-  - as 5 RPCs plpgsql contra o schema vivo (simulação com `ROLLBACK` na publicação);
-  - `EXPLAIN` e tempo de `fin_cmv_aplicar_padroes` na maior unidade;
   - `types.ts` não regenerado.
 
-### Ativação (requer autorização)
-1. **Frontend.** Entra primeiro: sem `recursos` ele se comporta exatamente como hoje. A migration vem logo em seguida (passo 2), porque com a migration e o cliente antigo publicado os totais do CMV contariam lançamentos que a lista não mostra.
-2. **Migration**, logo depois do frontend. Remove e recria três funções (`DROP FUNCTION`): o conector MCP deve recusar, então ela é rodada pelo SQL Editor, dentro de `BEGIN; SET LOCAL lock_timeout = '5s'; … COMMIT;` e fora do pico (o `ADD COLUMN` pede lock exclusivo rápido em `fin_lancamentos`). É reexecutável (`CREATE OR REPLACE`). No fim, ela recalcula o cache de saldo de todas as contas uma vez (sem mudança visível esperada: em 2026-10-08 as 19 contas batiam com a fórmula). Depois:
-   - conferir uma assinatura por função, grants, triggers e o md5 dos corpos contra o banco descartável;
-   - registrar a versão `20261008120000` com o nome do arquivo;
-   - antes de rodar "Aplicar padrões" em unidade grande, medir `fin_cmv_aplicar_padroes` contra o `statement_timeout` de 8 s (com o gatilho de saldo dividido, classificar não recalcula mais o cache de saldo da conta).
+### Ativação
+1. **Frontend** — ✅ PR #160 (merge `8dff085`), publicado na Vercel em 2026-10-09. Entra primeiro: sem `recursos` ele se comporta exatamente como antes. A migration vem logo em seguida, porque com a migration e o cliente antigo publicado os totais do CMV contariam lançamentos que a lista não mostra.
+2. **Migration** — ✅ rodada pelo SQL Editor em 2026-10-09 às 11h48 (Brasília), sem lock timeout, e registrada como `20261008120000`.
+   - **Como rodar** (inclusive em outro ambiente): o conector MCP recusa `DROP FUNCTION`, então vai pelo SQL Editor, fora do pico. O `ADD COLUMN` pede lock exclusivo rápido em `fin_lancamentos`. Cole o arquivo inteiro com `SET LOCAL lock_timeout = '5s';` na 1ª linha e sem `BEGIN`/`COMMIT`: o texto colado já roda como uma transação, tudo ou nada. É reexecutável (`CREATE OR REPLACE`).
+   - **Funções:** os 12 corpos são iguais aos do arquivo. O md5 só bate normalizando o CRLF que a colagem pelo Windows introduz (nenhum literal atravessa linha). Cada função tem uma assinatura, as antigas foram removidas, `anon` não tem EXECUTE e os helpers `_fin_cmv_*` não têm EXECUTE para clientes.
+   - **Gatilhos e saldo:** `trg_saldo_cache_lancamento` em INSERT/DELETE, `trg_saldo_cache_lancamento_upd` em UPDATE com WHEN nas 6 colunas e `trg_fin_cmv_guard_decisao` ativos. As 19 contas têm cache igual à fórmula.
+   - **Simulação com rollback,** como `authenticated` (admin da maior unidade), sem nada gravado:
+     - importação do extrato com competência própria;
+     - criação no Livro Razão com a resposta;
+     - reclassificação de conciliado (data de caixa e vínculo preservados);
+     - classificação na revisão;
+     - relatório e lista.
+   - **"Aplicar padrões"** desde 2020 na maior unidade: prévia em 67 ms (992 lançamentos e 583 boletos) e gravação de 1575 documentos em 3,1 s, contra o limite de 8 s.
 3. **Por unidade.** Em CMV → Regras de vínculo:
    - conferir os padrões das categorias de mercadoria;
    - rodar "Aplicar padrões às pendentes" a partir da data desejada (prévia antes);
