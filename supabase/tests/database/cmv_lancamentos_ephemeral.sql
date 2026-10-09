@@ -6,7 +6,8 @@
 -- has_permission/has_any_permission (leem test.permissions), strip_html,
 -- immutable_unaccent (sem a extensão unaccent), fin_get_limite_aprovacao e
 -- fin_validate_recorrencia_config. Os gatilhos de soma do rateio e de edição de
--- lançamento realizado têm o corpo de produção (2026-10-05).
+-- lançamento realizado têm o corpo de produção (2026-10-05), e o cache de saldo
+-- (refresh_saldo_cache e o gatilho de fin_lancamentos) também (2026-10-08).
 -- Uso: powershell -File supabase/tests/database/run_ephemeral.ps1 supabase/tests/database/cmv_lancamentos_ephemeral.sql
 
 DO $roles$
@@ -54,7 +55,7 @@ CREATE TABLE public.fin_categorias (
   parent_id uuid, codigo text DEFAULT '', ordem integer DEFAULT 0, ativo boolean NOT NULL DEFAULT true,
   created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), company_id uuid NOT NULL
 );
-CREATE TABLE public.fin_contas (id uuid PRIMARY KEY, nome text NOT NULL, company_id uuid NOT NULL);
+CREATE TABLE public.fin_contas (id uuid PRIMARY KEY, nome text NOT NULL, company_id uuid NOT NULL, saldo_inicial numeric NOT NULL DEFAULT 0);
 CREATE TABLE public.fin_centros_custo (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), nome text NOT NULL, ativo boolean NOT NULL DEFAULT true, company_id uuid NOT NULL
 );
@@ -166,13 +167,94 @@ END; $$;
 CREATE TRIGGER trg_validate_rateio_sum BEFORE INSERT OR DELETE OR UPDATE ON public.fin_lancamento_rateios
   FOR EACH ROW EXECUTE FUNCTION public.trg_validate_rateio_sum();
 
--- Representa o trg_saldo_cache_lancamento de produção, que roda refresh_saldo_cache a CADA UPDATE de
--- fin_lancamentos: aqui só registra o UPDATE, para provar quantos refreshes uma classificação custa.
-CREATE TABLE public.cmv_update_log (lancamento_id uuid NOT NULL);
-CREATE FUNCTION public.cmv_log_update() RETURNS trigger LANGUAGE plpgsql AS $$
-BEGIN INSERT INTO public.cmv_update_log VALUES (NEW.id); RETURN NULL; END; $$;
-CREATE TRIGGER trg_cmv_log_update AFTER UPDATE ON public.fin_lancamentos
-  FOR EACH ROW EXECUTE FUNCTION public.cmv_log_update();
+-- Cache de saldo com o corpo de produção: tabela de 20260315052956_restore_cache_table.sql (sem a policy,
+-- que lê profiles), refresh_saldo_cache de 20260315052957_split_0.sql e trg_refresh_saldo_cache_lancamento
+-- de 20260315052958_split_1.sql, copiados literalmente (iguais ao banco vivo em 2026-10-08), com o gatilho
+-- único de antes. A migration o divide em INSERT/DELETE + UPDATE com WHEN.
+CREATE TABLE IF NOT EXISTS public.fin_contas_saldo_cache (
+  conta_id uuid PRIMARY KEY REFERENCES public.fin_contas(id) ON DELETE CASCADE,
+  company_id uuid NOT NULL REFERENCES public.companies(id),
+  saldo numeric NOT NULL DEFAULT 0,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE OR REPLACE FUNCTION public.refresh_saldo_cache(p_conta_id uuid)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_saldo numeric;
+  v_company uuid;
+  v_saldo_inicial numeric;
+BEGIN
+  SELECT company_id, saldo_inicial INTO v_company, v_saldo_inicial
+  FROM fin_contas WHERE id = p_conta_id;
+
+  IF v_company IS NULL THEN RETURN; END IF;
+
+  SELECT v_saldo_inicial + COALESCE(SUM(
+    CASE
+      WHEN l.tipo = 'TRANSFERENCIA' AND l.conta_id = p_conta_id THEN -l.valor
+      WHEN l.tipo = 'TRANSFERENCIA' AND l.conta_destino_id = p_conta_id THEN l.valor
+      WHEN l.tipo = 'RECEITA' AND l.conta_id = p_conta_id THEN l.valor
+      WHEN l.tipo = 'DESPESA' AND l.conta_id = p_conta_id THEN -l.valor
+      ELSE 0
+    END
+  ), 0) INTO v_saldo
+  FROM fin_lancamentos l
+  WHERE l.status IN ('REALIZADO', 'CONCILIADO')
+    AND l.company_id = v_company
+    AND (l.conta_id = p_conta_id OR l.conta_destino_id = p_conta_id);
+
+  INSERT INTO fin_contas_saldo_cache (conta_id, company_id, saldo, updated_at)
+  VALUES (p_conta_id, v_company, v_saldo, now())
+  ON CONFLICT (conta_id) DO UPDATE SET saldo = EXCLUDED.saldo, updated_at = now();
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.trg_refresh_saldo_cache_lancamento()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF TG_OP = 'DELETE' THEN
+    IF OLD.conta_id IS NOT NULL THEN PERFORM refresh_saldo_cache(OLD.conta_id); END IF;
+    IF OLD.conta_destino_id IS NOT NULL THEN PERFORM refresh_saldo_cache(OLD.conta_destino_id); END IF;
+    RETURN OLD;
+  END IF;
+
+  IF NEW.conta_id IS NOT NULL THEN PERFORM refresh_saldo_cache(NEW.conta_id); END IF;
+  IF NEW.conta_destino_id IS NOT NULL THEN PERFORM refresh_saldo_cache(NEW.conta_destino_id); END IF;
+
+  IF TG_OP = 'UPDATE' THEN
+    IF OLD.conta_id IS NOT NULL AND OLD.conta_id IS DISTINCT FROM NEW.conta_id THEN
+      PERFORM refresh_saldo_cache(OLD.conta_id);
+    END IF;
+    IF OLD.conta_destino_id IS NOT NULL AND OLD.conta_destino_id IS DISTINCT FROM NEW.conta_destino_id THEN
+      PERFORM refresh_saldo_cache(OLD.conta_destino_id);
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_saldo_cache_lancamento ON public.fin_lancamentos;
+CREATE TRIGGER trg_saldo_cache_lancamento
+AFTER INSERT OR UPDATE OR DELETE ON public.fin_lancamentos
+FOR EACH ROW EXECUTE FUNCTION public.trg_refresh_saldo_cache_lancamento();
+
+-- Contador de recálculos (só do teste): cada refresh_saldo_cache grava exatamente uma linha do cache
+-- (INSERT ou o UPDATE do ON CONFLICT), então uma linha neste log = um recálculo daquela conta.
+CREATE TABLE public.cmv_saldo_log (conta_id uuid NOT NULL, saldo numeric NOT NULL);
+CREATE FUNCTION public.cmv_log_saldo() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN INSERT INTO public.cmv_saldo_log VALUES (NEW.conta_id, NEW.saldo); RETURN NULL; END; $$;
+CREATE TRIGGER trg_cmv_log_saldo AFTER INSERT OR UPDATE ON public.fin_contas_saldo_cache
+  FOR EACH ROW EXECUTE FUNCTION public.cmv_log_saldo();
 
 -- Versões anteriores das RPCs (assinatura de produção), para as migrations dropparem e recriarem.
 CREATE FUNCTION public._guarded_create_conta_pagar(text,numeric,text,uuid,date,date,uuid,uuid,uuid,text,text,jsonb,jsonb,text,jsonb)
@@ -227,6 +309,7 @@ DECLARE
   c_b constant uuid := 'c0000000-0000-4000-8000-0000000000b1';      -- unidade B
   k_a constant uuid := 'd0000000-0000-4000-8000-00000000000a';
   k_b constant uuid := 'd0000000-0000-4000-8000-00000000000b';
+  k_a2 constant uuid := 'd0000000-0000-4000-8000-00000000000c';
   TUDO constant text := 'financeiro:cmv:view,financeiro:cmv:manage,financeiro:pagar:create,financeiro:pagar:edit,financeiro:lancamentos:create,financeiro:lancamentos:edit,financeiro:conciliacao:reconcile';
   r jsonb;
   v_manual uuid; v_prev uuid; v_conc uuid; v_rat uuid; v_pend uuid; v_cancel uuid; v_desconc uuid;
@@ -237,6 +320,8 @@ DECLARE
   v_valido uuid; v_baixa_legada uuid; v_cp_legado uuid; v_so_origem uuid; v_so_referencia uuid;
   v_bol2 uuid; v_bol_rat uuid; v_p_baixa uuid;
   v_bad text;
+  v_sem_pag2 uuid; v_lr4 uuid; v_lr5 uuid; v_idem boolean;
+  v_saldo_l uuid; v_saldo_ka numeric; v_def text;
 BEGIN
   INSERT INTO companies VALUES (A, 'Unidade A'), (B, 'Unidade B');
   INSERT INTO fin_categorias (id, nome, tipo, company_id, cmv_sugerir) VALUES
@@ -281,8 +366,9 @@ BEGIN
   VALUES ('DESPESA', 100, '2026-09-11', '2026-09-11', 'REALIZADO', 'manual', A, c_peixes, true, 'Feira rateada') RETURNING id INTO v_rat;
   INSERT INTO fin_lancamento_rateios (lancamento_id, categoria_id, valor, company_id, cmv_incluir)
   VALUES (v_rat, c_peixes, 60, A, true), (v_rat, c_escr, 40, A, false);
-  INSERT INTO fin_lancamentos (tipo, valor, data_competencia, data_pagamento, status, origem, company_id, categoria_id, descricao)
-  VALUES ('DESPESA', 7, '2026-09-12', '2026-09-12', 'REALIZADO', 'manual', A, c_sem, 'Pendente') RETURNING id INTO v_pend;
+  -- com conta: classificá-lo depois prova que o cache de saldo não é recalculado (seção 11)
+  INSERT INTO fin_lancamentos (tipo, valor, data_competencia, data_pagamento, status, origem, company_id, categoria_id, descricao, conta_id)
+  VALUES ('DESPESA', 7, '2026-09-12', '2026-09-12', 'REALIZADO', 'manual', A, c_sem, 'Pendente', k_a) RETURNING id INTO v_pend;
   -- o boleto continua contando como antes
   r := _guarded_create_conta_pagar(p_descricao => 'Boleto peixe', p_valor => 50, p_data_vencimento => '2026-09-20',
     p_data_competencia => '2026-09-09', p_categoria_id => c_peixes, p_cmv => '{"incluir": true}');
@@ -450,6 +536,17 @@ BEGIN
   PERFORM cmv_assert((SELECT count(*) FILTER (WHERE cmv_incluir) = 1 AND count(*) FILTER (WHERE NOT cmv_incluir) = 1
     FROM fin_lancamento_rateios WHERE lancamento_id = v_lr2), 'decisão por linha de rateio');
   PERFORM cmv_assert((SELECT cmv_incluir IS NULL FROM fin_lancamentos WHERE id = v_lr2), 'lançamento rateado não tem decisão própria');
+  -- reenvio da criação (resposta perdida) com a MESMA chave e outra resposta do CMV: é a mesma operação
+  SELECT u.id, u.idempotente INTO v_lr4, v_idem FROM _guarded_upsert_lancamento(p_tipo => 'DESPESA', p_status => 'REALIZADO', p_valor => 21,
+    p_categoria_id => c_peixes, p_data_competencia => '2026-09-08', p_data_pagamento => '2026-09-08', p_descricao => 'Reenvio',
+    p_idempotency_key => 'reenvio-cmv', p_cmv => '{"incluir": true}') u;
+  PERFORM cmv_assert(v_lr4 IS NOT NULL AND NOT v_idem, 'a primeira criação não é reenvio');
+  SELECT u.id, u.idempotente INTO v_lr5, v_idem FROM _guarded_upsert_lancamento(p_tipo => 'DESPESA', p_status => 'REALIZADO', p_valor => 21,
+    p_categoria_id => c_peixes, p_data_competencia => '2026-09-08', p_data_pagamento => '2026-09-08', p_descricao => 'Reenvio',
+    p_idempotency_key => 'reenvio-cmv', p_cmv => '{"incluir": false}') u;
+  PERFORM cmv_assert(v_idem AND v_lr5 = v_lr4, 'reenvio com outra resposta do CMV devolve o lançamento da 1ª chamada (idempotente)');
+  PERFORM cmv_assert((SELECT count(*) FROM fin_lancamentos WHERE idempotency_key = 'manual:reenvio-cmv') = 1, 'reenvio não cria 2ª linha');
+  PERFORM cmv_assert((SELECT cmv_incluir FROM fin_lancamentos WHERE id = v_lr4), 'reenvio não troca a decisão gravada na criação');
   -- receita: nem o cabeçalho nem as linhas recebem decisão (formulário que virou receita)
   SELECT u.id INTO v_lr3 FROM _guarded_upsert_lancamento(p_tipo => 'RECEITA', p_valor => 10, p_descricao => 'Receita',
     p_cmv => '{"incluir": true}',
@@ -490,7 +587,7 @@ BEGIN
   PERFORM cmv_assert((SELECT data_competencia = '2026-08-31' AND data_pagamento = '2026-09-10' AND conciliado
     FROM fin_lancamentos WHERE id = v_imp), 'reclassificação muda só a competência e mantém a conciliação');
   PERFORM cmv_assert((SELECT id = v_rid AND cmv_incluir IS FALSE FROM fin_lancamento_rateios WHERE lancamento_id = v_imp), 'linha preservada com a nova decisão');
-  -- conciliado sem data_pagamento: a competência antiga vira a data do banco
+  -- conciliado sem data_pagamento nem conciliado_em: a competência antiga (a data de caixa) vira a data do banco
   INSERT INTO fin_lancamentos (tipo, valor, data_competencia, data_pagamento, status, origem, company_id, categoria_id, conciliado, descricao)
   VALUES ('DESPESA', 33, '2026-09-05', NULL, 'REALIZADO', 'manual', A, c_peixes, true, 'Manual conciliado') RETURNING id INTO v_sem_pag;
   PERFORM _guarded_update_reconciled_classification(p_id => v_sem_pag, p_categoria_id => c_peixes,
@@ -498,6 +595,16 @@ BEGIN
     p_justificativa_edicao => 'competência', p_cmv => '{"incluir": true}', p_data_competencia => '2026-09-01');
   PERFORM cmv_assert((SELECT data_competencia = '2026-09-01' AND data_pagamento = '2026-09-05' AND cmv_incluir
     FROM fin_lancamentos WHERE id = v_sem_pag), 'sem data do banco, a competência antiga vira data de pagamento');
+  -- conciliado pelo lote legado (só conciliado_em): a data de caixa era o dia de conciliado_em em Brasília
+  -- (01:30 UTC de 13/09 = 22:30 de 12/09) e continua sendo depois de trocar a competência
+  INSERT INTO fin_lancamentos (tipo, valor, data_competencia, data_pagamento, status, origem, company_id, categoria_id, conciliado, conciliado_em, descricao)
+  VALUES ('DESPESA', 34, '2026-09-05', NULL, 'REALIZADO', 'manual', A, c_peixes, true, '2026-09-13 01:30:00+00', 'Manual conciliado pelo lote')
+  RETURNING id INTO v_sem_pag2;
+  PERFORM _guarded_update_reconciled_classification(p_id => v_sem_pag2, p_categoria_id => c_peixes,
+    p_expected_updated_at => (SELECT updated_at FROM fin_lancamentos WHERE id = v_sem_pag2),
+    p_justificativa_edicao => 'competência', p_cmv => '{"incluir": true}', p_data_competencia => '2026-09-01');
+  PERFORM cmv_assert((SELECT data_competencia = '2026-09-01' AND data_pagamento = '2026-09-12'
+    FROM fin_lancamentos WHERE id = v_sem_pag2), 'sem data do banco, a data de caixa (conciliado_em em Brasília) vira data de pagamento');
   -- cliente antigo (7 parâmetros) preserva decisão e competência
   PERFORM _guarded_update_reconciled_classification(v_sem_pag, c_peixes, NULL, 'obs', '[]'::jsonb,
     (SELECT updated_at FROM fin_lancamentos WHERE id = v_sem_pag), 'só observação');
@@ -537,22 +644,24 @@ BEGIN
   v_bol_rat := (r->>'id')::uuid;
 
   PERFORM set_config('test.permissions', 'financeiro:lancamentos:edit', false);
-  DELETE FROM cmv_update_log;
+  DELETE FROM cmv_saldo_log;
   r := fin_cmv_classificar(jsonb_build_array(jsonb_build_object('lancamento_id', v_pend, 'rateio_id', NULL, 'incluir', true,
     'expected_updated_at', (SELECT updated_at FROM fin_lancamentos WHERE id = v_pend))));
   PERFORM cmv_assert((SELECT cmv_incluir FROM fin_lancamentos WHERE id = v_pend), 'lançamento classificado por quem edita lançamentos');
   PERFORM cmv_assert((r->'atualizados'->0->>'lancamento_id')::uuid = v_pend AND (r->>'titulos')::int = 1, 'retorno identifica o lançamento');
   PERFORM cmv_assert(EXISTS (SELECT 1 FROM fin_audit_logs WHERE entidade = 'lancamentos' AND entidade_id = v_pend AND acao = 'cmv_classificar'), 'auditoria do lançamento');
-  -- decisão e versão do lançamento sem rateio vão num UPDATE só: cada UPDATE custa um refresh do cache de saldo
-  PERFORM cmv_assert((SELECT count(*) FROM cmv_update_log WHERE lancamento_id = v_pend) = 1, 'lançamento sem rateio: um UPDATE só (um refresh de saldo)');
+  -- classificar não muda tipo/valor/status/conta: o cache de saldo da conta do lançamento não é recalculado
+  PERFORM cmv_assert((SELECT conta_id FROM fin_lancamentos WHERE id = v_pend) = k_a AND NOT EXISTS (SELECT 1 FROM cmv_saldo_log),
+    'classificar lançamento sem rateio (com conta) não recalcula o saldo');
   PERFORM cmv_assert((r->'atualizados'->0->>'updated_at')::timestamptz = (SELECT updated_at FROM fin_lancamentos WHERE id = v_pend), 'o retorno devolve a versão nova do lançamento');
   -- conciliado e REALIZADO sem justificativa de edição: classificar não esbarra no gatilho de edição
-  DELETE FROM cmv_update_log;
+  DELETE FROM cmv_saldo_log;
   PERFORM fin_cmv_classificar(jsonb_build_array(jsonb_build_object('lancamento_id', v_conc,
     'rateio_id', (SELECT id FROM fin_lancamento_rateios WHERE lancamento_id = v_conc AND categoria_id = c_escr), 'incluir', true,
     'expected_updated_at', (SELECT updated_at FROM fin_lancamentos WHERE id = v_conc))));
   PERFORM cmv_assert((SELECT bool_and(cmv_incluir) FROM fin_lancamento_rateios WHERE lancamento_id = v_conc), 'linha de rateio da conciliação classificada');
-  PERFORM cmv_assert((SELECT count(*) FROM cmv_update_log WHERE lancamento_id = v_conc) = 1, 'lançamento com rateio: um UPDATE só, o da versão');
+  PERFORM cmv_assert((SELECT conta_id FROM fin_lancamentos WHERE id = v_conc) = k_a AND NOT EXISTS (SELECT 1 FROM cmv_saldo_log),
+    'classificar linha de rateio (lançamento com conta) não recalcula o saldo');
   PERFORM cmv_expect_error(format($q$SELECT public.fin_cmv_classificar('[{"lancamento_id":"%s","rateio_id":null,"incluir":true,"expected_updated_at":"%s"}]')$q$,
     v_rat, (SELECT updated_at FROM fin_lancamentos WHERE id = v_rat)), 'CMV_ALVO_INVALIDO%', 'lançamento rateado classificado pelo cabeçalho');
   PERFORM cmv_expect_error(format($q$SELECT public.fin_cmv_classificar('[{"lancamento_id":"%s","rateio_id":"%s","incluir":true,"expected_updated_at":"%s"}]')$q$,
@@ -641,18 +750,19 @@ BEGIN
   PERFORM set_config('test.company_id', A::text, false);
 
   -- 12. Aplicar padrões às pendentes (histórico)
-  INSERT INTO fin_lancamentos (tipo, valor, data_competencia, data_pagamento, status, origem, company_id, categoria_id, descricao)
-  VALUES ('DESPESA', 11, '2026-09-14', '2026-09-14', 'REALIZADO', 'manual', A, c_peixes, 'Pendente peixe') RETURNING id INTO v_p_peixes;
-  INSERT INTO fin_lancamentos (tipo, valor, data_competencia, data_pagamento, status, origem, company_id, categoria_id, descricao)
-  VALUES ('DESPESA', 12, '2026-09-14', '2026-09-14', 'REALIZADO', 'manual', A, c_escr, 'Pendente escritório') RETURNING id INTO v_p_escr;
+  -- Os que recebem padrão têm conta: aplicar prova que o cache de saldo não é recalculado.
+  INSERT INTO fin_lancamentos (tipo, valor, data_competencia, data_pagamento, status, origem, company_id, categoria_id, descricao, conta_id)
+  VALUES ('DESPESA', 11, '2026-09-14', '2026-09-14', 'REALIZADO', 'manual', A, c_peixes, 'Pendente peixe', k_a) RETURNING id INTO v_p_peixes;
+  INSERT INTO fin_lancamentos (tipo, valor, data_competencia, data_pagamento, status, origem, company_id, categoria_id, descricao, conta_id)
+  VALUES ('DESPESA', 12, '2026-09-14', '2026-09-14', 'REALIZADO', 'manual', A, c_escr, 'Pendente escritório', k_a) RETURNING id INTO v_p_escr;
   INSERT INTO fin_lancamentos (tipo, valor, data_competencia, data_pagamento, status, origem, company_id, categoria_id, descricao)
   VALUES ('DESPESA', 13, '2026-09-14', '2026-09-14', 'REALIZADO', 'manual', A, c_sem, 'Pendente sem padrão') RETURNING id INTO v_p_sem;
   INSERT INTO fin_lancamentos (tipo, valor, data_competencia, data_pagamento, status, origem, company_id, categoria_id, descricao)
   VALUES ('DESPESA', 14, '2026-08-01', '2026-08-01', 'REALIZADO', 'manual', A, c_peixes, 'Pendente antigo') RETURNING id INTO v_p_antigo;
   INSERT INTO fin_lancamentos (tipo, valor, data_competencia, data_pagamento, status, origem, company_id, categoria_id, cmv_incluir, descricao)
   VALUES ('DESPESA', 15, '2026-09-15', '2026-09-15', 'REALIZADO', 'manual', A, c_peixes, false, 'Já decidido') RETURNING id INTO v_p_decidido;
-  INSERT INTO fin_lancamentos (tipo, valor, data_competencia, data_pagamento, status, origem, company_id, descricao)
-  VALUES ('DESPESA', 15, '2026-09-16', '2026-09-16', 'REALIZADO', 'manual', A, 'Pendente rateado') RETURNING id INTO v_p_rat;
+  INSERT INTO fin_lancamentos (tipo, valor, data_competencia, data_pagamento, status, origem, company_id, descricao, conta_id)
+  VALUES ('DESPESA', 15, '2026-09-16', '2026-09-16', 'REALIZADO', 'manual', A, 'Pendente rateado', k_a) RETURNING id INTO v_p_rat;
   INSERT INTO fin_lancamento_rateios (lancamento_id, categoria_id, valor, company_id) VALUES (v_p_rat, c_peixes, 10, A), (v_p_rat, c_sem, 5, A);
   -- baixa legada de boleto ainda pendente: fora da apuração, então nem a prévia nem a gravação a alcançam
   INSERT INTO fin_lancamentos (tipo, valor, data_competencia, data_pagamento, status, origem, conciliado, company_id, categoria_id, descricao, conta_id)
@@ -680,17 +790,13 @@ BEGIN
   PERFORM cmv_expect_error($q$SELECT public.fin_cmv_aplicar_padroes('2026-09-14', false)$q$, 'JUSTIFICATIVA_OBRIGATORIA%', 'gravar exige justificativa');
   PERFORM cmv_expect_error($q$SELECT public.fin_cmv_aplicar_padroes(NULL, true)$q$, 'CMV_PERIODO_OBRIGATORIO%', 'data inicial obrigatória');
 
-  DELETE FROM cmv_update_log;
+  DELETE FROM cmv_saldo_log;
   r := fin_cmv_aplicar_padroes('2026-09-14', false, 'aplicação inicial');
   PERFORM cmv_assert((r->>'documentos')::int = 4 AND (r->>'linhas')::int = 4
     AND (r->>'centavos_sim')::bigint = 3700 AND (r->>'centavos_nao')::bigint = 1200, 'três lançamentos e um boleto classificados');
-  -- um UPDATE por lançamento (cada um custa um refresh do cache de saldo): decisão e versão juntas no sem rateio,
-  -- só a versão no rateado; a baixa legada, o já decidido, o sem padrão e o antigo nem são tocados
-  PERFORM cmv_assert((SELECT count(*) FROM cmv_update_log WHERE lancamento_id = v_p_peixes) = 1
-    AND (SELECT count(*) FROM cmv_update_log WHERE lancamento_id = v_p_escr) = 1
-    AND (SELECT count(*) FROM cmv_update_log WHERE lancamento_id = v_p_rat) = 1
-    AND (SELECT count(*) FROM cmv_update_log WHERE lancamento_id IN (v_p_sem, v_p_antigo, v_p_decidido, v_p_baixa)) = 0,
-    'aplicar padrões: um UPDATE por lançamento alterado e nenhum nos demais');
+  -- a decisão e a versão não mudam tipo/valor/status/conta: nenhum recálculo do cache de saldo
+  PERFORM cmv_assert((SELECT count(*) FROM fin_lancamentos WHERE id IN (v_p_peixes, v_p_escr, v_p_rat) AND conta_id = k_a) = 3
+    AND NOT EXISTS (SELECT 1 FROM cmv_saldo_log), 'aplicar padrões não recalcula o saldo de nenhuma conta');
   PERFORM cmv_assert((SELECT cmv_incluir FROM fin_lancamentos WHERE id = v_p_peixes)
     AND (SELECT cmv_incluir IS FALSE FROM fin_lancamentos WHERE id = v_p_escr)
     AND (SELECT cmv_incluir IS NULL FROM fin_lancamentos WHERE id = v_p_sem)
@@ -715,6 +821,60 @@ BEGIN
   PERFORM set_config('test.company_id', A::text, false);
   PERFORM cmv_assert(has_function_privilege('authenticated', 'public.fin_cmv_aplicar_padroes(date,boolean,text)', 'EXECUTE'), 'authenticated executa aplicar padrões');
   PERFORM cmv_assert(NOT has_function_privilege('anon', 'public.fin_cmv_aplicar_padroes(date,boolean,text)', 'EXECUTE'), 'anon não aplica padrões');
+
+  -- 13. Cache de saldo: o UPDATE só recalcula quando muda o que refresh_saldo_cache lê
+  -- Depois das DUAS aplicações da migration, o gatilho único de antes virou exatamente dois.
+  PERFORM cmv_assert((SELECT count(*) FROM pg_trigger t
+    WHERE t.tgrelid = 'public.fin_lancamentos'::regclass AND NOT t.tgisinternal
+      AND t.tgfoid = 'public.trg_refresh_saldo_cache_lancamento()'::regprocedure) = 2,
+    'exatamente dois gatilhos de saldo em fin_lancamentos');
+  -- tgtype: 1 = por linha, 2 = BEFORE, 4 = INSERT, 8 = DELETE, 16 = UPDATE
+  PERFORM cmv_assert(EXISTS (SELECT 1 FROM pg_trigger t
+    WHERE t.tgrelid = 'public.fin_lancamentos'::regclass AND t.tgname = 'trg_saldo_cache_lancamento'
+      AND t.tgfoid = 'public.trg_refresh_saldo_cache_lancamento()'::regprocedure
+      AND (t.tgtype & 1) = 1 AND (t.tgtype & 2) = 0 AND (t.tgtype & 28) = 12 AND t.tgqual IS NULL),
+    'trg_saldo_cache_lancamento: AFTER INSERT OR DELETE, por linha, sem WHEN');
+  SELECT pg_get_triggerdef(t.oid) INTO v_def FROM pg_trigger t
+  WHERE t.tgrelid = 'public.fin_lancamentos'::regclass AND t.tgname = 'trg_saldo_cache_lancamento_upd'
+    AND t.tgfoid = 'public.trg_refresh_saldo_cache_lancamento()'::regprocedure
+    AND (t.tgtype & 1) = 1 AND (t.tgtype & 2) = 0 AND (t.tgtype & 28) = 16 AND t.tgqual IS NOT NULL;
+  PERFORM cmv_assert(v_def IS NOT NULL, 'trg_saldo_cache_lancamento_upd: AFTER UPDATE, por linha, com WHEN');
+  PERFORM cmv_assert((SELECT bool_and(strpos(v_def, 'old.' || c) > 0 AND strpos(v_def, 'new.' || c) > 0)
+      FROM unnest(ARRAY['tipo', 'valor', 'status', 'conta_id', 'conta_destino_id', 'company_id']) AS c),
+    'o WHEN do _upd compara as 6 colunas que refresh_saldo_cache lê, dos dois lados: ' || COALESCE(v_def, ''));
+  PERFORM cmv_assert(strpos(v_def, 'old.*') = 0 AND strpos(v_def, 'new.*') = 0 AND strpos(v_def, 'updated_at') = 0,
+    'o WHEN nunca compara a linha inteira');
+
+  INSERT INTO fin_contas (id, nome, company_id) VALUES (k_a2, 'Banco A2', A);
+  DELETE FROM cmv_saldo_log;
+  INSERT INTO fin_lancamentos (tipo, valor, data_competencia, status, origem, company_id, categoria_id, descricao, conta_id)
+  VALUES ('DESPESA', 50, '2026-09-21', 'PREVISTO', 'manual', A, c_escr, 'Saldo: previsto', k_a2) RETURNING id INTO v_saldo_l;
+  PERFORM cmv_assert((SELECT count(*) FROM cmv_saldo_log WHERE conta_id = k_a2) = 1
+    AND (SELECT saldo FROM fin_contas_saldo_cache WHERE conta_id = k_a2) = 0, 'INSERT recalcula a conta (previsto não entra no saldo)');
+  DELETE FROM cmv_saldo_log;
+  UPDATE fin_lancamentos SET status = 'REALIZADO', data_pagamento = '2026-09-21' WHERE id = v_saldo_l;
+  PERFORM cmv_assert((SELECT count(*) FROM cmv_saldo_log WHERE conta_id = k_a2) = 1
+    AND (SELECT saldo FROM fin_contas_saldo_cache WHERE conta_id = k_a2) = -50, 'PREVISTO→REALIZADO recalcula e o saldo muda');
+  DELETE FROM cmv_saldo_log;
+  UPDATE fin_lancamentos SET valor = 80, justificativa_edicao = 'valor corrigido' WHERE id = v_saldo_l;
+  PERFORM cmv_assert((SELECT count(*) FROM cmv_saldo_log WHERE conta_id = k_a2) = 1
+    AND (SELECT saldo FROM fin_contas_saldo_cache WHERE conta_id = k_a2) = -80, 'UPDATE de valor recalcula e o saldo muda');
+  v_saldo_ka := (SELECT saldo FROM fin_contas_saldo_cache WHERE conta_id = k_a);
+  DELETE FROM cmv_saldo_log;
+  UPDATE fin_lancamentos SET conta_id = k_a, justificativa_edicao = 'conta corrigida' WHERE id = v_saldo_l;
+  PERFORM cmv_assert((SELECT count(*) FROM cmv_saldo_log WHERE conta_id = k_a2) = 1
+    AND (SELECT count(*) FROM cmv_saldo_log WHERE conta_id = k_a) = 1
+    AND (SELECT saldo FROM fin_contas_saldo_cache WHERE conta_id = k_a2) = 0
+    AND (SELECT saldo FROM fin_contas_saldo_cache WHERE conta_id = k_a) = v_saldo_ka - 80,
+    'troca de conta recalcula as duas: a antiga perde a despesa e a nova ganha');
+  -- observação, conciliação e versão não mexem no saldo: nenhum recálculo
+  DELETE FROM cmv_saldo_log;
+  UPDATE fin_lancamentos SET observacoes = 'só nota', conciliado = true, conciliado_em = now() WHERE id = v_saldo_l;
+  PERFORM cmv_assert(NOT EXISTS (SELECT 1 FROM cmv_saldo_log), 'UPDATE que não muda as 6 colunas não recalcula');
+  DELETE FROM cmv_saldo_log;
+  DELETE FROM fin_lancamentos WHERE id = v_saldo_l;
+  PERFORM cmv_assert((SELECT count(*) FROM cmv_saldo_log WHERE conta_id = k_a) = 1
+    AND (SELECT saldo FROM fin_contas_saldo_cache WHERE conta_id = k_a) = v_saldo_ka, 'DELETE recalcula e o saldo volta');
 
   RETURN 'cmv_lancamentos_ephemeral: OK';
 END;

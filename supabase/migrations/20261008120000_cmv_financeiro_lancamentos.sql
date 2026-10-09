@@ -29,6 +29,18 @@ CREATE OR REPLACE TRIGGER trg_fin_cmv_guard_decisao
   BEFORE INSERT OR UPDATE ON public.fin_lancamentos
   FOR EACH ROW EXECUTE FUNCTION public._fin_cmv_guard_decisao();
 
+-- Cache de saldo: UPDATE só recalcula quando muda uma coluna que refresh_saldo_cache lê.
+-- Coluna nova lida por refresh_saldo_cache precisa entrar no WHEN (regra no CLAUDE.md).
+CREATE OR REPLACE TRIGGER trg_saldo_cache_lancamento
+  AFTER INSERT OR DELETE ON public.fin_lancamentos
+  FOR EACH ROW EXECUTE FUNCTION public.trg_refresh_saldo_cache_lancamento();
+CREATE OR REPLACE TRIGGER trg_saldo_cache_lancamento_upd
+  AFTER UPDATE ON public.fin_lancamentos
+  FOR EACH ROW
+  WHEN ((OLD.tipo, OLD.valor, OLD.status, OLD.conta_id, OLD.conta_destino_id, OLD.company_id)
+        IS DISTINCT FROM (NEW.tipo, NEW.valor, NEW.status, NEW.conta_id, NEW.conta_destino_id, NEW.company_id))
+  EXECUTE FUNCTION public.trg_refresh_saldo_cache_lancamento();
+
 -- ─── Helpers internos (sem EXECUTE para clientes) ────────────────────────────
 
 -- Linhas classificáveis de fin_lancamentos (regra no cabeçalho do arquivo).
@@ -754,10 +766,13 @@ BEGIN
       RAISE EXCEPTION 'Permission denied: financeiro:lancamentos:edit';
     END IF;
 
-    -- Fetch existing for optimistic locking
+    -- Fetch existing for optimistic locking. FOR UPDATE: uma classificação do CMV
+    -- (fin_cmv_classificar) concluída entre esta leitura e o UPDATE seria
+    -- sobrescrita pelo p_cmv velho do formulário.
     SELECT fl.* INTO _existing
     FROM public.fin_lancamentos fl
-    WHERE fl.id = p_id AND fl.company_id = _company_id;
+    WHERE fl.id = p_id AND fl.company_id = _company_id
+    FOR UPDATE;
 
     IF NOT FOUND THEN
       RAISE EXCEPTION 'Lancamento not found';
@@ -972,8 +987,10 @@ $function$;
 -- ─── Lançamento conciliado: reclassificação com decisão e competência ────────
 -- Continua sem desfazer a conciliação: categoria, centro de custo, rateio,
 -- observações, a decisão do CMV e a DATA DE COMPETÊNCIA (com justificativa). A
--- data do banco (data_pagamento) nunca muda; se o lançamento não tem, a
--- competência antiga vira data_pagamento antes da troca — o reconhecimento da
+-- data do banco (data_pagamento) nunca muda; se o lançamento não tem, a data de
+-- caixa vigente (conciliado_em no fuso de Brasília, senão a competência antiga)
+-- vira data_pagamento antes da troca — os relatórios de caixa usam
+-- COALESCE(data_pagamento, conciliado_em, data_competencia) e o reconhecimento da
 -- linha já conciliada usa data_pagamento || data_competencia.
 -- `cmv_incluir` por linha de rateio só é considerado quando `p_cmv` não é nulo (`{}` basta).
 -- Corpo a partir de 20260825182354_allow_safe_reconciled_classification_edit.sql
@@ -1163,11 +1180,14 @@ BEGIN
     END IF;
   END IF;
 
-  -- Competência: só a data de competência muda; a data do banco fica.
+  -- Competência: só a data de competência muda; a data do banco fica. Sem
+  -- data_pagamento, a data de caixa vigente (a mesma fórmula dos relatórios:
+  -- conciliado_em em Brasília, senão a competência antiga) vira data_pagamento,
+  -- para a saída de caixa não mudar de dia junto com a competência.
   v_competencia := COALESCE(p_data_competencia, v_lanc.data_competencia);
   v_pagamento := CASE
     WHEN v_competencia IS DISTINCT FROM v_lanc.data_competencia
-      THEN COALESCE(v_lanc.data_pagamento, v_lanc.data_competencia)
+      THEN COALESCE(v_lanc.data_pagamento, (v_lanc.conciliado_em AT TIME ZONE 'America/Sao_Paulo')::date, v_lanc.data_competencia)
     ELSE v_lanc.data_pagamento
   END;
 
@@ -1526,8 +1546,8 @@ BEGIN
         IF v_tem_rateio THEN
           RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'CMV_ALVO_INVALIDO: lançamento rateado classifica por linha';
         END IF;
-        -- Decisão e versão no mesmo UPDATE: cada UPDATE de fin_lancamentos dispara o
-        -- refresh do cache de saldo da conta, então um só por documento.
+        -- Decisão e versão no mesmo UPDATE, um só por documento. Nenhuma das duas é
+        -- lida pelo cache de saldo: trg_saldo_cache_lancamento_upd não recalcula.
         UPDATE public.fin_lancamentos
         SET cmv_incluir = v_item.incluir, updated_at = v_now
         WHERE id = v_lanc.id AND company_id = v_company_id;
@@ -1577,8 +1597,9 @@ GRANT EXECUTE ON FUNCTION public.fin_cmv_classificar(jsonb, text) TO authenticat
 -- Só linhas PENDENTES (cmv_incluir NULL) de categoria COM padrão, com competência
 -- a partir de p_desde, de boletos e de lançamentos. Decisão já tomada nunca é
 -- trocada e categoria sem padrão continua pendente. p_simular (padrão) só conta.
--- A elegibilidade (o que é despesa do CMV) vem de _fin_cmv_linhas_fontes: não é
--- repetida aqui, então a baixa legada de boleto e o espelho ficam de fora sozinhos.
+-- A lista de documentos vem de _fin_cmv_linhas_fontes (a baixa legada de boleto e o
+-- espelho ficam de fora sozinhos); depois do bloqueio, cada documento passa de novo
+-- pela mesma regra, sem chamar _fin_cmv_linhas_fontes por documento.
 CREATE OR REPLACE FUNCTION public.fin_cmv_aplicar_padroes(
   p_desde date,
   p_simular boolean DEFAULT true,
@@ -1597,7 +1618,7 @@ DECLARE
   v_n integer;
   v_sim bigint;
   v_nao bigint;
-  v_status text;
+  v_elegivel boolean;
   v_linhas_rateio integer;
   v_linhas_doc integer;
   v_sim_doc bigint;
@@ -1661,16 +1682,34 @@ BEGIN
     WHERE l.cmv_incluir IS NULL AND l.data_competencia >= p_desde AND c.cmv_sugerir IS NOT NULL
     ORDER BY l.fonte, l.documento_id
   LOOP
-    -- O estado do documento é relido já com o bloqueio: o que foi cancelado entre a
-    -- listagem e aqui não recebe padrão.
+    -- O documento é relido já com o bloqueio e passa de novo pela regra da apuração
+    -- (a mesma que fin_cmv_classificar reconfere): o que foi cancelado, virou baixa de
+    -- boleto, foi desconciliado ou mudou de competência entre a listagem e aqui não
+    -- recebe padrão. Não encontrado = NULL = fora.
     IF v_doc.fonte = 'boleto' THEN
-      SELECT cp.status INTO v_status FROM public.fin_contas_pagar cp
-      WHERE cp.id = v_doc.documento_id AND cp.company_id = v_company_id FOR UPDATE;
+      SELECT cp.status IN ('AGUARDANDO_APROVACAO', 'APROVADO', 'PAGO')
+             AND cp.data_competencia >= p_desde
+        INTO v_elegivel
+      FROM public.fin_contas_pagar cp
+      WHERE cp.id = v_doc.documento_id AND cp.company_id = v_company_id
+      FOR UPDATE;
     ELSE
-      SELECT l.status INTO v_status FROM public.fin_lancamentos l
-      WHERE l.id = v_doc.documento_id AND l.company_id = v_company_id FOR UPDATE;
+      SELECT l.tipo = 'DESPESA'
+             AND l.status <> 'CANCELADO'
+             AND NULLIF(l.referencia_modulo, '') IS NULL
+             AND l.origem NOT IN ('espelho_cp', 'espelho_cr', 'ajuste_pagamento')
+             AND (l.origem <> 'conciliacao' OR l.conciliado IS TRUE)
+             AND NOT EXISTS (
+               SELECT 1 FROM public.fin_contas_pagar cp
+               WHERE cp.company_id = v_company_id AND cp.lancamento_id = l.id
+             )
+             AND l.data_competencia >= p_desde
+        INTO v_elegivel
+      FROM public.fin_lancamentos l
+      WHERE l.id = v_doc.documento_id AND l.company_id = v_company_id
+      FOR UPDATE;
     END IF;
-    IF NOT FOUND OR v_status = 'CANCELADO' THEN CONTINUE; END IF;
+    IF v_elegivel IS NOT TRUE THEN CONTINUE; END IF;
 
     IF v_doc.fonte = 'boleto' THEN
       v_antes := public._fin_cmv_retrato(v_company_id, v_doc.documento_id);
@@ -1712,8 +1751,8 @@ BEGIN
       INTO v_n, v_sim, v_nao
       FROM alterado;
     ELSE
-      -- Decisão e versão no mesmo UPDATE: cada UPDATE de fin_lancamentos dispara o
-      -- refresh do cache de saldo da conta, então um só por documento.
+      -- Decisão e versão no mesmo UPDATE, um só por documento. Nenhuma das duas é
+      -- lida pelo cache de saldo: trg_saldo_cache_lancamento_upd não recalcula.
       WITH alterado AS (
         UPDATE public.fin_lancamentos l
         SET cmv_incluir = c.cmv_sugerir, updated_at = v_now
@@ -1771,5 +1810,98 @@ $$;
 
 REVOKE ALL ON FUNCTION public.fin_cmv_aplicar_padroes(date, boolean, text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.fin_cmv_aplicar_padroes(date, boolean, text) TO authenticated, service_role;
+
+-- ─── Conferência no deploy e recálculo do cache de saldo ─────────────────────
+-- PL/pgSQL só resolve colunas na 1ª execução: aqui, na aplicação da migration,
+-- conferem-se as colunas que as RPCs desta migration leem e gravam, as assinaturas
+-- (as novas existem; as antigas, removidas no topo de cada RPC, não) e os dois
+-- gatilhos do cache de saldo. Por último o cache de todas as contas é recalculado
+-- uma vez: com o WHEN, um UPDATE incidental deixa de corrigir um cache desatualizado.
+DO $$
+DECLARE
+  v_sig text;
+BEGIN
+  PERFORM l.id, l.company_id, l.tipo, l.valor, l.status, l.data_competencia, l.data_pagamento,
+          l.data_vencimento, l.descricao, l.observacoes, l.conta_id, l.conta_destino_id,
+          l.categoria_id, l.centro_custo_id, l.forma_pagamento, l.origem, l.recorrente,
+          l.recorrencia_config, l.referencia_modulo, l.conciliado, l.conciliado_em,
+          l.conciliado_por, l.idempotency_key, l.justificativa_edicao, l.cmv_incluir,
+          l.created_by, l.created_at, l.updated_at
+  FROM public.fin_lancamentos l LIMIT 0;
+  PERFORM r.id, r.lancamento_id, r.categoria_id, r.centro_custo_id, r.valor, r.percentual,
+          r.observacao, r.company_id, r.cmv_incluir, r.created_at
+  FROM public.fin_lancamento_rateios r LIMIT 0;
+  PERFORM cp.id, cp.company_id, cp.lancamento_id, cp.cmv_incluir, cp.status, cp.data_competencia,
+          cp.categoria_id, cp.valor, cp.updated_at
+  FROM public.fin_contas_pagar cp LIMIT 0;
+  PERFORM c.id, c.company_id, c.nome, c.codigo, c.parent_id, c.grupo, c.tipo, c.ativo,
+          c.cmv_sugerir, c.updated_at
+  FROM public.fin_categorias c LIMIT 0;
+  -- A ativação (cmv_financeiro_ativo) é uma linha chave/valor de fin_config, lida por _fin_cmv_ativo.
+  PERFORM k.company_id, k.key, k.value FROM public.fin_config k LIMIT 0;
+  PERFORM cc.id, cc.company_id, cc.ativo FROM public.fin_centros_custo cc LIMIT 0;
+  PERFORM ct.id, ct.company_id, ct.nome, ct.saldo_inicial FROM public.fin_contas ct LIMIT 0;
+  PERFORM v.company_id, v.conta_id, v.lancamento_id, v.external_id FROM public.fin_conciliacao_vinculos v LIMIT 0;
+  PERFORM a.entidade, a.entidade_id, a.acao, a.antes, a.depois, a.justificativa, a.user_id, a.company_id
+  FROM public.fin_audit_logs a LIMIT 0;
+  PERFORM s.conta_id, s.company_id, s.saldo, s.updated_at FROM public.fin_contas_saldo_cache s LIMIT 0;
+
+  FOREACH v_sig IN ARRAY ARRAY[
+    'public.reconcile_import_lancamento(date,text,numeric,text,uuid,uuid,jsonb,text,boolean,integer,date)',
+    'public._guarded_upsert_lancamento(uuid,text,text,numeric,uuid,uuid,uuid,date,date,date,text,text,text,text,boolean,jsonb,jsonb,timestamptz,text,text,jsonb)',
+    'public._guarded_update_reconciled_classification(uuid,uuid,uuid,text,jsonb,timestamptz,text,jsonb,date)',
+    'public.fin_cmv_classificar(jsonb,text)',
+    'public.fin_cmv_aplicar_padroes(date,boolean,text)',
+    'public.get_fin_cmv_config()',
+    'public._fin_cmv_linhas_lancamentos(uuid)',
+    'public._fin_cmv_linhas_fontes(uuid)',
+    'public._fin_cmv_retrato_lancamento(uuid,uuid)',
+    'public._fin_cmv_heranca(jsonb,uuid)',
+    'public._fin_cmv_linhas(uuid)',
+    'public._fin_cmv_retrato(uuid,uuid)',
+    'public._fin_cmv_ativo(uuid)',
+    'public._fin_cmv_guard_decisao()',
+    'public.refresh_saldo_cache(uuid)',
+    'public.trg_refresh_saldo_cache_lancamento()',
+    'public.assert_tenant()',
+    'public.has_any_permission(uuid,text[])',
+    'public.strip_html(text)',
+    'public.immutable_unaccent(text)'
+  ] LOOP
+    IF to_regprocedure(v_sig) IS NULL THEN
+      RAISE EXCEPTION 'CMV lançamentos: função não encontrada: %', v_sig;
+    END IF;
+  END LOOP;
+
+  FOREACH v_sig IN ARRAY ARRAY[
+    'public.reconcile_import_lancamento(date,text,numeric,text,uuid,uuid,jsonb,text,boolean,integer)',
+    'public._guarded_upsert_lancamento(uuid,text,text,numeric,uuid,uuid,uuid,date,date,date,text,text,text,text,boolean,jsonb,jsonb,timestamptz,text,text)',
+    'public._guarded_update_reconciled_classification(uuid,uuid,uuid,text,jsonb,timestamptz,text)'
+  ] LOOP
+    IF to_regprocedure(v_sig) IS NOT NULL THEN
+      RAISE EXCEPTION 'CMV lançamentos: assinatura antiga ainda existe (overload): %', v_sig;
+    END IF;
+  END LOOP;
+
+  -- tgtype: 1 = por linha, 2 = BEFORE, 4 = INSERT, 8 = DELETE, 16 = UPDATE, 32 = TRUNCATE, 64 = INSTEAD OF.
+  IF (SELECT count(*) FROM pg_trigger t
+      WHERE t.tgrelid = 'public.fin_lancamentos'::regclass AND NOT t.tgisinternal
+        AND t.tgfoid = 'public.trg_refresh_saldo_cache_lancamento()'::regprocedure) <> 2
+     OR NOT EXISTS (
+       SELECT 1 FROM pg_trigger t
+       WHERE t.tgrelid = 'public.fin_lancamentos'::regclass AND t.tgname = 'trg_saldo_cache_lancamento'
+         AND t.tgfoid = 'public.trg_refresh_saldo_cache_lancamento()'::regprocedure
+         AND t.tgenabled <> 'D' AND (t.tgtype & 127) = 13 AND t.tgqual IS NULL)
+     OR NOT EXISTS (
+       SELECT 1 FROM pg_trigger t
+       WHERE t.tgrelid = 'public.fin_lancamentos'::regclass AND t.tgname = 'trg_saldo_cache_lancamento_upd'
+         AND t.tgfoid = 'public.trg_refresh_saldo_cache_lancamento()'::regprocedure
+         AND t.tgenabled <> 'D' AND (t.tgtype & 127) = 17 AND t.tgqual IS NOT NULL) THEN
+    RAISE EXCEPTION 'CMV lançamentos: gatilhos do cache de saldo inesperados (esperados: trg_saldo_cache_lancamento só em INSERT/DELETE e trg_saldo_cache_lancamento_upd só em UPDATE, com WHEN)';
+  END IF;
+
+  PERFORM public.refresh_saldo_cache(c.id) FROM public.fin_contas c;
+END;
+$$;
 
 NOTIFY pgrst, 'reload schema';

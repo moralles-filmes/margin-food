@@ -123,13 +123,16 @@ describe('migration CMV com lançamentos — escrita', () => {
     expect(c).toContain("RAISE EXCEPTION 'REQUEST_ID_REUTILIZADO';");
     expect(c).toContain("RAISE EXCEPTION 'Lançamento conciliado não pode ser editado. Desconcilie primeiro.';");
     expect(plano(c)).toContain("'financeiro:lancamentos:create', 'finance:manage', 'system:global:manage'");
+    // a edição trava a linha antes do lock otimista: uma classificação concluída no meio não é sobrescrita
+    expect(plano(c)).toContain('FROM public.fin_lancamentos fl WHERE fl.id = p_id AND fl.company_id = _company_id FOR UPDATE;');
   });
 
   it('reclassificação: muda a competência e a decisão; a data do banco nunca', () => {
     const c = corpo('_guarded_update_reconciled_classification');
     expect(sql).toContain('DROP FUNCTION IF EXISTS public._guarded_update_reconciled_classification(uuid, uuid, uuid, text, jsonb, timestamptz, text);');
     expect(c).toContain('p_cmv jsonb DEFAULT NULL::jsonb,\n  p_data_competencia date DEFAULT NULL::date');
-    expect(c).toContain('THEN COALESCE(v_lanc.data_pagamento, v_lanc.data_competencia)');
+    // sem data_pagamento, a data de caixa vigente (a fórmula dos relatórios) vira data_pagamento
+    expect(c).toContain("THEN COALESCE(v_lanc.data_pagamento, (v_lanc.conciliado_em AT TIME ZONE 'America/Sao_Paulo')::date, v_lanc.data_competencia)");
     expect(c).toContain("RAISE EXCEPTION 'ORIGEM_INVALIDA: edite a conta a pagar/receber de origem';");
     expect(c).toContain("RAISE EXCEPTION 'JUSTIFICATIVA_OBRIGATORIA';");
     expect(c).not.toMatch(/\bvalor\s*=\s*p_/);
@@ -253,11 +256,20 @@ describe('migration CMV com lançamentos — classificação e padrões', () => 
     expect(c).toContain('UPDATE public.fin_contas_pagar\n    SET updated_at = v_now');
   });
 
-  it('aplicar padrões relê o status já com o bloqueio e não toca em documento cancelado', () => {
+  it('aplicar padrões reconfere, já com o bloqueio, a mesma elegibilidade da apuração', () => {
     const a = corpo('fin_cmv_aplicar_padroes');
-    expect(a).toContain("IF NOT FOUND OR v_status = 'CANCELADO' THEN CONTINUE; END IF;");
-    expect(a.indexOf('FOR UPDATE')).toBeLessThan(a.indexOf("v_status = 'CANCELADO'"));
-    expect(a.indexOf("v_status = 'CANCELADO'")).toBeLessThan(a.indexOf('UPDATE public.fin_lancamento_rateios'));
+    const p = plano(a);
+    // boleto: os estados que a apuração conta e a competência a partir da data
+    expect(p).toContain(
+      "SELECT cp.status IN ('AGUARDANDO_APROVACAO', 'APROVADO', 'PAGO') AND cp.data_competencia >= p_desde INTO v_elegivel FROM public.fin_contas_pagar cp WHERE cp.id = v_doc.documento_id AND cp.company_id = v_company_id FOR UPDATE;",
+    );
+    // lançamento: a regra de _fin_cmv_linhas_lancamentos / fin_cmv_classificar, aplicada ao documento travado
+    expect(p).toContain(
+      "SELECT l.tipo = 'DESPESA' AND l.status <> 'CANCELADO' AND NULLIF(l.referencia_modulo, '') IS NULL AND l.origem NOT IN ('espelho_cp', 'espelho_cr', 'ajuste_pagamento') AND (l.origem <> 'conciliacao' OR l.conciliado IS TRUE) AND NOT EXISTS ( SELECT 1 FROM public.fin_contas_pagar cp WHERE cp.company_id = v_company_id AND cp.lancamento_id = l.id ) AND l.data_competencia >= p_desde INTO v_elegivel FROM public.fin_lancamentos l WHERE l.id = v_doc.documento_id AND l.company_id = v_company_id FOR UPDATE;",
+    );
+    expect(a).toContain('IF v_elegivel IS NOT TRUE THEN CONTINUE; END IF;');
+    expect(a.indexOf('IF v_elegivel IS NOT TRUE')).toBeLessThan(a.indexOf('UPDATE public.fin_lancamento_rateios'));
+    expect(a).not.toContain('v_status');
   });
 
   it('aplicar padrões: só pendentes, prévia antes de qualquer escrita, justificativa e gerenciar o CMV', () => {
@@ -273,13 +285,45 @@ describe('migration CMV com lançamentos — classificação e padrões', () => 
     expect(sql).toContain('GRANT EXECUTE ON FUNCTION public.fin_cmv_aplicar_padroes(date, boolean, text) TO authenticated, service_role;');
   });
 
-  it('aplicar padrões herda a elegibilidade da apuração em vez de repeti-la', () => {
+  it('aplicar padrões lista os documentos pela apuração e nunca a chama por documento', () => {
     const c = corpo('fin_cmv_aplicar_padroes');
+    // uma na prévia, uma na listagem do laço: nenhuma por documento (seria O(n²))
+    expect(c.split('_fin_cmv_linhas_fontes(').length - 1).toBe(2);
     expect(c.split('FROM public._fin_cmv_linhas_fontes(v_company_id) l').length - 1).toBe(2);
-    expect(c).not.toContain('referencia_modulo');
-    expect(c).not.toContain("'espelho_cp'");
-    expect(c).not.toContain('fin_contas_pagar cp WHERE cp.company_id');
     // ordem fixa de bloqueio, igual à de fin_cmv_classificar: boletos antes de lançamentos, por id
     expect(plano(c)).toContain('ORDER BY l.fonte, l.documento_id');
+  });
+});
+
+describe('migration CMV com lançamentos — cache de saldo', () => {
+  const colunas = ['tipo', 'valor', 'status', 'conta_id', 'conta_destino_id', 'company_id'];
+
+  it('INSERT/DELETE recalculam sempre; UPDATE só quando muda uma das 6 colunas que refresh_saldo_cache lê', () => {
+    const p = plano(semComentarios);
+    expect(p).toContain(
+      'CREATE OR REPLACE TRIGGER trg_saldo_cache_lancamento AFTER INSERT OR DELETE ON public.fin_lancamentos FOR EACH ROW EXECUTE FUNCTION public.trg_refresh_saldo_cache_lancamento();',
+    );
+    const upd = p.match(
+      /CREATE OR REPLACE TRIGGER trg_saldo_cache_lancamento_upd AFTER UPDATE ON public\.fin_lancamentos FOR EACH ROW WHEN \((.*?)\) EXECUTE FUNCTION public\.trg_refresh_saldo_cache_lancamento\(\);/,
+    );
+    expect(upd, 'gatilho de UPDATE com WHEN').not.toBeNull();
+    const when = upd![1];
+    // `OLD.* IS DISTINCT FROM NEW.*` é sempre verdadeiro (updated_at muda) e anularia a divisão
+    expect(when).not.toMatch(/\b(OLD|NEW)\s*\.\s*\*/i);
+    expect(when).not.toContain('updated_at');
+    const lados = when.split(' IS DISTINCT FROM ');
+    expect(lados).toHaveLength(2);
+    for (const [lado, prefixo] of [[lados[0], 'OLD'], [lados[1], 'NEW']] as const) {
+      const itens = lado.replace(/^\(|\)$/g, '').split(',').map(s => s.trim());
+      expect(itens, `lado ${prefixo}`).toEqual(colunas.map(c => `${prefixo}.${c}`));
+    }
+  });
+
+  it('o corpo das funções do cache fica intocado e o cache de todas as contas é recalculado no fim', () => {
+    // md5 de refresh_saldo_cache é conferido em docs/multi-unidades/fase7-20260916/pos-validacao.sql
+    expect(sql).not.toMatch(/CREATE (OR REPLACE )?FUNCTION public\.(refresh_saldo_cache|trg_refresh_saldo_cache_lancamento)\(/);
+    const recalculo = sql.indexOf('PERFORM public.refresh_saldo_cache(c.id) FROM public.fin_contas c;');
+    expect(recalculo).toBeGreaterThan(sql.indexOf('CREATE OR REPLACE TRIGGER trg_saldo_cache_lancamento_upd'));
+    expect(recalculo).toBeGreaterThan(sql.lastIndexOf('CREATE OR REPLACE FUNCTION'));
   });
 });
