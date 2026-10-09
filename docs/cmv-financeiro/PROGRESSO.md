@@ -150,6 +150,38 @@ Spec e plano em `docs/superpowers/` (links no PLANO.md §6). Branch `feat/cmv-fi
   - CMV: "despesas", origem, classificar lançamento e "Aplicar padrões";
   - PDF.
 
+### Validação (2026-10-09)
+```
+vitest run                                                   237 arquivos / 2663 testes  ✅
+tsc --noEmit -p tsconfig.app.json                            ✅
+eslint (37 arquivos .ts/.tsx do branch)                      ✅  0 erros, 38 avisos preexistentes
+vite build                                                   ✅
+bun run rbac:lint                                            ✅  PASS, 0 bloqueantes (5 importantes, 1 deste branch — ver abaixo)
+psql cmv_lancamentos_ephemeral.sql (PostgreSQL 16 local)     ✅  OK, migration aplicada duas vezes
+psql cmv_financeiro_ephemeral.sql (PostgreSQL 16 local)      ✅  OK
+```
+- **Banco descartável.** Os cenários cobertos:
+  - dupla contagem (espelho, ajuste de pagamento, título criado do extrato e boleto com `lancamento_id`);
+  - `p_data` = data do banco na deduplicação, com a competência ajustada à parte;
+  - reclassificação preservando a data de caixa, inclusive pelo `conciliado_em` em Brasília;
+  - herança por categoria do cliente antigo;
+  - trava de escrita direta, isolamento entre unidades, lock otimista e lote;
+  - "Aplicar padrões" (prévia e gravação);
+  - reenvio com decisão diferente devolvendo o mesmo lançamento;
+  - cache de saldo: classificar e aplicar não recalculam; valor, status, conta, criação e exclusão recalculam.
+- **Revisão.** Passaram por revisão do branch inteiro e por auditoria de módulo (6 auditores, só leitura). Os achados entraram numa rodada única de correção (`6005cd6`, `e4e88aa`, `380e97d`), e uma re-revisão independente encontrou todos resolvidos.
+- **Aceito.** O `rbac:lint` aponta `select('*')` ao abrir no Livro Razão um lançamento vindo do CMV. É uma linha por id, sob RLS. A linha alimenta o detalhe e a edição, e uma projeção que esquecesse uma coluna deixaria o campo em branco no formulário.
+- **Produção (somente leitura, 2026-10-08/09):**
+  - corpos de `refresh_saldo_cache` e `trg_refresh_saldo_cache_lancamento` iguais às migrations de 2026-03-15;
+  - 19 contas (7 inativas) com cache igual à fórmula;
+  - 0 lançamentos com conta, categoria ou centro de outra unidade;
+  - 1003 lançamentos elegíveis na maior unidade.
+- **Não verificado:**
+  - fluxo no navegador com login real;
+  - as 5 RPCs plpgsql contra o schema vivo (simulação com `ROLLBACK` na publicação);
+  - `EXPLAIN` e tempo de `fin_cmv_aplicar_padroes` na maior unidade;
+  - `types.ts` não regenerado.
+
 ### Ativação (requer autorização)
 1. **Frontend.** Entra primeiro: sem `recursos` ele se comporta exatamente como hoje. A migration vem logo em seguida (passo 2), porque com a migration e o cliente antigo publicado os totais do CMV contariam lançamentos que a lista não mostra.
 2. **Migration**, logo depois do frontend. Remove e recria três funções (`DROP FUNCTION`): o conector MCP deve recusar, então ela é rodada pelo SQL Editor, dentro de `BEGIN; SET LOCAL lock_timeout = '5s'; … COMMIT;` e fora do pico (o `ADD COLUMN` pede lock exclusivo rápido em `fin_lancamentos`). É reexecutável (`CREATE OR REPLACE`). No fim, ela recalcula o cache de saldo de todas as contas uma vez (sem mudança visível esperada: em 2026-10-08 as 19 contas batiam com a fórmula). Depois:
