@@ -10,7 +10,7 @@
 
 - Faz: CMV de estoque do período (custo das saídas do estoque ÷ faturamento bruto do Fechamento de Caixa), com escopo Tudo / Geral (sem salmão) / Somente Salmão e filtro por setor; quebra por categoria, por setor, top itens (paginado) e semanal (W1–W5); metas mensais de CMV (geral, salmão, total e faixas de alerta); insights e simulação rápida calculados só na tela.
 - Não faz:
-  - **CMV Financeiro** (Financeiro → CMV, chave `financeiro:cmv:*`): numerador nos boletos de Contas a Pagar, não no estoque → [financeiro.md](financeiro.md) e `docs/cmv-financeiro/`. Os dois só compartilham o denominador (faturamento bruto do Fechamento de Caixa); o CMV Financeiro não lê `metas_cmv` nem a Edge `cmv`, e este módulo não lê boletos.
+  - **CMV Financeiro** (Financeiro → CMV, chave `financeiro:cmv:*`): numerador nos boletos de Contas a Pagar e nas despesas de Lançamentos/Conciliação, não no estoque → [financeiro.md](financeiro.md) e `docs/cmv-financeiro/`. Os dois só compartilham o denominador (faturamento bruto do Fechamento de Caixa); o CMV Financeiro não lê `metas_cmv` nem a Edge `cmv`, e este módulo não lê boletos.
   - Relatórios → CMV (`relatorios:cmv:*`): outro cálculo, pela RPC `_relatorios_kpis_guarded` → [relatorios.md](relatorios.md).
   - Lançar faturamento: Financeiro → Fechamento de Caixa ([financeiro.md](financeiro.md)); aqui só é lido.
   - Saldo, movimentações e custo dos produtos → [estoque.md](estoque.md). Custo e CMV% por prato → [ficha-tecnica.md](ficha-tecnica.md).

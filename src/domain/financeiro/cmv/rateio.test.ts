@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { decisaoSugerida, dividirCentavos, paraCentavos, resumirBoleto } from './rateio';
+import { decisaoAoTrocarCategoria, decisaoSugerida, dividirCentavos, paraCentavos, resumirBoleto } from './rateio';
 
 describe('CMV Financeiro — decisão por rateio', () => {
   it('exemplo obrigatório: boleto de R$ 2.150,00 leva R$ 1.800,00 ao CMV e deixa R$ 350,00 fora', () => {
@@ -48,5 +48,24 @@ describe('CMV Financeiro — decisão por rateio', () => {
     expect(decisaoSugerida('novo', padroes)).toBeNull();
     expect(decisaoSugerida('desconhecida', padroes)).toBeNull();
     expect(decisaoSugerida('', padroes)).toBeNull();
+  });
+});
+
+describe('CMV Financeiro — decisão ao trocar a categoria', () => {
+  const padroes = new Map<string, boolean | null>([['peixes', true], ['escr', false], ['sem', null]]);
+
+  it('sem resposta anterior: o padrão da categoria, marcado como sugestão', () => {
+    expect(decisaoAoTrocarCategoria(null, 'peixes', padroes)).toEqual({ cmv_incluir: true, cmv_aviso: 'sugerido' });
+    expect(decisaoAoTrocarCategoria(undefined, 'escr', padroes)).toEqual({ cmv_incluir: false, cmv_aviso: 'sugerido' });
+  });
+
+  it('categoria sem padrão: em branco, sem aviso', () => {
+    expect(decisaoAoTrocarCategoria(null, 'sem', padroes)).toEqual({ cmv_incluir: null, cmv_aviso: undefined });
+    expect(decisaoAoTrocarCategoria(undefined, '', padroes)).toEqual({ cmv_incluir: null, cmv_aviso: undefined });
+  });
+
+  it('resposta anterior diferente da nova sugestão: troca com aviso, nunca em silêncio', () => {
+    expect(decisaoAoTrocarCategoria(true, 'escr', padroes)).toEqual({ cmv_incluir: false, cmv_aviso: 'redefinido' });
+    expect(decisaoAoTrocarCategoria(true, 'sem', padroes)).toEqual({ cmv_incluir: null, cmv_aviso: 'redefinido' });
   });
 });

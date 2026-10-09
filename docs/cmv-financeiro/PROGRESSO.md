@@ -6,7 +6,7 @@ Checkpoint por fase. Diagnóstico e decisões: [`PLANO.md`](./PLANO.md). Entregu
 
 ## Estado atual (2026-10-03)
 
-Fases 0 a 6 concluídas, auditadas e **em produção**: frontend publicado pelo PR #138 (deploy Vercel de `main` em 2026-10-03) e migration executada no SQL Editor do Supabase em 2026-10-03, registrada no histórico como `20261003140000 cmv_financeiro` (mesmo nome do arquivo; não renomear). Nenhuma unidade está com a classificação ligada e nada do histórico foi classificado — a ativação por unidade é decisão do negócio (ver "Ativação", passo 4).
+Fases 0 a 6 concluídas, auditadas e **em produção**: frontend publicado pelo PR #138 (deploy Vercel de `main` em 2026-10-03) e migration executada no SQL Editor do Supabase em 2026-10-03, registrada no histórico como `20261003140000 cmv_financeiro` (mesmo nome do arquivo; não renomear). Em 2026-10-05 a Ren Sushi já estava com a classificação ligada e 121 padrões de categoria (a Aoi Sushi, com 93 padrões, ainda desligada) — a ativação por unidade é decisão do negócio (ver "Ativação", passo 4).
 
 Conferido em produção depois da execução (2026-10-03):
 - 3 colunas novas anuláveis e sem default; nenhuma linha classificada, nenhum padrão de categoria, nenhuma unidade ativada.
@@ -131,3 +131,69 @@ Aceito / em aberto (P3):
 - Série = parcelas criadas juntas (`created_at` idêntico + `parcela_total`, autor e fornecedor) ou ligadas por `lancamento_pai_id`. No histórico (11 séries, 476 boletos) o vínculo de pai está vazio porque a 1ª parcela foi excluída.
 - Conferido em produção: corpo das 3 funções idêntico ao do banco de teste (md5), helpers sem EXECUTE para clientes, prévia (`p_simular`) executada como admin sem gravar nada.
 - Limite aceito: `serie_boletos` é calculado por linha da página, sem índice próprio — rever se o volume de boletos crescer muito.
+
+## Extensão: despesas de Lançamentos e Conciliação (2026-10-05)
+
+Spec e plano em `docs/superpowers/` (links no PLANO.md §6). Branch `feat/cmv-financeiro-lancamentos`, a partir do PR #144 (Redesign V2).
+
+### Entregue
+- Migration `supabase/migrations/20261008120000_cmv_financeiro_lancamentos.sql`:
+  - coluna `fin_lancamentos.cmv_incluir` e a trava de escrita direta;
+  - `_fin_cmv_linhas_lancamentos`, `_fin_cmv_linhas_fontes`, `_fin_cmv_retrato_lancamento` e `_fin_cmv_heranca`;
+  - payload, lista e config com as duas fontes;
+  - `reconcile_import_lancamento` (+ `p_data_competencia`), `_guarded_upsert_lancamento` (+ `p_cmv`) e `_guarded_update_reconciled_classification` (+ `p_cmv`, `p_data_competencia`);
+  - `fin_cmv_classificar` (boleto ou lançamento) e `fin_cmv_aplicar_padroes` (nova).
+- Teste de banco real: `supabase/tests/database/cmv_lancamentos_ephemeral.sql`, rodado por `run_ephemeral.ps1`.
+- Telas:
+  - Livro Razão: pergunta, competência na reclassificação e abertura vinda do CMV;
+  - Conciliação: Sim/Não e competência na linha e no rateio; diálogo "Criar";
+  - CMV: "despesas", origem, classificar lançamento e "Aplicar padrões";
+  - PDF.
+
+### Validação (2026-10-09)
+```
+vitest run                                                   237 arquivos / 2663 testes  ✅
+tsc --noEmit -p tsconfig.app.json                            ✅
+eslint (37 arquivos .ts/.tsx do branch)                      ✅  0 erros, 38 avisos preexistentes
+vite build                                                   ✅
+bun run rbac:lint                                            ✅  PASS, 0 bloqueantes (5 importantes, 1 deste branch — ver abaixo)
+psql cmv_lancamentos_ephemeral.sql (PostgreSQL 16 local)     ✅  OK, migration aplicada duas vezes
+psql cmv_financeiro_ephemeral.sql (PostgreSQL 16 local)      ✅  OK
+```
+- **Banco descartável.** Os cenários cobertos:
+  - dupla contagem (espelho, ajuste de pagamento, título criado do extrato e boleto com `lancamento_id`);
+  - `p_data` = data do banco na deduplicação, com a competência ajustada à parte;
+  - reclassificação preservando a data de caixa, inclusive pelo `conciliado_em` em Brasília;
+  - herança por categoria do cliente antigo;
+  - trava de escrita direta, isolamento entre unidades, lock otimista e lote;
+  - "Aplicar padrões" (prévia e gravação);
+  - reenvio com decisão diferente devolvendo o mesmo lançamento;
+  - cache de saldo: classificar e aplicar não recalculam; valor, status, conta, criação e exclusão recalculam.
+- **Revisão.** Passaram por revisão do branch inteiro e por auditoria de módulo (6 auditores, só leitura). Os achados entraram numa rodada única de correção (`6005cd6`, `e4e88aa`, `380e97d`), e uma re-revisão independente encontrou todos resolvidos.
+- **Aceito.** O `rbac:lint` aponta `select('*')` ao abrir no Livro Razão um lançamento vindo do CMV. É uma linha por id, sob RLS. A linha alimenta o detalhe e a edição, e uma projeção que esquecesse uma coluna deixaria o campo em branco no formulário.
+- **Produção (somente leitura, 2026-10-08/09):**
+  - corpos de `refresh_saldo_cache` e `trg_refresh_saldo_cache_lancamento` iguais às migrations de 2026-03-15;
+  - 19 contas (7 inativas) com cache igual à fórmula;
+  - 0 lançamentos com conta, categoria ou centro de outra unidade;
+  - 1003 lançamentos elegíveis na maior unidade.
+- **Não verificado:**
+  - fluxo no navegador com login real;
+  - as 5 RPCs plpgsql contra o schema vivo (simulação com `ROLLBACK` na publicação);
+  - `EXPLAIN` e tempo de `fin_cmv_aplicar_padroes` na maior unidade;
+  - `types.ts` não regenerado.
+
+### Ativação (requer autorização)
+1. **Frontend.** Entra primeiro: sem `recursos` ele se comporta exatamente como hoje. A migration vem logo em seguida (passo 2), porque com a migration e o cliente antigo publicado os totais do CMV contariam lançamentos que a lista não mostra.
+2. **Migration**, logo depois do frontend. Remove e recria três funções (`DROP FUNCTION`): o conector MCP deve recusar, então ela é rodada pelo SQL Editor, dentro de `BEGIN; SET LOCAL lock_timeout = '5s'; … COMMIT;` e fora do pico (o `ADD COLUMN` pede lock exclusivo rápido em `fin_lancamentos`). É reexecutável (`CREATE OR REPLACE`). No fim, ela recalcula o cache de saldo de todas as contas uma vez (sem mudança visível esperada: em 2026-10-08 as 19 contas batiam com a fórmula). Depois:
+   - conferir uma assinatura por função, grants, triggers e o md5 dos corpos contra o banco descartável;
+   - registrar a versão `20261008120000` com o nome do arquivo;
+   - antes de rodar "Aplicar padrões" em unidade grande, medir `fin_cmv_aplicar_padroes` contra o `statement_timeout` de 8 s (com o gatilho de saldo dividido, classificar não recalcula mais o cache de saldo da conta).
+3. **Por unidade.** Em CMV → Regras de vínculo:
+   - conferir os padrões das categorias de mercadoria;
+   - rodar "Aplicar padrões às pendentes" a partir da data desejada (prévia antes);
+   - revisar o que ficou pendente (categorias sem padrão).
+
+### Reversão
+- Desligar "Pedir a resposta nas novas despesas" só esconde a pergunta nas telas: a apuração continua lendo as duas fontes e contando as despesas.
+- Revert do PR sozinho não basta com a migration aplicada: o cliente antigo leria pendências e totais com lançamentos que a lista dele não mostra. Reverter o frontend e, na mesma janela, recriar `_fin_cmv_payload` (de `20261003140000`) e `_fin_cmv_lista` (de `20261003203219`) pelo SQL Editor; colunas e decisões gravadas ficam e passam a ser ignoradas.
+- A divisão do gatilho de saldo pode ficar (o cache resultante é o mesmo). Para voltar ao gatilho único: `DROP TRIGGER IF EXISTS trg_saldo_cache_lancamento_upd ON public.fin_lancamentos; CREATE OR REPLACE TRIGGER trg_saldo_cache_lancamento AFTER INSERT OR UPDATE OR DELETE ON public.fin_lancamentos FOR EACH ROW EXECUTE FUNCTION public.trg_refresh_saldo_cache_lancamento();`

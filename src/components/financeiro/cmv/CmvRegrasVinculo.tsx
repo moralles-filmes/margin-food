@@ -22,6 +22,7 @@ import {
   type CmvCategoriaConfig, type CmvSituacao,
 } from '@/hooks/useCmvFinanceiro';
 import { CmvPainel } from './CmvCards';
+import CmvAplicarPadroesDialog from './CmvAplicarPadroesDialog';
 import CmvDecisaoToggle from './CmvDecisaoToggle';
 
 // Exemplo ilustrativo fixo — nunca gravado nem misturado aos dados da empresa.
@@ -95,6 +96,7 @@ function ExemploPratico() {
         <div className="space-y-1.5">
           <p>Neste exemplo, <strong>{formatarCentavos(resumo.incluidoCentavos)}</strong> (Peixes + Bebidas) entram no CMV e <strong>{formatarCentavos(resumo.foraCentavos)}</strong> (Material de escritório) ficam fora.</p>
           <p>O boleto continua valendo {formatarCentavos(resumo.totalCentavos)} em Contas a Pagar: cobrança e pagamento não mudam.</p>
+          <p>Vale igual para um PIX lançado no Livro Razão ou criado pela Conciliação Bancária: cada linha com a sua resposta, na data de competência.</p>
         </div>
       </div>
     </div>
@@ -106,11 +108,12 @@ interface Props {
   canManage: boolean;
   canRevisar: boolean;
   pendentesGeral: CmvContagem | null;
+  pendentesGeralPorFonte: { boleto: CmvContagem; lancamento: CmvContagem } | null;
   semCompetencia: CmvContagem | null;
   onAbrirLista: (situacao: CmvSituacao, escopo: 'geral' | 'periodo') => void;
 }
 
-export default function CmvRegrasVinculo({ companyId, canManage, canRevisar, pendentesGeral, semCompetencia, onAbrirLista }: Props) {
+export default function CmvRegrasVinculo({ companyId, canManage, canRevisar, pendentesGeral, pendentesGeralPorFonte, semCompetencia, onAbrirLista }: Props) {
   const supabase = useSupabase();
   const toast = useScopedToast();
   const queryClient = useQueryClient();
@@ -119,6 +122,7 @@ export default function CmvRegrasVinculo({ companyId, canManage, canRevisar, pen
   const config = useCmvConfig({ companyId, enabled: true });
   const [busca, setBusca] = useState('');
   const [alterando, setAlterando] = useState<string | null>(null);
+  const [aplicarAberto, setAplicarAberto] = useState(false);
 
   const categorias = useMemo(() => {
     const todas = config.data?.categorias ?? [];
@@ -159,11 +163,14 @@ export default function CmvRegrasVinculo({ companyId, canManage, canRevisar, pen
       try {
         await definirClassificacaoAtiva(supabase, ativo);
         toast.success(ativo
-          ? 'Classificação ativada: novos boletos passam a pedir a resposta Sim/Não.'
-          : 'Classificação desativada: o formulário de Contas a Pagar volta ao comportamento anterior.');
+          ? 'Classificação ativada: as novas despesas passam a pedir a resposta Sim/Não.'
+          : 'Classificação desativada: Contas a Pagar, Lançamentos e Conciliação voltam ao comportamento anterior.');
         recarregar();
         emitDataEvent('financeiro:pagar');
+        emitDataEvent('financeiro:lancamentos');
+        emitDataEvent('financeiro:conciliacao');
       } catch (error) {
+        console.error('[CMV Financeiro] Falha ao alterar a classificação:', error);
         toast.error(mensagemErroCmv(error));
       }
     });
@@ -175,7 +182,7 @@ export default function CmvRegrasVinculo({ companyId, canManage, canRevisar, pen
     <div className="space-y-4">
       <CmvPainel titulo={<span className="inline-flex items-center gap-2">Regras de vínculo ao CMV <Info className="h-4 w-4 text-primary-ink" aria-hidden="true" /></span>}>
         <p className="mb-4 max-w-3xl text-sm text-muted-foreground">
-          A escolha é feita em cada linha de rateio do boleto. Quando um boleto tem mais de uma categoria, só as linhas marcadas para aparecer no CMV financeiro entram no cálculo — cada linha com a sua decisão.
+          A escolha é feita em cada linha de rateio da despesa — boleto de Contas a Pagar, lançamento do Livro Razão ou linha da Conciliação Bancária. Quando uma despesa tem mais de uma categoria, só as linhas marcadas para aparecer no CMV financeiro entram no cálculo — cada linha com a sua decisão.
         </p>
         <ExemploPratico />
       </CmvPainel>
@@ -190,7 +197,7 @@ export default function CmvRegrasVinculo({ companyId, canManage, canRevisar, pen
         )}
       >
         <p className="mb-3 text-sm text-muted-foreground">
-          O padrão será sugerido em novos lançamentos. Alterações não modificam boletos já cadastrados.
+          O padrão será sugerido em novos lançamentos. Alterações não modificam despesas já cadastradas.
           {!canManage && ' Você pode consultar os padrões; alterar exige a permissão de gerenciar o CMV Financeiro.'}
         </p>
         {config.isPending ? (
@@ -253,15 +260,15 @@ export default function CmvRegrasVinculo({ companyId, canManage, canRevisar, pen
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <CmvPainel titulo={<span className="inline-flex items-center gap-2"><ListChecks className="h-4 w-4 text-primary-ink" aria-hidden="true" />2. Decisão em cada lançamento</span>}>
           <p className="text-sm text-muted-foreground">
-            A resposta “Aparecer no CMV financeiro?” fica gravada em cada linha de rateio do boleto e é ela que a apuração usa. Edite em Contas a Pagar ou clique numa categoria do relatório para conferir os boletos.
+            A resposta “Aparecer no CMV financeiro?” fica gravada em cada linha da despesa e é ela que a apuração usa. Edite em Contas a Pagar, no Livro Razão ou clique numa categoria do relatório para conferir as despesas.
           </p>
           <div className="mt-4 flex items-start justify-between gap-4 rounded-xl border border-border p-3">
             <div>
-              <Label htmlFor="cmv-ativar" className="text-sm font-semibold text-foreground">Pedir a resposta nos novos boletos</Label>
+              <Label htmlFor="cmv-ativar" className="text-sm font-semibold text-foreground">Pedir a resposta nas novas despesas</Label>
               <p className="mt-0.5 text-xs text-muted-foreground">
                 {ativa
-                  ? 'Ativo: o formulário de Contas a Pagar exige Sim ou Não em cada linha de um boleto novo. Boletos antigos continuam editáveis com a pendência visível.'
-                  : 'Desativado: o formulário de Contas a Pagar funciona como antes e os boletos novos ficam pendentes de classificação.'}
+                  ? 'Ativo: Contas a Pagar exige Sim ou Não em cada linha de um boleto novo; Lançamentos e a Conciliação mostram a pergunta já preenchida pelo padrão da categoria, sem travar o salvar.'
+                  : 'Desativado: Contas a Pagar, Lançamentos e Conciliação funcionam como antes e as despesas novas ficam pendentes de classificação.'}
               </p>
             </div>
             <Switch id="cmv-ativar" checked={ativa} disabled={!canManage || enviando || config.isPending || !config.data} onCheckedChange={alterarAtivacao} />
@@ -273,7 +280,7 @@ export default function CmvRegrasVinculo({ companyId, canManage, canRevisar, pen
 
         <CmvPainel titulo={<span className="inline-flex items-center gap-2"><History className="h-4 w-4 text-primary-ink" aria-hidden="true" />3. Revisão do histórico</span>}>
           <p className="text-sm text-muted-foreground">
-            Nada do histórico é classificado automaticamente. Revise os boletos pendentes, selecione as linhas e confirme a prévia; cada alteração fica na auditoria com o antes e o depois.
+            Nada do histórico é classificado sem alguém confirmar. Aplique o padrão da categoria às pendentes (com prévia) ou revise linha a linha; cada alteração fica na auditoria com o antes e o depois.
             {!canRevisar && ' Aplicar em lote exige a permissão de gerenciar o CMV Financeiro.'}
           </p>
           <dl className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -281,6 +288,12 @@ export default function CmvRegrasVinculo({ companyId, canManage, canRevisar, pen
               <dt className="text-xs text-muted-foreground">Pendentes de classificação (todo o histórico)</dt>
               <dd className="mt-0.5 text-lg font-bold tabular-nums text-foreground">{pendentesGeral ? pendentesGeral.titulos : '—'}</dd>
               <dd className="text-xs tabular-nums text-muted-foreground">{pendentesGeral ? formatarCentavos(pendentesGeral.centavos) : ''}</dd>
+              {pendentesGeralPorFonte && (
+                <dd className="text-xs tabular-nums text-muted-foreground">
+                  {pendentesGeralPorFonte.boleto.titulos} {pendentesGeralPorFonte.boleto.titulos === 1 ? 'boleto' : 'boletos'} ·{' '}
+                  {pendentesGeralPorFonte.lancamento.titulos} {pendentesGeralPorFonte.lancamento.titulos === 1 ? 'lançamento' : 'lançamentos'}
+                </dd>
+              )}
             </div>
             <div className="rounded-xl border border-border p-3">
               <dt className="text-xs text-muted-foreground">Sem data de competência</dt>
@@ -290,10 +303,24 @@ export default function CmvRegrasVinculo({ companyId, canManage, canRevisar, pen
           </dl>
           <div className="mt-3 flex flex-wrap gap-2">
             <Button type="button" size="sm" onClick={() => onAbrirLista('pendente', 'geral')}>Revisar pendências</Button>
+            {/* Só com a migration de lançamentos no banco: antes dela fin_cmv_aplicar_padroes não existe. */}
+            {canRevisar && config.data?.recursos.lancamentos === true && (
+              <Button type="button" variant="outline" size="sm" onClick={() => setAplicarAberto(true)}>Aplicar padrões às pendentes</Button>
+            )}
             <Button type="button" variant="outline" size="sm" onClick={() => onAbrirLista('sem_competencia', 'geral')}>Ver boletos sem competência</Button>
           </div>
         </CmvPainel>
       </div>
+
+      <CmvAplicarPadroesDialog
+        open={aplicarAberto}
+        onOpenChange={setAplicarAberto}
+        onAplicado={() => {
+          void queryClient.invalidateQueries({ queryKey: CMV_QUERY_ROOT });
+          emitDataEvent('financeiro:pagar');
+          emitDataEvent('financeiro:lancamentos');
+        }}
+      />
     </div>
   );
 }

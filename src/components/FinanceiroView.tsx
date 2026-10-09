@@ -234,6 +234,8 @@ export default function FinanceiroView() {
 
   useNavigationSubtab('financeiro', subtab => {
     if (subtab === 'pagar' && visibleSubtabs.includes('pagar')) handleTabSelect('pagar');
+    // Vindo do CMV: abre Lançamentos (Livro Razão, a visão inicial), que consome o registro.
+    if (subtab === 'lancamentos' && visibleSubtabs.includes('lancamentos')) handleTabSelect('lancamentos');
   });
 
   // Contas a Pagar pending count — mesma fonte do menu lateral

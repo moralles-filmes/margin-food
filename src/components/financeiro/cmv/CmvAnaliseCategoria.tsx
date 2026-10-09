@@ -114,7 +114,7 @@ export function CmvDemonstrativo({ report, onAbrirCategoria }: {
       )}
     >
       {report.grupos.length === 0 ? (
-        <EmptyState title="Nenhum boleto incluído no CMV neste período" description="Marque os boletos em Contas a Pagar ou revise as pendências de classificação." compact />
+        <EmptyState title="Nenhuma despesa incluída no CMV neste período" description="Marque as despesas em Contas a Pagar, no Livro Razão ou na Conciliação, ou revise as pendências de classificação." compact />
       ) : (
         <>
           {termo && (
@@ -160,7 +160,7 @@ export function CmvDemonstrativo({ report, onAbrirCategoria }: {
                           <button
                             type="button" onClick={() => onAbrirCategoria(linha)}
                             className="truncate rounded text-left hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                            title={`Ver boletos de ${linha.nome}`}
+                            title={`Ver despesas de ${linha.nome}`}
                           >
                             {linha.nome}
                           </button>

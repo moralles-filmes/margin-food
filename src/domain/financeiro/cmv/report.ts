@@ -6,7 +6,7 @@
  * componente recalcula total, percentual ou variação por conta própria.
  *
  *   R  = faturamento bruto do Fechamento de Caixa no intervalo efetivo
- *   C  = soma das linhas de rateio incluídas, pela competência do boleto
+ *   C  = soma das linhas incluídas (boletos e lançamentos), pela competência
  *   CMV% = C / R × 100, só com R > 0 (sempre razão dos totais, nunca média de %)
  */
 import {
@@ -57,10 +57,14 @@ export interface CmvPayload {
   faturamento: { data: string; centavos: number }[];
   cmv: { data: string; categoriaId: string | null; centavos: number }[];
   boletos: { data: string; quantidade: number }[];
+  /** Lançamentos (Livro Razão e conciliação) com linha incluída, por dia. Banco sem o recurso: vazio. */
+  lancamentos: { data: string; quantidade: number }[];
   qualidade: { data: string; situacao: 'pendente' | 'fora'; titulos: number; centavos: number }[];
   categorias: CmvCategoriaRef[];
   semCompetencia: CmvContagem;
   pendentesGeral: CmvContagem;
+  /** Pendências por fonte; `null` quando o banco ainda não separa (antes da migration de lançamentos). */
+  pendentesGeralPorFonte: { boleto: CmvContagem; lancamento: CmvContagem } | null;
 }
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -130,6 +134,10 @@ export function parseCmvPayload(raw: unknown): CmvPayload {
       const b = objeto(item, `boletos[${i}]`);
       return { data: data(b.data, 'boletos.data'), quantidade: inteiro(b.quantidade, 'boletos.quantidade') };
     }),
+    lancamentos: o.lancamentos == null ? [] : lista(o.lancamentos, 'lancamentos').map((item, i) => {
+      const b = objeto(item, `lancamentos[${i}]`);
+      return { data: data(b.data, 'lancamentos.data'), quantidade: inteiro(b.quantidade, 'lancamentos.quantidade') };
+    }),
     qualidade: lista(o.qualidade, 'qualidade').map((item, i) => {
       const q = objeto(item, `qualidade[${i}]`);
       if (q.situacao !== 'pendente' && q.situacao !== 'fora') {
@@ -157,6 +165,13 @@ export function parseCmvPayload(raw: unknown): CmvPayload {
     }),
     semCompetencia: contagem(o.sem_competencia, 'sem_competencia'),
     pendentesGeral: contagem(o.pendentes_geral, 'pendentes_geral'),
+    pendentesGeralPorFonte: o.pendentes_geral_por_fonte == null ? null : (() => {
+      const p = objeto(o.pendentes_geral_por_fonte, 'pendentes_geral_por_fonte');
+      return {
+        boleto: contagem(p.boleto, 'pendentes_geral_por_fonte.boleto'),
+        lancamento: contagem(p.lancamento, 'pendentes_geral_por_fonte.lancamento'),
+      };
+    })(),
   };
 }
 
@@ -225,6 +240,9 @@ export interface CmvLado {
   /** Por que o CMV% não pôde ser calculado. */
   motivoSemPercentual: string | null;
   boletos: number;
+  lancamentos: number;
+  /** Boletos + lançamentos com linha incluída no CMV. */
+  documentos: number;
   pendentes: CmvContagem;
   fora: CmvContagem;
 }
@@ -300,6 +318,9 @@ export interface CmvReport {
   cmv: CmvIndicador;
   percentual: { atual: number | null; anterior: number | null; pontos: number | null };
   boletos: CmvIndicador;
+  lancamentos: CmvIndicador;
+  /** Despesas vinculadas ao CMV = boletos + lançamentos. */
+  documentos: CmvIndicador;
   /** R − C: "Saldo após CMV, antes das demais despesas". */
   saldoAposCmvCentavos: number | null;
   serie: CmvPontoSerie[];
@@ -313,6 +334,7 @@ export interface CmvReport {
   avisos: CmvAviso[];
   semCompetencia: CmvContagem;
   pendentesGeral: CmvContagem;
+  pendentesGeralPorFonte: { boleto: CmvContagem; lancamento: CmvContagem } | null;
 }
 
 export const CMV_SEM_CATEGORIA_ID = '__sem_categoria__';
@@ -329,7 +351,7 @@ function montarLado(payload: CmvPayload, faixa: CmvIntervalo | null, dias: numbe
   if (faixa === null) {
     return {
       intervalo: null, dias: 0, faturamentoCentavos: null, diasComFechamento: 0, diasSemFechamento: [],
-      cmvCentavos: 0, cmvPercentual: null, motivoSemPercentual: 'Período ainda não iniciado.', boletos: 0,
+      cmvCentavos: 0, cmvPercentual: null, motivoSemPercentual: 'Período ainda não iniciado.', boletos: 0, lancamentos: 0, documentos: 0,
       pendentes: { titulos: 0, centavos: 0 }, fora: { titulos: 0, centavos: 0 },
     };
   }
@@ -347,6 +369,8 @@ function montarLado(payload: CmvPayload, faixa: CmvIntervalo | null, dias: numbe
     else if (faturamentoCentavos === 0) motivoSemPercentual = 'Faturamento zero confirmado no fechamento de caixa.';
     else motivoSemPercentual = 'Faturamento negativo: o percentual não se aplica.';
   }
+  const boletos = payload.boletos.filter(b => dentro(b.data, faixa)).reduce((s, b) => s + b.quantidade, 0);
+  const lancamentos = payload.lancamentos.filter(b => dentro(b.data, faixa)).reduce((s, b) => s + b.quantidade, 0);
   return {
     intervalo: faixa,
     dias,
@@ -356,7 +380,9 @@ function montarLado(payload: CmvPayload, faixa: CmvIntervalo | null, dias: numbe
     cmvCentavos,
     cmvPercentual,
     motivoSemPercentual,
-    boletos: payload.boletos.filter(b => dentro(b.data, faixa)).reduce((s, b) => s + b.quantidade, 0),
+    boletos,
+    lancamentos,
+    documentos: boletos + lancamentos,
     pendentes: somar('pendente'),
     fora: somar('fora'),
   };
@@ -600,7 +626,7 @@ function montarInsights(report: Omit<CmvReport, 'insights' | 'avisos'>): CmvInsi
   if (atual.pendentes.titulos > 0) {
     insights.push({
       tipo: 'pendencia', tom: 'alerta',
-      texto: `${plural(atual.pendentes.titulos, 'boleto', 'boletos')} do período (${formatarCentavos(atual.pendentes.centavos)}) ${atual.pendentes.titulos === 1 ? 'aguarda' : 'aguardam'} classificação: a apuração pode estar incompleta.`,
+      texto: `${plural(atual.pendentes.titulos, 'despesa', 'despesas')} do período (${formatarCentavos(atual.pendentes.centavos)}) ${atual.pendentes.titulos === 1 ? 'aguarda' : 'aguardam'} classificação: a apuração pode estar incompleta.`,
     });
   }
   if (atual.intervalo !== null && atual.diasSemFechamento.length > 0) {
@@ -633,7 +659,7 @@ function montarAvisos(report: Omit<CmvReport, 'insights' | 'avisos'>): CmvAviso[
   if (atual.pendentes.titulos > 0) {
     avisos.push({
       tipo: 'pendencia',
-      texto: `Apuração possivelmente incompleta: ${plural(atual.pendentes.titulos, 'boleto', 'boletos')} do período (${formatarCentavos(atual.pendentes.centavos)}) sem classificação no CMV.`,
+      texto: `Apuração possivelmente incompleta: ${plural(atual.pendentes.titulos, 'despesa', 'despesas')} do período (${formatarCentavos(atual.pendentes.centavos)}) sem classificação no CMV.`,
     });
   }
   if (report.semCompetencia.titulos > 0) {
@@ -707,6 +733,8 @@ export function buildCmvReport(payload: CmvPayload, filtro: CmvFiltro): CmvRepor
     cmv: indicador(atual.cmvCentavos, anterior.intervalo === null ? null : anterior.cmvCentavos),
     percentual: { atual: atual.cmvPercentual, anterior: anterior.cmvPercentual, pontos },
     boletos: indicador(atual.boletos, anterior.intervalo === null ? null : anterior.boletos),
+    lancamentos: indicador(atual.lancamentos, anterior.intervalo === null ? null : anterior.lancamentos),
+    documentos: indicador(atual.documentos, anterior.intervalo === null ? null : anterior.documentos),
     saldoAposCmvCentavos: atual.faturamentoCentavos === null ? null : atual.faturamentoCentavos - atual.cmvCentavos,
     serie: montarSerie(payload, janelas.atual, janelas.efetivoAtual, granularidade, grupoPorCategoria),
     serieAnterior: montarSerie(payload, janelas.anterior, janelas.efetivoAnterior, granularidade, grupoPorCategoria),
@@ -715,6 +743,7 @@ export function buildCmvReport(payload: CmvPayload, filtro: CmvFiltro): CmvRepor
     totalCategorias,
     semCompetencia: payload.semCompetencia,
     pendentesGeral: payload.pendentesGeral,
+    pendentesGeralPorFonte: payload.pendentesGeralPorFonte,
   };
   return { ...base, insights: montarInsights(base), avisos: montarAvisos(base) };
 }

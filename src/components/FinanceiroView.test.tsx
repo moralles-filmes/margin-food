@@ -1,7 +1,8 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import FinanceiroView from '@/components/FinanceiroView';
+import { dropNavigationRequest, requestNavigation } from '@/hooks/useNavigationRequest';
 
 const permissionState = vi.hoisted(() => ({ visibleSubtabs: ['relatorio-socios'] as string[] }));
 
@@ -72,6 +73,27 @@ function LocationProbe() {
 
 afterEach(() => {
   permissionState.visibleSubtabs = ['relatorio-socios'];
+  dropNavigationRequest();
+});
+
+describe('navegação vinda do CMV para Lançamentos', () => {
+  it('abre Lançamentos quando o pedido traz a sub-aba lancamentos', async () => {
+    permissionState.visibleSubtabs = ['dashboard', 'lancamentos'];
+    render(<MemoryRouter><FinanceiroView /></MemoryRouter>);
+    expect(screen.queryByLabelText('Visão de lançamentos')).not.toBeInTheDocument();
+
+    act(() => requestNavigation({ tab: 'financeiro', subtab: 'lancamentos', record: { type: 'lancamento', id: 'l1' } }));
+    expect(await screen.findByLabelText('Visão de lançamentos')).toBeInTheDocument();
+  });
+
+  it('sem acesso a Lançamentos o pedido não troca de aba', async () => {
+    permissionState.visibleSubtabs = ['dashboard', 'pagar'];
+    render(<MemoryRouter><FinanceiroView /></MemoryRouter>);
+
+    act(() => requestNavigation({ tab: 'financeiro', subtab: 'lancamentos' }));
+    await act(async () => {});
+    expect(screen.queryByLabelText('Visão de lançamentos')).not.toBeInTheDocument();
+  });
 });
 
 describe('navegação do Financeiro para Borderô e Apresentação Sócios', () => {

@@ -43,6 +43,14 @@ import { avaliarLancamentoCandidato, casaSozinho, janelaCandidatos, valorDiverge
 import { matchTransferCandidate, findTransferWarnings, type TransferCandidate, type TransferWarning } from '@/lib/conciliacaoTransferMatch';
 import { bankLineKey, buildConciliadosCounts, findStaleImportedRows, fitidKey, type ConciliadoRow, type VinculoRow } from '@/lib/conciliacaoConciliados';
 import { registrarOcorrenciaUsada, reservarOcorrencias, type OcorrenciasLivres } from '@/lib/conciliacaoOcorrencia';
+import { fetchCmvConfig, type CmvConfig } from '@/hooks/useCmvFinanceiro';
+import { decisaoAoTrocarCategoria, type CmvAvisoDecisao, type CmvDecisao } from '@/domain/financeiro/cmv';
+import CmvDecisaoToggle from '@/components/financeiro/cmv/CmvDecisaoToggle';
+import ConciliacaoLinhaCmv from '@/components/financeiro/ConciliacaoLinhaCmv';
+import {
+  competenciaDaLinhaExtrato, decisaoDaLinhaExtrato, definirDecisaoDaLinha, linhaTemAjusteCmv, rateioDaLinhaExtrato,
+  resumoCmvRateio, trocarCategoriaDaLinha,
+} from '@/lib/conciliacaoCmv';
 import { getConsolidatedBankDelta, isAutomaticInvestmentLine, isPendingAutomaticInvestmentLine } from '@/lib/conciliacaoInvestimentoAutomatico';
 import {
   classifySaldoArquivo,
@@ -130,6 +138,11 @@ interface LinhaExtrato {
   /** Índice com que a linha foi enviada e voltou `possible_duplicate`; o
    *  reenvio usa o mesmo (ver `@/lib/conciliacaoOcorrencia`). */
   ocorrencia?: number;
+  /** CMV financeiro: decisão da linha sem rateio (ausente = pendente). */
+  cmvIncluir?: CmvDecisao;
+  cmvAviso?: CmvAvisoDecisao;
+  /** Competência própria (yyyy-MM-dd); ausente = a data do banco (`data`). */
+  competencia?: string;
 }
 
 /** Classificação da diferença entre o valor do boleto e o que saiu do banco. */
@@ -146,6 +159,8 @@ interface RateioLinha {
   valor: number;
   percentual: number;
   observacao: string;
+  cmv_incluir?: CmvDecisao;
+  cmv_aviso?: CmvAvisoDecisao;
 }
 
 /* ───────── sessionStorage helpers ───────── */
@@ -334,6 +349,14 @@ export default function ConciliacaoBancariaSection() {
   const [rateioLinhas, setRateioLinhas] = useState<RateioLinha[]>([]);
   const [categorias, setCategorias] = useState<CategoriaFinRef[]>([]);
   const [centrosCusto, setCentrosCusto] = useState<CentroCustoRef[]>([]);
+  // CMV Financeiro da unidade. Os controles novos só existem com `recursos.lancamentos`.
+  const [cmvConfig, setCmvConfig] = useState<CmvConfig | null>(null);
+  const cmvRecurso = cmvConfig?.recursos.lancamentos === true;
+  // Sugestão pelo padrão da categoria só com a classificação ativa.
+  const cmvPadroes = useMemo(
+    () => (cmvRecurso && cmvConfig?.classificacaoAtiva ? new Map(cmvConfig.categorias.map(c => [c.id, c.cmvSugerir])) : null),
+    [cmvConfig, cmvRecurso],
+  );
 
   const [transferDialog, setTransferDialog] = useState<{ open: boolean; linhaIndex: number }>({ open: false, linhaIndex: -1 });
   const [transferContaDestino, setTransferContaDestino] = useState('');
@@ -441,9 +464,14 @@ export default function ConciliacaoBancariaSection() {
     Promise.all([
       supabase.from('fin_categorias').select('id, nome, tipo, parent_id, centro_custo_padrao_id, excluir_dos_totais').eq('ativo', true).order('nome'),
       supabase.from('fin_centros_custo').select('id, nome').eq('ativo', true).order('nome'),
-    ]).then(([catRes, ccRes]) => {
+      fetchCmvConfig(supabase),
+    ]).then(([catRes, ccRes, cmvRes]) => {
       setCategorias(buildCategoryOptions(catRes.data || []));
       setCentrosCusto(ccRes.data || []);
+      // `null` = a leitura falhou: a recarga (troca de conta, nova tentativa) mantém a última
+      // configuração boa, senão as respostas e competências das linhas sumiriam do payload.
+      // Servidor que responde sem o recurso continua desligando os controles.
+      if (cmvRes) setCmvConfig(cmvRes);
     });
   }, [contaSel, supabase, contasTentativa]);
 
@@ -1658,13 +1686,16 @@ export default function ConciliacaoBancariaSection() {
     if (existing && existing.length > 0) {
       setRateioLinhas([...existing]);
     } else {
-      setRateioLinhas([{ categoria_id: '', centro_custo_id: '', valor: linha.valor, percentual: 100, observacao: '' }]);
+      // A 1ª linha começa com a categoria, o centro de custo padrão dela e a resposta que a linha já tinha:
+      // abrir o rateio só para responder Sim/Não não pode mandar o item sem o centro de custo da categoria.
+      const centroPadrao = categorias.find(c => c.id === linha.categoriaId)?.centro_custo_padrao_id || '';
+      setRateioLinhas([{ categoria_id: linha.categoriaId || '', centro_custo_id: centroPadrao, valor: linha.valor, percentual: 100, observacao: '', cmv_incluir: decisaoDaLinhaExtrato(linha) }]);
     }
     setRateioDialog({ open: true, linhaIndex });
   };
 
   const addRateioLinha = () => {
-    setRateioLinhas(prev => [...prev, { categoria_id: '', centro_custo_id: '', valor: 0, percentual: 0, observacao: '' }]);
+    setRateioLinhas(prev => [...prev, { categoria_id: '', centro_custo_id: '', valor: 0, percentual: 0, observacao: '', cmv_incluir: null }]);
   };
 
   const removeRateioLinha = (idx: number) => {
@@ -1680,6 +1711,9 @@ export default function ConciliacaoBancariaSection() {
       if (field === 'categoria_id') {
         const cat = categorias.find(c => c.id === value);
         if (cat?.centro_custo_padrao_id) linha.centro_custo_id = cat.centro_custo_padrao_id;
+        if (cmvPadroes && linhas[rateioDialog.linhaIndex]?.tipo === 'DESPESA') {
+          Object.assign(linha, decisaoAoTrocarCategoria(linha.cmv_incluir, String(value), cmvPadroes));
+        }
       }
 
       if (field === 'valor' && valorTotal > 0) {
@@ -1692,6 +1726,9 @@ export default function ConciliacaoBancariaSection() {
       return updated;
     });
   };
+
+  const setRateioCmv = (idx: number, incluir: boolean) =>
+    setRateioLinhas(prev => prev.map((l, i) => (i === idx ? { ...l, cmv_incluir: incluir, cmv_aviso: undefined } : l)));
 
   const ratearIgual = () => {
     const valorTotal = linhas[rateioDialog.linhaIndex]?.valor || 0;
@@ -1888,28 +1925,8 @@ export default function ConciliacaoBancariaSection() {
   };
 
   /** Rateio (ou categoria única) da linha, no formato que a RPC de importação espera. */
-  const buildRateioPayload = (l: LinhaExtrato) => {
-    if (l.rateioLinhas && l.rateioLinhas.length > 0) {
-      return l.rateioLinhas.map(r => ({
-        categoria_id: r.categoria_id || null,
-        centro_custo_id: r.centro_custo_id || null,
-        valor: r.valor,
-        percentual: r.percentual || null,
-        observacao: r.observacao || null,
-      }));
-    }
-    if (l.categoriaId) {
-      const cat = categorias.find(c => c.id === l.categoriaId);
-      return [{
-        categoria_id: l.categoriaId,
-        centro_custo_id: cat?.centro_custo_padrao_id || null,
-        valor: l.valor,
-        percentual: 100,
-        observacao: null,
-      }];
-    }
-    return null;
-  };
+  const buildRateioPayload = (l: LinhaExtrato) =>
+    rateioDaLinhaExtrato(l, categoriaId => categorias.find(c => c.id === categoriaId)?.centro_custo_padrao_id || null, cmvRecurso);
 
   /** Índice da linha aberta em "Criar lançamento", pela mesma regra do Processar. */
   const ocorrenciaDaLinhaCriar = (): number | undefined => {
@@ -1936,7 +1953,8 @@ export default function ConciliacaoBancariaSection() {
         p_external_id: l.fitId || null,
         p_force_duplicate: true,
         p_occurrence_index: l.ocorrencia ?? 0,
-      });
+        ...competenciaDaLinhaExtrato(l, cmvRecurso),
+      } as any);
       if (error) throw error;
       const result = data as { lancamento_id?: string } | null;
       await bindExtratoLine(l, result?.lancamento_id);
@@ -2079,6 +2097,17 @@ export default function ConciliacaoBancariaSection() {
   const importarEConciliar = async (jaConfirmouVinculos = false, jaConfirmouBaixas = false) => {
     if (!contaSel) { toast.error('Selecione uma conta bancária'); return; }
 
+    // Sem a configuração do CMV (falhou ou ainda não chegou), a resposta e a competência
+    // ajustadas nas linhas a importar — ex.: restauradas do rascunho — não iriam ao servidor:
+    // o lançamento nasceria pendente e com a data do banco, sem aviso. Antes de qualquer gravação.
+    const perderiaAjusteCmv = !cmvRecurso && linhas.some(l => !isAutomaticInvestmentLine(l)
+      && l.selecionada && !l.matchId && !l.jaConciliada && !l.ignorada && linhaTemAjusteCmv(l));
+    if (perderiaAjusteCmv) {
+      console.error('[ConciliacaoBancariaSection.importarEConciliar]', 'configuração do CMV ausente com linhas ajustadas', { cmvConfig });
+      toast.error('A configuração do CMV não carregou. Recarregue a página antes de processar para não perder as respostas e competências ajustadas.');
+      return;
+    }
+
     // Linhas cujo match é uma baixa já registrada em Contas a Pagar/Receber:
     // antes de processar, a pessoa decide entre vincular ou lançar como novo.
     const indicesJaNoRazao = linhas
@@ -2180,6 +2209,7 @@ export default function ConciliacaoBancariaSection() {
             p_rateio_linhas: buildRateioPayload(l),
             p_external_id: l.fitId || null,
             p_occurrence_index: ocorrencia,
+            ...competenciaDaLinhaExtrato(l, cmvRecurso),
           } as any);
           if (error) throw error;
           const result = data as { status?: string; lancamento_id?: string; criado_em?: string } | null;
@@ -2343,6 +2373,9 @@ export default function ConciliacaoBancariaSection() {
 
   const rateioValorTotal = linhas[rateioDialog.linhaIndex]?.valor || 0;
   const rateioLinhaTipo = linhas[rateioDialog.linhaIndex]?.tipo;
+  // Pergunta do CMV no rateio: despesa, banco com o recurso e classificação ativa (ou já respondida).
+  const rateioMostraCmv = cmvRecurso && rateioLinhaTipo === 'DESPESA'
+    && (cmvConfig?.classificacaoAtiva === true || rateioLinhas.some(r => (r.cmv_incluir ?? null) !== null));
   const rateioTotalAtual = rateioLinhas.reduce((s, l) => s + Number(l.valor || 0), 0);
   const rateioDiff = rateioValorTotal - rateioTotalAtual;
   const rateioValido = Math.abs(rateioDiff) < 0.01;
@@ -2379,7 +2412,7 @@ export default function ConciliacaoBancariaSection() {
     [categoriasDescontoConcedido],
   );
   const setLinhaCategoria = (i: number, categoriaId: string) =>
-    setLinhas(prev => prev.map((l, j) => j === i ? { ...l, categoriaId } : l));
+    setLinhas(prev => prev.map((l, j) => (j === i ? trocarCategoriaDaLinha(l, categoriaId, cmvPadroes) : l)));
 
   const getOriginBadge = (origin?: MatchSuggestion['origin']) => {
     if (!origin) return null;
@@ -2588,6 +2621,28 @@ export default function ConciliacaoBancariaSection() {
       </div>
     ) : null
   );
+
+  /** Pergunta do CMV e competência da linha que vira despesa nova (com o recurso no banco). */
+  const cmvLinha = (linha: LinhaExtrato, i: number, e: EstadoLinha) => {
+    if (!cmvRecurso || e.isAutomatic || e.hasMatch || e.isDone || e.isInactive || linha.tipo !== 'DESPESA') return null;
+    const multi = linha.rateioLinhas && linha.rateioLinhas.length > 1 ? linha.rateioLinhas : null;
+    const respondida = decisaoDaLinhaExtrato(linha) !== null || (linha.rateioLinhas ?? []).some(r => (r.cmv_incluir ?? null) !== null);
+    return (
+      <ConciliacaoLinhaCmv
+        mostrarCmv={cmvConfig?.classificacaoAtiva === true || respondida}
+        decisao={decisaoDaLinhaExtrato(linha)}
+        aviso={linha.cmvAviso}
+        onDecisao={incluir => setLinhas(prev => prev.map((l, j) => (j === i ? definirDecisaoDaLinha(l, incluir) : l)))}
+        rateio={multi ? resumoCmvRateio(multi) : null}
+        onAbrirRateio={() => openRateio(i)}
+        permiteCompetencia
+        dataBanco={linha.data}
+        competencia={linha.competencia}
+        onCompetencia={competencia => setLinhas(prev => prev.map((l, j) => (j === i ? { ...l, competencia } : l)))}
+        rotulo={linha.descricao}
+      />
+    );
+  };
 
   const valorLinha = (linha: LinhaExtrato, e: EstadoLinha) => (
     <>
@@ -2991,6 +3046,7 @@ export default function ConciliacaoBancariaSection() {
                                   </div>
                                   {notasLinha(linha, e)}
                                   {categoriaLinha(linha, i, e)}
+                                  {cmvLinha(linha, i, e)}
                                   {acoes && <div className="mt-2">{acoes}</div>}
                                 </div>
                               </div>
@@ -3026,6 +3082,7 @@ export default function ConciliacaoBancariaSection() {
                                   </p>
                                   {notasLinha(linha, e)}
                                   {categoriaLinha(linha, i, e)}
+                                  {cmvLinha(linha, i, e)}
                                 </TableCell>
                                 <TableCell><StatusBadge status={tipo.status} label={tipo.label} /></TableCell>
                                 <TableCell className="text-right">{valorLinha(linha, e)}</TableCell>
@@ -3755,6 +3812,16 @@ export default function ConciliacaoBancariaSection() {
                         </Button>
                       )}
                     </div>
+                    {rateioMostraCmv && (
+                      <div className="col-span-2 flex flex-wrap items-center gap-2 sm:col-span-12">
+                        <span className="text-xs text-muted-foreground">Aparecer no CMV financeiro?</span>
+                        <CmvDecisaoToggle
+                          size="sm" value={rl.cmv_incluir ?? null} onChange={v => setRateioCmv(idx, v)}
+                          label={`Aparecer no CMV financeiro? — linha ${idx + 1} do rateio`}
+                        />
+                        {rl.cmv_aviso === 'redefinido' && <span className="text-xs text-warning">Categoria trocada: confira.</span>}
+                      </div>
+                    )}
                   </li>
                 ))}
               </ol>
@@ -3878,6 +3945,7 @@ export default function ConciliacaoBancariaSection() {
         linha={criarDialog.linhaIndex >= 0 ? linhas[criarDialog.linhaIndex] || null : null}
         ocorrencia={ocorrenciaDaLinhaCriar()}
         contaBancariaId={contaSel}
+        cmvConfig={cmvConfig}
         onCreated={(result) => {
           const idx = criarDialog.linhaIndex;
           const linha = linhas[idx];

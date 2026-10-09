@@ -20,7 +20,7 @@ import { useTravaEnvio } from '@/hooks/useTravaEnvio';
 import { requestNavigation } from '@/hooks/useNavigationRequest';
 import { formatarCentavos, formatarData, type CmvDecisao } from '@/domain/financeiro/cmv';
 import {
-  CMV_QUERY_ROOT, aplicarCmvSerie, classificarCmv, mensagemErroCmv, useCmvLinhas,
+  CMV_QUERY_ROOT, aplicarCmvSerie, classificarCmv, itemDaLinha, mensagemErroCmv, useCmvLinhas,
   type CmvLinhaDetalhe, type CmvSituacao,
 } from '@/hooks/useCmvFinanceiro';
 import CmvDecisaoToggle from './CmvDecisaoToggle';
@@ -41,14 +41,18 @@ interface Props {
   companyId: string | null | undefined;
   /** Pode alterar a decisão de um boleto (Contas a Pagar → editar, ou gerenciar o CMV). */
   canClassificar: boolean;
+  /** Pode alterar a decisão de um lançamento (Livro Razão → editar, conciliar, ou gerenciar o CMV). */
+  canClassificarLancamento: boolean;
   /** Pode aplicar a decisão em lote (revisão do histórico). */
   canLote: boolean;
-  /** Pode abrir o lançamento original em Contas a Pagar. */
+  /** Pode abrir o boleto em Contas a Pagar. */
   canAbrirBoleto: boolean;
+  /** Pode abrir o lançamento no Livro Razão. */
+  canAbrirLancamento: boolean;
 }
 
 const PAGINA = 50;
-const chaveLinha = (l: Pick<CmvLinhaDetalhe, 'contaPagarId' | 'rateioId'>) => `${l.contaPagarId}:${l.rateioId ?? ''}`;
+const chaveLinha = (l: Pick<CmvLinhaDetalhe, 'fonte' | 'documentoId' | 'rateioId'>) => `${l.fonte}:${l.documentoId}:${l.rateioId ?? ''}`;
 
 const SITUACAO_TEXTO: Record<'sim' | 'nao' | 'pendente', string> = {
   sim: 'Sim (entra no CMV)',
@@ -60,11 +64,21 @@ function textoDecisao(decisao: CmvDecisao): string {
   return decisao === true ? SITUACAO_TEXTO.sim : decisao === false ? SITUACAO_TEXTO.nao : SITUACAO_TEXTO.pendente;
 }
 
+/** De onde veio a despesa, para a pessoa reconhecer a linha. */
+function origemDaLinha(l: CmvLinhaDetalhe): string {
+  if (l.fonte === 'boleto') return l.fornecedor ? `Boleto · ${l.fornecedor}` : 'Boleto';
+  const origem = l.origem === 'conciliacao' ? 'Conciliação' : 'Lançamento';
+  return l.contaNome ? `${origem} · ${l.contaNome}` : origem;
+}
+
 /**
- * Boletos e rateios por trás de um número do relatório, e revisão de pendências.
- * A decisão de uma linha é gravada na hora; o lote passa por prévia e confirmação.
+ * Despesas (boletos e lançamentos) e rateios por trás de um número do relatório, e
+ * revisão de pendências. A decisão de uma linha é gravada na hora; o lote passa por
+ * prévia e confirmação.
  */
-export default function CmvBoletosDialog({ alvo, onClose, companyId, canClassificar, canLote, canAbrirBoleto }: Props) {
+export default function CmvBoletosDialog({
+  alvo, onClose, companyId, canClassificar, canClassificarLancamento, canLote, canAbrirBoleto, canAbrirLancamento,
+}: Props) {
   const supabase = useSupabase();
   const toast = useScopedToast();
   const queryClient = useQueryClient();
@@ -101,7 +115,7 @@ export default function CmvBoletosDialog({ alvo, onClose, companyId, canClassifi
   const totalPaginas = lista ? Math.max(1, Math.ceil(lista.totalLinhas / PAGINA)) : 1;
 
   // A seleção guarda a linha como estava ao ser marcada; a cada recarga, as que
-  // estão na página trocam pela versão nova (o `updatedAt` é o lock do boleto).
+  // estão na página trocam pela versão nova (o `updatedAt` é o lock do documento).
   useEffect(() => {
     if (!lista) return;
     setSelecionadas(atual => {
@@ -116,9 +130,10 @@ export default function CmvBoletosDialog({ alvo, onClose, companyId, canClassifi
     });
   }, [lista]);
 
-  // Espera a recarga: até lá a linha ainda carrega a versão antiga do boleto.
+  // Espera a recarga: até lá a linha ainda carrega a versão antiga do documento.
   const aposGravar = async () => {
     emitDataEvent('financeiro:pagar');
+    emitDataEvent('financeiro:lancamentos');
     await queryClient.invalidateQueries({ queryKey: CMV_QUERY_ROOT });
   };
 
@@ -127,17 +142,16 @@ export default function CmvBoletosDialog({ alvo, onClose, companyId, canClassifi
     await trava(async () => {
       setSalvando(chaveLinha(linha));
       try {
-        await classificarCmv(supabase, [{
-          contaPagarId: linha.contaPagarId, rateioId: linha.rateioId, incluir, expectedUpdatedAt: linha.updatedAt,
-        }]);
+        await classificarCmv(supabase, [itemDaLinha(linha, incluir)]);
         toast.success(incluir ? 'Linha incluída no CMV financeiro.' : 'Linha retirada do CMV financeiro.');
-        // O boleto mudou de versão: as linhas dele saem da seleção do lote.
+        // O documento mudou de versão: as linhas dele saem da seleção do lote.
         setSelecionadas(atual => {
-          const proximo = new Map([...atual].filter(([, l]) => l.contaPagarId !== linha.contaPagarId));
+          const proximo = new Map([...atual].filter(([, l]) => l.documentoId !== linha.documentoId));
           return proximo.size === atual.size ? atual : proximo;
         });
         await aposGravar();
       } catch (error) {
+        console.error('[CMV Financeiro] Falha ao classificar a linha:', error);
         toast.error(mensagemErroCmv(error));
         void query.refetch();
       } finally {
@@ -168,7 +182,7 @@ export default function CmvBoletosDialog({ alvo, onClose, companyId, canClassifi
     const linhas = [...selecionadas.values()];
     return {
       linhas,
-      titulos: new Set(linhas.map(l => l.contaPagarId)).size,
+      titulos: new Set(linhas.map(l => l.documentoId)).size,
       centavos: linhas.reduce((s, l) => s + l.linhaCentavos, 0),
     };
   }, [selecionadas]);
@@ -179,17 +193,14 @@ export default function CmvBoletosDialog({ alvo, onClose, companyId, canClassifi
     await trava(async () => {
       setSalvando('lote');
       try {
-        const resultado = await classificarCmv(
-          supabase,
-          previa.linhas.map(l => ({ contaPagarId: l.contaPagarId, rateioId: l.rateioId, incluir, expectedUpdatedAt: l.updatedAt })),
-          justificativa,
-        );
-        toast.success(`${resultado.itens} ${resultado.itens === 1 ? 'linha classificada' : 'linhas classificadas'} em ${resultado.titulos} ${resultado.titulos === 1 ? 'boleto' : 'boletos'}.`);
+        const resultado = await classificarCmv(supabase, previa.linhas.map(l => itemDaLinha(l, incluir)), justificativa);
+        toast.success(`${resultado.itens} ${resultado.itens === 1 ? 'linha classificada' : 'linhas classificadas'} em ${resultado.titulos} ${resultado.titulos === 1 ? 'despesa' : 'despesas'}.`);
         setSelecionadas(new Map());
         setLote(null);
         setJustificativa('');
         await aposGravar();
       } catch (error) {
+        console.error('[CMV Financeiro] Falha ao classificar o lote:', error);
         toast.error(`${mensagemErroCmv(error)} Nada foi alterado e a seleção foi limpa: selecione de novo.`);
         setLote(null);
         // A seleção pode conter linha com versão antiga: repetir o mesmo lote falharia de novo.
@@ -207,7 +218,7 @@ export default function CmvBoletosDialog({ alvo, onClose, companyId, canClassifi
     await trava(async () => {
       setSalvando('serie');
       try {
-        const resultado = await aplicarCmvSerie(supabase, referencia.contaPagarId, { expectedUpdatedAt: referencia.updatedAt });
+        const resultado = await aplicarCmvSerie(supabase, referencia.documentoId, { expectedUpdatedAt: referencia.updatedAt });
         toast.success(resultado.titulosAlterados === 0
           ? 'As outras parcelas da série já estavam com esta resposta.'
           : `${resultado.titulosAlterados} ${resultado.titulosAlterados === 1 ? 'parcela da série atualizada' : 'parcelas da série atualizadas'}.`);
@@ -216,6 +227,7 @@ export default function CmvBoletosDialog({ alvo, onClose, companyId, canClassifi
         setSelecionadas(new Map());
         await aposGravar();
       } catch (error) {
+        console.error('[CMV Financeiro] Falha ao aplicar a resposta à série:', error);
         toast.error(`${mensagemErroCmv(error)} Nada foi alterado.`);
         setSerie(null);
         void query.refetch();
@@ -225,12 +237,19 @@ export default function CmvBoletosDialog({ alvo, onClose, companyId, canClassifi
     });
   };
 
-  const abrirBoleto = (id: string) => {
+  const abrirDocumento = (linha: CmvLinhaDetalhe) => {
     onClose();
-    requestNavigation({ tab: 'financeiro', subtab: 'pagar', record: { type: 'conta_pagar', id } });
+    if (linha.fonte === 'boleto') {
+      requestNavigation({ tab: 'financeiro', subtab: 'pagar', record: { type: 'conta_pagar', id: linha.documentoId } });
+    } else {
+      requestNavigation({ tab: 'financeiro', subtab: 'lancamentos', record: { type: 'lancamento', id: linha.documentoId } });
+    }
   };
-
-  const colunas = 7 + (canLote ? 1 : 0) + (canAbrirBoleto ? 1 : 0);
+  const podeClassificar = (l: CmvLinhaDetalhe) =>
+    (l.fonte === 'boleto' ? canClassificar : canClassificarLancamento) && l.status !== 'CANCELADO';
+  const podeAbrir = (l: CmvLinhaDetalhe) => (l.fonte === 'boleto' ? canAbrirBoleto : canAbrirLancamento);
+  const colunaAbrir = canAbrirBoleto || canAbrirLancamento;
+  const colunas = 7 + (canLote ? 1 : 0) + (colunaAbrir ? 1 : 0);
 
   return (
     <>
@@ -244,8 +263,8 @@ export default function CmvBoletosDialog({ alvo, onClose, companyId, canClassifi
           <div className="flex-1 space-y-3 overflow-y-auto px-6 py-4">
             {lista && (
               <p className="text-sm text-muted-foreground" aria-live="polite">
-                <strong className="font-semibold text-foreground">{lista.totalTitulos}</strong> {lista.totalTitulos === 1 ? 'boleto' : 'boletos'},{' '}
-                <strong className="font-semibold text-foreground">{lista.totalLinhas}</strong> {lista.totalLinhas === 1 ? 'linha' : 'linhas'} de rateio,{' '}
+                <strong className="font-semibold text-foreground">{lista.totalTitulos}</strong> {lista.totalTitulos === 1 ? 'despesa' : 'despesas'},{' '}
+                <strong className="font-semibold text-foreground">{lista.totalLinhas}</strong> {lista.totalLinhas === 1 ? 'linha' : 'linhas'},{' '}
                 total de <strong className="font-semibold tabular-nums text-foreground">{formatarCentavos(lista.totalCentavos)}</strong>.
               </p>
             )}
@@ -266,19 +285,19 @@ export default function CmvBoletosDialog({ alvo, onClose, companyId, canClassifi
             {query.isError ? (
               <div className="flex flex-col items-center gap-3 py-10 text-center text-sm text-muted-foreground">
                 <AlertTriangle className="h-6 w-6 text-destructive" aria-hidden="true" />
-                <p>{mensagemErroCmv(query.error, 'Não foi possível carregar os boletos.')}</p>
+                <p>{mensagemErroCmv(query.error, 'Não foi possível carregar as despesas.')}</p>
                 <Button type="button" variant="outline" size="sm" onClick={() => void query.refetch()}>Tentar novamente</Button>
               </div>
             ) : query.isPending ? (
-              <div className="space-y-2" role="status" aria-label="Carregando boletos">
+              <div className="space-y-2" role="status" aria-label="Carregando despesas">
                 {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
               </div>
             ) : itens.length === 0 ? (
-              <EmptyState title="Nenhum boleto neste recorte" description="Não há linhas de rateio com esta situação no intervalo consultado." compact />
+              <EmptyState title="Nenhuma despesa neste recorte" description="Não há linhas com esta situação no intervalo consultado." compact />
             ) : (
               <div className="overflow-x-auto rounded-xl border border-border">
                 <table className="w-full min-w-[1020px] border-collapse text-sm">
-                  <caption className="sr-only">Boletos e linhas de rateio do recorte</caption>
+                  <caption className="sr-only">Despesas e linhas do recorte</caption>
                   <thead>
                     <tr className="border-b border-border bg-muted/60 text-xs text-muted-foreground">
                       {canLote && (
@@ -286,20 +305,21 @@ export default function CmvBoletosDialog({ alvo, onClose, companyId, canClassifi
                           <Checkbox checked={todasDaPagina} onCheckedChange={v => alternarPagina(v === true)} aria-label="Selecionar todas as linhas desta página" />
                         </th>
                       )}
-                      <th scope="col" className="px-3 py-2 text-left font-medium">Fornecedor / boleto</th>
+                      <th scope="col" className="px-3 py-2 text-left font-medium">Descrição / origem</th>
                       <th scope="col" className="px-3 py-2 text-left font-medium">Competência</th>
                       <th scope="col" className="px-3 py-2 text-left font-medium">Vencimento</th>
                       <th scope="col" className="px-3 py-2 text-left font-medium">Situação</th>
                       <th scope="col" className="px-3 py-2 text-left font-medium">Categoria</th>
-                      <th scope="col" className="px-3 py-2 text-right font-medium">Valor do boleto</th>
+                      <th scope="col" className="px-3 py-2 text-right font-medium">Valor do documento</th>
                       <th scope="col" className="px-3 py-2 text-right font-medium">Valor da linha</th>
                       <th scope="col" className="px-3 py-2 text-left font-medium">Aparecer no CMV?</th>
-                      {canAbrirBoleto && <th scope="col" className="w-10 px-3 py-2"><span className="sr-only">Abrir lançamento</span></th>}
+                      {colunaAbrir && <th scope="col" className="w-10 px-3 py-2"><span className="sr-only">Abrir</span></th>}
                     </tr>
                   </thead>
                   <tbody>
                     {itens.map(linha => {
                       const chave = chaveLinha(linha);
+                      const origem = origemDaLinha(linha);
                       return (
                         <tr key={chave} className="border-b border-border last:border-0">
                           {canLote && (
@@ -311,8 +331,8 @@ export default function CmvBoletosDialog({ alvo, onClose, companyId, canClassifi
                             </td>
                           )}
                           <th scope="row" className="max-w-[16rem] px-3 py-2 text-left font-normal">
-                            <span className="block truncate font-medium text-foreground" title={linha.fornecedor ?? linha.descricao}>{linha.fornecedor || linha.descricao}</span>
-                            {linha.fornecedor && <span className="block truncate text-xs text-muted-foreground" title={linha.descricao}>{linha.descricao}</span>}
+                            <span className="block truncate font-medium text-foreground" title={linha.descricao}>{linha.descricao}</span>
+                            <span className="block truncate text-xs text-muted-foreground" title={origem}>{origem}</span>
                           </th>
                           <td className="whitespace-nowrap px-3 py-2 tabular-nums">
                             {linha.dataCompetencia ? formatarData(linha.dataCompetencia) : <span className="font-medium text-warning">Sem competência</span>}
@@ -323,7 +343,7 @@ export default function CmvBoletosDialog({ alvo, onClose, companyId, canClassifi
                           <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-muted-foreground">{formatarCentavos(linha.tituloCentavos)}</td>
                           <td className="whitespace-nowrap px-3 py-2 text-right font-semibold tabular-nums text-foreground">{formatarCentavos(linha.linhaCentavos)}</td>
                           <td className="whitespace-nowrap px-3 py-2">
-                            {canClassificar && linha.status !== 'CANCELADO' ? (
+                            {podeClassificar(linha) ? (
                               <span className="inline-flex items-center gap-2">
                                 <CmvDecisaoToggle
                                   size="sm" value={linha.cmvIncluir} disabled={salvando !== null}
@@ -332,7 +352,7 @@ export default function CmvBoletosDialog({ alvo, onClose, companyId, canClassifi
                                 />
                                 {salvando === chave && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" aria-label="Salvando" />}
                                 {linha.cmvIncluir === null && salvando !== chave && <span className="text-xs font-medium text-warning">Pendente</span>}
-                                {canLote && linha.serieBoletos > 1 && linha.cmvIncluir !== null && (
+                                {canLote && linha.fonte === 'boleto' && linha.serieBoletos > 1 && linha.cmvIncluir !== null && (
                                   <Button
                                     type="button" variant="outline" size="sm" className="h-7 gap-1 px-2 text-xs" disabled={salvando !== null}
                                     onClick={() => setSerie(linha)}
@@ -347,11 +367,16 @@ export default function CmvBoletosDialog({ alvo, onClose, companyId, canClassifi
                               <span className={linha.cmvIncluir === null ? 'font-medium text-warning' : undefined}>{textoDecisao(linha.cmvIncluir)}</span>
                             )}
                           </td>
-                          {canAbrirBoleto && (
+                          {colunaAbrir && (
                             <td className="px-3 py-2">
-                              <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => abrirBoleto(linha.contaPagarId)} aria-label={`Abrir ${linha.descricao} em Contas a Pagar`}>
-                                <ExternalLink className="h-4 w-4" />
-                              </Button>
+                              {podeAbrir(linha) && (
+                                <Button
+                                  type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => abrirDocumento(linha)}
+                                  aria-label={`Abrir ${linha.descricao} em ${linha.fonte === 'boleto' ? 'Contas a Pagar' : 'Lançamentos'}`}
+                                >
+                                  <ExternalLink className="h-4 w-4" />
+                                </Button>
+                              )}
                             </td>
                           )}
                         </tr>
@@ -384,10 +409,10 @@ export default function CmvBoletosDialog({ alvo, onClose, companyId, canClassifi
               <div className="space-y-2 text-sm text-muted-foreground">
                 <p>
                   Esta ação altera <strong className="text-foreground">{previa.linhas.length}</strong> {previa.linhas.length === 1 ? 'linha' : 'linhas'} de{' '}
-                  <strong className="text-foreground">{previa.titulos}</strong> {previa.titulos === 1 ? 'boleto' : 'boletos'}, somando{' '}
+                  <strong className="text-foreground">{previa.titulos}</strong> {previa.titulos === 1 ? 'despesa' : 'despesas'}, somando{' '}
                   <strong className="tabular-nums text-foreground">{formatarCentavos(previa.centavos)}</strong>.
                 </p>
-                <p>Só a decisão do CMV muda: valor, categoria, cobrança e pagamento dos boletos ficam como estão. A alteração fica registrada na auditoria e pode ser revertida linha a linha.</p>
+                <p>Só a decisão do CMV muda: valor, categoria, cobrança e pagamento ficam como estão. A alteração fica registrada na auditoria e pode ser revertida linha a linha.</p>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>

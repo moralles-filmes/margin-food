@@ -17,7 +17,7 @@ export default function CmvComparativo({ report, onAbrirCategoria }: {
   report: CmvReport;
   onAbrirCategoria: (linha: CmvCategoriaLinha) => void;
 }) {
-  const { atual, anterior, faturamento, cmv, percentual, boletos } = report;
+  const { atual, anterior, faturamento, cmv, percentual, documentos } = report;
   const linhas: { rotulo: string; atual: string; anterior: string; diferenca: string; variacao: string }[] = [
     {
       rotulo: 'Faturamento (Fechamento de Caixa)',
@@ -46,10 +46,10 @@ export default function CmvComparativo({ report, onAbrirCategoria }: {
       variacao: '—',
     },
     {
-      rotulo: 'Boletos vinculados ao CMV',
-      atual: boletos.atual === null ? '—' : String(boletos.atual), anterior: boletos.anterior === null ? '—' : String(boletos.anterior),
-      diferenca: boletos.diferenca === null ? '—' : `${boletos.diferenca > 0 ? '+' : ''}${boletos.diferenca}`,
-      variacao: formatarVariacao(boletos.variacaoPercentual),
+      rotulo: 'Despesas vinculadas ao CMV',
+      atual: documentos.atual === null ? '—' : String(documentos.atual), anterior: documentos.anterior === null ? '—' : String(documentos.anterior),
+      diferenca: documentos.diferenca === null ? '—' : `${documentos.diferenca > 0 ? '+' : ''}${documentos.diferenca}`,
+      variacao: formatarVariacao(documentos.variacaoPercentual),
     },
     { rotulo: 'Dias no intervalo comparado', atual: String(atual.dias), anterior: String(anterior.dias), diferenca: '—', variacao: '—' },
     { rotulo: 'Dias com fechamento de caixa', atual: fechamento(atual), anterior: fechamento(anterior), diferenca: '—', variacao: '—' },

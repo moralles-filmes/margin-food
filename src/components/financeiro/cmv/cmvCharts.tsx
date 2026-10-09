@@ -221,7 +221,7 @@ export function CmvComposicao({ report, onAbrirGrupo }: { report: CmvReport; onA
               <button
                 type="button" onClick={() => onAbrirGrupo(grupo)}
                 className="flex w-full items-center gap-2 rounded-md text-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                aria-label={`Ver boletos de ${fatia.nome}`}
+                aria-label={`Ver despesas de ${fatia.nome}`}
               >
                 {conteudo}
               </button>
@@ -322,7 +322,7 @@ export function CmvRanking({ grupos, onAbrirGrupo }: { grupos: CmvGrupo[]; onAbr
               <button
                 type="button" onClick={() => onAbrirGrupo(grupo)}
                 className="flex w-full items-center gap-2 rounded-md hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                aria-label={`Ver boletos de ${grupo.nome}: ${formatarCentavos(grupo.atualCentavos)}, ${formatarPercentual(grupo.participacao, 1)} do CMV`}
+                aria-label={`Ver despesas de ${grupo.nome}: ${formatarCentavos(grupo.atualCentavos)}, ${formatarPercentual(grupo.participacao, 1)} do CMV`}
               >
                 {linha}
               </button>
