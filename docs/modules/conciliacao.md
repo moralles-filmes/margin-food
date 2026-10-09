@@ -10,7 +10,7 @@
 
 - Faz: lê o extrato (OFX/OFC/CSV), reconhece linhas já conciliadas, casa linha com lançamento manual, espelho de CP/CR ou título em aberto, cria lançamento ou título a partir da linha, trata transferência entre contas e investimento automático, e confere o saldo final contra o banco.
 - Não faz: cadastro de títulos, baixa fora do extrato, relatórios → [financeiro.md](financeiro.md).
-- Código: `src/components/financeiro/ConciliacaoBancariaSection.tsx`, `ConciliacaoParts.tsx`, `ConfirmarSaldoExtratoDialog.tsx`, `CriarLancamentoExtratoDialog.tsx`, `src/lib/conciliacao*.ts`, `src/lib/extratoParser.ts`.
+- Código: `src/components/financeiro/ConciliacaoBancariaSection.tsx`, `ConciliacaoParts.tsx`, `ConfirmarSaldoExtratoDialog.tsx`, `CriarLancamentoExtratoDialog.tsx`, `ConciliacaoLinhaCmv.tsx`, `src/lib/conciliacao*.ts`, `src/lib/extratoParser.ts`.
 
 ## Tabelas
 
@@ -25,7 +25,7 @@
 
 ### Visão geral
 
-- **Conciliação Bancária (OFX/OFC)** — 3 destinos: `lancamento`, `conta_pagar`, `conta_receber`. Categoria obrigatória para Receita/Despesa (Transferência é exceção); vai no INSERT do lançamento (nasce `REALIZADO`+`conciliado=true`), **nunca via UPDATE pós-criação** (trigger de lançamento realizado exige justificativa nos campos vigiados). FITID é persistido no banco para reconhecer vínculos entre computadores diferentes; parser não pode colapsar transações legítimas repetidas. Transferências entre contas usam um único lançamento (não duplicam). Lista de Lançamentos usa paginação PostgREST completa (`range`), nunca `.limit(200)`; filtro padrão de período é resolvido no banco (90 dias, com opção de todo o histórico).
+- **Conciliação Bancária (OFX/OFC)** — 3 destinos: `lancamento`, `conta_pagar`, `conta_receber`. Categoria obrigatória para Receita/Despesa (Transferência é exceção); vai no INSERT do lançamento (nasce `REALIZADO`+`conciliado=true`), **nunca via UPDATE pós-criação** (trigger de lançamento realizado exige justificativa nos campos vigiados). FITID é persistido no banco para reconhecer vínculos entre computadores diferentes; parser não pode colapsar transações legítimas repetidas. Transferências entre contas usam um único lançamento (não duplicam). Lista de Lançamentos usa paginação PostgREST completa (`range`), nunca `.limit(200)`; filtro padrão de período é resolvido no banco (90 dias, com opção de todo o histórico). A data da linha do extrato é sempre o `p_data` de `reconcile_import_lancamento` (chave de idempotência e checagem de duplicata); competência própria só por `p_data_competencia`, que muda apenas `data_competencia`. No diálogo "Criar" com destino Lançamento e `recursos.lancamentos` ligado no servidor, "Data Pagamento" fica travada na data do banco e, em linha de despesa, a competência, a categoria e a resposta do CMV ajustadas na linha são herdadas; para conta a pagar/receber a competência volta à data do banco.
 
 ### Leitura do arquivo
 
@@ -47,7 +47,7 @@
 - **Divergência entre boleto e extrato vira lançamento separado** — `reconcile_pay_conta_pagar` recebe `p_valor_extrato` e recusa a baixa com `DIVERGENCIA_VALOR` se a diferença não for classificada como JUROS/TARIFA/DESCONTO. O espelho mantém o valor e a categoria do boleto; a diferença nasce como `origem='ajuste_pagamento'` na categoria financeira (DESPESA se o banco debitou a mais, RECEITA se a menos). Assim a soma bate com o extrato sem poluir a categoria da mercadoria.
 - **Desconciliar (`unreconcile_lancamento`) limpa `fin_conciliacao_vinculos`, igual ao estorno de CP** — sem isso, o vínculo do FITID antigo sobrevive e exclui o lançamento das sugestões de match (`lancamentosVinculados`) mesmo depois de desconciliado; como o FITID muda a cada novo download (ver acima), a reconciliação seguinte não reconhece o FITID novo nem encontra o lançamento nas sugestões — e para lançamento `espelho_cp`/`espelho_cr` a checagem de duplicata por conteúdo também não pega (só olha `origem='conciliacao'`). Resultado: nasce um segundo lançamento para o mesmo pagamento.
 - **Estorno de CP limpa `fin_conciliacao_vinculos`** — sem isso o FITID continua apontando para o lançamento CANCELADO, a linha reaparece como "já conciliada" e o valor some do razão sem como relançar (mesmo princípio do `unreconcile_lancamento`, ver acima).
-- **Editar lançamento conciliado sem desconciliar é só reclassificação** — usar `_guarded_update_reconciled_classification`, que preserva `fin_conciliacao_vinculos` e permite apenas categoria, centro de custo, rateio e observações com justificativa; valor, datas, conta, tipo, status e descrição bancária exigem desconciliação, e espelhos CP/CR são editados no título de origem.
+- **Editar lançamento conciliado sem desconciliar é só reclassificação** — usar `_guarded_update_reconciled_classification`, que preserva `fin_conciliacao_vinculos` e permite apenas categoria, centro de custo, rateio, observações, a decisão do CMV e a **data de competência**, com justificativa. A data do banco (`data_pagamento`) nunca muda; se o lançamento não tem `data_pagamento`, a data de caixa vigente (`conciliado_em` no fuso de Brasília, senão a competência antiga) vira `data_pagamento` antes da troca — relatórios de caixa usam `COALESCE(data_pagamento, conciliado_em, data_competencia)` e o reconhecimento de linha já conciliada usa `data_pagamento || data_competencia`. Valor, conta, tipo, status e descrição bancária exigem desconciliação, e espelhos CP/CR são editados no título de origem.
 
 ### Transferências e investimento automático
 
@@ -61,7 +61,7 @@
 
 ## Commands, queries e eventos
 
-- Commands: `reconcile_import_lancamento`, `reconcile_link_existing_lancamento`, `reconcile_pay_conta_pagar`, `reconcile_create_titulo_from_extrato`, `reconcile_create_transfer`, `reconcile_auto_bind_transfer_counterparts`, `unreconcile_lancamento`, `_guarded_update_reconciled_classification`, `_guarded_ajustar_saldo_inicial_conta`.
+- Commands: `reconcile_import_lancamento` (`p_data_competencia`; `cmv_incluir` por item de `p_rateio_linhas`), `reconcile_link_existing_lancamento`, `reconcile_pay_conta_pagar`, `reconcile_create_titulo_from_extrato`, `reconcile_create_transfer`, `reconcile_auto_bind_transfer_counterparts`, `unreconcile_lancamento`, `_guarded_update_reconciled_classification` (`p_cmv`, `p_data_competencia`), `_guarded_ajustar_saldo_inicial_conta`.
 - Queries: `get_fin_saldo_conta_em`.
 - Funções puras do cliente: `matchLinha`, `buildConciliadosCounts`/`bankLineKey` (`conciliacaoConciliados.ts`), `reservarOcorrencias` (`conciliacaoOcorrencia.ts`), `matchTransferCandidate`/`findTransferWarnings` (`conciliacaoTransferMatch.ts`), regras de match manual (`conciliacaoLancamentoMatch.ts`).
 
