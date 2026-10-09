@@ -152,10 +152,10 @@ Spec e plano em `docs/superpowers/` (links no PLANO.md §6). Branch `feat/cmv-fi
 
 ### Ativação (requer autorização)
 1. **Frontend.** Entra primeiro: sem `recursos` ele se comporta exatamente como hoje. A migration vem logo em seguida (passo 2), porque com a migration e o cliente antigo publicado os totais do CMV contariam lançamentos que a lista não mostra.
-2. **Migration**, logo depois do frontend. Remove e recria três funções (`DROP FUNCTION`): o conector MCP deve recusar, então ela é rodada pelo SQL Editor. É reexecutável (`CREATE OR REPLACE`). Depois:
+2. **Migration**, logo depois do frontend. Remove e recria três funções (`DROP FUNCTION`): o conector MCP deve recusar, então ela é rodada pelo SQL Editor, dentro de `BEGIN; SET LOCAL lock_timeout = '5s'; … COMMIT;` e fora do pico (o `ADD COLUMN` pede lock exclusivo rápido em `fin_lancamentos`). É reexecutável (`CREATE OR REPLACE`). No fim, ela recalcula o cache de saldo de todas as contas uma vez (sem mudança visível esperada: em 2026-10-08 as 19 contas batiam com a fórmula). Depois:
    - conferir uma assinatura por função, grants, triggers e o md5 dos corpos contra o banco descartável;
    - registrar a versão `20261008120000` com o nome do arquivo;
-   - antes de rodar "Aplicar padrões" em unidade grande, medir `fin_cmv_aplicar_padroes` contra o `statement_timeout` de 8 s, porque cada lançamento atualizado recalcula o cache de saldo da conta.
+   - antes de rodar "Aplicar padrões" em unidade grande, medir `fin_cmv_aplicar_padroes` contra o `statement_timeout` de 8 s (com o gatilho de saldo dividido, classificar não recalcula mais o cache de saldo da conta).
 3. **Por unidade.** Em CMV → Regras de vínculo:
    - conferir os padrões das categorias de mercadoria;
    - rodar "Aplicar padrões às pendentes" a partir da data desejada (prévia antes);
@@ -164,3 +164,4 @@ Spec e plano em `docs/superpowers/` (links no PLANO.md §6). Branch `feat/cmv-fi
 ### Reversão
 - Desligar "Pedir a resposta nas novas despesas" só esconde a pergunta nas telas: a apuração continua lendo as duas fontes e contando as despesas.
 - Revert do PR sozinho não basta com a migration aplicada: o cliente antigo leria pendências e totais com lançamentos que a lista dele não mostra. Reverter o frontend e, na mesma janela, recriar `_fin_cmv_payload` (de `20261003140000`) e `_fin_cmv_lista` (de `20261003203219`) pelo SQL Editor; colunas e decisões gravadas ficam e passam a ser ignoradas.
+- A divisão do gatilho de saldo pode ficar (o cache resultante é o mesmo). Para voltar ao gatilho único: `DROP TRIGGER IF EXISTS trg_saldo_cache_lancamento_upd ON public.fin_lancamentos; CREATE OR REPLACE TRIGGER trg_saldo_cache_lancamento AFTER INSERT OR UPDATE OR DELETE ON public.fin_lancamentos FOR EACH ROW EXECUTE FUNCTION public.trg_refresh_saldo_cache_lancamento();`
