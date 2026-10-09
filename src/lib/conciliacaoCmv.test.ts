@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   competenciaDaLinhaExtrato, datasDoLancamentoCriado, decisaoDaLinhaExtrato, definirDecisaoDaLinha,
-  rateioDaLinhaExtrato, resumoCmvRateio, trocarCategoriaDaLinha, type LinhaExtratoCmv,
+  linhaTemAjusteCmv, rateioDaLinhaExtrato, resumoCmvRateio, trocarCategoriaDaLinha, type LinhaExtratoCmv,
 } from './conciliacaoCmv';
 
 const padroes = new Map<string, boolean | null>([['peixes', true], ['escr', false], ['sem', null]]);
@@ -106,5 +106,20 @@ describe('conciliação — decisão do CMV e competência da linha do extrato',
     // banco sem o recurso: exatamente o fluxo de antes
     expect(datasDoLancamentoCriado({ dataBanco: '2026-09-10', dataCompetencia: '2026-09-03', aceitaCompetencia: false }))
       .toEqual({ p_data: '2026-09-03', extra: {}, atualizaPagamento: true });
+  });
+});
+
+describe('conciliação — linha com ajuste do CMV que só vai ao servidor com o recurso', () => {
+  it('competência diferente da data do banco ou resposta (na linha ou no rateio) é ajuste', () => {
+    expect(linhaTemAjusteCmv(linha({ competencia: '2026-09-01' }))).toBe(true);
+    expect(linhaTemAjusteCmv(linha({ cmvIncluir: false }))).toBe(true);
+    expect(linhaTemAjusteCmv(linha({ rateioLinhas: [rateio('peixes', 40, null), rateio('escr', 15, true)] }))).toBe(true);
+  });
+
+  it('linha sem resposta, competência igual à data do banco ou receita não tem o que perder', () => {
+    expect(linhaTemAjusteCmv(linha())).toBe(false);
+    expect(linhaTemAjusteCmv(linha({ competencia: '2026-09-10', cmvIncluir: null }))).toBe(false);
+    expect(linhaTemAjusteCmv(linha({ rateioLinhas: [rateio('peixes', 55)] }))).toBe(false);
+    expect(linhaTemAjusteCmv(linha({ tipo: 'RECEITA', competencia: '2026-09-01', cmvIncluir: true }))).toBe(false);
   });
 });

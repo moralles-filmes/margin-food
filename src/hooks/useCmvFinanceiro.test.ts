@@ -110,6 +110,11 @@ describe('useCmvFinanceiro — chamadas ao cliente Supabase', () => {
     expect(mensagemErroCmv({ message: 'STATUS_INVALIDO' })).toBe('Registro cancelado não pode ser classificado.');
   });
 
+  it('tempo esgotado no servidor (statement_timeout) diz que nada foi gravado, em vez da mensagem genérica', () => {
+    expect(mensagemErroCmv({ code: '57014', message: 'canceling statement due to statement timeout' }))
+      .toBe('A operação demorou demais e foi cancelada; nada foi gravado. Tente de novo ou use um período menor.');
+  });
+
   it('a configuração nunca lança: falha inesperada vira "indisponível"', async () => {
     const erro = vi.spyOn(console, 'error').mockImplementation(() => {});
     const quebrado = { rpc() { throw new TypeError('boom'); } };

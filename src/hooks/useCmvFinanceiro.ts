@@ -55,6 +55,7 @@ const MENSAGENS: [RegExp, string][] = [
   [/JUSTIFICATIVA_OBRIGATORIA/, 'Informe a justificativa.'],
   [/COMPETENCIA_INVALIDA/, 'Transferência não aceita competência própria.'],
   [/STATUS_INVALIDO/, 'Registro cancelado não pode ser classificado.'],
+  [/statement timeout|57014/i, 'A operação demorou demais e foi cancelada; nada foi gravado. Tente de novo ou use um período menor.'],
   [/PERMISSION_DENIED/, 'Você não tem permissão para esta ação.'],
   [/NOT_FOUND/, 'Registro não encontrado. Recarregue a tela.'],
 ];

@@ -44,3 +44,24 @@ export function cmvDoCabecalho(temRateio: boolean, decisao: CmvDecisao | undefin
   if (!enviaCmv) return {};
   return { p_cmv: { incluir: temRateio ? null : (decisao ?? null) } };
 }
+
+/**
+ * Conteúdo da chave de idempotência da criação no Livro Razão: os parâmetros sem o
+ * que vem do CMV (`p_cmv` e, em cada item de `p_rateios`, `cmv_incluir` e `id`).
+ * O servidor reconhece o reenvio pela operação (tipo, valor, conta, competência,
+ * descrição, categoria), não pela resposta: com a resposta na chave, trocar Sim/Não
+ * depois de uma resposta perdida gerava chave nova e um 2º lançamento. Usar o mesmo
+ * conteúdo em `chave` e em `confirmar`. Devolve uma cópia; o original não muda.
+ */
+export function conteudoChaveLancamento(params: Record<string, unknown>): Record<string, unknown> {
+  const { p_cmv: _cmv, ...resto } = params;
+  if (!Array.isArray(resto.p_rateios)) return resto;
+  return {
+    ...resto,
+    p_rateios: resto.p_rateios.map(item => {
+      if (typeof item !== 'object' || item === null) return item;
+      const { cmv_incluir: _incluir, id: _id, ...linha } = item as Record<string, unknown>;
+      return linha;
+    }),
+  };
+}

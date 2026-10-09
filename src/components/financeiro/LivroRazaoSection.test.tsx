@@ -48,7 +48,12 @@ const detalhe = vi.hoisted(() => ({ props: null as null | { open: boolean; data:
 vi.mock('@/contexts/CompanyScopeContext', () => ({ useSupabase: () => supabase }));
 vi.mock('@/permissions', () => ({ useCan: () => true }));
 vi.mock('@/hooks/useScopedToast', () => ({ useScopedToast: () => state.toast }));
-vi.mock('@/lib/dataEvents', () => ({ useDataEvent: () => undefined, useEmitDataEvent: () => vi.fn() }));
+/** Último handler registrado por evento: disparar um simula a recarga vinda de outra aba. */
+const eventos = vi.hoisted(() => new Map<string, () => unknown>());
+vi.mock('@/lib/dataEvents', () => ({
+  useDataEvent: (nome: string, handler: () => unknown) => { eventos.set(nome, handler); },
+  useEmitDataEvent: () => vi.fn(),
+}));
 vi.mock('@/hooks/useChavesPendentes', () => ({
   useChavesPendentes: () => ({ chave: vi.fn(), confirmar: vi.fn(), renovar: vi.fn() }),
 }));
@@ -70,6 +75,7 @@ const lancamento = (over: Record<string, unknown>) => ({
 beforeEach(() => {
   formulario.props = null;
   detalhe.props = null;
+  eventos.clear();
   dropNavigationRequest();
   for (const k of Object.keys(tableData)) delete tableData[k];
   for (const k of Object.keys(tableError)) delete tableError[k];
@@ -254,6 +260,36 @@ describe('Livro Razão — CMV financeiro na despesa nova', () => {
     expect(rateios[0]).not.toHaveProperty('id');
   });
 
+  /** Recarga por evento de outra aba (BroadcastChannel) com outra resposta de `get_fin_cmv_config`. */
+  const recarregarCom = async (resposta: { data: unknown; error: { message: string } | null }) => {
+    const base = state.rpc.getMockImplementation()!;
+    state.rpc.mockImplementation((name: string, params?: unknown) =>
+      name === 'get_fin_cmv_config' ? Promise.resolve(resposta) : base(name, params));
+    const antes = state.rpc.mock.calls.filter(([nome]) => nome === 'get_fin_cmv_config').length;
+    await act(async () => { await eventos.get('financeiro:lancamentos')!(); });
+    expect(state.rpc.mock.calls.filter(([nome]) => nome === 'get_fin_cmv_config').length).toBeGreaterThan(antes);
+  };
+
+  it('recarga com falha na configuração mantém a última boa: o formulário aberto ainda envia a decisão', async () => {
+    const erro = vi.spyOn(console, 'error').mockImplementation(() => {});
+    comConfig({ classificacao_ativa: true, categorias: [{ id: 'cat-peixe', nome: 'Peixes', cmv_sugerir: true }], recursos: { lancamentos: true } });
+    await novaDespesa();
+    await waitFor(() => expect(formulario.props?.cmv).not.toBeNull());
+    await recarregarCom({ data: null, error: { message: 'falha de rede' } });
+    expect(formulario.props!.cmv).toMatchObject({ ativo: true });
+    const args = await salvarCom({ descricao: 'PIX arroz', valor: 55, categoria_id: 'cat-peixe', cmv_incluir: true });
+    expect(args).toMatchObject({ p_cmv: { incluir: true } });
+    erro.mockRestore();
+  });
+
+  it('recarga em que o servidor responde sem o recurso continua tirando o CMV do formulário', async () => {
+    comConfig({ classificacao_ativa: true, categorias: [], recursos: { lancamentos: true } });
+    await novaDespesa();
+    await waitFor(() => expect(formulario.props?.cmv).not.toBeNull());
+    await recarregarCom({ data: { classificacao_ativa: true, categorias: [] }, error: null });
+    expect(formulario.props!.cmv).toBeNull();
+  });
+
   it('despesa que virou receita e voltou a despesa envia a decisão que o formulário guarda', async () => {
     comConfig({ classificacao_ativa: true, categorias: [], recursos: { lancamentos: true } });
     await novaDespesa();
@@ -339,6 +375,21 @@ describe('Livro Razão — editar com a decisão do CMV', () => {
     expect(args).toBeDefined();
     expect(args).not.toHaveProperty('p_cmv');
     expect(args).not.toHaveProperty('p_data_competencia');
+  });
+
+  it('falha ao ler os rateios na edição registra o erro antes do aviso', async () => {
+    const erro = vi.spyOn(console, 'error').mockImplementation(() => {});
+    state.items = [lancamento({ id: 'l4', tipo: 'DESPESA', valor: 40, descricao: 'Compra de insumos', categoria_id: 'cat-peixe' })];
+    tableError.fin_lancamento_rateios = { message: 'falhou' };
+    render(<LivroRazaoSection initialDateFrom="2026-03-01" initialDateTo="2026-03-31" />);
+    await configCarregada();
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Editar lançamento Compra de insumos' }))[0]);
+    await waitFor(() => expect(state.toast.error).toHaveBeenCalledWith('Erro ao carregar rateios: falhou'));
+    const log = erro.mock.calls.findIndex(([etiqueta]) => etiqueta === '[LivroRazaoSection.openEdit]');
+    expect(log).toBeGreaterThanOrEqual(0);
+    expect(erro.mock.calls[log][1]).toEqual({ message: 'falhou' });
+    expect(erro.mock.invocationCallOrder[log]).toBeLessThan(state.toast.error.mock.invocationCallOrder[0]);
+    erro.mockRestore();
   });
 
   it('lançamento não conciliado: a edição também envia a decisão lida', async () => {

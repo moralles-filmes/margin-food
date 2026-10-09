@@ -303,7 +303,8 @@ export default function CmvRegrasVinculo({ companyId, canManage, canRevisar, pen
           </dl>
           <div className="mt-3 flex flex-wrap gap-2">
             <Button type="button" size="sm" onClick={() => onAbrirLista('pendente', 'geral')}>Revisar pendências</Button>
-            {canRevisar && (
+            {/* Só com a migration de lançamentos no banco: antes dela fin_cmv_aplicar_padroes não existe. */}
+            {canRevisar && config.data?.recursos.lancamentos === true && (
               <Button type="button" variant="outline" size="sm" onClick={() => setAplicarAberto(true)}>Aplicar padrões às pendentes</Button>
             )}
             <Button type="button" variant="outline" size="sm" onClick={() => onAbrirLista('sem_competencia', 'geral')}>Ver boletos sem competência</Button>

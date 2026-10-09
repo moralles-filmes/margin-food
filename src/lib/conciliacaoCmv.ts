@@ -77,6 +77,19 @@ export function competenciaDaLinhaExtrato(l: LinhaExtratoCmv, aceita: boolean): 
   return { p_data_competencia: l.competencia };
 }
 
+/**
+ * A despesa traz algo que só vai ao servidor com o recurso: competência diferente da
+ * data do banco ou resposta do CMV (na linha ou em alguma linha do rateio). Sem o
+ * recurso, essa linha perderia o ajuste em silêncio — ex.: rascunho restaurado do
+ * sessionStorage com a configuração ainda não carregada. Receita nunca leva nenhum dos dois.
+ */
+export function linhaTemAjusteCmv(l: LinhaExtratoCmv): boolean {
+  if (l.tipo !== 'DESPESA') return false;
+  return Boolean(l.competencia && l.competencia !== l.data)
+    || (l.cmvIncluir ?? null) !== null
+    || (l.rateioLinhas ?? []).some(r => (r.cmv_incluir ?? null) !== null);
+}
+
 /** Decisão exibida na linha: com rateio de uma linha, a dessa linha; senão, a da linha do extrato. */
 export function decisaoDaLinhaExtrato(l: LinhaExtratoCmv): CmvDecisao {
   if (l.rateioLinhas && l.rateioLinhas.length === 1) return l.rateioLinhas[0].cmv_incluir ?? null;

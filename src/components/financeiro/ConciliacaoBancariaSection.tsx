@@ -48,7 +48,7 @@ import { decisaoAoTrocarCategoria, type CmvAvisoDecisao, type CmvDecisao } from 
 import CmvDecisaoToggle from '@/components/financeiro/cmv/CmvDecisaoToggle';
 import ConciliacaoLinhaCmv from '@/components/financeiro/ConciliacaoLinhaCmv';
 import {
-  competenciaDaLinhaExtrato, decisaoDaLinhaExtrato, definirDecisaoDaLinha, rateioDaLinhaExtrato,
+  competenciaDaLinhaExtrato, decisaoDaLinhaExtrato, definirDecisaoDaLinha, linhaTemAjusteCmv, rateioDaLinhaExtrato,
   resumoCmvRateio, trocarCategoriaDaLinha,
 } from '@/lib/conciliacaoCmv';
 import { getConsolidatedBankDelta, isAutomaticInvestmentLine, isPendingAutomaticInvestmentLine } from '@/lib/conciliacaoInvestimentoAutomatico';
@@ -468,7 +468,10 @@ export default function ConciliacaoBancariaSection() {
     ]).then(([catRes, ccRes, cmvRes]) => {
       setCategorias(buildCategoryOptions(catRes.data || []));
       setCentrosCusto(ccRes.data || []);
-      setCmvConfig(cmvRes);
+      // `null` = a leitura falhou: a recarga (troca de conta, nova tentativa) mantém a última
+      // configuração boa, senão as respostas e competências das linhas sumiriam do payload.
+      // Servidor que responde sem o recurso continua desligando os controles.
+      if (cmvRes) setCmvConfig(cmvRes);
     });
   }, [contaSel, supabase, contasTentativa]);
 
@@ -2093,6 +2096,17 @@ export default function ConciliacaoBancariaSection() {
 
   const importarEConciliar = async (jaConfirmouVinculos = false, jaConfirmouBaixas = false) => {
     if (!contaSel) { toast.error('Selecione uma conta bancária'); return; }
+
+    // Sem a configuração do CMV (falhou ou ainda não chegou), a resposta e a competência
+    // ajustadas nas linhas a importar — ex.: restauradas do rascunho — não iriam ao servidor:
+    // o lançamento nasceria pendente e com a data do banco, sem aviso. Antes de qualquer gravação.
+    const perderiaAjusteCmv = !cmvRecurso && linhas.some(l => !isAutomaticInvestmentLine(l)
+      && l.selecionada && !l.matchId && !l.jaConciliada && !l.ignorada && linhaTemAjusteCmv(l));
+    if (perderiaAjusteCmv) {
+      console.error('[ConciliacaoBancariaSection.importarEConciliar]', 'configuração do CMV ausente com linhas ajustadas', { cmvConfig });
+      toast.error('A configuração do CMV não carregou. Recarregue a página antes de processar para não perder as respostas e competências ajustadas.');
+      return;
+    }
 
     // Linhas cujo match é uma baixa já registrada em Contas a Pagar/Receber:
     // antes de processar, a pessoa decide entre vincular ou lançar como novo.

@@ -21,6 +21,8 @@ const state = vi.hoisted(() => ({
   chamadas: [] as Array<{ companyId: unknown; filtro: CmvFiltro; enabled: boolean }>,
   listas: [] as Array<{ params: CmvListaParams; enabled: boolean }>,
   lista: null as null | Record<string, unknown>,
+  /** Resposta de `get_fin_cmv_config` (já interpretada). */
+  config: null as null | Record<string, unknown>,
   classificar: vi.fn(),
   navegar: vi.fn(),
   refetch: vi.fn(),
@@ -51,7 +53,7 @@ vi.mock('@/hooks/useCmvFinanceiro', async importOriginal => ({
       ...state.respostas.get(`${options.filtro.inicio}|${options.filtro.fim}`),
     };
   },
-  useCmvConfig: () => ({ data: { classificacaoAtiva: false, categorias: [], recursos: { lancamentos: true } }, isPending: false, isError: false, refetch: vi.fn() }),
+  useCmvConfig: () => ({ data: state.config, isPending: false, isError: false, refetch: vi.fn() }),
   useCmvLinhas: (options: { params: CmvListaParams; enabled: boolean }) => {
     state.listas.push(options);
     return { data: state.lista ?? { totalLinhas: 0, totalTitulos: 0, totalCentavos: 0, itens: [] }, isPending: false, isFetching: false, isError: false, error: null, refetch: vi.fn() };
@@ -103,6 +105,7 @@ beforeEach(() => {
   state.chamadas.length = 0;
   state.listas.length = 0;
   state.lista = null;
+  state.config = { classificacaoAtiva: false, categorias: [], recursos: { lancamentos: true } };
   state.classificar.mockReset();
   state.navegar.mockReset();
   state.refetch.mockReset();
@@ -279,6 +282,15 @@ describe('CMV Financeiro — tela', () => {
     fireEvent.click(screen.getByRole('tab', { name: /Regras de vínculo/ }));
     expect(screen.getByText('Pedir a resposta nas novas despesas')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Aplicar padrões às pendentes' })).toBeInTheDocument();
+  });
+
+  it('Regras de vínculo: banco sem o recurso de lançamentos não mostra "Aplicar padrões" (a RPC ainda não existe)', () => {
+    state.config = { classificacaoAtiva: false, categorias: [], recursos: { lancamentos: false } };
+    state.respostas.set(SEMANA, pronto(relatorioSemana()));
+    renderizar();
+    fireEvent.click(screen.getByRole('tab', { name: /Regras de vínculo/ }));
+    expect(screen.getByRole('button', { name: 'Revisar pendências' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Aplicar padrões às pendentes' })).not.toBeInTheDocument();
   });
 
   it('abrir leva cada linha ao módulo da sua fonte: lançamento no Livro Razão, boleto em Contas a Pagar', () => {

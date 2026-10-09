@@ -28,7 +28,7 @@ import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
 import ContaDetailDialog, { type ContaDetailData, type ContaDetailRateio } from './ContaDetailDialog';
 import ContaFormDialog, { type ContaFormCmv, type ContaFormData, type RateioLine } from './ContaFormDialog';
 import { fetchCmvConfig } from '@/hooks/useCmvFinanceiro';
-import { cmvDoCabecalho, rateiosComCmv } from '@/lib/cmvLancamentoPayload';
+import { cmvDoCabecalho, conteudoChaveLancamento, rateiosComCmv } from '@/lib/cmvLancamentoPayload';
 import { useNavigationRecord } from '@/hooks/useNavigationRequest';
 import * as XLSX from '@/lib/safeXlsx';
 import { buildCategoryOptions } from '@/lib/categoriaOptions';
@@ -352,12 +352,17 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
     setCentros((ccRes.data as CentroCustoRef[]) || []);
     setContas((contRes.data as ContaRef[]) || []);
     // Classificação desligada = sem sugestão: a despesa nova nasce pendente (a decisão já gravada continua à vista).
-    setCmvForm(cmvConfig?.recursos.lancamentos
-      ? {
-          ativo: cmvConfig.classificacaoAtiva,
-          padroes: cmvConfig.classificacaoAtiva ? new Map(cmvConfig.categorias.map(c => [c.id, c.cmvSugerir])) : new Map(),
-        }
-      : null);
+    // `null` = a leitura falhou: a recarga (inclusive por evento de outra aba, com o formulário aberto)
+    // mantém a última configuração boa; senão salvar ignoraria a resposta e a competência digitadas.
+    // Servidor que responde sem o recurso continua tirando o CMV do formulário.
+    if (cmvConfig) {
+      setCmvForm(cmvConfig.recursos.lancamentos
+        ? {
+            ativo: cmvConfig.classificacaoAtiva,
+            padroes: cmvConfig.classificacaoAtiva ? new Map(cmvConfig.categorias.map(c => [c.id, c.cmvSugerir])) : new Map(),
+          }
+        : null);
+    }
     setRefsCarregadas(true);
   }, [loadPage, supabase, loadTotais, loadSaldoAtual]);
 
@@ -520,6 +525,7 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
         : Promise.resolve({ data: null, error: null }),
     ]);
     if (ratesRes.error) {
+      console.error('[LivroRazaoSection.openEdit]', ratesRes.error);
       toast.error('Erro ao carregar rateios: ' + ratesRes.error.message);
       return;
     }
@@ -779,8 +785,11 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
         ...cmvDoCabecalho(rateioLines.length > 0, form.cmv_incluir, enviaCmv),
       };
 
-      // Só a criação leva chave; a edição já é protegida pelo optimistic lock.
-      const idempotencyKey = editId ? null : await chavesLancamento.chave(rpcParams);
+      // Só a criação leva chave; a edição já é protegida pelo optimistic lock. A resposta do
+      // CMV fica fora da chave (o servidor não a compara no reenvio): trocar Sim/Não depois de
+      // uma resposta perdida não pode virar outra operação.
+      const conteudoChave = conteudoChaveLancamento(rpcParams);
+      const idempotencyKey = editId ? null : await chavesLancamento.chave(conteudoChave);
       // A chave fica com o texto digitado. Lançamento vindo do extrato mantém o texto do banco.
       const descricaoEnviada = editId && editOrigem !== 'manual' ? form.descricao : padronizarTexto(form.descricao);
       const { data, error } = await supabase.rpc('_guarded_upsert_lancamento' as any, { ...rpcParams, p_descricao: descricaoEnviada, p_idempotency_key: idempotencyKey } as any);
@@ -794,7 +803,7 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
         return;
       }
 
-      if (!editId) chavesLancamento.confirmar(rpcParams);
+      if (!editId) chavesLancamento.confirmar(conteudoChave);
       const jaRegistrado = !editId && (data as { idempotente?: boolean }[] | null)?.[0]?.idempotente === true;
       toast.success(editId
         ? 'Lançamento atualizado'
