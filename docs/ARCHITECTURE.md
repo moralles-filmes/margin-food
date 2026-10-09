@@ -254,7 +254,7 @@ CREATE POLICY "select_own_company" ON tabela
 - Radar — Visão consolidada de compras
 - Simulador de Compras — Simulação de cenários
 
-**Tabelas:** `metas_compra_mensal`, `metas_provisionadas_salmao`
+**Tabelas:** `planning_metas_compra` (as metas provisionadas de salmão, `salmon_metas_provisionadas`, são do módulo Salmão). Detalhe: `docs/modules/planejamento.md`.
 
 **RPCs:** `_planning_upsert_meta_guarded`, `_planning_spend_summary_guarded`, `_planning_delete_meta_guarded`
 
@@ -437,8 +437,8 @@ CREATE POLICY "select_own_company" ON tabela
 #### Planejamento
 | Tabela | Finalidade |
 |--------|-----------|
-| `metas_compra_mensal` | Metas de compra por categoria/mês |
-| `metas_provisionadas_salmao` | Metas provisionadas de salmão |
+| `planning_metas_compra` | Metas de compra por categoria/mês |
+| `salmon_metas_provisionadas` | Metas provisionadas de salmão (módulo Salmão) |
 
 #### Financeiro
 | Tabela | Finalidade |

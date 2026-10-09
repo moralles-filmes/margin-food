@@ -14,7 +14,7 @@ Leia esta seção antes de começar qualquer fase.
 1. **Leia `CLAUDE.md` / `AGENTS.md` da raiz** — as regras do projeto continuam valendo integralmente.
 2. **Leia [PLANO-DE-FASES.md](PLANO-DE-FASES.md)** para saber onde sua fase se encaixa.
 3. **Leia [01-DESIGN-SYSTEM.md](01-DESIGN-SYSTEM.md)** — é a fonte única de cor/raio/sombra. Nunca escreva hex em componente.
-4. **Leia [referencias/MOCKUPS.md](referencias/MOCKUPS.md)** — a direção visual alvo. Se houver PNGs em `referencias/`, abra-os.
+4. **Leia `referencias/MOCKUPS.md`** — a direção visual alvo. Se houver PNGs em `referencias/`, abra-os. *(Pasta removida na limpeza final da Fase 11, abaixo; a referência vigente é o `01-DESIGN-SYSTEM.md`.)*
 5. Execute **apenas a sua fase**. Não adiante trabalho de fases seguintes — isso quebra a rastreabilidade e infla o diff.
 6. Ao terminar, rode a **bateria de validação** (abaixo) — a fase só fecha com tudo verde.
 7. Atualize o **checklist da sua fase** em [PLANO-DE-FASES.md](PLANO-DE-FASES.md) (marque `[x]`) e registre o que mudou em [PROGRESSO.md](PROGRESSO.md).
@@ -52,8 +52,8 @@ Baseline registrado em 2026-08-27 (antes da Fase 1): typecheck 0, lint **0 error
 | [01-DESIGN-SYSTEM.md](01-DESIGN-SYSTEM.md) | Referência completa de tokens, paleta, contraste, aliases legados |
 | [PLANO-DE-FASES.md](PLANO-DE-FASES.md) | As 11 fases, escopo e checklist de cada uma |
 | [PROGRESSO.md](PROGRESSO.md) | Registro do que cada fase entregou |
-| [referencias/MOCKUPS.md](referencias/MOCKUPS.md) | Descrição detalhada dos mockups de referência |
-| [prompts/](prompts/) | Prompt pronto para iniciar cada fase |
+| `referencias/MOCKUPS.md` | Descrição detalhada dos mockups de referência (removido na limpeza final da Fase 11) |
+| `prompts/` | Prompt pronto para iniciar cada fase (removido na limpeza final da Fase 11) |
 
 ---
 
