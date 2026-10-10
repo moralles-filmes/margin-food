@@ -152,3 +152,22 @@ describe('Contas a Receber (V2)', () => {
     expect(escritas()).toEqual([]);
   });
 });
+
+describe('Contas a Receber — categoria obrigatória', () => {
+  it('com o rateio ligado, a linha sem categoria não grava', async () => {
+    render(<ContasReceberSection />);
+    await screen.findByText('Sinal atrasado');
+    fireEvent.click(screen.getByRole('button', { name: /Nova Conta/ }));
+    const dialogo = await screen.findByRole('dialog', { name: 'Nova receita' });
+    fireEvent.change(within(dialogo).getByLabelText('Descrição *'), { target: { value: 'Evento corporativo' } });
+    const valor = within(dialogo).getByLabelText('Valor *');
+    fireEvent.focus(valor);
+    fireEvent.change(valor, { target: { value: '100,00' } });
+    fireEvent.blur(valor);
+    fireEvent.click(within(dialogo).getByRole('switch', { name: 'Habilitar rateio' }));
+
+    await act(async () => { fireEvent.click(within(dialogo).getByRole('button', { name: 'Salvar' })); });
+    expect(state.toast.error).toHaveBeenCalledWith('Selecione a categoria da linha 1 do rateio.');
+    expect(escritas()).toEqual([]);
+  });
+});

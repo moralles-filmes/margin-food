@@ -279,3 +279,38 @@ describe('Contas a Pagar (V2)', () => {
     expect(state.rpcCalls).toEqual([]);
   });
 });
+
+describe('Contas a Pagar — categoria obrigatória', () => {
+  const novaConta = async () => {
+    render(<ContasPagarSection />);
+    await screen.findByText('Boleto vencido');
+    fireEvent.click(screen.getByRole('button', { name: /Nova Conta/ }));
+    const dialogo = await screen.findByRole('dialog', { name: 'Nova despesa' });
+    fireEvent.change(within(dialogo).getByLabelText('Descrição *'), { target: { value: 'Boleto de energia' } });
+    const valor = within(dialogo).getByLabelText('Valor *');
+    fireEvent.focus(valor);
+    fireEvent.change(valor, { target: { value: '100,00' } });
+    fireEvent.blur(valor);
+    return dialogo;
+  };
+  const salvar = async (dialogo: HTMLElement) => {
+    await act(async () => { fireEvent.click(within(dialogo).getByRole('button', { name: 'Salvar' })); });
+  };
+
+  it('sem rateio e sem categoria não grava', async () => {
+    const dialogo = await novaConta();
+    await salvar(dialogo);
+    expect(state.toast.error).toHaveBeenCalledWith('Selecione uma categoria.');
+    expect(escritas()).toEqual([]);
+  });
+
+  it('com o rateio ligado, a linha sem categoria fica à vista e não grava', async () => {
+    const dialogo = await novaConta();
+    fireEvent.click(within(dialogo).getByRole('switch', { name: 'Habilitar rateio' }));
+    expect(within(dialogo).getByRole('columnheader', { name: 'Categoria *' })).toBeInTheDocument();
+    expect(within(dialogo).getByText('Selecione a categoria em todas as linhas do rateio')).toBeInTheDocument();
+    await salvar(dialogo);
+    expect(state.toast.error).toHaveBeenCalledWith('Selecione a categoria da linha 1 do rateio.');
+    expect(escritas()).toEqual([]);
+  });
+});

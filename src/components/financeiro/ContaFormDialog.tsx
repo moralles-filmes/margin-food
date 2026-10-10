@@ -203,6 +203,8 @@ export default function ContaFormDialog({
   const totalRateio = rateioLines.reduce((s, l) => s + Number(l.valor || 0), 0);
   const diffRateio = form.valor - totalRateio;
   const rateioValido = rateioLines.length === 0 || Math.abs(diffRateio) < 0.01;
+  // Quem barra o salvar é a tela (erroCategoriaObrigatoria); aqui a falta fica à vista.
+  const rateioSemCategoria = rateioLines.some(l => !l.categoria_id?.trim());
 
   const handleToggleRateio = (v: boolean) => {
     setEnableRateio(v);
@@ -514,7 +516,7 @@ export default function ContaFormDialog({
                           </Button>
                         </div>
                         <div>
-                          <Label htmlFor={id(`rateio-cat-${line.key}`)} className="text-xs text-muted-foreground">Categoria</Label>
+                          <Label htmlFor={id(`rateio-cat-${line.key}`)} className="text-xs text-muted-foreground">Categoria *</Label>
                           <CategoryCombobox
                             id={id(`rateio-cat-${line.key}`)}
                             value={line.categoria_id}
@@ -568,7 +570,7 @@ export default function ContaFormDialog({
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="text-xs">Categoria</TableHead>
+                        <TableHead className="text-xs">Categoria *</TableHead>
                         <TableHead className="text-xs">Centro Custo</TableHead>
                         <TableHead className={`text-xs ${mostrarCmv ? 'min-w-[8.5rem]' : 'min-w-[7.5rem]'}`}>Valor</TableHead>
                         <TableHead className="text-xs w-16">%</TableHead>
@@ -635,7 +637,8 @@ export default function ContaFormDialog({
                 <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-xs" aria-live="polite">
                   <span className="text-muted-foreground">Total rateado: <strong className="tabular-nums text-foreground">{fmt(totalRateio)}</strong></span>
                   {Math.abs(diffRateio) >= 0.01 && <span className="font-medium text-destructive">Diferença: {fmt(diffRateio)}</span>}
-                  {Math.abs(diffRateio) < 0.01 && rateioLines.length > 0 && <span className="font-medium text-success">Rateio fechado</span>}
+                  {rateioSemCategoria && <span className="font-medium text-destructive">Selecione a categoria em todas as linhas do rateio</span>}
+                  {Math.abs(diffRateio) < 0.01 && rateioLines.length > 0 && !rateioSemCategoria && <span className="font-medium text-success">Rateio fechado</span>}
                 </div>
                 {cmvResumoBloco}
               </div>

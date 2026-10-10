@@ -30,6 +30,9 @@ export function mapPagamentoError(err: unknown): string {
   if (msg.includes('AJUSTE_INVALIDO'))
     // Mesmo motivo do CATEGORIA_OPERACIONAL acima — repassa a mensagem da RPC.
     return msg.replace(/^.*AJUSTE_INVALIDO:\s*/, '');
+  if (msg.includes('RATEIO_SEM_CATEGORIA'))
+    // Título legado com linha nula: a cópia do rateio para o espelho da baixa é recusada.
+    return 'Há linha de rateio sem categoria. Escolha a categoria em todas as linhas (num boleto, edite a conta em Contas a Pagar) e tente de novo.';
   if (msg.includes('CATEGORY_REQUIRED'))
     return 'O lançamento está sem categoria. Informe a categoria antes de conciliar.';
   if (msg.includes('EXTERNAL_ID_CONFLICT'))

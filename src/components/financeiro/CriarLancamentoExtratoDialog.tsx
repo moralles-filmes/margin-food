@@ -23,6 +23,7 @@ import SupplierCombobox from '@/components/financeiro/SupplierCombobox';
 import { Plus, Trash2, PieChart, CheckCircle, CheckCircle2, Loader2, FileText, Calculator } from 'lucide-react';
 import { traduzirErroIdempotencia } from '@/domain/financeiro/idempotencia';
 import { mapPagamentoError } from '@/lib/financeiroErrorMap';
+import { erroCategoriaObrigatoria } from '@/domain/financeiro/categoriaObrigatoria';
 import { padronizarTexto } from '@/lib/padronizarTexto';
 import CmvDecisaoToggle from '@/components/financeiro/cmv/CmvDecisaoToggle';
 import { decisaoAoTrocarCategoria, type CmvAvisoDecisao, type CmvDecisao } from '@/domain/financeiro/cmv';
@@ -255,7 +256,11 @@ export default function CriarLancamentoExtratoDialog({
 
   const rateioTotal = rateioLinhas.reduce((s, l) => s + Number(l.valor || 0), 0);
   const rateioDiff = valor - rateioTotal;
-  const rateioValido = !useRateio || (rateioLinhas.length > 0 && Math.abs(rateioDiff) < 0.01 && rateioLinhas.every(l => l.categoria_id));
+  /** Por que o rateio não pode ser salvo, ou `null`. */
+  const erroRateio = !useRateio ? null
+    : rateioLinhas.length === 0 ? 'Adicione ao menos uma linha ao rateio.'
+      : Math.abs(rateioDiff) >= 0.01 ? `Rateio incompleto. Ajuste os valores para totalizar ${fmtBRL(valor)}.`
+        : erroCategoriaObrigatoria({ rateio: rateioLinhas });
 
   const handleSave = async () => {
     if (saving || salvandoRef.current) return;
@@ -268,7 +273,7 @@ export default function CriarLancamentoExtratoDialog({
       toast.error(categorias.length === 0 ? 'Carregando categorias… tente de novo em instantes.' : 'Categoria indisponível. Selecione outra.');
       return;
     }
-    if (useRateio && !rateioValido) { toast.error('Rateio inválido'); return; }
+    if (erroRateio) { toast.error(erroRateio); return; }
 
     salvandoRef.current = true;
     setSaving(true);
