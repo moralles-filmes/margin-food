@@ -40,7 +40,8 @@ import { runOptionalAutoBind } from '@/lib/conciliacaoAutoBind';
 import { extractSupabaseErrorMessage } from '@/lib/supabaseErrors';
 import { computeScore } from '@/lib/conciliacaoScore';
 import { avaliarLancamentoCandidato, casaSozinho, janelaCandidatos, valorDivergenteDoExtrato, type SituacaoConta } from '@/lib/conciliacaoLancamentoMatch';
-import { excluirTransferenciasVinculadasNoArquivo, matchTransferCandidate, findTransferWarnings, type TransferCandidate, type TransferWarning } from '@/lib/conciliacaoTransferMatch';
+import { atribuirContrapartidasTransferencia, findTransferWarnings, prepararCandidatosTransferencia, type PeriodoArquivo, type TransferCandidate, type TransferWarning } from '@/lib/conciliacaoTransferMatch';
+import { acumularArquivo, lerArquivoConciliacao, type ArquivoConciliacao } from '@/lib/conciliacaoArquivo';
 import { bankLineKey, buildConciliadosCounts, findStaleImportedRows, fitidKey, type ConciliadoRow, type VinculoRow } from '@/lib/conciliacaoConciliados';
 import { registrarOcorrenciaUsada, reservarOcorrencias, type OcorrenciasLivres } from '@/lib/conciliacaoOcorrencia';
 import { fetchCmvConfig, type CmvConfig } from '@/hooks/useCmvFinanceiro';
@@ -262,13 +263,24 @@ function consumeCount(counts: Map<string, number>, key: string): boolean {
   return true;
 }
 
-/** Chaves `tipo|fitId` de todas as linhas do arquivo — insumo de buildConciliadosCounts. */
-function fitidsDasLinhas(linhas: Pick<LinhaExtrato, 'tipo' | 'fitId'>[]): Set<string> {
-  const set = new Set<string>();
-  for (const l of linhas) {
-    if (l.fitId) set.add(fitidKey(l.tipo, l.fitId));
-  }
-  return set;
+// FITIDs e período do arquivo inteiro, inclusive das linhas que já saíram da
+// lista (ver `@/lib/conciliacaoArquivo`). Acompanha as linhas: sobrevive ao
+// recarregar a página e recomeça a cada arquivo novo.
+const ARQUIVO_KEY = (contaId: string) => `conciliacao_arquivo_${contaId}`;
+
+function loadArquivo(contaId: string): ArquivoConciliacao | null {
+  try {
+    const raw = sessionStorage.getItem(ARQUIVO_KEY(contaId));
+    return raw ? lerArquivoConciliacao(JSON.parse(raw)) : null;
+  } catch (_) { /* sessionStorage indisponível — vale só a lista atual */ return null; }
+}
+
+function saveArquivo(contaId: string, arquivo: ArquivoConciliacao) {
+  try { sessionStorage.setItem(ARQUIVO_KEY(contaId), JSON.stringify(arquivo)); } catch (_) { /* sessionStorage indisponível */ }
+}
+
+function clearArquivo(contaId: string) {
+  try { sessionStorage.removeItem(ARQUIVO_KEY(contaId)); } catch (_) { /* sessionStorage indisponível */ }
 }
 
 const CONCILIACAO_VISOES = [
@@ -968,6 +980,8 @@ export default function ConciliacaoBancariaSection() {
      *  baixa e uma despesa real sumiria da conciliação. */
     lancamentosVinculados: Set<string>;
     transferCandidates: TransferCandidate[];
+    /** Período do arquivo inteiro — transferência longe dele não é reconhecida sozinha. */
+    periodoArquivo: PeriodoArquivo | undefined;
     staleImportedRows: ConciliadoRow[];
   }
 
@@ -1038,14 +1052,26 @@ export default function ConciliacaoBancariaSection() {
   };
 
   /**
+   * Arquivo da sessão somado às linhas dadas, e gravado: o refresh e o reprocesso
+   * partem da lista que sobrou, mas a linha que saiu dela continua no arquivo.
+   */
+  const arquivoDaSessao = (linhasAtuais: ReadonlyArray<LinhaExtrato>): ArquivoConciliacao => {
+    const arquivo = acumularArquivo(draftKey ? loadArquivo(draftKey) : null, linhasAtuais);
+    if (draftKey && isScopeActive()) saveArquivo(draftKey, arquivo);
+    return arquivo;
+  };
+
+  /**
    * Busca lançamentos/CP/CR candidatos + sets de já-conciliadas/ignoradas para a conta selecionada.
-   * `fitidsNoArquivo` (chaves `tipo|fitId` das linhas do arquivo sendo importado) decide quais
-   * lançamentos vinculados saem do reconhecimento por conteúdo — ver buildConciliadosCounts.
+   * `arquivo.fitids` (chaves `tipo|fitId` de TODAS as linhas do arquivo, inclusive as que já saíram
+   * da lista) decide quais lançamentos vinculados saem do reconhecimento por conteúdo — ver
+   * buildConciliadosCounts — e quais transferências já têm dona.
    */
   const fetchMatchContext = async (
-    fitidsNoArquivo: ReadonlySet<string>,
+    arquivo: ArquivoConciliacao,
     linhasArquivo: ReadonlyArray<LinhaExtrato>,
   ): Promise<MatchContext> => {
+    const fitidsNoArquivo: ReadonlySet<string> = new Set(arquivo.fitids);
     const fetchLancamentosNaJanela = async () => {
       const window = janelaCandidatos(linhasArquivo.map(l => l.data));
       if (!window) return { data: [] as LancamentoCandidate[] };
@@ -1155,32 +1181,39 @@ export default function ConciliacaoBancariaSection() {
     const allLancamentos = Array.from(lancMap.values());
 
     // Transferência já amarrada pelo FITID a uma linha deste arquivo não pode ser
-    // contrapartida de outra linha — ver excluirTransferenciasVinculadasNoArquivo.
-    const transferCandidates = excluirTransferenciasVinculadasNoArquivo(
+    // contrapartida de outra linha — ver prepararCandidatosTransferencia.
+    const transferCandidates = prepararCandidatosTransferencia(
       (transferRes.data || []) as TransferCandidate[],
       vinculos,
       fitidsNoArquivo,
     );
+    const periodoArquivo = arquivo.periodo;
 
-    return { allLancamentos, contasPagar, contasReceber, conciliadosCounts, internalMovementIds, ignoradasIds, externalIdsProcessados, lancamentosVinculados, transferCandidates, staleImportedRows };
+    return { allLancamentos, contasPagar, contasReceber, conciliadosCounts, internalMovementIds, ignoradasIds, externalIdsProcessados, lancamentosVinculados, transferCandidates, periodoArquivo, staleImportedRows };
   };
 
-  /** Recalcula o estado de match de UMA linha (já conciliada/ignorada/sugestão) contra o contexto atual do banco. */
-  const matchLinha = (
+  /** Linha sem nenhum estado de match — toda reavaliação parte daqui. */
+  const semMatch = (linha: LinhaExtrato): LinhaExtrato => ({
+    ...linha,
+    matchId: undefined, matchOrigin: undefined, matchDescricao: undefined, matchRaw: undefined,
+    matchJaNoRazao: undefined, matchMoverConta: undefined, suggestions: undefined,
+    transferReconhecida: undefined, transferAlertas: undefined,
+    ignoradaId: undefined,
+    movimentacaoInterna: undefined,
+  });
+
+  /**
+   * Etapa 1 de matchLinhas, na ordem do arquivo: ContaMax, FITID, conteúdo já
+   * conciliado e ignorada. `undefined` = a linha não se resolve por identidade.
+   */
+  const resolverIdentidade = (
     linha: LinhaExtrato,
     ctx: MatchContext,
     usedIds: Set<string>,
     occurrenceIndex: number,
-  ): LinhaExtrato => {
+  ): LinhaExtrato | undefined => {
     const key = bankLineKey(linha);
-    const base = {
-      ...linha,
-      matchId: undefined, matchOrigin: undefined, matchDescricao: undefined, matchRaw: undefined,
-      matchJaNoRazao: undefined, matchMoverConta: undefined, suggestions: undefined,
-      transferReconhecida: undefined, transferAlertas: undefined,
-      ignoradaId: undefined,
-      movimentacaoInterna: undefined,
-    };
+    const base = semMatch(linha);
 
     // ContaMax sempre tem precedência sobre FITID, lançamento e transferência:
     // a linha é evidência interna e nunca pode ser "roubada" pelo fluxo financeiro.
@@ -1234,6 +1267,21 @@ export default function ConciliacaoBancariaSection() {
       return { ...base, selecionada: false, ignorada: true, ignoradaId, jaConciliada: false };
     }
 
+    return undefined;
+  };
+
+  /**
+   * Etapa 2 de matchLinhas, na ordem do arquivo: contrapartida de transferência
+   * já atribuída, aviso de transferência parecida e sugestões.
+   */
+  const completarMatch = (
+    linha: LinhaExtrato,
+    ctx: MatchContext,
+    usedIds: Set<string>,
+    transferenciaAtribuida: string | undefined,
+  ): LinhaExtrato => {
+    const base = semMatch(linha);
+
     // Contrapartida de transferência já lançada pela outra conta — reconhece por
     // valor/data (não depende de FITID, então funciona em OFX e CSV). Sem isso,
     // essa linha nunca teria candidato no loop de sugestões abaixo: uma linha de
@@ -1242,21 +1290,21 @@ export default function ConciliacaoBancariaSection() {
     // sempre, levando o usuário a recriar a transferência manualmente (duplicidade).
     let transferAlertas: TransferWarning[] | undefined;
     if (contaSel) {
-      const transferMatch = matchTransferCandidate(linha, contaSel, ctx.transferCandidates, usedIds);
-      if (transferMatch) {
-        usedIds.add(`transfer-${transferMatch.id}`);
-        const candidato = ctx.transferCandidates.find(c => c.id === transferMatch.id);
+      const candidato = transferenciaAtribuida
+        ? ctx.transferCandidates.find(c => c.id === transferenciaAtribuida)
+        : undefined;
+      if (candidato) {
         return {
           ...base,
           selecionada: false,
           jaConciliada: true,
           ignorada: false,
-          transferReconhecida: candidato ? {
+          transferReconhecida: {
             id: candidato.id,
             data: candidato.data_competencia,
             conta_id: candidato.conta_id,
             conta_destino_id: candidato.conta_destino_id,
-          } : undefined,
+          },
         };
       }
 
@@ -1355,6 +1403,48 @@ export default function ConciliacaoBancariaSection() {
   };
 
   /**
+   * Recalcula o estado de match das linhas contra o contexto atual do banco.
+   * `deveCasar` limita quais são reavaliadas (o refresh só mexe nas travadas); as
+   * demais voltam como estão. A contrapartida de transferência é decidida de uma
+   * vez, entre as linhas que sobraram da etapa 1, pelo melhor par do arquivo —
+   * ver atribuirContrapartidasTransferencia.
+   */
+  const matchLinhas = (
+    linhasArquivo: LinhaExtrato[],
+    ctx: MatchContext,
+    usedIds: Set<string>,
+    deveCasar: (linha: LinhaExtrato) => boolean = () => true,
+  ): LinhaExtrato[] => {
+    const occurrenceCounts = new Map<string, number>();
+    const etapa1 = linhasArquivo.map(linha => {
+      const key = bankLineKey(linha);
+      const occurrenceIndex = occurrenceCounts.get(key) || 0;
+      occurrenceCounts.set(key, occurrenceIndex + 1);
+      if (!deveCasar(linha)) return { linha, pendente: false };
+      const resolvida = resolverIdentidade(linha, ctx, usedIds, occurrenceIndex);
+      return resolvida ? { linha: resolvida, pendente: false } : { linha, pendente: true };
+    });
+
+    const atribuicao = contaSel
+      ? atribuirContrapartidasTransferencia(
+        etapa1.flatMap(({ linha, pendente }, indice) => (pendente
+          ? [{ indice, tipo: linha.tipo, valor: linha.valor, data: linha.data, descricao: linha.descricao }]
+          : [])),
+        contaSel,
+        ctx.transferCandidates,
+        ctx.periodoArquivo,
+      )
+      : new Map<number, string>();
+    // Reserva antes da etapa 2: uma linha anterior no arquivo não deve avisar
+    // sobre a transferência que já é de outra linha.
+    for (const id of atribuicao.values()) usedIds.add(`transfer-${id}`);
+
+    return etapa1.map(({ linha, pendente }, indice) => (pendente
+      ? completarMatch(linha, ctx, usedIds, atribuicao.get(indice))
+      : linha));
+  };
+
+  /**
    * Vincula o segundo extrato de uma transferência já criada pelo primeiro banco.
    * A RPC só aceita um candidato inequívoco e exige um vínculo bancário prévio na
    * conta oposta; coincidências ambíguas continuam disponíveis para revisão manual.
@@ -1417,21 +1507,14 @@ export default function ConciliacaoBancariaSection() {
       try {
         await neutralizeAutomaticInvestmentLines(parsed);
       } catch (error) {
-        // A linha continuará desmarcada e sem ações financeiras em matchLinha.
+        // A linha continuará desmarcada e sem ações financeiras em matchLinhas.
         // Assim uma indisponibilidade nunca a transforma em receita/despesa.
         neutralizationError = error;
       }
 
       await autoBindTransferCounterparts(parsed);
-      const ctx = await fetchMatchContext(fitidsDasLinhas(parsed), parsed);
-      const usedIds = new Set<string>();
-      const occurrenceCounts = new Map<string, number>();
-      const final = parsed.map(linha => {
-        const key = bankLineKey(linha);
-        const occurrenceIndex = occurrenceCounts.get(key) || 0;
-        occurrenceCounts.set(key, occurrenceIndex + 1);
-        return matchLinha(linha, ctx, usedIds, occurrenceIndex);
-      });
+      const ctx = await fetchMatchContext(arquivoDaSessao(parsed), parsed);
+      const final = matchLinhas(parsed, ctx, new Set<string>());
       setLinhasAntigasAusentes(ctx.staleImportedRows);
 
       const visibleLines = final;
@@ -1493,16 +1576,21 @@ export default function ConciliacaoBancariaSection() {
    * escolhidos manualmente), que nunca são tocadas aqui.
    * Corrige o caso de uma linha continuar exibindo "Já conciliada anteriormente" no Importar
    * Extrato depois que o lançamento correspondente foi desconciliado/excluído na aba Lançamentos.
+   * `deveCasar` amplia as linhas reavaliadas (a ContaMax recém-registrada).
    */
-  const refreshLockedLinhas = async (source?: LinhaExtrato[]) => {
+  const refreshLockedLinhas = async (
+    source?: LinhaExtrato[],
+    deveCasar: (linha: LinhaExtrato) => boolean = l => !!(l.jaConciliada || l.ignorada),
+  ) => {
     if (!contaSel) return;
     const base = source || linhas;
-    if (!base.some(l => l.jaConciliada || l.ignorada)) return;
+    if (!base.some(deveCasar)) return;
     try {
-      // O set de FITIDs vem do arquivo INTEIRO (base), não só das linhas travadas:
-      // a exclusão em buildConciliadosCounts depende de qualquer linha do arquivo
-      // poder reivindicar o vínculo, mesmo que ela não esteja sendo re-matchada aqui.
-      const ctx = await fetchMatchContext(fitidsDasLinhas(base), base);
+      // FITIDs e período do arquivo INTEIRO — as linhas travadas, as pendentes e as
+      // que já saíram da lista: a exclusão em buildConciliadosCounts e a dona de cada
+      // transferência dependem de qualquer linha do arquivo poder reivindicar o
+      // vínculo, mesmo que ela não esteja sendo re-matchada aqui.
+      const ctx = await fetchMatchContext(arquivoDaSessao(base), base);
       setLinhasAntigasAusentes(ctx.staleImportedRows);
       const usedIds = new Set<string>();
       for (const l of base) {
@@ -1510,15 +1598,7 @@ export default function ConciliacaoBancariaSection() {
           usedIds.add(`${l.matchOrigin === 'lancamento' ? 'lanc' : l.matchOrigin === 'conta_pagar' ? 'cp' : 'cr'}-${l.matchId}`);
         }
       }
-      const occurrenceCounts = new Map<string, number>();
-      setLinhas(prev => prev.map(l => {
-        const key = bankLineKey(l);
-        const occurrenceIndex = occurrenceCounts.get(key) || 0;
-        occurrenceCounts.set(key, occurrenceIndex + 1);
-        return (l.jaConciliada || l.ignorada)
-          ? matchLinha(l, ctx, usedIds, occurrenceIndex)
-          : l;
-      }));
+      setLinhas(prev => matchLinhas(prev, ctx, usedIds, deveCasar));
     } catch (err) {
       console.error('[ConciliacaoBancariaSection.refreshLockedLinhas]', err);
     }
@@ -1631,6 +1711,7 @@ export default function ConciliacaoBancariaSection() {
     if (draftKey) clearSaldoExtrato(draftKey);
     if (draftKey) clearLinhas(draftKey);
     if (draftKey) clearOcorrenciasLivres(draftKey);
+    if (draftKey) clearArquivo(draftKey);
   };
 
   // ========== Ignorar linha ==========
@@ -1857,6 +1938,14 @@ export default function ConciliacaoBancariaSection() {
       toast.error('Este boleto está sem categoria. Informe a categoria em Contas a Pagar antes de conciliar.');
       return;
     }
+    // Mesma trava de `selectSuggestion`: com o boleto em duas linhas, a 2ª baixa
+    // voltava `noop` e o FITID dela era gravado no lançamento da 1ª.
+    const outraLinha = linhas.find((l, j) => j !== i && !l.jaConciliada
+      && l.matchId === boleto.id && l.matchOrigin === 'conta_pagar');
+    if (outraLinha) {
+      toast.error(`Este boleto já está vinculado à linha "${outraLinha.descricao}" deste extrato. Cada boleto cobre uma única linha do extrato.`);
+      return;
+    }
     setLinhas(prev => prev.map((l, j) => j === i ? {
       ...l,
       matchId: boleto.id,
@@ -1918,7 +2007,10 @@ export default function ConciliacaoBancariaSection() {
       toast.success(
         `${result.processed || targets.length} movimentação(ões) ContaMax tratada(s) sem efeito financeiro.`,
       );
-      await processarLinhas(linhas);
+      emitDataEvent('financeiro:conciliacao');
+      // Só a ContaMax mudou: reavalia ela e as travadas. Recasar a lista inteira
+      // apagava as escolhas feitas nas linhas pendentes.
+      await refreshLockedLinhas(linhas, l => isAutomaticInvestmentLine(l) || !!(l.jaConciliada || l.ignorada));
     } catch (error) {
       console.error('[ConciliacaoBancariaSection.processAutomaticInvestmentLines]', error);
       toast.error(extractSupabaseErrorMessage(
@@ -1971,7 +2063,8 @@ export default function ConciliacaoBancariaSection() {
       emitDataEvent('financeiro:conciliacao');
       toast.success('Lançamento importado como transação legítima repetida.');
     } catch (err: any) {
-      toast.error(err.message || 'Erro ao importar');
+      console.error('[ConciliacaoBancariaSection.forcarImportarDuplicata]', err);
+      toast.error(err?.message ? mapPagamentoError(err) : 'Erro ao importar');
     } finally {
       forcandoRef.current = false;
     }
@@ -4108,6 +4201,8 @@ export default function ConciliacaoBancariaSection() {
             // Arquivo novo: as linhas iguais já gravadas voltam como reconhecidas,
             // então as ocorrências recomeçam por elas (ver `@/lib/conciliacaoOcorrencia`).
             if (draftKey && isScopeActive()) clearOcorrenciasLivres(draftKey);
+            // O arquivo da sessão também recomeça: os FITIDs do anterior não são deste.
+            if (draftKey && isScopeActive()) clearArquivo(draftKey);
             setLoading(true);
             await processarLinhas(pending);
             setLoading(false);

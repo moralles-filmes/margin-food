@@ -22,6 +22,7 @@ import { buildCategoryOptions } from '@/lib/categoriaOptions';
 import SupplierCombobox from '@/components/financeiro/SupplierCombobox';
 import { Plus, Trash2, PieChart, CheckCircle, CheckCircle2, Loader2, FileText, Calculator } from 'lucide-react';
 import { traduzirErroIdempotencia } from '@/domain/financeiro/idempotencia';
+import { mapPagamentoError } from '@/lib/financeiroErrorMap';
 import { padronizarTexto } from '@/lib/padronizarTexto';
 import CmvDecisaoToggle from '@/components/financeiro/cmv/CmvDecisaoToggle';
 import { decisaoAoTrocarCategoria, type CmvAvisoDecisao, type CmvDecisao } from '@/domain/financeiro/cmv';
@@ -68,6 +69,15 @@ const DESTINOS: { value: Destino; label: string }[] = [
   { value: 'conta_pagar', label: 'Conta a Pagar' },
   { value: 'conta_receber', label: 'Conta a Receber' },
 ];
+
+/** Falha do vínculo depois de criar: recusa do banco não se resolve repetindo, então diz o motivo. */
+function falhaDoVinculo(bindError: unknown, criado: string): Error {
+  const msg = String((bindError as { message?: string })?.message ?? '');
+  if (msg.includes('LANCAMENTO_JA_VINCULADO') || msg.includes('EXTERNAL_ID_CONFLICT')) {
+    return new Error(`${criado}, mas a linha do extrato não foi vinculada: ${mapPagamentoError(bindError)}`);
+  }
+  return new Error(`${criado}, mas o vínculo com a linha do extrato falhou. Tente novamente — a repetição não duplica.`);
+}
 
 export default function CriarLancamentoExtratoDialog({
  open, onOpenChange, linha, ocorrencia, contaBancariaId, onCreated, cmvConfig = null }: Props) {
@@ -335,7 +345,7 @@ export default function CriarLancamentoExtratoDialog({
           await bindExtratoLine(importResult?.lancamento_id);
         } catch (bindError) {
           console.error('[CriarLancamentoExtratoDialog.bind]', bindError);
-          throw new Error('O lançamento foi criado, mas o vínculo com a linha do extrato falhou. Tente novamente — a repetição não duplica.');
+          throw falhaDoVinculo(bindError, 'O lançamento foi criado');
         }
 
         // Update the just-created lancamento with extra fields if needed.
@@ -409,7 +419,7 @@ export default function CriarLancamentoExtratoDialog({
           await bindExtratoLine(lancResult.lancamento_id);
         } catch (bindError) {
           console.error('[CriarLancamentoExtratoDialog.bind]', bindError);
-          throw new Error(`A conta a ${pagar ? 'pagar' : 'receber'} foi criada, mas o vínculo com a linha do extrato falhou. Tente novamente — a repetição não duplica.`);
+          throw falhaDoVinculo(bindError, `A conta a ${pagar ? 'pagar' : 'receber'} foi criada`);
         }
 
         toast.success(pagar

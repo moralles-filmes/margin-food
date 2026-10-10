@@ -31,6 +31,11 @@ Este arquivo serve para sincronizar o progresso do desenvolvimento entre os dife
 - [ ] Travar empresa de `conta_id`/`conta_destino_id`/`categoria_id`/`centro_custo_id` no cabeçalho de `fin_lancamentos` com trigger no padrão de `trg_fin_rateio_valida_empresa` — hoje `_guarded_upsert_lancamento`, `reconcile_import_lancamento` e os demais escritores aceitam id de outra unidade (0 casos em produção em 2026-10-08)
 - [ ] Monitor de Performance (Configurações) sem fonte: nada grava `SLOW_QUERY` em `audit_logs` — a lista de slow queries vem sempre vazia
 - [ ] Tornar obrigatório o `p_expected_updated_at` de `rh_atualizar_colaborador` (hoje `DEFAULT NULL` só para a aba aberta antes do deploy de `20261007220000` continuar gravando) — DROP da assinatura e CREATE sem o default
+- [ ] Conciliação: aplicar em produção as migrations `20261010150000` (vínculo automático de transferência pelo par mútuo) e `20261010160000` (um vínculo por lançamento; legado pela ocorrência) — roteiro, testes e reversão em `docs/conciliacao-transferencia-atribuicao/`
+- [ ] Conciliação: guardar a identidade da linha (data, valor, descrição normalizada) em `fin_conciliacao_vinculos` — sem ela, vínculo com FITID regenerado não reconhece a mesma linha reimportada com outra data (transferência vinculada até 3 dias da linha vira aviso) nem o espelho/manual de descrição diferente do memo
+- [ ] Conciliação: `reconcile_create_transfer_from_extrato` sem FITID (CSV) reaproveita a transferência existente (`existing`) sem reivindicá-la — duas linhas iguais ficam numa transferência só; e o empate de distância cria uma 3ª cópia
+- [ ] Conciliação: `reconcile_ignorar_lancamento` não é idempotente — clique duplo grava duas ignoradas e a 2ª absorve outra linha idêntica na próxima importação
+- [ ] Conciliação: sugestões de lançamento/CP/CR casam pela ordem do arquivo (o boleto vai para a 1ª linha de score suficiente, não para a melhor) e as consultas de transferência/espelho usam `limit(500)` sem janela de datas
 - [ ] Avaliar chave RBAC própria para o Borderô (`financeiro:bordero:view/export`) — hoje herda `financeiro:relatorio-socios:*` da Apresentação Sócios (em 2026-09-15 todo membro com essa chave já tinha `pagar:view` e `contas:view`)
 
 ## 🔄 Em Progresso (Doing)
