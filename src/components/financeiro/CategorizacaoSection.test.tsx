@@ -4,7 +4,7 @@ import CategorizacaoSection from './CategorizacaoSection';
 
 /**
  * Cliente falso: responde às leituras (regras, nomes, contagem e prévia) e registra TODA chamada.
- * "Aplicar Regras" nunca é acionado aqui; editar/desativar só nos casos em que a RLS descarta o UPDATE.
+ * "Aplicar Regras" só com resultado simulado; editar/desativar com o UPDATE simulado (gravou ou a RLS descartou).
  */
 const state = vi.hoisted(() => ({
   rpcCalls: [] as string[],
@@ -12,6 +12,8 @@ const state = vi.hoisted(() => ({
   tableWrites: [] as string[],
   // Linhas devolvidas pelo UPDATE ... select('id'); [] = a RLS descartou sem erro.
   linhasUpdate: [{ id: 'r2' }] as unknown[],
+  previewTotal: undefined as number | undefined,
+  aplicar: { total: 7, categorizados: 3, regras_com_erro: [] as string[] },
   dados: {} as Record<string, unknown[]>,
   erro: {} as Record<string, boolean>,
   contagem: 7 as number | null,
@@ -47,8 +49,9 @@ const supabase = {
       return Promise.resolve(state.contagemErro ? { data: null, error: { message: 'falha' } } : { data: state.contagem, error: null });
     }
     if (name === 'preview_regra_categorizacao') {
-      return Promise.resolve({ data: [{ id: 'l1', descricao: 'Pagamento aluguel teste', valor: 1500, data_competencia: '2026-01-05' }], error: null });
+      return Promise.resolve({ data: [{ id: 'l1', descricao: 'Pagamento aluguel teste', valor: 1500, data_competencia: '2026-01-05', total: state.previewTotal }], error: null });
     }
+    if (name === 'aplicar_regras_categorizacao') return Promise.resolve({ data: state.aplicar, error: null });
     return Promise.resolve({ data: null, error: null });
   },
 };
@@ -68,6 +71,8 @@ beforeEach(() => {
   state.rpcArgs = {};
   state.tableWrites = [];
   state.linhasUpdate = [{ id: 'r2' }];
+  state.previewTotal = undefined;
+  state.aplicar = { total: 7, categorizados: 3, regras_com_erro: [] };
   state.erro = {};
   state.contagem = 7;
   state.contagemErro = false;
@@ -142,7 +147,7 @@ describe('Categorização (V2)', () => {
 
     fireEvent.change(within(dialogo).getByLabelText('Padrão de texto'), { target: { value: 'aluguel' } });
     fireEvent.click(within(dialogo).getByRole('button', { name: /Testar Regra/ }));
-    expect(await within(dialogo).findByText('1 lançamento(s) seriam categorizados (máx. 20):')).toBeInTheDocument();
+    expect(await within(dialogo).findByText('1 lançamento(s) seriam categorizados:')).toBeInTheDocument();
     expect(within(dialogo).getByText(/Padrão testado: “aluguel” \(Contém\)/)).toBeInTheDocument();
     expect(within(dialogo).getByText('Pagamento aluguel teste')).toBeInTheDocument();
 
@@ -166,6 +171,49 @@ describe('Categorização (V2)', () => {
     fireEvent.click(within(dialogo).getByRole('button', { name: /Testar Regra/ }));
     expect(await within(dialogo).findByText(/lançamentos do tipo da categoria sem categoria nem rateio/)).toBeInTheDocument();
     expect(state.rpcArgs.preview_regra_categorizacao).toEqual({ p_padrao: 'aluguel', p_tipo_match: 'contem', p_categoria_id: 'k2' });
+  });
+
+  it('prévia com mais casamentos do que exemplos mostra o total', async () => {
+    state.previewTotal = 134;
+    render(<CategorizacaoSection />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Editar regra aluguel' }));
+    const dialogo = await screen.findByRole('dialog', { name: 'Editar Regra' });
+    fireEvent.click(within(dialogo).getByRole('button', { name: /Testar Regra/ }));
+    expect(await within(dialogo).findByText('134 lançamento(s) seriam categorizados; os 1 mais recentes:')).toBeInTheDocument();
+  });
+
+  it('Aplicar Regras pede confirmação: cancelar não chama o banco', async () => {
+    render(<CategorizacaoSection />);
+    await screen.findByText('7 lançamento(s) sem categoria.');
+    fireEvent.click(screen.getByRole('button', { name: /Aplicar Regras/ }));
+    const confirmacao = await screen.findByRole('alertdialog');
+    expect(within(confirmacao).getByText(/As 2 regra\(s\) ativa\(s\) vão classificar .* \(até 7\)/)).toBeInTheDocument();
+    fireEvent.click(within(confirmacao).getByRole('button', { name: 'Cancelar' }));
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
+    expect(state.rpcCalls).not.toContain('aplicar_regras_categorizacao');
+  });
+
+  it('Aplicar Regras confirmado: resultado e aviso das regras com Regex recusado pelo banco', async () => {
+    state.aplicar = { total: 7, categorizados: 3, regras_com_erro: ['(?<nome>x)'] };
+    render(<CategorizacaoSection />);
+    await screen.findByText('7 lançamento(s) sem categoria.');
+    fireEvent.click(screen.getByRole('button', { name: /Aplicar Regras/ }));
+    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Aplicar' }));
+    await waitFor(() => expect(state.toast.success).toHaveBeenCalledWith('3 lançamento(s) categorizado(s) de 7 analisados'));
+    expect(state.toast.warning).toHaveBeenCalledWith(
+      'Regra(s) ignorada(s) porque o banco recusou o Regex: (?<nome>x). Corrija o padrão e aplique de novo.');
+  });
+
+  it('Desativar segue a permissão do banco (editar), não a de excluir', async () => {
+    state.perms = new Set(['financeiro:categorizacao:view', 'financeiro:categorizacao:delete']);
+    const { unmount } = render(<CategorizacaoSection />);
+    await screen.findByRole('table');
+    expect(screen.queryByRole('button', { name: 'Desativar regra aluguel' })).not.toBeInTheDocument();
+    unmount();
+
+    state.perms = new Set(['financeiro:categorizacao:view', 'financeiro:categorizacao:edit']);
+    render(<CategorizacaoSection />);
+    expect(await screen.findByRole('button', { name: 'Desativar regra aluguel' })).toBeInTheDocument();
   });
 
   it('editar regra que a RLS não deixou gravar: erro, nunca "Regra atualizada"', async () => {

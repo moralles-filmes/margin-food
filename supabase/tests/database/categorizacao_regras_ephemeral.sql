@@ -145,23 +145,26 @@ BEGIN
     ('c0000000-0000-4000-8000-0000000000b1', 'Despesa B', 'despesa', true, B);
   INSERT INTO fin_centros_custo (id, nome, company_id) VALUES
     ('cc000000-0000-4000-8000-00000000000a', 'Cozinha A', A),
+    ('cc000000-0000-4000-8000-0000000000a2', 'Salão A', A),
     ('cc000000-0000-4000-8000-00000000000b', 'Cozinha B', B);
   INSERT INTO fin_contas (id, nome, company_id) VALUES
     ('d0000000-0000-4000-8000-00000000000a', 'Banco A', A),
     ('d0000000-0000-4000-8000-00000000000c', 'Caixa A', A);
 
-  INSERT INTO fin_lancamentos (id, tipo, valor, descricao, status, company_id, centro_custo_id, conta_id, conta_destino_id) VALUES
-    ('a0000000-0000-4000-8000-000000000001', 'DESPESA', 100, 'MANUTENÇÃO DO FREEZER', 'REALIZADO', A, NULL, 'd0000000-0000-4000-8000-00000000000a', NULL),
-    ('a0000000-0000-4000-8000-000000000002', 'RECEITA', 50, 'Reembolso manutenção', 'REALIZADO', A, NULL, 'd0000000-0000-4000-8000-00000000000a', NULL),
-    ('a0000000-0000-4000-8000-000000000003', 'TRANSFERENCIA', 700, 'Transferência manutenção', 'REALIZADO', A, NULL, 'd0000000-0000-4000-8000-00000000000a', 'd0000000-0000-4000-8000-00000000000c'),
-    ('a0000000-0000-4000-8000-000000000004', 'DESPESA', 10, 'Desconto 100% aplicado', 'REALIZADO', A, NULL, NULL, NULL),
-    ('a0000000-0000-4000-8000-000000000005', 'DESPESA', 11, 'Desconto 1000 aplicado', 'REALIZADO', A, NULL, NULL, NULL),
-    ('a0000000-0000-4000-8000-000000000006', 'DESPESA', 300, 'Aluguel loja', 'REALIZADO', A, NULL, NULL, NULL),
-    ('a0000000-0000-4000-8000-000000000007', 'DESPESA', 300, 'Aluguel sala', 'CANCELADO', A, NULL, NULL, NULL),
-    ('a0000000-0000-4000-8000-000000000008', 'DESPESA', 40, 'Frete', 'REALIZADO', A, NULL, NULL, NULL),
-    ('a0000000-0000-4000-8000-000000000009', 'DESPESA', 60, 'Gás', 'REALIZADO', A, NULL, NULL, NULL),
-    ('a0000000-0000-4000-8000-000000000010', 'DESPESA', 200, 'Energia elétrica', 'REALIZADO', A, 'cc000000-0000-4000-8000-00000000000a', NULL, NULL),
-    ('a0000000-0000-4000-8000-0000000000b1', 'DESPESA', 90, 'Manutenção B', 'REALIZADO', B, NULL, NULL, NULL);
+  INSERT INTO fin_lancamentos (id, tipo, valor, descricao, status, company_id, centro_custo_id, conta_id, conta_destino_id, origem, conciliado) VALUES
+    ('a0000000-0000-4000-8000-000000000001', 'DESPESA', 100, 'MANUTENÇÃO DO FREEZER', 'REALIZADO', A, NULL, 'd0000000-0000-4000-8000-00000000000a', NULL, 'manual', false),
+    ('a0000000-0000-4000-8000-000000000002', 'RECEITA', 50, 'Reembolso manutenção', 'REALIZADO', A, NULL, 'd0000000-0000-4000-8000-00000000000a', NULL, 'manual', false),
+    ('a0000000-0000-4000-8000-000000000003', 'TRANSFERENCIA', 700, 'Transferência manutenção', 'REALIZADO', A, NULL, 'd0000000-0000-4000-8000-00000000000a', 'd0000000-0000-4000-8000-00000000000c', 'manual', false),
+    ('a0000000-0000-4000-8000-000000000004', 'DESPESA', 10, 'Desconto 100% aplicado', 'REALIZADO', A, 'cc000000-0000-4000-8000-0000000000a2', NULL, NULL, 'manual', false),
+    ('a0000000-0000-4000-8000-000000000005', 'DESPESA', 11, 'Desconto 1000 aplicado', 'REALIZADO', A, NULL, NULL, NULL, 'manual', false),
+    ('a0000000-0000-4000-8000-000000000006', 'DESPESA', 300, 'Aluguel loja', 'REALIZADO', A, NULL, NULL, NULL, 'manual', false),
+    ('a0000000-0000-4000-8000-000000000007', 'DESPESA', 300, 'Aluguel sala', 'CANCELADO', A, NULL, NULL, NULL, 'manual', false),
+    ('a0000000-0000-4000-8000-000000000008', 'DESPESA', 40, 'Frete', 'REALIZADO', A, NULL, NULL, NULL, 'manual', false),
+    ('a0000000-0000-4000-8000-000000000009', 'DESPESA', 60, 'Gás', 'REALIZADO', A, NULL, NULL, NULL, 'manual', false),
+    ('a0000000-0000-4000-8000-000000000010', 'DESPESA', 200, 'Energia elétrica', 'REALIZADO', A, 'cc000000-0000-4000-8000-00000000000a', NULL, NULL, 'manual', false),
+    ('a0000000-0000-4000-8000-0000000000b1', 'DESPESA', 90, 'Manutenção B', 'REALIZADO', B, NULL, NULL, NULL, 'manual', false),
+    ('a0000000-0000-4000-8000-000000000011', 'DESPESA', 70, 'Manutenção extrato pendente', 'REALIZADO', A, NULL, 'd0000000-0000-4000-8000-00000000000a', NULL, 'conciliacao', false),
+    ('a0000000-0000-4000-8000-000000000012', 'DESPESA', 25, 'Manutenção boleto', 'REALIZADO', A, NULL, 'd0000000-0000-4000-8000-00000000000a', NULL, 'espelho_cp', false);
   -- Rateio com a linha sem categoria: a categoria do cabeçalho seria ignorada nos relatórios.
   INSERT INTO fin_lancamento_rateios (lancamento_id, categoria_id, valor, company_id) VALUES
     ('a0000000-0000-4000-8000-000000000006', NULL, 300, A);
@@ -169,12 +172,16 @@ BEGIN
   INSERT INTO fin_regras_categorizacao (padrao, tipo_match, categoria_id, centro_custo_id, prioridade, company_id, created_at) VALUES
     ('manutencao', 'contem', 'c0000000-0000-4000-8000-000000000001', NULL, 0, A, '2026-10-01'),
     ('freezer', 'contem', 'c0000000-0000-4000-8000-000000000002', 'cc000000-0000-4000-8000-00000000000a', 10, A, '2026-10-02'),
-    ('100%', 'contem', 'c0000000-0000-4000-8000-000000000005', NULL, 0, A, '2026-10-03'),
+    ('100%', 'contem', 'c0000000-0000-4000-8000-000000000005', 'cc000000-0000-4000-8000-00000000000a', 0, A, '2026-10-03'),
     ('aluguel', 'contem', 'c0000000-0000-4000-8000-000000000001', NULL, 0, A, '2026-10-04'),
     ('frete', 'contem', 'c0000000-0000-4000-8000-0000000000b1', NULL, 0, A, '2026-10-05'),
     ('gas', 'contem', 'c0000000-0000-4000-8000-000000000004', NULL, 0, A, '2026-10-06'),
     ('energia eletrica', 'exato', 'c0000000-0000-4000-8000-000000000006', 'cc000000-0000-4000-8000-00000000000b', 0, A, '2026-10-07'),
-    ('manutencao', 'contem', 'c0000000-0000-4000-8000-0000000000b1', NULL, 0, B, '2026-10-08');
+    ('manutencao', 'contem', 'c0000000-0000-4000-8000-0000000000b1', NULL, 0, B, '2026-10-08'),
+    -- Padrão vazio casaria tudo; regex aceita pelo JS e recusada pelo Postgres.
+    ('', 'contem', 'c0000000-0000-4000-8000-000000000001', NULL, 50, A, '2026-10-09'),
+    ('   ', 'contem', 'c0000000-0000-4000-8000-000000000001', NULL, 50, A, '2026-10-09'),
+    ('(?<nome>freezer)', 'regex', 'c0000000-0000-4000-8000-000000000001', NULL, -1, A, '2026-10-09');
 END; $$;
 
 CREATE FUNCTION public.cat_reset() RETURNS void LANGUAGE plpgsql AS $$
@@ -192,7 +199,7 @@ END; $$;
 CREATE FUNCTION public.run_categorizacao_antes() RETURNS text LANGUAGE plpgsql AS $$
 BEGIN
   PERFORM cat_reset();
-  PERFORM cat_assert(public.contar_lancamentos_sem_categoria() = 9, 'antes: a contagem inclui a transferência (9)');
+  PERFORM cat_assert(public.contar_lancamentos_sem_categoria() = 11, 'antes: a contagem inclui a transferência e a linha pendente do extrato (11)');
   PERFORM cat_expect_error('SELECT public.aplicar_regras_categorizacao()', 'Justificativa obrigatória%',
     'antes: Aplicar Regras falha no gatilho de lançamento realizado');
   PERFORM cat_assert((SELECT count(*) FROM fin_lancamentos WHERE categoria_id IS NOT NULL) = 0, 'antes: a falha desfaz tudo');
@@ -222,7 +229,7 @@ BEGIN
     'as 3 funções da categorização com search_path vazio');
 
   -- Contagem: transferência e cancelado fora; rateio sem categoria conta
-  PERFORM cat_assert(public.contar_lancamentos_sem_categoria() = 8, 'contagem sem transferência (8)');
+  PERFORM cat_assert(public.contar_lancamentos_sem_categoria() = 9, 'contagem sem transferência nem linha pendente do extrato (9; espelho de boleto conta)');
 
   -- Prévia: sem acento, sem transferência, tipo da categoria, % literal, rateio e cancelado fora
   r := public.preview_regra_categorizacao('manutencao', 'contem');
@@ -239,6 +246,13 @@ BEGIN
   PERFORM cat_assert(cat_ids(r) = 'Desconto 100% aplicado', '% do padrão é texto, não curinga — veio ' || cat_ids(r));
   r := public.preview_regra_categorizacao('aluguel', 'contem');
   PERFORM cat_assert(json_array_length(r) = 0, 'prévia ignora lançamento com rateio e cancelado');
+  r := public.preview_regra_categorizacao('a', 'contem');
+  PERFORM cat_assert(json_array_length(r) = 6 AND (r->0->>'total')::int = 6,
+    'prévia traz o total; espelho, extrato pendente, rateio e transferência fora — veio ' || cat_ids(r));
+  PERFORM cat_assert(json_array_length(public.preview_regra_categorizacao('', 'contem')) = 0
+    AND json_array_length(public.preview_regra_categorizacao('   ', 'contem')) = 0, 'padrão vazio não casa nada');
+  PERFORM cat_expect_error($q$SELECT public.preview_regra_categorizacao('(?<nome>x)', 'regex')$q$, 'invalid regular expression%',
+    'regex recusada pelo Postgres falha já no teste, mesmo sem candidato');
   r := public.preview_regra_categorizacao('ENERGIA ELETRICA', 'exato');
   PERFORM cat_assert(cat_ids(r) = 'Energia elétrica', 'exato sem acento e sem caixa — veio ' || cat_ids(r));
   r := public.preview_regra_categorizacao('^manut', 'regex');
@@ -247,45 +261,56 @@ BEGIN
   -- Permissão e tenant
   PERFORM set_config('test.permissions', 'financeiro:categorizacao:view', false);
   PERFORM cat_expect_error('SELECT public.aplicar_regras_categorizacao()', 'PERMISSION_DENIED', 'aplicar exige manage');
+  -- Chave legada, como nas policies de fin_regras_categorizacao.
+  PERFORM set_config('test.permissions', 'finance:read', false);
+  PERFORM cat_assert(public.contar_lancamentos_sem_categoria() = 9
+    AND json_array_length(public.preview_regra_categorizacao('manutencao', 'contem')) = 2, 'finance:read conta e testa');
+  PERFORM cat_expect_error('SELECT public.aplicar_regras_categorizacao()', 'PERMISSION_DENIED', 'finance:read não aplica');
   PERFORM set_config('test.permissions', 'financeiro:categorizacao:view,financeiro:categorizacao:manage,financeiro:lancamentos:view,financeiro:alertas:view', false);
 
   -- Aplicar: não falha no gatilho, grava justificativa, respeita prioridade, tipo, empresa e rateio
   r := public.aplicar_regras_categorizacao();
-  PERFORM cat_assert((r->>'total')::int = 8 AND (r->>'categorizados')::int = 3, 'aplicar: 3 de 8 — veio ' || r::text);
+  PERFORM cat_assert((r->>'total')::int = 9 AND (r->>'categorizados')::int = 3
+      AND (r->'regras_com_erro')::text = '["(?<nome>freezer)"]',
+    'aplicar: 3 de 9 e a regex recusada volta em regras_com_erro sem derrubar as outras — veio ' || r::text);
 
   SELECT categoria_id, centro_custo_id, justificativa_edicao INTO v_l FROM fin_lancamentos WHERE id = 'a0000000-0000-4000-8000-000000000001';
   PERFORM cat_assert(v_l.categoria_id = 'c0000000-0000-4000-8000-000000000002'
     AND v_l.centro_custo_id = 'cc000000-0000-4000-8000-00000000000a'
     AND v_l.justificativa_edicao = 'Categorização automática pela regra "freezer"',
     'prioridade maior classifica primeiro, com centro e justificativa');
-  PERFORM cat_assert((SELECT categoria_id FROM fin_lancamentos WHERE id = 'a0000000-0000-4000-8000-000000000004') = 'c0000000-0000-4000-8000-000000000005',
-    'desconto 100% categorizado');
+  SELECT categoria_id, centro_custo_id INTO v_l FROM fin_lancamentos WHERE id = 'a0000000-0000-4000-8000-000000000004';
+  PERFORM cat_assert(v_l.categoria_id = 'c0000000-0000-4000-8000-000000000005' AND v_l.centro_custo_id = 'cc000000-0000-4000-8000-0000000000a2',
+    'desconto 100% categorizado; o centro que o lançamento já tinha prevalece sobre o da regra');
   SELECT categoria_id, centro_custo_id INTO v_l FROM fin_lancamentos WHERE id = 'a0000000-0000-4000-8000-000000000010';
   PERFORM cat_assert(v_l.categoria_id = 'c0000000-0000-4000-8000-000000000006' AND v_l.centro_custo_id = 'cc000000-0000-4000-8000-00000000000a',
     'exato categoriza e o centro de outra empresa é ignorado (mantém o atual)');
   PERFORM cat_assert((SELECT count(*) FROM fin_lancamentos WHERE categoria_id IS NULL AND id IN (
       'a0000000-0000-4000-8000-000000000002', 'a0000000-0000-4000-8000-000000000003', 'a0000000-0000-4000-8000-000000000005',
       'a0000000-0000-4000-8000-000000000006', 'a0000000-0000-4000-8000-000000000007', 'a0000000-0000-4000-8000-000000000008',
-      'a0000000-0000-4000-8000-000000000009', 'a0000000-0000-4000-8000-0000000000b1')) = 8,
-    'intactos: receita, transferência, 1000, rateio, cancelado, categoria de outra empresa, categoria inativa, outra empresa');
+      'a0000000-0000-4000-8000-000000000009', 'a0000000-0000-4000-8000-000000000011', 'a0000000-0000-4000-8000-000000000012',
+      'a0000000-0000-4000-8000-0000000000b1')) = 10,
+    'intactos: receita, transferência, 1000, rateio, cancelado, categoria de outra empresa, categoria inativa, extrato pendente, espelho de boleto, outra empresa');
   PERFORM cat_assert((SELECT count(*) FROM fin_lancamentos WHERE justificativa_edicao IS NOT NULL) = 3, 'justificativa só nos categorizados');
-  PERFORM cat_assert(public.contar_lancamentos_sem_categoria() = 5, 'contagem cai para 5');
+  PERFORM cat_assert(public.contar_lancamentos_sem_categoria() = 6, 'contagem cai para 6');
 
   -- Reaplicar não muda nada
+  PERFORM set_config('test.permissions', 'finance:manage', false);
   r := public.aplicar_regras_categorizacao();
-  PERFORM cat_assert((r->>'total')::int = 5 AND (r->>'categorizados')::int = 0, 'segunda aplicação: 0 de 5 — veio ' || r::text);
+  PERFORM cat_assert((r->>'total')::int = 6 AND (r->>'categorizados')::int = 0, 'segunda aplicação (chave legada finance:manage): 0 de 6 — veio ' || r::text);
+  PERFORM set_config('test.permissions', 'financeiro:categorizacao:view,financeiro:categorizacao:manage,financeiro:lancamentos:view,financeiro:alertas:view', false);
 
   -- Alerta do Dashboard e Livro Razão "Sem categoria" sem transferência
-  PERFORM cat_assert((public.get_fin_alertas()->>'lancamentos_sem_categoria')::int = 5, 'alerta do Dashboard sem transferência (5)');
+  PERFORM cat_assert((public.get_fin_alertas()->>'lancamentos_sem_categoria')::int = 6, 'alerta do Dashboard igual à contagem (6)');
   r := public.list_fin_lancamentos_cursor(p_sem_categoria => true);
-  PERFORM cat_assert(json_array_length(r->'items') = 5
+  PERFORM cat_assert(json_array_length(r->'items') = 6
       AND NOT EXISTS (SELECT 1 FROM json_array_elements(r->'items') x WHERE x->>'tipo' = 'TRANSFERENCIA'),
     'Livro Razão "Sem categoria" sem transferência — veio ' || json_array_length(r->'items'));
   r := public.get_fin_lancamentos_totais(p_sem_categoria => true);
-  PERFORM cat_assert((r->>'total_transferencia')::numeric = 0 AND (r->>'total_despesa')::numeric = 411 AND (r->>'total_receita')::numeric = 50,
+  PERFORM cat_assert((r->>'total_transferencia')::numeric = 0 AND (r->>'total_despesa')::numeric = 436 AND (r->>'total_receita')::numeric = 50,
     'totais do "Sem categoria" sem transferência — veio ' || r::text);
   r := public.list_fin_lancamentos_cursor();
-  PERFORM cat_assert(json_array_length(r->'items') = 9, 'Livro Razão sem filtro continua trazendo tudo, transferência inclusive');
+  PERFORM cat_assert(json_array_length(r->'items') = 10, 'Livro Razão sem filtro continua trazendo tudo, transferência inclusive');
   r := public.get_fin_lancamentos_totais();
   PERFORM cat_assert((r->>'total_transferencia')::numeric = 700, 'totais sem filtro continuam com a transferência');
 

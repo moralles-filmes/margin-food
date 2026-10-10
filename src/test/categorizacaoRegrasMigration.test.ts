@@ -36,8 +36,19 @@ describe('migração: regras de categorização', () => {
     // Na aplicação, o tipo do lançamento precisa ser o da categoria (despesa/receita).
     expect(corpo('aplicar_regras_categorizacao')).toContain('AND fl.tipo = v_regra.tipo_lancamento');
     expect(corpo('get_fin_alertas')).toContain(
-      "WHERE fl.company_id = v_company AND fl.status IN ('REALIZADO','CONCILIADO') AND fl.tipo <> 'TRANSFERENCIA' AND fl.categoria_id IS NULL",
+      "WHERE fl.company_id = v_company AND fl.status IN ('REALIZADO','CONCILIADO') AND fl.tipo <> 'TRANSFERENCIA' AND NOT (fl.origem = 'conciliacao' AND fl.conciliado IS NOT TRUE) AND fl.categoria_id IS NULL",
     );
+  });
+
+  it('linha de extrato não conciliada não é pendência; espelho de boleto não é categorizado pela regra', () => {
+    const pendente = "AND NOT (fl.origem = 'conciliacao' AND fl.conciliado IS NOT TRUE)";
+    for (const nome of ['contar_lancamentos_sem_categoria', 'aplicar_regras_categorizacao', 'preview_regra_categorizacao']) {
+      expect(corpo(nome), nome).toContain(pendente);
+    }
+    const espelho = "AND COALESCE(fl.origem, '') NOT IN ('espelho_cp', 'espelho_cr')";
+    expect(corpo('aplicar_regras_categorizacao')).toContain(espelho);
+    expect(corpo('preview_regra_categorizacao')).toContain(espelho);
+    expect(corpo('contar_lancamentos_sem_categoria')).not.toContain('espelho_cp');
   });
 
   it('o "Sem categoria" do Livro Razão também deixa a transferência de fora', () => {
@@ -47,12 +58,12 @@ describe('migração: regras de categorização', () => {
     );
   });
 
-  it('só categoria ativa da empresa, do mesmo tipo; centro de outra empresa é ignorado', () => {
+  it('só categoria ativa da empresa, do mesmo tipo; centro só ativo, da empresa e onde o lançamento não tem', () => {
     const aplicar = corpo('aplicar_regras_categorizacao');
     expect(aplicar).toContain('JOIN public.fin_categorias c ON c.id = r.categoria_id AND c.company_id = v_company_id AND c.ativo = true');
-    expect(aplicar).toContain('LEFT JOIN public.fin_centros_custo cc ON cc.id = r.centro_custo_id AND cc.company_id = v_company_id');
+    expect(aplicar).toContain('LEFT JOIN public.fin_centros_custo cc ON cc.id = r.centro_custo_id AND cc.company_id = v_company_id AND cc.ativo = true');
     expect(aplicar).toContain('upper(c.tipo) AS tipo_lancamento');
-    expect(aplicar).toContain('centro_custo_id = COALESCE(v_regra.centro_custo_id, fl.centro_custo_id)');
+    expect(aplicar).toContain('centro_custo_id = COALESCE(fl.centro_custo_id, v_regra.centro_custo_id)');
     expect(corpo('preview_regra_categorizacao')).toContain(
       'WHERE c.id = p_categoria_id AND c.company_id = v_company_id AND c.ativo = true',
     );
@@ -80,7 +91,23 @@ describe('migração: regras de categorização', () => {
       expect(f, nome).toContain('v_company_id := public.assert_tenant();');
       expect(f, nome).toContain('IF NOT public.has_any_permission(auth.uid(), ARRAY[');
     }
-    expect(corpo('aplicar_regras_categorizacao')).toContain("'financeiro:categorizacao:manage', 'system:global:manage' ]");
+    // Chave granular, legado e global, como as policies de fin_regras_categorizacao.
+    expect(corpo('aplicar_regras_categorizacao')).toContain("'financeiro:categorizacao:manage', 'finance:manage', 'system:global:manage' ]");
+    for (const nome of ['contar_lancamentos_sem_categoria', 'preview_regra_categorizacao']) {
+      expect(corpo(nome), nome).toContain("'financeiro:categorizacao:view', 'financeiro:categorizacao:manage', 'finance:read', 'system:global:manage' ]");
+    }
+  });
+
+  it('regex recusada pelo Postgres pula só a regra; padrão vazio não casa nada', () => {
+    const aplicar = corpo('aplicar_regras_categorizacao');
+    expect(aplicar).toContain("IF v_regra.tipo_match = 'regex' THEN PERFORM '' ~* v_regra.padrao; END IF;");
+    expect(aplicar).toContain('EXCEPTION WHEN invalid_regular_expression THEN v_regras_com_erro := array_append(v_regras_com_erro, v_regra.padrao);');
+    expect(aplicar).toContain("'regras_com_erro', to_json(v_regras_com_erro)");
+    expect(aplicar).toContain("AND btrim(COALESCE(r.padrao, '')) <> ''");
+    const previa = corpo('preview_regra_categorizacao');
+    expect(previa).toContain("IF btrim(COALESCE(p_padrao, '')) = '' THEN RETURN '[]'::json; END IF;");
+    expect(previa).toContain("IF p_tipo_match = 'regex' THEN PERFORM '' ~* p_padrao; END IF;");
+    expect(previa).toContain("count(*) OVER () AS total");
   });
 
   it('prévia troca de assinatura sem deixar overload e com o ACL de antes', () => {

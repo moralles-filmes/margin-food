@@ -13,20 +13,30 @@
 --    ignoravam acento e liam % e _ como curinga.
 --
 -- Mudanças:
---  1-3. contar/aplicar/prévia reescritas com search_path vazio: transferência
---       fora; categoria ativa da empresa e do mesmo tipo do lançamento; centro de
---       custo de outra empresa ignorado; casamento sem acento com % e _ literais;
---       justificativa automática no UPDATE. A aplicação só mexe em lançamento sem
---       linha de rateio (com rateio, a categoria do cabeçalho é ignorada nos
---       relatórios). A prévia ganha p_categoria_id (DEFAULT NULL: cliente antigo
---       com 2 argumentos continua funcionando) — assinatura nova exige DROP da
---       antiga; CREATE OR REPLACE deixa a migration reaplicável.
---  4.   get_fin_alertas: só "lancamentos_sem_categoria" deixa de contar
---       transferência. Demais chaves com o corpo vivo, sem alteração.
+--  1-3. contar/aplicar/prévia reescritas com search_path vazio:
+--       - pendência = receita/despesa sem categoria nem rateio categorizado, fora
+--         cancelado, transferência e linha do extrato ainda não conciliada (o
+--         Livro Razão também a esconde);
+--       - a aplicação só mexe em lançamento sem linha de rateio (com rateio, a
+--         categoria do cabeçalho é ignorada nos relatórios) e fora dos espelhos de
+--         boleto (editados no título de origem);
+--       - categoria ativa da empresa e do mesmo tipo do lançamento; centro de
+--         custo ativo da empresa e só onde o lançamento ainda não tem centro;
+--       - casamento sem acento com \ % _ literais; padrão vazio é ignorado;
+--       - justificativa automática no UPDATE; regex que o Postgres recusa não
+--         derruba as outras regras (volta em regras_com_erro);
+--       - gates com a chave legada do financeiro (finance:read/finance:manage),
+--         como as policies de fin_regras_categorizacao.
+--       A prévia ganha p_categoria_id (DEFAULT NULL: cliente antigo com 2
+--       argumentos continua funcionando) e o total de casamentos em cada item;
+--       assinatura nova exige DROP da antiga; CREATE OR REPLACE deixa a migration
+--       reaplicável.
+--  4.   get_fin_alertas: só "lancamentos_sem_categoria" muda, com os mesmos cortes
+--       da contagem (sem transferência e sem linha de extrato não conciliada); o
+--       alerta continua só com REALIZADO/CONCILIADO.
 --  5-6. Livro Razão (list_fin_lancamentos_cursor de 12 argumentos e
 --       get_fin_lancamentos_totais): o filtro "Sem categoria" deixa de trazer
---       transferência, para bater com a contagem da Categorização. Corpos vivos,
---       só o ramo v_sem muda.
+--       transferência. Corpos vivos, só o ramo v_sem muda.
 --
 -- RLS, grants de tabela e permissões não mudam. CREATE OR REPLACE preserva o
 -- ACL das funções existentes. Reversão: docs/categorizacao-regras/reversao.sql.
@@ -50,18 +60,21 @@ BEGIN
   IF NOT public.has_any_permission(auth.uid(), ARRAY[
     'financeiro:categorizacao:view',
     'financeiro:categorizacao:manage',
+    'finance:read',
     'system:global:manage'
   ]) THEN
     RAISE EXCEPTION 'PERMISSION_DENIED';
   END IF;
 
-  -- Transferência nunca leva categoria: não é pendência.
+  -- Transferência nunca leva categoria e linha de extrato não conciliada ainda não
+  -- está no Livro Razão: nenhuma das duas é pendência.
   SELECT count(*)::int INTO v_count
   FROM public.fin_lancamentos fl
   WHERE fl.company_id = v_company_id
     AND fl.categoria_id IS NULL
     AND fl.status <> 'CANCELADO'
     AND fl.tipo <> 'TRANSFERENCIA'
+    AND NOT (fl.origem = 'conciliacao' AND fl.conciliado IS NOT TRUE)
     AND NOT EXISTS (
       SELECT 1 FROM public.fin_lancamento_rateios flr
       WHERE flr.lancamento_id = fl.id
@@ -89,11 +102,13 @@ DECLARE
   v_match_count int;
   v_padrao text;
   v_padrao_like text;
+  v_regras_com_erro text[] := ARRAY[]::text[];
 BEGIN
   v_company_id := public.assert_tenant();
 
   IF NOT public.has_any_permission(auth.uid(), ARRAY[
     'financeiro:categorizacao:manage',
+    'finance:manage',
     'system:global:manage'
   ]) THEN
     RAISE EXCEPTION 'PERMISSION_DENIED';
@@ -106,6 +121,7 @@ BEGIN
     AND fl.categoria_id IS NULL
     AND fl.status <> 'CANCELADO'
     AND fl.tipo <> 'TRANSFERENCIA'
+    AND NOT (fl.origem = 'conciliacao' AND fl.conciliado IS NOT TRUE)
     AND NOT EXISTS (
       SELECT 1 FROM public.fin_lancamento_rateios flr
       WHERE flr.lancamento_id = fl.id
@@ -113,11 +129,11 @@ BEGIN
     );
 
   IF v_total = 0 THEN
-    RETURN json_build_object('total', 0, 'categorizados', 0);
+    RETURN json_build_object('total', 0, 'categorizados', 0, 'regras_com_erro', '[]'::json);
   END IF;
 
   -- Só categoria ativa da própria empresa (a FK não confere a empresa); centro de
-  -- custo de outra empresa é ignorado e o lançamento mantém o que já tem.
+  -- custo inativo ou de outra empresa é ignorado. Padrão vazio casaria tudo.
   FOR v_regra IN
     SELECT r.padrao, r.tipo_match, r.categoria_id,
       upper(c.tipo) AS tipo_lancamento,
@@ -126,48 +142,67 @@ BEGIN
     JOIN public.fin_categorias c
       ON c.id = r.categoria_id AND c.company_id = v_company_id AND c.ativo = true
     LEFT JOIN public.fin_centros_custo cc
-      ON cc.id = r.centro_custo_id AND cc.company_id = v_company_id
+      ON cc.id = r.centro_custo_id AND cc.company_id = v_company_id AND cc.ativo = true
     WHERE r.company_id = v_company_id AND r.ativo = true
+      AND btrim(COALESCE(r.padrao, '')) <> ''
     ORDER BY r.prioridade DESC, r.created_at ASC
   LOOP
     -- Sem acento e sem caixa; no "Contém", \ % e _ do padrão valem como texto.
-    v_padrao := lower(public.immutable_unaccent(COALESCE(v_regra.padrao, '')));
+    v_padrao := lower(public.immutable_unaccent(v_regra.padrao));
     v_padrao_like := '%' || replace(replace(replace(v_padrao, E'\\', E'\\\\'), '%', E'\\%'), '_', E'\\_') || '%';
 
-    WITH matched AS (
-      UPDATE public.fin_lancamentos fl
-      SET
-        categoria_id = v_regra.categoria_id,
-        centro_custo_id = COALESCE(v_regra.centro_custo_id, fl.centro_custo_id),
-        -- Lançamento REALIZADO só troca categoria com justificativa
-        -- (trg_validate_fin_lancamento_update); fica também no histórico de auditoria.
-        justificativa_edicao = 'Categorização automática pela regra "' || v_regra.padrao || '"',
-        updated_at = now()
-      WHERE fl.company_id = v_company_id
-        AND fl.categoria_id IS NULL
-        AND fl.status <> 'CANCELADO'
-        -- Tipo da categoria (despesa/receita) = tipo do lançamento; deixa a transferência de fora.
-        AND fl.tipo = v_regra.tipo_lancamento
-        -- Com linha de rateio, a categoria do cabeçalho é ignorada nos relatórios.
-        AND NOT EXISTS (
-          SELECT 1 FROM public.fin_lancamento_rateios flr
-          WHERE flr.lancamento_id = fl.id
-        )
-        AND (
-          CASE v_regra.tipo_match
-            WHEN 'contem' THEN lower(public.immutable_unaccent(COALESCE(fl.descricao, ''))) LIKE v_padrao_like ESCAPE E'\\'
-            WHEN 'exato'  THEN lower(public.immutable_unaccent(COALESCE(fl.descricao, ''))) = v_padrao
-            WHEN 'regex'  THEN COALESCE(fl.descricao, '') ~* v_regra.padrao
-            ELSE false
-          END
-        )
-      RETURNING fl.id
-    )
-    SELECT count(*) INTO v_match_count FROM matched;
-    v_categorizados := v_categorizados + v_match_count;
+    -- Regex que o Postgres recusa (ex.: grupo nomeado, aceito pelo JS da tela) pula
+    -- só esta regra; o bloco desfaz apenas o que ela gravaria.
+    BEGIN
+      IF v_regra.tipo_match = 'regex' THEN
+        PERFORM '' ~* v_regra.padrao;
+      END IF;
+
+      WITH matched AS (
+        UPDATE public.fin_lancamentos fl
+        SET
+          categoria_id = v_regra.categoria_id,
+          -- Centro já escolhido no lançamento prevalece; o da regra só preenche o vazio.
+          centro_custo_id = COALESCE(fl.centro_custo_id, v_regra.centro_custo_id),
+          -- Lançamento REALIZADO só troca categoria com justificativa
+          -- (trg_validate_fin_lancamento_update); fica também no histórico de auditoria.
+          justificativa_edicao = 'Categorização automática pela regra "' || v_regra.padrao || '"',
+          updated_at = now()
+        WHERE fl.company_id = v_company_id
+          AND fl.categoria_id IS NULL
+          AND fl.status <> 'CANCELADO'
+          -- Tipo da categoria (despesa/receita) = tipo do lançamento; deixa a transferência de fora.
+          AND fl.tipo = v_regra.tipo_lancamento
+          AND NOT (fl.origem = 'conciliacao' AND fl.conciliado IS NOT TRUE)
+          -- Espelho de boleto se corrige no título de origem.
+          AND COALESCE(fl.origem, '') NOT IN ('espelho_cp', 'espelho_cr')
+          -- Com linha de rateio, a categoria do cabeçalho é ignorada nos relatórios.
+          AND NOT EXISTS (
+            SELECT 1 FROM public.fin_lancamento_rateios flr
+            WHERE flr.lancamento_id = fl.id
+          )
+          AND (
+            CASE v_regra.tipo_match
+              WHEN 'contem' THEN lower(public.immutable_unaccent(COALESCE(fl.descricao, ''))) LIKE v_padrao_like ESCAPE E'\\'
+              WHEN 'exato'  THEN lower(public.immutable_unaccent(COALESCE(fl.descricao, ''))) = v_padrao
+              WHEN 'regex'  THEN COALESCE(fl.descricao, '') ~* v_regra.padrao
+              ELSE false
+            END
+          )
+        RETURNING fl.id
+      )
+      SELECT count(*) INTO v_match_count FROM matched;
+      v_categorizados := v_categorizados + v_match_count;
+    EXCEPTION WHEN invalid_regular_expression THEN
+      v_regras_com_erro := array_append(v_regras_com_erro, v_regra.padrao);
+    END;
   END LOOP;
 
-  RETURN json_build_object('total', v_total, 'categorizados', v_categorizados);
+  RETURN json_build_object(
+    'total', v_total,
+    'categorizados', v_categorizados,
+    'regras_com_erro', to_json(v_regras_com_erro)
+  );
 END;
 $function$;
 
@@ -198,9 +233,20 @@ BEGIN
   IF NOT public.has_any_permission(auth.uid(), ARRAY[
     'financeiro:categorizacao:view',
     'financeiro:categorizacao:manage',
+    'finance:read',
     'system:global:manage'
   ]) THEN
     RAISE EXCEPTION 'PERMISSION_DENIED';
+  END IF;
+
+  -- Padrão vazio é ignorado na aplicação: não casa nada.
+  IF btrim(COALESCE(p_padrao, '')) = '' THEN
+    RETURN '[]'::json;
+  END IF;
+
+  -- Regex que o Postgres recusa dá erro já no teste, mesmo sem lançamento candidato.
+  IF p_tipo_match = 'regex' THEN
+    PERFORM '' ~* p_padrao;
   END IF;
 
   -- Com categoria escolhida, só lançamentos do tipo dela, como na aplicação;
@@ -215,23 +261,27 @@ BEGIN
   END IF;
 
   -- Mesmo casamento de aplicar_regras_categorizacao.
-  v_padrao := lower(public.immutable_unaccent(COALESCE(p_padrao, '')));
+  v_padrao := lower(public.immutable_unaccent(p_padrao));
   v_padrao_like := '%' || replace(replace(replace(v_padrao, E'\\', E'\\\\'), '%', E'\\%'), '_', E'\\_') || '%';
 
+  -- Até 20 exemplos; "total" é o número de lançamentos que o padrão pega.
   SELECT COALESCE(json_agg(json_build_object(
     'id', sub.id,
     'descricao', sub.descricao,
     'valor', sub.valor,
-    'data_competencia', sub.data_competencia::text
+    'data_competencia', sub.data_competencia::text,
+    'total', sub.total
   )), '[]'::json) INTO v_result
   FROM (
-    SELECT fl.id, fl.descricao, fl.valor, fl.data_competencia
+    SELECT fl.id, fl.descricao, fl.valor, fl.data_competencia, count(*) OVER () AS total
     FROM public.fin_lancamentos fl
     WHERE fl.company_id = v_company_id
       AND fl.categoria_id IS NULL
       AND fl.status <> 'CANCELADO'
       AND fl.tipo <> 'TRANSFERENCIA'
       AND (v_tipo IS NULL OR fl.tipo = v_tipo)
+      AND NOT (fl.origem = 'conciliacao' AND fl.conciliado IS NOT TRUE)
+      AND COALESCE(fl.origem, '') NOT IN ('espelho_cp', 'espelho_cr')
       AND NOT EXISTS (
         SELECT 1 FROM public.fin_lancamento_rateios flr
         WHERE flr.lancamento_id = fl.id
@@ -256,7 +306,7 @@ REVOKE ALL ON FUNCTION public.preview_regra_categorizacao(text, text, uuid) FROM
 GRANT EXECUTE ON FUNCTION public.preview_regra_categorizacao(text, text, uuid) TO authenticated, service_role;
 
 /* ─────────────────────────────────────────────────────────────────────────
-   4. get_fin_alertas — corpo vivo; só "lancamentos_sem_categoria" muda
+   4. get_fin_alertas — corpo vivo; só "lancamentos_sem_categoria" muda (mesmos cortes da contagem)
    ───────────────────────────────────────────────────────────────────────── */
 CREATE OR REPLACE FUNCTION public.get_fin_alertas()
  RETURNS json
@@ -381,6 +431,7 @@ BEGIN
       SELECT COUNT(*)::int FROM fin_lancamentos fl
       WHERE fl.company_id = v_company AND fl.status IN ('REALIZADO','CONCILIADO')
         AND fl.tipo <> 'TRANSFERENCIA'
+        AND NOT (fl.origem = 'conciliacao' AND fl.conciliado IS NOT TRUE)
         AND fl.categoria_id IS NULL
         AND NOT EXISTS (
           SELECT 1 FROM fin_lancamento_rateios flr
@@ -689,8 +740,9 @@ BEGIN
   JOIN public.fin_categorias c
     ON c.id = r.categoria_id AND c.company_id = v_sentinel AND c.ativo = true
   LEFT JOIN public.fin_centros_custo cc
-    ON cc.id = r.centro_custo_id AND cc.company_id = v_sentinel
+    ON cc.id = r.centro_custo_id AND cc.company_id = v_sentinel AND cc.ativo = true
   WHERE r.company_id = v_sentinel AND r.ativo = true AND upper(c.tipo) IS NOT NULL
+    AND btrim(COALESCE(r.padrao, '')) <> ''
   LIMIT 1;
 
   PERFORM 1
@@ -699,6 +751,8 @@ BEGIN
     AND fl.categoria_id IS NULL
     AND fl.tipo <> 'TRANSFERENCIA'
     AND fl.justificativa_edicao IS NULL
+    AND NOT (fl.origem = 'conciliacao' AND fl.conciliado IS NOT TRUE)
+    AND COALESCE(fl.origem, '') NOT IN ('espelho_cp', 'espelho_cr')
     AND lower(public.immutable_unaccent(COALESCE(fl.descricao, ''))) LIKE '%x%' ESCAPE E'\\'
     AND NOT EXISTS (
       SELECT 1 FROM public.fin_lancamento_rateios flr
