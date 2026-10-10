@@ -1,3 +1,4 @@
+import { fitidKey } from '@/lib/conciliacaoConciliados';
 import { computeScore } from '@/lib/conciliacaoScore';
 
 /**
@@ -60,6 +61,34 @@ function diffDias(dataA: string, dataB: string): number {
   const b = new Date(dataB).getTime();
   if (Number.isNaN(a) || Number.isNaN(b)) return Number.POSITIVE_INFINITY;
   return Math.abs((a - b) / 86400000);
+}
+
+/**
+ * Remove as transferências cuja perna NESTA conta já está amarrada, pelo FITID,
+ * a uma linha do arquivo atual. Essa linha é reivindicada pelo fast-path de
+ * FITID; oferecer a mesma transferência como contrapartida por valor/data fazia
+ * ela cobrir também OUTRA linha do arquivo — que aparecia como "já conciliada" e
+ * nunca virava lançamento (caso real: Pix de R$ 500 do Del Match em 05/10 casou
+ * com a transferência de R$ 500 de 01/10, já vinculada à própria linha).
+ *
+ * Só exclui quando o FITID vinculado está no arquivo, igual a
+ * buildConciliadosCounts: Santander e PagBank podem regenerar o FITID a cada
+ * download, e aí este matcher é a única camada que reconhece a mesma linha
+ * reimportada. O servidor (reconcile_auto_bind_transfer_counterparts) já exige a
+ * ausência de vínculo nesta conta.
+ *
+ * `vinculos` precisa ser só os da conta selecionada.
+ */
+export function excluirTransferenciasVinculadasNoArquivo(
+  candidates: TransferCandidate[],
+  vinculos: ReadonlyArray<{ external_id: string; tipo: string; lancamento_id: string }>,
+  fitidsNoArquivo: ReadonlySet<string>,
+): TransferCandidate[] {
+  const cobertas = new Set<string>();
+  for (const v of vinculos) {
+    if (v.lancamento_id && fitidsNoArquivo.has(fitidKey(v.tipo, v.external_id))) cobertas.add(v.lancamento_id);
+  }
+  return cobertas.size === 0 ? candidates : candidates.filter(c => !cobertas.has(c.id));
 }
 
 export function matchTransferCandidate(

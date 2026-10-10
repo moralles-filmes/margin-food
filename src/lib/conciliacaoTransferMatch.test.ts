@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { matchTransferCandidate, findTransferWarnings, type TransferCandidate } from './conciliacaoTransferMatch';
+import { excluirTransferenciasVinculadasNoArquivo, matchTransferCandidate, findTransferWarnings, type TransferCandidate } from './conciliacaoTransferMatch';
 
 const CONTA_X = 'conta-x';
 const CONTA_Y = 'conta-y';
@@ -187,5 +187,64 @@ describe('findTransferWarnings', () => {
       { limite: 2 },
     );
     expect(warnings.map(w => w.id)).toEqual(['near', 'mid']);
+  });
+});
+
+describe('excluirTransferenciasVinculadasNoArquivo', () => {
+  // Caso real (PagBank Gm): transferência de R$ 500 em 01/10 já vinculada à
+  // própria linha pelo FITID; o Pix de R$ 500 ao Del Match em 05/10 somava 61
+  // pontos contra ela e ficava "já conciliada" sem nunca virar lançamento.
+  const delza = transfer({
+    id: 'delza',
+    valor: 500,
+    data_competencia: '2026-10-01',
+    descricao: 'Pix enviado - Delza Aparecida Da Silva',
+  });
+  const linhaDelMatch = {
+    tipo: 'DESPESA' as const,
+    valor: 500,
+    data: '2026-10-05',
+    descricao: 'QR Code Pix enviado - Del Match Delivery',
+  };
+  const vinculoDelza = { external_id: 'fitid-delza', tipo: 'DESPESA', lancamento_id: 'delza' };
+
+  it('sem a exclusão, a linha de outro Pix de mesmo valor casa com a transferência já vinculada', () => {
+    expect(matchTransferCandidate(linhaDelMatch, CONTA_X, [delza], new Set())?.id).toBe('delza');
+  });
+
+  it('tira dos candidatos a transferência cujo FITID vinculado está no arquivo', () => {
+    const candidatos = excluirTransferenciasVinculadasNoArquivo(
+      [delza],
+      [vinculoDelza],
+      new Set(['DESPESA|fitid-delza']),
+    );
+    expect(candidatos).toEqual([]);
+    expect(matchTransferCandidate(linhaDelMatch, CONTA_X, candidatos, new Set())).toBeUndefined();
+    expect(findTransferWarnings(linhaDelMatch, CONTA_X, candidatos, new Set())).toEqual([]);
+  });
+
+  it('mantém a transferência quando o FITID vinculado não está no arquivo (banco regenerou o FITID)', () => {
+    const candidatos = excluirTransferenciasVinculadasNoArquivo(
+      [delza],
+      [vinculoDelza],
+      new Set(['DESPESA|fitid-novo-do-mesmo-pix']),
+    );
+    expect(candidatos).toEqual([delza]);
+    expect(matchTransferCandidate(
+      { ...linhaDelMatch, data: '2026-10-01', descricao: 'Pix enviado - Delza Aparecida Da Silva' },
+      CONTA_X,
+      candidatos,
+      new Set(),
+    )?.id).toBe('delza');
+  });
+
+  it('mantém transferência sem vínculo nesta conta e compara o FITID junto com o tipo', () => {
+    const outra = transfer({ id: 'outra', valor: 500, data_competencia: '2026-10-02' });
+    const candidatos = excluirTransferenciasVinculadasNoArquivo(
+      [delza, outra],
+      [vinculoDelza],
+      new Set(['RECEITA|fitid-delza']),
+    );
+    expect(candidatos.map(c => c.id)).toEqual(['delza', 'outra']);
   });
 });

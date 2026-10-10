@@ -40,7 +40,7 @@ import { runOptionalAutoBind } from '@/lib/conciliacaoAutoBind';
 import { extractSupabaseErrorMessage } from '@/lib/supabaseErrors';
 import { computeScore } from '@/lib/conciliacaoScore';
 import { avaliarLancamentoCandidato, casaSozinho, janelaCandidatos, valorDivergenteDoExtrato, type SituacaoConta } from '@/lib/conciliacaoLancamentoMatch';
-import { matchTransferCandidate, findTransferWarnings, type TransferCandidate, type TransferWarning } from '@/lib/conciliacaoTransferMatch';
+import { excluirTransferenciasVinculadasNoArquivo, matchTransferCandidate, findTransferWarnings, type TransferCandidate, type TransferWarning } from '@/lib/conciliacaoTransferMatch';
 import { bankLineKey, buildConciliadosCounts, findStaleImportedRows, fitidKey, type ConciliadoRow, type VinculoRow } from '@/lib/conciliacaoConciliados';
 import { registrarOcorrenciaUsada, reservarOcorrencias, type OcorrenciasLivres } from '@/lib/conciliacaoOcorrencia';
 import { fetchCmvConfig, type CmvConfig } from '@/hooks/useCmvFinanceiro';
@@ -1154,7 +1154,13 @@ export default function ConciliacaoBancariaSection() {
     for (const l of espelhos) lancMap.set(l.id, { ...l, _sameAccount: true, _jaNoRazao: true });
     const allLancamentos = Array.from(lancMap.values());
 
-    const transferCandidates = (transferRes.data || []) as TransferCandidate[];
+    // Transferência já amarrada pelo FITID a uma linha deste arquivo não pode ser
+    // contrapartida de outra linha — ver excluirTransferenciasVinculadasNoArquivo.
+    const transferCandidates = excluirTransferenciasVinculadasNoArquivo(
+      (transferRes.data || []) as TransferCandidate[],
+      vinculos,
+      fitidsNoArquivo,
+    );
 
     return { allLancamentos, contasPagar, contasReceber, conciliadosCounts, internalMovementIds, ignoradasIds, externalIdsProcessados, lancamentosVinculados, transferCandidates, staleImportedRows };
   };
