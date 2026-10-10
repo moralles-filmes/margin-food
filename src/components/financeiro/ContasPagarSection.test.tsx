@@ -59,6 +59,9 @@ const supabase = {
         : { data: { total_pagar_pendente: 4321.09, vencidas_pagar: 1, total_receber_pendente: 0, vencidas_receber: 0 }, error: null });
     }
     if (name === 'fin_get_limite_aprovacao_atual') return Promise.resolve({ data: 2500, error: null });
+    if (name === '_guarded_update_conta_pagar_serie') {
+      return Promise.resolve({ data: { id: 's', status: 'APROVADO', parcelas_atualizadas: 31, parcelas_ignoradas: 0 }, error: null });
+    }
     return Promise.resolve({ data: null, error: null });
   },
 };
@@ -71,6 +74,7 @@ vi.mock('@/hooks/useNavigationRequest', () => ({ useNavigationRecord: () => unde
 vi.mock('@/hooks/useChavesPendentes', () => ({ useChavesPendentes: () => ({ chave: vi.fn(), confirmar: vi.fn(), renovar: vi.fn() }) }));
 vi.mock('@/hooks/useCmvFinanceiro', () => ({ fetchCmvConfig: () => Promise.resolve(null), aplicarCmvSerie: vi.fn(), mensagemErroCmv: () => '' }));
 vi.mock('@/lib/pdfFinanceiro', () => ({ gerarPDFContasPagar: vi.fn() }));
+vi.mock('@/components/compras/QuickSupplierDialog', () => ({ default: () => null }));
 
 const TODAS = ['financeiro:pagar:view', 'financeiro:pagar:create', 'financeiro:pagar:edit', 'financeiro:pagar:delete', 'financeiro:pagar:approve', 'financeiro:pagar:export'];
 const conta = (over: Record<string, unknown>) => ({
@@ -213,6 +217,59 @@ describe('Contas a Pagar (V2)', () => {
     expect(screen.getByRole('button', { name: 'Pagar Boleto vencido' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Estornar pagamento de Boleto pago' })).toBeInTheDocument();
     expect(escritas()).toEqual([]);
+  });
+
+  it('parcela de série: pergunta ao salvar; "Voltar" não grava; cada opção chama a sua RPC com os mesmos parâmetros', async () => {
+    state.items = [conta({ id: 's', descricao: 'FGTS Marilda (5/36)', parcela_atual: 5, parcela_total: 36, data_competencia: '2099-01-10' })];
+    render(<ContasPagarSection />);
+    const salvarComo = async (opcao?: string) => {
+      if (!screen.queryByRole('dialog', { name: 'Editar Conta a Pagar' })) {
+        fireEvent.click(await screen.findByRole('button', { name: 'Editar FGTS Marilda (5/36)' }));
+      }
+      const formulario = await screen.findByRole('dialog', { name: 'Editar Conta a Pagar' });
+      fireEvent.click(within(formulario).getByRole('button', { name: 'Salvar' }));
+      const escolha = await screen.findByRole('alertdialog');
+      expect(escolha).toHaveTextContent('Esta conta é a parcela 5 de 36.');
+      expect(escolha).toHaveTextContent('O código de pagamento de cada boleto é mantido.');
+      expect(escolha).toHaveTextContent('as já pagas ou canceladas não mudam');
+      expect(escolha).toHaveTextContent('passa de novo pela regra de aprovação');
+      if (opcao) fireEvent.click(within(escolha).getByRole('button', { name: opcao }));
+      return escolha;
+    };
+
+    const escolha = await salvarComo();
+    expect(escritas()).toEqual([]);
+    fireEvent.click(within(escolha).getByRole('button', { name: 'Voltar' }));
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
+    expect(screen.getByRole('dialog', { name: 'Editar Conta a Pagar' })).toBeInTheDocument();
+    expect(escritas()).toEqual([]);
+
+    await salvarComo('Somente esta parcela');
+    await waitFor(() => expect(escritas()).toEqual(['_guarded_update_conta_pagar']));
+    expect(state.toast.success).toHaveBeenLastCalledWith('Conta atualizada');
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Editar Conta a Pagar' })).not.toBeInTheDocument());
+
+    await salvarComo('Esta e as próximas');
+    await waitFor(() => expect(escritas()).toEqual(['_guarded_update_conta_pagar', '_guarded_update_conta_pagar_serie']));
+    expect(state.toast.success).toHaveBeenLastCalledWith('Conta atualizada, junto com 31 parcelas seguintes.');
+    const [so, serie] = state.rpcCalls.filter(c => c.name.startsWith('_guarded_update_conta_pagar'));
+    expect(serie.params).toEqual(so.params);
+    expect(serie.params).toEqual(expect.objectContaining({ p_id: 's', p_expected_updated_at: '2026-01-01T00:00:00Z' }));
+  });
+
+  it('conta sem série (ou a última parcela) salva direto, sem perguntar', async () => {
+    state.items = [
+      conta({ id: 'u', descricao: 'Boleto avulso' }),
+      conta({ id: 'l', descricao: 'FGTS Marilda (36/36)', parcela_atual: 36, parcela_total: 36 }),
+    ];
+    render(<ContasPagarSection />);
+    for (const descricao of ['Boleto avulso', 'FGTS Marilda (36/36)']) {
+      fireEvent.click(await screen.findByRole('button', { name: `Editar ${descricao}` }));
+      fireEvent.click(within(await screen.findByRole('dialog', { name: 'Editar Conta a Pagar' })).getByRole('button', { name: 'Salvar' }));
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Editar Conta a Pagar' })).not.toBeInTheDocument());
+    }
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(escritas()).toEqual(['_guarded_update_conta_pagar', '_guarded_update_conta_pagar']);
   });
 
   it('sem permissão de leitura: estado de acesso negado e nenhuma consulta', () => {
