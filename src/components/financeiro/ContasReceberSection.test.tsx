@@ -119,7 +119,7 @@ describe('Contas a Receber (V2)', () => {
   });
 
   it('parcela de série: pergunta ao salvar e "Esta e as próximas" chama a RPC da série com os mesmos parâmetros', async () => {
-    state.items = [conta({ id: 's', descricao: 'Mensalidade (2/6)', parcela_atual: 2, parcela_total: 6 })];
+    state.items = [conta({ id: 's', descricao: 'Mensalidade (2/6)', parcela_atual: 2, parcela_total: 6, categoria_id: 'cat-eventos' })];
     render(<ContasReceberSection />);
     const salvarComo = async (opcao: string) => {
       fireEvent.click(await screen.findByRole('button', { name: 'Editar Mensalidade (2/6)' }));

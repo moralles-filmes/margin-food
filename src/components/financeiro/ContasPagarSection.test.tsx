@@ -220,7 +220,7 @@ describe('Contas a Pagar (V2)', () => {
   });
 
   it('parcela de série: pergunta ao salvar; "Voltar" não grava; cada opção chama a sua RPC com os mesmos parâmetros', async () => {
-    state.items = [conta({ id: 's', descricao: 'FGTS Marilda (5/36)', parcela_atual: 5, parcela_total: 36, data_competencia: '2099-01-10' })];
+    state.items = [conta({ id: 's', descricao: 'FGTS Marilda (5/36)', parcela_atual: 5, parcela_total: 36, data_competencia: '2099-01-10', categoria_id: 'cat-encargos' })];
     render(<ContasPagarSection />);
     const salvarComo = async (opcao?: string) => {
       if (!screen.queryByRole('dialog', { name: 'Editar Conta a Pagar' })) {
@@ -259,8 +259,8 @@ describe('Contas a Pagar (V2)', () => {
 
   it('conta sem série (ou a última parcela) salva direto, sem perguntar', async () => {
     state.items = [
-      conta({ id: 'u', descricao: 'Boleto avulso' }),
-      conta({ id: 'l', descricao: 'FGTS Marilda (36/36)', parcela_atual: 36, parcela_total: 36 }),
+      conta({ id: 'u', descricao: 'Boleto avulso', categoria_id: 'cat-energia' }),
+      conta({ id: 'l', descricao: 'FGTS Marilda (36/36)', parcela_atual: 36, parcela_total: 36, categoria_id: 'cat-encargos' }),
     ];
     render(<ContasPagarSection />);
     for (const descricao of ['Boleto avulso', 'FGTS Marilda (36/36)']) {
