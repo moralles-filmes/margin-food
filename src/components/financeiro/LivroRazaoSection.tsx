@@ -162,6 +162,8 @@ interface LivroRazaoProps {
   initialDateFrom?: string;
   initialDateTo?: string;
   initialTipo?: string;
+  /** Filtro de categoria inicial (ex.: 'sem_categoria'); sem datas iniciais, abre em todo o período. */
+  initialCategoria?: string;
 }
 
 const dayHeaderFormatter = new Intl.DateTimeFormat('pt-BR', { weekday: 'short', day: 'numeric', month: 'long' });
@@ -172,7 +174,7 @@ function capitalizeFirst(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-export default function LivroRazaoSection({ initialContaId, initialDateFrom, initialDateTo, initialTipo }: LivroRazaoProps = {}) {
+export default function LivroRazaoSection({ initialContaId, initialDateFrom, initialDateTo, initialTipo, initialCategoria }: LivroRazaoProps = {}) {
   const emitDataEvent = useEmitDataEvent();
   const toast = useScopedToast();
   const supabase = useSupabase();
@@ -211,13 +213,16 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
   const [filtroTipo, setFiltroTipo] = useState(initialTipo || 'todos');
   const [filtroOrigem, setFiltroOrigem] = useState('todos');
   const [filtroConta, setFiltroConta] = useState(initialContaId || 'todos');
-  const [filtroCategoria, setFiltroCategoria] = useState(CATEGORIA_FILTRO_TODOS);
+  const [filtroCategoria, setFiltroCategoria] = useState(initialCategoria || CATEGORIA_FILTRO_TODOS);
+  // Vindo com filtro de categoria (pendências da Categorização), o período não pode esconder lançamento antigo.
+  const abreSemPeriodo = Boolean(initialCategoria) && !initialDateFrom && !initialDateTo;
   const [filtroDataDe, setFiltroDataDe] = useState(() => {
     if (initialDateFrom) return initialDateFrom;
+    if (abreSemPeriodo) return '';
     const d = new Date(); d.setDate(d.getDate() - 30);
     return formatDateISO(d);
   });
-  const [filtroDataAte, setFiltroDataAte] = useState(() => initialDateTo || todayBR());
+  const [filtroDataAte, setFiltroDataAte] = useState(() => initialDateTo || (abreSemPeriodo ? '' : todayBR()));
   const [mesFiltro, setMesFiltro] = useState(() => formatInBR(new Date(), 'yyyy-MM'));
 
   const handleMesChange = (mes: string) => {

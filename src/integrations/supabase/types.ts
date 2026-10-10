@@ -11463,7 +11463,7 @@ export type Database = {
         Returns: Json
       }
       preview_regra_categorizacao: {
-        Args: { p_padrao: string; p_tipo_match?: string }
+        Args: { p_categoria_id?: string; p_padrao: string; p_tipo_match?: string }
         Returns: Json
       }
       rbac_permissions_diff: { Args: { _registry_keys: Json }; Returns: Json }
