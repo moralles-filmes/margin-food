@@ -342,9 +342,12 @@ describe('parseExtrato — ACCTID de conta destino não conta como segunda conta
 
 // Layout do OFX do Itaú (mais novo primeiro): cada dia abre com uma linha que só
 // informa o saldo, e o período fecha com o SALDO ANTERIOR. Valores sintéticos.
+// Sem o sufixo de fuso que o Itaú põe nas datas (colchetes com "-03" e "EST"):
+// o Tailwind varre os .ts de src/, lê o sufixo como classe arbitrária e o CSS
+// inválido gerado quebra o build. O parser só lê os 8 primeiros dígitos.
 const itauTrn = (dia: string, valor: string, fitId: string, memo: string, tipo = valor.startsWith('-') ? 'DEBIT' : 'CREDIT') => `<STMTTRN>
 <TRNTYPE>${tipo}
-<DTPOSTED>${dia}100000[-03:EST]
+<DTPOSTED>${dia}100000
 <TRNAMT>${valor}
 <FITID>${fitId}
 <CHECKNUM>${fitId}
@@ -364,13 +367,13 @@ DATA:OFXSGML
 <ACCTTYPE>CHECKING
 </BANKACCTFROM>
 <BANKTRANLIST>
-<DTSTART>20261001100000[-03:EST]
-<DTEND>20261003100000[-03:EST]
+<DTSTART>20261001100000
+<DTEND>20261003100000
 ${transacoes.join('\n')}
 </BANKTRANLIST>
 <LEDGERBAL>
 <BALAMT>${ledger.valor}
-<DTASOF>${ledger.dia}100000[-03:EST]
+<DTASOF>${ledger.dia}100000
 </LEDGERBAL>
 </STMTRS>
 </STMTTRNRS>
