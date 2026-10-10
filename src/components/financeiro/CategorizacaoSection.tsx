@@ -20,7 +20,7 @@ import { useEmitDataEvent, useDataEvent } from '@/lib/dataEvents';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { useScopedToast } from '@/hooks/useScopedToast';
 import { fmtBRL, formatDateBR, parseLocalDate } from '@/lib/formatters';
-import { Plus, Edit, Trash2, Tag, Zap, FileWarning, Search, RefreshCw, ListChecks } from 'lucide-react';
+import { Plus, Edit, Trash2, Tag, Zap, FileWarning, Search, RefreshCw, ListChecks, ExternalLink } from 'lucide-react';
 import { useFormDirtyGuard } from '@/hooks/useFormDirtyGuard';
 import FormCloseConfirmDialog from '@/components/ui/FormCloseConfirmDialog';
 import { FinKpiGrid, FinNote, FinScreenHeader, FinSectionGroup } from './finV2Layout';
@@ -56,9 +56,19 @@ interface PreviewItem {
   descricao: string;
   valor: number;
   data_competencia: string;
+  /** Quantos lançamentos o padrão pega ao todo (a prévia traz no máximo 20). */
+  total?: number;
 }
 
-export default function CategorizacaoSection() {
+interface CategorizacaoSectionProps {
+  /** Abre o Livro Razão filtrado em "Sem categoria"; ausente quando o usuário não vê Lançamentos. */
+  onVerSemCategoria?: () => void;
+}
+
+// A RLS descarta o UPDATE sem permissão e devolve 0 linhas, sem erro.
+const REGRA_NAO_GRAVADA = 'sem permissão para editar regras ou a regra não existe mais';
+
+export default function CategorizacaoSection({ onVerSemCategoria }: CategorizacaoSectionProps = {}) {
   const emitDataEvent = useEmitDataEvent();
   const toast = useScopedToast();
   const supabase = useSupabase();
@@ -66,8 +76,9 @@ export default function CategorizacaoSection() {
   const canView = useCan('financeiro:categorizacao:view');
   const canCreate = useCan('financeiro:categorizacao:create');
   const canEdit = useCan('financeiro:categorizacao:edit');
-  const canDelete = useCan('financeiro:categorizacao:delete');
   const canManage = useCan('financeiro:categorizacao:manage');
+  // Desativar é UPDATE (ativo=false): a policy de UPDATE pede :edit ou :manage, não :delete.
+  const canDesativar = canEdit || canManage;
 
   const [regras, setRegras] = useState<Regra[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
@@ -91,7 +102,7 @@ export default function CategorizacaoSection() {
   // e qual padrão a prévia exibida testou.
   const [erros, setErros] = useState({ regras: false, nomes: false, contagem: false });
   const [previewErro, setPreviewErro] = useState(false);
-  const [previewTestado, setPreviewTestado] = useState<{ padrao: string; tipo: string } | null>(null);
+  const [previewTestado, setPreviewTestado] = useState<{ padrao: string; tipo: string; categoria: string } | null>(null);
   const [listaRef, listaEstreita] = useConteinerEstreito(REGRAS_LISTA_LIMITE_PX);
   const retornoForm = useRetornoFoco();
   const campoId = useId();
@@ -185,12 +196,17 @@ export default function CategorizacaoSection() {
       };
 
       if (editId) {
-        const { error } = await supabase.from('fin_regras_categorizacao').update(payload).eq('id', editId);
-        if (error) { toast.error(error.message); return; }
+        const { data, error } = await supabase.from('fin_regras_categorizacao').update(payload).eq('id', editId).select('id');
+        if (error) { console.error('[CategorizacaoSection.save]', error); toast.error(error.message); return; }
+        if (!data?.length) {
+          console.error('[CategorizacaoSection.save] UPDATE sem linha gravada', editId);
+          toast.error(`A regra não foi salva: ${REGRA_NAO_GRAVADA}.`);
+          return;
+        }
         toast.success('Regra atualizada');
       } else {
         const { error } = await supabase.from('fin_regras_categorizacao').insert(withCompanyId(companyId, payload));
-        if (error) { toast.error(error.message); return; }
+        if (error) { console.error('[CategorizacaoSection.save]', error); toast.error(error.message); return; }
         toast.success('Regra criada');
       }
 
@@ -213,8 +229,14 @@ export default function CategorizacaoSection() {
     });
     if (!ok) { devolverFoco(origemFoco); return; }
 
-    const { error } = await supabase.from('fin_regras_categorizacao').update({ ativo: false }).eq('id', regra.id);
-    if (error) { toast.error(error.message); devolverFoco(origemFoco); return; }
+    const { data, error } = await supabase.from('fin_regras_categorizacao').update({ ativo: false }).eq('id', regra.id).select('id');
+    if (error) { console.error('[CategorizacaoSection.remover]', error); toast.error(error.message); devolverFoco(origemFoco); return; }
+    if (!data?.length) {
+      console.error('[CategorizacaoSection.remover] UPDATE sem linha gravada', regra.id);
+      toast.error(`A regra não foi desativada: ${REGRA_NAO_GRAVADA}.`);
+      devolverFoco(origemFoco);
+      return;
+    }
     toast.success('Regra desativada');
     load();
     emitDataEvent('financeiro:categorizacao');
@@ -222,26 +244,40 @@ export default function CategorizacaoSection() {
 
   const aplicarRegras = async () => {
     if (aplicando || regras.length === 0) return;
+    // Em lote e sem desfazer automático: confirma antes de gravar.
+    const origemFoco = elementoComFoco();
+    const ok = await confirm({
+      title: 'Aplicar regras de categorização',
+      description: `As ${regras.length} regra(s) ativa(s) vão classificar as receitas e despesas sem categoria que casarem com elas${semCategoriaCount ? ` (até ${semCategoriaCount.toLocaleString('pt-BR')})` : ''}. Cada lançamento recebe a categoria com uma justificativa automática; para desfazer, edite um a um no Livro Razão.`,
+      confirmLabel: 'Aplicar',
+    });
+    if (!ok) { devolverFoco(origemFoco); return; }
+
     setAplicando(true);
     try {
       const { data, error } = await supabase.rpc('aplicar_regras_categorizacao');
       if (error) {
+        console.error(error);
         if (error.message?.includes('PERMISSION_DENIED')) {
           toast.error('Sem permissão para aplicar regras de categorização.');
         } else {
           toast.error('Erro ao aplicar regras: ' + error.message);
         }
-        console.error(error);
         return;
       }
 
-      const result = data as unknown as { total: number; categorizados: number };
+      const result = data as unknown as { total: number; categorizados: number; regras_com_erro?: string[] };
       if (result.total === 0) {
         toast.info('Nenhum lançamento sem categoria encontrado');
       } else {
         toast.success(`${result.categorizados} lançamento(s) categorizado(s) de ${result.total} analisados`);
         emitDataEvent('financeiro:lancamentos');
         emitDataEvent('financeiro:categorizacao');
+      }
+      // O banco recusou o Regex destas regras (a tela valida com o JS): as demais foram aplicadas.
+      const comErro = result.regras_com_erro ?? [];
+      if (comErro.length > 0) {
+        toast.warning(`Regra(s) ignorada(s) porque o banco recusou o Regex: ${comErro.join(', ')}. Corrija o padrão e aplique de novo.`);
       }
     } catch (err) {
       console.error(err);
@@ -268,16 +304,18 @@ export default function CategorizacaoSection() {
       const { data, error } = await supabase.rpc('preview_regra_categorizacao', {
         p_padrao: form.padrao.trim(),
         p_tipo_match: form.tipo_match,
+        // Com categoria, a prévia traz só o tipo dela (despesa/receita), como a aplicação.
+        ...(form.categoria_id ? { p_categoria_id: form.categoria_id } : {}),
       });
       if (error) {
-        toast.error('Erro ao testar regra');
         console.error(error);
+        toast.error('Erro ao testar regra');
         setPreviewErro(true);
         return;
       }
       const items = (data as unknown as PreviewItem[]) || [];
       setPreviewErro(false);
-      setPreviewTestado({ padrao: form.padrao.trim(), tipo: form.tipo_match });
+      setPreviewTestado({ padrao: form.padrao.trim(), tipo: form.tipo_match, categoria: form.categoria_id });
       setPreviewItems(items);
       setShowPreview(true);
       if (items.length === 0) {
@@ -298,9 +336,11 @@ export default function CategorizacaoSection() {
   const regrasValor = erros.regras ? '—' : String(regras.length);
   const resumoGrid = kpiGridClassFor(longestValueLength([regrasValor, contagemValor]), 2);
   const temPendentes = semCategoriaCount !== null && semCategoriaCount > 0;
+  const previewTotal = previewItems[0]?.total ?? previewItems.length;
   const previewDesatualizada = previewTestado !== null
-    && (previewTestado.padrao !== form.padrao.trim() || previewTestado.tipo !== form.tipo_match);
-  const temAcoes = canEdit || canDelete;
+    && (previewTestado.padrao !== form.padrao.trim() || previewTestado.tipo !== form.tipo_match
+      || previewTestado.categoria !== form.categoria_id);
+  const temAcoes = canEdit || canDesativar;
   const ids = {
     padrao: `${campoId}-padrao`,
     tipo: `${campoId}-tipo`,
@@ -317,7 +357,7 @@ export default function CategorizacaoSection() {
           <Edit aria-hidden="true" className="w-4 h-4" />
         </Button>
       )}
-      {canDelete && (
+      {canDesativar && (
         <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => remover(regra)} title={`Desativar regra ${regra.padrao}`} aria-label={`Desativar regra ${regra.padrao}`}>
           <Trash2 aria-hidden="true" className="w-4 h-4" />
         </Button>
@@ -331,7 +371,7 @@ export default function CategorizacaoSection() {
 
       <FinScreenHeader
         title="Regras de Categorização Automática"
-        description="Classificam pela descrição os lançamentos que estão sem categoria."
+        description="Classificam pela descrição as receitas e despesas do Livro Razão que estão sem categoria. Não atuam na conciliação."
         actions={(
           <>
             {canManage && (
@@ -378,7 +418,7 @@ export default function CategorizacaoSection() {
               value={contagemValor}
               sub={erros.contagem || semCategoriaCount === null
                 ? 'Indisponível: a contagem não carregou'
-                : 'Sem categoria nem rateio categorizado, exceto cancelados'}
+                : 'Receitas e despesas sem categoria; transferências e cancelados ficam de fora'}
               variant={temPendentes ? 'warning' : 'default'}
             />
           </FinKpiGrid>
@@ -390,9 +430,9 @@ export default function CategorizacaoSection() {
 
       {/* Uncategorized alert */}
       {temPendentes && (
-        <div className="flex items-start gap-3 rounded-summary border border-warning-border bg-warning-soft p-4 text-sm">
+        <div className="flex flex-wrap items-start gap-3 rounded-summary border border-warning-border bg-warning-soft p-4 text-sm">
           <FileWarning aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
-          <p>
+          <p className="min-w-0 flex-1">
             <span className="font-medium text-foreground">
               {semCategoriaCount} lançamento(s) sem categoria.
             </span>
@@ -404,6 +444,11 @@ export default function CategorizacaoSection() {
                   : 'Crie regras de categorização para classificá-los automaticamente.'}
             </span>
           </p>
+          {onVerSemCategoria && (
+            <Button size="sm" variant="outline" onClick={onVerSemCategoria}>
+              <ExternalLink aria-hidden="true" className="w-4 h-4 mr-1" /> Ver no Livro Razão
+            </Button>
+          )}
         </div>
       )}
 
@@ -413,7 +458,7 @@ export default function CategorizacaoSection() {
           <DialogHeader>
             <DialogTitle>{editId ? 'Editar Regra' : 'Nova Regra de Categorização'}</DialogTitle>
             <DialogDescription>
-              A regra classifica lançamentos sem categoria cuja descrição corresponde ao padrão.
+              A regra classifica receitas e despesas sem categoria cuja descrição corresponde ao padrão, só com categoria do mesmo tipo. Contém e Exato ignoram acento e maiúsculas.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
@@ -498,15 +543,17 @@ export default function CategorizacaoSection() {
                     <p id={ids.preview} className="text-xs font-medium text-foreground">
                       {previewItems.length === 0
                         ? 'Nenhum lançamento correspondente'
-                        : `${previewItems.length} lançamento(s) seriam categorizados (máx. 20):`}
+                        : previewTotal > previewItems.length
+                          ? `${previewTotal.toLocaleString('pt-BR')} lançamento(s) seriam categorizados; os ${previewItems.length} mais recentes:`
+                          : `${previewTotal} lançamento(s) seriam categorizados:`}
                     </p>
                     {previewTestado && (
                       <p className="text-xs text-muted-foreground">
-                        Padrão testado: “{previewTestado.padrao}” ({MATCH_LABELS[previewTestado.tipo] || previewTestado.tipo}) · lançamentos sem categoria, os mais recentes por competência. Só este padrão: ao aplicar, regras de prioridade maior classificam antes.
+                        Padrão testado: “{previewTestado.padrao}” ({MATCH_LABELS[previewTestado.tipo] || previewTestado.tipo}) · {previewTestado.categoria ? 'lançamentos do tipo da categoria' : 'receitas e despesas'} sem categoria nem rateio, os mais recentes por competência. Só este padrão: ao aplicar, regras de prioridade maior classificam antes.
                       </p>
                     )}
                     {previewDesatualizada && (
-                      <p className="text-xs font-medium text-warning">O padrão mudou depois do teste: teste de novo.</p>
+                      <p className="text-xs font-medium text-warning">O padrão ou a categoria mudou depois do teste: teste de novo.</p>
                     )}
                   </div>
                   {previewItems.length > 0 && (

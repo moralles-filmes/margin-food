@@ -39,6 +39,7 @@ import FechamentoCaixaSection from '@/components/financeiro/FechamentoCaixaSecti
 import CadastroBaseTree from '@/components/financeiro/CadastroBaseTree';
 import ContasBancariasSection from '@/components/financeiro/ContasBancariasSection';
 import LivroRazaoSection from '@/components/financeiro/LivroRazaoSection';
+import { CATEGORIA_FILTRO_SEM_CATEGORIA } from '@/components/financeiro/categoriaFiltro';
 import CentrosCustoFinSection from '@/components/financeiro/CentrosCustoFinSection';
 
 type FinSubTab = 'dashboard' | 'cadastros' | 'contas' | 'lancamentos' | 'pagar' | 'codigos_pagamento' | 'receber' | 'fluxo' | 'dre' | 'orcamento' | 'conciliacao' | 'alertas' | 'recorrencias' | 'categorizacao' | 'bordero' | 'apresentacao_socios' | 'projecao' | 'kpis' | 'auditoria' | 'comparativo' | 'fechamento' | 'cmv';
@@ -85,7 +86,7 @@ const LANCAMENTOS_VIEWS = [
   { value: 'conciliacao', label: 'Conciliação Bancária' },
 ];
 
-function LancamentosSection({ initialContaId, initialDateFrom, initialDateTo, initialTipo }: { initialContaId?: string; initialDateFrom?: string; initialDateTo?: string; initialTipo?: string }) {
+function LancamentosSection({ initialContaId, initialDateFrom, initialDateTo, initialTipo, initialCategoria }: { initialContaId?: string; initialDateFrom?: string; initialDateTo?: string; initialTipo?: string; initialCategoria?: string }) {
   const [innerTab, setInnerTab] = useState<'razao' | 'conciliacao'>('razao');
   return (
     <div className="space-y-4">
@@ -98,7 +99,7 @@ function LancamentosSection({ initialContaId, initialDateFrom, initialDateTo, in
           onChange={v => setInnerTab(v as 'razao' | 'conciliacao')}
         />
       </div>
-      {innerTab === 'razao' ? <LivroRazaoSection initialContaId={initialContaId} initialDateFrom={initialDateFrom} initialDateTo={initialDateTo} initialTipo={initialTipo} /> : <Suspense fallback={<FinSpinner />}><ConciliacaoBancariaSection /></Suspense>}
+      {innerTab === 'razao' ? <LivroRazaoSection initialContaId={initialContaId} initialDateFrom={initialDateFrom} initialDateTo={initialDateTo} initialTipo={initialTipo} initialCategoria={initialCategoria} /> : <Suspense fallback={<FinSpinner />}><ConciliacaoBancariaSection /></Suspense>}
     </div>
   );
 }
@@ -206,6 +207,7 @@ export default function FinanceiroView() {
   const [fluxoDateFrom, setFluxoDateFrom] = useState<string | undefined>(undefined);
   const [fluxoDateTo, setFluxoDateTo] = useState<string | undefined>(undefined);
   const [lancamentosInitialTipo, setLancamentosInitialTipo] = useState<string | undefined>(undefined);
+  const [lancamentosInitialCategoria, setLancamentosInitialCategoria] = useState<string | undefined>(undefined);
   const [pagarInitialStatus, setPagarInitialStatus] = useState<string | undefined>(undefined);
   const [receberInitialStatus, setReceberInitialStatus] = useState<string | undefined>(undefined);
   const { visibleSubtabs } = useModuleAccess('financeiro');
@@ -267,6 +269,16 @@ export default function FinanceiroView() {
     setActiveTab(params.tab as FinSubTab);
   }, [setActiveTab]);
 
+  // "Ver no Livro Razão" da Categorização: só os lançamentos sem categoria, em todo o período
+  const handleVerSemCategoria = useCallback(() => {
+    setExtratoContaId(undefined);
+    setFluxoDateFrom(undefined);
+    setFluxoDateTo(undefined);
+    setLancamentosInitialTipo(undefined);
+    setLancamentosInitialCategoria(CATEGORIA_FILTRO_SEM_CATEGORIA);
+    setActiveTab('lancamentos');
+  }, [setActiveTab]);
+
   // Clear filters when navigating away
   useEffect(() => {
     if (activeTab !== 'lancamentos') {
@@ -274,6 +286,7 @@ export default function FinanceiroView() {
       setFluxoDateFrom(undefined);
       setFluxoDateTo(undefined);
       setLancamentosInitialTipo(undefined);
+      setLancamentosInitialCategoria(undefined);
     }
     if (activeTab !== 'pagar') setPagarInitialStatus(undefined);
     if (activeTab !== 'receber') setReceberInitialStatus(undefined);
@@ -381,7 +394,7 @@ export default function FinanceiroView() {
       {effectiveTab === 'fechamento' && <FechamentoCaixaSection />}
       {effectiveTab === 'cadastros' && <CadastrosBase />}
       {effectiveTab === 'contas' && <ContasBancariasSection onNavigateExtrato={handleNavigateExtrato} />}
-      {effectiveTab === 'lancamentos' && <LancamentosSection initialContaId={extratoContaId} initialDateFrom={fluxoDateFrom} initialDateTo={fluxoDateTo} initialTipo={lancamentosInitialTipo} />}
+      {effectiveTab === 'lancamentos' && <LancamentosSection initialContaId={extratoContaId} initialDateFrom={fluxoDateFrom} initialDateTo={fluxoDateTo} initialTipo={lancamentosInitialTipo} initialCategoria={lancamentosInitialCategoria} />}
       {effectiveTab === 'pagar' && <ContasPagarSection initialStatus={pagarInitialStatus} />}
       {effectiveTab === 'codigos_pagamento' && <Suspense fallback={<FinSpinner />}><CodigosPagamentoSection /></Suspense>}
       {effectiveTab === 'receber' && <ContasReceberSection initialStatus={receberInitialStatus} />}
@@ -391,7 +404,7 @@ export default function FinanceiroView() {
       {/* conciliacao está dentro de LancamentosSection */}
       {effectiveTab === 'alertas' && <AlertasSection onNavigate={(t) => setActiveTab(t as FinSubTab)} />}
       {effectiveTab === 'recorrencias' && <RecorrenciasSection onNavigate={(t) => setActiveTab(t as FinSubTab)} />}
-      {effectiveTab === 'categorizacao' && <CategorizacaoSection />}
+      {effectiveTab === 'categorizacao' && <CategorizacaoSection onVerSemCategoria={visibleSubtabs.includes('lancamentos') ? handleVerSemCategoria : undefined} />}
       {effectiveTab === 'bordero' && <Suspense fallback={<FinSpinner />}><BorderoSection /></Suspense>}
       {effectiveTab === 'apresentacao_socios' && (
         <Suspense fallback={<FinSpinner />}>

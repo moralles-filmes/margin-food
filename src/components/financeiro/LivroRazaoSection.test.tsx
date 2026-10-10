@@ -123,6 +123,18 @@ describe('Livro Razão (V2)', () => {
     expect(state.rpc).toHaveBeenCalledWith('get_fin_saldo_atual', { p_conta_id: 'c1', p_data: '2026-03-31' });
   });
 
+  it('vindo da Categorização: abre em "Sem categoria" e em todo o período', async () => {
+    render(<LivroRazaoSection initialCategoria="sem_categoria" />);
+
+    expect(await screen.findAllByText('Todo o período')).not.toHaveLength(0);
+    expect(state.rpc).toHaveBeenCalledWith('list_fin_lancamentos_cursor', expect.objectContaining({
+      p_start: null, p_end: null, p_categoria_id: null, p_sem_categoria: true,
+    }));
+    expect(state.rpc).toHaveBeenCalledWith('get_fin_lancamentos_totais', expect.objectContaining({
+      p_start: null, p_end: null, p_sem_categoria: true,
+    }));
+  });
+
   it('cabeçalho do dia diz "fim do dia" sem filtro de linha e tipos aparecem como Receita/Despesa', async () => {
     render(<LivroRazaoSection initialDateFrom="2026-03-01" initialDateTo="2026-03-31" />);
 
