@@ -31,6 +31,7 @@ import { todayBR, formatInBR } from '@/lib/datetime';
 import TableActions from '@/components/ui/TableActions';
 import ContaDetailDialog, { type ContaDetailData, type ContaDetailRateio } from './ContaDetailDialog';
 import ContaFormDialog, { type ContaFormData, type RateioLine } from './ContaFormDialog';
+import EscopoSerieDialog, { type EscopoSerie } from './EscopoSerieDialog';
 import * as XLSX from '@/lib/safeXlsx';
 import { mapFinanceiroDeleteError } from '@/lib/financeiroErrorMap';
 import { buildCategoryOptions } from '@/lib/categoriaOptions';
@@ -39,7 +40,7 @@ import DateRangePresets from './DateRangePresets';
 import SearchableSelect from '@/components/ui/SearchableSelect';
 import { buildCategoriaFilterOptions, categoriaFiltroToParams, CATEGORIA_FILTRO_TODOS } from './categoriaFiltro';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
-import { getRecurrenceValidationMessage } from '@/domain/financeiro/recurrence';
+import { getRecurrenceValidationMessage, mensagemEdicaoSerie, mensagemErroEdicaoSerie, temParcelasSeguintes, type ResultadoEdicaoSerie } from '@/domain/financeiro/recurrence';
 import { traduzirErroIdempotencia } from '@/domain/financeiro/idempotencia';
 import { useChavesPendentes } from '@/hooks/useChavesPendentes';
 import { useTravaEnvio } from '@/hooks/useTravaEnvio';
@@ -60,6 +61,8 @@ interface ContaReceber {
   data_vencimento: string;
   categoria_id: string | null;
   updated_at: string;
+  parcela_atual?: number | null;
+  parcela_total?: number | null;
 }
 
 interface Categoria { id: string; nome: string; tipo: string; codigo: string | null; parent_id: string | null; centro_custo_padrao_id: string | null; groupLabel?: string; }
@@ -128,6 +131,8 @@ export default function ContasReceberSection({ initialStatus }: ContasReceberSec
   });
   const [rateioLines, setRateioLines] = useState<RateioLine[]>([]);
   const [editingItem, setEditingItem] = useState<ContaReceber | null>(null);
+  // Parcela de série em edição: pergunta, ao salvar, se a alteração vale também para as próximas.
+  const [escopoSerie, setEscopoSerie] = useState<{ atual: number; total: number } | null>(null);
   const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
 
   // Detail dialog state
@@ -297,7 +302,7 @@ export default function ContasReceberSection({ initialStatus }: ContasReceberSec
     try {
       const { data: detail, error: detailErr } = await supabase
         .from('fin_contas_receber')
-        .select('id, descricao, cliente, valor, status, data_competencia, data_vencimento, data_recebimento, forma_pagamento, categoria_id, centro_custo_id, conta_id, observacoes, recorrente, recorrencia_config, updated_at')
+        .select('id, descricao, cliente, valor, status, data_competencia, data_vencimento, data_recebimento, forma_pagamento, categoria_id, centro_custo_id, conta_id, observacoes, recorrente, recorrencia_config, parcela_atual, parcela_total, updated_at')
         .eq('id', item.id)
         .single();
       if (detailErr) throw detailErr;
@@ -359,7 +364,7 @@ export default function ContasReceberSection({ initialStatus }: ContasReceberSec
   };
 
   /* ─── Save via RPC ─── */
-  const save = async () => {
+  const save = async (escopo?: EscopoSerie) => {
     if (saving || salvandoRef.current) return;
     if (!form.descricao.trim() || form.valor <= 0) { toast.error('Descrição e valor obrigatórios'); return; }
     const recurrenceError = form.recorrente
@@ -368,6 +373,12 @@ export default function ContasReceberSection({ initialStatus }: ContasReceberSec
     if (recurrenceError) { toast.error(recurrenceError); return; }
     const rateioValido = rateioLines.length === 0 || Math.abs(form.valor - rateioLines.reduce((s, l) => s + Number(l.valor || 0), 0)) < 0.01;
     if (rateioLines.length > 0 && !rateioValido) { toast.error('Rateio incompleto'); return; }
+    if (editingItem && !escopo && temParcelasSeguintes(editingItem)) {
+      setEscopoSerie({ atual: Number(editingItem.parcela_atual), total: Number(editingItem.parcela_total) });
+      return;
+    }
+    // "Esta e as próximas": mesma edição, aplicada no banco também às próximas parcelas em aberto.
+    const emSerie = Boolean(editingItem) && escopo === 'serie';
 
     salvandoRef.current = true;
     setSaving(true);
@@ -407,18 +418,19 @@ export default function ContasReceberSection({ initialStatus }: ContasReceberSec
       // A chave fica com o texto digitado; o banco recebe a descrição padronizada.
       const enviado = { ...payload, p_descricao: padronizarTexto(params.p_descricao) };
 
-      const { data, error } = await (supabase.rpc as any)(editingItem ? '_guarded_update_conta_receber' : '_guarded_create_conta_receber', enviado);
+      const rpc = !editingItem ? '_guarded_create_conta_receber' : emSerie ? '_guarded_update_conta_receber_serie' : '_guarded_update_conta_receber';
+      const { data, error } = await (supabase.rpc as any)(rpc, enviado);
 
       if (error) {
         console.error('[ContasReceberSection.save]', error);
-        toast.error(traduzirErroIdempotencia(error.message) ?? error.message);
+        toast.error((emSerie ? mensagemErroEdicaoSerie(error) : null) ?? traduzirErroIdempotencia(error.message) ?? error.message);
         return;
       }
-      const result = data as SaveContaReceberResult | null;
+      const result = data as (SaveContaReceberResult & ResultadoEdicaoSerie) | null;
       const createdCount = Number(result?.lancamentos_criados) || 1;
       if (!editingItem) chavesCriacao.confirmar(params);
       toast.success(editingItem
-        ? 'Conta atualizada'
+        ? emSerie ? mensagemEdicaoSerie(result, 'recebida') : 'Conta atualizada'
         : result?.idempotente
           ? 'Esta conta a receber já estava registrada.'
           : `${createdCount} conta${createdCount > 1 ? 's' : ''} a receber criada${createdCount > 1 ? 's' : ''}`);
@@ -864,8 +876,15 @@ export default function ContasReceberSection({ initialStatus }: ContasReceberSec
         contas={contas}
         isEditing={!!editingItem}
         saving={saving}
-        onSave={save}
+        onSave={() => { void save(); }}
         onClose={guardedClose}
+      />
+
+      <EscopoSerieDialog
+        parcela={escopoSerie}
+        variant="receber"
+        onEscolher={escopo => { setEscopoSerie(null); void save(escopo); }}
+        onVoltar={() => setEscopoSerie(null)}
       />
 
       {/* Estorno */}

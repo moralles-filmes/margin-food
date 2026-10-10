@@ -35,6 +35,7 @@ import { todayBR, formatInBR } from '@/lib/datetime';
 import TableActions from '@/components/ui/TableActions';
 import ContaDetailDialog, { type ContaDetailData, type ContaDetailRateio } from './ContaDetailDialog';
 import ContaFormDialog, { type ContaFormCmv, type ContaFormData, type RateioLine } from './ContaFormDialog';
+import EscopoSerieDialog, { type EscopoSerie } from './EscopoSerieDialog';
 import { aplicarCmvSerie, fetchCmvConfig, mensagemErroCmv } from '@/hooks/useCmvFinanceiro';
 import * as XLSX from '@/lib/safeXlsx';
 import { mapFinanceiroDeleteError, mapPagamentoError } from '@/lib/financeiroErrorMap';
@@ -44,7 +45,7 @@ import DateRangePresets from './DateRangePresets';
 import SearchableSelect from '@/components/ui/SearchableSelect';
 import { buildCategoriaFilterOptions, categoriaFiltroToParams, CATEGORIA_FILTRO_TODOS } from './categoriaFiltro';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
-import { getRecurrenceValidationMessage } from '@/domain/financeiro/recurrence';
+import { getRecurrenceValidationMessage, mensagemEdicaoSerie, mensagemErroEdicaoSerie, temParcelasSeguintes, type ResultadoEdicaoSerie } from '@/domain/financeiro/recurrence';
 import { traduzirErroIdempotencia } from '@/domain/financeiro/idempotencia';
 import { useChavesPendentes } from '@/hooks/useChavesPendentes';
 import { padronizarTexto } from '@/lib/padronizarTexto';
@@ -65,6 +66,8 @@ interface ContaPagar {
   data_vencimento: string;
   categoria_id: string | null;
   updated_at: string;
+  parcela_atual?: number | null;
+  parcela_total?: number | null;
 }
 
 interface Categoria { id: string; nome: string; tipo: string; codigo: string | null; parent_id: string | null; centro_custo_padrao_id: string | null; groupLabel?: string; }
@@ -85,7 +88,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: typeof
 
 const PAGE_SIZE = 50;
 
-const CP_DETAIL_COLUMNS = 'id, descricao, fornecedor, supplier_id, valor, status, data_competencia, data_vencimento, data_pagamento, forma_pagamento, tipo_codigo_pagamento, codigo_pagamento, categoria_id, centro_custo_id, conta_id, observacoes, recorrente, recorrencia_config, parcela_total, lancamento_pai_id, updated_at';
+const CP_DETAIL_COLUMNS = 'id, descricao, fornecedor, supplier_id, valor, status, data_competencia, data_vencimento, data_pagamento, forma_pagamento, tipo_codigo_pagamento, codigo_pagamento, categoria_id, centro_custo_id, conta_id, observacoes, recorrente, recorrencia_config, parcela_atual, parcela_total, lancamento_pai_id, updated_at';
 
 type DecisoesCmv = Map<string, boolean | null>;
 /** Decisões do CMV como estavam ao abrir a edição: '' = título, demais = id da linha de rateio. */
@@ -161,6 +164,8 @@ export default function ContasPagarSection({ initialStatus }: ContasPagarSection
   const [aplicandoSerie, setAplicandoSerie] = useState(false);
   const { executar: travaSerie } = useTravaEnvio();
   const [editingItem, setEditingItem] = useState<ContaPagar | null>(null);
+  // Parcela de série em edição: pergunta, ao salvar, se a alteração vale também para as próximas.
+  const [escopoSerie, setEscopoSerie] = useState<{ atual: number; total: number } | null>(null);
   const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
 
   // Detail dialog state
@@ -455,7 +460,7 @@ export default function ContasPagarSection({ initialStatus }: ContasPagarSection
   };
 
   /* ─── Save via RPC ─── */
-  const save = async () => {
+  const save = async (escopo?: EscopoSerie) => {
     if (saving || salvandoRef.current) return;
     if (!form.descricao.trim() || form.valor <= 0) { toast.error('Descrição e valor obrigatórios'); return; }
     const paymentError = validarCodigoPagamento(form);
@@ -482,6 +487,12 @@ export default function ContasPagarSection({ initialStatus }: ContasPagarSection
         : (form.cmv_incluir ?? null) === null && (form.cmv_aviso === 'redefinido' || form.cmv_aviso === 'unificar');
       if (redefinido) { toast.error('Informe de novo se o boleto aparece no CMV financeiro'); return; }
     }
+    if (editingItem && !escopo && temParcelasSeguintes(editingItem)) {
+      setEscopoSerie({ atual: Number(editingItem.parcela_atual), total: Number(editingItem.parcela_total) });
+      return;
+    }
+    // "Esta e as próximas": mesma edição, aplicada no banco também às próximas parcelas em aberto.
+    const emSerie = Boolean(editingItem) && escopo === 'serie';
 
     let ofertaSerie: { id: string; descricao: string } | null = null;
     salvandoRef.current = true;
@@ -539,19 +550,20 @@ export default function ContasPagarSection({ initialStatus }: ContasPagarSection
       // A chave fica com o texto digitado; o banco recebe a descrição padronizada.
       const enviado = { ...payload, p_descricao: padronizarTexto(params.p_descricao) };
 
-      const { data, error } = await (supabase.rpc as any)(editingItem ? '_guarded_update_conta_pagar' : '_guarded_create_conta_pagar', enviado);
+      const rpc = !editingItem ? '_guarded_create_conta_pagar' : emSerie ? '_guarded_update_conta_pagar_serie' : '_guarded_update_conta_pagar';
+      const { data, error } = await (supabase.rpc as any)(rpc, enviado);
 
       if (error) {
         console.error('[ContasPagarSection.save]', { code: error.code });
-        toast.error(traduzirErroIdempotencia(error.message) ?? (error.message.includes('CODIGO_PAGAMENTO')
+        toast.error((emSerie ? mensagemErroEdicaoSerie(error) : null) ?? traduzirErroIdempotencia(error.message) ?? (error.message.includes('CODIGO_PAGAMENTO')
           ? 'Confira o tipo e o código de pagamento informado.'
           : /CMV_|RATEIO_NAO_FECHA/.test(error.message) ? mensagemErroCmv(error, error.message) : error.message));
         return;
       }
-      const result = data as SaveContaPagarResult | null;
+      const result = data as (SaveContaPagarResult & ResultadoEdicaoSerie) | null;
       const createdCount = Number(result?.lancamentos_criados) || 1;
       const statusMsg = editingItem
-        ? 'Conta atualizada'
+        ? emSerie ? mensagemEdicaoSerie(result, 'paga') : 'Conta atualizada'
         : result?.idempotente
           ? 'Esta conta a pagar já estava registrada.'
           : result?.status === 'AGUARDANDO_APROVACAO'
@@ -1137,8 +1149,15 @@ export default function ContasPagarSection({ initialStatus }: ContasPagarSection
         isEditing={!!editingItem}
         saving={saving}
         cmv={editingItem && !cmvLidoNaEdicao.current ? null : cmvForm}
-        onSave={save}
+        onSave={() => { void save(); }}
         onClose={guardedClose}
+      />
+
+      <EscopoSerieDialog
+        parcela={escopoSerie}
+        variant="pagar"
+        onEscolher={escopo => { setEscopoSerie(null); void save(escopo); }}
+        onVoltar={() => setEscopoSerie(null)}
       />
 
       <AlertDialog open={serieCmv !== null} onOpenChange={o => { if (!o && !aplicandoSerie) setSerieCmv(null); }}>

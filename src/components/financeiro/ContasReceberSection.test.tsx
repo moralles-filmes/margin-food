@@ -15,15 +15,24 @@ const state = vi.hoisted(() => ({
 const LEITURAS = new Set(['list_fin_contas_receber_cursor', 'get_fin_counts_by_status']);
 
 function builder(table: string) {
+  let single = false;
+  let id: string | null = null;
   const b: Record<string, unknown> = {};
   const self = () => b;
   Object.assign(b, {
-    select: self, order: self, eq: self, single: self,
+    select: self, order: self,
+    eq: (col: string, val: string) => { if (col === 'id') id = val; return b; },
+    single: () => { single = true; return b; },
     insert: () => { state.tableWrites.push(`insert:${table}`); return b; },
     update: () => { state.tableWrites.push(`update:${table}`); return b; },
     upsert: () => { state.tableWrites.push(`upsert:${table}`); return b; },
     delete: () => { state.tableWrites.push(`delete:${table}`); return b; },
-    then: (resolve: (v: unknown) => void) => Promise.resolve({ data: [], error: null }).then(resolve),
+    then: (resolve: (v: unknown) => void) => {
+      if (table === 'fin_contas_receber' && single) {
+        return Promise.resolve({ data: state.items.find(r => r.id === id) ?? null, error: null }).then(resolve);
+      }
+      return Promise.resolve({ data: [], error: null }).then(resolve);
+    },
   });
   return b;
 }
@@ -38,6 +47,9 @@ const supabase = {
     }
     if (name === 'get_fin_counts_by_status') {
       return Promise.resolve({ data: { total_pagar_pendente: 0, vencidas_pagar: 0, total_receber_pendente: 987.65, vencidas_receber: 0 }, error: null });
+    }
+    if (name === '_guarded_update_conta_receber_serie') {
+      return Promise.resolve({ data: { id: 's', parcelas_atualizadas: 2, parcelas_ignoradas: 1 }, error: null });
     }
     return Promise.resolve({ data: null, error: null });
   },
@@ -104,6 +116,32 @@ describe('Contas a Receber (V2)', () => {
     await act(async () => { fireEvent.click(confirmar); fireEvent.click(confirmar); });
     await waitFor(() => expect(escritas()).toEqual(['_guarded_estornar_conta_receber']));
     expect(state.rpcCalls.find(c => c.name === '_guarded_estornar_conta_receber')?.params).toEqual({ p_id: 'r' });
+  });
+
+  it('parcela de série: pergunta ao salvar e "Esta e as próximas" chama a RPC da série com os mesmos parâmetros', async () => {
+    state.items = [conta({ id: 's', descricao: 'Mensalidade (2/6)', parcela_atual: 2, parcela_total: 6 })];
+    render(<ContasReceberSection />);
+    const salvarComo = async (opcao: string) => {
+      fireEvent.click(await screen.findByRole('button', { name: 'Editar Mensalidade (2/6)' }));
+      fireEvent.click(within(await screen.findByRole('dialog', { name: 'Editar Conta a Receber' })).getByRole('button', { name: 'Salvar' }));
+      const escolha = await screen.findByRole('alertdialog');
+      expect(escolha).toHaveTextContent('Esta conta é a parcela 2 de 6.');
+      expect(escolha).toHaveTextContent('as já recebidas ou canceladas não mudam');
+      expect(escolha).toHaveTextContent('mesmo que tenha sido ajustado à mão');
+      expect(escolha).not.toHaveTextContent('código de pagamento');
+      expect(escolha).not.toHaveTextContent('regra de aprovação');
+      fireEvent.click(within(escolha).getByRole('button', { name: opcao }));
+    };
+
+    await salvarComo('Somente esta parcela');
+    await waitFor(() => expect(escritas()).toEqual(['_guarded_update_conta_receber']));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Editar Conta a Receber' })).not.toBeInTheDocument());
+
+    await salvarComo('Esta e as próximas');
+    await waitFor(() => expect(escritas()).toEqual(['_guarded_update_conta_receber', '_guarded_update_conta_receber_serie']));
+    expect(state.toast.success).toHaveBeenLastCalledWith('Conta atualizada, junto com 2 parcelas seguintes. 1 parcela já recebida ou cancelada ficou como estava.');
+    const [so, serie] = state.rpcCalls.filter(c => c.name.startsWith('_guarded_update_conta_receber'));
+    expect(serie.params).toEqual(so.params);
   });
 
   it('"Receber" só abre o diálogo de recebimento', async () => {
