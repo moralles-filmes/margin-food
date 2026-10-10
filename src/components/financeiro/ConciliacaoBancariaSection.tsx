@@ -46,6 +46,7 @@ import { bankLineKey, buildConciliadosCounts, findStaleImportedRows, fitidKey, t
 import { registrarOcorrenciaUsada, reservarOcorrencias, type OcorrenciasLivres } from '@/lib/conciliacaoOcorrencia';
 import { fetchCmvConfig, type CmvConfig } from '@/hooks/useCmvFinanceiro';
 import { decisaoAoTrocarCategoria, type CmvAvisoDecisao, type CmvDecisao } from '@/domain/financeiro/cmv';
+import { erroCategoriaObrigatoria } from '@/domain/financeiro/categoriaObrigatoria';
 import CmvDecisaoToggle from '@/components/financeiro/cmv/CmvDecisaoToggle';
 import ConciliacaoLinhaCmv from '@/components/financeiro/ConciliacaoLinhaCmv';
 import {
@@ -776,7 +777,8 @@ export default function ConciliacaoBancariaSection() {
     const valorFinal = editRateioLines.length > 0 ? totalRateio : editForm.valor;
     if (!valorFinal || valorFinal <= 0) { toast.error('Valor obrigatório'); return; }
     if (editRateioLines.length > 0 && !rateioValido) { toast.error(`Rateio incompleto. Ajuste os valores para totalizar ${fmt(editForm.valor)}.`); return; }
-    if (editRateioLines.length > 0 && editRateioLines.some(l => !l.categoria_id)) { toast.error('Todas as linhas de rateio precisam de categoria'); return; }
+    const erroCategoria = erroCategoriaObrigatoria({ tipo: editForm.tipo, categoriaId: editForm.categoria_id, rateio: editRateioLines });
+    if (erroCategoria) { toast.error(erroCategoria); return; }
     if (editPrevStatus === 'REALIZADO' && !editJustificativa.trim()) {
       toast.error('Justificativa obrigatória para edição de lançamento REALIZADO.');
       return;
@@ -1837,8 +1839,9 @@ export default function ConciliacaoBancariaSection() {
       toast.error(`Rateio incompleto. Diferença: ${fmt(valorTotal - totalRateio)}`);
       return;
     }
-    if (rateioLinhas.some(l => !l.categoria_id)) {
-      toast.error('Todas as linhas do rateio precisam ter uma categoria.');
+    const erroCategoria = erroCategoriaObrigatoria({ rateio: rateioLinhas });
+    if (erroCategoria) {
+      toast.error(erroCategoria);
       return;
     }
     setLinhas(prev => prev.map((l, i) => i === rateioDialog.linhaIndex ? { ...l, rateioLinhas: [...rateioLinhas] } : l));
@@ -2246,10 +2249,10 @@ export default function ConciliacaoBancariaSection() {
       return;
     }
 
-    const novasSemCategoria = toImport.filter(l => {
-      if (l.categoriaId) return false;
-      return !l.rateioLinhas?.length || l.rateioLinhas.some(r => !r.categoria_id);
-    });
+    // Mesma ordem do buildRateioPayload: com rateio, o que vai para a RPC são as linhas dele.
+    const novasSemCategoria = toImport.filter(l => erroCategoriaObrigatoria({
+      categoriaId: l.categoriaId, rateio: l.rateioLinhas ?? [],
+    }) !== null);
     if (novasSemCategoria.length > 0) {
       toast.error(`${novasSemCategoria.length} linha(s) selecionada(s) estão sem categoria. Selecione a categoria antes de processar.`);
       return;

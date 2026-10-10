@@ -47,6 +47,7 @@ import { buildCategoriaFilterOptions, categoriaFiltroToParams, CATEGORIA_FILTRO_
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { getRecurrenceValidationMessage, mensagemEdicaoSerie, mensagemErroEdicaoSerie, temParcelasSeguintes, type ResultadoEdicaoSerie } from '@/domain/financeiro/recurrence';
 import { traduzirErroIdempotencia } from '@/domain/financeiro/idempotencia';
+import { erroCategoriaObrigatoria } from '@/domain/financeiro/categoriaObrigatoria';
 import { useChavesPendentes } from '@/hooks/useChavesPendentes';
 import { padronizarTexto } from '@/lib/padronizarTexto';
 import { useTravaEnvio } from '@/hooks/useTravaEnvio';
@@ -471,6 +472,8 @@ export default function ContasPagarSection({ initialStatus }: ContasPagarSection
     if (recurrenceError) { toast.error(recurrenceError); return; }
     const rateioValido = rateioLines.length === 0 || Math.abs(form.valor - rateioLines.reduce((s, l) => s + Number(l.valor || 0), 0)) < 0.01;
     if (rateioLines.length > 0 && !rateioValido) { toast.error('Rateio incompleto'); return; }
+    const erroCategoria = erroCategoriaObrigatoria({ categoriaId: form.categoria_id, rateio: rateioLines });
+    if (erroCategoria) { toast.error(erroCategoria); return; }
     // Edição aberta antes de o CMV carregar não leu as decisões: segue como cliente antigo (o servidor preserva).
     const enviaCmv = Boolean(cmvForm) && (!editingItem || cmvLidoNaEdicao.current);
     // Boleto novo com a classificação ativa precisa da decisão explícita (o servidor também exige).

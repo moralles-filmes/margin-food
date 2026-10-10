@@ -302,3 +302,16 @@ describe('Lançamentos — "Aparecer no CMV financeiro?"', () => {
     expect(salvar()).toBeEnabled();
   });
 });
+
+describe('Rateio — categoria em todas as linhas', () => {
+  it('linha sem categoria fica à vista e o rateio só aparece fechado com todas preenchidas', () => {
+    render(<Form cmv={null} initial={{ ...base, valor: 100 }} linhas={[linha('a', 'peixes', 60, null), linha('b', '', 40, null)]} />);
+    expect(screen.getByRole('columnheader', { name: 'Categoria *' })).toBeInTheDocument();
+    expect(screen.getByText('Selecione a categoria em todas as linhas do rateio')).toBeInTheDocument();
+    expect(screen.queryByText('Rateio fechado')).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getAllByLabelText('Categoria')[1], { target: { value: 'escritorio' } });
+    expect(screen.queryByText('Selecione a categoria em todas as linhas do rateio')).not.toBeInTheDocument();
+    expect(screen.getByText('Rateio fechado')).toBeInTheDocument();
+  });
+});

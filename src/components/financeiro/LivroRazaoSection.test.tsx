@@ -468,3 +468,45 @@ describe('Livro Razão — abrir o lançamento vindo do CMV', () => {
     expect(detalhe.props?.open ?? false).toBe(false);
   });
 });
+
+describe('Livro Razão — categoria obrigatória', () => {
+  const abrir = async (botao: RegExp) => {
+    render(<LivroRazaoSection initialDateFrom="2026-03-01" initialDateTo="2026-03-31" />);
+    fireEvent.click(await screen.findByRole('button', { name: botao }));
+    await waitFor(() => expect(formulario.props).not.toBeNull());
+  };
+  const salvar = async (campos: Record<string, unknown>, rateio?: Record<string, unknown>[]) => {
+    if (rateio) act(() => formulario.props!.onRateioLinesChange(rateio));
+    act(() => formulario.props!.onFormChange({ ...formulario.props!.form, ...campos }));
+    await act(async () => { await formulario.props!.onSave(); });
+  };
+  const linha = (key: string, categoria_id: string, valor: number) => ({ key, categoria_id, centro_custo_id: '', valor, percentual: 50 });
+
+  it('despesa sem categoria e sem rateio não grava', async () => {
+    await abrir(/Nova Despesa/);
+    await salvar({ descricao: 'PIX arroz', valor: 55, categoria_id: '' });
+    expect(chamada('_guarded_upsert_lancamento')).toBeUndefined();
+    expect(state.toast.error).toHaveBeenCalledWith('Selecione uma categoria.');
+  });
+
+  it('rateio com uma linha sem categoria não grava, mesmo com categoria no cabeçalho', async () => {
+    await abrir(/Nova Receita/);
+    await salvar({ descricao: 'Venda', valor: 50, categoria_id: 'cat-venda' }, [linha('r1', 'cat-venda', 25), linha('r2', '', 25)]);
+    expect(chamada('_guarded_upsert_lancamento')).toBeUndefined();
+    expect(state.toast.error).toHaveBeenCalledWith('Selecione a categoria da linha 2 do rateio.');
+  });
+
+  it('rateio com categoria em todas as linhas grava as linhas', async () => {
+    await abrir(/Nova Despesa/);
+    await salvar({ descricao: 'PIX arroz', valor: 50, categoria_id: '' }, [linha('r1', 'cat-a', 25), linha('r2', 'cat-b', 25)]);
+    expect(state.toast.error).not.toHaveBeenCalled();
+    expect((chamada('_guarded_upsert_lancamento')?.p_rateios as unknown[]) ?? []).toHaveLength(2);
+  });
+
+  it('transferência continua sem categoria', async () => {
+    await abrir(/Nova Transferência/);
+    await salvar({ descricao: 'Entre contas', valor: 100, conta_id: 'c1', conta_destino_id: 'c2', categoria_id: '' });
+    expect(state.toast.error).not.toHaveBeenCalled();
+    expect(chamada('create_transfer')).toMatchObject({ p_valor: 100, p_conta_origem: 'c1', p_conta_destino: 'c2' });
+  });
+});

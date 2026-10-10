@@ -38,6 +38,7 @@ import MonthNavigator, { monthBounds } from './MonthNavigator';
 import SearchableSelect from '@/components/ui/SearchableSelect';
 import { buildCategoriaFilterOptions, categoriaFiltroToParams, CATEGORIA_FILTRO_TODOS } from './categoriaFiltro';
 import { traduzirErroIdempotencia } from '@/domain/financeiro/idempotencia';
+import { erroCategoriaObrigatoria } from '@/domain/financeiro/categoriaObrigatoria';
 import { useChavesPendentes } from '@/hooks/useChavesPendentes';
 import { FinKpiGrid, FinNote, FinScreenHeader, FinSectionGroup } from './finV2Layout';
 import {
@@ -725,7 +726,8 @@ export default function LivroRazaoSection({ initialContaId, initialDateFrom, ini
     const valorFinal = rateioLines.length > 0 ? totalRateio : form.valor;
     if (!valorFinal || valorFinal <= 0) { toast.error('Valor obrigatório'); return; }
     if (rateioLines.length > 0 && !rateioValido) { toast.error(`Rateio incompleto. Ajuste os valores para totalizar ${fmt(form.valor)}.`); return; }
-    if (rateioLines.length > 0 && rateioLines.some(l => !l.categoria_id)) { toast.error('Todas as linhas de rateio precisam de categoria'); return; }
+    const erroCategoria = erroCategoriaObrigatoria({ tipo: form.tipo, categoriaId: form.categoria_id, rateio: rateioLines });
+    if (erroCategoria) { toast.error(erroCategoria); return; }
 
     if (editId && editPrevStatus === 'REALIZADO' && !justificativa.trim()) {
       toast.error('Justificativa obrigatória para edição de lançamento REALIZADO.');

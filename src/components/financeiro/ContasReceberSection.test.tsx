@@ -119,7 +119,7 @@ describe('Contas a Receber (V2)', () => {
   });
 
   it('parcela de série: pergunta ao salvar e "Esta e as próximas" chama a RPC da série com os mesmos parâmetros', async () => {
-    state.items = [conta({ id: 's', descricao: 'Mensalidade (2/6)', parcela_atual: 2, parcela_total: 6 })];
+    state.items = [conta({ id: 's', descricao: 'Mensalidade (2/6)', parcela_atual: 2, parcela_total: 6, categoria_id: 'cat-eventos' })];
     render(<ContasReceberSection />);
     const salvarComo = async (opcao: string) => {
       fireEvent.click(await screen.findByRole('button', { name: 'Editar Mensalidade (2/6)' }));
@@ -149,6 +149,25 @@ describe('Contas a Receber (V2)', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Receber Sinal atrasado' }));
     const dialogo = await screen.findByRole('dialog', { name: 'Registrar recebimento' });
     expect(within(dialogo).getByLabelText('Data do recebimento')).toBeInTheDocument();
+    expect(escritas()).toEqual([]);
+  });
+});
+
+describe('Contas a Receber — categoria obrigatória', () => {
+  it('com o rateio ligado, a linha sem categoria não grava', async () => {
+    render(<ContasReceberSection />);
+    await screen.findByText('Sinal atrasado');
+    fireEvent.click(screen.getByRole('button', { name: /Nova Conta/ }));
+    const dialogo = await screen.findByRole('dialog', { name: 'Nova receita' });
+    fireEvent.change(within(dialogo).getByLabelText('Descrição *'), { target: { value: 'Evento corporativo' } });
+    const valor = within(dialogo).getByLabelText('Valor *');
+    fireEvent.focus(valor);
+    fireEvent.change(valor, { target: { value: '100,00' } });
+    fireEvent.blur(valor);
+    fireEvent.click(within(dialogo).getByRole('switch', { name: 'Habilitar rateio' }));
+
+    await act(async () => { fireEvent.click(within(dialogo).getByRole('button', { name: 'Salvar' })); });
+    expect(state.toast.error).toHaveBeenCalledWith('Selecione a categoria da linha 1 do rateio.');
     expect(escritas()).toEqual([]);
   });
 });
