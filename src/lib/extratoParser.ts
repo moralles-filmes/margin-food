@@ -15,8 +15,11 @@
  *  - FITID nunca vira descrição (Santander/PagBank regeneram o FITID a cada download);
  *  - sinal do valor derivado de <TRNTYPE> quando o banco exporta tudo positivo;
  *  - separador decimal vs. milhar resolvido por número de casas;
- *  - arquivo com mais de uma conta é sinalizado em vez de misturado.
+ *  - arquivo com mais de uma conta é sinalizado em vez de misturado;
+ *  - linha que só informa o saldo (Itaú) é descartada, com aviso.
  */
+
+import { normalizeSearchText } from '@/lib/utils';
 
 interface ExtratoLinha {
   data: string;       // ISO yyyy-MM-dd
@@ -86,6 +89,64 @@ export function decodeExtratoBuffer(buffer: ArrayBuffer): string {
   } catch {
     return utf8;
   }
+}
+
+/* ───────── Linhas informativas de saldo ───────── */
+
+/**
+ * Descrições que o banco grava no extrato como se fossem transação, mas que só
+ * informam o saldo. O Itaú emite no OFX um <STMTTRN> CREDIT por dia com o saldo
+ * do dia no TRNAMT, mais um SALDO ANTERIOR na véspera do período — importadas,
+ * viravam receita falsa (AOI Sushi, 2026-10-10: R$ 12.875,92 em 8 linhas).
+ * Igualdade exata, sem acento/caixa: um prefixo "saldo" esconderia movimento real.
+ */
+const DESCRICOES_SALDO_DIA = new Set(['saldo total disponivel dia', 'saldo do dia']);
+const DESCRICOES_SALDO_ANTERIOR = new Set(['saldo anterior']);
+
+type LinhaSaldo = 'dia' | 'anterior';
+
+function classificarLinhaSaldo(descricao: string): LinhaSaldo | null {
+  const chave = normalizeSearchText(descricao).replace(/\s+/g, ' ');
+  if (DESCRICOES_SALDO_DIA.has(chave)) return 'dia';
+  if (DESCRICOES_SALDO_ANTERIOR.has(chave)) return 'anterior';
+  return null;
+}
+
+function avisoLinhasSaldo(descricoes: string[]): string {
+  const n = descricoes.length;
+  const nomes = Array.from(new Set(descricoes)).join(', ');
+  return n === 1
+    ? `1 linha de saldo informada pelo banco (${nomes}) foi desconsiderada — saldo não é movimentação.`
+    : `${n} linhas de saldo informadas pelo banco (${nomes}) foram desconsideradas — saldo não é movimentação.`;
+}
+
+/**
+ * Saldo do último dia do extrato, quando ele fecha no centavo com o SALDO
+ * ANTERIOR + os movimentos do arquivo. O LEDGERBAL do Itaú é o saldo no momento
+ * do download e inclui movimento do dia que ainda não está no arquivo — sugerido
+ * na conferência, acusava divergência sem haver erro de conciliação. Se o banco
+ * embutir limite ou aplicação no saldo, a conta não fecha e o LEDGERBAL continua.
+ */
+function saldoDoUltimoDiaConferido(
+  saldos: ReadonlyArray<{ data: string; valor: number; saldo: LinhaSaldo }>,
+  linhas: ReadonlyArray<ExtratoLinha>,
+): { valor: number; data: string } | undefined {
+  const anterior = saldos.find(s => s.saldo === 'anterior');
+  const ultimo = saldos
+    .filter(s => s.saldo === 'dia')
+    .reduce<(typeof saldos)[number] | undefined>((acc, s) => (!acc || s.data > acc.data ? s : acc), undefined);
+  if (!anterior || !ultimo) return undefined;
+  // Movimento depois do último saldo diário não está coberto por ele.
+  if (linhas.some(l => l.data > ultimo.data)) return undefined;
+
+  const centavos = (v: number) => Math.round(v * 100);
+  const movimento = linhas.reduce(
+    (soma, l) => soma + (l.tipo === 'RECEITA' ? centavos(l.valor) : -centavos(l.valor)),
+    0,
+  );
+  return centavos(anterior.valor) + movimento === centavos(ultimo.valor)
+    ? { valor: ultimo.valor, data: ultimo.data }
+    : undefined;
 }
 
 /* ───────── OFX/QFX/OFC parser ───────── */
@@ -270,24 +331,39 @@ function parseOFX(text: string): ExtratoParseResult {
     });
   }
 
+  // Linhas que só informam o saldo saem antes de decidir o sinal: o saldo de
+  // uma conta no vermelho vem negativo e não pode decidir o sentido das demais.
+  const saldosInformados: (TransacaoCrua & { saldo: LinhaSaldo })[] = [];
+  const movimentos: TransacaoCrua[] = [];
+  for (const t of crus) {
+    const saldo = classificarLinhaSaldo(t.descricao);
+    if (saldo) saldosInformados.push({ ...t, saldo });
+    else movimentos.push(t);
+  }
+  if (saldosInformados.length > 0) {
+    avisos.push(avisoLinhasSaldo(saldosInformados.map(s => s.descricao)));
+  }
+
   // 2ª passada: definir receita/despesa. Parte dos bancos exporta TRNAMT sempre
   // positivo e deixa o sentido só em <TRNTYPE> — lido pelo sinal, o extrato
   // inteiro viraria receita. Só recorremos ao TRNTYPE quando NENHUMA linha do
   // arquivo tem valor negativo (prova de que o banco não usa sinal); havendo
   // qualquer negativo, o sinal é a fonte da verdade.
-  const algumNegativo = crus.some(t => t.valor < 0);
-  const usarTrnType = !algumNegativo && crus.some(t => TRNTYPE_DEBITO.has(t.trnType));
+  const algumNegativo = movimentos.some(t => t.valor < 0);
+  const usarTrnType = !algumNegativo && movimentos.some(t => TRNTYPE_DEBITO.has(t.trnType));
   if (usarTrnType) {
     avisos.push('O banco exportou todos os valores sem sinal — o sentido de cada lançamento foi deduzido do tipo da transação (TRNTYPE). Confira as despesas.');
   }
 
-  const linhas: ExtratoLinha[] = crus.map(t => ({
+  const linhas: ExtratoLinha[] = movimentos.map(t => ({
     data: t.data,
     descricao: t.descricao,
     valor: Math.abs(t.valor),
     tipo: (usarTrnType ? TRNTYPE_DEBITO.has(t.trnType) : t.valor < 0) ? 'DESPESA' : 'RECEITA',
     fitId: t.fitId,
   }));
+
+  saldoFinalArquivo = saldoDoUltimoDiaConferido(saldosInformados, linhas) ?? saldoFinalArquivo;
 
   return { linhas, conta, saldoFinalArquivo, avisos };
 }
@@ -347,6 +423,7 @@ function parseCSV(text: string): ExtratoParseResult {
   }
 
   // Transações
+  const saldosDescartados: string[] = [];
   for (const line of rawLines) {
     if (!line.trim()) continue;
     const parts = splitCSVLine(line);
@@ -384,6 +461,10 @@ function parseCSV(text: string): ExtratoParseResult {
     }
 
     if (valor === 0) continue;
+    if (classificarLinhaSaldo(descricao)) {
+      saldosDescartados.push(descricao);
+      continue;
+    }
     linhas.push({
       data,
       descricao: descricao || 'Sem descrição',
@@ -391,6 +472,8 @@ function parseCSV(text: string): ExtratoParseResult {
       tipo: valor > 0 ? 'RECEITA' : 'DESPESA',
     });
   }
+
+  if (saldosDescartados.length > 0) avisos.push(avisoLinhasSaldo(saldosDescartados));
 
   return { linhas, conta, avisos };
 }

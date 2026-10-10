@@ -339,3 +339,135 @@ describe('parseExtrato — ACCTID de conta destino não conta como segunda conta
     expect(parseExtrato('e.ofx', comDestino).avisos.some(a => a.includes('contas diferentes'))).toBe(false);
   });
 });
+
+// Layout do OFX do Itaú (mais novo primeiro): cada dia abre com uma linha que só
+// informa o saldo, e o período fecha com o SALDO ANTERIOR. Valores sintéticos.
+// Sem o sufixo de fuso que o Itaú põe nas datas (colchetes com "-03" e "EST"):
+// o Tailwind varre os .ts de src/, lê o sufixo como classe arbitrária e o CSS
+// inválido gerado quebra o build. O parser só lê os 8 primeiros dígitos.
+const itauTrn = (dia: string, valor: string, fitId: string, memo: string, tipo = valor.startsWith('-') ? 'DEBIT' : 'CREDIT') => `<STMTTRN>
+<TRNTYPE>${tipo}
+<DTPOSTED>${dia}100000
+<TRNAMT>${valor}
+<FITID>${fitId}
+<CHECKNUM>${fitId}
+<MEMO>${memo}
+</STMTTRN>`;
+
+const ofxItau = (transacoes: string[], ledger = { valor: '90.00', dia: '20261003' }) => `OFXHEADER:100
+DATA:OFXSGML
+<OFX>
+<BANKMSGSRSV1>
+<STMTTRNRS>
+<STMTRS>
+<CURDEF>BRL
+<BANKACCTFROM>
+<BANKID>0341
+<ACCTID>0242988228
+<ACCTTYPE>CHECKING
+</BANKACCTFROM>
+<BANKTRANLIST>
+<DTSTART>20261001100000
+<DTEND>20261003100000
+${transacoes.join('\n')}
+</BANKTRANLIST>
+<LEDGERBAL>
+<BALAMT>${ledger.valor}
+<DTASOF>${ledger.dia}100000
+</LEDGERBAL>
+</STMTRS>
+</STMTTRNRS>
+</BANKMSGSRSV1>
+</OFX>`;
+
+const ITAU_DIA_02 = [
+  itauTrn('20261002', '250.00', '20261002001', 'SALDO TOTAL DISPONÍVEL DIA'),
+  itauTrn('20261002', '-50.00', '20261002002', 'COMPRA NO DEBITO PADARIA'),
+  itauTrn('20261002', '100.00', '20261002003', 'PIX RECEBIDO CLIENTE'),
+];
+const ITAU_DIA_01 = [
+  itauTrn('20261001', '200.00', '20261001001', 'SALDO TOTAL DISPONÍVEL DIA'),
+  itauTrn('20261001', '300.00', '20261001002', 'PIX RECEBIDO CLIENTE'),
+  itauTrn('20261001', '-100.00', '20261001003', 'TAR PACOTE'),
+];
+const ITAU_SALDO_ANTERIOR = itauTrn('20260930', '0.00', '20260930001', 'SALDO ANTERIOR');
+const ITAU_PADRAO = [...ITAU_DIA_02, ...ITAU_DIA_01, ITAU_SALDO_ANTERIOR];
+
+describe('parseExtrato — linhas de saldo informativas (Itaú)', () => {
+  it('descarta SALDO TOTAL DISPONÍVEL DIA e SALDO ANTERIOR e avisa quantas saíram', () => {
+    // Caso real (AOI Sushi, 2026-10-10): as 8 linhas de saldo entravam como RECEITA.
+    const result = parseExtrato('itau.ofx', ofxItau(ITAU_PADRAO));
+    expect(result.linhas.map(l => l.descricao)).toEqual([
+      'COMPRA NO DEBITO PADARIA', 'PIX RECEBIDO CLIENTE', 'PIX RECEBIDO CLIENTE', 'TAR PACOTE',
+    ]);
+    expect(result.avisos).toEqual([
+      '3 linhas de saldo informadas pelo banco (SALDO TOTAL DISPONÍVEL DIA, SALDO ANTERIOR) foram desconsideradas — saldo não é movimentação.',
+    ]);
+  });
+
+  it('reconhece a descrição sem acento e com outra caixa', () => {
+    const variantes = ofxItau(ITAU_PADRAO)
+      .replace('<MEMO>SALDO TOTAL DISPONÍVEL DIA', '<MEMO>Saldo do dia')
+      .replace('<MEMO>SALDO TOTAL DISPONÍVEL DIA', '<MEMO>SALDO TOTAL DISPONIVEL DIA');
+    const result = parseExtrato('itau.ofx', variantes);
+    expect(result.linhas).toHaveLength(4);
+    expect(result.linhas.some(l => /saldo/i.test(l.descricao))).toBe(false);
+  });
+
+  it('mantém movimento que só contém a palavra SALDO', () => {
+    const comResgate = [itauTrn('20261002', '80.00', '20261002004', 'RESGATE SALDO APLIC'), ...ITAU_PADRAO];
+    const result = parseExtrato('itau.ofx', ofxItau(comResgate));
+    expect(result.linhas.map(l => l.descricao)).toContain('RESGATE SALDO APLIC');
+  });
+
+  it('sugere o saldo do último dia quando fecha com SALDO ANTERIOR + movimentos', () => {
+    // O LEDGERBAL (R$ 90 em 03/10) inclui movimento do dia do download que não
+    // está no arquivo; a conferência pelo último dia listado fecha no centavo.
+    const result = parseExtrato('itau.ofx', ofxItau(ITAU_PADRAO));
+    expect(result.saldoFinalArquivo).toEqual({ valor: 250, data: '2026-10-02' });
+  });
+
+  it('mantém o LEDGERBAL quando o saldo diário não fecha com os movimentos', () => {
+    // Saldo com limite ou aplicação embutidos não é o saldo da conta.
+    const comLimite = ofxItau(ITAU_PADRAO).replace('<TRNAMT>250.00', '<TRNAMT>1250.00');
+    expect(parseExtrato('itau.ofx', comLimite).saldoFinalArquivo).toEqual({ valor: 90, data: '2026-10-03' });
+  });
+
+  it('mantém o LEDGERBAL quando há movimento depois do último saldo diário', () => {
+    const comDia03 = [itauTrn('20261003', '-160.00', '20261003001', 'PIX ENVIADO FORNECEDOR'), ...ITAU_PADRAO];
+    expect(parseExtrato('itau.ofx', ofxItau(comDia03)).saldoFinalArquivo).toEqual({ valor: 90, data: '2026-10-03' });
+  });
+
+  it('mantém o LEDGERBAL quando o arquivo não traz o SALDO ANTERIOR', () => {
+    const semAnterior = [...ITAU_DIA_02, ...ITAU_DIA_01];
+    expect(parseExtrato('itau.ofx', ofxItau(semAnterior)).saldoFinalArquivo).toEqual({ valor: 90, data: '2026-10-03' });
+  });
+
+  it('saldo negativo não desliga a dedução do sentido pelo TRNTYPE', () => {
+    // Banco sem sinal nos movimentos: só o saldo da conta no vermelho vem negativo.
+    const semSinal = ofxItau([
+      itauTrn('20261001', '-70.00', '20261001001', 'SALDO DO DIA', 'DEBIT'),
+      itauTrn('20261001', '100.00', '20261001002', 'TAR PACOTE', 'DEBIT'),
+      itauTrn('20261001', '30.00', '20261001003', 'PIX RECEBIDO CLIENTE', 'CREDIT'),
+    ]);
+    const result = parseExtrato('itau.ofx', semSinal);
+    expect(result.linhas.map(l => [l.descricao, l.tipo])).toEqual([
+      ['TAR PACOTE', 'DESPESA'],
+      ['PIX RECEBIDO CLIENTE', 'RECEITA'],
+    ]);
+  });
+
+  it('CSV: descarta as linhas de saldo e avisa, sem popular saldoFinalArquivo', () => {
+    const csv = [
+      '09/10/2026;SALDO ANTERIOR;1.000,00',
+      '09/10/2026;PIX RECEBIDO CLIENTE;150,00',
+      '09/10/2026;SALDO DO DIA;1.150,00',
+    ].join('\n');
+    const result = parseExtrato('itau.csv', csv);
+    expect(result.linhas.map(l => l.descricao)).toEqual(['PIX RECEBIDO CLIENTE']);
+    expect(result.avisos).toEqual([
+      '2 linhas de saldo informadas pelo banco (SALDO ANTERIOR, SALDO DO DIA) foram desconsideradas — saldo não é movimentação.',
+    ]);
+    expect(result.saldoFinalArquivo).toBeUndefined();
+  });
+});
